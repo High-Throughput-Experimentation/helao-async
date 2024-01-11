@@ -651,7 +651,15 @@ class HelaoSyncer:
                             f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                         )
                         self.base.print_message("Parsing hlo dicts.")
-                        file_meta, file_data = read_hlo(sp)
+                        try:
+                            file_meta, file_data = read_hlo(sp)
+                        except Exception as err:
+                            str_err = "".join(
+                                traceback.format_exception(type(err), err, err.__traceback__)
+                            )
+                            self.base.print_message(str_err)
+                            file_meta = {}
+                            file_data = {}
                         msg = {"meta": file_meta, "data": file_data}
                     else:
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}"

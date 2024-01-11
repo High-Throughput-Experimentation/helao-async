@@ -116,73 +116,74 @@ class HelaoAnalysisSyncer:
             analysis_params = {}
         eua = self.ana_funcs[analysis_name](process_uuid, process_df, analysis_params)
         # self.base.print_message("calculating analysis output")
-        eua.calc_output()
-        # self.base.print_message("exporting analysis output")
-        model_dict, output_dict = eua.export_analysis(
-            analysis_name=analysis_name,
-            bucket=self.bucket,
-            region=self.region,
-            dummy=self.world_config.get("dummy", True),
-        )
-        process_dict = pgs3.LOADER.get_pro(process_uuid, hmod=False)
-        if process_dict.get("data_request_id", None) is not None:
-            model_dict["data_request_id"] = process_dict["data_request_id"]
-        ana_tsstr = model_dict.get(
-            "analysis_timestamp", set_time().strftime("%Y-%m-%d %H:%M:%S.%f")
-        )
-        ana_ts = datetime.strptime(ana_tsstr, "%Y-%m-%d %H:%M:%S.%f")
-        HMS = ana_ts.strftime("%H%M%S")
-        year_week = ana_ts.strftime("%y.%U")
-        analysis_day = ana_ts.strftime("%Y%m%d")
-        local_ana_dir = os.path.join(
-            self.local_ana_root, year_week, analysis_day, f"{HMS}__{analysis_name}"
-        )
-        os.makedirs(local_ana_dir, exist_ok=True)
-        with open(os.path.join(local_ana_dir, f"{eua.analysis_uuid}.yml"), "w") as f:
-            f.write(yml_dumps(model_dict))
-
-        s3_model_target = f"analysis/{eua.analysis_uuid}.json"
-
-        if not self.config_dict.get("local_only", False):
-            self.base.print_message("uploading analysis model to S3 bucket")
-            try:
-                s3_model_success = await self.to_s3(model_dict, s3_model_target)
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                print(tb)
-        else:
-            s3_model_success = True
-            self.base.print_message(
-                "Analysis server config set to local_only, skipping S3/API push."
+        calc_result = eua.calc_output()
+        if calc_result:
+            # self.base.print_message("exporting analysis output")
+            model_dict, output_dict = eua.export_analysis(
+                analysis_name=analysis_name,
+                bucket=self.bucket,
+                region=self.region,
+                dummy=self.world_config.get("dummy", True),
             )
-
-        outputs = model_dict.get("outputs", [])
-        output_successes = []
-        # self.base.print_message("uploading analysis outputs to S3 bucket")
-        for output in outputs:
-            s3_dict_keys = output["output_keys"]
-            s3_dict = {k: v for k, v in output_dict.items() if k in s3_dict_keys}
-            s3_output_target = output["analysis_output_path"]["key"]
-            local_json_out = os.path.join(
-                local_ana_dir, os.path.basename(s3_output_target)
+            process_dict = pgs3.LOADER.get_prc(process_uuid, hmod=False)
+            if process_dict.get("data_request_id", None) is not None:
+                model_dict["data_request_id"] = process_dict["data_request_id"]
+            ana_tsstr = model_dict.get(
+                "analysis_timestamp", set_time().strftime("%Y-%m-%d %H:%M:%S.%f")
             )
-            with open(local_json_out, "w") as f:
-                json.dump(s3_dict, f)
+            ana_ts = datetime.strptime(ana_tsstr, "%Y-%m-%d %H:%M:%S.%f")
+            HMS = ana_ts.strftime("%H%M%S")
+            year_week = ana_ts.strftime("%y.%U")
+            analysis_day = ana_ts.strftime("%Y%m%d")
+            local_ana_dir = os.path.join(
+                self.local_ana_root, year_week, analysis_day, f"{HMS}__{analysis_name}"
+            )
+            os.makedirs(local_ana_dir, exist_ok=True)
+            with open(os.path.join(local_ana_dir, f"{eua.analysis_uuid}.yml"), "w") as f:
+                f.write(yml_dumps(model_dict))
+
+            s3_model_target = f"analysis/{eua.analysis_uuid}.json"
+
             if not self.config_dict.get("local_only", False):
-                s3_success = await self.to_s3(s3_dict, s3_output_target)
+                self.base.print_message("uploading analysis model to S3 bucket")
+                try:
+                    s3_model_success = await self.to_s3(model_dict, s3_model_target)
+                except Exception as e:
+                    tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                    print(tb)
             else:
-                s3_success = True
-            output_successes.append(s3_success)
-        s3_output_success = all(output_successes)
+                s3_model_success = True
+                self.base.print_message(
+                    "Analysis server config set to local_only, skipping S3/API push."
+                )
 
-        # api_success = await self.to_api(model_dict)
-        api_success = True
+            outputs = model_dict.get("outputs", [])
+            output_successes = []
+            # self.base.print_message("uploading analysis outputs to S3 bucket")
+            for output in outputs:
+                s3_dict_keys = output["output_keys"]
+                s3_dict = {k: v for k, v in output_dict.items() if k in s3_dict_keys}
+                s3_output_target = output["analysis_output_path"]["key"]
+                local_json_out = os.path.join(
+                    local_ana_dir, os.path.basename(s3_output_target)
+                )
+                with open(local_json_out, "w") as f:
+                    json.dump(s3_dict, f)
+                if not self.config_dict.get("local_only", False):
+                    s3_success = await self.to_s3(s3_dict, s3_output_target)
+                else:
+                    s3_success = True
+                output_successes.append(s3_success)
+            s3_output_success = all(output_successes)
 
-        if s3_model_success and s3_output_success and api_success:
-            self.base.print_message(f"Successfully synced {eua.analysis_uuid}")
-            return True
+            # api_success = await self.to_api(model_dict)
+            api_success = True
 
-        self.base.print_message(f"Analysis {eua.analysis_uuid} sync failed.")
+            if s3_model_success and s3_output_success and api_success:
+                self.base.print_message(f"Successfully synced {eua.analysis_uuid}")
+                return True
+
+        self.base.print_message(f"Analysis {eua.analysis_uuid} sync failed for process_uuid {process_uuid}.", warning=True)
         self.running_tasks.pop(str(process_uuid))
         return False
 
@@ -282,9 +283,9 @@ class HelaoAnalysisSyncer:
     ):
         """Generate list of EcheUvisAnalysis from sequence or plate_id (latest seq)."""
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
-        min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2023-04-26"
-        df = pgs3.LOADER.get_recent(
-            query=SDCUVIS_QUERY, min_date=min_date, plate_id=plate_id
+        # min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2024-01-01"
+        df = pgs3.LOADER.get_sequence(
+            query=SDCUVIS_QUERY, sequence_uuid=str(sequence_uuid)
         )
 
         ## patch erroneous plate_ids here
@@ -309,6 +310,7 @@ class HelaoAnalysisSyncer:
             pdf.query("experiment_name=='ECHEUVIS_sub_CA_led'")
             .query("run_use=='data'")
             .query("action_name=='acquire_spec_extrig'")
+            # .query("action_name=='acquire_spec_adv'")
         )
         for puuid in eudf.process_uuid:
             await self.enqueue_calc(

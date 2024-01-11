@@ -193,6 +193,9 @@ class DryUvisAnalysis(EcheUvisAnalysis):
         rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
         btup = parse_spechlo(self.inputs.insitu_spec)
 
+        if any([x is False for x in rdtups + rltups + [btup]]):
+            return False
+
         ap = self.analysis_params
         aggfunc = np.mean if ap["agg_method"] == "mean" else np.median
         wl = btup[0]
@@ -270,3 +273,4 @@ class DryUvisAnalysis(EcheUvisAnalysis):
             insitu_min_rescaled=insitu_min_rscl,
             insitu_max_rescaled=insitu_max_rscl,
         )
+        return True

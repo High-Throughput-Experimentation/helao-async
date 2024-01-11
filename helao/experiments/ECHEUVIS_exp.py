@@ -64,7 +64,7 @@ def ECHEUVIS_sub_shutdown(experiment: Experiment):
 
 def ECHEUVIS_sub_CV_led(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 6,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -99,7 +99,7 @@ def ECHEUVIS_sub_CV_led(
     toggle2_period: float = 2.0,
     toggle2_time: float = -1,
     spec_int_time_ms: float = 15,
-    spec_n_avg: int = 1,
+    spec_n_avg: int = 10,
     spec_technique: str = "T_UVVIS",
     comment: str = "",
 ):
@@ -171,6 +171,25 @@ def ECHEUVIS_sub_CV_led(
         ],
     )
 
+    # apm.add(ORCH_server, "wait", {"waittime": 5})
+    
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": True,
+    #     },
+    # )
+
+    apm.add(
+        CAM_server,
+        "acquire_image",
+        {"duration": min(CV_duration_sec, 10), "acqusition_rate": 0.5},
+        start_condition=ActionStartCondition.no_wait,
+        nonblocking=True,
+    )
+
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
             ss,
@@ -188,14 +207,25 @@ def ECHEUVIS_sub_CV_led(
                 ProcessContrib.samples_out,
             ],
         )
-
-    apm.add(
-        CAM_server,
-        "acquire_image",
-        {"duration": min(CV_duration_sec, 10), "acqusition_rate": 0.5},
-        start_condition=ActionStartCondition.no_wait,
-        nonblocking=True,
-    )
+        # apm.add(
+        #     ss,
+        #     "acquire_spec_adv",
+        #     {
+        #         "int_time_ms": apm.pars.spec_int_time_ms,
+        #         "n_avg": apm.pars.spec_n_avg,
+        #         "duration_sec": apm.pars.toggle2_time,
+        #     },
+        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        #     run_use="data",
+        #     technique_name=apm.pars.spec_technique,
+        #     process_finish=False,
+        #     process_contrib=[
+        #         ProcessContrib.files,
+        #         ProcessContrib.samples_out,
+        #     ],
+        #     start_condition=ActionStartCondition.no_wait,
+        #     nonblocking=True,
+        # )
 
     # apply potential
     apm.add(
@@ -232,22 +262,21 @@ def ECHEUVIS_sub_CV_led(
         ],
     )
 
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add(
-            ss,
-            "stop_extrig_after",
-            {"delay": apm.pars.toggle2_time},
-            start_condition=ActionStartCondition.no_wait,
-        )
-
-    apm.add(IO_server, "stop_digital_cycle", {})
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": False,
+    #     },
+    # )
 
     return apm.action_list  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_CA_led(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 6,
     CA_potential_vsRHE: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -276,7 +305,7 @@ def ECHEUVIS_sub_CA_led(
     toggle2_period: float = 2.0,
     toggle2_time: float = -1,
     spec_int_time_ms: float = 15,
-    spec_n_avg: int = 1,
+    spec_n_avg: int = 10,
     spec_technique: str = "T_UVVIS",
     comment: str = "",
 ):
@@ -330,6 +359,25 @@ def ECHEUVIS_sub_CA_led(
         ],
     )
 
+    # apm.add(ORCH_server, "wait", {"waittime": 5})
+
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": True,
+    #     },
+    # )
+
+    apm.add(
+        CAM_server,
+        "acquire_image",
+        {"duration": min(apm.pars.CA_duration_sec, 10), "acqusition_rate": 0.5},
+        start_condition=ActionStartCondition.no_wait,
+        nonblocking=True,
+    )
+
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
             ss,
@@ -347,6 +395,25 @@ def ECHEUVIS_sub_CA_led(
                 ProcessContrib.samples_out,
             ],
         )
+        # apm.add(
+        #     ss,
+        #     "acquire_spec_adv",
+        #     {
+        #         "int_time_ms": apm.pars.spec_int_time_ms,
+        #         "n_avg": apm.pars.spec_n_avg,
+        #         "duration_sec": apm.pars.toggle2_time,
+        #     },
+        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        #     run_use="data",
+        #     technique_name=apm.pars.spec_technique,
+        #     process_finish=False,
+        #     process_contrib=[
+        #         ProcessContrib.files,
+        #         ProcessContrib.samples_out,
+        #     ],
+        #     start_condition=ActionStartCondition.no_wait,
+        #     nonblocking=True,
+        # )
 
     # apply potential
     potential = (
@@ -355,14 +422,6 @@ def ECHEUVIS_sub_CA_led(
         - 0.059 * apm.pars.solution_ph
     )
     print(f"ECHE_sub_CA potential: {potential}")
-
-    apm.add(
-        CAM_server,
-        "acquire_image",
-        {"duration": min(apm.pars.CA_duration_sec, 10), "acqusition_rate": 0.5},
-        start_condition=ActionStartCondition.no_wait,
-        nonblocking=True,
-    )
 
     apm.add(
         PSTAT_server,
@@ -386,22 +445,21 @@ def ECHEUVIS_sub_CA_led(
         ],
     )
 
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add(
-            ss,
-            "stop_extrig_after",
-            {"delay": apm.pars.toggle2_time},
-            start_condition=ActionStartCondition.no_wait,
-        )
-
-    apm.add(IO_server, "stop_digital_cycle", {})
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": False,
+    #     },
+    # )
 
     return apm.action_list  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_CP_led(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 6,
     CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -430,7 +488,7 @@ def ECHEUVIS_sub_CP_led(
     toggle2_period: float = 2.0,
     toggle2_time: float = -1,
     spec_int_time_ms: float = 15,
-    spec_n_avg: int = 1,
+    spec_n_avg: int = 10,
     spec_technique: str = "T_UVVIS",
     comment: str = "",
 ):
@@ -484,6 +542,25 @@ def ECHEUVIS_sub_CP_led(
         ],
     )
 
+    # apm.add(ORCH_server, "wait", {"waittime": 5})
+    
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": True,
+    #     },
+    # )
+
+    apm.add(
+        CAM_server,
+        "acquire_image",
+        {"duration": min(apm.pars.CP_duration_sec, 10), "acqusition_rate": 0.5},
+        start_condition=ActionStartCondition.no_wait,
+        nonblocking=True,
+    )
+    
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
             ss,
@@ -501,14 +578,26 @@ def ECHEUVIS_sub_CP_led(
                 ProcessContrib.samples_out,
             ],
         )
+        # apm.add(
+        #     ss,
+        #     "acquire_spec_adv",
+        #     {
+        #         "int_time_ms": apm.pars.spec_int_time_ms,
+        #         "n_avg": apm.pars.spec_n_avg,
+        #         "duration_sec": apm.pars.toggle2_time,
+        #     },
+        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        #     run_use="data",
+        #     technique_name=apm.pars.spec_technique,
+        #     process_finish=False,
+        #     process_contrib=[
+        #         ProcessContrib.files,
+        #         ProcessContrib.samples_out,
+        #     ],
+        #     start_condition=ActionStartCondition.no_wait,
+        #     nonblocking=True,
+        # )
 
-    apm.add(
-        CAM_server,
-        "acquire_image",
-        {"duration": min(apm.pars.CP_duration_sec, 10), "acqusition_rate": 0.5},
-        start_condition=ActionStartCondition.no_wait,
-        nonblocking=True,
-    )
 
     apm.add(
         PSTAT_server,
@@ -532,19 +621,14 @@ def ECHEUVIS_sub_CP_led(
         ],
     )
 
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add(
-            ss,
-            "stop_extrig_after",
-            {"delay": apm.pars.toggle2_time},
-            start_condition=ActionStartCondition.no_wait,
-        )
-
-    apm.add(
-        IO_server,
-        "stop_digital_cycle",
-        {},
-    )
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": False,
+    #     },
+    # )
 
     return apm.action_list  # returns complete action list to orch
 
@@ -561,7 +645,7 @@ def ECHEUVIS_sub_interrupt(
 
 def ECHEUVIS_sub_OCV_led(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 6,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -589,7 +673,7 @@ def ECHEUVIS_sub_OCV_led(
     toggle2_period: float = 2.0,
     toggle2_time: float = -1,
     spec_int_time_ms: float = 15,
-    spec_n_avg: int = 1,
+    spec_n_avg: int = 10,
     spec_technique: str = "T_UVVIS",
     comment: str = "",
 ):
@@ -643,6 +727,25 @@ def ECHEUVIS_sub_OCV_led(
         ],
     )
 
+    # apm.add(ORCH_server, "wait", {"waittime": 2})
+
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": True,
+    #     },
+    # )
+
+    apm.add(
+        CAM_server,
+        "acquire_image",
+        {"duration": min(apm.pars.OCV_duration_sec, 10), "acqusition_rate": 0.5},
+        start_condition=ActionStartCondition.wait_for_orch,
+        nonblocking=True,
+    )
+
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
             ss,
@@ -660,14 +763,25 @@ def ECHEUVIS_sub_OCV_led(
                 ProcessContrib.samples_out,
             ],
         )
-
-    apm.add(
-        CAM_server,
-        "acquire_image",
-        {"duration": min(apm.pars.OCV_duration_sec, 10), "acqusition_rate": 0.5},
-        start_condition=ActionStartCondition.no_wait,
-        nonblocking=True,
-    )
+        # apm.add(
+        #     ss,
+        #     "acquire_spec_adv",
+        #     {
+        #         "int_time_ms": apm.pars.spec_int_time_ms,
+        #         "n_avg": apm.pars.spec_n_avg,
+        #         "duration_sec": apm.pars.toggle2_time,
+        #     },
+        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        #     run_use="data",
+        #     technique_name=apm.pars.spec_technique,
+        #     process_finish=False,
+        #     process_contrib=[
+        #         ProcessContrib.files,
+        #         ProcessContrib.samples_out,
+        #     ],
+        #     start_condition=ActionStartCondition.no_wait,
+        #     nonblocking=True,
+        # )
 
     apm.add(
         PSTAT_server,
@@ -690,15 +804,14 @@ def ECHEUVIS_sub_OCV_led(
         ],
     )
 
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add(
-            ss,
-            "stop_extrig_after",
-            {"delay": apm.pars.toggle2_time},
-            start_condition=ActionStartCondition.no_wait,
-        )
-
-    apm.add(IO_server, "stop_digital_cycle", {})
+    apm.add(
+        IO_server,
+        "set_digital_out",
+        {
+            "do_item": apm.pars.illumination_source,
+            "on": False,
+        },
+    )
 
     return apm.action_list  # returns complete action list to orch
 

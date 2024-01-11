@@ -361,3 +361,137 @@ class HelaoProcess(HelaoModel):
         self.process_timestamp = self.timestamp
         self.process_params = self.params
         self.technique_name = self.name
+
+
+class EcheUvisLoader(LocalLoader):
+    """ECHEUVIS process dataloader"""
+
+    def __init__(
+        self,
+        data_path: str
+    ):
+        super().__init__(data_path)
+
+    def get_recent(
+        self,
+        query: str,
+        min_date: str = "2023-04-26",
+        plate_id: Optional[int] = None,
+        sample_no: Optional[int] = None,
+    ):
+        conditions = []
+        conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
+        recent_md = sorted(
+            [md for md, pi, sn in self.recent_cache if pi is None and sn is None]
+        )
+        recent_mdpi = sorted(
+            [md for md, pi, sn in self.recent_cache if pi == plate_id and sn is None]
+        )
+        recent_mdsn = sorted(
+            [md for md, pi, sn in self.recent_cache if pi is None and sn == sample_no]
+        )
+        query_parts = ""
+        if plate_id is not None:
+            query_parts += f" & plate_id=={plate_id}"
+        if sample_no is not None:
+            query_parts += f" & sample_no=={sample_no}"
+
+        if (
+            min_date,
+            plate_id,
+            sample_no,
+        ) not in self.recent_cache or not self.cache_sql:
+            data = self.run_raw_query(query + "\n".join(conditions))
+            pdf = pd.DataFrame(data)
+            # print("!!! dataframe shape:", pdf.shape)
+            # print("!!! dataframe cols:", pdf.columns)
+            pdf["plate_id"] = pdf.global_label.apply(
+                lambda x: int(x.split("_")[-2])
+                if "solid" in x and "None" not in x
+                else None
+            )
+            pdf["sample_no"] = pdf.global_label.apply(
+                lambda x: int(x.split("_")[-1])
+                if "solid" in x and "None" not in x
+                else None
+            )
+            # assign solid samples from sequence params
+            for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
+                subdf = pdf.query("sequence_uuid==@suuid")
+                spars = subdf.iloc[0]["sequence_params"]
+                pid = spars["plate_id"]
+                solid_samples = spars["plate_sample_no_list"]
+                assemblies = sorted(
+                    set(
+                        subdf.query(
+                            "global_label.str.contains('assembly')"
+                        ).global_label
+                    )
+                )
+                for slab, alab in zip(solid_samples, assemblies):
+                    pdf.loc[
+                        pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
+                        "plate_id",
+                    ] = pid
+                    pdf.loc[
+                        pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
+                        "sample_no",
+                    ] = slab
+            # self.recent_cache[
+            #     (
+            #         min_date,
+            #         plate_id,
+            #         sample_no,
+            #     )
+            # ] = pdf.sort_values("process_timestamp")
+
+        elif recent_md and min_date >= recent_md[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_md[0],
+                    None,
+                    None,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+        elif recent_mdpi and min_date >= recent_mdpi[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_mdpi[0],
+                    plate_id,
+                    None,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+        elif recent_mdsn and min_date >= recent_mdsn[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_mdsn[0],
+                    None,
+                    sample_no,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+
+        return self.recent_cache[
+            (
+                min_date,
+                plate_id,
+                sample_no,
+            )
+        ].reset_index(drop=True)
