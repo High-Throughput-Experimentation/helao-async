@@ -50,11 +50,12 @@ servers:
     fast: nidaqmx_server
     params:
       dev_gasvalve:
-        1: dev1/port0/line0
+        '1': dev1/port0/line0
         2A: dev1/port0/line1
         2B: dev1/port0/line2
         3A: dev1/port0/line3
         3B: dev1/port0/line4
+      dev_liquidvalve:
         4A: dev1/port0/line5
         4B: dev1/port0/line6
         5A: dev1/port0/line7
@@ -110,7 +111,15 @@ servers:
   #         port: COM5
   #         unit_id: B
 
-
+  PSTAT:
+    host: hte-anec-03.htejcap.caltech.edu
+    port: 8004
+    group: action
+    fast: gamry_server
+    params:
+      dev_id: 0
+      filterfreq_hz: 1000.0
+      grounded: true
   CALC:
     host: hte-ecms-01.htejcap.caltech.edu
     port: 8011
