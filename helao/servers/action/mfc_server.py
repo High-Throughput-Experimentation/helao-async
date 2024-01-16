@@ -194,7 +194,7 @@ async def mfc_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/hold_valve", tags=["action"])
+        @app.post(f"/{server_key}/hold_valve_action", tags=["action"])
         async def hold_valve_action(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
@@ -205,8 +205,8 @@ async def mfc_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/cancel_hold", tags=["action"])
-        async def cancel_hold_action(
+        @app.post(f"/{server_key}/cancel_hold_valve_action", tags=["action"])
+        async def cancel_hold_valve_action(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
@@ -216,7 +216,7 @@ async def mfc_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/hold_valve_closed", tags=["action"])
+        @app.post(f"/{server_key}/hold_valve_closed_action", tags=["action"])
         async def hold_valve_closed_action(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
