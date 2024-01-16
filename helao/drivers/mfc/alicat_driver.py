@@ -120,8 +120,8 @@ class AliCatMFC:
         while True:
             for dev_name, fc in self.fcs.items():
                 # self.base.print_message(f"Refreshing {dev_name} MFC")
-                fc.flush()
                 if self.polling:
+                    fc.flush()
                     checktime = time.time()
                     # self.base.print_message(f"{dev_name} MFC checked at {checktime}")
                     if checktime - lastupdate < waittime:
