@@ -30,7 +30,7 @@ from helaocore.models.sample import SolidSample, LiquidSample, GasSample
 from helaocore.models.machine import MachineModel
 from helaocore.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
-from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
+#from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.drivers.io.enum import TriggerType
 
 # list valid experiment functions
@@ -38,7 +38,7 @@ EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname().lower()
 PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()
-MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict()
+#MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict()
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
