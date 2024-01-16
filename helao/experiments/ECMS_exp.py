@@ -12,7 +12,7 @@ __all__ = [
     "ECMS_sub_alloff",
     "ECMS_sub_electrolyte_fill_cell",
     "ECMS_sub_prevacuum_cell",
-    "CCSI_sub_headspace_purge_and_CO2baseline",
+    "ECMS_sub_headspace_purge_and_CO2baseline",
     "ECMS_sub_CA",
     "ECMS_sub_CV",
     "ECMS_sub_drain",
@@ -252,7 +252,7 @@ def ECMS_sub_prevacuum_cell(
     
     return apm.action_list
 
-def ECMS__sub_headspace_purge_and_CO2baseline(
+def ECMS_sub_headspace_purge_and_CO2baseline(
     experiment: Experiment,
     experiment_version: int = 1,
     CO2equilibrium_duration: float = 30,

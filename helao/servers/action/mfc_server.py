@@ -177,7 +177,7 @@ async def mfc_dyn_endpoints(app=None):
             ramp_sccm_sec: float = 0,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="set_flow")
-            app.driver.set_flowrate(**active.action.action_params)
+            await app.driver.set_flowrate(**active.action.action_params)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -190,7 +190,7 @@ async def mfc_dyn_endpoints(app=None):
             ramp_psi_sec: float = 0,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="set_pressure")
-            app.driver.set_pressure(**active.action.action_params)
+            await app.driver.set_pressure(**active.action.action_params)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
