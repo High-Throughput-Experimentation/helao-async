@@ -44,14 +44,14 @@ ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
 CALC_server = MachineModel(server_name="CALC", machine_name=ORCH_HOST).as_dict()
-CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
+#CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
 MFC_server = MachineModel(server_name="MFC", machine_name=ORCH_HOST).as_dict()
-SOLUTIONPUMP_server = MachineModel(
-    server_name="SYRINGE0", machine_name=ORCH_HOST
-).as_dict()
-WATERCLEANPUMP_server = MachineModel(
-    server_name="SYRINGE1", machine_name=ORCH_HOST
-).as_dict()
+# SOLUTIONPUMP_server = MachineModel(
+#     server_name="SYRINGE0", machine_name=ORCH_HOST
+# ).as_dict()
+# WATERCLEANPUMP_server = MachineModel(
+#     server_name="SYRINGE1", machine_name=ORCH_HOST
+# ).as_dict()
 toggle_triggertype = TriggerType.fallingedge
 
 
@@ -249,7 +249,7 @@ def ECMS_sub_prevacuum_cell(
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "3B", "on": 0})
     return apm.action_list
-    )
+    
     return apm.action_list
 
 def ECMS__sub_headspace_purge_and_CO2baseline(
