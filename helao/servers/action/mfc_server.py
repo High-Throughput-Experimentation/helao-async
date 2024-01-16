@@ -201,7 +201,7 @@ async def mfc_dyn_endpoints(app=None):
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             active = await app.base.setup_and_contain_action(action_abbr="hold_valve")
-            app.driver.hold_valve(active.action.action_params.get("device_name", None))
+            await app.driver.hold_valve(active.action.action_params.get("device_name", None))
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -212,7 +212,7 @@ async def mfc_dyn_endpoints(app=None):
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             active = await app.base.setup_and_contain_action(action_abbr="cancel_hold")
-            app.driver.cancel_hold(active.action.action_params.get("device_name", None))
+            await app.driver.hold_cancel(active.action.action_params.get("device_name", None))
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -223,7 +223,7 @@ async def mfc_dyn_endpoints(app=None):
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             active = await app.base.setup_and_contain_action(action_abbr="close_valve")
-            app.driver.hold_valve_closed(
+            await app.driver.hold_valve_closed(
                 active.action.action_params.get("device_name", None)
             )
             finished_action = await active.finish()
