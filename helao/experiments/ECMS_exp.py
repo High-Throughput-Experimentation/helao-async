@@ -252,7 +252,7 @@ def ECMS_sub_prevacuum_cell(
     
     return apm.action_list
 
-def ECMS__sub_headspace_purge_and_CO2baseline(
+def ECMS_sub_headspace_purge_and_CO2baseline(
     experiment: Experiment,
     experiment_version: int = 1,
     CO2equilibrium_duration: float = 30,
@@ -311,12 +311,14 @@ def ECMS_sub_CA(
             - 0.059 * apm.pars.pH
             - REF_TABLE[ref_type]
         )
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_globalexp_params=["_fast_samples_in"],
-    )
+# =============================================================================
+#     apm.add(
+#         PAL_server,
+#         "archive_custom_query_sample",
+#         {"custom": "cell1_we"},
+#         to_globalexp_params=["_fast_samples_in"],
+#     )
+# =============================================================================
     apm.add(
         PSTAT_server,
         "run_CA",

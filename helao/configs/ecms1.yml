@@ -80,7 +80,7 @@ servers:
     group: visualizer
     bokeh: action_visualizer
     params:
-      doc_name: CCSI Visualizer
+      doc_name: ECMS Visualizer
   LIVE:
     host: hte-ecms-01.htejcap.caltech.edu
     port: 5004
