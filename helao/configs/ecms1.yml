@@ -61,10 +61,10 @@ servers:
         5A: dev1/port0/line7
         5B: dev1/port1/line0
       dev_pump:
-        RecirculatingPeriPump1: dev1/port1/line1
-        RecirculatingPeriPump1-dir: dev1/port1/line2
-        RecirculatingPeriPump2: dev1/port1/line3
-        RecirculatingPeriPump2-dir: dev1/port1/line4
+        RecirculatingPeriPump1-dir: dev1/port1/line1
+        RecirculatingPeriPump1: dev1/port1/line2
+        RecirculatingPeriPump2-dir: dev1/port1/line3
+        RecirculatingPeriPump2: dev1/port1/line4
   PAL:
     host: hte-ecms-01.htejcap.caltech.edu
     port: 8007
@@ -110,7 +110,7 @@ servers:
       dev_id: 0
       filterfreq_hz: 1000.0
       grounded: true
-      allow_no_sample: true
+      allow_no_sample: true # would need to remove this later so all samples can be tracked
   CALC:
     host: hte-ecms-01.htejcap.caltech.edu
     port: 8011
