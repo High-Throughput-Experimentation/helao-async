@@ -23,6 +23,134 @@ from helao.helpers.premodels import ExperimentPlanMaker
 SEQUENCES = __all__
 
 
+# =============================================================================
+#     experiment: Experiment,
+#     experiment_version: int = 1,
+#     liquid_forward_time: float = 20,
+#     liquid_backward_time: float = 10,
+#     reservoir_liquid_sample_no: int = 1511,
+#     volume_ul_cell_liquid: int = 1
+# ):
+# =============================================================================
+def ANEC_series_CA(
+    sequence_version: int = 1,
+    plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    reservoir_liquid_sample_no: int = 1511,
+    volume_ul_cell_liquid: float = 1000,
+    WE_potential__V: List[float] = [-0.9, -1.0, -1.1, -1.2, -1.3],
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    CA_duration_sec: List[float] = [900, 900, 900, 900, 900],
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    ref_offset__V: float = 0.0,
+    toolGC: str = "HS 2",
+    toolarchive: str = "LS 3",
+    volume_ul_GC: int = 300,
+    volume_ul_archive: int = 500,
+    liquidDrain_time: float = 80.0,
+    wash1: bool = True,
+    wash2: bool = True,
+    wash3: bool = True,
+    wash4: bool = False,
+):
+    """running CA at different potentials and aliquot sampling at the cell1_we position.
+
+    Flush and fill cell, run CA, and drain.
+
+    (1) Fill cell with liquid for 90 seconds
+    (2) Equilibrate for 15 seconds
+    (3) run CA
+    (4) mix product
+    (5) Drain cell and purge with CO2 for 60 seconds
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+
+
+    """
+
+    epm = ExperimentPlanMaker()
+
+    # housekeeping
+    epm.add_experiment("ECMS_sub_unload_cell", {})
+
+    #epm.add_experiment("ANEC_sub_normal_state", {})
+
+    epm.add_experiment(
+        "ECMS_sub_load_solid",
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    )
+
+    for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
+        print(f" ... cycle {cycle} potential:", potential, f" ... cycle {cycle} duration:", time)
+
+        epm.add_experiment(
+            "ECMS_sub_electrolyte_fill_cell",
+            {
+                "liquid_flush_time": 80,
+                "co2_purge_time": 15,
+                "equilibration_time": 1.0,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "volume_ul_cell_liquid": volume_ul_cell_liquid,
+            },
+        )
+
+        epm.add_experiment("ECMS_sub_prevacuum_cell",{})
+
+        epm.add_experiment(
+            "ECMS__sub_headspace_purge_and_CO2baseline",
+            {
+                "liquid_flush_time": 80,
+                "co2_purge_time": 15,
+                "equilibration_time": 1.0,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "volume_ul_cell_liquid": volume_ul_cell_liquid,
+            },
+        )
+        
+        epm.add_experiment(
+            "ECMS_sub_CA",
+            {
+                "WE_potential__V": potential,
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "ref_offset__V": ref_offset__V,
+                "CA_duration_sec": time,
+                "SampleRate": SampleRate,
+                "IErange": IErange,
+            },
+        )
+
+        epm.add_experiment("ECMS_sub_drain",{"liquid_drain_time": liquid_drain_time})
+
+
+        epm.add_experiment("ECMS_sub_drain_cell", {"drain_time": liquidDrain_time})
+
+    epm.add_experiment("ECMS_sub_alloff", {})
+    
+    return epm.experiment_plan_list
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def CCSI_initialization(
     sequence_version: int = 4, #removed subdrain, added clean inject
     headspace_purge_cycles: int = 5,

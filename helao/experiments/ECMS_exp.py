@@ -252,7 +252,7 @@ def ECMS_sub_prevacuum_cell(
     
     return apm.action_list
 
-def ECMS_sub_headspace_purge_and_CO2baseline(
+def ECMS__sub_headspace_purge_and_CO2baseline(
     experiment: Experiment,
     experiment_version: int = 1,
     CO2equilibrium_duration: float = 30,
@@ -488,6 +488,6 @@ def ECMS_sub_electrolyte_clean_cell(
         },
     )
     
-    apm.add_action_list(ANEC_sub_drain(experiment))
+    apm.add_action_list(ECMS_sub_drain(experiment))
 
     return apm.action_list

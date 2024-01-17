@@ -102,7 +102,7 @@ servers:
     verbose: false
 
   PSTAT:
-    host: hte-anec-03.htejcap.caltech.edu
+    host: hte-ecms-01.htejcap.caltech.edu
     port: 8004
     group: action
     fast: gamry_server
