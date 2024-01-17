@@ -110,6 +110,7 @@ servers:
       dev_id: 0
       filterfreq_hz: 1000.0
       grounded: true
+      allow_no_sample: true
   CALC:
     host: hte-ecms-01.htejcap.caltech.edu
     port: 8011

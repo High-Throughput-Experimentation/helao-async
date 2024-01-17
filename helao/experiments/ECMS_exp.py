@@ -311,14 +311,12 @@ def ECMS_sub_CA(
             - 0.059 * apm.pars.pH
             - REF_TABLE[ref_type]
         )
-# =============================================================================
-#     apm.add(
-#         PAL_server,
-#         "archive_custom_query_sample",
-#         {"custom": "cell1_we"},
-#         to_globalexp_params=["_fast_samples_in"],
-#     )
-# =============================================================================
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_globalexp_params=["_fast_samples_in"],
+    )
     apm.add(
         PSTAT_server,
         "run_CA",
