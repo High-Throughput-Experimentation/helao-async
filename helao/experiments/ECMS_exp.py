@@ -196,7 +196,7 @@ def ECMS_sub_electrolyte_fill_cell(
     experiment_version: int = 1,
     liquid_forward_time: float = 20,
     liquid_backward_time: float = 10,
-    reservoir_liquid_sample_no: int = 1511,
+    reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1
 ):
     """Add electrolyte volume to cell position.
