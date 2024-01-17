@@ -923,12 +923,13 @@ class FlowMeter(object):
         while values[-1].upper() in ["MOV", "VOV", "POV"]:
             del values[-1]
 
-        if values[-1].upper() == "HLD":
-            hold = True
-            del values[-1]
-        else:
-            hold = False
-
+        holdlockd = {}
+        for stat, key in [("HLD", "hold_valve"), ("LCK", "lock_display")]:
+            has_stat = stat in values
+            holdlockd[key] = has_stat
+            if has_stat:
+                values.pop(values.index(stat))
+        
         if address != self.address:
             raise ValueError("Flow controller address mismatch.")
         if len(values) == 5 and len(self.status_keys) == 6:
@@ -941,7 +942,7 @@ class FlowMeter(object):
             k: (v if k == self.status_keys[-1] else float(v))
             for k, v in zip(self.status_keys, values)
         }
-        return_dict["hold_valve"] = hold
+        return_dict.update(holdlockd)
 
         return return_dict
 
