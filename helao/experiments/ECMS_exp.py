@@ -175,9 +175,29 @@ def ECMS_sub_alloff(
     )
     apm.add(
         MFC_server,
-        "cancel_acquire_flowrate",
-        {}
+        "set_flowrate",
+        {
+            "flowrate_sccm": apm.pars.flowrate_sccm,
+            "ramp_sccm_sec": apm.pars.flow_ramp_sccm,
+            "device_name": "CO2",
+        },
+        asc.no_wait,
     )
+    apm.add(
+        MFC_server,
+        "hold_valve_closed_action",
+        {
+            "device_name": "CO2"
+        },
+        asc.no_wait,
+    )
+# =============================================================================
+#     apm.add(
+#         MFC_server,
+#         "cancel_acquire_flowrate",
+#         {}
+#     )
+# =============================================================================
     apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0}, asc.no_wait)
@@ -210,9 +230,9 @@ def ECMS_sub_electrolyte_fill_cell(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "Direction": 0})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_forward_time})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "Direction": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_backward_time})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
@@ -258,8 +278,8 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     CO2equilibrium_duration: float = 30,
     flowrate_sccm: float = 5.0,
     flow_ramp_sccm: float = 0,
-    flow_duration: float = -1,
-    co2measure_acqrate: float = 0.5
+    #flow_duration: float = -1,
+    #co2measure_acqrate: float = 0.5
 ):
     """prevacuum the cell gas phase side to make the electrolyte contact with GDE
     """
@@ -270,19 +290,38 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 1})
-
     apm.add(
         MFC_server,
-        "acquire_flowrate",
+        "set_flowrate",
         {
             "flowrate_sccm": apm.pars.flowrate_sccm,
             "ramp_sccm_sec": apm.pars.flow_ramp_sccm,
-            "acquisition_rate": apm.pars.co2measure_acqrate,
-            "duration": apm.pars.flow_duration,
-            "stay_open": True
+            "device_name": "CO2",
         },
         asc.no_wait,
     )
+    apm.add(
+        MFC_server,
+        "cencel_hold_valve_action",
+        {
+            "device_name": "CO2"
+        },
+        asc.no_wait,
+    )
+# =============================================================================
+#     apm.add(
+#         MFC_server,
+#         "acquire_flowrate",
+#         {
+#             "flowrate_sccm": apm.pars.flowrate_sccm,
+#             "ramp_sccm_sec": apm.pars.flow_ramp_sccm,
+#             "acquisition_rate": apm.pars.co2measure_acqrate,
+#             "duration": apm.pars.flow_duration,
+#             "stay_open": True
+#         },
+#         asc.no_wait,
+#     )
+# =============================================================================
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.CO2equilibrium_duration})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 1})
     #apm.add(ORCH_server, "wait", {"waittime": apm.pars.baseline_duration})
@@ -445,7 +484,7 @@ def ECMS_sub_drain(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 1})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1-dir", "Direction": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1-dir", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_drain_time})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
