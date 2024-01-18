@@ -50,20 +50,21 @@ servers:
     fast: nidaqmx_server
     params:
       dev_gasvalve:
-        1: dev1/port0/line0
+        '1': dev1/port0/line0
         2A: dev1/port0/line1
         2B: dev1/port0/line2
         3A: dev1/port0/line3
         3B: dev1/port0/line4
+      dev_liquidvalve:
         4A: dev1/port0/line5
         4B: dev1/port0/line6
         5A: dev1/port0/line7
         5B: dev1/port1/line0
       dev_pump:
-        RecirculatingPeriPump1: dev1/port1/line1
-        RecirculatingPeriPump1-dir: dev1/port1/line2
-        RecirculatingPeriPump2: dev1/port1/line3
-        RecirculatingPeriPump2-dir: dev1/port1/line4
+        RecirculatingPeriPump1-dir: dev1/port1/line1
+        RecirculatingPeriPump1: dev1/port1/line2
+        RecirculatingPeriPump2-dir: dev1/port1/line3
+        RecirculatingPeriPump2: dev1/port1/line4
   PAL:
     host: hte-ecms-01.htejcap.caltech.edu
     port: 8007
@@ -79,7 +80,7 @@ servers:
     group: visualizer
     bokeh: action_visualizer
     params:
-      doc_name: CCSI Visualizer
+      doc_name: ECMS Visualizer
   LIVE:
     host: hte-ecms-01.htejcap.caltech.edu
     port: 5004
@@ -99,18 +100,17 @@ servers:
           port: COM5
           unit_id: A
     verbose: false
-  # N2MFC:
-  #   host: hte-ecms-01.htejcap.caltech.edu
-  #   port: 8019
-  #   group: action
-  #   fast: mfc_server
-  #   params:
-  #     devices:
-  #       N2:
-  #         port: COM5
-  #         unit_id: B
 
-
+  PSTAT:
+    host: hte-ecms-01.htejcap.caltech.edu
+    port: 8004
+    group: action
+    fast: gamry_server
+    params:
+      dev_id: 0
+      filterfreq_hz: 1000.0
+      grounded: true
+      allow_no_sample: true # would need to remove this later so all samples can be tracked
   CALC:
     host: hte-ecms-01.htejcap.caltech.edu
     port: 8011

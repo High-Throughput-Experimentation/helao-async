@@ -103,11 +103,18 @@ class AliCatMFC:
         self.base.print_message("got 'start_polling' request, raising signal")
         async with self.base.aiolock:
             await self.poll_signalq.put(True)
+        while not self.polling:
+            self.base.print_message("waiting for polling loop to start")
+            await asyncio.sleep(0.1)
 
     async def stop_polling(self):
         self.base.print_message("got 'stop_polling' request, raising signal")
         async with self.base.aiolock:
             await self.poll_signalq.put(False)
+        while self.polling:
+            self.base.print_message("waiting for polling loop to stop")
+            await asyncio.sleep(0.1)
+            
 
     async def poll_signal_loop(self):
         while True:
@@ -120,8 +127,8 @@ class AliCatMFC:
         while True:
             for dev_name, fc in self.fcs.items():
                 # self.base.print_message(f"Refreshing {dev_name} MFC")
-                fc.flush()
                 if self.polling:
+                    fc.flush()
                     checktime = time.time()
                     # self.base.print_message(f"{dev_name} MFC checked at {checktime}")
                     if checktime - lastupdate < waittime:
@@ -916,12 +923,13 @@ class FlowMeter(object):
         while values[-1].upper() in ["MOV", "VOV", "POV"]:
             del values[-1]
 
-        if values[-1].upper() == "HLD":
-            hold = True
-            del values[-1]
-        else:
-            hold = False
-
+        holdlockd = {}
+        for stat, key in [("HLD", "hold_valve"), ("LCK", "lock_display")]:
+            has_stat = stat in values
+            holdlockd[key] = has_stat
+            if has_stat:
+                values.pop(values.index(stat))
+        
         if address != self.address:
             raise ValueError("Flow controller address mismatch.")
         if len(values) == 5 and len(self.status_keys) == 6:
@@ -934,7 +942,7 @@ class FlowMeter(object):
             k: (v if k == self.status_keys[-1] else float(v))
             for k, v in zip(self.status_keys, values)
         }
-        return_dict["hold_valve"] = hold
+        return_dict.update(holdlockd)
 
         return return_dict
 
