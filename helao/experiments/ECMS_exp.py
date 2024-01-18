@@ -475,9 +475,6 @@ def ECMS_sub_CV(
 def ECMS_sub_headspace_flow_shutdown(
     experiment: Experiment,
     experiment_version: int = 1,
-    CO2equilibrium_duration: float = 30,
-    flowrate_sccm: float = 5.0,
-    flow_ramp_sccm: float = 0,
     #flow_duration: float = -1,
     #co2measure_acqrate: float = 0.5
 ):
@@ -511,8 +508,8 @@ def ECMS_sub_headspace_flow_shutdown(
     apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 0})
     #apm.add(ORCH_server, "wait", {"waittime": apm.pars.baseline_duration})
-
     return apm.action_list
+
 def ECMS_sub_drain(
     experiment: Experiment,
     experiment_version: int = 1,
