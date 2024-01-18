@@ -177,8 +177,8 @@ def ECMS_sub_alloff(
         MFC_server,
         "set_flowrate",
         {
-            "flowrate_sccm": apm.pars.flowrate_sccm,
-            "ramp_sccm_sec": apm.pars.flow_ramp_sccm,
+            "flowrate_sccm": 0.0,
+            "ramp_sccm_sec": 0.0,
             "device_name": "CO2",
         },
         asc.no_wait,
@@ -302,7 +302,7 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     )
     apm.add(
         MFC_server,
-        "cencel_hold_valve_action",
+        "cancel_hold_valve_action",
         {
             "device_name": "CO2"
         },
