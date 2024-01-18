@@ -15,6 +15,7 @@ __all__ = [
     "ECMS_sub_headspace_purge_and_CO2baseline",
     "ECMS_sub_CA",
     "ECMS_sub_CV",
+    "ECMS_sub_headspace_flow_shutdown",
     "ECMS_sub_drain",
     "ECMS_sub_electrolyte_clean_cell"
 ]
@@ -471,6 +472,47 @@ def ECMS_sub_CV(
 
     return apm.action_list
 
+def ECMS_sub_headspace_flow_shutdown(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    CO2equilibrium_duration: float = 30,
+    flowrate_sccm: float = 5.0,
+    flow_ramp_sccm: float = 0,
+    #flow_duration: float = -1,
+    #co2measure_acqrate: float = 0.5
+):
+    """prevacuum the cell gas phase side to make the electrolyte contact with GDE
+    """
+
+    apm = ActionPlanMaker()
+
+    # Fill cell with liquid
+
+    apm.add(
+        MFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": 0.0,
+            "ramp_sccm_sec": 0.0,
+            "device_name": "CO2",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        MFC_server,
+        "hold_valve_closed_action",
+        {
+            "device_name": "CO2"
+        },
+        asc.no_wait,
+    )
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 0})
+    #apm.add(ORCH_server, "wait", {"waittime": apm.pars.baseline_duration})
+
+    return apm.action_list
 def ECMS_sub_drain(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -508,7 +550,7 @@ def ECMS_sub_electrolyte_clean_cell(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "Direction": 0})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_forward_time})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
