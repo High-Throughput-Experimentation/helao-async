@@ -3,6 +3,14 @@
 The 'galil' device class exposes motion and I/O functions from the underlying 'gclib'
 library. Class methods are specific to Galil devices. Device configuration is read from
 config/config.py. 
+
+This driver requires gclib to be installed. After installation, activate the helao
+environment and run:
+
+`python "c:\Program Files (x86)\Galil\gclib\source\wrappers\python\setup.py" install`
+
+to install the python module.
+
 """
 
 __all__ = ["Galil", "MoveModes", "TransformationModes"]

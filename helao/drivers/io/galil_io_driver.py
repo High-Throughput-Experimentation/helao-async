@@ -3,6 +3,14 @@
 The 'galil' device class exposes motion and I/O functions from the underlying 'gclib'
 library. Class methods are specific to Galil devices. Device configuration is read from
 config/config.py. 
+
+This driver requires gclib to be installed. After installation, activate the helao
+environment and run:
+
+`python "c:\Program Files (x86)\Galil\gclib\source\wrappers\python\setup.py" install`
+
+to install the python module.
+
 """
 
 __all__ = [
@@ -132,11 +140,19 @@ class Galil:
 
     async def start_polling(self):
         self.base.print_message("got 'start_polling' request, raising signal")
-        await self.poll_signalq.put(True)
+        async with self.base.aiolock:
+            await self.poll_signalq.put(True)
+        while not self.polling:
+            self.base.print_message("waiting for polling loop to start")
+            await asyncio.sleep(0.1)
 
     async def stop_polling(self):
         self.base.print_message("got 'stop_polling' request, raising signal")
-        await self.poll_signalq.put(False)
+        async with self.base.aiolock:
+            await self.poll_signalq.put(False)
+        while self.polling:
+            self.base.print_message("waiting for polling loop to stop")
+            await asyncio.sleep(0.1)
 
     async def poll_signal_loop(self):
         while True:
