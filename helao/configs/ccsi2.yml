@@ -1,7 +1,7 @@
 dummy: true
 simulation: false
 experiment_libraries:
-  - CCSI_exp
+  - CSIL_exp
   - samples_exp
 experiment_params:
   gamrychannelwait: -1
@@ -116,7 +116,7 @@ servers:
       pumps:
         zero:
           address: 0
-          diameter: 26.7
+          diameter: 15.9
   SYRINGE1:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8014
@@ -127,7 +127,15 @@ servers:
       pumps:
         one:
           address: 1
-          diameter: 26.7
+          diameter: 15.9
+  DOSEPUMP:
+    host: hte-eche-05.htejcap.caltech.edu
+    port: 8016
+    group: action
+    fast: diapump_server
+    params:
+      port: COM7
+      address: 0
   MFC:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8009
