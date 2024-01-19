@@ -149,9 +149,9 @@ def ECMS_repeat_CV(
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    epm.add_experiment("ANEC_sub_unload_cell", {})
+    epm.add_experiment("ECMS_sub_unload_cell", {})
     epm.add_experiment(
-        "ANEC_sub_load_solid",
+        "ECMS_sub_load_solid",
         {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
@@ -180,7 +180,7 @@ def ECMS_repeat_CV(
         )
 
         epm.add_experiment(
-            "ANEC_sub_CV",
+            "ECMs_sub_CV",
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
