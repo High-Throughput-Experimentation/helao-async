@@ -180,7 +180,7 @@ def ECMS_repeat_CV(
         )
 
         epm.add_experiment(
-            "ECMs_sub_CV",
+            "ECMS_sub_CV",
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
