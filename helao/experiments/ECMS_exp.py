@@ -279,6 +279,7 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     CO2equilibrium_duration: float = 30,
     flowrate_sccm: float = 5.0,
     flow_ramp_sccm: float = 0,
+    MS_baseline_duration: float = 300,
     #flow_duration: float = -1,
     #co2measure_acqrate: float = 0.5
 ):
@@ -325,8 +326,7 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
 # =============================================================================
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.CO2equilibrium_duration})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 1})
-    #apm.add(ORCH_server, "wait", {"waittime": apm.pars.baseline_duration})
-
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.MS_baseline_duration})
     return apm.action_list
 
 def ECMS_sub_CA(
@@ -552,6 +552,6 @@ def ECMS_sub_electrolyte_clean_cell(
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-    apm.add_action_list(ECMS_sub_drain(experiment))
+    #apm.add_action_list(ECMS_sub_drain(experiment))
 
     return apm.action_list
