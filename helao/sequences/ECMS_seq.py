@@ -66,7 +66,7 @@ def ECMS_series_CA(
         epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
 
         epm.add_experiment(
-            "ECMS__sub_headspace_purge_and_CO2baseline",
+            "ECMS_sub_headspace_purge_and_CO2baseline",
             {
                 "CO2equilibrium_duration": CO2equilibrium_duration,
                 "flowrate_sccm": flowrate_sccm,
@@ -170,7 +170,7 @@ def ECMS_repeat_CV(
         epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
 
         epm.add_experiment(
-            "ECMS__sub_headspace_purge_and_CO2baseline",
+            "ECMS_sub_headspace_purge_and_CO2baseline",
             {
                 "CO2equilibrium_duration": CO2equilibrium_duration,
                 "flowrate_sccm": flowrate_sccm,
