@@ -71,8 +71,8 @@ servers:
         6B: dev1/port1/line0
        # '8': dev1/port0/line11
         #'9': dev1/port0/line12
-      dev_pump:
-        RecirculatingPeriPump1: dev1/port0/line12
+      # dev_pump:
+      #   RecirculatingPeriPump1: dev1/port0/line12
   PAL:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8007

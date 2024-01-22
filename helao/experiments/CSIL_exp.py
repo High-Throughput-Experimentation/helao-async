@@ -906,7 +906,6 @@ def CCSI_sub_co2massdose(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
     apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 30000},asc.no_wait )
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
