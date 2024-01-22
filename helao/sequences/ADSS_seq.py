@@ -6,6 +6,8 @@ __all__ = [
     "ADSS_CA_cell_1potential",
     "ADSS_PA_CVs_CAs_cell",
     "ADSS_PA_CVs_CAs_CVs_cell_simple",
+    "ADSS_PA_CVs_testing",
+
 ]
 
 from typing import List
@@ -1154,7 +1156,7 @@ def ADSS_PA_CVs_testing(
     liquid_sample_no: int = 220,
     liquid_sample_volume_ul: float = 4000,
     recirculate_wait_time_m: float = 5,
-    CV_cycles: List[int] = [10,10],
+    CV_cycles: List[int] = [10,3],
     Vinit_vsRHE: List[float] = [0.05,0.05],  # Initial value in volts or amps.
     Vapex1_vsRHE: List[float] = [0.05,0.05],  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: List[float] = [1.2,1.2],  # Apex 2 value in volts or amps.
@@ -1167,7 +1169,7 @@ def ADSS_PA_CVs_testing(
     potential_versus: str = "rhe",
     # CA_duration_sec: List[float] = [60,60],
     # CA_samplerate_sec: float = 0.1,
-    CV2_cycles: List[int] = [10],
+    CV2_cycles: List[int] = [3],
     CV2_Vinit_vsRHE: List[float] = [0.05],  # Initial value in volts or amps.
     CV2_Vapex1_vsRHE: List[float] = [0.05],  # Apex 1 value in volts or amps.
     CV2_Vapex2_vsRHE: List[float] = [1.2],  # Apex 2 value in volts or amps.
