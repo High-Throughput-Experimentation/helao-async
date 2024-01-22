@@ -86,14 +86,14 @@ ECHEUVIS_multiCA_led_defaults = {
     "solution_ph": 10,
     "measurement_area": 0.071,  # 3mm diameter droplet
     "liquid_volume_ml": 1.0,
-    "ref_vs_nhe": 0.21 + 0.049,
+    "ref_vs_nhe": 0.21 + 0.082,
     # "CA_potential_vsRHE": [
     #     0.4,
     #     1.0,
     #     1.6,
     #     2.2,
     # ],
-    "CA_duration_sec": 85,
+    "CA_duration_sec": 10,
     "CA_potential_vsRHE": [
         -0.2,
         0,
