@@ -129,7 +129,7 @@ servers:
           address: 1
           diameter: 15.9
   DOSEPUMP:
-    host: hte-eche-05.htejcap.caltech.edu
+    host: hte-ccsi-02.htejcap.caltech.edu
     port: 8016
     group: action
     fast: diapump_server
