@@ -1157,11 +1157,11 @@ def ADSS_PA_CVs_testing(
     liquid_sample_volume_ul: float = 4000,
     recirculate_wait_time_m: float = 5,
     CV_cycles: List[int] = [10,3],
-    Vinit_vsRHE: List[float] = [0.05,0.05],  # Initial value in volts or amps.
-    Vapex1_vsRHE: List[float] = [0.05,0.05],  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: List[float] = [1.2,1.2],  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: List[float] = [0.05,0.05],  # Final value in volts or amps.
-    scanrate_voltsec: List[float] = [0.1,0.02],  # scan rate in volts/second or amps/second.
+    Vinit_vsRHE: List[float] = [0.05,0.05,0.05],  # Initial value in volts or amps.
+    Vapex1_vsRHE: List[float] = [0.05,0.05,0.05],  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: List[float] = [1.2,1.2,1.2],  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: List[float] = [0.05,0.05,0.05],  # Final value in volts or amps.
+    scanrate_voltsec: List[float] = [0.1,0.02,0.02],  # scan rate in volts/second or amps/second.
     CV_samplerate_sec: float = 0.05,
     #number_of_preCAs: int = 3,
     # number_of_postCAs: int = 2,
@@ -1280,7 +1280,7 @@ def ADSS_PA_CVs_testing(
                 "aliquot_insitu": False,
             },
         )
-        if i == 0:
+        if i == 1:
             epm.add_experiment(
                 "ADSS_sub_interrupt",
                 {
@@ -1491,6 +1491,8 @@ def ADSS_PA_CVs_testing(
                         "reason":"Pause for switch to oxygen"
                     },
                 )
+            if i == 1: break
+            
         if keep_electrolyte_post:
             epm.add_experiment("ADSS_sub_unload_solid",{})
 
