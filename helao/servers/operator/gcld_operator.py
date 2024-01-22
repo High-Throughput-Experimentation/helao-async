@@ -93,7 +93,7 @@ ECHEUVIS_multiCA_led_defaults = {
     #     1.6,
     #     2.2,
     # ],
-    "CA_duration_sec": 10,
+    "CA_duration_sec": 85,
     "CA_potential_vsRHE": [
         -0.2,
         0,
