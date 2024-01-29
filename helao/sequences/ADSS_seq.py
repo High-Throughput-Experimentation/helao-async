@@ -601,7 +601,7 @@ def ADSS_PA_CVs_CAs_cell(
     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_PA_CVs_CAs_CVs_cell_simple(
-    sequence_version: int = 2, 
+    sequence_version: int = 3, #add initial aliquoting before first CV
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -636,6 +636,8 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     ph: float = 9.53,
     ref_type: str = "leakless",
     ref_offset__V: float = 0.0,
+    aliquot_init: bool = True,
+    aliquot_bf_2ndCV: bool = True,
     aliquot_postCV: List[int] = [1,0,0],
     aliquot_postCA: List[int] = [1,0],
     aliquot_volume_ul: int = 200,
@@ -715,6 +717,39 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
         })
     washmod = 0
 
+    if aliquot_init: #stops gas purge, takes aliquote, starts gas purge again
+        epm.add_experiment(
+            "ADSS_sub_gasvalve_toggle",
+            {
+                "open": False,
+            })
+        
+        washmod += 1
+        washone = washmod %4 %3 %2
+        washtwo = (washmod + 1) %4 %3 %2
+        washthree = (washmod + 2) %4 %3 %2
+        washfour = (washmod + 3) %4 %3 %2
+
+        epm.add_experiment(
+            "ADSS_sub_sample_aliquot",
+            {
+                "aliquot_volume_ul": aliquot_volume_ul,
+                "EquilibrationTime_s": 0,
+                "PAL_Injector": PAL_Injector,
+                "PAL_Injector_id": PAL_Injector_id,
+                "rinse_1": washone,
+                "rinse_2": washtwo,
+                "rinse_3": washthree,
+                "rinse_4": washfour,
+            })
+
+        epm.add_experiment(
+        "ADSS_sub_gasvalve_toggle",
+        {
+            "open": True,
+        })
+
+
     for i, CV_cycle in enumerate(CV_cycles):
 
         epm.add_experiment(
@@ -791,6 +826,38 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
                     "rinse_4": washfour,
                 }
             )
+
+    if aliquot_bf_2ndCV: #stops gas purge, takes aliquote, starts gas purge again
+        epm.add_experiment(
+            "ADSS_sub_gasvalve_toggle",
+            {
+                "open": False,
+            })
+        
+        washmod += 1
+        washone = washmod %4 %3 %2
+        washtwo = (washmod + 1) %4 %3 %2
+        washthree = (washmod + 2) %4 %3 %2
+        washfour = (washmod + 3) %4 %3 %2
+
+        epm.add_experiment(
+            "ADSS_sub_sample_aliquot",
+            {
+                "aliquot_volume_ul": aliquot_volume_ul,
+                "EquilibrationTime_s": 0,
+                "PAL_Injector": PAL_Injector,
+                "PAL_Injector_id": PAL_Injector_id,
+                "rinse_1": washone,
+                "rinse_2": washtwo,
+                "rinse_3": washthree,
+                "rinse_4": washfour,
+            })
+
+        epm.add_experiment(
+        "ADSS_sub_gasvalve_toggle",
+        {
+            "open": True,
+        })
 
     for i, CV_cycle in enumerate(CV2_cycles):
 

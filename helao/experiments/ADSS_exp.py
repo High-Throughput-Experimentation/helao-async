@@ -42,6 +42,7 @@ __all__ = [
     "ADSS_sub_CA_photo",
     "ADSS_sub_OCV_photo",
     "ADSS_sub_interrupt",
+    "ADSS_sub_gasvalve_toggle",
 ]
 
 
@@ -2137,3 +2138,25 @@ def ADSS_sub_refill_syringe(
 
 
     return apm.action_list
+
+
+def ADSS_sub_gasvalve_toggle(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    open: bool = True,
+):
+    apm = ActionPlanMaker()
+    if apm.pars.open:    
+        apm.add(
+            NI_server,
+            "gasvalve",
+            {"gasvalve": "V1", "on": 1}
+        )
+    else:
+        apm.add(
+            NI_server,
+            "gasvalve",
+            {"gasvalve": "V1", "on": 0}
+        )
+
+    return apm.action_list  # returns complete action list to orch
