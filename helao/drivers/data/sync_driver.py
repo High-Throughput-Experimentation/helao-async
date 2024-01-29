@@ -405,11 +405,15 @@ class HelaoSyncer:
     base: Base
     running_tasks: dict
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: Base, db_server_name: str = "DB"):
         """Pushes yml to S3 and API."""
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
+        # to load this driver on orch, we check the default "DB" key or take a manually-specified key
+        if not self.config_dict and db_server_name in self.world_config["servers"]:
+            self.config_dict = self.world_config["servers"][db_server_name].get("params", {})
+
         self.max_tasks = self.config_dict.get("max_tasks", 4)
         if "aws_config_path" in self.config_dict:
             os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
