@@ -46,7 +46,7 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.servers.base import Base, Active
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.zdeque import zdeque
-
+from helao.drivers.data.sync_driver import HelaoSyncer
 
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
@@ -86,6 +86,10 @@ class Orch(Base):
             server_name=self.server.server_name,
             user_sequence_path=self.helaodirs.user_seq,
         )
+
+        self.use_db = "DB" in self.world_cfg["servers"].keys()
+        if self.use_db:
+            self.syncer = HelaoSyncer(action_serv=self, db_server_name="DB")
 
         # instantiate experiment/experiment queue, action queue
         self.sequence_dq = zdeque([])
@@ -472,6 +476,8 @@ class Orch(Base):
 
             self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
+            if self.use_db:
+                self.syncer.to_s3(self.seq_model.clean_dict(strip_private=True), ) # todo: generate s3 path
 
             # add all experiments from sequence to experiment queue
             # todo: use seq model instead to initialize some parameters
