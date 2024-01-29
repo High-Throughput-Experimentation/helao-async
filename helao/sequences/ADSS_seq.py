@@ -769,6 +769,12 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
             },
         )
         if aliquot_postCV[i] == 1:
+            epm.add_experiment(
+                "ADSS_sub_gasvalve_toggle",
+                {
+                    "open": False,
+                })
+            
             washmod += 1
             washone = washmod %4 %3 %2
             washtwo = (washmod + 1) %4 %3 %2
@@ -788,6 +794,12 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
                     "rinse_4": washfour,
                 }
             )
+
+            epm.add_experiment(
+                "ADSS_sub_gasvalve_toggle",
+                {
+                    "open": True,
+                })
 
     for i, CA_potential_vs in enumerate(CA_potentials_vs):
 
@@ -806,6 +818,12 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
             },
         )
         if aliquot_postCA[i] == 1:
+            epm.add_experiment(
+                "ADSS_sub_gasvalve_toggle",
+                {
+                    "open": False,
+                })
+                        
             washmod += 1
             washone = washmod %4 %3 %2
             washtwo = (washmod + 1) %4 %3 %2
@@ -826,6 +844,11 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
                 }
             )
 
+            epm.add_experiment(
+                "ADSS_sub_gasvalve_toggle",
+                {
+                    "open": True,
+                })
 
     for i, CV_cycle in enumerate(CV2_cycles):
 
@@ -847,6 +870,12 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
             },
         )
         if aliquot_postCV[i] == 1:
+            epm.add_experiment(
+                "ADSS_sub_gasvalve_toggle",
+                {
+                    "open": False,
+                })            
+            
             washmod += 1
             washone = washmod %4 %3 %2
             washtwo = (washmod + 1) %4 %3 %2
@@ -866,6 +895,11 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
                     "rinse_4": washfour,
                 }
             )
+            epm.add_experiment(
+                "ADSS_sub_gasvalve_toggle",
+                {
+                    "open": True,
+                })            
 
     if keep_electrolyte:
         epm.add_experiment("ADSS_sub_unload_solid",{})
