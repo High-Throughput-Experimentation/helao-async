@@ -850,6 +850,13 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
                     "open": True,
                 })
 
+    epm.add_experiment(
+            "ADSS_sub_interrupt",
+            {
+                "reason":"Pause for injection of phosphoric"
+            },
+        )
+
     for i, CV_cycle in enumerate(CV2_cycles):
 
         epm.add_experiment(
