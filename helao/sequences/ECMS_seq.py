@@ -51,6 +51,7 @@ def ECMS_series_CA(
 
     for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
         print(f" ... cycle {cycle} potential:", potential, f" ... cycle {cycle} duration:", time)
+        epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
 
         epm.add_experiment(
             "ECMS_sub_electrolyte_fill_cell",
@@ -63,7 +64,6 @@ def ECMS_series_CA(
             },
         )
 
-        epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
 
         epm.add_experiment(
             "ECMS_sub_headspace_purge_and_CO2baseline",
@@ -156,7 +156,7 @@ def ECMS_repeat_CV(
     )
 
     for _ in range(num_repeats):
-
+        epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
         epm.add_experiment(
             "ECMS_sub_electrolyte_fill_cell",
             {
@@ -167,7 +167,6 @@ def ECMS_repeat_CV(
                 "volume_ul_cell_liquid": volume_ul_cell_liquid,
             },
         )
-        epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
 
         epm.add_experiment(
             "ECMS_sub_headspace_purge_and_CO2baseline",
