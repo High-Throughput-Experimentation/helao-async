@@ -186,7 +186,7 @@ def ECMS_sub_alloff(
     )
     apm.add(
         MFC_server,
-        "hold_valve_closed_action",
+        "hold_valve_action",
         {
             "device_name": "CO2"
         },
@@ -255,7 +255,7 @@ def ECMS_sub_electrolyte_fill_cell(
 
 def ECMS_sub_prevacuum_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     vacuum_time: float = 10,
 ):
     """prevacuum the cell gas phase side to make the electrolyte contact with GDE
@@ -264,14 +264,16 @@ def ECMS_sub_prevacuum_cell(
     apm = ActionPlanMaker()
 
     # Fill cell with liquid
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "3B", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.vacuum_time})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "3B", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
+
     return apm.action_list
     
-    return apm.action_list
 
 def ECMS_sub_headspace_purge_and_CO2baseline(
     experiment: Experiment,
@@ -497,7 +499,7 @@ def ECMS_sub_headspace_flow_shutdown(
     )
     apm.add(
         MFC_server,
-        "hold_valve_closed_action",
+        "hold_valve_action",
         {
             "device_name": "CO2"
         },
