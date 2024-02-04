@@ -128,7 +128,7 @@ servers:
         V4: PXI-6284/port1/line5
         V5: PXI-6284/port1/line6
         '6': PXI-6284/port1/line7
-        '7': PXI-6284/port2/line0
+        O2N2toggle: PXI-6284/port2/line0
         '8': PXI-6284/port2/line1
         '9': PXI-6284/port2/line2
       dev_pump:

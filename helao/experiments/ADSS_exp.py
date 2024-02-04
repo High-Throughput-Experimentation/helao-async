@@ -43,6 +43,7 @@ __all__ = [
     "ADSS_sub_OCV_photo",
     "ADSS_sub_interrupt",
     "ADSS_sub_gasvalve_toggle",
+    "ADSS_sub_gasvalve_N2flow",
 ]
 
 
@@ -266,10 +267,13 @@ def ADSS_sub_load_solid(
 
 def ADSS_sub_load_liquid(
     experiment: Experiment,
-    experiment_version: int = 2,  # v2 changes from archive_custom_load
+    experiment_version: int = 3,  # v2 changes from archive_custom_load, v3 combine/dilute
+    
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
+    combine_liquids: bool = False,
+    dilute_liquids: bool = False,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
@@ -284,8 +288,8 @@ def ADSS_sub_load_liquid(
                 }
             ).model_dump(),
             "volume_ml": apm.pars.volume_ul_cell_liquid / 1000,
-            "combine_liquids": False,
-            "dilute_liquids": False,
+            "combine_liquids": apm.pars.combine_liquids,
+            "dilute_liquids": apm.pars.dilute_liquids,
         },
         start_condition=ActionStartCondition.wait_for_orch,  #
     )
@@ -2139,24 +2143,32 @@ def ADSS_sub_refill_syringe(
 
     return apm.action_list
 
-
 def ADSS_sub_gasvalve_toggle(
     experiment: Experiment,
     experiment_version: int = 1,
     open: bool = True,
 ):
+ #true for N2 flow
     apm = ActionPlanMaker()
-    if apm.pars.open:    
-        apm.add(
-            NI_server,
-            "gasvalve",
-            {"gasvalve": "V1", "on": 1}
-        )
-    else:
-        apm.add(
-            NI_server,
-            "gasvalve",
-            {"gasvalve": "V1", "on": 0}
-        )
+    apm.add(
+        NI_server,
+        "gasvalve",
+        {"gasvalve": "V1", "on": apm.pars.open}
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_gasvalve_N2flow(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    open: bool = True,
+):
+ #true for N2 flow
+    apm = ActionPlanMaker()
+    apm.add(
+        NI_server,
+        "gasvalve",
+        {"gasvalve": "O2N2toggle", "on": apm.pars.open}
+    )
 
     return apm.action_list  # returns complete action list to orch
