@@ -4,6 +4,7 @@ __all__ = [
     "create_assembly_sample",
     "sort_plate_sample_no_list",
     "generate_sample_no_list",
+    "load_liquid_sample"
 ]
 
 
@@ -24,7 +25,9 @@ from helaocore.models.machine import MachineModel
 
 EXPERIMENTS = __all__
 
-PAL_server = MachineModel(server_name="PAL", machine_name=gethostname().lower()).as_dict()
+PAL_server = MachineModel(
+    server_name="PAL", machine_name=gethostname().lower()
+).as_dict()
 
 
 def create_liquid_sample(
@@ -236,6 +239,33 @@ def generate_sample_no_list(
             # "sample_nos_operator":apm.pars.sample_nos_operator,
             # "platemap_xys":apm.pars.platemap_xys,
             # "platemap_xys_operator":apm.pars.platemap_xys_operator,
+        },
+    )
+
+
+def load_liquid_sample(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    liquid_sample_no: int = 0,
+    machine_name: str = "nomachine",
+    tray: int = 0,
+    slot: int = 0,
+    vial: int = 0
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    liquid = LiquidSample(
+        sample_no=apm.pars.liquid_sample_no, machine_name=apm.pars.machine_name
+    )
+
+    apm.add(
+        PAL_server,
+        "archive_tray_load",
+        {
+            "load_sample_in": liquid,
+            "tray": apm.pars.tray,
+            "slot": apm.pars.slot,
+            "vial": apm.pars.vial
         },
     )
 
