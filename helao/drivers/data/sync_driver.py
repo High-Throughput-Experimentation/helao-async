@@ -622,7 +622,10 @@ class HelaoSyncer:
                 #     f"Re-adding {str(yml.target)} to sync queue with high priority."
                 # )
                 self.running_tasks.pop(yml.target.name)
-                self.task_set.remove(yml.target.name)
+                try:
+                    self.task_set.remove(yml.target.name)
+                except KeyError:
+                    pass
                 await self.enqueue_yml(yml.target, rank - 1)
                 self.base.print_message(f"{str(yml.target)} re-queued, exiting.")
                 return False
