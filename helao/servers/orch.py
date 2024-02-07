@@ -477,7 +477,9 @@ class Orch(Base):
             self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
             if self.use_db:
-                self.syncer.to_s3(self.seq_model.clean_dict(strip_private=True), ) # todo: generate s3 path
+                meta_s3_key = f"sequence/{self.seq_model.sequence_uuid}.json"
+                self.print_message(f"uploading initial active sequence json to s3 ({meta_s3_key})")
+                await self.syncer.to_s3(self.seq_model.clean_dict(strip_private=True), meta_s3_key)
 
             # add all experiments from sequence to experiment queue
             # todo: use seq model instead to initialize some parameters
@@ -597,7 +599,13 @@ class Orch(Base):
         )
 
         # write a temporary exp
+        self.exp_model = self.active_experiment.get_exp()
         await self.write_active_experiment_exp()
+        if self.use_db:
+            meta_s3_key = f"experiment/{self.exp_model.experiment_uuid}.json"
+            self.print_message(f"uploading initial active experiment json to s3 ({meta_s3_key})")
+            await self.syncer.to_s3(self.exp_model.clean_dict(strip_private=True), meta_s3_key)
+        
         return ErrorCodes.none
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
