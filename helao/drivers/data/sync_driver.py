@@ -411,8 +411,13 @@ class HelaoSyncer:
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
         # to load this driver on orch, we check the default "DB" key or take a manually-specified key
-        if not self.config_dict and db_server_name in self.world_config["servers"]:
-            self.config_dict = self.world_config["servers"][db_server_name].get("params", {})
+        if (
+            not self.config_dict.get("aws_config_path", False)
+            and db_server_name in self.world_config["servers"]
+        ):
+            self.config_dict = self.world_config["servers"][db_server_name].get(
+                "params", {}
+            )
 
         self.max_tasks = self.config_dict.get("max_tasks", 4)
         if "aws_config_path" in self.config_dict:
@@ -647,19 +652,17 @@ class HelaoSyncer:
             while prog.dict.get("files_pending", []):
                 for sp in prog.dict["files_pending"]:
                     fp = Path(sp)
-                    self.base.print_message(
-                        f"Pushing {sp} to S3 for {yml.target.name}"
-                    )
+                    self.base.print_message(f"Pushing {sp} to S3 for {yml.target.name}")
                     if fp.suffix == ".hlo":
-                        file_s3_key = (
-                            f"raw_data/{meta['action_uuid']}/{fp.name}.json"
-                        )
+                        file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                         self.base.print_message("Parsing hlo dicts.")
                         try:
                             file_meta, file_data = read_hlo(sp)
                         except Exception as err:
                             str_err = "".join(
-                                traceback.format_exception(type(err), err, err.__traceback__)
+                                traceback.format_exception(
+                                    type(err), err, err.__traceback__
+                                )
                             )
                             self.base.print_message(str_err)
                             file_meta = {}
@@ -716,9 +719,7 @@ class HelaoSyncer:
 
         # next push yml to S3
         if not prog.s3_done or force_s3:
-            self.base.print_message(
-                f"Pushing yml->json to S3 for {yml.target.name}"
-            )
+            self.base.print_message(f"Pushing yml->json to S3 for {yml.target.name}")
             uuid_key = patched_meta[f"{yml.type}_uuid"]
             meta_s3_key = f"{yml.type}/{uuid_key}.json"
             s3_success = await self.to_s3(yml_model, meta_s3_key)
@@ -771,9 +772,7 @@ class HelaoSyncer:
             # pop children from progress dict
             if yml.type in ["experiment", "sequence"]:
                 children = yml.children
-                self.base.print_message(
-                    f"Removing children from progress: {children}."
-                )
+                self.base.print_message(f"Removing children from progress: {children}.")
                 for childyml in children:
                     # self.base.print_message(f"Clearing {childyml.target.name}")
                     finished_child_path = childyml.finished_path.parent
@@ -869,7 +868,11 @@ class HelaoSyncer:
                 )
                 process_list = exp_prog.yml.meta.get("process_list", [])
                 process_input_str = f"{exp_prog.yml.meta['experiment_uuid']}__{pidx}"
-                process_uuid = process_list[pidx] if process_list else str(gen_uuid(process_input_str))
+                process_uuid = (
+                    process_list[pidx]
+                    if process_list
+                    else str(gen_uuid(process_input_str))
+                )
                 process_meta["process_uuid"] = process_uuid
                 process_meta["process_group_index"] = pidx
                 process_meta["action_list"] = []
@@ -1199,7 +1202,7 @@ class HelaoSyncer:
                     f"Did not find any .prg or .progress files in subdirectories of {sync_path}"
                 )
                 self.unsync_dir(sync_path)
-                
+
             else:
                 self.base.print_message(
                     f"Found {len(base_prgs)} .prg or .progress files in subdirectories of {sync_path}"
@@ -1248,8 +1251,6 @@ class HelaoSyncer:
             elif not os.path.isdir(fp):
                 shutil.move(
                     fp,
-                    os.path.dirname(
-                        fp.replace("RUNS_SYNCED", "RUNS_FINISHED")
-                    ),
+                    os.path.dirname(fp.replace("RUNS_SYNCED", "RUNS_FINISHED")),
                 )
         self.base.print_message(f"Successfully reverted {sync_dir}")
