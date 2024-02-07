@@ -26,9 +26,10 @@ class LocalLoader:
         target_state = self.target.split("RUNS_")[-1].split(os.sep)[0]
         states = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED", "RUNS_DIAG")
         state_dir = f"RUNS_{target_state}"
+        process_dir = self.target.replace(state_dir, "PROCESSES") 
         check_dirs = [
             f"{self.target.replace(state_dir, x)}" for x in states
-        ] + [self.target.replace(state_dir, "PROCESSES")]
+        ] + [process_dir]
         if not os.path.exists(self.target):
             raise FileNotFoundError(
                 "data_path argument is not a valid file or folder path"
@@ -38,6 +39,7 @@ class LocalLoader:
             with ZipFile(self.target, "r") as zf:
                 zip_contents = zf.namelist()
             _yml_paths = [x for x in zip_contents if x.endswith(".yml")]
+            _yml_paths += glob(os.path.join(process_dir, "**", "*.yml"), recursive=True)
         elif os.path.isdir(self.target):
             for check_dir in check_dirs:
                 _yml_paths += glob(os.path.join(check_dir, "**", "*.yml"), recursive=True)
