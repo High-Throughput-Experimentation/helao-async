@@ -1817,24 +1817,31 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
                     "rinse_4": washfour,
                 }
             )
+    # epm.add_experiment(
+    #         "ADSS_sub_interrupt",
+    #         {
+    #             "reason":"Pause for injection of phosphoric",
+    #         },
+    #     )
+
     epm.add_experiment(
-            "ADSS_sub_interrupt",
-            {
-                "reason":"Pause for injection of phosphoric"
-            },
-        )
-    epm.add_experiment(
-        "ADSS_sub_load_liquid",
+        "ADSS_sub_tranfer_liquid_in",
         {
-            "liquid_custom_position": "cell1_we",
+            "destination": "cell1_we",
+            "source_tray": phosphoric_location[0],
+            "source_slot": phosphoric_location[1],
+            "source_vial": phosphoric_location[2],            
             "liquid_sample_no": phosphoric_sample_no,
-            "volume_ul_cell_liquid": phosphoric_quantity_ul,
-            "combine_liquids": True,
-            "dilute_liquids": False,
+            "aliquot_volume_ul": phosphoric_quantity_ul,
+            "PAL_Injector": PAL_Injector,
+            "PAL_Injector_id": PAL_Injector_id,
+            "rinse_1": True,
+            "rinse_2": False,
+            "rinse_3": False,
+            "rinse_4": True,
         },
     )
 
-#need to add rshs transfer from vial tray_custom when not manual    
 
 
 
