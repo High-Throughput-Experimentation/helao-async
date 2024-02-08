@@ -9,6 +9,7 @@ __all__ = [
     "ECMS_sub_load_solid",
     "ECMS_sub_load_liquid",
     "ECMS_sub_load_gas",
+    "ECMS_sub_normal_state",
     "ECMS_sub_alloff",
     "ECMS_sub_electrolyte_fill_cell",
     "ECMS_sub_prevacuum_cell",
@@ -145,6 +146,50 @@ def ECMS_sub_load_gas(
     )
     return apm.action_list
 
+
+def ECMS_sub_normal_state(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+    """Set ECMS to 'normal' state.
+
+    All experiments begin and end in the following 'normal' state:
+    - separate (old) MFC for CO2 is ON to bypass GDE cell but go to MS.
+
+    Args:
+        experiment (Experiment): Experiment object provided by Orch
+    """
+
+    apm = ActionPlanMaker()
+
+    # Fill cell with liquid
+
+    apm.add(
+        MFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": 0.0,
+            "ramp_sccm_sec": 0.0,
+            "device_name": "CO2",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        MFC_server,
+        "hold_valve_action",
+        {
+            "device_name": "CO2"
+        },
+        asc.no_wait,
+    )
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 1})
+    #apm.add(ORCH_server, "wait", {"waittime": apm.pars.baseline_duration})
+    return apm.action_list
 
 #TODO add MFC off
 def ECMS_sub_alloff(
@@ -328,6 +373,8 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
 # =============================================================================
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.CO2equilibrium_duration})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.MS_baseline_duration})
     return apm.action_list
 
