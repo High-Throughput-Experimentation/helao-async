@@ -429,7 +429,7 @@ def CCSI_sub_initialization_firstpart(
 #
 # pCO2 SENSOR PURGE
     # only valve 3 closed //differ from probe purge
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}) #, asc.no_wait)  #no wait in error? 
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.Sensorpurge1_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0}, asc.no_wait)
@@ -440,7 +440,7 @@ def CCSI_sub_initialization_firstpart(
 
     return apm.action_list
 
-
+## multivalve on ccsi1 4 gas, 5 clean, 7 solution
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,

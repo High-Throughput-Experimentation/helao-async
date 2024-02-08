@@ -415,16 +415,17 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000} )
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.Probepurge1_duration})
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.Probepurge1_duration} )
+   # apm.add(ORCH_server, "wait", {"waittime": apm.pars.Probepurge1_duration},)
 
 #
 # pCO2 SENSOR PURGE
     # only valve 3 closed //differ from probe purge
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.Sensorpurge1_duration})
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})# , asc.no_wait) no wait in error?
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.Sensorpurge1_duration} )
+    #apm.add(ORCH_server, "wait", {"waittime": apm.pars.Sensorpurge1_duration})
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
@@ -432,6 +433,7 @@ def CCSI_sub_initialization_firstpart(
 
     return apm.action_list
 
+### multivalve on ccsi2 4 gas, 5 solution, 6 clean
 
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
@@ -474,7 +476,7 @@ def CCSI_sub_cellfill(
     else:
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1})
         apm.add(
-            NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 1}, asc.no_wait
+            NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait
         )
         apm.add(
             NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 1}, asc.no_wait
@@ -594,9 +596,9 @@ def CCSI_sub_co2monitoring(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000}, asc.no_wait )
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
+    #apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
     return apm.action_list
 
@@ -644,7 +646,7 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000}, asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
 
     apm.add(
         MFC_server,
@@ -654,11 +656,11 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
             "ramp_sccm_sec": apm.pars.flowramp_sccm,
             "duration": apm.pars.co2measure_duration - apm.pars.init_max_flow_s,
             "acquisition_rate": apm.pars.co2measure_acqrate,
-        },
+        }, asc.no_wait 
     )
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+   # apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
     return apm.action_list
 
@@ -759,9 +761,9 @@ def CCSI_sub_co2constantpressure(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000}, asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
     return apm.action_list
 
@@ -826,6 +828,7 @@ def CCSI_sub_co2mass_temp(
             "duration": apm.pars.co2measure_duration - apm.pars.init_max_flow_s,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
+        asc.no_wait,
         technique_name="Measure_added_co2",
         process_finish=True,
         process_contrib=[
@@ -904,10 +907,10 @@ def CCSI_sub_co2massdose(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000},asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration},asc.no_wait )
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
     apm.add(
         MFC_server,
         "cancel_acquire_flowrate",
@@ -979,11 +982,11 @@ def CCSI_sub_co2maintainconcentration(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000},asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration},asc.no_wait )
 
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
     apm.add(
         MFC_server,
         "cancel_acquire_flowrate",
@@ -1164,6 +1167,7 @@ def CCSI_sub_clean_inject(
                 "duration": 1.5,
                 "acquisition_rate": 0.5,
             },
+            asc.no_wait,
         )
     apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
