@@ -44,6 +44,7 @@ __all__ = [
     "ADSS_sub_interrupt",
     "ADSS_sub_gasvalve_toggle",
     "ADSS_sub_gasvalve_N2flow",
+    "ADSS_sub_transfer_liquid_in",
 ]
 
 
@@ -268,7 +269,7 @@ def ADSS_sub_load_solid(
 def ADSS_sub_load_liquid(
     experiment: Experiment,
     experiment_version: int = 3,  # v2 changes from archive_custom_load, v3 combine/dilute
-    
+
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
@@ -2172,3 +2173,65 @@ def ADSS_sub_gasvalve_N2flow(
     )
 
     return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_transfer_liquid_in(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    liquid_sample_no: int = 1,
+    aliquot_volume_ul: int = 200,
+    source_tray: int = 2,
+    source_slot: int = 2,
+    source_vial: int = 54,
+    destination: str = "cell1_we",
+    PAL_Injector: str = "LS 4",
+    PAL_Injector_id: str = "fill serial number here",
+    rinse_1: int = 1,
+    rinse_2: int = 0,
+    rinse_3: int = 0,
+    rinse_4: int = 0,
+):
+    apm = ActionPlanMaker()
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid",
+        {
+            "custom": apm.pars.destination,
+            "source_liquid_in": LiquidSample(
+                **{
+                    "sample_no": apm.pars.liquid_sample_no,
+                    "machine_name": gethostname(),
+                }
+            ).model_dump(),
+            "volume_ml": apm.pars.aliquot_volume_ul,
+            "combine_liquids": True,
+            "dilute_liquids": False,
+        },
+        technique_name="liquid_addition",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    apm.add(
+        PAL_server,
+        "PAL_transfer_tray_custom",
+        {
+            "volume_ul": apm.pars.aliquot_volume_ul,
+            "source_tray": apm.pars.source_tray,
+            "source_slot": apm.pars.source_slot,
+            "source_vial": apm.pars.source_vial,
+            "dest": apm.pars.destination,
+            "tool": apm.pars.PAL_Injector,
+            "wash1": apm.pars.rinse_1,
+            "wash2": apm.pars.rinse_2,
+            "wash3": apm.pars.rinse_3,
+            "wash4": apm.pars.rinse_4,
+
+        },
+    )
+
+    return apm.action_list  # returns complete action list to orch
+

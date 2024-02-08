@@ -247,7 +247,7 @@ def load_liquid_sample(
     experiment: Experiment,
     experiment_version: int = 1,
     liquid_sample_no: int = 0,
-    machine_name: str = "nomachine",
+    machine_name: str = "hte-xxxx-xx",
     tray: int = 0,
     slot: int = 0,
     vial: int = 0
