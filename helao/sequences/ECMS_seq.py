@@ -88,7 +88,7 @@ def ECMS_series_CA(
                 "IErange": IErange,
             },
         )
-        epm.add_experiment("ECMS_sub_headspace_flow_shutdown",{})
+        epm.add_experiment("ECMS_sub_normal_state",{})
         epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})      
         epm.add_experiment("ECMS_sub_electrolyte_clean_cell", {"liquid_backward_time": liquid_cleancell_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no})    
     epm.add_experiment("ECMS_sub_alloff", {})
@@ -195,7 +195,7 @@ def ECMS_repeat_CV(
             },
         )
 
-        epm.add_experiment("ECMS_sub_headspace_flow_shutdown",{})
+        epm.add_experiment("ECMS_sub_normal_state",{})
         epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})        
         epm.add_experiment("ECMS_sub_electrolyte_clean_cell", {"liquid_backward_time": liquid_cleancell_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no})
     
