@@ -1750,11 +1750,11 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     epm.add_experiment(
         "ADSS_sub_CV",
         {
-            "Vinit_vsRHE": CleaningCV_Vinit_vsRHE[i],
-            "Vapex1_vsRHE": CleaningCV_Vinit_vsRHE[i],
-            "Vapex2_vsRHE": CleaningCV_Vapex2_vsRHE[i],
-            "Vfinal_vsRHE": CleaningCV_Vinit_vsRHE[i],
-            "scanrate_voltsec": CleaningCV_scanrate_voltsec[i],
+            "Vinit_vsRHE": CleaningCV_Vinit_vsRHE,
+            "Vapex1_vsRHE": CleaningCV_Vinit_vsRHE,
+            "Vapex2_vsRHE": CleaningCV_Vapex2_vsRHE,
+            "Vfinal_vsRHE": CleaningCV_Vinit_vsRHE,
+            "scanrate_voltsec": CleaningCV_scanrate_voltsec,
             "SampleRate": CV_samplerate_sec,
             "cycles": CleaningCV_cycles,
             "gamry_i_range": gamry_i_range,
