@@ -603,13 +603,14 @@ def ADSS_PA_CVs_CAs_cell(
     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_PA_CVs_CAs_CVs_cell_simple(
-    sequence_version: int = 6, #add pump reverse after filling to prevent bubbles
+    sequence_version: int = 7, #add move to clean and clean 
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
     same_sample: bool = False,
     keep_electrolyte: bool = False,
     use_electrolyte: bool = False,
+    Move_to_clean_and_clean: bool = True,
     #liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 220,
     liquid_sample_volume_ul: float = 4000,
@@ -645,9 +646,9 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     aliquot_volume_ul: int = 200,
     Syringe_rate_ulsec: float = 300,
     # Drain: bool = False,
-     Cell_draintime_s: float = 60,
-     #ReturnLineWait_s: float = 30,
-     ReturnLineReverseWait_s: float = 10,
+    Cell_draintime_s: float = 60,
+    # ReturnLineWait_s: float = 30,
+    ReturnLineReverseWait_s: float = 10,
     # ResidualWait_s: float = 15,
     # flush_volume_ul: float = 2000,
     # clean: bool = False,
@@ -655,6 +656,9 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     # refill: bool = False,
     # refill_volume_ul: float = 6000,
     # water_refill_volume_ul: float = 6000,
+    Clean_volume_ul: float = 12000,
+    Clean_recirculate_s: float = 30,
+    Clean_drain_s: float = 60,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "LS4_peek"
 ):
@@ -903,6 +907,14 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
             }
         )
 
+    if Move_to_clean_and_clean:
+        epm.add_experiment("ADSS_sub_move_to_clean_cell", {})
+        epm.add_experiment("ADSS_sub_clean_cell",
+                           {
+                               "Clean_volume_ul": Clean_volume_ul,
+                               "ReturnLineWait_s": Clean_recirculate_s,
+                               "DrainWait_s": Clean_drain_s,
+                           })
 
     return epm.experiment_plan_list  # returns complete experiment list
 
