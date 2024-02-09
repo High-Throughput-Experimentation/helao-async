@@ -817,7 +817,7 @@ def CCSI_sub_co2mass_temp(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000}, asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
 
     apm.add(
         MFC_server,
@@ -838,7 +838,7 @@ def CCSI_sub_co2mass_temp(
     )
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
     return apm.action_list
 
@@ -1368,6 +1368,6 @@ def CCSI_leaktest_co2(
         },
     )
     if apm.pars.recirculate:
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000},asc.no_wait )
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
 
     return apm.action_list
