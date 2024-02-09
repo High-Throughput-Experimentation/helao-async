@@ -207,12 +207,12 @@ def CCSI_sub_headspace_purge_and_measure(
 
 #
 # DILUTION PURGE        
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000} )
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  # DeltaDilute time usually 15
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.DeltaDilute1_duration} )
+        #apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  # DeltaDilute time usually 15
 
 #
 # MAIN HEADSPACE PURGE
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
@@ -246,8 +246,8 @@ def CCSI_sub_headspace_purge_and_measure(
         process_finish=True,
         process_contrib=[ProcessContrib.files],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000}, asc.no_wait )
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
 
     return apm.action_list
@@ -270,12 +270,12 @@ def CCSI_sub_drain(
 
 #
 # DILUTION PURGE        
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000} )
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  # DeltaDilute time usually 15
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.DeltaDilute1_duration} )
+        #apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  # DeltaDilute time usually 15
 
 #
 # MAIN HEADSPACE PURGE and FILL
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+   # apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
@@ -284,9 +284,9 @@ def CCSI_sub_drain(
 
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
     if apm.pars.recirculation:
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000} )
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.recirculation_duration})
-        apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.recirculation_duration} )
+        #apm.add(ORCH_server, "wait", {"waittime": apm.pars.recirculation_duration})
+        #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
     if apm.pars.initialization:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
@@ -325,7 +325,7 @@ def CCSI_sub_initialization_end_state(
     # apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0}, asc.no_wait)
     # apm.add(ORCH_server, "wait", {"waittime": 0.25})
     # apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
-    # apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     # apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
     #   apm.add(MFC---stuff Flow ON)
     return apm.action_list
@@ -1158,7 +1158,7 @@ def CCSI_sub_clean_inject(
             ProcessContrib.files,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000},asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000,"duration": apm.pars.co2measure_duration+ 1.5},asc.no_wait )
     if apm.pars.use_co2_check:
         apm.add(
             CO2S_server,
@@ -1169,7 +1169,7 @@ def CCSI_sub_clean_inject(
             },
             asc.no_wait,
         )
-    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
     if apm.pars.use_co2_check:
         apm.add(

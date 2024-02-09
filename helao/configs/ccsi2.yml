@@ -157,7 +157,7 @@ servers:
       devices:
         N2:
           port: COM5
-          unit_id: B
+          unit_id: A
 
 
   CALC:
