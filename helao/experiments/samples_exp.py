@@ -4,7 +4,8 @@ __all__ = [
     "create_assembly_sample",
     "sort_plate_sample_no_list",
     "generate_sample_no_list",
-    "load_liquid_sample"
+    "load_liquid_sample",
+    "orch_sub_wait"
 ]
 
 
@@ -29,6 +30,8 @@ PAL_server = MachineModel(
     server_name="PAL", machine_name=gethostname().lower()
 ).as_dict()
 
+ORCH_HOST = gethostname()
+ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 
 def create_liquid_sample(
     experiment: Experiment,
@@ -269,4 +272,15 @@ def load_liquid_sample(
         },
     )
 
+    return apm.action_list  # returns complete action list to orch
+
+
+def orch_sub_wait(
+    experiment: Experiment,
+    experiment_version: int = 2,
+    wait_time_s: float = 10,
+):
+    apm = ActionPlanMaker()
+       
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time_s})
     return apm.action_list  # returns complete action list to orch
