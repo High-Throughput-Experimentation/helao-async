@@ -603,7 +603,7 @@ def ADSS_PA_CVs_CAs_cell(
     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_PA_CVs_CAs_CVs_cell_simple(
-    sequence_version: int = 6, #add pump reverse after filling to prevent bubbles
+    sequence_version: int = 7, #add move to clean and clean 
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
