@@ -1995,16 +1995,7 @@ def ADSS_PA_CV_TRI(
     cleaning_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
     cleaning_CV_samplerate_sec: float = 0.05,
     
-    #CV1 in N2 for background
-    CV_O2_cycles: List[int] = [5,3,3],
-    CV_O2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
-    CV_O2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
-    CV_O2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    CV_O2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    CV_O2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
-    CV_O2_samplerate_sec: float = 0.05,
-
-    #CV2 in O2 and with and without PA
+    #CVs in N2 for background
     CV_N2_cycles: List[int] = [5,3,3],
     CV_N2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
     CV_N2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
@@ -2012,6 +2003,15 @@ def ADSS_PA_CV_TRI(
     CV_N2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
     CV_N2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
     CV_N2_samplerate_sec: float = 0.05,
+
+    #CVs in O2 and with and without PA
+    CV_O2_cycles: List[int] = [5,3,3],
+    CV_O2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
+    CV_O2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
+    CV_O2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    CV_O2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    CV_O2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
+    CV_O2_samplerate_sec: float = 0.05,
 
     #Pstat and ref info
     gamry_i_range: str = "auto",
@@ -2290,7 +2290,7 @@ def ADSS_PA_CV_TRI(
             washfour = (washmod + 3) %4 %3 %2
 
             epm.add_experiment(
-            "ADSS_sub_tranfer_liquid_in",
+            "ADSS_sub_transfer_liquid_in",
             {
                 "destination": "cell1_we",
                 "source_tray": phosphoric_location[0],
