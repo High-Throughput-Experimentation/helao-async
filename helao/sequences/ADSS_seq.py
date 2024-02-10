@@ -2020,8 +2020,8 @@ def ADSS_PA_CV_TRI(
     
     #aliquote info
     aliquot_init: bool = True,
-    aliquot_cleaningCV: List[int] = [0],
-    aliquote_CV_init: List[int] = [1],
+    aliquot_after_cleaningCV: List[int] = [0],
+    aliquote_after_CV_init: List[int] = [1],
     aliquote_CV_O2: List[int] = [1,1,1],
     aliquote_CV_final: List[int] = [0],
     aliquot_volume_ul: int = 100,
@@ -2167,7 +2167,7 @@ def ADSS_PA_CV_TRI(
                     "aliquot_insitu": False,
                 },
             )
-            if aliquot_cleaningCV[i] == 1:
+            if aliquot_after_cleaningCV[i] == 1:
                 
                 washmod += 1
                 washone = washmod %4 %3 %2
@@ -2208,7 +2208,7 @@ def ADSS_PA_CV_TRI(
                     "aliquot_insitu": False,
                 },
             )
-            if aliquote_CV_init[i] == 1:
+            if aliquote_after_CV_init[i] == 1:
                 
                 washmod += 1
                 washone = washmod %4 %3 %2
