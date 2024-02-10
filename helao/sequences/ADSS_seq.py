@@ -1959,7 +1959,7 @@ def ADSS_PA_CV_TRI(
     plate_id: int = 5917,
     plate_sample_no: List[int] = [16304],  #  instead of map select
     
-    #boolean info
+    #side info
     same_sample: bool = False,
     keep_electrolyte: bool = False,
     use_electrolyte: bool = False,
@@ -1970,13 +1970,16 @@ def ADSS_PA_CV_TRI(
     purge_wait_N2_to_O2_m: int = 5,
     purge_wait_O2_to_N2_m: int = 15,
 
-    #electrolyte info and injection info
+    #electrolyte info
     ph: float = 1.24,
     liquid_sample_no: int = 220,
     liquid_sample_volume_ul: float = 4000,
     Syringe_rate_ulsec: float = 300,
     fill_recirculate_wait_time_s: float = 30,
     fill_recirculate_reverse_wait_time_s: float = 1,
+    
+    #phosphoric acid injection info
+    Inject: bool= True,
     phosphoric_sample_no: int = 99999,
     phosphoric_location: List[int] = [2,2,54],
     phosphoric_quantity_ul: int = 0,
@@ -2279,28 +2282,29 @@ def ADSS_PA_CV_TRI(
                 )
 
         #inject phosphoric acid
-        washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        if Inject:
+            washmod += 1
+            washone = washmod %4 %3 %2
+            washtwo = (washmod + 1) %4 %3 %2
+            washthree = (washmod + 2) %4 %3 %2
+            washfour = (washmod + 3) %4 %3 %2
 
-        epm.add_experiment(
-        "ADSS_sub_tranfer_liquid_in",
-        {
-            "destination": "cell1_we",
-            "source_tray": phosphoric_location[0],
-            "source_slot": phosphoric_location[1],
-            "source_vial": phosphoric_location[2],            
-            "liquid_sample_no": phosphoric_sample_no,
-            "aliquot_volume_ul": phosphoric_quantity_ul,
-            "PAL_Injector": PAL_Injector,
-            "PAL_Injector_id": PAL_Injector_id,
-            "rinse_1": washone,
-            "rinse_2": washtwo,
-            "rinse_3": washthree,
-            "rinse_4": washfour,
-        },)
+            epm.add_experiment(
+            "ADSS_sub_tranfer_liquid_in",
+            {
+                "destination": "cell1_we",
+                "source_tray": phosphoric_location[0],
+                "source_slot": phosphoric_location[1],
+                "source_vial": phosphoric_location[2],            
+                "liquid_sample_no": phosphoric_sample_no,
+                "aliquot_volume_ul": phosphoric_quantity_ul,
+                "PAL_Injector": PAL_Injector,
+                "PAL_Injector_id": PAL_Injector_id,
+                "rinse_1": washone,
+                "rinse_2": washtwo,
+                "rinse_3": washthree,
+                "rinse_4": washfour,
+            },)
 
         #recirculate to mix PA into electrolyte
         epm.add_experiment(
