@@ -1996,22 +1996,22 @@ def ADSS_PA_CV_TRI(
     cleaning_CV_samplerate_sec: float = 0.05,
     
     #CV1 in N2 for background
-    CV1_cycles: List[int] = [5,3,3],
-    CV1_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
-    CV1_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
-    CV1_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    CV1_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    CV1_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
-    CV1_samplerate_sec: float = 0.05,
+    CV_O2_cycles: List[int] = [5,3,3],
+    CV_O2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
+    CV_O2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
+    CV_O2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    CV_O2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    CV_O2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
+    CV_O2_samplerate_sec: float = 0.05,
 
     #CV2 in O2 and with and without PA
-    CV2_cycles: List[int] = [5,3,3],
-    CV2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
-    CV2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
-    CV2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    CV2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    CV2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
-    CV2_samplerate_sec: float = 0.05,
+    CV_N2_cycles: List[int] = [5,3,3],
+    CV_N2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
+    CV_N2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
+    CV_N2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    CV_N2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    CV_N2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
+    CV_N2_samplerate_sec: float = 0.05,
 
     #Pstat and ref info
     gamry_i_range: str = "auto",
@@ -2190,16 +2190,16 @@ def ADSS_PA_CV_TRI(
                 )
 
         #start background CVs in N2
-        for i, CV_cycle in enumerate(CV1_cycles):
+        for i, CV_cycle in enumerate(CV_N2_cycles):
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": CV1_Vinit_vsRHE[i],
-                    "Vapex1_vsRHE": CV1_Vapex1_vsRHE[i],
-                    "Vapex2_vsRHE": CV1_Vapex2_vsRHE[i],
-                    "Vfinal_vsRHE": CV1_Vfinal_vsRHE[i],
-                    "scanrate_voltsec": CV1_scanrate_voltsec[i],
-                    "SampleRate": CV1_samplerate_sec,
+                    "Vinit_vsRHE": CV_N2_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": CV_N2_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": CV_N2_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": CV_N2_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": CV_N2_scanrate_voltsec[i],
+                    "SampleRate": CV_N2_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -2240,17 +2240,17 @@ def ADSS_PA_CV_TRI(
             })
 
         #start O2 cycles
-        for i, CV_cycle in enumerate(CV2_cycles):
+        for i, CV_cycle in enumerate(CV_O2_cycles):
 
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": CV2_Vinit_vsRHE[i],
-                    "Vapex1_vsRHE": CV2_Vapex1_vsRHE[i],
-                    "Vapex2_vsRHE": CV2_Vapex2_vsRHE[i],
-                    "Vfinal_vsRHE": CV2_Vfinal_vsRHE[i],
-                    "scanrate_voltsec": CV2_scanrate_voltsec[i],
-                    "SampleRate": CV2_samplerate_sec,
+                    "Vinit_vsRHE": CV_O2_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": CV_O2_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": CV_O2_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": CV_O2_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": CV_O2_scanrate_voltsec[i],
+                    "SampleRate": CV_O2_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -2315,17 +2315,17 @@ def ADSS_PA_CV_TRI(
             })
 
         #start O2 cycles with PA
-        for i, CV_cycle in enumerate(CV2_cycles):
+        for i, CV_cycle in enumerate(CV_O2_cycles):
 
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": CV2_Vinit_vsRHE[i],
-                    "Vapex1_vsRHE": CV2_Vapex1_vsRHE[i],
-                    "Vapex2_vsRHE": CV2_Vapex2_vsRHE[i],
-                    "Vfinal_vsRHE": CV2_Vfinal_vsRHE[i],
-                    "scanrate_voltsec": CV2_scanrate_voltsec[i],
-                    "SampleRate": CV2_samplerate_sec,
+                    "Vinit_vsRHE": CV_O2_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": CV_O2_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": CV_O2_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": CV_O2_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": CV_O2_scanrate_voltsec[i],
+                    "SampleRate": CV_O2_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -2366,16 +2366,16 @@ def ADSS_PA_CV_TRI(
         
 
         #start background CVs in N2 with phosphoric acid
-        for i, CV_cycle in enumerate(CV1_cycles):
+        for i, CV_cycle in enumerate(CV_N2_cycles):
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": CV1_Vinit_vsRHE[i],
-                    "Vapex1_vsRHE": CV1_Vapex1_vsRHE[i],
-                    "Vapex2_vsRHE": CV1_Vapex2_vsRHE[i],
-                    "Vfinal_vsRHE": CV1_Vfinal_vsRHE[i],
-                    "scanrate_voltsec": CV1_scanrate_voltsec[i],
-                    "SampleRate": CV1_samplerate_sec,
+                    "Vinit_vsRHE": CV_N2_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": CV_N2_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": CV_N2_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": CV_N2_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": CV_N2_scanrate_voltsec[i],
+                    "SampleRate": CV_N2_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
