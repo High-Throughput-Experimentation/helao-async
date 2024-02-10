@@ -1961,8 +1961,8 @@ def ADSS_PA_CV_TRI(
     
     #side info
     same_sample: bool = False,
-    keep_electrolyte: bool = False,
-    use_electrolyte: bool = False,
+    use_current_electrolyte: bool = False,
+    keep_electrolyte_at_end: bool = False,
     move_to_clean_and_clean: bool = True,
     
     #purge wait times
@@ -1980,7 +1980,7 @@ def ADSS_PA_CV_TRI(
     
     #phosphoric acid injection info
     Inject: bool= True,
-    phosphoric_sample_no: int = 99999,
+    phosphoric_sample_no: int = 1261,
     phosphoric_location: List[int] = [2,2,54],
     phosphoric_quantity_ul: int = 0,
     inject_recirculate_wait_time_s: float = 60,
@@ -2075,14 +2075,14 @@ def ADSS_PA_CV_TRI(
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
                 "solid_sample_no": sample,
-                "previous_liquid": use_electrolyte,
+                "previous_liquid": use_current_electrolyte,
                 "liquid_custom_position": "cell1_we",
                 "liquid_sample_no": liquid_sample_no,            
                 "liquid_sample_volume_ul": liquid_sample_volume_ul,
             }
         )
 
-        if not use_electrolyte:
+        if not use_current_electrolyte:
             epm.add_experiment(
                 "ADSS_sub_cellfill_prefilled",
                 {
@@ -2406,7 +2406,7 @@ def ADSS_PA_CV_TRI(
                     }
                 )
 
-        if keep_electrolyte:
+        if keep_electrolyte_at_end:
             epm.add_experiment("ADSS_sub_unload_solid",{})
 
         else:
