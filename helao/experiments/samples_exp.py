@@ -257,15 +257,12 @@ def load_liquid_sample(
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    liquid = LiquidSample(
-        sample_no=apm.pars.liquid_sample_no, machine_name=apm.pars.machine_name
-    )
-
     apm.add(
         PAL_server,
         "archive_tray_load",
         {
-            "load_sample_in": liquid,
+            "liquid_sample_no": apm.pars.liquid,
+            "machine_name": apm.pars.machine_name,
             "tray": apm.pars.tray,
             "slot": apm.pars.slot,
             "vial": apm.pars.vial
