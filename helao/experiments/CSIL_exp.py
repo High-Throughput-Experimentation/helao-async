@@ -1158,7 +1158,7 @@ def CCSI_sub_clean_inject(
             ProcessContrib.files,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000,"duration": apm.pars.co2measure_duration+ 1.5},asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000,"duration_sec": apm.pars.co2measure_duration+ 1.5},asc.no_wait )
     if apm.pars.use_co2_check:
         apm.add(
             CO2S_server,
