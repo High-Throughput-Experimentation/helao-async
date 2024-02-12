@@ -249,6 +249,9 @@ def ECMS_sub_alloff(
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "3B", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0}, asc.no_wait)
@@ -389,6 +392,7 @@ def ECMS_sub_CA(
     ref_offset__V: float = 0.0,
     ref_type: str = "leakless",
     pH: float = 6.8,
+    MS_equilibrium_time: float = 90.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
@@ -425,7 +429,7 @@ def ECMS_sub_CA(
             ProcessContrib.samples_out,
         ],
     )
-
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.MS_equilibrium_time})
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
     return apm.action_list
@@ -445,6 +449,7 @@ def ECMS_sub_CV(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
+    MS_equilibrium_time: float = 90.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
@@ -516,7 +521,7 @@ def ECMS_sub_CV(
             ProcessContrib.samples_out,
         ],
     )
-
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.MS_equilibrium_time})
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
     return apm.action_list
