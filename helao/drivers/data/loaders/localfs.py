@@ -231,7 +231,7 @@ class LocalLoader:
 
     def get_hlo(self, yml_path: str, hlo_fn: str):
         if self.target.endswith(".zip"):
-            hlotarget = os.path.join(os.path.dirname(yml_path), hlo_fn)
+            hlotarget ="/".join([os.path.dirname(yml_path), hlo_fn])
             with ZipFile(self.target, "r") as zf:
                 lines = zf.open(hlotarget).readlines()
 
