@@ -2594,6 +2594,12 @@ def ADSS_PA_CV_TRI_test(
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 }
             )
+            epm.add_experiment("ADSS_sub_refill_syringes", {
+                "Waterclean_volume_ul": 0,
+                "Solution_volume_ul": liquid_sample_volume_ul,
+                "Syringe_rate_ulsec": 300,
+                }
+            )
             ########################### here add refill electrolyte syringe and set V3 back to False state at end ###########################
 
 
@@ -2945,6 +2951,18 @@ def ADSS_PA_CV_TRI_test(
                                 "DrainWait_s": clean_drain_s,
                             }
                         )
+            #if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
+            if clean_volume_ul > 10000:
+                volume = 6000 + clean_volume_ul
+            else:
+                volume = clean_volume_ul
+
+            epm.add_experiment("ADSS_sub_refill_syringes", {
+                "Waterclean_volume_ul": volume,
+                "Solution_volume_ul": 0,
+                "Syringe_rate_ulsec": 300,
+                }
+            )
             ########################### here add refill water syringe and set V2 back to False state at end. if clean V over 6mL and do 6+whatever clean V is ###########################
 
     return epm.experiment_plan_list  # returns complete experiment list
