@@ -585,8 +585,10 @@ def makeApp(confPrefix, server_key, helao_root):
     async def archive_tray_load(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        liquid_sample_no: int = 0,
-        machine_name: str = "hte-xxx-xxx",
+        load_sample_in: SampleUnion = Body(
+            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            embed=True,
+        ),
         tray: int = None,
         slot: int = None,
         vial: int = None,
@@ -594,8 +596,6 @@ def makeApp(confPrefix, server_key, helao_root):
         active = await app.base.setup_and_contain_action(
             action_abbr="load_sample",
         )
-        liquid_sample = LiquidSample(sample_no=active.action.action_params["sample_no"], machine_name=active.action.action_params["liquid_sample"]),
-        active.action_params["load_sample_in"] = liquid_sample
         error_code, loaded_sample = await app.driver.archive.tray_load(
             **active.action.action_params
         )
