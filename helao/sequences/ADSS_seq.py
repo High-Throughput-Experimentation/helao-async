@@ -2438,7 +2438,7 @@ def ADSS_PA_CV_TRI(
 
 def ADSS_PA_CV_TRI_test(
     sequence_version: int = 1, #
-    note: str = "need as many samples as you expect combinations of UPL and LPL",
+    #note: str = "need as many samples as you expect combinations of UPL and LPL",
     
     #sample info
     #solid_custom_position: str = "cell1_we",
