@@ -18,7 +18,8 @@ __all__ = [
     "ECMS_sub_CV",
     "ECMS_sub_headspace_flow_shutdown",
     "ECMS_sub_drain",
-    "ECMS_sub_electrolyte_clean_cell"
+    "ECMS_sub_electrolyte_clean_cell",
+    "ECMS_sub_cali"
 ]
 
 ###
@@ -608,4 +609,56 @@ def ECMS_sub_electrolyte_clean_cell(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
     #apm.add_action_list(ECMS_sub_drain(experiment))
 
+    return apm.action_list
+
+def ECMS_sub_cali(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    CO2flowrate_sccm: float = 5.0,
+    Califlowrate_sccm: float = 5.0,
+    flow_ramp_sccm: float = 0,
+):
+    """prevacuum the cell gas phase side to make the electrolyte contact with GDE
+    """
+
+    apm = ActionPlanMaker()
+
+    # set CO2 flow rate
+    apm.add(
+        MFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": apm.pars.CO2flowrate_sccm,
+            "ramp_sccm_sec": apm.pars.flow_ramp_sccm,
+            "device_name": "CO2",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        MFC_server,
+        "cancel_hold_valve_action",
+        {
+            "device_name": "CO2"
+        },
+        asc.no_wait,
+    )
+    # set Calibration gas flow rate
+    apm.add(
+        MFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": apm.pars.Califlowrate_sccm,
+            "ramp_sccm_sec": apm.pars.flow_ramp_sccm,
+            "device_name": "Caligas",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        MFC_server,
+        "cancel_hold_valve_action",
+        {
+            "device_name": "Caligas"
+        },
+        asc.no_wait,
+    )
     return apm.action_list

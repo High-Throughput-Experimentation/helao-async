@@ -21,7 +21,7 @@ def ECMS_initiation(
     solid_sample_no: int = 1,    
     reservoir_liquid_sample_no: int = 2,
     volume_ul_cell_liquid: float = 600,
-    liquid_forward_time: float = 50,
+    liquid_forward_time: float = 20,
     liquid_backward_time: float = 80,   
     vacuum_time: float = 10,   
     CO2equilibrium_duration: float = 30,
@@ -93,7 +93,19 @@ def ECMS_initiation(
     )
 
     epm.add_experiment("ECMS_sub_normal_state",{})
-    epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})        
+    epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})   
+# repeat refill to make sure contact was successfully made
+    epm.add_experiment(
+        "ECMS_sub_electrolyte_fill_cell",
+        {
+            "liquid_forward_time": liquid_forward_time,
+            "liquid_backward_time": liquid_backward_time,
+            "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+            "volume_ul_cell_liquid": volume_ul_cell_liquid,
+        },
+    )     
+    epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})   
+
     return epm.experiment_plan_list
 
 
