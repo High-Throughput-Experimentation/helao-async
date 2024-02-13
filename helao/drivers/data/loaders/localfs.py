@@ -184,7 +184,7 @@ class LocalLoader:
         self.prc_cache = {}
 
     def get_yml(self, path: str):
-        if self.target.endswith(".zip"):
+        if self.target.endswith(".zip") and not path.endswith("-prc.yml"):
             with ZipFile(self.target, "r") as zf:
                 metad = dict(yml_load(zf.open(path).read().decode("utf-8")))
         else:
