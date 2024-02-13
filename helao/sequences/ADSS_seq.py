@@ -2552,11 +2552,11 @@ def ADSS_PA_CV_TRI_test(
         j.append(i)
 
     #for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
-    for info in combinations: #order of list goes LPL, UPL, sample_no
+    for lpl, upl, sample_no in combinations: #order of list goes LPL, UPL, sample_no
         print("##########################################################\n" +
-                "Current LPL is {} Vrhe\n".format(info[0]) + 
-                "Current UPL is {} Vrhe\n".format(info[1]) + 
-                "Current Sample is {}\n".format(info[2]) + 
+                "Current LPL is {} Vrhe\n".format(lpl) + 
+                "Current UPL is {} Vrhe\n".format(upl) + 
+                "Current Sample is {}\n".format(sample_no) + 
                 "##########################################################")
 
         if not same_sample:
@@ -2566,7 +2566,7 @@ def ADSS_PA_CV_TRI_test(
                 {
                     "solid_custom_position": "cell1_we",
                     "solid_plate_id": plate_id,
-                    "solid_sample_no": info[2],
+                    "solid_sample_no": sample_no,
                     "liquid_custom_position": "cell1_we",
                     "liquid_sample_no": liquid_sample_no,
                     "liquid_sample_volume_ul": liquid_sample_volume_ul,
@@ -2578,7 +2578,7 @@ def ADSS_PA_CV_TRI_test(
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
-                "solid_sample_no": info[2],
+                "solid_sample_no": sample_no,
                 "previous_liquid": use_current_electrolyte,
                 "liquid_custom_position": "cell1_we",
                 "liquid_sample_no": liquid_sample_no,            
@@ -2711,10 +2711,10 @@ def ADSS_PA_CV_TRI_test(
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": info[0],
-                    "Vapex1_vsRHE": info[1],
-                    "Vapex2_vsRHE": info[0],
-                    "Vfinal_vsRHE": info[0],
+                    "Vinit_vsRHE": lpl,
+                    "Vapex1_vsRHE": upl,
+                    "Vapex2_vsRHE": lpl,
+                    "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
                     "SampleRate": testing_CV_samplerate_sec,
                     "cycles": CV_cycle,
@@ -2763,10 +2763,10 @@ def ADSS_PA_CV_TRI_test(
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": info[0],
-                    "Vapex1_vsRHE": info[1],
-                    "Vapex2_vsRHE": info[0],
-                    "Vfinal_vsRHE": info[0],
+                    "Vinit_vsRHE": lpl,
+                    "Vapex1_vsRHE": upl,
+                    "Vapex2_vsRHE": lpl,
+                    "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
                     "SampleRate": testing_CV_samplerate_sec,
                     "cycles": CV_cycle,
@@ -2840,10 +2840,10 @@ def ADSS_PA_CV_TRI_test(
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": info[0],
-                    "Vapex1_vsRHE": info[1],
-                    "Vapex2_vsRHE": info[0],
-                    "Vfinal_vsRHE": info[0],
+                    "Vinit_vsRHE": lpl,
+                    "Vapex1_vsRHE": upl,
+                    "Vapex2_vsRHE": lpl,
+                    "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
                     "SampleRate": testing_CV_samplerate_sec,                    
                     "cycles": CV_cycle,
@@ -2891,10 +2891,10 @@ def ADSS_PA_CV_TRI_test(
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": info[0],
-                    "Vapex1_vsRHE": info[1],
-                    "Vapex2_vsRHE": info[0],
-                    "Vfinal_vsRHE": info[0],
+                    "Vinit_vsRHE": lpl,
+                    "Vapex1_vsRHE": upl,
+                    "Vapex2_vsRHE": lpl,
+                    "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
                     "SampleRate": testing_CV_scanrate_voltsec,
                     "cycles": CV_cycle,
