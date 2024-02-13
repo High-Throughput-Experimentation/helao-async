@@ -2594,14 +2594,6 @@ def ADSS_PA_CV_TRI_test(
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 }
             )
-            epm.add_experiment("ADSS_sub_refill_syringes", {
-                "Waterclean_volume_ul": 0,
-                "Solution_volume_ul": liquid_sample_volume_ul,
-                "Syringe_rate_ulsec": 300,
-                }
-            )
-            ########################### here add refill electrolyte syringe and set V3 back to False state at end ###########################
-
 
         #set initial gas to N2
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
@@ -2631,6 +2623,15 @@ def ADSS_PA_CV_TRI_test(
                 "wait_time_s": 5,
             }
         )
+
+        #refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
+        if not use_current_electrolyte:
+            epm.add_experiment("ADSS_sub_refill_syringe", {
+                "syringe": "electrolyte",
+                "fill_volume_ul": liquid_sample_volume_ul,
+                "Syringe_rate_ulsec": 300,
+                }
+            )
 
         washmod = 0
 
@@ -2957,12 +2958,11 @@ def ADSS_PA_CV_TRI_test(
             else:
                 volume = clean_volume_ul
 
-            epm.add_experiment("ADSS_sub_refill_syringes", {
-                "Waterclean_volume_ul": volume,
-                "Solution_volume_ul": 0,
+            epm.add_experiment("ADSS_sub_refill_syringe", {
+                "syringe": "waterclean",
+                "fill_volume_ul": volume,
                 "Syringe_rate_ulsec": 300,
                 }
             )
-            ########################### here add refill water syringe and set V2 back to False state at end. if clean V over 6mL and do 6+whatever clean V is ###########################
 
     return epm.experiment_plan_list  # returns complete experiment list
