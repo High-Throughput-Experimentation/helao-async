@@ -105,19 +105,16 @@ servers:
     verbose: false
 
 
-# =============================================================================
-#   CALIBRATIONMFC:
-#     host: hte-ecms-01.htejcap.caltech.edu
-#     port: 8019 # needs to update
-#     group: action
-#     fast: mfc_server
-#     params:
-#       devices:
-#         Caligas:
-#           port: COM5 # needs to update
-#           unit_id: B
-# =============================================================================
-
+  CALIBRATIONMFC:
+    host: hte-ecms-01.htejcap.caltech.edu
+    port: 8012 # needs to update
+    group: action
+    fast: mfc_server
+    params:
+      devices:
+        Caligas:
+          port: COM6 # needs to update
+          unit_id: A
 
   PSTAT:
     host: hte-ecms-01.htejcap.caltech.edu
