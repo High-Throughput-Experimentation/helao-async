@@ -2438,11 +2438,12 @@ def ADSS_PA_CV_TRI(
 
 def ADSS_PA_CV_TRI_test(
     sequence_version: int = 1, #
+    note: str = "need as many samples as you expect combinations of UPL and LPL",
     
     #sample info
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
-    plate_sample_no_list: List[int] = [16304],  #  instead of map select
+    plate_sample_no_list: List[int] = [16304],  #  need as many samples as you expect combinations of UPL and LPL
     
     #side info
     same_sample: bool = False,
