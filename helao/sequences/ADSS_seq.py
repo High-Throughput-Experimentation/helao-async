@@ -2443,7 +2443,7 @@ def ADSS_PA_CV_TRI_test(
     #sample info
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
-    plate_sample_no_list: List[int] = [16304],  #  need as many samples as you expect combinations of UPL and LPL
+    plate_sample_no_list: List[int] = [16304,],  #  need as many samples as you expect combinations of UPL and LPL
     
     #side info
     same_sample: bool = False,
@@ -2465,7 +2465,7 @@ def ADSS_PA_CV_TRI_test(
     fill_recirculate_reverse_wait_time_s: float = 1,
     
     #phosphoric acid injection info
-    Inject: bool= True,
+    Inject_PA: bool= True,
     phosphoric_sample_no: int = 1261,
     phosphoric_location: List[int] = [2,2,54],
     phosphoric_quantity_ul: int = 0,
@@ -2826,14 +2826,14 @@ def ADSS_PA_CV_TRI_test(
             }
         )
 
-        #recirculate to mix PA into electrolyte
-        epm.add_experiment(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": inject_recirculate_wait_time_s,
-            }
-        )
+            #recirculate to mix PA into electrolyte
+            epm.add_experiment(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "forward",
+                    "wait_time_s": inject_recirculate_wait_time_s,
+                }
+            )
 
         #start O2 cycles with PA
         for i, CV_cycle in enumerate(CV_O2_cycles):
