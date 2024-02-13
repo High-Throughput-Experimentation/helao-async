@@ -2553,11 +2553,11 @@ def ADSS_PA_CV_TRI_test(
 
     #for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
     for info in combinations: #order of list goes LPL, UPL, sample_no
-       print("##########################################################\n"
-      "Current LPL is {} Vrhe\n".format(info[0]) + 
-      "Current UPL is {} Vrhe\n".format(info[1]) + 
-      "Current Sample is {}\n".format(info[2]) + 
-      "##########################################################")
+        print("##########################################################\n" +
+                "Current LPL is {} Vrhe\n".format(info[0]) + 
+                "Current UPL is {} Vrhe\n".format(info[1]) + 
+                "Current Sample is {}\n".format(info[2]) + 
+                "##########################################################")
 
         if not same_sample:
             
