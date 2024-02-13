@@ -13,23 +13,20 @@ from scipy.stats import binned_statistic
 from helaocore.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 
-from helao.drivers.data.loaders.localfs import HelaoProcess, HelaoAction
+from helao.drivers.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
 
 ANALYSIS_DEFAULTS = {
     "fom_key": "ExtCal.Concentration_ppb",
 }
 
 class IcpmsInputs:
-    ref_darks: List[HelaoProcess]
-    ref_dark_spec_acts: List[HelaoAction]
-    ref_lights: List[HelaoProcess]
-    ref_light_spec_acts: List[HelaoAction]
-    insitu_spec: HelaoProcess
-    insitu_spec_act: HelaoAction
+    icpms_process: HelaoProcess
+    icpms_action: HelaoAction
 
     def __init__(
         self,
-        insitu_process_uuid: UUID,
+        process_uuid: UUID,
+        local_loader: LocalLoader
     ):
         self.process = [
             HelaoProcess(x, query_df)
@@ -95,7 +92,7 @@ class IcpmsOutputs(BaseModel):
     insitu_max_rescaled: bool
 
 
-class IcpmsAnalysis(EcheUvisAnalysis):
+class IcpmsAnalysis:
     """Dry UVIS Analysis for GCLD demonstration."""
 
     analysis_timestamp: datetime
