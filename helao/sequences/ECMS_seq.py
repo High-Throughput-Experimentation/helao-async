@@ -3,7 +3,7 @@
 __all__ = [
     "ECMS_series_CA",
     "ECMS_repeat_CV",
-    "ECMS_GDE_prep",
+    "ECMS_initiation",
 
 ]
 
@@ -15,19 +15,19 @@ from helao.helpers.premodels import ExperimentPlanMaker
 SEQUENCES = __all__
 
 
-def ECMS_GDE_prep(
+def ECMS_initiation(
     sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,    
     reservoir_liquid_sample_no: int = 2,
     volume_ul_cell_liquid: float = 600,
-    liquid_forward_time: float = 0,
-    liquid_backward_time: float = 100,   
+    liquid_forward_time: float = 50,
+    liquid_backward_time: float = 80,   
     vacuum_time: float = 10,   
     CO2equilibrium_duration: float = 30,
     flowrate_sccm: float = 3.0,
     flow_ramp_sccm: float = 0,
-    MS_baseline_duration_1: float = 90, 
+    MS_baseline_duration_1: float = 120, 
     MS_baseline_duration_2: float = 90, 
     liquid_drain_time: float = 60.0,    
 ):
@@ -66,7 +66,6 @@ def ECMS_GDE_prep(
         {
             "liquid_forward_time": liquid_forward_time,
             "liquid_backward_time": liquid_backward_time,
-            "equilibration_time": 1.0,
             "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
             "volume_ul_cell_liquid": volume_ul_cell_liquid,
         },
@@ -120,7 +119,7 @@ def ECMS_series_CA(
     SampleRate: float = 1,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
-    MS_equilibrium_time: float = 90.0,
+    MS_equilibrium_time: float = 120.0,
     liquid_drain_time: float = 60.0,
     #liquid_cleancell_time: float = 120,
 ):
@@ -138,14 +137,11 @@ def ECMS_series_CA(
 
     for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
         print(f" ... cycle {cycle} potential:", potential, f" ... cycle {cycle} duration:", time)
-        #epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
-
         epm.add_experiment(
             "ECMS_sub_electrolyte_fill_cell",
             {
                 "liquid_forward_time": liquid_forward_time,
                 "liquid_backward_time": liquid_backward_time,
-                "equilibration_time": 1.0,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
                 "volume_ul_cell_liquid": volume_ul_cell_liquid,
             },
@@ -206,13 +202,13 @@ def ECMS_repeat_CV(
     liquid_backward_time: float = 100,   
     #vacuum_time: float = 10,   
     CO2equilibrium_duration: float = 30,
-    flowrate_sccm: float = 5.0,
+    flowrate_sccm: float = 3.0,
     flow_ramp_sccm: float = 0,
     MS_baseline_duration_1: float = 90, 
     MS_baseline_duration_2: float = 90, 
     WE_versus: str = "ref",
     ref_type: str = "leakless",
-    pH: float = 6.8,
+    pH: float = 7.8,
     num_repeats: int = 1,
     WE_potential_init__V: float = -1.3,
     WE_potential_apex1__V: float = -2.0,
@@ -224,9 +220,9 @@ def ECMS_repeat_CV(
     SampleRate: float = 0.1,
     IErange: str = "auto",
     ref_offset: float = 0.0,  
-    MS_equilibrium_time: float = 90.0,
+    MS_equilibrium_time: float = 120.0,
     liquid_drain_time: float = 60.0,    
-    liquid_cleancell_time: float = 120,
+    #liquid_cleancell_time: float = 120,
 ):
     """Repeat CV at the cell1_we position.
 
@@ -258,13 +254,11 @@ def ECMS_repeat_CV(
     #epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
 
     for _ in range(num_repeats):
-        #epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
         epm.add_experiment(
             "ECMS_sub_electrolyte_fill_cell",
             {
                 "liquid_forward_time": liquid_forward_time,
                 "liquid_backward_time": liquid_backward_time,
-                "equilibration_time": 1.0,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
                 "volume_ul_cell_liquid": volume_ul_cell_liquid,
             },
