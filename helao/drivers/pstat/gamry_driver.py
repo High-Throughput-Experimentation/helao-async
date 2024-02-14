@@ -1773,6 +1773,8 @@ class gamry:
         dtaq for data acquisition. The values passed in for Vinit and Vpv, Vpulse, will 
         be interpreted as volts for potentiostat mode or amps for galvanostat mode."""
 
+        eta = CycleTime * MaxCycles
+
         sigfunc_params = [
             self.pstat,
             Vinit,
@@ -1786,15 +1788,14 @@ class gamry:
             TimerRes,
             PulseTime,
             CycleTime,
-            0.001,
+            TimerRes,
             False,
-            0.0,
+            eta,
             False,
             self.GamryCOM.PstatMode,
         ]
         sigfunc = "GamryCOM.GamrySignalPv"
         measmode = Gamry_modes.PV
-        eta = CycleTime * MaxCycles
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
