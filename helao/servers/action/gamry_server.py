@@ -251,7 +251,7 @@ async def gamry_dyn_endpoints(app=None):
             Vpv__V: float = 0.0,
             Vpulse__V: float = 0.0,
             MaxCycles: int = 1,
-            TimerRes__s: float = 0.1,  # acquisition rate
+            AcqInterval__s: float = 0.1,  # acquisition rate
             PulseTime__s: float = 0.5,  # duration of pulse (second part of cycle)
             CycleTime__s: float = 1.0,  # full duration of cycle
 
