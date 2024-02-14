@@ -242,6 +242,34 @@ async def gamry_dyn_endpoints(app=None):
             return active_dict
 
 
+        @app.post(f"/{server_key}/run_PV", tags=["action"])
+        async def run_PV(
+            action: Action = Body({}, embed=True),
+            action_version: int = 1,
+            fast_samples_in: List[SampleUnion] = Body([], embed=True),
+            Vinit__V: float = 0.0,
+            Vpv__V: float = 0.0,
+            Vpulse__V: float = 0.0,
+            MaxCycles: int = 1,
+            TimerRes__s: float = 0.1,  # acquisition rate
+            PulseTime__s: float = 0.5,  # duration of pulse (second part of cycle)
+            CycleTime__s: float = 1.0,  # full duration of cycle
+
+            TTLwait: int = Query(
+                -1, ge=-1, le=3
+            ),  # -1 disables, else select TTL 0-3
+            TTLsend: int = Query(
+                -1, ge=-1, le=3
+            ),  # -1 disables, else select TTL 0-3
+            IErange: app.driver.gamry_range_enum = "auto",
+        ):
+            """Measure pulsed voltammetry"""
+            A =  app.base.setup_action()
+            A.action_abbr = "PV"
+            # A.save_data = True
+            active_dict = await app.driver.technique_PV(A)
+            return active_dict
+
 def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
