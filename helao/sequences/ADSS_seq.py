@@ -2801,7 +2801,7 @@ def ADSS_PA_CV_TRI_test(
                 )
 
         #inject phosphoric acid
-        if Inject:
+        if Inject_PA:
             washmod += 1
             washone = washmod %4 %3 %2
             washtwo = (washmod + 1) %4 %3 %2
