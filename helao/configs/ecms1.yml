@@ -107,7 +107,7 @@ servers:
 
   CALIBRATIONMFC:
     host: hte-ecms-01.htejcap.caltech.edu
-    port: 8012 # needs to update
+    port: 8012 
     group: action
     fast: mfc_server
     params:
