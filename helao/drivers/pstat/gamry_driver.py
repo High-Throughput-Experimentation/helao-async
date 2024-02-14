@@ -1761,7 +1761,7 @@ class gamry:
         Vpv = A.action_params["Vpv__V"]
         Vpulse = A.action_params["Vpulse__V"]
         MaxCycles = A.action_params["MaxCycles"]
-        TimerRes = A.action_params["TimerRes__s"]
+        TimerRes = A.action_params["AcqInterval__s"]
         PulseTime = A.action_params["PulseTime__s"]
         CycleTime = A.action_params["CycleTime__s"]
 
