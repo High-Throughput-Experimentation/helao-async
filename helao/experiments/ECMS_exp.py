@@ -49,6 +49,8 @@ IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
 CALC_server = MachineModel(server_name="CALC", machine_name=ORCH_HOST).as_dict()
 #CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
 MFC_server = MachineModel(server_name="MFC", machine_name=ORCH_HOST).as_dict()
+CALIBRATIONMFC_server = MachineModel(server_name="CALIBRATIONMFC", machine_name=ORCH_HOST).as_dict()
+
 # SOLUTIONPUMP_server = MachineModel(
 #     server_name="SYRINGE0", machine_name=ORCH_HOST
 # ).as_dict()
@@ -177,7 +179,7 @@ def ECMS_sub_normal_state(
     )
     apm.add(
         MFC_server,
-        "hold_valve_action",
+        "hold_valve_closed_action",
         {
             "device_name": "CO2"
         },
@@ -232,7 +234,7 @@ def ECMS_sub_alloff(
     )
     apm.add(
         MFC_server,
-        "hold_valve_action",
+        "hold_valve_closed_action",
         {
             "device_name": "CO2"
         },
@@ -552,7 +554,7 @@ def ECMS_sub_headspace_flow_shutdown(
     )
     apm.add(
         MFC_server,
-        "hold_valve_action",
+        "hold_valve_closed_action",
         {
             "device_name": "CO2"
         },
@@ -644,8 +646,9 @@ def ECMS_sub_cali(
         asc.no_wait,
     )
     # set Calibration gas flow rate
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
     apm.add(
-        MFC_server,
+        CALIBRATIONMFC_server,
         "set_flowrate",
         {
             "flowrate_sccm": apm.pars.Califlowrate_sccm,
@@ -655,7 +658,7 @@ def ECMS_sub_cali(
         asc.no_wait,
     )
     apm.add(
-        MFC_server,
+        CALIBRATIONMFC_server,
         "cancel_hold_valve_action",
         {
             "device_name": "Caligas"
