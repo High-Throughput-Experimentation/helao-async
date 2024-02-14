@@ -25,6 +25,7 @@ from helao.helpers.set_time import set_time
 from helao.helpers.yml_tools import yml_dumps
 from helao.drivers.data.sync_driver import dict2json
 from helao.drivers.data.loaders import pgs3
+from helao.drivers.data.loaders.localfs import LocalLoader
 from helao.drivers.data.analyses.echeuvis_stability import (
     EcheUvisAnalysis,
     SDCUVIS_QUERY,
@@ -345,6 +346,39 @@ class HelaoAnalysisSyncer:
                 query=DRYUVIS_QUERY, min_date=min_date, plate_id=plate_id
             )
             retry_counter += 1
+
+
+        # all processes in sequence
+        pdf = df.sort_values(
+            ["sequence_timestamp", "process_timestamp"], ascending=False
+        )
+        pdf = pdf.query("sequence_name.str.startswith('UVIS')")
+        if sequence_uuid is not None:
+            pdf = pdf.query("sequence_uuid==@sequence_uuid")
+        pdf = pdf.query("sequence_timestamp==sequence_timestamp.max()")
+
+        udf = (
+            pdf.query("experiment_name=='UVIS_sub_measure'")
+            .query("run_use=='data'")
+            .query("action_name=='acquire_spec_adv'")
+        )
+        for puuid in udf.process_uuid:
+            await self.enqueue_calc(
+                (
+                    puuid,
+                    pdf,
+                    params,
+                    "UVIS_BkgSubNorm",
+                )
+            )
+
+    async def batch_calc_icpms(
+        self,
+        sequence_uuid: Optional[UUID] = None,
+        params: dict = {},
+    ):
+        """Generate list of IcpmsAnalysis from sequence."""
+        local_loader = LocalLoader()
 
 
         # all processes in sequence

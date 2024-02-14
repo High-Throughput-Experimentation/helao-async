@@ -11,16 +11,10 @@ from pydantic import BaseModel
 from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
 
-from helaocore.models.analysis import (
-    AnalysisDataModel,
-    AnalysisOutputModel,
-    AnalysisModel,
-)
 from helaocore.version import get_filehash
-from helaocore.models.s3locator import S3Locator
 from helao.helpers.gen_uuid import gen_uuid
-from helao.helpers.set_time import set_time
 
+from .base_analysis import BaseAnalysis
 from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 
 ANALYSIS_DEFAULTS = {
@@ -256,7 +250,7 @@ class EcheUvisOutputs(BaseModel):
     mean_abs_omT_diff: float  # mean over wavelengths
 
 
-class EcheUvisAnalysis:
+class EcheUvisAnalysis(BaseAnalysis):
     """ECHEUVIS Optical Stability Analysis for GCLD demonstration."""
 
     analysis_timestamp: datetime
@@ -419,77 +413,3 @@ class EcheUvisAnalysis:
         )
         return True
 
-    def export_analysis(
-        self, analysis_name: str, bucket: str, region: str, dummy: bool = True
-    ):
-        action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
-        inputs = []
-
-        for ak in action_keys:
-            euis = vars(self.inputs)[ak]
-            ru = ak.split("_spec")[0].replace("insitu", "data")
-            if not isinstance(euis, list):
-                euis = [euis]
-            for eui in euis:
-                raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
-                if ru in ["data", "baseline"]:
-                    global_sample = (
-                        f"legacy__solid__{int(self.plate_id):d}_{int(self.sample_no):d}"
-                    )
-                else:
-                    global_sample = None
-                adm = AnalysisDataModel(
-                    action_uuid=eui.action_uuid,
-                    run_use=ru,
-                    raw_data_path=raw_data_path,
-                    global_sample_label=global_sample,
-                )
-                inputs.append(adm)
-
-        scalar_outputs = [
-            k for k, v in self.outputs.model_dump().items() if not isinstance(v, list)
-        ]
-        array_outputs = [
-            k for k in self.outputs.model_dump().keys() if k not in scalar_outputs
-        ]
-
-        outputs = []
-
-        for label, output_keys in [
-            ("scalar", scalar_outputs),
-            ("array", array_outputs),
-        ]:
-            if output_keys:
-                out_model = AnalysisOutputModel(
-                    analysis_output_path=S3Locator(
-                        bucket=bucket,
-                        key=f"analysis/{self.analysis_uuid}_output_{label}.json",
-                        region=region,
-                    ),
-                    content_type="application/json",
-                    output_keys=output_keys,
-                    output_name=label,
-                    output={
-                        k: self.outputs.model_dump()[k]
-                        for k in output_keys
-                        if not isinstance(self.outputs.model_dump()[k], list)  # only scalars
-                    },
-                )
-                outputs.append(out_model)
-
-        if not outputs:
-            print("!!! analysis does not contain any outputs")
-
-        ana_model = AnalysisModel(
-            analysis_name=analysis_name,
-            analysis_timestamp=set_time(),
-            analysis_params=self.analysis_params,
-            analysis_codehash=self.analysis_codehash,
-            analysis_uuid=self.analysis_uuid,
-            process_uuid=self.process_uuid,
-            process_params=self.inputs.insitu.process_params,
-            inputs=inputs,
-            outputs=outputs,
-            dummy=dummy,
-        )
-        return ana_model.clean_dict(), self.outputs.model_dump()

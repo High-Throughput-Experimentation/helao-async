@@ -150,6 +150,7 @@ class LocalLoader:
             _, exp_name = yml_dir.split("__")
             yml_file = os.path.basename(ymlp)
             idx, prc_uuid, techname = yml_file.replace("-prc.yml", "").split("__")
+            prc_uuid = UUID(prc_uuid)
             prc_idx = int(idx)
             exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%Y%m%d.%H%M%S%f")
             prc_parts.append(

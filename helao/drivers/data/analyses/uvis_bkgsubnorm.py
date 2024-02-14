@@ -13,8 +13,9 @@ from scipy.stats import binned_statistic
 from helaocore.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 
+from .base_analysis import BaseAnalysis
 from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
-from .echeuvis_stability import EcheUvisAnalysis, refadjust, parse_spechlo
+from .echeuvis_stability import refadjust, parse_spechlo
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],
@@ -155,7 +156,7 @@ class DryUvisOutputs(BaseModel):
     insitu_max_rescaled: bool
 
 
-class DryUvisAnalysis(EcheUvisAnalysis):
+class DryUvisAnalysis(BaseAnalysis):
     """Dry UVIS Analysis for GCLD demonstration."""
 
     analysis_timestamp: datetime
