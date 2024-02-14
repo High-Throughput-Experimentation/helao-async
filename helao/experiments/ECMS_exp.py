@@ -291,6 +291,8 @@ def ECMS_sub_alloff(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1-dir", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
     return apm.action_list
 
 
