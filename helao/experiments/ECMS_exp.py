@@ -614,9 +614,10 @@ def ECMS_sub_electrolyte_clean_cell(
 def ECMS_sub_cali(
     experiment: Experiment,
     experiment_version: int = 1,
-    CO2flowrate_sccm: float = 5.0,
-    Califlowrate_sccm: float = 5.0,
+    CO2flowrate_sccm: float = 20.0,
+    Califlowrate_sccm: float = 0.0,
     flow_ramp_sccm: float = 0,
+    MSsignal_quilibrium_time: float = 300,
 ):
     """prevacuum the cell gas phase side to make the electrolyte contact with GDE
     """
@@ -661,4 +662,6 @@ def ECMS_sub_cali(
         },
         asc.no_wait,
     )
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.MSsignal_quilibrium_time})
+
     return apm.action_list

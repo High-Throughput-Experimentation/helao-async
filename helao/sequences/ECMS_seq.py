@@ -4,7 +4,7 @@ __all__ = [
     "ECMS_series_CA",
     "ECMS_repeat_CV",
     "ECMS_initiation",
-
+    "ECMS_MS_calibration",
 ]
 
 from typing import List
@@ -342,7 +342,73 @@ def ECMS_repeat_CV(
 
 
 
+def ECMS_MS_calibration(
+    sequence_version: int = 1,
+    CO2equilibrium_duration: float = 30,
+    flowrate_sccm: float = 20.0,
+    flow_ramp_sccm: float = 0,
+    MS_baseline_duration_1: float = 120,     
+    CO2flowrate_sccm: List[float] = [19, 18, 17, 16, 15],
+    Califlowrate_sccm: List[float] = [1, 2, 3, 4, 5],
+    MSsignal_quilibrium_time_initial: float = 480,
+    MSsignal_quilibrium_time: float = 300,   
+    liquid_drain_time: float = 60.0,    
 
+):
+    """Repeat CV at the cell1_we position.
+
+    Flush and fill cell, run CV, and drain.
+
+    (1) Fill cell with liquid for 90 seconds
+    (2) Equilibrate for 15 seconds
+    (3) run CV
+    (5) Drain cell and purge with CO2 for 60 seconds
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+
+
+    """
+
+    epm = ExperimentPlanMaker()
+
+
+#achiving faster equilibrium time with faster CO2 flow rate
+    epm.add_experiment(
+        "ECMS_sub_headspace_purge_and_CO2baseline",
+        {
+            "CO2equilibrium_duration": CO2equilibrium_duration,
+            "flowrate_sccm": flowrate_sccm,
+            "flow_ramp_sccm": flow_ramp_sccm,
+            "MS_baseline_duration": MS_baseline_duration_1
+        },
+    )
+    for run, (co2gas, caligas) in enumerate(zip(CO2flowrate_sccm, Califlowrate_sccm)):
+        if run==0:
+            epm.add_experiment(
+                "ECMS_sub_cali",
+                {
+                    "CO2flowrate_sccm": co2gas,
+                    "Califlowrate_sccm": caligas,
+                    "MSsignal_quilibrium_time": MSsignal_quilibrium_time_initial,
+                },
+            )
+        else:
+            epm.add_experiment(
+                "ECMS_sub_cali",
+                {
+                    "CO2flowrate_sccm": co2gas,
+                    "Califlowrate_sccm": caligas,
+                    "MSsignal_quilibrium_time": MSsignal_quilibrium_time,
+                },
+            )
+    epm.add_experiment("ECMS_sub_normal_state",{})   
+    epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})   
+
+    return epm.experiment_plan_list
 
 
 
