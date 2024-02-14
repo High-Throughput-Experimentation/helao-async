@@ -31,6 +31,7 @@ from helao.drivers.data.analyses.echeuvis_stability import (
     SDCUVIS_QUERY,
 )
 from helao.drivers.data.analyses.uvis_bkgsubnorm import DryUvisAnalysis, DRYUVIS_QUERY
+from helao.drivers.data.analyses.icpms_local import IcpmsAnalysis
 
 
 class HelaoAnalysisSyncer:
@@ -67,6 +68,7 @@ class HelaoAnalysisSyncer:
         self.ana_funcs = {
             "ECHEUVIS_InsituOpticalStability": EcheUvisAnalysis,
             "UVIS_BkgSubNorm": DryUvisAnalysis,
+            "ICPMS_Concentration": IcpmsAnalysis,
         }
 
     def sync_exit_callback(self, task: asyncio.Task):
@@ -372,44 +374,24 @@ class HelaoAnalysisSyncer:
                 )
             )
 
-    async def batch_calc_icpms(
+    async def batch_calc_icpms_local(
         self,
-        sequence_uuid: Optional[UUID] = None,
+        sequence_zip_path: str = "",
         params: dict = {},
     ):
         """Generate list of IcpmsAnalysis from sequence."""
-        local_loader = LocalLoader()
+        local_loader = LocalLoader(sequence_zip_path)
+        pdf = local_loader.processes
 
-
-        # all processes in sequence
-        pdf = df.sort_values(
-            ["sequence_timestamp", "process_timestamp"], ascending=False
-        )
-        pdf = pdf.query("sequence_name.str.startswith('UVIS')")
-        if sequence_uuid is not None:
-            pdf = pdf.query("sequence_uuid==@sequence_uuid")
-        pdf = pdf.query("sequence_timestamp==sequence_timestamp.max()")
-
-        udf = (
-            pdf.query("experiment_name=='UVIS_sub_measure'")
-            .query("run_use=='data'")
-            .query("action_name=='acquire_spec_adv'")
-        )
-        for puuid in udf.process_uuid:
+        for puuid in pdf.process_uuid:
             await self.enqueue_calc(
                 (
                     puuid,
-                    pdf,
+                    local_loader,
                     params,
-                    "UVIS_BkgSubNorm",
+                    "ICPMS_Concentration",
                 )
             )
 
     def shutdown(self):
         pass
-
-
-# for each EcheUvisAnalysis:
-# populate HelaoAnalysis model
-# write ana.outputs.json() to s3 bucket
-# push HelaoAnalysis to API
