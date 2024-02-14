@@ -2442,8 +2442,8 @@ def ADSS_PA_CV_TRI_test(
     
     #sample info
     #solid_custom_position: str = "cell1_we",
-    plate_id: int = 5917,
-    plate_sample_no_list: List[int] = [16304,],  #  need as many samples as you expect combinations of UPL and LPL
+    plate_id: int = 6307,
+    plate_sample_no_list: List[int] = [16304],  #  need as many samples as you expect combinations of UPL and LPL
     
     #side info
     same_sample: bool = False,
@@ -2452,14 +2452,14 @@ def ADSS_PA_CV_TRI_test(
     move_to_clean_and_clean: bool = True,
     
     #purge wait times
-    purge_wait_initialN2_m: int = 6,
+    purge_wait_initialN2_m: int = 10,
     purge_wait_N2_to_O2_m: int = 5,
     purge_wait_O2_to_N2_m: int = 15,
 
     #electrolyte info
     ph: float = 1.24,
-    liquid_sample_no: int = 220,
-    liquid_sample_volume_ul: float = 4000,
+    liquid_sample_no: int = 1251,
+    liquid_sample_volume_ul: float = 7000,
     Syringe_rate_ulsec: float = 300,
     fill_recirculate_wait_time_s: float = 30,
     fill_recirculate_reverse_wait_time_s: float = 1,
@@ -2467,19 +2467,19 @@ def ADSS_PA_CV_TRI_test(
     #phosphoric acid injection info
     Inject_PA: bool= True,
     phosphoric_sample_no: int = 1261,
-    phosphoric_location: List[int] = [2,2,54],
-    phosphoric_quantity_ul: int = 0,
+    phosphoric_location: List[int] = [2,3,54],
+    phosphoric_quantity_ul: int = 80,
     inject_recirculate_wait_time_s: float = 60,
     #liquid_custom_position: str = "elec_res1",
 
     #cleaning CVs 
-    cleaning_CV_cycles: List[int] = [5,3,3],
-    cleaning_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
-    cleaning_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
-    cleaning_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    cleaning_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    cleaning_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
-    cleaning_CV_samplerate_sec: float = 0.05,
+    cleaning_CV_cycles: List[int] = [20],
+    cleaning_Vinit_vsRHE: List[float] = [0.05],  # Initial value in volts or amps.
+    cleaning_Vapex1_vsRHE: List[float] = [1.5],  # Apex 1 value in volts or amps.
+    cleaning_Vapex2_vsRHE: List[float] = [0.05],  # Apex 2 value in volts or amps.
+    cleaning_Vfinal_vsRHE: List[float] = [0.05],  # Final value in volts or amps.
+    cleaning_scanrate_voltsec: List[float] = [0.2],  # scan rate in volts/second or amps/second.
+    cleaning_CV_samplerate_sec: float = 0.02,
 
     #testing CV info
     LPL_list: List[float] = [0.05, 0.15, 0.25],
@@ -2488,7 +2488,7 @@ def ADSS_PA_CV_TRI_test(
     testing_CV_samplerate_sec: float = 0.01,
 
     #CVs in N2 for background
-    CV_N2_cycles: List[int] = [5,3,3],
+    CV_N2_cycles: List[int] = [5],
     #CV_N2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
     #CV_N2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
     #CV_N2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
@@ -2497,7 +2497,7 @@ def ADSS_PA_CV_TRI_test(
     #CV_N2_samplerate_sec: float = 0.05,
 
     #CVs in O2 and with and without PA
-    CV_O2_cycles: List[int] = [5,3,3],
+    CV_O2_cycles: List[int] = [5,25,50],
     #CV_O2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
     #CV_O2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
     #CV_O2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
@@ -2508,7 +2508,7 @@ def ADSS_PA_CV_TRI_test(
     #Pstat and ref info
     gamry_i_range: str = "auto",
     ref_type: str = "leakless",
-    ref_offset__V: float = 0.0,
+    ref_offset__V: float = -0.005,
     
     #aliquote info
     aliquot_init: bool = True,
@@ -2521,13 +2521,13 @@ def ADSS_PA_CV_TRI_test(
     PAL_Injector_id: str = "LS4_peek",
     
     #cell drain info
-    cell_draintime_s: float = 60,
+    cell_draintime_s: float = 45,
     ReturnLineReverseWait_s: float = 5,
     
     #cell clean info
     clean_volume_ul: float = 12000,
     clean_recirculate_s: float = 30,
-    clean_drain_s: float = 30,
+    clean_drain_s: float = 45,
     # ResidualWait_s: float = 15,
     # flush_volume_ul: float = 2000,
     # clean: bool = False,
@@ -2544,16 +2544,8 @@ def ADSS_PA_CV_TRI_test(
 
     epm = ExperimentPlanMaker()
 
-    #create list of LPL, UPL, and sample combination
-    combinations = []
-    for i in LPL_list:
-        for j in UPL_list:
-            combinations.append([round(i,2),round(j,2)])
-    for i, j in zip(plate_sample_no_list, combinations):
-        j.append(i)
-
     #for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
-    for lpl, upl, sample_no in combinations: #order of list goes LPL, UPL, sample_no
+    for lpl, upl, sample_no in zip(LPL_list, UPL_list, plate_sample_no_list):
         print("##########################################################\n" +
                 "Current LPL is {} Vrhe\n".format(lpl) + 
                 "Current UPL is {} Vrhe\n".format(upl) + 
