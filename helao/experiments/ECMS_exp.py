@@ -15,11 +15,12 @@ __all__ = [
     "ECMS_sub_prevacuum_cell",
     "ECMS_sub_headspace_purge_and_CO2baseline",
     "ECMS_sub_CA",
+    "ECMS_sub_pulseCA",
     "ECMS_sub_CV",
     "ECMS_sub_headspace_flow_shutdown",
     "ECMS_sub_drain",
     "ECMS_sub_electrolyte_clean_cell",
-    "ECMS_sub_cali"
+    "ECMS_sub_cali", 
 ]
 
 ###
@@ -455,6 +456,68 @@ def ECMS_sub_CA(
             "Tval__s": apm.pars.CA_duration_sec,
             "AcqInterval__s": apm.pars.SampleRate,
             "IErange": apm.pars.IErange,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=True,
+        technique_name="CA",
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.MS_equilibrium_time})
+    # apm.add(ORCH_server, "wait", {"waittime": 10})
+
+    return apm.action_list
+
+def ECMS_sub_pulseCA(
+    experiment: Experiment,
+    experiment_version: int = 1,   
+    Vinit__V: float = 0,
+    Vpv__V: float = 0,
+    Vpulse__V: float = -1.0,
+    MaxCycles: int = 60,
+    TimerRes__s: float = 0.1,  # acquisition rate
+    PulseTime__s: float = 0.5,  # duration of pulse (second part of cycle)
+    CycleTime__s: float = 60.0,  # full duration of cycle
+    
+    WE_versus: str = "ref",
+    ref_offset__V: float = 0.0,
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    MS_equilibrium_time: float = 1.0,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+# =============================================================================
+#     if apm.pars.WE_versus == "ref":
+#         potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V
+#     elif apm.pars.WE_versus == "rhe":
+#         potential_vsRef = (
+#             apm.pars.WE_potential__V
+#             - 1.0 * apm.pars.ref_offset__V
+#             - 0.059 * apm.pars.pH
+#             - REF_TABLE[ref_type]
+#         )
+# =============================================================================
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_globalexp_params=["_fast_samples_in"],
+    )
+    apm.add(
+        PSTAT_server,
+        "run_PV",
+        {
+            "Vinit__V": apm.pars.Vinit__V,
+            "Vpv__V": apm.pars.Vpv__V,
+            "Vpulse__V": apm.pars.Vpulse__V,
+            "MaxCycles": apm.pars.MaxCycles,
+            "TimerRes__s": apm.pars.TimerRes__s,
+            "PulseTime__s": apm.pars.PulseTime__s,
+            "CycleTime__s": apm.pars.CycleTime__s,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
