@@ -185,12 +185,33 @@ def ECMS_sub_normal_state(
         },
         asc.no_wait,
     )
+    
+    apm.add(
+        CALIBRATIONMFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": 0.0,
+            "ramp_sccm_sec": 0.0,
+            "device_name": "Caligas",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        CALIBRATIONMFC_server,
+        "hold_valve_closed_action",
+        {
+            "device_name": "Caligas"
+        },
+        asc.no_wait,
+    )
+    
     apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0})
     #apm.add(ORCH_server, "wait", {"waittime": apm.pars.baseline_duration})
     return apm.action_list
 
@@ -240,13 +261,24 @@ def ECMS_sub_alloff(
         },
         asc.no_wait,
     )
-# =============================================================================
-#     apm.add(
-#         MFC_server,
-#         "cancel_acquire_flowrate",
-#         {}
-#     )
-# =============================================================================
+    apm.add(
+        CALIBRATIONMFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": 0.0,
+            "ramp_sccm_sec": 0.0,
+            "device_name": "Caligas",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        CALIBRATIONMFC_server,
+        "hold_valve_closed_action",
+        {
+            "device_name": "Caligas"
+        },
+        asc.no_wait,
+    )
     apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0}, asc.no_wait)
