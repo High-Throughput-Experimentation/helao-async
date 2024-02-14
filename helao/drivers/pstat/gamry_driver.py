@@ -1788,7 +1788,7 @@ class gamry:
             TimerRes,
             PulseTime,
             CycleTime,
-            TimerRes,
+            0,
             False,
             eta,
             False,
