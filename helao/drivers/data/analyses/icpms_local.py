@@ -83,7 +83,7 @@ class IcpmsAnalysis(BaseAnalysis):
         """Calculate stability FOMs and intermediate vectors."""
 
         fom_key = self.analysis_params["fom_key"]
-        _, hlo_data = self.inputs.icpms_act.mass_spec
+        _, hlo_data = self.inputs.mass_spec
 
         # create output model
         self.outputs = IcpmsOutputs(
