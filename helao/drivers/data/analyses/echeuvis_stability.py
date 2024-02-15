@@ -126,6 +126,7 @@ class EcheUvisInputs:
     insitu: HelaoProcess
     insitu_spec_act: HelaoAction
     insitu_ca_act: HelaoAction
+    process_params: dict
     # solid_samples: list
 
     def __init__(
@@ -136,6 +137,7 @@ class EcheUvisInputs:
         query_df: pd.DataFrame,
     ):
         self.insitu = HelaoProcess(insitu_process_uuid, query_df)
+        self.process_params = self.insitu.process_params
         self.insitu_spec_act = HelaoAction(
             query_df.query(
                 "process_uuid==@insitu_process_uuid & action_name=='acquire_spec_extrig'"

@@ -80,6 +80,7 @@ class DryUvisInputs:
     ref_light_spec_acts: List[HelaoAction]
     insitu_spec: HelaoProcess
     insitu_spec_act: HelaoAction
+    process_params: dict
 
     def __init__(
         self,
@@ -119,6 +120,7 @@ class DryUvisInputs:
             bdf.sort_values("action_timestamp").iloc[0].process_uuid,
             query_df,
         )
+        self.process_params = self.insitu.process_params
         self.insitu_spec_act = HelaoAction(
             bdf.query("action_name=='acquire_spec_adv'")
             .sort_values("action_timestamp")

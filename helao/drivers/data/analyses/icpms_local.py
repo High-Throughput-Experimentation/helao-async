@@ -20,11 +20,13 @@ class IcpmsInputs:
     icpms: HelaoProcess
     icpms_act: HelaoAction
     global_sample_label: str
+    process_params: dict
 
     def __init__(self, process_uuid: UUID, local_loader: LocalLoader):
         self.icpms = local_loader.get_prc(
             local_loader.processes.query("process_uuid==@process_uuid").index[0]
         )
+        self.process_params = self.icpms.process_params
         filed = [
             d for d in self.icpms.json["files"] if d["file_type"] == "icpms_helao__file"
         ][0]

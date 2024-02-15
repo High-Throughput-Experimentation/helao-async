@@ -96,7 +96,7 @@ class BaseAnalysis:
             analysis_codehash=self.analysis_codehash,
             analysis_uuid=self.analysis_uuid,
             process_uuid=self.process_uuid,
-            process_params=self.inputs.insitu.process_params,
+            process_params=self.inputs.process_params,
             inputs=inputs,
             outputs=outputs,
             dummy=dummy,
