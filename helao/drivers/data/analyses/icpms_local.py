@@ -42,7 +42,7 @@ class IcpmsInputs:
 
     @property
     def mass_spec(self):
-        return self.action.hlo
+        return self.icpms_act.hlo
 
 
 class IcpmsOutputs(BaseModel):
