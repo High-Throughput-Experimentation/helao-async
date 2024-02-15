@@ -40,6 +40,7 @@ class IcpmsInputs:
             ).index[0]
         )
 
+    @property
     def mass_spec(self):
         return self.action.hlo
 
