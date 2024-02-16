@@ -45,6 +45,7 @@ __all__ = [
     "ADSS_sub_gasvalve_toggle",
     "ADSS_sub_gasvalve_N2flow",
     "ADSS_sub_transfer_liquid_in",
+    "ADSS_sub_tray_icpms_export",
 ]
 
 
@@ -1498,6 +1499,37 @@ def ADSS_sub_tray_unload(
     )
 
     return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_tray_icpms_export(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    tray: int = 2,
+    slot: int = 1,
+    survey_runs: int = 1,
+    main_runs: int = 3,
+    rack: int = 2,
+    dilution_factor: float = 10,
+
+):
+ 
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    apm.add(
+        PAL_server,
+        "archive_tray_export_icpms",
+        {
+            "tray": apm.pars.tray,
+            "slot": apm.pars.slot,
+            "survey_runs": apm.pars.survey_runs,
+            "main_runs": apm.pars.main_runs,
+            "rack": apm.pars.rack,
+            "dilution_factor": apm.pars.dilution_factor,
+        },
+    )
+
+
+    return apm.action_list  # returns complete action list to orch
+
 
 def ADSS_sub_z_move(
     experiment: Experiment,
