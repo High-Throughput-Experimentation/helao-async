@@ -24,7 +24,7 @@ __all__ = [
     "CCSI_sub_co2monitoring",
     "CCSI_sub_co2monitoring_mfcmasscotwo",
     "CCSI_sub_clean_inject",
- #   "CCSI_sub_refill_clean",
+    "CCSI_sub_refill_clean",
     "CCSI_debug_co2purge",
 #    "CCSI_sub_fill_syringe",
 #    "CCSI_sub_full_fill_syringe",
@@ -1201,28 +1201,28 @@ def CCSI_sub_clean_inject(
     return apm.action_list
 
 
-# def CCSI_sub_refill_clean(
-#     experiment: Experiment,
-#     experiment_version: int = 2,  # v2 no backlash volume
-#     Waterclean_volume_ul: float = 5000,
-#     Syringe_rate_ulsec: float = 1000,
-# ):
-#     apm = ActionPlanMaker()
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
-#     apm.add(ORCH_server, "wait", {"waittime": 0.25})
+def CCSI_sub_refill_clean(
+    experiment: Experiment,
+    experiment_version: int = 2,  # v2 no backlash volume
+    Waterclean_volume_ul: float = 5000,
+    Syringe_rate_ulsec: float = 1000,
+):
+    apm = ActionPlanMaker()
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
-#     apm.add(
-#         WATERCLEANPUMP_server,
-#         "withdraw",
-#         {
-#             "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-#             "volume_uL": apm.pars.Waterclean_volume_ul,
-#         },
-#     )
-#     apm.add(ORCH_server, "wait", {"waittime": 5.25})
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
+    apm.add(
+        WATERCLEANPUMP_server,
+        "withdraw",
+        {
+            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+            "volume_uL": apm.pars.Waterclean_volume_ul,
+        },
+    )
+    apm.add(ORCH_server, "wait", {"waittime": 5.25})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
 
-#     return apm.action_list
+    return apm.action_list
 
 
 # def CCSI_sub_set_syringe_start(
