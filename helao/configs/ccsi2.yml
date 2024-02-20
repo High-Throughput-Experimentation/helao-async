@@ -116,7 +116,7 @@ servers:
       pumps:
         zero:
           address: 0
-          diameter: 15.9
+          diameter: 20.05
   SYRINGE1:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8014
@@ -127,7 +127,7 @@ servers:
       pumps:
         one:
           address: 1
-          diameter: 15.9
+          diameter: 20.05
   DOSEPUMP:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8016
