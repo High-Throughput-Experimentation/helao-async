@@ -1245,10 +1245,7 @@ class HelaoSyncer:
             if fp.endswith(".lock"):
                 os.remove(fp)
             elif not os.path.isdir(fp):
-                shutil.move(
-                    fp,
-                    os.path.dirname(
-                        fp.replace("RUNS_SYNCED", "RUNS_FINISHED")
-                    ),
-                )
+                tp = os.path.dirname( fp.replace("RUNS_SYNCED", "RUNS_FINISHED"))
+                os.makedirs(tp, exist_ok=True)
+                shutil.move(fp, tp)
         self.base.print_message(f"Successfully reverted {sync_dir}")
