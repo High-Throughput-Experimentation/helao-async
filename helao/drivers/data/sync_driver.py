@@ -27,6 +27,7 @@ from datetime import datetime
 from typing import Union, Optional, Dict, List
 import traceback
 from collections import defaultdict
+from copy import copy
 
 import botocore.exceptions
 import boto3
@@ -580,7 +581,7 @@ class HelaoSyncer:
             return True
 
         yml = prog.yml
-        meta = yml.meta
+        meta = copy(yml.meta)
 
         if yml.status == "synced":
             # self.base.print_message(
