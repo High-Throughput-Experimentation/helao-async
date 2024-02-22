@@ -1158,7 +1158,8 @@ class HelaoSyncer:
                     os.path.basename(sync_path).replace(".zip", ""),
                 )
                 os.makedirs(dest, exist_ok=True)
-                zf.extractall(dest)
+                no_lock_prg = [x for x in zf.namelist() if not x.endswith(".prg") and not x.endswith(".lock")]
+                zf.extractall(dest, members=no_lock_prg)
                 zf.close()
                 if not os.path.exists(sync_path.replace(".zip", ".orig")):
                     shutil.move(sync_path, sync_path.replace(".zip", ".orig"))
@@ -1173,25 +1174,25 @@ class HelaoSyncer:
             base_prgs = [
                 x
                 for x in glob(os.path.join(sync_path, "**", "*-*.pr*"), recursive=True)
-                if x.endswith(".progress") or x.endswith(".prg")
+                if x.endswith(".progress") or x.endswith(".prg") or x.endswith(".lock")
             ]
-            seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
-            for x in seq_prgs:
-                base_prgs = [
-                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
-                ]
-            exp_prgs = [x for x in base_prgs if "-exp.pr" in x]
-            for x in exp_prgs:
-                base_prgs = [
-                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
-                ]
-            act_prgs = [x for x in base_prgs if "-act.pr" in x]
-            for x in act_prgs:
-                base_prgs = [
-                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
-                ]
+            # seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
+            # for x in seq_prgs:
+            #     base_prgs = [
+            #         y for y in base_prgs if not y.startswith(os.path.dirname(x))
+            #     ]
+            # exp_prgs = [x for x in base_prgs if "-exp.pr" in x]
+            # for x in exp_prgs:
+            #     base_prgs = [
+            #         y for y in base_prgs if not y.startswith(os.path.dirname(x))
+            #     ]
+            # act_prgs = [x for x in base_prgs if "-act.pr" in x]
+            # for x in act_prgs:
+            #     base_prgs = [
+            #         y for y in base_prgs if not y.startswith(os.path.dirname(x))
+            #     ]
 
-            base_prgs = act_prgs + exp_prgs + seq_prgs
+            # base_prgs = act_prgs + exp_prgs + seq_prgs
 
             if not base_prgs:
                 self.base.print_message(
@@ -1201,9 +1202,9 @@ class HelaoSyncer:
                 
             else:
                 self.base.print_message(
-                    f"Found {len(base_prgs)} .prg or .progress files in subdirectories of {sync_path}"
+                    f"Found {len(base_prgs)} .prg, .progress, or .lock files in subdirectories of {sync_path}"
                 )
-                # remove all .prg files
+                # remove all .prg files and lock files
                 for prg in base_prgs:
                     base_dir = os.path.dirname(prg)
                     sub_prgs = [
@@ -1213,10 +1214,16 @@ class HelaoSyncer:
                         )
                         if x.endswith(".progress") or x.endswith(".prg")
                     ]
+                    sub_lock = [
+                        x
+                        for x in glob(
+                            os.path.join(base_dir, "**", "*.lock"), recursive=True
+                        )
+                    ]
                     self.base.print_message(
-                        f"Removing {len(base_prgs)} prg and progress files in subdirectories of {base_dir}"
+                        f"Removing {len(base_prgs) + len(sub_lock)} prg and progress files in subdirectories of {base_dir}"
                     )
-                    for sp in sub_prgs:
+                    for sp in sub_prgs + sub_lock:
                         os.remove(sp)
 
                     # move path back to RUNS_FINISHED
@@ -1242,7 +1249,7 @@ class HelaoSyncer:
 
     def unsync_dir(self, sync_dir: str):
         for fp in glob(os.path.join(sync_dir, "**", "*"), recursive=True):
-            if fp.endswith(".lock"):
+            if fp.endswith(".lock") or fp.endswith(".progress") or fp.endswith(".prg"):
                 os.remove(fp)
             elif not os.path.isdir(fp):
                 tp = os.path.dirname( fp.replace("RUNS_SYNCED", "RUNS_FINISHED"))
