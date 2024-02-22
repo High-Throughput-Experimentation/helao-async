@@ -2452,24 +2452,24 @@ def ADSS_PA_CV_TRI_new(
     move_to_clean_and_clean: bool = True,
     
     #purge wait times
-    purge_wait_initialN2_m: int = 10,
-    purge_wait_N2_to_O2_m: int = 5,
-    purge_wait_O2_to_N2_m: int = 15,
+    purge_wait_initialN2_min: int = 10,
+    purge_wait_N2_to_O2_min: int = 5,
+    purge_wait_O2_to_N2_min: int = 15,
 
     #electrolyte info
     ph: float = 1.24,
     liquid_sample_no: int = 1251,
     liquid_sample_volume_ul: float = 7000,
     Syringe_rate_ulsec: float = 300,
-    fill_recirculate_wait_time_s: float = 30,
-    fill_recirculate_reverse_wait_time_s: float = 1,
+    fill_recirculate_wait_time_sec: float = 30,
+    fill_recirculate_reverse_wait_time_sec: float = 1,
     
     #phosphoric acid injection info
     Inject_PA: bool= True,
     phosphoric_sample_no: int = 1261,
     phosphoric_location: List[int] = [2,3,54],
     phosphoric_quantity_ul: int = 80,
-    inject_recirculate_wait_time_s: float = 60,
+    inject_recirculate_wait_time_sec: float = 60,
     #liquid_custom_position: str = "elec_res1",
 
     #cleaning CVs 
@@ -2506,7 +2506,7 @@ def ADSS_PA_CV_TRI_new(
     #CV_O2_samplerate_sec: float = 0.05,
 
     #final OCP info
-    ocp_samplerate_sec: float = 0.1,
+    OCP_samplerate_sec: float = 0.1,
 
     #Pstat and ref info
     gamry_i_range: str = "auto",
@@ -2524,13 +2524,13 @@ def ADSS_PA_CV_TRI_new(
     PAL_Injector_id: str = "LS4_peek",
     
     #cell drain info
-    cell_draintime_s: float = 45,
-    ReturnLineReverseWait_s: float = 5,
+    cell_draintime_sec: float = 45,
+    ReturnLineReverseWait_sec: float = 5,
     
     #cell clean info
     clean_volume_ul: float = 12000,
-    clean_recirculate_s: float = 30,
-    clean_drain_s: float = 45,
+    clean_recirculate_sec: float = 30,
+    clean_drain_sec: float = 45,
     # ResidualWait_s: float = 15,
     # flush_volume_ul: float = 2000,
     # clean: bool = False,
@@ -2599,7 +2599,7 @@ def ADSS_PA_CV_TRI_new(
             "ADSS_sub_recirculate",
             {
                 "direction_forward_or_reverse": "forward",
-                "wait_time_s": fill_recirculate_wait_time_s,
+                "wait_time_s": fill_recirculate_wait_time_sec,
             }
         )
         
@@ -2608,7 +2608,7 @@ def ADSS_PA_CV_TRI_new(
             "ADSS_sub_recirculate",
             {
                 "direction_forward_or_reverse": "reverse",
-                "wait_time_s": fill_recirculate_reverse_wait_time_s,
+                "wait_time_s": fill_recirculate_reverse_wait_time_sec,
             })
         
         # pump recirculate forward
@@ -2657,7 +2657,7 @@ def ADSS_PA_CV_TRI_new(
         epm.add_experiment(
             "orch_sub_wait",
             {
-                "wait_time_s": purge_wait_initialN2_m * 60,
+                "wait_time_s": purge_wait_initialN2_min * 60,
             }
         )
         
@@ -2749,7 +2749,7 @@ def ADSS_PA_CV_TRI_new(
         epm.add_experiment(
             "orch_sub_wait",
             {
-                "wait_time_s": purge_wait_N2_to_O2_m * 60,
+                "wait_time_s": purge_wait_N2_to_O2_min * 60,
             }
         )
 
@@ -2826,7 +2826,7 @@ def ADSS_PA_CV_TRI_new(
                 "ADSS_sub_recirculate",
                 {
                     "direction_forward_or_reverse": "forward",
-                    "wait_time_s": inject_recirculate_wait_time_s,
+                    "wait_time_s": inject_recirculate_wait_time_sec,
                 }
             )
 
@@ -2878,8 +2878,8 @@ def ADSS_PA_CV_TRI_new(
         #measure OCP (default of OCV exp is to not take any aliquots)
         epm.add_experiment("ADSS_sub_OCV", 
                            {
-                               "Tval__s": purge_wait_O2_to_N2_m * 60,
-                               "samplerate_sec": ocp_samplerate_sec,
+                               "Tval__s": purge_wait_O2_to_N2_min * 60,
+                               "samplerate_sec": OCP_samplerate_sec,
                            })
         
         # epm.add_experiment(
@@ -2940,8 +2940,8 @@ def ADSS_PA_CV_TRI_new(
             epm.add_experiment(
                 "ADSS_sub_drain_cell",
                 {
-                    "DrainWait_s": cell_draintime_s,
-                    "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+                    "DrainWait_s": cell_draintime_sec,
+                    "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
                 #    "ResidualWait_s": ResidualWait_s,
                 }
             )
@@ -2951,8 +2951,8 @@ def ADSS_PA_CV_TRI_new(
             epm.add_experiment("ADSS_sub_clean_cell",
                             {
                                 "Clean_volume_ul": clean_volume_ul,
-                                "ReturnLineWait_s": clean_recirculate_s,
-                                "DrainWait_s": clean_drain_s,
+                                "ReturnLineWait_s": clean_recirculate_sec,
+                                "DrainWait_s": clean_drain_sec,
                             }
                         )
             #if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
