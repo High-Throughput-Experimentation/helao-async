@@ -9,7 +9,7 @@ __all__ = [
     "ADSS_PA_CVs_CAs_CVs_cell_simple",
     "ADSS_PA_CVs_testing",
     "ADSS_PA_CV_TRI",
-    "ADSS_PA_CV_TRI_test"
+    "ADSS_PA_CV_TRI_new"
 ]
 
 from typing import List
@@ -2436,8 +2436,8 @@ def ADSS_PA_CV_TRI(
     return epm.experiment_plan_list  # returns complete experiment list
 
 
-def ADSS_PA_CV_TRI_test(
-    sequence_version: int = 1, #
+def ADSS_PA_CV_TRI_new(
+    sequence_version: int = 2, #add ocp during gas switch form O2 to N2
     #note: str = "need as many samples as you expect combinations of UPL and LPL",
     
     #sample info
@@ -2504,6 +2504,9 @@ def ADSS_PA_CV_TRI_test(
     #CV_O2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
     #CV_O2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
     #CV_O2_samplerate_sec: float = 0.05,
+
+    #final OCP info
+    ocp_samplerate_sec: float = 0.1,
 
     #Pstat and ref info
     gamry_i_range: str = "auto",
@@ -2872,12 +2875,19 @@ def ADSS_PA_CV_TRI_test(
 
         #switch from O2 to N2 and saturate
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
-        epm.add_experiment(
-            "orch_sub_wait",
-            {
-                "wait_time_s": purge_wait_O2_to_N2_m * 60,
-            }
-        )
+        #measure OCP (default of OCV exp is to not take any aliquots)
+        epm.add_experiment("ADSS_sub_OCV", 
+                           {
+                               "Tval__s": purge_wait_O2_to_N2_m * 60,
+                               "samplerate_sec": ocp_samplerate_sec,
+                           })
+        
+        # epm.add_experiment(
+        #     "orch_sub_wait",
+        #     {
+        #         "wait_time_s": purge_wait_O2_to_N2_m * 60,
+        #     }
+        # )
         
         #start background CVs in N2 with phosphoric acid
         for i, CV_cycle in enumerate(CV_N2_cycles):
