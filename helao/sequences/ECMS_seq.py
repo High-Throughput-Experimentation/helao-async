@@ -1,4 +1,4 @@
-"""Sequence library for CCSI"""
+"""Sequence library for AutoGDE"""
 
 __all__ = [
     "ECMS_series_CA",
@@ -31,23 +31,7 @@ def ECMS_initiation(
     MS_baseline_duration_2: float = 90, 
     liquid_drain_time: float = 60.0,    
 ):
-    """Repeat CV at the cell1_we position.
 
-    Flush and fill cell, run CV, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CV
-    (5) Drain cell and purge with CO2 for 60 seconds
-
-    Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
-
-
-
-    """
 
     epm = ExperimentPlanMaker()
 
@@ -236,23 +220,6 @@ def ECMS_repeat_CV(
     liquid_drain_time: float = 60.0,    
     #liquid_cleancell_time: float = 120,
 ):
-    """Repeat CV at the cell1_we position.
-
-    Flush and fill cell, run CV, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CV
-    (5) Drain cell and purge with CO2 for 60 seconds
-
-    Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
-
-
-
-    """
 
     epm = ExperimentPlanMaker()
 
@@ -359,23 +326,7 @@ def ECMS_MS_calibration(
     liquid_drain_time: float = 60.0,    
 
 ):
-    """Repeat CV at the cell1_we position.
 
-    Flush and fill cell, run CV, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CV
-    (5) Drain cell and purge with CO2 for 60 seconds
-
-    Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
-
-
-
-    """
 
     epm = ExperimentPlanMaker()
 
