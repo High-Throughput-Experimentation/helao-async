@@ -1707,7 +1707,7 @@ class gamry:
     async def technique_RCA(self, A: Action):
         """Repeating CA definition"""
         Vinit = A.action_params["Vinit__V"]
-        Tinit = A.action_params["Iinit__s"]
+        Tinit = A.action_params["Tinit__s"]
         Vstep = A.action_params["Vstep__V"]
         Tstep = A.action_params["Tstep__s"]
         Cycles = A.action_params["Cycles"]
