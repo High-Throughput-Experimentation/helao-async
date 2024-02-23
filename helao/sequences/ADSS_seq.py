@@ -2462,6 +2462,7 @@ def ADSS_PA_CV_TRI_new(
     liquid_sample_volume_ul: float = 7000,
     Syringe_rate_ulsec: float = 300,
     fill_recirculate_wait_time_sec: float = 30,
+    pump_reversal_during_filling: bool = True,
     fill_recirculate_reverse_wait_time_sec: float = 1,
     
     #phosphoric acid injection info
@@ -2604,21 +2605,22 @@ def ADSS_PA_CV_TRI_new(
         )
         
         # pump recirculate reverse (for bubbles)
-        epm.add_experiment(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "reverse",
-                "wait_time_s": fill_recirculate_reverse_wait_time_sec,
-            })
+        if pump_reversal_during_filling:
+            epm.add_experiment(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "reverse",
+                    "wait_time_s": fill_recirculate_reverse_wait_time_sec,
+                })
         
-        # pump recirculate forward
-        epm.add_experiment(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": 5,
-            }
-        )
+            # pump recirculate forward
+            epm.add_experiment(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "forward",
+                    "wait_time_s": 5,
+                }
+            )
 
         #refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
         if not use_current_electrolyte:
@@ -2880,6 +2882,11 @@ def ADSS_PA_CV_TRI_new(
                            {
                                "Tval__s": purge_wait_O2_to_N2_min * 60,
                                "samplerate_sec": OCP_samplerate_sec,
+                               "gamry_i_range": gamry_i_range,
+                               "ph": ph,
+                               "ref_type": ref_type,
+                               "ref_offset__V": ref_offset__V,
+                               "aliquot_insitu": False,
                            })
         
         # epm.add_experiment(
