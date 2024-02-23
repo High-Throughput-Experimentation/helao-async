@@ -472,47 +472,6 @@ def ECMS_sub_CA(
 
     return apm.action_list
 
-def ANEC_sub_OCV(
-    experiment: Experiment,
-    experiment_version: int = 1,
-    Tval__s: float = 900.0,
-    IErange: str = "auto",
-):
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_globalexp_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    # OCV
-    apm.add(
-        PSTAT_server,
-        "run_OCV",
-        {
-            "Tval__s": apm.pars.Tval__s,
-            "SampleRate": 0.05,
-            "IErange": apm.pars.IErange,
-        },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        technique_name="CP",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
-    )
-    return apm.action_list  # returns complete action list to orch
 
 def ECMS_sub_pulseCA(
     experiment: Experiment,
@@ -561,7 +520,7 @@ def ECMS_sub_pulseCA(
         },
         to_globalexp_params=["Ewe_V__mean_final"],
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        technique_name="CP",
+        technique_name="OCV",
         process_finish=True,
         process_contrib=[
             ProcessContrib.action_params,
