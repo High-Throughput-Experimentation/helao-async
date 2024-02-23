@@ -17,6 +17,8 @@ import asyncio
 import time
 import psutil
 import traceback
+from collections import defaultdict
+
 import numpy as np
 
 from helao.helpers.premodels import Action
@@ -125,6 +127,8 @@ class gamry:
         self.Gamry_devid = self.config_dict.get("dev_id", 0)
         self.filterfreq_hz = 1.0 * self.config_dict.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config_dict.get("grounded", True))
+        self.data_buffer_size = 100
+        self.data_buffer = defaultdict(list)
 
         asyncio.gather(self.init_Gamry(self.Gamry_devid))
 
@@ -196,6 +200,12 @@ class gamry:
 
                 # endpoint can return even we got errors
                 self.IO_continue = True
+
+                # check if we have Ewe_V or I_A in data_buffer, add means to action params
+                for k in ["Ewe_V", "I_A"]:
+                    if k in self.data_buffer:
+                        meanv = np.mean(self.data_buffer[k][-5:])
+                        self.active.action.action_params[f"{k}__mean_final"] = meanv
 
                 if self.active:
                     self.base.print_message("gamry finishes active action")
@@ -354,6 +364,7 @@ class gamry:
         need to initialize and open connection to gamry first"""
         await asyncio.sleep(0.01)
         error = ErrorCodes.none
+        self.data_buffer = defaultdict(list) 
         if self.pstat:
             try:
                 IErangesdict = dict(
@@ -1070,6 +1081,12 @@ class gamry:
                 tmpc = len(self.dtaqsink.acquired_points)
                 if counter < tmpc:
                     tmp_datapoints = self.dtaqsink.acquired_points[counter:tmpc]
+                    for tup in tmp_datapoints:
+                        for k, v in zip(self.FIFO_column_headings, tup):
+                            if len(self.data_buffer[k])>self.data_buffer_size:
+                                self.data_buffer[k].pop(0)
+                            self.data_buffer[k].append(v)
+                    
                     # print(counter, tmpc, len(tmp_datapoints))
                     # EIS needs to be tested and fixed
                     # # Need to get additional data for EIS
