@@ -540,8 +540,7 @@ def ECMS_sub_pulseCA(
             "Cycles": apm.pars.Cycles,
             "AcqInterval__s": apm.pars.AcqInterval__s,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"， 
-                               "Ewe_V__mean_final":　"Vinit__V"},
+        from_globalexp_params= {"_fast_samples_in":"fast_samples_in","Ewe_V__mean_final":"Vinit__V"},
         process_finish=True,
         technique_name="CA",
         process_contrib=[
