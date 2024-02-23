@@ -472,17 +472,59 @@ def ECMS_sub_CA(
 
     return apm.action_list
 
+def ANEC_sub_OCV(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Tval__s: float = 900.0,
+    IErange: str = "auto",
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # get sample for gamry
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+
+    # OCV
+    apm.add(
+        PSTAT_server,
+        "run_OCV",
+        {
+            "Tval__s": apm.pars.Tval__s,
+            "SampleRate": 0.05,
+            "IErange": apm.pars.IErange,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        technique_name="CP",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    return apm.action_list  # returns complete action list to orch
+
 def ECMS_sub_pulseCA(
     experiment: Experiment,
     experiment_version: int = 1,   
-    Vinit__V: float = 0,
-    Vpv__V: float = 0,
-    Vpulse__V: float = -1.0,
-    MaxCycles: int = 60,
-    TimerRes__s: float = 0.1,  # acquisition rate
-    PulseTime__s: float = 0.5,  # duration of pulse (second part of cycle)
-    CycleTime__s: float = 60.0,  # full duration of cycle
-    
+    #Vinit__V: float = 0.0,
+    Tinit__s: float = 0.5,
+    Vstep__V: float = 0.5,
+    Tstep__s: float = 0.5,
+    Cycles: int = 5,
+    AcqInterval__s: float = 0.01,  # acquisition rate
+    Tocv__s: float = 60.0,
+    IErange: str = "auto",
     WE_versus: str = "ref",
     ref_offset__V: float = 0.0,
     ref_type: str = "leakless",
@@ -507,19 +549,40 @@ def ECMS_sub_pulseCA(
         {"custom": "cell1_we"},
         to_globalexp_params=["_fast_samples_in"],
     )
+    
+    # OCV
     apm.add(
         PSTAT_server,
-        "run_PV",
+        "run_OCV",
         {
-            "Vinit__V": apm.pars.Vinit__V,
-            "Vpv__V": apm.pars.Vpv__V,
-            "Vpulse__V": apm.pars.Vpulse__V,
-            "MaxCycles": apm.pars.MaxCycles,
-            "TimerRes__s": apm.pars.TimerRes__s,
-            "PulseTime__s": apm.pars.PulseTime__s,
-            "CycleTime__s": apm.pars.CycleTime__s,
+            "Tval__s": apm.pars.Tocv__s,
+            "SampleRate": 0.05,
+            "IErange": apm.pars.IErange,
         },
+        to_globalexp_params=["Ewe_V__mean_final"],
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        technique_name="CP",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    apm.add(
+        PSTAT_server,
+        "run_RCA",
+        {
+            #"Vinit__V": apm.pars.Vinit__V,
+            "Tinit__s": apm.pars.Tinit__s,
+            "Vstep__V": apm.pars.Vstep__V,
+            "Tstep__s": apm.pars.Tstep__s,
+            "Cycles": apm.pars.Cycles,
+            "AcqInterval__s": apm.pars.AcqInterval__s,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"， 
+                               "Ewe_V__mean_final":　"Vinit__V"},
         process_finish=True,
         technique_name="CA",
         process_contrib=[
