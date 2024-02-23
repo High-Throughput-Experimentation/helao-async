@@ -201,12 +201,6 @@ class gamry:
                 # endpoint can return even we got errors
                 self.IO_continue = True
 
-                # check if we have Ewe_V or I_A in data_buffer, add means to action params
-                for k in ["Ewe_V", "I_A"]:
-                    if k in self.data_buffer:
-                        meanv = np.mean(self.data_buffer[k][-5:])
-                        self.active.action.action_params[f"{k}__mean_final"] = meanv
-
                 if self.active:
                     self.base.print_message("gamry finishes active action")
                     _ = await self.active.finish()
@@ -1051,6 +1045,7 @@ class gamry:
                 return {"measure": "run_error"}
 
             realtime = await self.active.get_realtime()
+
             if self.active:
                 self.active.finish_hlo_header(
                     realtime=realtime,
@@ -1132,6 +1127,12 @@ class gamry:
                     # self.base.print_message(f"counter: {counter}, tmpc: {tmpc}")
                     counter = tmpc
                     sink_status = self.dtaqsink.status
+
+            # check if we have Ewe_V or I_A in data_buffer, add means to action params
+            for k in ["Ewe_V", "I_A"]:
+                if k in self.data_buffer:
+                    meanv = np.mean(self.data_buffer[k][-5:])
+                    self.active.action.action_params[f"{k}__mean_final"] = meanv
 
             self.close_pstat_connection()
             return {"measure": f"done_{self.IO_meas_mode}"}
