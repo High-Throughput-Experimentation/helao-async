@@ -33,6 +33,7 @@ VALID_ACTION_NAME = (
     "run_CV",
     "run_EIS",
     "run_OCV",
+    "run_RCA",
 )
 
 

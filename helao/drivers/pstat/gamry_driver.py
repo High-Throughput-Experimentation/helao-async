@@ -1724,7 +1724,7 @@ class gamry:
         # calculate signal array
         cycle_time = Tinit + Tstep
         points_per_cycle = round(cycle_time / AcqInt)
-        signal_array = [Vinit if i*AcqInt < Tinit else Vstep for i in range(points_per_cycle)]
+        signal_array = [Vinit if i*AcqInt <= Tinit else Vstep for i in range(points_per_cycle)]
 
         eta = cycle_time * Cycles
 
