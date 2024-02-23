@@ -859,73 +859,22 @@ class gamry:
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADVMax(False, 0.0))
                         # dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMax(False, 0.0))
-                elif mode == Gamry_modes.PV:
-                    Dtaqmode = "GamryCOM.GamryDtaqPv"
+                elif mode == Gamry_modes.RCA:
+                    Dtaqmode = "GamryCOM.GamryDtaqUniv"
                     Dtaqtype = None
                     self.FIFO_column_headings = [
                         "t_s",
-                        "Vstep_V",
-                        "Vfwd_V",
-                        "Vrev_V",
-                        "Vsig_V",
+                        "Ewe_V",
+                        "Vu",
+                        "I_A",
+                        "Vsig",
                         "Ach_V",
                         "IERange",
                         "Overload_HEX",
-                        "StopTest",
-                        "AEch1_V",
-                        "AEch2_V",
-                        "AEch3_V",
-                        "AEch4_V",
-                        "AEch5_V",
-                        "AEch6_V",
-                        "AEch7_V",
-                        "AEch8_V",
+                        "unknown1",
                     ]
                     self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
                     self.pstat.SetVchRangeMode(True)
-
-                    # append stop conditions
-                    pv_stop_conditions = {
-                        # "stop_threshimin": "SetThreshIMin",
-                        # "stop_threshimax": "SetThreshIMax",
-                        # "stop_threshvmin": "SetThreshVMin",
-                        # "stop_threshvmax": "SetThreshVMax",
-                        # "stop_threshtmin": "SetThreshTMin",
-                        # "stop_threshtmax": "SetThreshTMax",
-                        # "stop_imin": "SetStopImin",
-                        # "stop_imax": "SetStopImax",
-                        # "stop_vmin": "SetStopVmin",
-                        # "stop_vmax": "SetStopVmax",
-                    }
-                    pv_delay_values = {
-                        # "stop_delayimin": "SetStopAtDelayImin",
-                        # "stop_delayimax": "SetStopAtDelayImax",
-                        # "stop_delayvmin": "SetStopAtDelayVmin",
-                        # "stop_delayvmax": "SetStopAtDelayVmax",
-                    }
-
-                    for par, method in pv_stop_conditions.items():
-                        if act_params.get(par, None) is not None:
-                            dtaq_lims.append(
-                                lambda dtaq: getattr(dtaq, method)(
-                                    True, act_params[par]
-                                )
-                            )
-                        else:
-                            dtaq_lims.append(
-                                lambda dtaq: getattr(dtaq, method)(False, 0.0)
-                            )
-                    for par, method in pv_delay_values.items():
-                        if act_params.get(par, None) is not None:
-                            dtaq_lims.append(
-                                lambda dtaq: getattr(dtaq, method)(
-                                    act_params[par]
-                                )
-                            )
-                        else:
-                            dtaq_lims.append(
-                                lambda dtaq: getattr(dtaq, method)(0.0)
-                            )
 
                 # Gamry Signal not available
                 else:
@@ -1755,15 +1704,14 @@ class gamry:
         )
         return activeDict
 
-    async def technique_PV(self, A: Action):
-        """PV definition"""
+    async def technique_RCA(self, A: Action):
+        """Repeating CA definition"""
         Vinit = A.action_params["Vinit__V"]
-        Vpv = A.action_params["Vpv__V"]
-        Vpulse = A.action_params["Vpulse__V"]
-        MaxCycles = A.action_params["MaxCycles"]
-        TimerRes = A.action_params["AcqInterval__s"]
-        PulseTime = A.action_params["PulseTime__s"]
-        CycleTime = A.action_params["CycleTime__s"]
+        Tinit = A.action_params["Iinit__s"]
+        Vstep = A.action_params["Vstep__V"]
+        Tstep = A.action_params["Tstep__s"]
+        Cycles = A.action_params["Cycles"]
+        AcqInt = A.action_params["AcqInterval__s"]
 
         TTLwait = A.action_params["TTLwait"]
         TTLsend = A.action_params["TTLsend"]
@@ -1773,47 +1721,32 @@ class gamry:
         dtaq for data acquisition. The values passed in for Vinit and Vpv, Vpulse, will 
         be interpreted as volts for potentiostat mode or amps for galvanostat mode."""
 
-        eta = CycleTime * MaxCycles
+        # calculate signal array
+        cycle_time = Tinit + Tstep
+        points_per_cycle = round(cycle_time / AcqInt)
+        signal_array = [Vinit if i*AcqInt < Tinit else Vstep for i in range(points_per_cycle)]
+
+        eta = cycle_time * Cycles
 
         sigfunc_params = [
             self.pstat,
-            Vinit,
-            Vpv,
-            Vpulse,
-            False,
-            0.0,
-            False,
-            0.0,
-            MaxCycles,
-            TimerRes,
-            PulseTime,
-            CycleTime,
-            0,
-            False,
-            eta,
-            False,
+            Cycles,
+            AcqInt,
+            points_per_cycle,
+            signal_array,
             self.GamryCOM.PstatMode,
         ]
-        sigfunc = "GamryCOM.GamrySignalPv"
-        measmode = Gamry_modes.PV
+        sigfunc = "GamryCOM.GamrySignalArray"
+        measmode = Gamry_modes.RCA
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-            "Vinit": Vinit,
-            "Vpv": Vpv,
-            "Vpulse": Vpulse,
-            "EnableOverrideA": False,
-            "VOverrideA": 0.0,
-            "EnableOverrideB": False,
-            "VOverrideB": 0.0,
-            "MaxCycles": MaxCycles,
-            "TimerRes": TimerRes,
-            "PulseTime": PulseTime,
-            "CycleTime": CycleTime,
-            "IntPeriod": 0.001,
-            "DropKnockSignalEnable": False,
-            "DropKnockSignalDuration": 0.0,
-            "DropKnockSignalPolarity": False,
+            "Vinit__V": Vinit,
+            "Tinit__s": Tinit,
+            "Vstep__V": Vstep,
+            "Tstep__s": Tstep,
+            "Cycles": Cycles,
+            "AcqInterval__s": AcqInt,
         }
 
         # common
@@ -1826,7 +1759,7 @@ class gamry:
             measmode=measmode,
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
-            samplerate=TimerRes,
+            samplerate=AcqInt,
             eta=eta,
         )
         return activeDict
