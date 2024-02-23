@@ -488,7 +488,7 @@ def ECMS_sub_pulseCA(
     ref_offset__V: float = 0.0,
     ref_type: str = "leakless",
     pH: float = 6.8,
-    MS_equilibrium_time: float = 1.0,
+    MS_equilibrium_time: float = 90.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 # =============================================================================

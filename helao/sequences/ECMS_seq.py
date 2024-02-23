@@ -2,6 +2,7 @@
 
 __all__ = [
     "ECMS_series_CA",
+    "ECMS_series_pulseCA",
     "ECMS_repeat_CV",
     "ECMS_initiation",
     "ECMS_MS_calibration",
@@ -93,6 +94,99 @@ def ECMS_initiation(
     return epm.experiment_plan_list
 
 
+def ECMS_series_pulseCA(
+    sequence_version: int = 1,
+    plate_id: int = 4534,
+    solid_sample_no: int = 1,    
+    reservoir_liquid_sample_no: int = 2,
+    volume_ul_cell_liquid: float = 600,
+    liquid_forward_time: float = 0,
+    liquid_backward_time: float = 100,  
+    #vacuum_time: float = 10,   
+    CO2equilibrium_duration: float = 30,
+    flowrate_sccm: float = 3.0,
+    flow_ramp_sccm: float = 0,
+    MS_baseline_duration_1: float = 90,
+    MS_baseline_duration_2: float = 90, 
+    WE_potential__V: List[float] = [-1.4, -1.6, -1.8, -1.9, -2.0],
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 7.8,
+    CA_duration_sec: List[float] = [600, 600, 600, 600, 600],
+    SampleRate: float = 1,
+    IErange: str = "auto",
+    ref_offset__V: float = 0.0,
+    MS_equilibrium_time: float = 120.0,
+    liquid_drain_time: float = 60.0,    
+    Tinit__s: float = 0.5,
+    Vstep__V: float = 0.5,
+    Tstep__s: float = 0.5,
+    Cycles: int = 600,
+    AcqInterval__s: float = 0.01,  # acquisition rate
+    Tocv__s: float = 60.0,
+):
+
+    
+    epm = ExperimentPlanMaker()
+
+    # housekeeping
+    epm.add_experiment("ECMS_sub_unload_cell", {})
+    epm.add_experiment(
+        "ECMS_sub_load_solid",
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    )
+    #epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
+
+    for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
+        print(f" ... cycle {cycle} potential:", potential, f" ... cycle {cycle} duration:", time)
+        epm.add_experiment(
+            "ECMS_sub_electrolyte_fill_cell",
+            {
+                "liquid_forward_time": liquid_forward_time,
+                "liquid_backward_time": liquid_backward_time,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "volume_ul_cell_liquid": volume_ul_cell_liquid,
+            },
+        )
+#achiving faster equilibrium time with faster CO2 flow rate
+        epm.add_experiment(
+            "ECMS_sub_headspace_purge_and_CO2baseline",
+            {
+                "CO2equilibrium_duration": CO2equilibrium_duration,
+                "flowrate_sccm": 20.0,
+                "flow_ramp_sccm": flow_ramp_sccm,
+                "MS_baseline_duration": MS_baseline_duration_1
+            },
+        )
+
+        epm.add_experiment(
+            "ECMS_sub_headspace_purge_and_CO2baseline",
+            {
+                "CO2equilibrium_duration": 1.0,
+                "flowrate_sccm": flowrate_sccm,
+                "flow_ramp_sccm": flow_ramp_sccm,
+                "MS_baseline_duration": MS_baseline_duration_2
+            },
+        )
+        
+        epm.add_experiment(
+            "ECMS_sub_pulseCA",
+            {
+                "Vstep__V": potential,
+                "Tinit__s": Tinit__s,
+                "Tstep__s": Tstep__s,
+                "Cycles": Cycles,
+                "AcqInterval__s": AcqInterval__s,
+                "Tocv__s": Tocv__s,
+            },
+        )  
+        epm.add_experiment("ECMS_sub_normal_state",{})
+        epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})      
+        #epm.add_experiment("ECMS_sub_electrolyte_clean_cell", {"liquid_backward_time": liquid_cleancell_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no})    
+    #epm.add_experiment("ECMS_sub_alloff", {})
+    
+    return epm.experiment_plan_list
+
 def ECMS_series_CA(
     sequence_version: int = 1,
     plate_id: int = 4534,
@@ -183,7 +277,6 @@ def ECMS_series_CA(
     #epm.add_experiment("ECMS_sub_alloff", {})
     
     return epm.experiment_plan_list
-
 
 
 
