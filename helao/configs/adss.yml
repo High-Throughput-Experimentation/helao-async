@@ -3,6 +3,9 @@ simulation: false
 builtin_ref_motorxy:
   - -10
   - 10
+builtin_ref_motorxy_2:
+  - -10
+  - 80
 experiment_libraries:
   - ADSS_exp
   - samples_exp

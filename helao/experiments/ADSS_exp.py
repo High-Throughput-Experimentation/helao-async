@@ -46,6 +46,7 @@ __all__ = [
     "ADSS_sub_gasvalve_N2flow",
     "ADSS_sub_transfer_liquid_in",
     "ADSS_sub_tray_icpms_export",
+    "ADSS_sub_move_to_ref_measurement",
 ]
 
 
@@ -1949,7 +1950,7 @@ def ADSS_sub_move_to_clean_cell(
     apm.add(
         MOTOR_server,
         "solid_get_builtin_specref",
-        {},
+        {"ref_name": "builtin_ref_motorxy"},
         to_globalexp_params=["_refxy"],
     )
     apm.add(
@@ -1967,6 +1968,33 @@ def ADSS_sub_move_to_clean_cell(
 
     return apm.action_list
 
+def ADSS_sub_move_to_ref_measurement(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    reference_position_name: str = "builtin_ref_motorxy_2",
+):
+    apm = ActionPlanMaker()
+    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+    apm.add(
+        MOTOR_server,
+        "solid_get_builtin_specref",
+        {"ref_position_name": reference_position_name},
+        to_globalexp_params=["_refxy"],
+    )
+    apm.add(
+        MOTOR_server,
+        "move",
+        {
+            "axis": ["x", "y"],
+            "mode": MoveModes.absolute,
+            "transformation": TransformationModes.platexy,
+        },
+        from_globalexp_params={"_refxy": "d_mm"},
+    )
+
+    apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
+
+    return apm.action_list
 
 # def ADSS_sub_refill_syringes(
 #     experiment: Experiment,
