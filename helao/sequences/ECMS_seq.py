@@ -79,17 +79,19 @@ def ECMS_initiation(
 
     epm.add_experiment("ECMS_sub_normal_state",{})
     epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})   
-# repeat refill to make sure contact was successfully made
-    epm.add_experiment(
-        "ECMS_sub_electrolyte_fill_cell",
-        {
-            "liquid_forward_time": liquid_forward_time,
-            "liquid_backward_time": liquid_backward_time,
-            "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-            "volume_ul_cell_liquid": volume_ul_cell_liquid,
-        },
-    )     
-    epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})   
+# =============================================================================
+# # repeat refill to make sure contact was successfully made
+#     epm.add_experiment(
+#         "ECMS_sub_electrolyte_fill_cell",
+#         {
+#             "liquid_forward_time": liquid_forward_time,
+#             "liquid_backward_time": liquid_backward_time,
+#             "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+#             "volume_ul_cell_liquid": volume_ul_cell_liquid,
+#         },
+#     )     
+#     epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})   
+# =============================================================================
 
     return epm.experiment_plan_list
 
@@ -108,20 +110,18 @@ def ECMS_series_pulseCA(
     flow_ramp_sccm: float = 0,
     MS_baseline_duration_1: float = 90,
     MS_baseline_duration_2: float = 90, 
-    WE_potential__V: List[float] = [-1.4, -1.6, -1.8, -1.9, -2.0],
+    WE_potential__V: List[float] = [-1.5, -1.6, -1.8, -1.9, -2.0],
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 7.8,
-    CA_duration_sec: List[float] = [600, 600, 600, 600, 600],
     SampleRate: float = 1,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
     MS_equilibrium_time: float = 120.0,
     liquid_drain_time: float = 60.0,    
-    Tinit__s: float = 0.5,
-    Vstep__V: float = 0.5,
-    Tstep__s: float = 0.5,
-    Cycles: int = 600,
+    Tinit__s: float = 0.1,
+    Tstep__s: float = 0.1,
+    Cycles: int = 3000,
     AcqInterval__s: float = 0.01,  # acquisition rate
     Tocv__s: float = 60.0,
 ):
@@ -137,8 +137,7 @@ def ECMS_series_pulseCA(
     )
     #epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
 
-    for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
-        print(f" ... cycle {cycle} potential:", potential, f" ... cycle {cycle} duration:", time)
+    for cycle, potential in enumerate(WE_potential__V):
         epm.add_experiment(
             "ECMS_sub_electrolyte_fill_cell",
             {
