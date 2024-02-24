@@ -1978,7 +1978,7 @@ def ADSS_sub_move_to_ref_measurement(
     apm.add(
         MOTOR_server,
         "solid_get_builtin_specref",
-        {"ref_position_name": reference_position_name},
+        {"ref_position_name": apm.pars.reference_position_name},
         to_globalexp_params=["_refxy"],
     )
     apm.add(
