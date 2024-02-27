@@ -84,7 +84,7 @@ def move_to_synced(file_path: Path):
     target_path = Path(*parts)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        file_path.replace(target_path)
+        file_path.rename(target_path)
         return target_path
     except PermissionError:
         print(f"Permission error when moving {file_path} to {target_path}")
@@ -99,7 +99,7 @@ def revert_to_finished(file_path: Path):
     target_path = Path(*parts)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        file_path.replace(target_path)
+        file_path.rename(target_path)
         return target_path
     except PermissionError:
         print(f"Permission error when moving {file_path} to {target_path}")
@@ -124,8 +124,8 @@ class HelaoYml:
             os.makedirs(os.path.dirname(self.filelockpath), exist_ok=True)
             with open(self.filelockpath, "w") as _:
                 pass
-        with self.filelock:
-            self.meta = yml_load(self.target)
+        # with self.filelock:
+        #     self.meta = yml_load(self.target)
 
     def check_paths(self):
         if not self.exists:
@@ -286,11 +286,11 @@ class HelaoYml:
             ]
             return [p[0] for p in possible_parents if p][0]
 
-    # @property
-    # def meta(self):
-    #     with self.filelock:
-    #         ymld = yml_load(self.target)
-    #     return ymld
+    @property
+    def meta(self):
+        with self.filelock:
+            ymld = yml_load(self.target)
+        return ymld
 
     def write_meta(self, meta_dict: dict):
         with self.filelock:
