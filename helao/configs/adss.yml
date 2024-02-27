@@ -6,6 +6,9 @@ builtin_ref_motorxy:
 builtin_ref_motorxy_2:
   - -10
   - 80
+builtin_ref_motorxy_3:
+  - -10
+  - 70 
 experiment_libraries:
   - ADSS_exp
   - samples_exp
