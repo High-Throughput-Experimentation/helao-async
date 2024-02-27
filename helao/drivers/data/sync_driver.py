@@ -87,6 +87,7 @@ def move_to_synced(file_path: Path):
         file_path.replace(target_path)
         return target_path
     except PermissionError:
+        print(f"Permission error when moving {file_path} to {target_path}")
         return False
 
 
@@ -101,6 +102,7 @@ def revert_to_finished(file_path: Path):
         file_path.replace(target_path)
         return target_path
     except PermissionError:
+        print(f"Permission error when moving {file_path} to {target_path}")
         return False
 
 
