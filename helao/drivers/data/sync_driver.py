@@ -756,7 +756,8 @@ class HelaoSyncer:
 
             # finally move yaml and update target
             self.base.print_message(f"Moving {yml.target.name} to RUNS_SYNCED")
-            yml_success = move_to_synced(yml_path)
+            with yml.filelock:
+                yml_success = move_to_synced(yml_path)
             if yml_success:
                 result = yml.cleanup()
                 self.base.print_message(f"Cleanup {yml.target.name} {result}.")
