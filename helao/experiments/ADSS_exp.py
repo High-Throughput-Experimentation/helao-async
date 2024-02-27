@@ -1981,17 +1981,28 @@ def ADSS_sub_move_to_ref_measurement(
         {"ref_position_name": apm.pars.reference_position_name},
         to_globalexp_params=["_refxy"],
     )
-    apm.add(
-        MOTOR_server,
-        "move",
-        {
-            "axis": ["x", "y"],
-            "mode": MoveModes.absolute,
-            "transformation": TransformationModes.platexy,
-        },
-        from_globalexp_params={"_refxy": "d_mm"},
-    )
-
+    if reference_position_name == "builtin_ref_motorxy": # if using clean cell position with this experiment, then use platexy. otherwise motorxy
+        apm.add(
+            MOTOR_server,
+            "move",
+            {
+                "axis": ["x", "y"],
+                "mode": MoveModes.absolute,
+                "transformation": TransformationModes.platexy,
+            },
+            from_globalexp_params={"_refxy": "d_mm"},
+        )
+    else:
+        apm.add(
+            MOTOR_server,
+            "move",
+            {
+                "axis": ["x", "y"],
+                "mode": MoveModes.absolute,
+                "transformation": TransformationModes.motorxy,
+            },
+            from_globalexp_params={"_refxy": "d_mm"},
+        )
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
 
     return apm.action_list
