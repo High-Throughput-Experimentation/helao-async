@@ -1981,7 +1981,7 @@ def ADSS_sub_move_to_ref_measurement(
         {"ref_position_name": apm.pars.reference_position_name},
         to_globalexp_params=["_refxy"],
     )
-    if reference_position_name == "builtin_ref_motorxy": # if using clean cell position with this experiment, then use platexy. otherwise motorxy
+    if apm.pars.reference_position_name == "builtin_ref_motorxy": # if using clean cell position with this experiment, then use platexy. otherwise motorxy
         apm.add(
             MOTOR_server,
             "move",
