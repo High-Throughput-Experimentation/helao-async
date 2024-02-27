@@ -122,6 +122,8 @@ class HelaoYml:
             os.makedirs(os.path.dirname(self.filelockpath), exist_ok=True)
             with open(self.filelockpath, "w") as _:
                 pass
+        with self.filelock:
+            self.meta = yml_load(self.target)
 
     def check_paths(self):
         if not self.exists:
@@ -282,11 +284,11 @@ class HelaoYml:
             ]
             return [p[0] for p in possible_parents if p][0]
 
-    @property
-    def meta(self):
-        with self.filelock:
-            ymld = yml_load(self.target)
-        return ymld
+    # @property
+    # def meta(self):
+    #     with self.filelock:
+    #         ymld = yml_load(self.target)
+    #     return ymld
 
     def write_meta(self, meta_dict: dict):
         with self.filelock:
