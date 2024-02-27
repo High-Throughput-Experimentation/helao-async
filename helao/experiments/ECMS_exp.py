@@ -1,5 +1,5 @@
 """
-Action library for ECMS
+Action library for AutoGDE
 
 server_key must be a FastAPI action server defined in config
 """
@@ -17,7 +17,6 @@ __all__ = [
     "ECMS_sub_CA",
     "ECMS_sub_pulseCA",
     "ECMS_sub_CV",
-    "ECMS_sub_headspace_flow_shutdown",
     "ECMS_sub_drain",
     "ECMS_sub_electrolyte_clean_cell",
     "ECMS_sub_cali", 
@@ -647,43 +646,6 @@ def ECMS_sub_CV(
 
     return apm.action_list
 
-def ECMS_sub_headspace_flow_shutdown(
-    experiment: Experiment,
-    experiment_version: int = 1,
-    #flow_duration: float = -1,
-    #co2measure_acqrate: float = 0.5
-):
-    """prevacuum the cell gas phase side to make the electrolyte contact with GDE
-    """
-
-    apm = ActionPlanMaker()
-
-    # Fill cell with liquid
-
-    apm.add(
-        MFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": 0.0,
-            "ramp_sccm_sec": 0.0,
-            "device_name": "CO2",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        MFC_server,
-        "hold_valve_closed_action",
-        {
-            "device_name": "CO2"
-        },
-        asc.no_wait,
-    )
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 0})
-    #apm.add(ORCH_server, "wait", {"waittime": apm.pars.baseline_duration})
-    return apm.action_list
 
 def ECMS_sub_drain(
     experiment: Experiment,
