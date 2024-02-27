@@ -34,7 +34,9 @@ def yml_load(input: Union[str, Path]):
     yaml = ruamel.yaml.YAML(typ="rt")
     yaml.version = (1, 2)
     if isinstance(input, Path):
-        obj = yaml.load(input.open("r"))
+        with input.open("r") as f:
+            obj = yaml.load(f)
     else:
-        obj = yaml.load(open(input, "r"))
+        with open(input, "r") as f:
+            obj = yaml.load(f)
     return obj
