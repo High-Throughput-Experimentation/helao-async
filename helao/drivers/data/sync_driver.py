@@ -625,7 +625,7 @@ class HelaoSyncer:
                 # )
                 for child in prog.yml.finished_children:
                     if child.target.name not in self.running_tasks:
-                        await self.enqueue_prog.yml(child.target, rank - 2)
+                        await self.enqueue_yml(child.target, rank - 2)
                         self.base.print_message(str(child.target))
                 # self.base.print_message(
                 #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
@@ -635,7 +635,7 @@ class HelaoSyncer:
                     self.task_set.remove(prog.yml.target.name)
                 except KeyError:
                     pass
-                await self.enqueue_prog.yml(prog.yml.target, rank - 1)
+                await self.enqueue_yml(prog.yml.target, rank - 1)
                 self.base.print_message(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
 
