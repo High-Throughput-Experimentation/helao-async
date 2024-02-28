@@ -589,66 +589,65 @@ class HelaoSyncer:
             # )
             return True
 
-        yml = prog.yml
-        meta = copy(yml.meta)
+        meta = copy(prog.yml.meta)
 
-        if yml.status == "synced":
+        if prog.yml.status == "synced":
             # self.base.print_message(
-            #     f"Cannot sync {str(yml.target)}, status is already 'synced'."
+            #     f"Cannot sync {str(prog.yml.target)}, status is already 'synced'."
             # )
             return True
 
         # self.base.print_message(
-        #     f"{str(yml.target)} status is not synced, checking for finished."
+        #     f"{str(prog.yml.target)} status is not synced, checking for finished."
         # )
 
-        if yml.status == "active":
+        if prog.yml.status == "active":
             # self.base.print_message(
-            #     f"Cannot sync {str(yml.target)}, status is not 'finished'."
+            #     f"Cannot sync {str(prog.yml.target)}, status is not 'finished'."
             # )
             return False
 
-        # self.base.print_message(f"{str(yml.target)} status is finished, proceeding.")
+        # self.base.print_message(f"{str(prog.yml.target)} status is finished, proceeding.")
 
         # first check if child objects are registered with API (non-actions)
-        if yml.type != "action":
-            if yml.active_children:
+        if prog.yml.type != "action":
+            if prog.yml.active_children:
                 self.base.print_message(
-                    f"Cannot sync {str(yml.target)}, children are still 'active'."
+                    f"Cannot sync {str(prog.yml.target)}, children are still 'active'."
                 )
                 return False
-            if yml.finished_children:
+            if prog.yml.finished_children:
                 # self.base.print_message(
-                #     f"Cannot sync {str(yml.target)}, children are not 'synced'."
+                #     f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
                 # )
                 # self.base.print_message(
                 #     "Adding 'finished' children to sync queue with highest priority."
                 # )
-                for child in yml.finished_children:
+                for child in prog.yml.finished_children:
                     if child.target.name not in self.running_tasks:
-                        await self.enqueue_yml(child.target, rank - 2)
+                        await self.enqueue_prog.yml(child.target, rank - 2)
                         self.base.print_message(str(child.target))
                 # self.base.print_message(
-                #     f"Re-adding {str(yml.target)} to sync queue with high priority."
+                #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
                 # )
-                self.running_tasks.pop(yml.target.name)
+                self.running_tasks.pop(prog.yml.target.name)
                 try:
-                    self.task_set.remove(yml.target.name)
+                    self.task_set.remove(prog.yml.target.name)
                 except KeyError:
                     pass
-                await self.enqueue_yml(yml.target, rank - 1)
-                self.base.print_message(f"{str(yml.target)} re-queued, exiting.")
+                await self.enqueue_prog.yml(prog.yml.target, rank - 1)
+                self.base.print_message(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
 
-        # self.base.print_message(f"{str(yml.target)} children are synced, proceeding.")
+        # self.base.print_message(f"{str(prog.yml.target)} children are synced, proceeding.")
 
         # next push files to S3 (actions only)
-        if yml.type == "action":
+        if prog.yml.type == "action":
             # re-check file lists
-            # self.base.print_message(f"Checking file lists for {yml.target.name}")
+            # self.base.print_message(f"Checking file lists for {prog.yml.target.name}")
             prog.dict["files_pending"] += [
                 str(p)
-                for p in yml.hlo_files + yml.misc_files
+                for p in prog.yml.hlo_files + prog.yml.misc_files
                 if p not in prog.dict["files_pending"]
                 and p not in prog.dict["files_s3"]
             ]
@@ -657,7 +656,7 @@ class HelaoSyncer:
                 for sp in prog.dict["files_pending"]:
                     fp = Path(sp)
                     self.base.print_message(
-                        f"Pushing {sp} to S3 for {yml.target.name}"
+                        f"Pushing {sp} to S3 for {prog.yml.target.name}"
                     )
                     if fp.suffix == ".hlo":
                         file_s3_key = (
@@ -690,9 +689,9 @@ class HelaoSyncer:
 
                         prog.write_dict()
 
-        # if yml is an experiment first check processes before pushing to API
-        if yml.type == "experiment":
-            self.base.print_message(f"Finishing processes for {yml.target.name}")
+        # if prog.yml is an experiment first check processes before pushing to API
+        if prog.yml.type == "experiment":
+            self.base.print_message(f"Finishing processes for {prog.yml.target.name}")
             retry_count = 0
             s3_unf, api_unf = prog.list_unfinished_procs()
             while s3_unf or api_unf:
@@ -703,7 +702,7 @@ class HelaoSyncer:
                 retry_count += 1
             if s3_unf or api_unf:
                 self.base.print_message(
-                    f"Processes in {str(yml.target)} did not sync after 3 tries."
+                    f"Processes in {str(prog.yml.target)} did not sync after 3 tries."
                 )
                 return False
             if prog.dict["process_metas"]:
@@ -712,34 +711,34 @@ class HelaoSyncer:
                     for _, d in sorted(prog.dict["process_metas"].items())
                 ]
 
-        self.base.print_message(f"Patching model for {yml.target.name}")
+        self.base.print_message(f"Patching model for {prog.yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
-        yml_model = MOD_MAP[yml.type](**patched_meta).clean_dict(strip_private=True)
+        prog.yml_model = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(strip_private=True)
 
-        # patch technique lists in yml_model
-        tech_name = yml_model.get("technique_name", "NA")
+        # patch technique lists in prog.yml_model
+        tech_name = prog.yml_model.get("technique_name", "NA")
         if isinstance(tech_name, list):
-            split_technique = tech_name[yml_model.get("action_split", 0)]
-            yml_model["technique_name"] = split_technique
+            split_technique = tech_name[prog.yml_model.get("action_split", 0)]
+            prog.yml_model["technique_name"] = split_technique
 
-        # next push yml to S3
+        # next push prog.yml to S3
         if not prog.s3_done or force_s3:
             self.base.print_message(
-                f"Pushing yml->json to S3 for {yml.target.name}"
+                f"Pushing prog.yml->json to S3 for {prog.yml.target.name}"
             )
-            uuid_key = patched_meta[f"{yml.type}_uuid"]
-            meta_s3_key = f"{yml.type}/{uuid_key}.json"
-            s3_success = await self.to_s3(yml_model, meta_s3_key)
+            uuid_key = patched_meta[f"{prog.yml.type}_uuid"]
+            meta_s3_key = f"{prog.yml.type}/{uuid_key}.json"
+            s3_success = await self.to_s3(prog.yml_model, meta_s3_key)
             if s3_success:
                 prog.dict["s3"] = True
                 prog.write_dict()
 
-        # next push yml to API
+        # next push prog.yml to API
         if not prog.api_done or force_api:
-            self.base.print_message(f"Pushing yml to API for {yml.target.name}")
-            api_success = await self.to_api(yml_model, yml.type)
+            self.base.print_message(f"Pushing prog.yml to API for {prog.yml.target.name}")
+            api_success = await self.to_api(prog.yml_model, prog.yml.type)
             self.base.print_message(
-                f"API push returned {api_success} for {yml.target.name}"
+                f"API push returned {api_success} for {prog.yml.target.name}"
             )
             if api_success:
                 prog.dict["api"] = True
@@ -748,11 +747,11 @@ class HelaoSyncer:
         # move to synced
         if prog.s3_done and prog.api_done:
             self.base.print_message(
-                f"Moving files to RUNS_SYNCED for {yml.target.name}"
+                f"Moving files to RUNS_SYNCED for {prog.yml.target.name}"
             )
-            for lock_path in yml.lock_files:
+            for lock_path in prog.yml.lock_files:
                 lock_path.unlink()
-            for file_path in yml.misc_files + yml.hlo_files:
+            for file_path in prog.yml.misc_files + prog.yml.hlo_files:
                 self.base.print_message(f"Moving {str(file_path)}")
                 move_success = move_to_synced(file_path)
                 while not move_success:
@@ -761,57 +760,58 @@ class HelaoSyncer:
                     move_success = move_to_synced(file_path)
 
             # finally move yaml and update target
-            self.base.print_message(f"Moving {yml.target.name} to RUNS_SYNCED")
-            with yml.filelock:
-                yml_success = move_to_synced(yml_path)
+            self.base.print_message(f"Moving {prog.yml.target.name} to RUNS_SYNCED")
+            with prog.yml.filelock:
+                yml_success = move_to_synced(prog.yml_path)
             if yml_success:
-                result = yml.cleanup()
-                self.base.print_message(f"Cleanup {yml.target.name} {result}.")
+                result = prog.yml.cleanup()
+                self.base.print_message(f"Cleanup {prog.yml.target.name} {result}.")
                 if result == "success":
                     self.base.print_message("yml_success")
-                    prog.ymlpath = Path(yml_success)
-                    yml = prog.yml
+                    prog = Path(yml_success)
+                    self.base.print_message("reassigning prog")
                     prog.dict["yml"] = str(yml_success)
+                    self.base.print_message("updating progress")
                     prog.write_dict()
 
             # pop children from progress dict
-            if yml.type in ["experiment", "sequence"]:
-                children = yml.children
+            if prog.yml.type in ["experiment", "sequence"]:
+                children = prog.yml.children
                 self.base.print_message(
                     f"Removing children from progress: {children}."
                 )
                 for childyml in children:
-                    # self.base.print_message(f"Clearing {childyml.target.name}")
+                    # self.base.print_message(f"Clearing {childprog.yml.target.name}")
                     finished_child_path = childyml.finished_path.parent
                     if finished_child_path.exists():
                         self.try_remove_empty(str(finished_child_path))
                     # try:
-                    #     self.progress.pop(childyml.target.name)
+                    #     self.progress.pop(childprog.yml.target.name)
                     # except Exception as err:
                     #     self.base.print_message(
-                    #         f"Could not remove {childyml.target.name}: {err}"
+                    #         f"Could not remove {childprog.yml.target.name}: {err}"
                     #     )
-                self.try_remove_empty(str(yml.finished_path.parent))
+                self.try_remove_empty(str(prog.yml.finished_path.parent))
 
-            if yml.type == "sequence":
-                self.base.print_message(f"Zipping {yml.target.parent.name}.")
-                zip_target = yml.target.parent.parent.joinpath(
-                    f"{yml.target.parent.name}.zip"
+            if prog.yml.type == "sequence":
+                self.base.print_message(f"Zipping {prog.yml.target.parent.name}.")
+                zip_target = prog.yml.target.parent.parent.joinpath(
+                    f"{prog.yml.target.parent.name}.zip"
                 )
                 self.base.print_message(
                     f"Full sequence has synced, creating zip: {str(zip_target)}"
                 )
-                zip_dir(yml.target.parent, zip_target)
+                zip_dir(prog.yml.target.parent, zip_target)
                 self.cleanup_root()
                 # self.base.print_message(f"Removing sequence from progress.")
-                # self.progress.pop(yml.target.name)
+                # self.progress.pop(prog.yml.target.name)
 
             # self.base.print_message(f"Removing task from running_tasks.")
-            self.running_tasks.pop(yml.target.name)
+            self.running_tasks.pop(prog.yml.target.name)
 
         # if action contributes processes, update processes
-        if yml.type == "action" and meta.get("process_contrib", False):
-            exp_prog = self.update_process(yml, meta)
+        if prog.yml.type == "action" and meta.get("process_contrib", False):
+            exp_prog = self.update_process(prog.yml, meta)
             await self.sync_process(exp_prog)
 
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
