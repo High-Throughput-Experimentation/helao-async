@@ -46,7 +46,7 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.servers.base import Base, Active
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.zdeque import zdeque
-
+from helao.drivers.data.sync_driver import HelaoSyncer
 
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
@@ -86,6 +86,10 @@ class Orch(Base):
             server_name=self.server.server_name,
             user_sequence_path=self.helaodirs.user_seq,
         )
+
+        self.use_db = "DB" in self.world_cfg["servers"].keys()
+        if self.use_db:
+            self.syncer = HelaoSyncer(action_serv=self, db_server_name="DB")
 
         # instantiate experiment/experiment queue, action queue
         self.sequence_dq = zdeque([])
@@ -472,6 +476,10 @@ class Orch(Base):
 
             self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
+            if self.use_db:
+                meta_s3_key = f"sequence/{self.seq_model.sequence_uuid}.json"
+                self.print_message(f"uploading initial active sequence json to s3 ({meta_s3_key})")
+                await self.syncer.to_s3(self.seq_model.clean_dict(strip_private=True), meta_s3_key)
 
             # add all experiments from sequence to experiment queue
             # todo: use seq model instead to initialize some parameters
@@ -591,7 +599,13 @@ class Orch(Base):
         )
 
         # write a temporary exp
+        self.exp_model = self.active_experiment.get_exp()
         await self.write_active_experiment_exp()
+        if self.use_db:
+            meta_s3_key = f"experiment/{self.exp_model.experiment_uuid}.json"
+            self.print_message(f"uploading initial active experiment json to s3 ({meta_s3_key})")
+            await self.syncer.to_s3(self.exp_model.clean_dict(strip_private=True), meta_s3_key)
+        
         return ErrorCodes.none
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
