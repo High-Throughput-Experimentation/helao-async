@@ -808,7 +808,7 @@ class HelaoSyncer:
                 # self.base.print_message(f"Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
 
-            # self.base.print_message(f"Removing task from running_tasks.")
+            self.base.print_message(f"Removing {prog.yml.target.name} from running_tasks.")
             self.running_tasks.pop(prog.yml.target.name)
 
         # if action contributes processes, update processes
