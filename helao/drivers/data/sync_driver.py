@@ -666,7 +666,7 @@ class HelaoSyncer:
             while prog.dict.get("files_pending", []):
                 for sp in prog.dict["files_pending"]:
                     fp = Path(sp)
-                    self.base.print_message(f"Pushing {sp} to S3 for {yml.target.name}")
+                    self.base.print_message(f"Pushing {sp} to S3 for {prog.yml.target.name}")
                     if fp.suffix == ".hlo":
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                         self.base.print_message("Parsing hlo dicts.")
