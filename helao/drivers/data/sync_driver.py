@@ -126,6 +126,7 @@ class HelaoYml:
                 pass
         # with self.filelock:
         #     self.meta = yml_load(self.target)
+        self.meta = yml_load(self.target)
 
     def check_paths(self):
         if not self.exists:
@@ -286,11 +287,11 @@ class HelaoYml:
             ]
             return [p[0] for p in possible_parents if p][0]
 
-    @property
-    def meta(self):
-        with self.filelock:
-            ymld = yml_load(self.target)
-        return ymld
+    # @property
+    # def meta(self):
+    #     with self.filelock:
+    #         ymld = yml_load(self.target)
+    #     return ymld
 
     def write_meta(self, meta_dict: dict):
         with self.filelock:
@@ -337,36 +338,35 @@ class Progress:
             with open(self.prglockpath, "w") as _:
                 pass
 
-        with self.prglock:
-            # first time, write progress dict
-            if not self.prg.exists():
-                self.prg.parent.mkdir(parents=True, exist_ok=True)
-                self.dict = {
-                    "yml": self.yml.target.__str__(),
-                    "api": False,
-                    "s3": False,
+        # first time, write progress dict
+        if not self.prg.exists():
+            self.prg.parent.mkdir(parents=True, exist_ok=True)
+            self.dict = {
+                "yml": self.yml.target.__str__(),
+                "api": False,
+                "s3": False,
+            }
+            if self.yml.type == "action":
+                act_dict = {
+                    "files_pending": [],
+                    "files_s3": {},
                 }
-                if self.yml.type == "action":
-                    act_dict = {
-                        "files_pending": [],
-                        "files_s3": {},
-                    }
-                    self.dict.update(act_dict)
-                if self.yml.type == "experiment":
-                    process_groups = self.yml.meta.get("process_order_groups", {})
-                    exp_dict = {
-                        "process_actions_done": {},  # {action submit order: yml.target.name}
-                        "process_groups": process_groups,  # {process_idx: contributor action indices}
-                        "process_metas": {},  # {process_idx: yml_dict}
-                        "process_s3": [],  # list of process_idx with S3 done
-                        "process_api": [],  # list of process_idx with API done
-                        "legacy_finisher_idxs": [],  # end action indicies (submit order)
-                        "legacy_experiment": False if process_groups else True,
-                    }
-                    self.dict.update(exp_dict)
-                self.write_dict()
-            else:
-                self.read_dict()
+                self.dict.update(act_dict)
+            if self.yml.type == "experiment":
+                process_groups = self.yml.meta.get("process_order_groups", {})
+                exp_dict = {
+                    "process_actions_done": {},  # {action submit order: yml.target.name}
+                    "process_groups": process_groups,  # {process_idx: contributor action indices}
+                    "process_metas": {},  # {process_idx: yml_dict}
+                    "process_s3": [],  # list of process_idx with S3 done
+                    "process_api": [],  # list of process_idx with API done
+                    "legacy_finisher_idxs": [],  # end action indicies (submit order)
+                    "legacy_experiment": False if process_groups else True,
+                }
+                self.dict.update(exp_dict)
+            self.write_dict()
+        else:
+            self.read_dict()
 
     @property
     def yml(self):
@@ -389,8 +389,7 @@ class Progress:
         return [], []
 
     def read_dict(self):
-        with self.prglock:
-            self.dict = yml_load(self.prg)
+        self.dict = yml_load(self.prg)
 
     def write_dict(self, new_dict: Optional[Dict] = None):
         out_dict = self.dict if new_dict is None else new_dict
@@ -689,8 +688,7 @@ class HelaoSyncer:
                         prog.dict["files_s3"].update({fp.name: file_s3_key})
                         self.base.print_message(f"Updating progress: {prog.dict}")
 
-                        with prog.prglock:
-                            prog.write_dict()
+                        prog.write_dict()
 
         # if yml is an experiment first check processes before pushing to API
         if yml.type == "experiment":
@@ -734,8 +732,7 @@ class HelaoSyncer:
             s3_success = await self.to_s3(yml_model, meta_s3_key)
             if s3_success:
                 prog.dict["s3"] = True
-                with prog.prglock:
-                    prog.write_dict()
+                prog.write_dict()
 
         # next push yml to API
         if not prog.api_done or force_api:
@@ -746,8 +743,7 @@ class HelaoSyncer:
             )
             if api_success:
                 prog.dict["api"] = True
-                with prog.prglock:
-                    prog.write_dict()
+                prog.write_dict()
 
         # move to synced
         if prog.s3_done and prog.api_done:
@@ -776,8 +772,7 @@ class HelaoSyncer:
                     prog.ymlpath = Path(yml_success)
                     yml = prog.yml
                     prog.dict["yml"] = str(yml_success)
-                    with prog.prglock:
-                        prog.write_dict()
+                    prog.write_dict()
 
             # pop children from progress dict
             if yml.type in ["experiment", "sequence"]:
