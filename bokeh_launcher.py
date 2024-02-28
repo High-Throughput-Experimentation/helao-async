@@ -45,8 +45,10 @@ if __name__ == "__main__":
     bokehapp = Server(
         {f"/{servPy}": partial(makeApp, confPrefix=confArg, server_key=server_key, helao_root=helao_root)},
         port=servPort,
-        address=servHost,
-        allow_websocket_origin=[f"{servHost}:{servPort}"],
+        # address=servHost,
+        # allow_websocket_origin=[f"{servHost}:{servPort}"],
+        address="0.0.0.0",
+        allow_websocket_origin=[f"0.0.0.0:{servPort}"],
     )
     print_message(
         {},
