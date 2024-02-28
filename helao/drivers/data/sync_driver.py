@@ -387,11 +387,13 @@ class Progress:
         return [], []
 
     def read_dict(self):
-        self.dict = yml_load(self.prg)
+        with self.prglock:
+            self.dict = yml_load(self.prg)
 
     def write_dict(self, new_dict: Optional[Dict] = None):
         out_dict = self.dict if new_dict is None else new_dict
-        self.prg.write_text(str(yml_dumps(out_dict)), encoding="utf-8")
+        with self.prglock:
+            self.prg.write_text(str(yml_dumps(out_dict)), encoding="utf-8")
 
     @property
     def s3_done(self):
@@ -402,7 +404,8 @@ class Progress:
         return self.dict["api"]
 
     def remove_prg(self):
-        self.prg.unlink()
+        with self.prglock:
+            self.prg.unlink()
 
 
 class HelaoSyncer:
