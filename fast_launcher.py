@@ -1,7 +1,6 @@
 __all__ = []
 
 import traceback
-import faulthandler
 import sys
 import os
 from importlib import import_module
@@ -31,34 +30,25 @@ if __name__ == "__main__":
     else:
         log_root = None
     # LOGGING_CONFIG["formatters"]["default"]["fmt"] = "%(asctime)s [%(name)s] %(levelprefix)s %(message)s"
-    fault_dir = os.path.join(os.path.dirname(log_root), "FAULTS")
-    os.makedirs(fault_dir, exist_ok = True)
-    fault_path = os.path.join(fault_dir, f"{server_key}_faults.txt")
-    fault_file = open(fault_path, "a")
-    faulthandler.enable(fault_file)
 
-    try:
-        LOGGING_CONFIG["formatters"]["default"]["datefmt"] = "%H:%M:%S"
-        LOGGING_CONFIG["formatters"]["default"][
-            "fmt"
-        ] = f"\n[%(asctime)s_{server_key}]: %(levelprefix)s %(message)s\r"
-        LOGGING_CONFIG["formatters"]["default"]["use_colors"] = False
+    LOGGING_CONFIG["formatters"]["default"]["datefmt"] = "%H:%M:%S"
+    LOGGING_CONFIG["formatters"]["default"][
+        "fmt"
+    ] = f"\n[%(asctime)s_{server_key}]: %(levelprefix)s %(message)s\r"
+    LOGGING_CONFIG["formatters"]["default"]["use_colors"] = False
 
-        LOGGING_CONFIG["formatters"]["access"]["datefmt"] = "%H:%M:%S"
-        LOGGING_CONFIG["formatters"]["access"][
-            "fmt"
-        ] = f"\n[%(asctime)s_{server_key}]: %(levelprefix)s %(message)s\r"
-        LOGGING_CONFIG["formatters"]["access"]["use_colors"] = False
+    LOGGING_CONFIG["formatters"]["access"]["datefmt"] = "%H:%M:%S"
+    LOGGING_CONFIG["formatters"]["access"][
+        "fmt"
+    ] = f"\n[%(asctime)s_{server_key}]: %(levelprefix)s %(message)s\r"
+    LOGGING_CONFIG["formatters"]["access"]["use_colors"] = False
 
-        print_message(
-            {},
-            "fast_launcher",
-            f" ---- starting  {server_key} ----",
-            log_dir=log_root,
-            info=True,
-        )
-        # fastapp = uvicorn.run(app, host=S["host"], port=S["port"])
-        fastapp = uvicorn.run(app, host="0.0.0.0", port=S["port"])
-    except Exception:
-        faulthandler.disable()
-        fault_file.close()
+    print_message(
+        {},
+        "fast_launcher",
+        f" ---- starting  {server_key} ----",
+        log_dir=log_root,
+        info=True,
+    )
+    # fastapp = uvicorn.run(app, host=S["host"], port=S["port"])
+    fastapp = uvicorn.run(app, host="0.0.0.0", port=S["port"])
