@@ -25,11 +25,13 @@ from helao.helpers.set_time import set_time
 from helao.helpers.yml_tools import yml_dumps
 from helao.drivers.data.sync_driver import dict2json
 from helao.drivers.data.loaders import pgs3
+from helao.drivers.data.loaders.localfs import LocalLoader
 from helao.drivers.data.analyses.echeuvis_stability import (
     EcheUvisAnalysis,
     SDCUVIS_QUERY,
 )
 from helao.drivers.data.analyses.uvis_bkgsubnorm import DryUvisAnalysis, DRYUVIS_QUERY
+from helao.drivers.data.analyses.icpms_local import IcpmsAnalysis
 
 
 class HelaoAnalysisSyncer:
@@ -66,6 +68,7 @@ class HelaoAnalysisSyncer:
         self.ana_funcs = {
             "ECHEUVIS_InsituOpticalStability": EcheUvisAnalysis,
             "UVIS_BkgSubNorm": DryUvisAnalysis,
+            "ICPMS_Concentration": IcpmsAnalysis,
         }
 
     def sync_exit_callback(self, task: asyncio.Task):
@@ -371,11 +374,24 @@ class HelaoAnalysisSyncer:
                 )
             )
 
+    async def batch_calc_icpms_local(
+        self,
+        sequence_zip_path: str = "",
+        params: dict = {},
+    ):
+        """Generate list of IcpmsAnalysis from sequence."""
+        local_loader = LocalLoader(sequence_zip_path)
+        pdf = local_loader.processes
+
+        for puuid in pdf.process_uuid:
+            await self.enqueue_calc(
+                (
+                    puuid,
+                    local_loader,
+                    params,
+                    "ICPMS_Concentration",
+                )
+            )
+
     def shutdown(self):
         pass
-
-
-# for each EcheUvisAnalysis:
-# populate HelaoAnalysis model
-# write ana.outputs.json() to s3 bucket
-# push HelaoAnalysis to API

@@ -1,0 +1,39 @@
+dummy: true
+simulation: false
+experiment_libraries:
+  - samples_exp
+  - TEST_exp
+sequence_libraries:
+  - TEST_seq
+run_type: icpm
+root: C:\INST_hlo
+servers:
+  ORCH:
+    host: hte-icpm-01.htejcap.caltech.edu
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params:
+      enable_op: true
+      bokeh_port: 5002
+      seqspec_parser_path: helao\specifications\last3months.py
+      seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
+  DB:
+    host: hte-icpm-01.htejcap.caltech.edu
+    port: 8010
+    group: action
+    fast: dbpack_server
+    params:
+      aws_config_path: k:/users/hte/.credentials/aws_config.ini
+      aws_profile: default
+      aws_bucket: helao.data
+      api_host: caltech-api.modelyst.com
+      testing: false
+  ANA:
+    host: hte-icpm-01.htejcap.caltech.edu
+    port: 8014
+    group: action
+    fast: analysis_server
+    params:
+      env_file: k:/users/hte/.credentials/helao_data.env
+      local_only: false

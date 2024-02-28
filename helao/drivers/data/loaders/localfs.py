@@ -1,11 +1,11 @@
 import os
-import builtins
 import json
 from glob import glob
 from uuid import UUID
 from datetime import datetime
 from zipfile import ZipFile
 from collections import defaultdict
+from typing import Optional
 
 import pandas as pd
 
@@ -26,9 +26,10 @@ class LocalLoader:
         target_state = self.target.split("RUNS_")[-1].split(os.sep)[0]
         states = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED", "RUNS_DIAG")
         state_dir = f"RUNS_{target_state}"
+        process_dir = os.path.dirname(self.target).replace(state_dir, "PROCESSES") 
         check_dirs = [
             f"{self.target.replace(state_dir, x)}" for x in states
-        ] + [self.target.replace(state_dir, "PROCESSES")]
+        ] + [process_dir]
         if not os.path.exists(self.target):
             raise FileNotFoundError(
                 "data_path argument is not a valid file or folder path"
@@ -38,6 +39,7 @@ class LocalLoader:
             with ZipFile(self.target, "r") as zf:
                 zip_contents = zf.namelist()
             _yml_paths = [x for x in zip_contents if x.endswith(".yml")]
+            _yml_paths += glob(os.path.join(process_dir, "**", "*-prc.yml"), recursive=True)
         elif os.path.isdir(self.target):
             for check_dir in check_dirs:
                 _yml_paths += glob(os.path.join(check_dir, "**", "*.yml"), recursive=True)
@@ -148,6 +150,7 @@ class LocalLoader:
             _, exp_name = yml_dir.split("__")
             yml_file = os.path.basename(ymlp)
             idx, prc_uuid, techname = yml_file.replace("-prc.yml", "").split("__")
+            prc_uuid = UUID(prc_uuid)
             prc_idx = int(idx)
             exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%Y%m%d.%H%M%S%f")
             prc_parts.append(
@@ -182,7 +185,7 @@ class LocalLoader:
         self.prc_cache = {}
 
     def get_yml(self, path: str):
-        if self.target.endswith(".zip"):
+        if self.target.endswith(".zip") and not path.endswith("-prc.yml"):
             with ZipFile(self.target, "r") as zf:
                 metad = dict(yml_load(zf.open(path).read().decode("utf-8")))
         else:
@@ -229,7 +232,7 @@ class LocalLoader:
 
     def get_hlo(self, yml_path: str, hlo_fn: str):
         if self.target.endswith(".zip"):
-            hlotarget = os.path.join(os.path.dirname(yml_path), hlo_fn)
+            hlotarget ="/".join([os.path.dirname(yml_path), hlo_fn])
             with ZipFile(self.target, "r") as zf:
                 lines = zf.open(hlotarget).readlines()
 

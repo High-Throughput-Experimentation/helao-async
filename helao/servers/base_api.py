@@ -1,9 +1,11 @@
+import os
 import json
 import time
 import asyncio
+import faulthandler
 from copy import copy
-
 from socket import gethostname
+
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
 from helao.servers.base import Base
@@ -19,7 +21,6 @@ from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from starlette.types import Message
 from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK
-
 
 class BaseAPI(HelaoFastAPI):
     def __init__(
@@ -114,6 +115,15 @@ class BaseAPI(HelaoFastAPI):
         @self.on_event("startup")
         def startup_event():
             self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
+
+            self.root_dir = self.base.world_cfg.get("root", None)
+            if self.root_dir is not None:
+                self.fault_dir = os.path.join(self.root_dir, "FAULTS")
+                os.makedirs(self.fault_dir, exist_ok = True)
+                fault_path = os.path.join(self.fault_dir, f"{server_key}_faults.txt")
+                self.fault_file = open(fault_path, "a")
+                faulthandler.enable(self.fault_file)
+
             self.base.myinit()
             if driver_class is not None:
                 self.driver = driver_class(self.base)
@@ -257,6 +267,10 @@ class BaseAPI(HelaoFastAPI):
                     "driver has NO async_shutdown function", info=True
                 )
                 retvals["async_shutdown"] = None
+
+            if self.save_root is not None:
+                faulthandler.disable()
+                self.fault_file.close()
             return retvals
 
         @self.post(f"/{server_key}/estop", tags=["action"])

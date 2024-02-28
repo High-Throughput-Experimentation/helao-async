@@ -17,6 +17,8 @@ import inspect
 import traceback
 from queue import Queue
 
+import aiodebug.hang_inspection
+import aiodebug.log_slow_callbacks
 import aiofiles
 import colorama
 import ntplib
@@ -200,6 +202,11 @@ class Base:
 
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
+        # produce warnings on coroutines taking longer than interval
+        aiodebug.log_slow_callbacks.enable(1.0)
+        # dump coroutine stack traces when event loop hangs for longer than interval
+        self.dumper = aiodebug.hang_inspection.start(os.path.join(self.helaodirs.root, "FAULTS"), interval=5.0)
+        self.dumper_task = self.aloop.create_task(aiodebug.hang_inspection.stop_wait(self.dumper))
         self.aloop.set_exception_handler(self.exception_handler)
         if self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())
