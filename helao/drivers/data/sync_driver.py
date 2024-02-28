@@ -428,7 +428,7 @@ class HelaoSyncer:
         self.bucket = self.config_dict["aws_bucket"]
         self.api_host = self.config_dict["api_host"]
 
-        self.progress = {}
+        # self.progress = {}
         self.sequence_objs = {}
         self.task_queue = asyncio.PriorityQueue()
         self.task_set = set()
@@ -537,22 +537,23 @@ class HelaoSyncer:
         #         pass
         # ymllock = FileLock(ymllockpath)
         # with ymllock:
-        if yml_path.name in self.progress:
-            prog = self.progress[yml_path.name]
-            if not prog.yml.exists:
-                prog.yml.check_paths()
-                prog.dict.update({"yml": str(prog.yml.target)})
-                prog.write_dict()
+        # if yml_path.name in self.progress:
+        #     prog = self.progress[yml_path.name]
+        #     if not prog.yml.exists:
+        #         prog.yml.check_paths()
+        #         prog.dict.update({"yml": str(prog.yml.target)})
+        #         prog.write_dict()
+        # else:
+        if not yml_path.exists():
+            hy = HelaoYml(yml_path)
+            hy.check_paths()
+            prog = Progress(hy.target)
+            prog.write_dict()
         else:
-            if not yml_path.exists():
-                hy = HelaoYml(yml_path)
-                hy.check_paths()
-                prog = Progress(hy.target)
-                prog.write_dict()
-            else:
-                prog = Progress(yml_path)
-        self.progress[yml_path.name] = prog
-        return self.progress[yml_path.name]
+            prog = Progress(yml_path)
+        # self.progress[yml_path.name] = prog
+        # return self.progress[yml_path.name]
+        return prog
 
     async def enqueue_yml(self, upath: Union[Path, str], rank: int = 5):
         """Adds yml to sync queue, defaulting to lowest priority."""
@@ -784,12 +785,12 @@ class HelaoSyncer:
                     finished_child_path = childyml.finished_path.parent
                     if finished_child_path.exists():
                         self.try_remove_empty(str(finished_child_path))
-                    try:
-                        self.progress.pop(childyml.target.name)
-                    except Exception as err:
-                        self.base.print_message(
-                            f"Could not remove {childyml.target.name}: {err}"
-                        )
+                    # try:
+                    #     self.progress.pop(childyml.target.name)
+                    # except Exception as err:
+                    #     self.base.print_message(
+                    #         f"Could not remove {childyml.target.name}: {err}"
+                    #     )
                 self.try_remove_empty(str(yml.finished_path.parent))
 
             if yml.type == "sequence":
@@ -803,7 +804,7 @@ class HelaoSyncer:
                 zip_dir(yml.target.parent, zip_target)
                 self.cleanup_root()
                 # self.base.print_message(f"Removing sequence from progress.")
-                self.progress.pop(yml.target.name)
+                # self.progress.pop(yml.target.name)
 
             # self.base.print_message(f"Removing task from running_tasks.")
             self.running_tasks.pop(yml.target.name)
