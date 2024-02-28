@@ -223,6 +223,7 @@ class HelaoYml:
             contents = [x for x in check_dir.glob("*") if x != check_dir]
             if contents:
                 print(f"{str(check_dir)} is not empty")
+                print(contents)
                 return "failed"
             try:
                 check_dir.rmdir()
