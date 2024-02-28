@@ -4,6 +4,7 @@ channels:
   - defaults
 dependencies:
   - pip:
+    - aiodebug
     - aioshutil
     - plumbum
     - psycopg2

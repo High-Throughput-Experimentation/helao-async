@@ -6,7 +6,6 @@ import faulthandler
 from copy import copy
 from socket import gethostname
 
-import aiodebug
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
 from helao.servers.base import Base
@@ -117,9 +116,9 @@ class BaseAPI(HelaoFastAPI):
         def startup_event():
             self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
 
-            self.save_root = self.base.world_cfg.get("root", None)
-            if self.save_root is not None:
-                self.fault_dir = os.path.join(self.save_root, "FAULTS")
+            self.root_dir = self.base.world_cfg.get("root", None)
+            if self.root_dir is not None:
+                self.fault_dir = os.path.join(self.root_dir, "FAULTS")
                 os.makedirs(self.fault_dir, exist_ok = True)
                 fault_path = os.path.join(self.fault_dir, f"{server_key}_faults.txt")
                 self.fault_file = open(fault_path, "a")
