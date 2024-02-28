@@ -422,7 +422,7 @@ class HelaoSyncer:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
-        self.max_tasks = self.config_dict.get("max_tasks", 1)
+        self.max_tasks = self.config_dict.get("max_tasks", 4)
         if "aws_config_path" in self.config_dict:
             os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
             self.aws_session = boto3.Session(
