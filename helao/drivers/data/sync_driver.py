@@ -773,7 +773,7 @@ class HelaoSyncer:
                 self.base.print_message(f"Cleanup {yml.target.name} {result}.")
                 if result == "success":
                     self.base.print_message("yml_success")
-                    prog.yml = HelaoYml(yml_success)
+                    prog.ymlpath = Path(yml_success)
                     yml = prog.yml
                     prog.dict["yml"] = str(yml_success)
                     with prog.prglock:
