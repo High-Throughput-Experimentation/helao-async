@@ -303,34 +303,32 @@ class HelaoYml:
 
 
 class Progress:
-    yml: HelaoYml
+    ymlpath: HelaoYml
     prg: Path
     dict: Dict
 
-    def __init__(self, path: Union[HelaoYml, Path, str]):
+    def __init__(self, path: Union[Path, str]):
         """Loads and saves progress for a given Helao yml or prg file."""
 
-        if isinstance(path, HelaoYml):
-            self.yml = path
-        elif isinstance(path, Path):
+        if isinstance(path, Path):
             if path.suffix == ".yml":
-                self.yml = HelaoYml(path)
+                self.ymlpath = path
             elif path.suffix == ".prg":
                 self.prg = path
         else:
             if path.endswith(".yml"):
-                self.yml = HelaoYml(path)
+                self.ymlpath = Path(path)
             elif path.endswith(".prg"):
                 self.prg = Path(path)
             else:
                 raise ValueError(f"{path} is not a valid Helao .yml or .prg file")
 
-        if not hasattr(self, "yml"):
-            self.read_dict()
-            self.yml = HelaoYml(self.dict["yml"])
+        # if not hasattr(self, "yml"):
+        #     self.read_dict()
+        #     self.yml = HelaoYml(self.dict["yml"])
 
-        if not hasattr(self, "prg"):
-            self.prg = self.yml.synced_path.with_suffix(".prg")
+        # if not hasattr(self, "prg"):
+        #     self.prg = self.yml.synced_path.with_suffix(".prg")
 
         self.prglockpath = str(self.prg) + ".lock"
         self.prglock = FileLock(self.prglockpath)
@@ -369,6 +367,10 @@ class Progress:
                 self.write_dict()
             else:
                 self.read_dict()
+
+    @property
+    def yml(self):
+        return HelaoYml(self.ymlpath)
 
     def list_unfinished_procs(self):
         """Returns pair of lists with non-synced s3 and api processes."""
