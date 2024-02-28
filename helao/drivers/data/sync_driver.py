@@ -137,7 +137,7 @@ class HelaoYml:
                 if self.exists:
                     break
             if not self.exists:
-                raise ValueError(f"{self.target} does not exist")
+                print(f"{self.target} does not exist")
         if self.target.is_dir():
             self.targetdir = self.target
             possible_ymls = [
