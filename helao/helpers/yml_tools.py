@@ -1,3 +1,4 @@
+import os
 import ruamel.yaml
 from pathlib import Path
 from typing import Union
@@ -36,7 +37,9 @@ def yml_load(input: Union[str, Path]):
     if isinstance(input, Path):
         with input.open("r") as f:
             obj = yaml.load(f)
-    else:
+    elif os.path.exists(input):
         with open(input, "r") as f:
             obj = yaml.load(f)
+    else:
+        obj = yaml.load(input)
     return obj
