@@ -217,6 +217,7 @@ class HelaoYml:
         if not self.target.exists():
             return "success"
         tempparts = list(self.parts)
+        tempparts = [x.replace("RUNS_SYNCED", "RUNS_FINISHED") for x in tempparts]
         steps = len(tempparts) - self.status_idx
         for i in range(1, steps):
             check_dir = Path(os.path.join(*tempparts[:-i]))
