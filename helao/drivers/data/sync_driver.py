@@ -771,7 +771,7 @@ class HelaoSyncer:
                 self.base.print_message(f"Cleanup {prog.yml.target.name} {result}.")
                 if result == "success":
                     self.base.print_message("yml_success")
-                    prog = Path(yml_success)
+                    prog = self.get_progress(Path(yml_success))
                     self.base.print_message("reassigning prog")
                     prog.dict["yml"] = str(yml_success)
                     self.base.print_message("updating progress")
