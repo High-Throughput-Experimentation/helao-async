@@ -474,13 +474,14 @@ def ECMS_sub_CA(
 
 def ECMS_sub_pulseCA(
     experiment: Experiment,
-    experiment_version: int = 1,   
-    #Vinit__V: float = 0.0,
+    experiment_version: int = 2,   
+    Vinit__V: float = 0.0,
     Tinit__s: float = 0.5,
     Vstep__V: float = 0.5,
     Tstep__s: float = 0.5,
     Cycles: int = 5,
     AcqInterval__s: float = 0.01,  # acquisition rate
+    run_OCV: str ="yes",
     Tocv__s: float = 60.0,
     IErange: str = "auto",
     WE_versus: str = "ref",
@@ -507,48 +508,70 @@ def ECMS_sub_pulseCA(
         {"custom": "cell1_we"},
         to_globalexp_params=["_fast_samples_in"],
     )
-    
-    # OCV
-    apm.add(
-        PSTAT_server,
-        "run_OCV",
-        {
-            "Tval__s": apm.pars.Tocv__s,
-            "SampleRate": 0.05,
-            "IErange": apm.pars.IErange,
-        },
-        to_globalexp_params=["Ewe_V__mean_final"],
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        technique_name="OCV",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
-    )
-    apm.add(
-        PSTAT_server,
-        "run_RCA",
-        {
-            #"Vinit__V": apm.pars.Vinit__V,
-            "Tinit__s": apm.pars.Tinit__s,
-            "Vstep__V": apm.pars.Vstep__V,
-            "Tstep__s": apm.pars.Tstep__s,
-            "Cycles": apm.pars.Cycles,
-            "AcqInterval__s": apm.pars.AcqInterval__s,
-        },
-        from_globalexp_params= {"_fast_samples_in":"fast_samples_in","Ewe_V__mean_final":"Vinit__V"},
-        process_finish=True,
-        technique_name="CA",
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
-    )
+    if run_OCV=='yes':
+        # OCV
+        apm.add(
+            PSTAT_server,
+            "run_OCV",
+            {
+                "Tval__s": apm.pars.Tocv__s,
+                "SampleRate": 0.05,
+                "IErange": apm.pars.IErange,
+            },
+            to_globalexp_params=["Ewe_V__mean_final"],
+            from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+            technique_name="OCV",
+            process_finish=True,
+            process_contrib=[
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        )
+        apm.add(
+            PSTAT_server,
+            "run_RCA",
+            {
+                #"Vinit__V": apm.pars.Vinit__V,
+                "Tinit__s": apm.pars.Tinit__s,
+                "Vstep__V": apm.pars.Vstep__V,
+                "Tstep__s": apm.pars.Tstep__s,
+                "Cycles": apm.pars.Cycles,
+                "AcqInterval__s": apm.pars.AcqInterval__s,
+            },
+            from_globalexp_params= {"_fast_samples_in":"fast_samples_in","Ewe_V__mean_final":"Vinit__V"},
+            process_finish=True,
+            technique_name="CA",
+            process_contrib=[
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        )
+    else:
+        apm.add(
+            PSTAT_server,
+            "run_RCA",
+            {
+                "Vinit__V": apm.pars.Vinit__V,
+                "Tinit__s": apm.pars.Tinit__s,
+                "Vstep__V": apm.pars.Vstep__V,
+                "Tstep__s": apm.pars.Tstep__s,
+                "Cycles": apm.pars.Cycles,
+                "AcqInterval__s": apm.pars.AcqInterval__s,
+            },
+            from_globalexp_params= {"_fast_samples_in":"fast_samples_in"},
+            process_finish=True,
+            technique_name="CA",
+            process_contrib=[
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        )
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.MS_equilibrium_time})
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 

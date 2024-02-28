@@ -313,11 +313,13 @@ def ECMS_series_pulseCA(
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
     MS_equilibrium_time: float = 120.0,
-    liquid_drain_time: float = 60.0,    
-    Tinit__s: float = 0.1,
-    Tstep__s: float = 0.1,
-    Cycles: int = 3000,
+    liquid_drain_time: float = 60.0,
+    Vinit__V: float = 0.0,    
+    Tinit__s: float = 5,
+    Tstep__s: float = 5,
+    Cycles: int = 60,
     AcqInterval__s: float = 0.01,  # acquisition rate
+    run_OCV: str ="no",
     Tocv__s: float = 60.0,
 ):
 
@@ -366,12 +368,14 @@ def ECMS_series_pulseCA(
         epm.add_experiment(
             "ECMS_sub_pulseCA",
             {
+                "Vinit__V": Vinit__V,
                 "Vstep__V": potential,
                 "Tinit__s": Tinit__s,
                 "Tstep__s": Tstep__s,
                 "Cycles": Cycles,
                 "AcqInterval__s": AcqInterval__s,
                 "Tocv__s": Tocv__s,
+                "run_OCV": run_OCV
             },
         )  
         epm.add_experiment("ECMS_sub_normal_state",{})
