@@ -17,7 +17,8 @@ import inspect
 import traceback
 from queue import Queue
 
-import aiodebug
+import aiodebug.hang_inspection
+import aiodebug.log_slow_callbacks
 import aiofiles
 import colorama
 import ntplib
