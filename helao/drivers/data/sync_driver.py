@@ -327,8 +327,8 @@ class Progress:
         #     self.read_dict()
         #     self.yml = HelaoYml(self.dict["yml"])
 
-        # if not hasattr(self, "prg"):
-        #     self.prg = self.yml.synced_path.with_suffix(".prg")
+        if not hasattr(self, "prg"):
+            self.prg = self.yml.synced_path.with_suffix(".prg")
 
         self.prglockpath = str(self.prg) + ".lock"
         self.prglock = FileLock(self.prglockpath)
