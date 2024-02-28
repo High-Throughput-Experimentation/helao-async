@@ -31,7 +31,7 @@ from copy import copy
 
 import botocore.exceptions
 import boto3
-from filelock import FileLock
+# from filelock import FileLock
 
 from helao.servers.base import Base
 from helaocore.models.process import ProcessModel
@@ -108,25 +108,27 @@ def revert_to_finished(file_path: Path):
 
 class HelaoYml:
     target: Path
-    dir: Path
-    parts: list
+    targetdir: Path
 
     def __init__(self, target: Union[Path, str]):
         if isinstance(target, str):
             self.target = Path(target)
         else:
             self.target = target
-        self.parts = list(Path(target).parts)
         self.check_paths()
-        self.filelockpath = str(self.target) + ".lock"
-        self.filelock = FileLock(self.filelockpath)
-        if not os.path.exists(self.filelockpath):
-            os.makedirs(os.path.dirname(self.filelockpath), exist_ok=True)
-            with open(self.filelockpath, "w") as _:
-                pass
+        # self.filelockpath = str(self.target) + ".lock"
+        # self.filelock = FileLock(self.filelockpath)
+        # if not os.path.exists(self.filelockpath):
+        #     os.makedirs(os.path.dirname(self.filelockpath), exist_ok=True)
+        #     with open(self.filelockpath, "w") as _:
+        #         pass
         # with self.filelock:
         #     self.meta = yml_load(self.target)
         self.meta = yml_load(self.target)
+
+    @property
+    def parts(self):
+        return list(self.target.parts)
 
     def check_paths(self):
         if not self.exists:
@@ -137,32 +139,32 @@ class HelaoYml:
             if not self.exists:
                 raise ValueError(f"{self.target} does not exist")
         if self.target.is_dir():
-            self.dir = self.target
+            self.targetdir = self.target
             possible_ymls = [
                 x
-                for x in list(self.dir.glob("*.yml"))
+                for x in list(self.targetdir.glob("*.yml"))
                 if x.stem.endswith("-seq")
                 or x.stem.endswith("-exp")
                 or x.stem.endswith("-act")
             ]
             if len(possible_ymls) > 1:
                 raise ValueError(
-                    f"{self.dir} contains multiple .yml files and is not a valid Helao directory"
+                    f"{self.targetdir} contains multiple .yml files and is not a valid Helao directory"
                 )
             elif not possible_ymls:
                 raise ValueError(
-                    f"{self.dir} does not contain any .yml files and is not a valid Helao dir"
+                    f"{self.targetdir} does not contain any .yml files and is not a valid Helao dir"
                 )
             self.target = possible_ymls[0]
         else:
-            self.dir = self.target.parent
-        self.parts = list(self.target.parts)
-        if not any([x.startswith("RUNS_") for x in self.dir.parts]):
+            self.targetdir = self.target.parent
+        # self.parts = list(self.target.parts)
+        if not any([x.startswith("RUNS_") for x in self.targetdir.parts]):
             raise ValueError(
                 f"{self.target} is not located with a Helao RUNS_* directory"
             )
-        self.filelockpath = str(self.target) + ".lock"
-        self.filelock = FileLock(self.filelockpath)
+        # self.filelockpath = str(self.target) + ".lock"
+        # self.filelock = FileLock(self.filelockpath)
 
     @property
     def exists(self):
@@ -182,7 +184,7 @@ class HelaoYml:
 
     @property
     def status(self):
-        path_parts = [x for x in self.dir.parts if x.startswith("RUNS_")]
+        path_parts = [x for x in self.targetdir.parts if x.startswith("RUNS_")]
         status = path_parts[0].split("_")[-1].lower()
         return status
 
@@ -214,10 +216,9 @@ class HelaoYml:
 
     def cleanup(self):
         """Remove empty directories in RUNS_ACTIVE or RUNS_FINISHED."""
-        if not self.target.exists():
+        if not self.target.exists() or self.target==self.synced_path:
             return "success"
         tempparts = list(self.parts)
-        tempparts = [x.replace("RUNS_SYNCED", "RUNS_FINISHED") for x in tempparts]
         steps = len(tempparts) - self.status_idx
         for i in range(1, steps):
             check_dir = Path(os.path.join(*tempparts[:-i]))
@@ -263,7 +264,7 @@ class HelaoYml:
     def misc_files(self) -> List[Path]:
         return [
             x
-            for x in self.dir.glob("*")
+            for x in self.targetdir.glob("*")
             if x.is_file()
             and not x.suffix == ".yml"
             and not x.suffix == ".hlo"
@@ -272,11 +273,11 @@ class HelaoYml:
 
     @property
     def lock_files(self) -> List[Path]:
-        return [x for x in self.dir.glob("*") if x.is_file() and x.suffix == ".lock"]
+        return [x for x in self.targetdir.glob("*") if x.is_file() and x.suffix == ".lock"]
 
     @property
     def hlo_files(self) -> List[Path]:
-        return [x for x in self.dir.glob("*") if x.is_file() and x.suffix == ".hlo"]
+        return [x for x in self.targetdir.glob("*") if x.is_file() and x.suffix == ".hlo"]
 
     @property
     def parent_path(self) -> Path:
@@ -296,13 +297,13 @@ class HelaoYml:
     #     return ymld
 
     def write_meta(self, meta_dict: dict):
-        with self.filelock:
-            self.target.write_text(
-                str(
-                    yml_dumps(meta_dict),
-                    encoding="utf-8",
-                )
+        # with self.filelock:
+        self.target.write_text(
+            str(
+                yml_dumps(meta_dict),
+                encoding="utf-8",
             )
+        )
 
 
 class Progress:
@@ -333,12 +334,12 @@ class Progress:
         if not hasattr(self, "prg"):
             self.prg = self.yml.synced_path.with_suffix(".prg")
 
-        self.prglockpath = str(self.prg) + ".lock"
-        self.prglock = FileLock(self.prglockpath)
-        if not os.path.exists(self.prglockpath):
-            os.makedirs(os.path.dirname(self.prglockpath), exist_ok=True)
-            with open(self.prglockpath, "w") as _:
-                pass
+        # self.prglockpath = str(self.prg) + ".lock"
+        # self.prglock = FileLock(self.prglockpath)
+        # if not os.path.exists(self.prglockpath):
+        #     os.makedirs(os.path.dirname(self.prglockpath), exist_ok=True)
+        #     with open(self.prglockpath, "w") as _:
+        #         pass
 
         # first time, write progress dict
         if not self.prg.exists():
@@ -395,8 +396,8 @@ class Progress:
 
     def write_dict(self, new_dict: Optional[Dict] = None):
         out_dict = self.dict if new_dict is None else new_dict
-        with self.prglock:
-            self.prg.write_text(str(yml_dumps(out_dict)), encoding="utf-8")
+        # with self.prglock:
+        self.prg.write_text(str(yml_dumps(out_dict)), encoding="utf-8")
 
     @property
     def s3_done(self):
@@ -407,8 +408,8 @@ class Progress:
         return self.dict["api"]
 
     def remove_prg(self):
-        with self.prglock:
-            self.prg.unlink()
+        # with self.prglock:
+        self.prg.unlink()
 
 
 class HelaoSyncer:
@@ -763,8 +764,8 @@ class HelaoSyncer:
 
             # finally move yaml and update target
             self.base.print_message(f"Moving {prog.yml.target.name} to RUNS_SYNCED")
-            with prog.yml.filelock:
-                yml_success = move_to_synced(yml_path)
+            # with prog.yml.filelock:
+            yml_success = move_to_synced(yml_path)
             if yml_success:
                 result = prog.yml.cleanup()
                 self.base.print_message(f"Cleanup {prog.yml.target.name} {result}.")
@@ -823,31 +824,31 @@ class HelaoSyncer:
         """Takes action yml and updates processes in exp parent."""
         exp_path = Path(act_yml.parent_path)
         exp_prog = self.get_progress(exp_path)
-        with exp_prog.prglock:
-            act_idx = act_meta["action_order"]
-            # handle legacy experiments (no process list)
-            if exp_prog.dict["legacy_experiment"]:
-                # if action is a process finisher, add to exp progress
-                if act_meta["process_finish"]:
-                    exp_prog.dict["legacy_finisher_idxs"] = sorted(
-                        set(exp_prog.dict["legacy_finisher_idxs"]).union([act_idx])
-                    )
-                pf_idxs = exp_prog.dict["legacy_finisher_idxs"]
-                pidx = (
-                    len(pf_idxs)
-                    if act_idx > max(pf_idxs + [-1])
-                    else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
+        # with exp_prog.prglock:
+        act_idx = act_meta["action_order"]
+        # handle legacy experiments (no process list)
+        if exp_prog.dict["legacy_experiment"]:
+            # if action is a process finisher, add to exp progress
+            if act_meta["process_finish"]:
+                exp_prog.dict["legacy_finisher_idxs"] = sorted(
+                    set(exp_prog.dict["legacy_finisher_idxs"]).union([act_idx])
                 )
-                exp_prog.dict["process_groups"][pidx] = exp_prog.dict[
-                    "process_groups"
-                ].get(pidx, [])
-                exp_prog.dict["process_groups"][pidx].append(act_idx)
-            else:
-                pidx = [
-                    k
-                    for k, l in exp_prog.dict["process_groups"].items()
-                    if act_idx in l
-                ][0]
+            pf_idxs = exp_prog.dict["legacy_finisher_idxs"]
+            pidx = (
+                len(pf_idxs)
+                if act_idx > max(pf_idxs + [-1])
+                else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
+            )
+            exp_prog.dict["process_groups"][pidx] = exp_prog.dict[
+                "process_groups"
+            ].get(pidx, [])
+            exp_prog.dict["process_groups"][pidx].append(act_idx)
+        else:
+            pidx = [
+                k
+                for k, l in exp_prog.dict["process_groups"].items()
+                if act_idx in l
+            ][0]
 
             # if exp_prog doesn't yet have metadict, create one
             if pidx not in exp_prog.dict["process_metas"]:
