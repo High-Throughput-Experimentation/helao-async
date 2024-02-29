@@ -18,7 +18,7 @@ __all__ = [
     "ECMS_sub_pulseCA",
     "ECMS_sub_CV",
     "ECMS_sub_drain",
-    "ECMS_sub_electrolyte_clean_cell",
+    "ECMS_sub_final_clean_cell",
     "ECMS_sub_cali", 
 ]
 
@@ -729,11 +729,13 @@ def ECMS_sub_drain(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 0})
     return apm.action_list
 
-def ECMS_sub_electrolyte_clean_cell(
+def ECMS_sub_final_clean_cell(
     experiment: Experiment,
     experiment_version: int = 1,
-    liquid_backward_time: float = 30,
-    reservoir_liquid_sample_no: int = 2,
+    liquid_backward_time_1: float = 300,
+    liquid_backward_time_2: float = 300,
+    reservoir_liquid_sample_no: int = 1,
+    volume_ul_cell_liquid: int = 1
 ):
     """Add electrolyte volume to cell position.
 
@@ -741,18 +743,34 @@ def ECMS_sub_electrolyte_clean_cell(
     """
 
     apm = ActionPlanMaker()
-    
+
     # Fill cell with liquid
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_backward_time})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_backward_time_1})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_backward_time_2})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-    #apm.add_action_list(ECMS_sub_drain(experiment))
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
 
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid",
+        {
+            "custom": "cell1_we",
+            "source_liquid_in": LiquidSample(
+                sample_no=apm.pars.reservoir_liquid_sample_no, machine_name=ORCH_HOST
+            ).model_dump(),
+            "volume_ml": apm.pars.volume_ul_cell_liquid,
+            "combine_liquids": True,
+            "dilute_liquids": True,
+        },
+    )
     return apm.action_list
 
 def ECMS_sub_cali(
