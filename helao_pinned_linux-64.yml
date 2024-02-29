@@ -5,7 +5,7 @@ dependencies:
   - _libgcc_mutex=0.1
   - _openmp_mutex=4.5
   - aiofiles=23.2.1
-  - aiohttp=3.9.1
+  - aiohttp=3.9.3
   - aiomysql=0.1.1
   - aiosignal=1.3.1
   - aiosqlite=0.19.0
@@ -24,20 +24,20 @@ dependencies:
   - backcall=0.2.0
   - backports=1.0
   - backports.functools_lru_cache=1.6.4
-  - bcrypt=4.1.2
+  - bcrypt=4.1.1
   - beautifulsoup4=4.12.2
   - bleach=6.0.0
   - bokeh=2.4.3
-  - boto3=1.34.2
-  - botocore=1.34.2
+  - boto3=1.34.52
+  - botocore=1.34.52
   - brotli=1.0.9
   - brotli-bin=1.0.9
   - brotlipy=0.7.0
   - bzip2=1.0.8
   - c-ares=1.18.1
-  - ca-certificates=2023.5.7
+  - ca-certificates=2023.7.22
   - cairo=1.16.0
-  - certifi=2023.5.7
+  - certifi=2023.7.22
   - cffi=1.16.0
   - charset-normalizer=2.1.1
   - click=8.1.3
@@ -47,6 +47,7 @@ dependencies:
   - cryptography=41.0.7
   - curl=8.2.1
   - cycler=0.11.0
+  - databases=0.5.3
   - dbus=1.13.6
   - debugpy=1.8.0
   - decorator=5.1.1
@@ -55,7 +56,7 @@ dependencies:
   - exceptiongroup=1.1.3
   - executing=1.2.0
   - expat=2.5.0
-  - fastapi=0.105.0
+  - fastapi=0.110.0
   - filelock=3.13.1
   - flit-core=3.8.0
   - font-ttf-dejavu-sans-mono=2.37
@@ -67,21 +68,21 @@ dependencies:
   - fonts-conda-forge=1
   - fonttools=4.46.0
   - freetype=2.12.1
-  - frozenlist=1.4.1
+  - frozenlist=1.4.0
   - gettext=0.21.1
   - git=2.43.0
   - glib=2.78.3
   - glib-tools=2.78.3
   - graphite2=1.3.13
   - greenlet=3.0.2
-  - gst-plugins-base=1.22.6
-  - gstreamer=1.22.6
+  - gst-plugins-base=1.22.7
+  - gstreamer=1.22.7
   - h11=0.14.0
   - h2=4.1.0
   - harfbuzz=8.2.1
   - hpack=4.0.0
   - httpcore=1.0.2
-  - httpx=0.25.2
+  - httpx=0.27.0
   - hyperframe=6.0.1
   - icu=73.2
   - idna=3.4
@@ -90,7 +91,7 @@ dependencies:
   - importlib-resources=5.12.0
   - importlib_metadata=6.6.0
   - importlib_resources=5.12.0
-  - ipykernel=6.26.0
+  - ipykernel=6.29.3
   - ipython=8.12.2
   - ipython_genutils=0.2.0
   - jedi=0.18.2
@@ -101,18 +102,18 @@ dependencies:
   - jsonschema=4.17.3
   - jupyter-lsp=2.2.0
   - jupyter_client=8.2.0
-  - jupyter_core=5.5.1
+  - jupyter_core=5.5.0
   - jupyter_events=0.6.3
   - jupyter_server=2.5.0
   - jupyter_server_terminals=0.4.4
-  - jupyterlab=4.0.9
+  - jupyterlab=4.1.2
   - jupyterlab_pygments=0.2.2
   - jupyterlab_server=2.22.1
   - keyutils=1.6.1
   - kiwisolver=1.4.5
   - krb5=1.21.2
   - lame=3.100
-  - lcms2=2.15
+  - lcms2=2.16
   - ld_impl_linux-64=2.40
   - lerc=4.0.0
   - libblas=3.9.0
@@ -153,7 +154,7 @@ dependencies:
   - libpq=16.1
   - libsndfile=1.2.0
   - libsodium=1.0.18
-  - libsqlite=3.44.2
+  - libsqlite=3.45.1
   - libssh2=1.11.0
   - libstdcxx-ng=12.2.0
   - libsystemd0=253
@@ -164,14 +165,15 @@ dependencies:
   - libvorbis=1.3.7
   - libwebp-base=1.3.2
   - libxcb=1.15
+  - libxcrypt=4.4.36
   - libxkbcommon=1.6.0
   - libxml2=2.11.5
   - libzlib=1.2.13
   - lz4-c=1.9.4
   - markdown-it-py=3.0.0
   - markupsafe=2.1.3
-  - matplotlib=3.8.2
-  - matplotlib-base=3.8.2
+  - matplotlib=3.8.3
+  - matplotlib-base=3.8.3
   - matplotlib-inline=0.1.6
   - mdurl=0.1.0
   - mistune=2.0.5
@@ -192,23 +194,23 @@ dependencies:
   - notebook=6.5.4
   - notebook-shim=0.2.3
   - nspr=4.35
-  - nss=3.94
+  - nss=3.95
   - ntplib=0.4.0
-  - numpy=1.26.2
+  - numpy=1.26.4
   - openjpeg=2.5.0
-  - openssl=3.2.0
+  - openssl=3.2.1
   - packaging=23.1
-  - pandas=2.1.4
+  - pandas=2.2.1
   - pandoc=2.19.2
   - pandocfilters=1.5.0
-  - paramiko=3.3.1
+  - paramiko=3.4.0
   - parso=0.8.3
   - pcre2=10.42
   - perl=5.32.1
   - pexpect=4.8.0
   - pickleshare=0.7.5
   - pillow=10.1.0
-  - pip=23.3.2
+  - pip=24.0
   - pixman=0.40.0
   - pkgutil-resolve-name=1.3.10
   - platformdirs=3.5.1
@@ -217,22 +219,22 @@ dependencies:
   - prometheus_client=0.16.0
   - prompt-toolkit=3.0.38
   - prompt_toolkit=3.0.38
-  - psutil=5.9.7
+  - psutil=5.9.8
   - psycopg2=2.9.9
   - pthread-stubs=0.4
   - ptyprocess=0.7.0
   - pulseaudio-client=16.1
   - pure_eval=0.2.2
-  - pyaml=23.9.7
-  - pybase64=1.3.0
+  - pyaml=23.12.0
+  - pybase64=1.3.2
   - pycparser=2.21
-  - pydantic=2.5.2
-  - pydantic-core=2.14.5
-  - pydantic-settings=2.1.0
+  - pydantic=2.6.3
+  - pydantic-core=2.16.3
+  - pydantic-settings=2.2.1
   - pyfiglet=0.8.post1
   - pyftdi=0.55.0
   - pygments=2.15.1
-  - pymodbus=3.6.2
+  - pymodbus=3.6.4
   - pymysql=1.0.3
   - pynacl=1.5.0
   - pyopenssl=23.3.0
@@ -242,12 +244,12 @@ dependencies:
   - pyrsistent=0.20.0
   - pyserial=3.5
   - pysocks=1.7.1
-  - python=3.11.7
+  - python=3.11.8
   - python-dateutil=2.8.2
-  - python-dotenv=1.0.0
+  - python-dotenv=1.0.1
   - python-fastjsonschema=2.16.3
   - python-json-logger=2.0.7
-  - python-multipart=0.0.6
+  - python-multipart=0.0.9
   - python-tzdata=2023.3
   - python_abi=3.11
   - pytz=2023.3
@@ -262,41 +264,42 @@ dependencies:
   - rfc3339-validator=0.1.4
   - rfc3986-validator=0.1.1
   - rich=13.4.2
-  - ruamel.yaml=0.18.5
+  - ruamel.yaml=0.18.6
   - ruamel.yaml.clib=0.2.7
-  - s3transfer=0.9.0
-  - scikit-learn=1.3.2
-  - scipy=1.11.4
+  - s3transfer=0.10.0
+  - scikit-learn=1.4.1.post1
+  - scipy=1.12.0
   - send2trash=1.8.2
   - setuptools=67.7.2
   - shellingham=1.5.1
-  - shortuuid=1.0.11
+  - shortuuid=1.0.12
   - sip=6.7.12
   - six=1.16.0
   - sniffio=1.3.0
   - soupsieve=2.3.2.post1
   - sqlalchemy2-stubs=0.0.2a34
-  - sqlite=3.44.2
+  - sqlite=3.45.1
   - sshtunnel=0.4.0
   - stack_data=0.6.2
-  - starlette=0.27.0
-  - termcolor=2.3.0
+  - starlette=0.36.3
+  - termcolor=2.4.0
   - terminado=0.17.1
   - threadpoolctl=3.1.0
   - tinycss2=1.2.1
   - tk=8.6.13
   - toml=0.10.2
   - tomli=2.0.1
+  - tomlkit=0.12.1
   - tornado=6.3.3
-  - tqdm=4.66.1
+  - tqdm=4.66.2
   - traitlets=5.9.0
   - typer=0.9.0
-  - typing-extensions=4.8.0
+  - typing-extensions=4.9.0
   - typing_extensions=4.9.0
   - tzdata=2023c
   - unicodedata2=15.1.0
   - urllib3=1.26.15
-  - uvicorn=0.24.0.post1
+  - uvicorn=0.27.1
   - wcwidth=0.2.6
   - webencodings=0.5.1
   - websocket-client=1.5.1
@@ -311,7 +314,7 @@ dependencies:
   - xorg-kbproto=1.0.7
   - xorg-libice=1.1.1
   - xorg-libsm=1.2.4
-  - xorg-libx11=1.8.6
+  - xorg-libx11=1.8.7
   - xorg-libxau=1.0.11
   - xorg-libxdmcp=1.1.3
   - xorg-libxext=1.3.4
@@ -323,7 +326,7 @@ dependencies:
   - xz=5.2.6
   - yaml=0.2.5
   - yarl=1.9.3
-  - zeroconf=0.130.0
+  - zeroconf=0.131.0
   - zeromq=4.3.5
   - zipp=3.15.0
   - zlib=1.2.13
@@ -331,14 +334,13 @@ dependencies:
   - pip:
       - aiodebug==2.3.0
       - aioshutil==1.3
-      - databases==0.8.0
       - llvmlite==0.41.1
-      - git+https://github.com/spomjaksilp/pyMeCom
+      - mecom==0.1
       - numba==0.58.1
       - plumbum==1.8.2
       - pyft232==0.12
       - pylablib==1.4.2
       - pyqtgraph==0.13.3
       - rpyc==5.3.1
-      - sqlalchemy==2.0.23
-      - sqlmodel==0.0.14
+      - sqlalchemy==2.0.27
+      - sqlmodel==0.0.16
