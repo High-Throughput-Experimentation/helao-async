@@ -1,6 +1,4 @@
 import os
-from urllib3.connection import NewConnectionError
-from requests.adapters import MaxRetryError
 
 from helaocore.error import ErrorCodes
 from helao.helpers.premodels import Sequence, Experiment
@@ -38,7 +36,6 @@ class HelaoOperator:
                 path_params,
                 json_params,
             )
-        # except (ConnectionError, ConnectionRefusedError, NewConnectionError, MaxRetryError):
         except Exception:
             resp = {
                 k: "unreachable" for k in ("orch_state", "loop_state", "loop_intent")
