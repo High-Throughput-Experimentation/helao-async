@@ -38,7 +38,8 @@ class HelaoOperator:
                 path_params,
                 json_params,
             )
-        except (ConnectionError, ConnectionRefusedError, NewConnectionError, MaxRetryError):
+        # except (ConnectionError, ConnectionRefusedError, NewConnectionError, MaxRetryError):
+        except:
             resp = {
                 k: "unreachable" for k in ("orch_state", "loop_state", "loop_intent")
             }
