@@ -15,21 +15,21 @@ from helao.helpers.print_message import print_message
 from helao.helpers.premodels import Sequence, Experiment, Action
 
 
-async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
+async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
     yp = Path(yml_path)
 
     def print_msg(msg):
-        if base is not None:
-            base.print_message(msg, info=True)
-        else:
-            print_message({}, "yml_finisher", msg, info=True)
+        # if base is not None:
+        #     base.print_message(msg, info=True)
+        # else:
+        print_message({}, "yml_finisher", msg, info=True)
 
-    if "DB" in base.world_cfg["servers"].keys():
-        dbp_host = base.world_cfg["servers"]["DB"]["host"]
-        dbp_port = base.world_cfg["servers"]["DB"]["port"]
-    else:
+    if "host" not in db_config or "port" not in db_config:
         print_msg(f"DB server not defined in config, {yml_path} will not sync.")
         return False
+    else:
+        dbp_port = db_config["port"]
+        dbp_host = db_config["host"]
 
     if not yp.exists():
         print_msg(f"{yml_path} was not found, was it already moved?")
@@ -143,7 +143,7 @@ async def move_dir(
                     )
                     yml_path = os.path.join(new_dir, f"{timestamp}-{obj_type[:3]}.yml")
                     if not is_manual:
-                        await yml_finisher(yml_path, base=base)
+                        await yml_finisher(yml_path, db_config=base.world_cfg.get("servers", {}).get("DB", {}))
                 if rm_success and obj_type == "action" and is_manual:
                     # remove active sequence and experiment dirs
                     exp_dir = os.path.dirname(yml_dir)
