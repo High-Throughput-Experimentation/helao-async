@@ -20,6 +20,7 @@ __all__ = [
     "ECMS_sub_drain",
     "ECMS_sub_final_clean_cell",
     "ECMS_sub_cali", 
+    "ECMS_sub_pulsecali",
 ]
 
 ###
@@ -519,7 +520,7 @@ def ECMS_sub_pulseCA(
     Tstep__s: float = 0.5,
     Cycles: int = 5,
     AcqInterval__s: float = 0.01,  # acquisition rate
-    run_OCV: str ="yes",
+    run_OCV: str ="no",
     Tocv__s: float = 60.0,
     IErange: str = "auto",
     WE_versus: str = "ref",
@@ -588,7 +589,7 @@ def ECMS_sub_pulseCA(
                 ProcessContrib.samples_out,
             ],
         )
-    else:
+    if run_OCV=='no':
         apm.add(
             PSTAT_server,
             "run_RCA",
@@ -806,6 +807,41 @@ def ECMS_sub_cali(
     )
     # set Calibration gas flow rate
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
+    apm.add(
+        CALIBRATIONMFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": apm.pars.Califlowrate_sccm,
+            "ramp_sccm_sec": apm.pars.flow_ramp_sccm,
+            "device_name": "Caligas",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        CALIBRATIONMFC_server,
+        "cancel_hold_valve_action",
+        {
+            "device_name": "Caligas"
+        },
+        asc.no_wait,
+    )
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.MSsignal_quilibrium_time})
+
+    return apm.action_list
+
+
+def ECMS_sub_pulsecali(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    #CO2flowrate_sccm: float = 20.0,
+    Califlowrate_sccm: float = 0.0,
+    flow_ramp_sccm: float = 0,
+    MSsignal_quilibrium_time: float = 300,
+):
+    """prevacuum the cell gas phase side to make the electrolyte contact with GDE
+    """
+
+    apm = ActionPlanMaker()
     apm.add(
         CALIBRATIONMFC_server,
         "set_flowrate",

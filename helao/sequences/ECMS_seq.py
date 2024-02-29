@@ -6,6 +6,7 @@ __all__ = [
     "ECMS_series_CA",
     "ECMS_series_pulseCA", 
     "ECMS_MS_calibration",
+    "ECMS_MS_pulsecalibration"
 ]
 
 from typing import List
@@ -447,6 +448,65 @@ def ECMS_MS_calibration(
 
     return epm.experiment_plan_list
 
+def ECMS_MS_pulsecalibration(
+    sequence_version: int = 1,
+    reservoir_liquid_sample_no: int = 2,
+    volume_ul_cell_liquid: float = 600,
+    #liquid_forward_time: float = 20,
+    liquid_backward_time: float = 80,   
+    CO2equilibrium_duration: float = 30,
+    flowrate_sccm: float = 19.0,
+    Califlowrate_sccm: float = 1,
+    flow_ramp_sccm: float = 0,
+    MS_baseline_duration_1: float = 60,     
+    #Califlowrate_sccm: List[float] = [1, 2, 3, 4, 5],
+    #MSsignal_quilibrium_time_initial: float = 480,
+    MSsignal_quilibrium_time: float = 10, 
+    calibration_cycles: int = 15, 
+    #liquid_drain_time: float = 60.0,    
 
+):
+
+
+    epm = ExperimentPlanMaker()
+
+
+# =============================================================================
+#     epm.add_experiment(
+#         "ECMS_sub_electrolyte_fill_cell",
+#         {
+#             #"liquid_forward_time": liquid_forward_time,
+#             "liquid_backward_time": liquid_backward_time,
+#             "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+#             "volume_ul_cell_liquid": volume_ul_cell_liquid,
+#         },
+#     )
+# =============================================================================
+#achiving faster equilibrium time with faster CO2 flow rate
+    epm.add_experiment(
+        "ECMS_sub_headspace_purge_and_CO2baseline",
+        {
+            "CO2equilibrium_duration": CO2equilibrium_duration,
+            "flowrate_sccm": flowrate_sccm,
+            "flow_ramp_sccm": flow_ramp_sccm,
+            "MS_baseline_duration": MS_baseline_duration_1
+        },
+    )
+    for run in range(calibration_cycles):
+        epm.add_experiment(
+            "ECMS_sub_pulsecali",
+            {
+                "Califlowrate_sccm": Califlowrate_sccm,
+                "MSsignal_quilibrium_time": MSsignal_quilibrium_time,
+            },
+        )
+        epm.add_experiment(
+            "ECMS_sub_pulsecali",
+            {
+                "Califlowrate_sccm": 0.0,
+                "MSsignal_quilibrium_time": MSsignal_quilibrium_time,
+            },
+        )
+    return epm.experiment_plan_list
 
 
