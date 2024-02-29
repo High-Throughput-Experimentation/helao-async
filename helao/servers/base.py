@@ -203,7 +203,7 @@ class Base:
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
         # produce warnings on coroutines taking longer than interval
-        aiodebug.log_slow_callbacks.enable(1.0)
+        aiodebug.log_slow_callbacks.enable(30.0)
         # dump coroutine stack traces when event loop hangs for longer than interval
         self.dumper = aiodebug.hang_inspection.start(os.path.join(self.helaodirs.root, "FAULTS"), interval=5.0)
         self.dumper_task = self.aloop.create_task(aiodebug.hang_inspection.stop_wait(self.dumper))
