@@ -268,7 +268,7 @@ class BaseAPI(HelaoFastAPI):
                 )
                 retvals["async_shutdown"] = None
 
-            if self.save_root is not None:
+            if self.root_dir is not None:
                 faulthandler.disable()
                 self.fault_file.close()
             return retvals
