@@ -215,7 +215,6 @@ def ECMS_sub_normal_state(
     #apm.add(ORCH_server, "wait", {"waittime": apm.pars.baseline_duration})
     return apm.action_list
 
-#TODO add MFC off
 def ECMS_sub_alloff(
     experiment: Experiment,
     experiment_version: int = 1,

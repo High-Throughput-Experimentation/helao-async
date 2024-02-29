@@ -299,13 +299,12 @@ def ECMS_series_pulseCA(
     volume_ul_cell_liquid: float = 600,
     #liquid_forward_time: float = 0,
     liquid_backward_time: float = 100,  
-    #vacuum_time: float = 10,   
     CO2equilibrium_duration: float = 30,
     flowrate_sccm: float = 3.0,
     flow_ramp_sccm: float = 0,
     MS_baseline_duration_1: float = 90,
     MS_baseline_duration_2: float = 90, 
-    WE_potential__V: List[float] = [-1.5, -1.6, -1.8, -1.9, -2.0],
+    WE_pulsepotential__V: List[float] = [-1.5, -1.6, -1.8, -1.9, -2.0],
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 7.8,
@@ -315,8 +314,8 @@ def ECMS_series_pulseCA(
     MS_equilibrium_time: float = 120.0,
     liquid_drain_time: float = 60.0,
     Vinit__V: float = 0.0,    
-    Tinit__s: float = 5,
-    Tstep__s: float = 5,
+    Tinit__s: float = 5.0,
+    Tstep__s: float = 5.0,
     Cycles: int = 60,
     AcqInterval__s: float = 0.01,  # acquisition rate
     run_OCV: str ="no",
@@ -334,7 +333,7 @@ def ECMS_series_pulseCA(
     )
     #epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
 
-    for cycle, potential in enumerate(WE_potential__V):
+    for cycle, potential in enumerate(WE_pulsepotential__V):
         epm.add_experiment(
             "ECMS_sub_electrolyte_fill_cell",
             {
