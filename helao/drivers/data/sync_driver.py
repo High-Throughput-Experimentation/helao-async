@@ -1117,16 +1117,19 @@ class HelaoSyncer:
                 fail_url = f"https://{self.api_host}/failed"
                 async with aiohttp.ClientSession() as session:
                     for _ in range(retries):
-                        async with session.post(fail_url, json=fail_model) as resp:
-                            if resp.status == 200:
+                        try:
+                            async with session.post(fail_url, json=fail_model) as resp:
+                                if resp.status == 200:
+                                    self.base.print_message(
+                                        f"successful debug API push for {meta_type}: {meta_uuid}"
+                                    )
+                                    break
                                 self.base.print_message(
-                                    f"successful debug API push for {meta_type}: {meta_uuid}"
+                                    f"failed debug API push for {meta_type}: {meta_uuid}"
                                 )
-                                break
-                            self.base.print_message(
-                                f"failed debug API push for {meta_type}: {meta_uuid}"
-                            )
-                            self.base.print_message(f"response: {await resp.json()}")
+                                self.base.print_message(f"response: {await resp.json()}")
+                        except TimeoutError:
+                                self.base.print_message(f"unable to post failure model for {meta_type}: {meta_uuid}")
         return api_success
 
     def list_pending(self, omit_manual_exps: bool = True):
