@@ -108,11 +108,15 @@ class HelaoDriver:
     def timestamp_str(self):
         return self.timestamp.strftime('%F %T,%f')[:-3]
 
+    def connect(self):
+        """Open connection to resource."""
+        pass
+
     def reset(self):
         """Reinitialize driver, force-close old connection if necessary."""
         pass
 
     def close(self):
-        """Close driver connection to hardware, i.e. release resource."""
+        """Release connection to resource."""
         pass
 
