@@ -48,8 +48,14 @@ class BaseAPI(HelaoFastAPI):
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.method == "HEAD":  # comes from endpoint checker, session.head()
+                self.base.print_message(
+                    "received head request, returning empty response with status 200"
+                )
                 return Response(status_code=HTTP_200_OK)
-            elif request.url.path.strip("/").startswith(f"{server_key}/") and request.method == "POST":
+            if request.url.path.strip("/").startswith(f"{server_key}/") and request.method == "POST":
+                self.base.print_message(
+                    "received action request, checking start conditions and endpoint status"
+                )
                 body_bytes = await request.body()
                 body_dict = json.loads(body_bytes)
                 action_dict = body_dict.get("action", {})
@@ -60,8 +66,14 @@ class BaseAPI(HelaoFastAPI):
                     == 0
                     or start_cond == ASC.no_wait
                 ):
+                    self.base.print_message(
+                        "endpoint is available, executing"
+                    )
                     return await call_next(request)
                 else:  # collision between two base requests for one resource, queue
+                    self.base.print_message(
+                        "endpoint is not available"
+                    )
                     action_dict["action_params"] = action_dict.get("action_params", {})
                     action_dict["action_params"]["delayed_on_actserv"] = True
                     extra_params = {}
