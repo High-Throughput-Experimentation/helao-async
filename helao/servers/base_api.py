@@ -52,6 +52,8 @@ class BaseAPI(HelaoFastAPI):
                     "received head request, returning empty response with status 200"
                 )
                 return Response(status_code=HTTP_200_OK)
+            else:
+                return await call_next(request)
             if request.url.path.strip("/").startswith(f"{server_key}/") and request.method == "POST":
                 print(
                     "received action request, checking start conditions and endpoint status"
