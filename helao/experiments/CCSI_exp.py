@@ -937,6 +937,16 @@ def CCSI_sub_co2maintainconcentration(
     refill_freq_sec: float = 60.0,
 ):
     apm = ActionPlanMaker()
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+    )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     #    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, }, nonblocking=True)
     apm.add(
