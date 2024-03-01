@@ -757,9 +757,10 @@ class HelaoSyncer:
         if prog.s3_done and prog.api_done:
             # get yml target name for popping later (after seq zip removes yml)
             yml_target_name = prog.yml.target.name
+            yml_type = prog.yml.type
             
             self.base.print_message(
-                f"Moving files to RUNS_SYNCED for {prog.yml.target.name}"
+                f"Moving files to RUNS_SYNCED for {yml_target_name}"
             )
             for lock_path in prog.yml.lock_files:
                 lock_path.unlink()
@@ -772,12 +773,12 @@ class HelaoSyncer:
                     move_success = move_to_synced(file_path)
 
             # finally move yaml and update target
-            self.base.print_message(f"Moving {prog.yml.target.name} to RUNS_SYNCED")
+            self.base.print_message(f"Moving {yml_target_name} to RUNS_SYNCED")
             # with prog.yml.filelock:
             yml_success = move_to_synced(yml_path)
             if yml_success:
                 result = prog.yml.cleanup()
-                self.base.print_message(f"Cleanup {prog.yml.target.name} {result}.")
+                self.base.print_message(f"Cleanup {yml_target_name} {result}.")
                 if result == "success":
                     self.base.print_message("yml_success")
                     prog = self.get_progress(Path(yml_success))
@@ -787,7 +788,7 @@ class HelaoSyncer:
                     prog.write_dict()
 
             # pop children from progress dict
-            if prog.yml.type in ["experiment", "sequence"]:
+            if yml_type in ["experiment", "sequence"]:
                 children = prog.yml.children
                 self.base.print_message(
                     f"Removing children from progress: {children}."
@@ -805,7 +806,7 @@ class HelaoSyncer:
                     #     )
                 self.try_remove_empty(str(prog.yml.finished_path.parent))
 
-            if prog.yml.type == "sequence":
+            if yml_type == "sequence":
                 self.base.print_message(f"Zipping {prog.yml.target.parent.name}.")
                 zip_target = prog.yml.target.parent.parent.joinpath(
                     f"{prog.yml.target.parent.name}.zip"
@@ -822,7 +823,7 @@ class HelaoSyncer:
             self.running_tasks.pop(yml_target_name)
 
         # if action contributes processes, update processes
-        if prog.yml.type == "action" and meta.get("process_contrib", False):
+        if yml_type == "action" and meta.get("process_contrib", False):
             exp_prog = self.update_process(prog.yml, meta)
             await self.sync_process(exp_prog)
 
