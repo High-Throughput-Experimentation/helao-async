@@ -1,5 +1,5 @@
 __all__ = [
-    "ICPMS_analysis",
+    "ICPMS_postseq",
 ]
 
 import random
