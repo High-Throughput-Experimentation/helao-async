@@ -63,6 +63,8 @@ from helao.helpers.ref_electrode import REF_TABLE
 from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.drivers.robot.pal_driver import Spacingmethod, PALtools
 
+from helaocore.models.run_use import RunUse
+
 
 EXPERIMENTS = __all__
 
@@ -985,6 +987,7 @@ def ADSS_sub_CV(
     aliquot_insitu: bool = True,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here",
+    run_use: RunUse = "data",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1001,6 +1004,7 @@ def ADSS_sub_CV(
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
+
 
     # apply potential
     apm.add(
@@ -1029,6 +1033,7 @@ def ADSS_sub_CV(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        run_use = apm.pars.run_use,
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CV",
         process_finish=True,

@@ -2656,6 +2656,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "run_use": "ref"
                 }
             )
             
@@ -2676,6 +2677,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "run_use": "ref"
                 }
             )
         
@@ -2705,6 +2707,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "run_use": "ref"
                 }
             )
         
@@ -3268,6 +3271,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "run_use": "ref"
                 }
             )
             
@@ -3288,6 +3292,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "run_use": "ref"
                 }
             )
         
@@ -3317,6 +3322,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "run_use": "ref"
                 }
             )
         
