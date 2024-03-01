@@ -21,14 +21,6 @@ from helao.sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 from helao.sequences.ECHEUVIS_seq import ECHEUVIS_multiCA_led, ECHEUVIS_postseq
 from helaocore.models.orchstatus import LoopStatus
 
-inst_config = sys.argv[1]
-PLATE_ID = int(sys.argv[2])
-env_config = sys.argv[3]
-RESUME_ID = False
-if len(sys.argv) == 5:
-    RESUME_ID = sys.argv[4]
-load_dotenv(dotenv_path=Path(env_config))
-TEST = False
 
 TEST_SMPS_2286 = [
     # {
@@ -251,6 +243,16 @@ def num_uploads(db_cfg):
 
 
 def main():
+
+    inst_config = sys.argv[1]
+    PLATE_ID = int(sys.argv[2])
+    env_config = sys.argv[3]
+    RESUME_ID = False
+    if len(sys.argv) == 5:
+        RESUME_ID = sys.argv[4]
+    load_dotenv(dotenv_path=Path(env_config))
+    TEST = False
+    
     helao_root = os.path.dirname(os.path.realpath(__file__))
     while "helao.py" not in os.listdir(helao_root):
         helao_root = os.path.dirname(helao_root)
