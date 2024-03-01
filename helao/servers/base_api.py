@@ -42,34 +42,6 @@ class BaseAPI(HelaoFastAPI):
         )
         self.driver = None
 
-        # async def set_body(request: Request, body: bytes):
-        #     async def receive() -> Message:
-        #         return {"type": "http.request", "body": body}
-
-        #     request._receive = receive
-
-        # async def get_body(request: Request) -> bytes:
-        #     body = await request.body()
-        #     await set_body(request, body)
-        #     return body
-
-        async def set_body(request: Request):
-            receive_ = await request._receive()
-
-            body = receive_.get('body')
-            # Make all changes to the body object here and return the modified request
-
-            async def receive() -> Message:
-                receive_["body"] = body
-                return receive_
-
-            request._receive = receive
-
-        async def get_body(request: Request) -> bytes:
-            body = await request.body()
-            await set_body(request)
-            return body
-
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
@@ -77,8 +49,7 @@ class BaseAPI(HelaoFastAPI):
             if request.method == "HEAD":  # comes from endpoint checker, session.head()
                 response = Response()
             elif request.url.path.strip("/").startswith(f"{server_key}/") and request.method == "POST":
-                # await set_body(request, await request.body())
-                body_bytes = await get_body(request)
+                body_bytes = await request.body()
                 body_dict = json.loads(body_bytes)
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
