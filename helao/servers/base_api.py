@@ -47,7 +47,7 @@ class BaseAPI(HelaoFastAPI):
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.method == "HEAD":  # comes from endpoint checker, session.head()
-                response = Response()
+                return Response()
             elif request.url.path.strip("/").startswith(f"{server_key}/") and request.method == "POST":
                 body_bytes = await request.body()
                 body_dict = json.loads(body_bytes)
@@ -59,7 +59,7 @@ class BaseAPI(HelaoFastAPI):
                     == 0
                     or start_cond == ASC.no_wait
                 ):
-                    response = await call_next(request)
+                    return await call_next(request)
                 else:  # collision between two base requests for one resource, queue
                     action_dict["action_params"] = action_dict.get("action_params", {})
                     action_dict["action_params"]["delayed_on_actserv"] = True
@@ -77,7 +77,6 @@ class BaseAPI(HelaoFastAPI):
                     )
                     # send active status but don't create active object
                     await self.base.status_q.put(action.get_actmodel())
-                    response = JSONResponse(action.as_dict())
                     self.base.print_message(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )
@@ -87,9 +86,8 @@ class BaseAPI(HelaoFastAPI):
                             extra_params,
                         )
                     )
-            else:
-                response = await call_next(request)
-            return response
+                    return JSONResponse(action.as_dict())
+            return await call_next(request)
 
         @self.exception_handler(StarletteHTTPException)
         async def custom_http_exception_handler(request, exc):
