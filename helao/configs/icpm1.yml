@@ -1,9 +1,11 @@
-dummy: true
+dummy: false
 simulation: false
 experiment_libraries:
   - samples_exp
+  - ICPMS_exp
   - TEST_exp
 sequence_libraries:
+  - ICPMS_seq
   - TEST_seq
 run_type: icpm
 root: C:\INST_hlo
