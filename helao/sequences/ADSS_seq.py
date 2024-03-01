@@ -2437,19 +2437,26 @@ def ADSS_PA_CV_TRI(
 
 
 def ADSS_PA_CV_TRI_new(
-    sequence_version: int = 2, #add ocp during gas switch form O2 to N2
+    sequence_version: int = 3, #add ref measurements
     #note: str = "need as many samples as you expect combinations of UPL and LPL",
     
     #sample info
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
+    plate_id_ref_Pt: int = 6173,
     plate_sample_no_list: List[int] = [16304],  #  need as many samples as you expect combinations of UPL and LPL
-    
+    LPL_list: List[float] = [0.05, 0.55, 0.05, 0.55,],
+    UPL_list: List[float] = [1.3, 0.8, 1.3, 0.8,],
+
     #side info
     same_sample: bool = False,
     use_current_electrolyte: bool = False,
     keep_electrolyte_at_end: bool = False,
     move_to_clean_and_clean: bool = True,
+    measure_ref_Pt_at_beginning: bool = True,
+    name_ref_Pt_at_beginning: str = "builtin_ref_motorxy_2",
+    measure_ref_Pt_at_end: bool = True,
+    name_ref_Pt_at_end: str = "builtin_ref_motorxy_3",
     
     #purge wait times
     purge_wait_initialN2_min: int = 10,
@@ -2458,20 +2465,29 @@ def ADSS_PA_CV_TRI_new(
 
     #electrolyte info
     ph: float = 1.24,
-    liquid_sample_no: int = 1251,
+    liquid_sample_no: int = 1053,
     liquid_sample_volume_ul: float = 7000,
     Syringe_rate_ulsec: float = 300,
     fill_recirculate_wait_time_sec: float = 30,
-    pump_reversal_during_filling: bool = True,
+    pump_reversal_during_filling: bool = False,
     fill_recirculate_reverse_wait_time_sec: float = 1,
     
     #phosphoric acid injection info
     Inject_PA: bool= True,
     phosphoric_sample_no: int = 1261,
     phosphoric_location: List[int] = [2,3,54],
-    phosphoric_quantity_ul: int = 80,
+    phosphoric_quantity_ul: int = 90,
     inject_recirculate_wait_time_sec: float = 60,
     #liquid_custom_position: str = "elec_res1",
+
+    #Ref Pt measurement CVs
+    ref_CV_cycles: List[int] = [8],
+    ref_Vinit_vsRHE: List[float] = 0.05,  # Initial value in volts or amps.
+    ref_Vapex1_vsRHE: List[float] = 1.3,  # Apex 1 value in volts or amps.
+    ref_Vapex2_vsRHE: List[float] = 0.05,  # Apex 2 value in volts or amps.
+    ref_Vfinal_vsRHE: List[float] = 0.05,  # Final value in volts or amps.
+    ref_CV_scanrate_voltsec: List[float] = 0.1,  # scan rate in volts/second or amps/second.
+    ref_CV_samplerate_sec: float = 0.01,
 
     #cleaning CVs 
     cleaning_CV_cycles: List[int] = [20],
@@ -2483,8 +2499,6 @@ def ADSS_PA_CV_TRI_new(
     cleaning_CV_samplerate_sec: float = 0.02,
 
     #testing CV info
-    LPL_list: List[float] = [0.05, 0.15, 0.25],
-    UPL_list: List[float] = [0.8, 0.9, 1.0],
     testing_CV_scanrate_voltsec: float= 0.1,
     testing_CV_samplerate_sec: float = 0.01,
 
@@ -2507,7 +2521,7 @@ def ADSS_PA_CV_TRI_new(
     #CV_O2_samplerate_sec: float = 0.05,
 
     #final OCP info
-    OCP_samplerate_sec: float = 0.1,
+    OCP_samplerate_sec: float = 0.5,
 
     #Pstat and ref info
     gamry_i_range: str = "auto",
@@ -2525,13 +2539,13 @@ def ADSS_PA_CV_TRI_new(
     PAL_Injector_id: str = "LS4_peek",
     
     #cell drain info
-    cell_draintime_sec: float = 45,
+    cell_draintime_sec: float = 60,
     ReturnLineReverseWait_sec: float = 5,
     
     #cell clean info
     clean_volume_ul: float = 12000,
-    clean_recirculate_sec: float = 30,
-    clean_drain_sec: float = 45,
+    clean_recirculate_sec: float = 60,
+    clean_drain_sec: float = 120,
     # ResidualWait_s: float = 15,
     # flush_volume_ul: float = 2000,
     # clean: bool = False,
@@ -2548,6 +2562,191 @@ def ADSS_PA_CV_TRI_new(
 
     epm = ExperimentPlanMaker()
 
+    #ref measurement at beginning of sequence
+    if measure_ref_Pt_at_beginning:
+        epm.add_experiment(
+            "ADSS_sub_move_to_ref_measurement",
+            {
+                "reference_position_name": name_ref_Pt_at_beginning
+            }
+        )
+
+        epm.add_experiment(
+            "ADSS_sub_load",
+            {
+                "solid_custom_position": "cell1_we",
+                "solid_plate_id": plate_id_ref_Pt,
+                "solid_sample_no": 1,################### can i use the sample id for all ref measurements?
+                "previous_liquid": use_current_electrolyte,
+                "liquid_custom_position": "cell1_we",
+                "liquid_sample_no": liquid_sample_no,            
+                "liquid_sample_volume_ul": liquid_sample_volume_ul,
+            }
+        )
+
+        epm.add_experiment(
+            "ADSS_sub_cellfill_prefilled",
+            {
+                "Solution_volume_ul": liquid_sample_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            }
+        )
+
+        #set initial gas to N2
+        epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
+
+        # pump recirculate forward
+        epm.add_experiment(
+            "ADSS_sub_recirculate",
+            {
+                "direction_forward_or_reverse": "forward",
+                "wait_time_s": fill_recirculate_wait_time_sec,
+            }
+        )
+        
+        # pump recirculate reverse (for bubbles)
+        if pump_reversal_during_filling:
+            epm.add_experiment(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "reverse",
+                    "wait_time_s": fill_recirculate_reverse_wait_time_sec,
+                })
+        
+            # pump recirculate forward
+            epm.add_experiment(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "forward",
+                    "wait_time_s": 5,
+                }
+            )
+
+        #refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
+        if not use_current_electrolyte:
+            epm.add_experiment("ADSS_sub_refill_syringe", {
+                "syringe": "electrolyte",
+                "fill_volume_ul": liquid_sample_volume_ul,
+                "Syringe_rate_ulsec": 300,
+                }
+            )
+
+        #saturate electrolyte with N2
+        epm.add_experiment(
+            "orch_sub_wait",
+            {
+                "wait_time_s": purge_wait_initialN2_min * 60,
+            }
+        )
+        
+        #start cleaning CVs in N2
+        for i, CV_cycle in enumerate(cleaning_CV_cycles):
+            epm.add_experiment(
+                "ADSS_sub_CV",
+                {
+                    "Vinit_vsRHE": cleaning_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": cleaning_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": cleaning_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": cleaning_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": cleaning_scanrate_voltsec[i],
+                    "SampleRate": cleaning_CV_samplerate_sec,
+                    "cycles": CV_cycle,
+                    "gamry_i_range": gamry_i_range,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "aliquot_insitu": False,
+                }
+            )
+            
+        #start background CVs in N2
+        for i, CV_cycle in enumerate(ref_CV_cycles):
+            epm.add_experiment(
+                "ADSS_sub_CV",
+                {
+                    "Vinit_vsRHE": ref_Vinit_vsRHE,
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
+                    "SampleRate": ref_CV_samplerate_sec,
+                    "cycles": CV_cycle,
+                    "gamry_i_range": gamry_i_range,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "aliquot_insitu": False,
+                }
+            )
+        
+        #switch from N2 to O2 and saturate
+        epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": False,})
+        epm.add_experiment(
+            "orch_sub_wait",
+            {
+                "wait_time_s": purge_wait_N2_to_O2_min * 60,
+            }
+        )
+
+        #start O2 cycles
+        for i, CV_cycle in enumerate(ref_CV_cycles):
+            epm.add_experiment(
+                "ADSS_sub_CV",
+                {
+                    "Vinit_vsRHE": ref_Vinit_vsRHE,
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
+                    "SampleRate": ref_CV_samplerate_sec,
+                    "cycles": CV_cycle,
+                    "gamry_i_range": gamry_i_range,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "aliquot_insitu": False,
+                }
+            )
+        
+        #switch from O2 to N2 and saturate
+        epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
+
+        #unload sample
+        epm.add_experiment("ADSS_sub_unloadall_customs",{})
+        
+        #drain cell
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": cell_draintime_sec,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
+            #    "ResidualWait_s": ResidualWait_s,
+            }
+        )
+
+        #clean cell
+        if move_to_clean_and_clean:
+            epm.add_experiment("ADSS_sub_move_to_clean_cell", {})
+            epm.add_experiment("ADSS_sub_clean_cell",
+                            {
+                                "Clean_volume_ul": clean_volume_ul,
+                                "ReturnLineWait_s": clean_recirculate_sec,
+                                "DrainWait_s": clean_drain_sec,
+                            }
+                        )
+            #if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
+            if clean_volume_ul > 10000:
+                volume = 6000 + clean_volume_ul
+            else:
+                volume = clean_volume_ul
+
+            epm.add_experiment("ADSS_sub_refill_syringe", {
+                "syringe": "waterclean",
+                "fill_volume_ul": volume,
+                "Syringe_rate_ulsec": 300,
+                }
+            )       
+  
     #for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
     for lpl, upl, sample_no in zip(LPL_list, UPL_list, plate_sample_no_list):
         print("##########################################################\n" +
@@ -2974,5 +3173,190 @@ def ADSS_PA_CV_TRI_new(
                 "Syringe_rate_ulsec": 300,
                 }
             )
+
+    #ref measurement at end of sequence
+    if measure_ref_Pt_at_end:
+        epm.add_experiment(
+            "ADSS_sub_move_to_ref_measurement",
+            {
+                "reference_position_name": name_ref_Pt_at_end,
+            }
+        )
+
+        epm.add_experiment(
+            "ADSS_sub_load",
+            {
+                "solid_custom_position": "cell1_we",
+                "solid_plate_id": plate_id_ref_Pt,
+                "solid_sample_no": 1,################### can i use the sample id for all ref measurements?
+                "previous_liquid": use_current_electrolyte,
+                "liquid_custom_position": "cell1_we",
+                "liquid_sample_no": liquid_sample_no,            
+                "liquid_sample_volume_ul": liquid_sample_volume_ul,
+            }
+        )
+
+        epm.add_experiment(
+            "ADSS_sub_cellfill_prefilled",
+            {
+                "Solution_volume_ul": liquid_sample_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            }
+        )
+
+        #set initial gas to N2
+        epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
+
+        # pump recirculate forward
+        epm.add_experiment(
+            "ADSS_sub_recirculate",
+            {
+                "direction_forward_or_reverse": "forward",
+                "wait_time_s": fill_recirculate_wait_time_sec,
+            }
+        )
+        
+        # pump recirculate reverse (for bubbles)
+        if pump_reversal_during_filling:
+            epm.add_experiment(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "reverse",
+                    "wait_time_s": fill_recirculate_reverse_wait_time_sec,
+                })
+        
+            # pump recirculate forward
+            epm.add_experiment(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "forward",
+                    "wait_time_s": 5,
+                }
+            )
+
+        #refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
+        if not use_current_electrolyte:
+            epm.add_experiment("ADSS_sub_refill_syringe", {
+                "syringe": "electrolyte",
+                "fill_volume_ul": liquid_sample_volume_ul,
+                "Syringe_rate_ulsec": 300,
+                }
+            )
+
+        #saturate electrolyte with N2
+        epm.add_experiment(
+            "orch_sub_wait",
+            {
+                "wait_time_s": purge_wait_initialN2_min * 60,
+            }
+        )
+        
+        #start cleaning CVs in N2
+        for i, CV_cycle in enumerate(cleaning_CV_cycles):
+            epm.add_experiment(
+                "ADSS_sub_CV",
+                {
+                    "Vinit_vsRHE": cleaning_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": cleaning_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": cleaning_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": cleaning_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": cleaning_scanrate_voltsec[i],
+                    "SampleRate": cleaning_CV_samplerate_sec,
+                    "cycles": CV_cycle,
+                    "gamry_i_range": gamry_i_range,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "aliquot_insitu": False,
+                }
+            )
+            
+        #start background CVs in N2
+        for i, CV_cycle in enumerate(ref_CV_cycles):
+            epm.add_experiment(
+                "ADSS_sub_CV",
+                {
+                    "Vinit_vsRHE": ref_Vinit_vsRHE,
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
+                    "SampleRate": ref_CV_samplerate_sec,
+                    "cycles": CV_cycle,
+                    "gamry_i_range": gamry_i_range,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "aliquot_insitu": False,
+                }
+            )
+        
+        #switch from N2 to O2 and saturate
+        epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": False,})
+        epm.add_experiment(
+            "orch_sub_wait",
+            {
+                "wait_time_s": purge_wait_N2_to_O2_min * 60,
+            }
+        )
+
+        #start O2 cycles
+        for i, CV_cycle in enumerate(ref_CV_cycles):
+            epm.add_experiment(
+                "ADSS_sub_CV",
+                {
+                    "Vinit_vsRHE": ref_Vinit_vsRHE,
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
+                    "SampleRate": ref_CV_samplerate_sec,
+                    "cycles": CV_cycle,
+                    "gamry_i_range": gamry_i_range,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "aliquot_insitu": False,
+                }
+            )
+        
+        #switch from O2 to N2 and saturate
+        epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
+
+        #unload sample
+        epm.add_experiment("ADSS_sub_unloadall_customs",{})
+        
+        #drain cell
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": cell_draintime_sec,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
+            #    "ResidualWait_s": ResidualWait_s,
+            }
+        )
+
+        #clean cell
+        if move_to_clean_and_clean:
+            epm.add_experiment("ADSS_sub_move_to_clean_cell", {})
+            epm.add_experiment("ADSS_sub_clean_cell",
+                            {
+                                "Clean_volume_ul": clean_volume_ul,
+                                "ReturnLineWait_s": clean_recirculate_sec,
+                                "DrainWait_s": clean_drain_sec,
+                            }
+                        )
+            #if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
+            if clean_volume_ul > 10000:
+                volume = 6000 + clean_volume_ul
+            else:
+                volume = clean_volume_ul
+
+            epm.add_experiment("ADSS_sub_refill_syringe", {
+                "syringe": "waterclean",
+                "fill_volume_ul": volume,
+                "Syringe_rate_ulsec": 300,
+                }
+            )       
 
     return epm.experiment_plan_list  # returns complete experiment list
