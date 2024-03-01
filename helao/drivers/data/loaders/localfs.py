@@ -22,7 +22,7 @@ class LocalLoader:
         self.seq_cache = {}
         self.prc_cache = {}
         self._yml_paths = {}
-        self.target = os.path.abspath(os.path.normpath(data_path))
+        self.target = os.path.abspath(os.path.normpath(data_path.strip('"').strip("'")))
         target_state = self.target.split("RUNS_")[-1].split(os.sep)[0]
         states = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED", "RUNS_DIAG")
         state_dir = f"RUNS_{target_state}"
