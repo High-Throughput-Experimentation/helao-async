@@ -51,9 +51,6 @@ TEST_SMPS_2286 = [
 ]
 
 # print({k: v for k, v in os.environ.items() if k in ('API_KEY', 'BASE_URL')})
-CLIENT = DataRequestsClient(
-    base_url=os.environ["BASE_URL"], api_key=os.environ["API_KEY"]
-)
 
 UVIS_T_defaults = {
     "reference_mode": "builtin",
@@ -253,6 +250,10 @@ def main():
     load_dotenv(dotenv_path=Path(env_config))
     TEST = False
     
+    CLIENT = DataRequestsClient(
+        base_url=os.environ["BASE_URL"], api_key=os.environ["API_KEY"]
+    )
+
     helao_root = os.path.dirname(os.path.realpath(__file__))
     while "helao.py" not in os.listdir(helao_root):
         helao_root = os.path.dirname(helao_root)
