@@ -187,7 +187,7 @@ class LocalLoader:
     def get_yml(self, path: str):
         if self.target.endswith(".zip") and not path.endswith("-prc.yml"):
             with ZipFile(self.target, "r") as zf:
-                metad = dict(yml_load(zf.open(path).read().decode("utf-8")))
+                metad = dict(yml_load(zf.open(path).read().replace(b'\x89', b'%').decode("utf-8")))
         else:
             # metad = yml_load("".join(builtins.open(path, "r").readlines()))
             FM = FileMapper(path)
