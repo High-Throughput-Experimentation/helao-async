@@ -755,6 +755,9 @@ class HelaoSyncer:
 
         # move to synced
         if prog.s3_done and prog.api_done:
+            # get yml target name for popping later (after seq zip removes yml)
+            yml_target_name = prog.yml.target.name
+            
             self.base.print_message(
                 f"Moving files to RUNS_SYNCED for {prog.yml.target.name}"
             )
@@ -815,8 +818,8 @@ class HelaoSyncer:
                 # self.base.print_message(f"Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
 
-            self.base.print_message(f"Removing {prog.yml.target.name} from running_tasks.")
-            self.running_tasks.pop(prog.yml.target.name)
+            self.base.print_message(f"Removing {yml_target_name} from running_tasks.")
+            self.running_tasks.pop(yml_target_name)
 
         # if action contributes processes, update processes
         if prog.yml.type == "action" and meta.get("process_contrib", False):
