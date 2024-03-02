@@ -46,8 +46,9 @@ class BaseAPI(HelaoFastAPI):
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
-            endpoint = request.url.path.strip("/").split("/")[-1]
-            return await call_next(request)
+            # endpoint = request.url.path.strip("/").split("/")[-1]
+            response = await call_next(request)
+            return response
             if request.method == "HEAD":  # comes from endpoint checker, session.head()
                 print(
                     "received head request, returning empty response with status 200"
