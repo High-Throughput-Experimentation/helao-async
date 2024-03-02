@@ -2695,12 +2695,23 @@ def ADSS_PA_CV_TRI_new(
         
         #switch from N2 to O2 and saturate
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": False,})
-        epm.add_experiment(
-            "orch_sub_wait",
-            {
-                "wait_time_s": purge_wait_N2_to_O2_min * 60,
-            }
-        )
+        epm.add_experiment("ADSS_sub_OCV", 
+                    {
+                        "Tval__s": purge_wait_N2_to_O2_min * 60,
+                        "samplerate_sec": OCP_samplerate_sec,
+                        "gamry_i_range": gamry_i_range,
+                        "ph": ph,
+                        "ref_type": ref_type,
+                        "ref_offset__V": ref_offset__V,
+                        "aliquot_insitu": False,
+                        "run_use": "ref"
+                    })
+#        epm.add_experiment(
+#            "orch_sub_wait",
+#            {
+#                "wait_time_s": purge_wait_N2_to_O2_min * 60,
+#            }
+#        )
 
         #start O2 cycles
         for i, CV_cycle in enumerate(ref_CV_cycles):
