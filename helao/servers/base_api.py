@@ -23,6 +23,7 @@ from starlette.responses import JSONResponse, Response
 # from starlette.status import HTTP_200_OK
 from websockets.exceptions import ConnectionClosedOK
 import logging
+import tempfile
 
 class BaseAPI(HelaoFastAPI):
     def __init__(
@@ -43,7 +44,7 @@ class BaseAPI(HelaoFastAPI):
             version=str(version),
         )
         self.driver = None
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(filename=os.path.join(tempfile.gettempdir(), "base_api.log"), level=logging.INFO)
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
