@@ -411,6 +411,7 @@ class Orch(Base):
             )
             if gs_sub in self.globstat_q.subscribers:
                 self.globstat_q.remove(gs_sub)
+
     async def globstat_broadcast_task(self):
         """Consume globstat_q. Does nothing for now."""
         async for _ in self.globstat_q.subscribe():
@@ -478,8 +479,12 @@ class Orch(Base):
             await self.write_seq(self.active_sequence)
             if self.use_db:
                 meta_s3_key = f"sequence/{self.seq_model.sequence_uuid}.json"
-                self.print_message(f"uploading initial active sequence json to s3 ({meta_s3_key})")
-                await self.syncer.to_s3(self.seq_model.clean_dict(strip_private=True), meta_s3_key)
+                self.print_message(
+                    f"uploading initial active sequence json to s3 ({meta_s3_key})"
+                )
+                await self.syncer.to_s3(
+                    self.seq_model.clean_dict(strip_private=True), meta_s3_key
+                )
 
             # add all experiments from sequence to experiment queue
             # todo: use seq model instead to initialize some parameters
@@ -603,9 +608,13 @@ class Orch(Base):
         await self.write_active_experiment_exp()
         if self.use_db:
             meta_s3_key = f"experiment/{self.exp_model.experiment_uuid}.json"
-            self.print_message(f"uploading initial active experiment json to s3 ({meta_s3_key})")
-            await self.syncer.to_s3(self.exp_model.clean_dict(strip_private=True), meta_s3_key)
-        
+            self.print_message(
+                f"uploading initial active experiment json to s3 ({meta_s3_key})"
+            )
+            await self.syncer.to_s3(
+                self.exp_model.clean_dict(strip_private=True), meta_s3_key
+            )
+
         return ErrorCodes.none
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
@@ -732,13 +741,23 @@ class Orch(Base):
                     )
                     error_code = ErrorCodes.http
 
-                if error_code != ErrorCodes.none:
-                    stop_message = f"Dispatching action {A.action_name} did not return status code 200. Pausing orch."
-                    self.stop_message = stop_message
-                    await self.stop()
-                    self.action_dq.insert(0, A)
-                    await self.update_operator(True)
-                    return ErrorCodes.none
+                for cond, stop_message in [
+                    (
+                        error_code != ErrorCodes.none,
+                        f"Dispatching {A.action_name} did not return status 200. Pausing orch.",
+                    ),
+                    (
+                        result_actiondict is None,
+                        f"Dispatching {A.action_name} returned None object. Pausing orch.",
+                    ),
+                ]:
+                    if cond:
+                        self.stop_message = stop_message
+                        await self.stop()
+                        self.print_message(f"Re-queuing {A.action_name}")
+                        self.action_dq.insert(0, A)
+                        await self.update_operator(True)
+                        return ErrorCodes.none
 
                 # except asyncio.exceptions.TimeoutError:
                 #     result_actiondict, error_code = await async_private_dispatcher(
