@@ -44,7 +44,9 @@ class BaseAPI(HelaoFastAPI):
             version=str(version),
         )
         self.driver = None
-        logging.basicConfig(filename=os.path.join(tempfile.gettempdir(), "base_api.log"), level=logging.INFO)
+        log_path = os.path.join(tempfile.gettempdir(), "base_api.log")
+        self.base.print_message(f"logging to {log_path}")
+        logging.basicConfig(filename=log_path, level=logging.INFO)
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
@@ -98,15 +100,15 @@ class BaseAPI(HelaoFastAPI):
                 response = await call_next(request)
             return response
 
-        @self.exception_handler(StarletteHTTPException)
-        async def custom_http_exception_handler(request, exc):
-            if request.url.path.strip("/").startswith(f"{server_key}/"):
-                print(f"Could not process request: {repr(exc)}")
-                for _, active in self.base.actives.items():
-                    active.set_estop()
-                for executor_id in self.base.executors:
-                    self.base.stop_executor(executor_id)
-            return await http_exception_handler(request, exc)
+        # @self.exception_handler(StarletteHTTPException)
+        # async def custom_http_exception_handler(request, exc):
+        #     if request.url.path.strip("/").startswith(f"{server_key}/"):
+        #         print(f"Could not process request: {repr(exc)}")
+        #         for _, active in self.base.actives.items():
+        #             active.set_estop()
+        #         for executor_id in self.base.executors:
+        #             self.base.stop_executor(executor_id)
+        #     return await http_exception_handler(request, exc)
 
         @self.on_event("startup")
         def startup_event():
