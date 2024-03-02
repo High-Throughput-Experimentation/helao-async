@@ -7,12 +7,9 @@ dependencies:
     - aiodebug
     - aioshutil
     - plumbum
-    - psycopg2
     - pyft232
     - pylablib
     - git+https://github.com/spomjaksilp/pyMeCom
-    - sqlalchemy
-    - sqlmodel>=0.0.14
   - aiofiles
   - aiohttp
   - bokeh=2
@@ -33,6 +30,7 @@ dependencies:
   - paramiko
   - pip
   - psutil
+  - psycopg2
   - pyaml
   - pybase64
   - pydantic-settings
@@ -53,7 +51,9 @@ dependencies:
   - scikit-learn
   - scipy
   - shortuuid
+  - sqlalchemy
   - sqlite
+  - sqlmodel
   - sshtunnel
   - starlette
   - termcolor
