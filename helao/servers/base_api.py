@@ -113,7 +113,7 @@ class BaseAPI(HelaoFastAPI):
 
             log_path = os.path.join(tempfile.gettempdir(), "base_api.log")
             self.base.print_message(f"logging to {log_path}")
-            logging.basicConfig(filename=log_path, level=logging.INFO)
+            logging.basicConfig(filename=log_path, level=20)
 
             self.root_dir = self.base.world_cfg.get("root", None)
             if self.root_dir is not None:
