@@ -44,67 +44,67 @@ class BaseAPI(HelaoFastAPI):
         self.driver = None
 
 
-        @self.middleware("http")
-        async def app_entry(request: Request, call_next):
-            # endpoint = request.url.path.strip("/").split("/")[-1]
-            response = await call_next(request)
-            return response
-            if request.method == "HEAD":  # comes from endpoint checker, session.head()
-                print(
-                    "received head request, returning empty response with status 200"
-                )
-                return Response(status_code=HTTP_200_OK)
-            else:
-                return await call_next(request)
-            if request.url.path.strip("/").startswith(f"{server_key}/") and request.method == "POST":
-                print(
-                    "received action request, checking start conditions and endpoint status"
-                )
-                body_bytes = await request.body()
-                body_dict = json.loads(body_bytes)
-                action_dict = body_dict.get("action", {})
-                start_cond = action_dict.get("start_condition", ASC.wait_for_all)
-                action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
-                if (
-                    len(self.base.actionservermodel.endpoints[endpoint].active_dict)
-                    == 0
-                    or start_cond == ASC.no_wait
-                ):
-                    print(
-                        "endpoint is available, executing"
-                    )
-                    return await call_next(request)
-                else:  # collision between two base requests for one resource, queue
-                    print(
-                        "endpoint is not available"
-                    )
-                    action_dict["action_params"] = action_dict.get("action_params", {})
-                    action_dict["action_params"]["delayed_on_actserv"] = True
-                    extra_params = {}
-                    for d in (
-                        request.query_params,
-                        request.path_params,
-                    ):
-                        for k, v in d.items():
-                            extra_params[k] = eval_val(v)
-                    action = Action(**action_dict)
-                    action.action_name = request.url.path.strip("/").split("/")[-1]
-                    action.action_server = MachineModel(
-                        server_name=server_key, machine_name=gethostname().lower()
-                    )
-                    # send active status but don't create active object
-                    await self.base.status_q.put(action.get_actmodel())
-                    self.base.print_message(
-                        f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
-                    )
-                    self.base.endpoint_queues[endpoint].put(
-                        (
-                            action,
-                            extra_params,
-                        )
-                    )
-                    return JSONResponse(action.as_dict())
-            return await call_next(request)
+        # @self.middleware("http")
+        # async def app_entry(request: Request, call_next):
+        #     # endpoint = request.url.path.strip("/").split("/")[-1]
+        #     response = await call_next(request)
+        #     return response
+        #     if request.method == "HEAD":  # comes from endpoint checker, session.head()
+        #         print(
+        #             "received head request, returning empty response with status 200"
+        #         )
+        #         return Response(status_code=HTTP_200_OK)
+        #     else:
+        #         return await call_next(request)
+        #     if request.url.path.strip("/").startswith(f"{server_key}/") and request.method == "POST":
+        #         print(
+        #             "received action request, checking start conditions and endpoint status"
+        #         )
+        #         body_bytes = await request.body()
+        #         body_dict = json.loads(body_bytes)
+        #         action_dict = body_dict.get("action", {})
+        #         start_cond = action_dict.get("start_condition", ASC.wait_for_all)
+        #         action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
+        #         if (
+        #             len(self.base.actionservermodel.endpoints[endpoint].active_dict)
+        #             == 0
+        #             or start_cond == ASC.no_wait
+        #         ):
+        #             print(
+        #                 "endpoint is available, executing"
+        #             )
+        #             return await call_next(request)
+        #         else:  # collision between two base requests for one resource, queue
+        #             print(
+        #                 "endpoint is not available"
+        #             )
+        #             action_dict["action_params"] = action_dict.get("action_params", {})
+        #             action_dict["action_params"]["delayed_on_actserv"] = True
+        #             extra_params = {}
+        #             for d in (
+        #                 request.query_params,
+        #                 request.path_params,
+        #             ):
+        #                 for k, v in d.items():
+        #                     extra_params[k] = eval_val(v)
+        #             action = Action(**action_dict)
+        #             action.action_name = request.url.path.strip("/").split("/")[-1]
+        #             action.action_server = MachineModel(
+        #                 server_name=server_key, machine_name=gethostname().lower()
+        #             )
+        #             # send active status but don't create active object
+        #             await self.base.status_q.put(action.get_actmodel())
+        #             self.base.print_message(
+        #                 f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
+        #             )
+        #             self.base.endpoint_queues[endpoint].put(
+        #                 (
+        #                     action,
+        #                     extra_params,
+        #                 )
+        #             )
+        #             return JSONResponse(action.as_dict())
+        #     return await call_next(request)
 
         @self.exception_handler(StarletteHTTPException)
         async def custom_http_exception_handler(request, exc):
