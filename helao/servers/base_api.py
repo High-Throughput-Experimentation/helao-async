@@ -43,7 +43,7 @@ class BaseAPI(HelaoFastAPI):
             version=str(version),
         )
         self.driver = None
-
+        logging.basicConfig(level=logging.INFO)
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
