@@ -29,6 +29,8 @@ from helaocore.models.hlostatus import HloStatus
 from starlette.types import Message
 from starlette.responses import JSONResponse, Response
 
+import logging
+import tempfile
 
 class OrchAPI(HelaoFastAPI):
     def __init__(
@@ -64,12 +66,12 @@ class OrchAPI(HelaoFastAPI):
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.method == "HEAD":  # comes from endpoint checker, session.head()
+                logging.info("got HEAD request in middleware")
                 response = Response()
-            elif request.url.path.strip("/").startswith(f"{server_key}/"):
-                await set_body(request, await request.body())
-                # body_dict = await request.json()
-                body_bytes = await get_body(request)
-                body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
+            elif request.url.path.strip("/").startswith(f"{server_key}/") and request.method == "POST":
+                logging.info("got action POST request in middleware")
+                body_bytes = await request.body()
+                body_dict = json.loads(body_bytes)
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
                 action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
@@ -78,8 +80,10 @@ class OrchAPI(HelaoFastAPI):
                     == 0
                     or start_cond == ASC.no_wait
                 ):
+                    logging.info("action endpoint is available")
                     response = await call_next(request)
-                else:  # collision between two orch requests for one resource, queue
+                else:  # collision between two base requests for one resource, queue
+                    logging.info("action endpoint is busy, queuing")
                     action_dict["action_params"] = action_dict.get("action_params", {})
                     action_dict["action_params"]["delayed_on_actserv"] = True
                     extra_params = {}
@@ -107,6 +111,7 @@ class OrchAPI(HelaoFastAPI):
                         )
                     )
             else:
+                logging.info("got non-action POST request")
                 response = await call_next(request)
             return response
 
@@ -130,6 +135,12 @@ class OrchAPI(HelaoFastAPI):
             experiment queue for testing.
             """
             self.orch = Orch(fastapp=self)
+
+            
+            log_path = os.path.join(tempfile.gettempdir(), "base_api.log")
+            self.orch.print_message(f"logging to {log_path}")
+            logging.basicConfig(filename=log_path, level=20)
+
             self.orch.myinit()
             if driver_class:
                 self.driver = driver_class(self.orch)
