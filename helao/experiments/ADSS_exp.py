@@ -1080,6 +1080,7 @@ def ADSS_sub_OCV(
     PAL_Injector_id: str = "fill serial number here",
     rinse_1: int = 1,
     rinse_4: int = 0,
+    run_use: RunUse = "data",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1106,6 +1107,7 @@ def ADSS_sub_OCV(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        run_use = apm.pars.run_use,
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="OCV",
         process_finish=True,
