@@ -2631,13 +2631,25 @@ def ADSS_PA_CV_TRI_new(
                 }
             )
 
-        #saturate electrolyte with N2
-        epm.add_experiment(
-            "orch_sub_wait",
-            {
-                "wait_time_s": purge_wait_initialN2_min * 60,
-            }
-        )
+        #saturate electrolyte with N2 and measure OCV while saturation
+        epm.add_experiment("ADSS_sub_OCV", 
+                           {
+                               "Tval__s": purge_wait_initialN2_min * 60,
+                               "samplerate_sec": OCP_samplerate_sec,
+                               "gamry_i_range": gamry_i_range,
+                               "ph": ph,
+                               "ref_type": ref_type,
+                               "ref_offset__V": ref_offset__V,
+                               "aliquot_insitu": False,
+                               "run_use": "ref"
+                           })
+
+        # epm.add_experiment(
+        #     "orch_sub_wait",
+        #     {
+        #         "wait_time_s": purge_wait_initialN2_min * 60,
+        #     }
+        # )
         
         #start cleaning CVs in N2
         for i, CV_cycle in enumerate(cleaning_CV_cycles):
@@ -2858,12 +2870,23 @@ def ADSS_PA_CV_TRI_new(
             )
 
         #saturate electrolyte with N2
-        epm.add_experiment(
-            "orch_sub_wait",
-            {
-                "wait_time_s": purge_wait_initialN2_min * 60,
-            }
-        )
+        epm.add_experiment("ADSS_sub_OCV", 
+                    {
+                        "Tval__s": purge_wait_initialN2_min * 60,
+                        "samplerate_sec": OCP_samplerate_sec,
+                        "gamry_i_range": gamry_i_range,
+                        "ph": ph,
+                        "ref_type": ref_type,
+                        "ref_offset__V": ref_offset__V,
+                        "aliquot_insitu": False,                        
+                    })
+        
+        # epm.add_experiment(
+        #     "orch_sub_wait",
+        #     {
+        #         "wait_time_s": purge_wait_initialN2_min * 60,
+        #     }
+        # )
         
         #start cleaning CVs in N2
         for i, CV_cycle in enumerate(cleaning_CV_cycles):
@@ -3247,12 +3270,24 @@ def ADSS_PA_CV_TRI_new(
             )
 
         #saturate electrolyte with N2
-        epm.add_experiment(
-            "orch_sub_wait",
-            {
-                "wait_time_s": purge_wait_initialN2_min * 60,
-            }
-        )
+        epm.add_experiment("ADSS_sub_OCV", 
+                    {
+                        "Tval__s": purge_wait_initialN2_min * 60,
+                        "samplerate_sec": OCP_samplerate_sec,
+                        "gamry_i_range": gamry_i_range,
+                        "ph": ph,
+                        "ref_type": ref_type,
+                        "ref_offset__V": ref_offset__V,
+                        "aliquot_insitu": False,
+                        "run_use": "ref"
+                    })
+        
+        # epm.add_experiment(
+        #     "orch_sub_wait",
+        #     {
+        #         "wait_time_s": purge_wait_initialN2_min * 60,
+        #     }
+        # )
         
         #start cleaning CVs in N2
         for i, CV_cycle in enumerate(cleaning_CV_cycles):
