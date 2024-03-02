@@ -44,9 +44,6 @@ class BaseAPI(HelaoFastAPI):
             version=str(version),
         )
         self.driver = None
-        log_path = os.path.join(tempfile.gettempdir(), "base_api.log")
-        self.base.print_message(f"logging to {log_path}")
-        logging.basicConfig(filename=log_path, level=logging.INFO)
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
@@ -113,6 +110,10 @@ class BaseAPI(HelaoFastAPI):
         @self.on_event("startup")
         def startup_event():
             self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
+
+            log_path = os.path.join(tempfile.gettempdir(), "base_api.log")
+            self.base.print_message(f"logging to {log_path}")
+            logging.basicConfig(filename=log_path, level=logging.INFO)
 
             self.root_dir = self.base.world_cfg.get("root", None)
             if self.root_dir is not None:
