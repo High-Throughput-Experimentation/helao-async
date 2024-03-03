@@ -8,8 +8,8 @@ __all__ = [
 #    "CCSI_test_KOH_testing",
 #    "CCSI_newer_KOH_testing",
     "CCSI_Solution_testing",
-    "CCSI_Solution_test_constantpressure",
-    "CCSI_Solution_testing_fixed_cleans",
+    #"CCSI_Solution_test_constantpressure",
+    #"CCSI_Solution_testing_fixed_cleans",
     "CCSI_priming",
     "CCSI_leaktest",
     #"CCSI_debug_liquidloads",
@@ -25,7 +25,7 @@ SEQUENCES = __all__
 
 def CCSI_initialization(
     sequence_version: int = 4, #removed subdrain, added clean inject
-    headspace_purge_cycles: int = 5,
+    headspace_purge_cycles: int = 6,
     HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
     Alphapurge1_duration: float = 10,
@@ -44,6 +44,8 @@ def CCSI_initialization(
     need_fill: bool = False,
     max_repeats: int = 5,
     drainrecirc: bool = True,
+    recirculation_rate_uL_min: int = 10000,
+    
 ):
 
     epm = ExperimentPlanMaker()
@@ -56,6 +58,7 @@ def CCSI_initialization(
         "Alphapurge1_duration": Alphapurge1_duration,
         "Probepurge1_duration": Probepurge1_duration,
         "Sensorpurge1_duration": Sensorpurge1_duration,
+        "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
 
 #
@@ -64,6 +67,7 @@ def CCSI_initialization(
         "HSpurge_duration": HSpurge_duration, 
         "DeltaDilute1_duration": DeltaDilute1_duration,
         "initialization": True,
+        "recirculation_rate_uL_min": recirculation_rate_uL_min,
         "co2measure_duration": CO2measure_duration, 
         "co2measure_acqrate": CO2measure_acqrate, 
         "co2_ppm_thresh": CO2threshold, 
@@ -85,6 +89,7 @@ def CCSI_initialization(
         "co2_ppm_thresh": CO2threshold, 
         "purge_if": "below",
         "drainrecirc": drainrecirc,
+        "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
     epm.add_experiment("CCSI_sub_clean_inject", {
         "Waterclean_volume_ul": Waterclean_volume_ul,
@@ -97,6 +102,7 @@ def CCSI_initialization(
         "co2measure_duration": 0, 
         "use_co2_check": False,
         "drainrecirc": drainrecirc,
+        "recirculation_rate_uL_min": recirculation_rate_uL_min,
         "need_fill": need_fill,
         })
 
@@ -625,7 +631,7 @@ def CCSI_debug_liquidloads(  #assumes initialization performed previously
     return epm.experiment_plan_list
 
 def CCSI_Solution_testing(  #assumes initialization performed previously
-    sequence_version: int = 6, #6 split of liquidfill to cellfill and co2monitoring exps
+    sequence_version: int = 7, #6 split of liquidfill to cellfill and co2monitoring exps
     gas_sample_no: int = 2,
     Solution_volume_ul: List[float] = [0,500, 50],
     Solution_reservoir_sample_no: int = 2,
@@ -650,6 +656,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
     DeltaDilute1_duration: float = 15,
     #initcleans: int = 3,
     drainrecirc: bool = True,
+    recirculation_rate_uL_min: int = 10000,
     need_fill: bool = False,
     
 ):
@@ -668,6 +675,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
         "max_repeats": max_repeats,
         "purge_if": purge_if,
         "drainrecirc": drainrecirc,
+        "recirculation_rate_uL_min": recirculation_rate_uL_min,
         "need_fill": need_fill,
         #  "HSpurge_duration": LiquidCleanPurge_duration,
     })
@@ -712,7 +720,12 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
         })
-        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
+        epm.add_experiment("CCSI_sub_drain", {
+            "HSpurge_duration": SamplePurge_duration,
+            "DeltaDilute1_duration": DeltaDilute1_duration,
+            "recirculation":drainrecirc,
+            "recirculation_rate_uL_min": recirculation_rate_uL_min,
+        })
 
         epm.add_experiment("CCSI_sub_clean_inject", {
             "Waterclean_volume_ul": drainclean_volume_ul,
@@ -726,6 +739,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
             "purge_if": purge_if,
             "max_repeats": max_repeats,
             "drainrecirc": drainrecirc,
+            "recirculation_rate_uL_min": recirculation_rate_uL_min,
             #  "HSpurge_duration": LiquidCleanPurge_duration,
         })
 
@@ -739,6 +753,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
             epm.add_experiment("CCSI_sub_drain", {
                 "HSpurge_duration": HSpurge_duration,
                 "DeltaDilute1_duration": DeltaDilute1_duration,
+                "recirculation_rate_uL_min": recirculation_rate_uL_min,
                 })
 
     return epm.experiment_plan_list
@@ -771,6 +786,8 @@ def CCSI_Solution_test_constantpressure(  #assumes initialization performed prev
     DeltaDilute1_duration: float = 15,
     #initcleans: int = 3,
     drainrecirc: bool = True,
+    recirculation_rate_uL_min: int = 10000,
+
     need_fill: bool = False,
     
 ):
@@ -995,6 +1012,8 @@ def CCSI_priming(  #assumes initialization performed previously
     DeltaDilute1_duration: float = 15,
     #initcleans: int = 3,
     drainrecirc: bool = True,
+    recirculation_rate_uL_min: int = 10000,
+
     need_fill: bool = False,
     
 ):
@@ -1028,7 +1047,12 @@ def CCSI_priming(  #assumes initialization performed previously
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
         })
-        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
+        epm.add_experiment("CCSI_sub_drain", {
+            "HSpurge_duration": LiquidCleanPurge_duration,
+            "DeltaDilute1_duration": DeltaDilute1_duration,
+            "recirculation":drainrecirc,
+            "recirculation_rate_uL_min": recirculation_rate_uL_min,
+        })
 
         epm.add_experiment("CCSI_sub_clean_inject", {
             "Waterclean_volume_ul": drainclean_volume_ul,
@@ -1042,6 +1066,7 @@ def CCSI_priming(  #assumes initialization performed previously
             "purge_if": purge_if,
             "max_repeats": max_repeats,
             "drainrecirc": drainrecirc,
+            "recirculation_rate_uL_min": recirculation_rate_uL_min,
             #  "HSpurge_duration": LiquidCleanPurge_duration,
         })
 
@@ -1055,12 +1080,13 @@ def CCSI_priming(  #assumes initialization performed previously
             epm.add_experiment("CCSI_sub_drain", {
                 "HSpurge_duration": HSpurge_duration,
                 "DeltaDilute1_duration": DeltaDilute1_duration,
+                "recirculation_rate_uL_min": recirculation_rate_uL_min,
                 })
 
     return epm.experiment_plan_list
 
 def CCSI_leaktest(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     headspace_purge_cycles: int = 5,
     HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
@@ -1073,6 +1099,7 @@ def CCSI_leaktest(
     CO2measure_duration: float = 600,
     CO2measure_acqrate: float = 1,
     recirculate: bool = True,
+    recirculation_rate_uL_min: int = 10000,
 ):
 
     epm = ExperimentPlanMaker()
@@ -1084,17 +1111,20 @@ def CCSI_leaktest(
         "Alphapurge1_duration": Alphapurge1_duration,
         "Probepurge1_duration": Probepurge1_duration,
         "Sensorpurge1_duration": Sensorpurge1_duration,
+        "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
 
     epm.add_experiment("CCSI_sub_drain", {
         "HSpurge_duration": HSpurge_duration,
         "DeltaDilute1_duration": DeltaDilute1_duration,
         "initialization": True,
+        "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
     epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
         "HSpurge_duration": HSpurge_duration, 
         "DeltaDilute1_duration": DeltaDilute1_duration,
         "initialization": True,
+        "recirculation_rate_uL_min": recirculation_rate_uL_min,
         "co2measure_duration": CO2measure_duration, 
         "co2measure_acqrate": CO2measure_acqrate, 
         })
@@ -1104,6 +1134,7 @@ def CCSI_leaktest(
         "recirculate": recirculate,
         "co2measure_duration": CO2measure_duration, 
         "co2measure_acqrate": CO2measure_acqrate, 
+        "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
     epm.add_experiment("CCSI_sub_peripumpoff",{})
 

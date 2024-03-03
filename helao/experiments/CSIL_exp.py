@@ -190,10 +190,11 @@ def CCSI_sub_alloff(
 
 def CCSI_sub_headspace_purge_and_measure(
     experiment: Experiment,
-    experiment_version: int = 6,
+    experiment_version: int = 7,
     HSpurge_duration: float = 20, 
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
+    recirculation_rate_uL_min: int = 10000,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
@@ -207,7 +208,7 @@ def CCSI_sub_headspace_purge_and_measure(
 
 #
 # DILUTION PURGE        
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.DeltaDilute1_duration} )
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.DeltaDilute1_duration} )
         #apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  # DeltaDilute time usually 15
 
 #
@@ -246,7 +247,7 @@ def CCSI_sub_headspace_purge_and_measure(
         process_finish=True,
         process_contrib=[ProcessContrib.files],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
 
@@ -255,12 +256,13 @@ def CCSI_sub_headspace_purge_and_measure(
 
 def CCSI_sub_drain(
     experiment: Experiment,
-    experiment_version: int = 5,  
+    experiment_version: int = 6,  
     HSpurge_duration: float = 20,  
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
     recirculation: bool = False,
     recirculation_duration: float = 20,
+    recirculation_rate_uL_min: int = 10000,
 ):
 
     apm = ActionPlanMaker()
@@ -270,7 +272,7 @@ def CCSI_sub_drain(
 
 #
 # DILUTION PURGE        
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.DeltaDilute1_duration} )
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.DeltaDilute1_duration} )
         #apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  # DeltaDilute time usually 15
 
 #
@@ -284,7 +286,7 @@ def CCSI_sub_drain(
 
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
     if apm.pars.recirculation:
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.recirculation_duration} )
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration} )
         #apm.add(ORCH_server, "wait", {"waittime": apm.pars.recirculation_duration})
         #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
@@ -351,12 +353,13 @@ def CCSI_sub_peripumpoff(
 
 def CCSI_sub_initialization_firstpart(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
     Alphapurge1_duration: float = 10,
     Probepurge1_duration: float = 10,
     Sensorpurge1_duration: float = 15,
+    recirculation_rate_uL_min: int = 10000,
     #    DeltaDilute1_duration: float = 15,
 ):
  #   
@@ -415,14 +418,14 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.Probepurge1_duration} )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.Probepurge1_duration} )
    # apm.add(ORCH_server, "wait", {"waittime": apm.pars.Probepurge1_duration},)
 
 #
 # pCO2 SENSOR PURGE
     # only valve 3 closed //differ from probe purge
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})# , asc.no_wait) no wait in error?
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.Sensorpurge1_duration} )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.Sensorpurge1_duration} )
     #apm.add(ORCH_server, "wait", {"waittime": apm.pars.Sensorpurge1_duration})
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
@@ -571,9 +574,10 @@ def CCSI_sub_cellfill(
 
 def CCSI_sub_co2monitoring(
     experiment: Experiment,
-    experiment_version: int = 1,  # move co2 monitoring to separate exp
+    experiment_version: int = 2,  # move co2 monitoring to separate exp
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
+    recirculation_rate_uL_min: int = 10000,
 ):
     apm = ActionPlanMaker()
 
@@ -596,7 +600,7 @@ def CCSI_sub_co2monitoring(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
     #apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
@@ -605,12 +609,14 @@ def CCSI_sub_co2monitoring(
 
 def CCSI_sub_co2monitoring_mfcmasscotwo(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
     flowramp_sccm: float = 9,
     init_max_flow_s: float = 30,
+    recirculation_rate_uL_min: int = 10000,
+    
 ):
     apm = ActionPlanMaker()
 
@@ -646,7 +652,7 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
 
     apm.add(
         MFC_server,
@@ -716,11 +722,12 @@ def CCSI_sub_co2topup_mfcmassdose(
 
 def CCSI_sub_co2constantpressure(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
     atm_pressure: float = 14.27,
     pressureramp: float = 2,
+    recirculation_rate_uL_min: int = 10000,
 ):
     # v2 v1ab open, sol inject clean inject
 
@@ -761,7 +768,7 @@ def CCSI_sub_co2constantpressure(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
 
@@ -770,12 +777,13 @@ def CCSI_sub_co2constantpressure(
 
 def CCSI_sub_co2mass_temp(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
     flowramp_sccm: float = 9,
     init_max_flow_s: float = 30,
+    recirculation_rate_uL_min: int = 10000,
 ):
     # v2 v1ab open, sol inject clean inject
 
@@ -817,7 +825,7 @@ def CCSI_sub_co2mass_temp(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
 
     apm.add(
         MFC_server,
@@ -845,7 +853,7 @@ def CCSI_sub_co2mass_temp(
 
 def CCSI_sub_co2massdose(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
@@ -853,6 +861,7 @@ def CCSI_sub_co2massdose(
     target_pressure: float = 14.30,
     total_gas_scc: float = 7.0,
     refill_freq_sec: float = 2.0,
+    recirculation_rate_uL_min: int = 10000,
 ):
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -907,7 +916,7 @@ def CCSI_sub_co2massdose(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration},asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration},asc.no_wait )
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
@@ -922,7 +931,7 @@ def CCSI_sub_co2massdose(
 
 def CCSI_sub_co2maintainconcentration(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
@@ -930,8 +939,19 @@ def CCSI_sub_co2maintainconcentration(
     target_co2_ppm: float = 1e5,
     headspace_scc: float = 7.5,
     refill_freq_sec: float = 60.0,
+    recirculation_rate_uL_min: int = 10000,
 ):
     apm = ActionPlanMaker()
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+    )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     #    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, }, nonblocking=True)
     apm.add(
@@ -982,7 +1002,7 @@ def CCSI_sub_co2maintainconcentration(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration},asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration},asc.no_wait )
 
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
@@ -998,11 +1018,12 @@ def CCSI_sub_co2maintainconcentration(
 
 def CCSI_sub_flowflush(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     co2measure_duration: float = 3600,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
     flowramp_sccm: float = 0,
+    recirculation_rate_uL_min: int = 10000,
 ):
     apm = ActionPlanMaker()
 
@@ -1028,7 +1049,7 @@ def CCSI_sub_flowflush(
         nonblocking=True,
     )
     apm.add(
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000}, 
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min}, 
         asc.no_wait,
         nonblocking=True,)
     )
@@ -1055,7 +1076,7 @@ def CCSI_sub_flowflush(
 
 def CCSI_sub_clean_inject(
     experiment: Experiment,
-    experiment_version: int = 8,  # ver 2 implements multivalve, ver 3 conditional, ver6 co2checktargetvolumerefills
+    experiment_version: int = 9,  # ver 2 implements multivalve, ver 3 conditional, ver6 co2checktargetvolumerefills
     Waterclean_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 500,
     LiquidCleanWait_s: float = 15,
@@ -1069,6 +1090,7 @@ def CCSI_sub_clean_inject(
     LiquidCleanPurge_duration: float = 60,  # set before determining actual
     DeltaDilute1_duration: float = 0,
     drainrecirc: bool = True,
+    recirculation_rate_uL_min: int = 10000,
 ):
     # drain
     # only 1B 6A-waste opened 1A closed pump off//differ from delta purge
@@ -1158,7 +1180,7 @@ def CCSI_sub_clean_inject(
             ProcessContrib.files,
         ],
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000,"duration_sec": apm.pars.co2measure_duration+ 1.5},asc.no_wait )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min,"duration_sec": apm.pars.co2measure_duration+ 1.5},asc.no_wait )
     if apm.pars.use_co2_check:
         apm.add(
             CO2S_server,
@@ -1195,6 +1217,7 @@ def CCSI_sub_clean_inject(
             experiment=experiment,
             HSpurge_duration=apm.pars.LiquidCleanPurge_duration,
             recirculation=apm.pars.drainrecirc,
+            recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
         )
     )
 
@@ -1352,10 +1375,11 @@ def CCSI_debug_co2purge(
 
 def CCSI_leaktest_co2(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     co2measure_duration: float = 600,
     co2measure_acqrate: float = 1,
     recirculate: bool = True,
+    recirculation_rate_uL_min: int = 10000,
 ):
     apm = ActionPlanMaker()
 
@@ -1368,6 +1392,6 @@ def CCSI_leaktest_co2(
         },
     )
     if apm.pars.recirculate:
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": 20000, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
 
     return apm.action_list
