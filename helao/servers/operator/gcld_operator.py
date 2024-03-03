@@ -21,7 +21,7 @@ from helao.sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 from helao.sequences.ECHEUVIS_seq import ECHEUVIS_multiCA_led, ECHEUVIS_postseq
 from helaocore.models.orchstatus import LoopStatus
 
-TEST = False
+TEST = True
 
 # TEST_SMPS_2286 = [
 #     {
