@@ -21,23 +21,54 @@ from helao.sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 from helao.sequences.ECHEUVIS_seq import ECHEUVIS_multiCA_led, ECHEUVIS_postseq
 from helaocore.models.orchstatus import LoopStatus
 
+TEST = False
+
+# TEST_SMPS_2286 = [
+#     {
+#         "sample_no": 14060,
+#         "composition": {"Fe": 0.516317, "Sb": 0.483683},
+#         "parameters": {"z_start": 1.0, "z_direction": "up"},
+#     },
+#     {
+#         "sample_no": 10695,
+#         "composition": {"Fe": 0.301409, "Sb": 0.698591},
+#         "parameters": {"z_start": 0.2, "z_direction": "down"},
+#     },
+#     {
+#         "sample_no": 3175,
+#         "composition": {"Fe": 0.756378, "Sb": 0.243622},
+#         "parameters": {"z_start": 0.6, "z_direction": "down"},
+#     },
+#     {
+#         "sample_no": 9030,
+#         "composition": {"Fe": 0.298030, "Sb": 0.701970},
+#         "parameters": {"z_start": 2.0, "z_direction": "up"},
+#     },
+#     {
+#         "sample_no": 18984,
+#         "composition": {"Fe": 0.217839, "Sb": 0.782161},
+#         "parameters": {"z_start": 1.4, "z_direction": "down"},
+#     },
+# ]
+
+# print({k: v for k, v in os.environ.items() if k in ('API_KEY', 'BASE_URL')})
 
 TEST_SMPS_2286 = [
-    # {
-    #     "sample_no": 14060,
-    #     "composition": {"Fe": 0.516317, "Sb": 0.483683},
-    #     "parameters": {"z_start": 1.0, "z_direction": "up"},
-    # },
-    # {
-    #     "sample_no": 10695,
-    #     "composition": {"Fe": 0.301409, "Sb": 0.698591},
-    #     "parameters": {"z_start": 0.2, "z_direction": "down"},
-    # },
-    # {
-    #     "sample_no": 3175,
-    #     "composition": {"Fe": 0.756378, "Sb": 0.243622},
-    #     "parameters": {"z_start": 0.6, "z_direction": "down"},
-    # },
+    {
+        "sample_no": 14060,
+        "composition": {"Fe": 0.516317, "Sb": 0.483683},
+        "parameters": {"z_start": 1.0, "z_direction": "up"},
+    },
+    {
+        "sample_no": 10695,
+        "composition": {"Fe": 0.301409, "Sb": 0.698591},
+        "parameters": {"z_start": 0.2, "z_direction": "down"},
+    },
+    {
+        "sample_no": 3175,
+        "composition": {"Fe": 0.756378, "Sb": 0.243622},
+        "parameters": {"z_start": 0.6, "z_direction": "down"},
+    },
     {
         "sample_no": 9030,
         "composition": {"Fe": 0.298030, "Sb": 0.701970},
@@ -50,7 +81,10 @@ TEST_SMPS_2286 = [
     },
 ]
 
-# print({k: v for k, v in os.environ.items() if k in ('API_KEY', 'BASE_URL')})
+MEASURED_6083 = [766, 802, 1872, 3096, 3113, 3131, 4479, 4550, 7571, 7633, 9012, 9056, 9065, 9083, 9109, 10739, 12439, 13989, 13989, 14069, 14087, 14122, 15654, 15760, 17319, 17319, 17346, 17461, 19028, 19117, 20461, 22035, 22044, 22079, 23579, 23606, 23641, 24980, 26230, 26283, 27300, 27362,]
+
+TEST_SMPS_6083 = [{"sample_no": s, "composition": {"Mn": 0.5, "Sb": 0.5}, "parameters": {"z_start": 1.2, "z_direction": "up"}} for s in MEASURED_6083]
+
 
 UVIS_T_defaults = {
     "reference_mode": "builtin",
@@ -169,6 +203,7 @@ def seq_constructor(
         experiment_list=[],
         experiment_plan_list=experiment_list,
         experimentmodel_list=[],
+        dummy=TEST,
     )
     return seq
 
@@ -204,6 +239,7 @@ def ana_constructor(
         experiment_list=[],
         experiment_plan_list=experiment_list,
         experimentmodel_list=experiment_list,
+        dummy=TEST,
     )
     return seq
 
@@ -248,7 +284,6 @@ def main():
     if len(sys.argv) == 5:
         RESUME_ID = sys.argv[4]
     load_dotenv(dotenv_path=Path(env_config))
-    TEST = False
     
     CLIENT = DataRequestsClient(
         base_url=os.environ["BASE_URL"], api_key=os.environ["API_KEY"]
@@ -279,12 +314,12 @@ def main():
         
         elif pending_requests or TEST:
             if TEST:
-                smpd = TEST_SMPS_2286[test_idx]
+                smpd = TEST_SMPS_6083[test_idx]
                 test_req = CreateDataRequestModel(
                     composition=smpd["composition"],
                     score=1.0,
                     parameters=smpd["parameters"],
-                    sample_label=f"legacy__solid__2286_{smpd['sample_no']}",
+                    sample_label=f"legacy__solid__6083_{smpd['sample_no']}",
                 )
                 with CLIENT:
                     data_request = CLIENT.create_data_request(test_req)
@@ -489,7 +524,7 @@ def main():
                 f"{gen_ts()} Orchestrator is idle. Checking for data requests in 10 seconds."
             )
             time.sleep(10)
-        if TEST & test_idx == len(TEST_SMPS_2286) - 1:
+        if TEST & test_idx == len(TEST_SMPS_6083) - 1:
             return 0
         print("\n")
 
