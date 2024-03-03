@@ -753,11 +753,12 @@ class HelaoSyncer:
                 prog.dict["api"] = True
                 prog.write_dict()
 
+        # get yml target name for popping later (after seq zip removes yml)
+        yml_target_name = prog.yml.target.name
+        yml_type = prog.yml.type
+
         # move to synced
         if prog.s3_done and prog.api_done:
-            # get yml target name for popping later (after seq zip removes yml)
-            yml_target_name = prog.yml.target.name
-            yml_type = prog.yml.type
             
             self.base.print_message(
                 f"Moving files to RUNS_SYNCED for {yml_target_name}"
