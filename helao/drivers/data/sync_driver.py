@@ -823,10 +823,10 @@ class HelaoSyncer:
             self.base.print_message(f"Removing {yml_target_name} from running_tasks.")
             self.running_tasks.pop(yml_target_name)
 
-        # if action contributes processes, update processes
-        if yml_type == "action" and meta.get("process_contrib", False):
-            exp_prog = self.update_process(prog.yml, meta)
-            await self.sync_process(exp_prog)
+            # if action contributes processes, update processes
+            if yml_type == "action" and meta.get("process_contrib", False):
+                exp_prog = self.update_process(prog.yml, meta)
+                await self.sync_process(exp_prog)
 
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
         return return_dict
