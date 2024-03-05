@@ -8,6 +8,7 @@ class Gamry_modes(str, Enum):
     LSV = "LSV"
     EIS = "EIS"
     OCV = "OCV"
+    RCA = "RCA"
 
 
 # https://www.gamry.com/support/technical-support/frequently-asked-questions/fixed-vs-autoranging/

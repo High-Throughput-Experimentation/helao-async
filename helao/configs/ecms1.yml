@@ -55,6 +55,9 @@ servers:
         2B: dev1/port0/line2
         3A: dev1/port0/line3
         3B: dev1/port0/line4
+        6A: dev1/port1/line5
+        6B: dev1/port1/line6
+        '7': dev1/port1/line7
       dev_liquidvalve:
         4A: dev1/port0/line5
         4B: dev1/port0/line6
@@ -100,6 +103,18 @@ servers:
           port: COM5
           unit_id: A
     verbose: false
+
+
+  CALIBRATIONMFC:
+    host: hte-ecms-01.htejcap.caltech.edu
+    port: 8012 
+    group: action
+    fast: mfc_server
+    params:
+      devices:
+        Caligas:
+          port: COM6 # needs to update
+          unit_id: A
 
   PSTAT:
     host: hte-ecms-01.htejcap.caltech.edu
