@@ -96,7 +96,7 @@ def CCSI_sub_load_solid(
                     "plate_id": apm.pars.solid_plate_id,
                     "machine_name": "legacy",
                 }
-            ).model_dump(),
+            ).dict(),
         },
     )
 
@@ -126,7 +126,7 @@ def CCSI_sub_load_liquid(
             "custom": "cell1_we",
             "source_liquid_in": LiquidSample(
                 sample_no=apm.pars.reservoir_liquid_sample_no, machine_name=ORCH_HOST
-            ).model_dump(),
+            ).dict(),
             "volume_ml": apm.pars.volume_ul_cell_liquid / 1000,
             "combine_liquids": apm.pars.combine_True_False,
             "dilute_liquids": apm.pars.water_True_False,
@@ -151,7 +151,7 @@ def CCSI_sub_load_gas(
             "custom": "cell1_we",
             "load_sample_in": GasSample(
                 sample_no=apm.pars.reservoir_gas_sample_no, machine_name=ORCH_HOST
-            ).model_dump(),
+            ).dict(),
             "volume_ml": apm.pars.volume_ul_cell_gas / 1000,
         },
     )
@@ -429,7 +429,7 @@ def CCSI_sub_initialization_firstpart(
 #
 # pCO2 SENSOR PURGE
     # only valve 3 closed //differ from probe purge
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}) #, asc.no_wait)  #no wait in error? 
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.Sensorpurge1_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0}, asc.no_wait)
@@ -440,7 +440,7 @@ def CCSI_sub_initialization_firstpart(
 
     return apm.action_list
 
-## multivalve on ccsi1 4 gas, 5 clean, 7 solution
+
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
@@ -937,16 +937,6 @@ def CCSI_sub_co2maintainconcentration(
     refill_freq_sec: float = 60.0,
 ):
     apm = ActionPlanMaker()
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_globalexp_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-    )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     #    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, }, nonblocking=True)
     apm.add(
