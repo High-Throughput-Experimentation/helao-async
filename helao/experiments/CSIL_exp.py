@@ -456,16 +456,6 @@ def CCSI_sub_cellfill(
     #    co2measure_acqrate: float = 0.5,
 ):
     apm = ActionPlanMaker()
-    # apm.add(
-    #     PAL_server,
-    #     "archive_custom_query_sample",
-    #     {
-    #         "custom": "cell1_we",
-    #     },
-    #     to_globalexp_params=[
-    #         "_fast_samples_in"
-    #     ],  # save new liquid_sample_no of eche cell to globals
-    # )
 
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
@@ -587,6 +577,17 @@ def CCSI_sub_cellfill(
     apm.add(ORCH_server, "wait", {"waittime": 1.75})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+    )
+
     return apm.action_list
 
 
