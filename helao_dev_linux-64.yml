@@ -9,6 +9,7 @@ dependencies:
     - plumbum
     - pyft232
     - pylablib
+    - sqlmodel
     - git+https://github.com/spomjaksilp/pyMeCom
   - aiofiles
   - aiohttp
@@ -53,7 +54,6 @@ dependencies:
   - shortuuid
   - sqlalchemy
   - sqlite
-  - sqlmodel
   - sshtunnel
   - starlette
   - termcolor

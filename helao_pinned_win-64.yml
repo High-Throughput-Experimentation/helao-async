@@ -226,7 +226,6 @@ dependencies:
   - soupsieve=2.5
   - sqlalchemy=2.0.27
   - sqlite=3.45.1
-  - sqlmodel=0.0.14
   - sshtunnel=0.4.0
   - stack_data=0.6.2
   - starlette=0.36.3
@@ -282,3 +281,4 @@ dependencies:
       - pylablib==1.4.2
       - pyqtgraph==0.13.3
       - rpyc==6.0.0
+      - sqlmodel==0.0.14
