@@ -23,10 +23,7 @@ from websockets.exceptions import ConnectionClosedOK
 
 from helao.helpers import logging
 
-if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="default_helao")
-else:
-    logger = logging.LOGGER
+global logger
 
 
 class BaseAPI(HelaoFastAPI):
@@ -48,6 +45,8 @@ class BaseAPI(HelaoFastAPI):
             version=str(version),
         )
         self.driver = None
+        logger = logging.LOGGER
+
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]

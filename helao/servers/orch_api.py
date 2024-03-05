@@ -31,10 +31,7 @@ from starlette.responses import JSONResponse, Response
 
 from helao.helpers import logging
 
-if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="default_helao")
-else:
-    logger = logging.LOGGER
+global logger
 
 
 class OrchAPI(HelaoFastAPI):
@@ -55,6 +52,7 @@ class OrchAPI(HelaoFastAPI):
             version=str(version),
         )
         self.driver = None
+        logger = logging.LOGGER
 
         async def set_body(request: Request, body: bytes):
             async def receive() -> Message:
