@@ -24,99 +24,89 @@ base object.
 
 """
 
+from abc import ABC, abstractmethod
 from enum import StrEnum
-from pathlib import Path
-from typing import List, Dict
 from datetime import datetime
+from dataclasses import dataclass, field
 
-import os
-import tempfile
-import logging
-import faulthandler
-import asyncio
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    logger = logging.make_logger(logger_name="default_helao")
+else:
+    logger = logging.LOGGER
 
 
 class DriverStatus(StrEnum):
-    uninitialized = "uninitialized"
     ok = "ok"
     error = "error"
+    uninitialized = "uninitialized"
+    unknown = "unknown"
 
 class DriverResponseType(StrEnum):
     success = "success"
     failed = "failed"
+    not_implemented = "not_implemented"
 
+
+@dataclass
 class DriverMessage:
-    timestamp: datetime
-    
-    def __init__(self):
-        self.timestamp = datetime.now()
+    timestamp: datetime = datetime.now()
 
     @property
     def timestamp_str(self):
         return self.timestamp.strftime('%F %T,%f')[:-3]
 
+
+@dataclass
 class DriverData(DriverMessage):
-    data: dict
-    def __init__(self):
-        super().__init__()
+    data: dict = field(default_factory=dict)
+        
 
+@dataclass
 class DriverResponse(DriverMessage):
-    response: DriverResponseType
-    message: str
-    data: DriverData
-    status: DriverStatus
+    response: DriverResponseType = DriverResponseType.not_implemented
+    message: str = "not implemented"
+    data: DriverData = field(default_factory=DriverData)
+    status: DriverStatus = DriverStatus.unknown
+
+
+class HelaoDriver(ABC):
+    """Generic class for helao drivers w/o base.py dependency.
     
-    def __init__(self):
-        super().__init__()
-
-class HelaoDriver:
+    Note: 
+        All public methods must return a DriverResponse object.
+    
+    """
     timestamp: datetime
-    name: str
     config: dict
-    status: DriverStatus
-    errors: list
-    warnings: list
-    infos: list
-    data_buffer: dict
-    live_buffer: dict
-    log_path: Path
 
-    def __init__(self, driver_name: str, config: dict = {}):
+    def __init__(self, config: dict = {}):
         self.timestamp = datetime.now()
-        self.name = driver_name
         self.config = config
-        self.status = DriverStatus.uninitialized
-        self.errors = []
-        self.warnings = []
-        self.infos = []
-        self.data_buffer = {}
-        self.live_buffer = {}
 
-        log_dir = self.config.get("log_dir", tempfile.gettempdir())
-        log_level = self.config.get("log_level", 20)
-        self.log_path = Path(os.path.join(log_dir, f"{self.name}_driver.log"))
-        format_string = "%(asctime)s :: %(levelname)-8s %(message)s"
-        logging.basicConfig(
-            filename=self.log_path, format=format_string, level=log_level
-        )
-        console = logging.StreamHandler()
-        console.setFormatter(logging.Formatter(format_string))
-        logging.getLogger('').addHandler(console)
-        logging.info(f"writing log events to {self.log_path}")
 
     @property
-    def timestamp_str(self):
+    def _timestamp_str(self):
         return self.timestamp.strftime('%F %T,%f')[:-3]
 
-    def connect(self):
+    @abstractmethod
+    def connect(self) -> DriverResponse:
         """Open connection to resource."""
-        pass
 
-    def reset(self):
+    @abstractmethod
+    def get_status(self) -> DriverResponse:
+        """Return current driver status."""
+
+    @abstractmethod
+    def stop(self) -> DriverResponse:
+        """General stop method, abort all active methods e.g. motion, I/O, compute."""
+
+    @abstractmethod
+    def reset(self) -> DriverResponse:
         """Reinitialize driver, force-close old connection if necessary."""
-        pass
 
-    def close(self):
+    @abstractmethod
+    def disconnect(self) -> DriverResponse:
         """Release connection to resource."""
-        pass
 
