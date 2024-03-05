@@ -488,6 +488,14 @@ def CCSI_sub_cellfill(
             procfinish = True
         else:
             procfinish = False
+        
+        apm.add_action_list(
+            CCSI_sub_load_liquid(
+                experiment=experiment,
+                reservoir_liquid_sample_no = apm.pars.Solution_reservoir_sample_no,
+                volume_ul_cell_liquid = apm.pars.Solution_volume_ul,
+            )
+        )
         apm.add(
             SOLUTIONPUMP_server,
             "infuse",
@@ -538,6 +546,16 @@ def CCSI_sub_cellfill(
             proccontrib = [
                 ProcessContrib.action_params,
             ]
+
+        apm.add_action_list(
+            CCSI_sub_load_liquid(
+                experiment=experiment,
+                reservoir_liquid_sample_no = apm.pars.Waterclean_reservoir_sample_no,
+                volume_ul_cell_liquid = apm.pars.Waterclean_volume_ul,
+                water_True_False = True,
+                combine_True_False = True,
+            )
+        )
 
         apm.add(
             WATERCLEANPUMP_server,

@@ -631,7 +631,7 @@ def CCSI_debug_liquidloads(  #assumes initialization performed previously
     return epm.experiment_plan_list
 
 def CCSI_Solution_testing(  #assumes initialization performed previously
-    sequence_version: int = 7, #6 split of liquidfill to cellfill and co2monitoring exps
+    sequence_version: int = 8, #6 split of liquidfill to cellfill and co2monitoring exps v8 moves sample loads to cellfill expt
     gas_sample_no: int = 2,
     Solution_volume_ul: List[float] = [0,500, 50],
     Solution_reservoir_sample_no: int = 2,
@@ -694,24 +694,27 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
             "reservoir_gas_sample_no": gas_sample_no,
             "volume_ul_cell_gas": 5000,
         })
-        if solnvolume != 0:
-            epm.add_experiment("CCSI_sub_load_liquid", {
-                "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
-                "volume_ul_cell_liquid": solnvolume,
-                "combine_True_False": False,
-                "water_True_False": False,
-            })
-        watervolume = total_sample_volume_ul - solnvolume
-        if watervolume != 0:
-            epm.add_experiment("CCSI_sub_load_liquid", {
-                "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
-                "volume_ul_cell_liquid": watervolume,
-                "combine_True_False": True,
-                "water_True_False": True,
-            })
+        # if solnvolume != 0:
+        #     epm.add_experiment("CCSI_sub_load_liquid", {
+        #         "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
+        #         "volume_ul_cell_liquid": solnvolume,
+        #         "combine_True_False": False,
+        #         "water_True_False": False,
+        #     })
+        # watervolume = total_sample_volume_ul - solnvolume
+        # if watervolume != 0:
+        #     epm.add_experiment("CCSI_sub_load_liquid", {
+        #         "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+        #         "volume_ul_cell_liquid": watervolume,
+        #         "combine_True_False": True,
+        #         "water_True_False": True,
+        #     })
+        watervolume = total_sample_volume_ul - solnvolume,
 
         epm.add_experiment("CCSI_sub_cellfill", {
+            "Solution_reservoir_sample_no": Solution_reservoir_sample_no,
             "Solution_volume_ul": solnvolume,
+            "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
             "Waterclean_volume_ul": watervolume,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidFillWait_s": LiquidFillWait_s,
