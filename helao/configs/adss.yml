@@ -3,6 +3,21 @@ simulation: false
 builtin_ref_motorxy:
   - -10
   - 10
+builtin_ref_motorxy_2:
+  - -32
+  - 35
+builtin_ref_motorxy_3:
+  - -32
+  - 25
+builtin_ref_motorxy_4:
+  - -32
+  - 15
+builtin_ref_motorxy_5:
+  - -32
+  - 5
+builtin_ref_motorxy_6:
+  - -32
+  - -5
 experiment_libraries:
   - ADSS_exp
   - samples_exp
@@ -128,7 +143,7 @@ servers:
         V4: PXI-6284/port1/line5
         V5: PXI-6284/port1/line6
         '6': PXI-6284/port1/line7
-        '7': PXI-6284/port2/line0
+        O2N2toggle: PXI-6284/port2/line0
         '8': PXI-6284/port2/line1
         '9': PXI-6284/port2/line2
       dev_pump:

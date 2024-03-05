@@ -42,6 +42,11 @@ __all__ = [
     "ADSS_sub_CA_photo",
     "ADSS_sub_OCV_photo",
     "ADSS_sub_interrupt",
+    "ADSS_sub_gasvalve_toggle",
+    "ADSS_sub_gasvalve_N2flow",
+    "ADSS_sub_transfer_liquid_in",
+    "ADSS_sub_tray_icpms_export",
+    "ADSS_sub_move_to_ref_measurement",
 ]
 
 
@@ -57,6 +62,8 @@ from helao.helpers.ref_electrode import REF_TABLE
 
 from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.drivers.robot.pal_driver import Spacingmethod, PALtools
+
+from helaocore.models.run_use import RunUse
 
 
 EXPERIMENTS = __all__
@@ -265,10 +272,13 @@ def ADSS_sub_load_solid(
 
 def ADSS_sub_load_liquid(
     experiment: Experiment,
-    experiment_version: int = 2,  # v2 changes from archive_custom_load
+    experiment_version: int = 3,  # v2 changes from archive_custom_load, v3 combine/dilute
+
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
+    combine_liquids: bool = False,
+    dilute_liquids: bool = False,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
@@ -283,8 +293,8 @@ def ADSS_sub_load_liquid(
                 }
             ).model_dump(),
             "volume_ml": apm.pars.volume_ul_cell_liquid / 1000,
-            "combine_liquids": False,
-            "dilute_liquids": False,
+            "combine_liquids": apm.pars.combine_liquids,
+            "dilute_liquids": apm.pars.dilute_liquids,
         },
         start_condition=ActionStartCondition.wait_for_orch,  #
     )
@@ -977,6 +987,7 @@ def ADSS_sub_CV(
     aliquot_insitu: bool = True,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here",
+    run_use: RunUse = "data",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -993,6 +1004,7 @@ def ADSS_sub_CV(
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
+
 
     # apply potential
     apm.add(
@@ -1021,6 +1033,7 @@ def ADSS_sub_CV(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        run_use = apm.pars.run_use,
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CV",
         process_finish=True,
@@ -1067,6 +1080,7 @@ def ADSS_sub_OCV(
     PAL_Injector_id: str = "fill serial number here",
     rinse_1: int = 1,
     rinse_4: int = 0,
+    run_use: RunUse = "data",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1093,6 +1107,7 @@ def ADSS_sub_OCV(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        run_use = apm.pars.run_use,
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="OCV",
         process_finish=True,
@@ -1492,6 +1507,37 @@ def ADSS_sub_tray_unload(
     )
 
     return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_tray_icpms_export(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    tray: int = 2,
+    slot: int = 1,
+    survey_runs: int = 1,
+    main_runs: int = 3,
+    rack: int = 2,
+    dilution_factor: float = 10,
+
+):
+ 
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    apm.add(
+        PAL_server,
+        "archive_tray_export_icpms",
+        {
+            "tray": apm.pars.tray,
+            "slot": apm.pars.slot,
+            "survey_runs": apm.pars.survey_runs,
+            "main_runs": apm.pars.main_runs,
+            "rack": apm.pars.rack,
+            "dilution_factor": apm.pars.dilution_factor,
+        },
+    )
+
+
+    return apm.action_list  # returns complete action list to orch
+
 
 def ADSS_sub_z_move(
     experiment: Experiment,
@@ -1911,7 +1957,7 @@ def ADSS_sub_move_to_clean_cell(
     apm.add(
         MOTOR_server,
         "solid_get_builtin_specref",
-        {},
+        {"ref_name": "builtin_ref_motorxy"},
         to_globalexp_params=["_refxy"],
     )
     apm.add(
@@ -1929,6 +1975,44 @@ def ADSS_sub_move_to_clean_cell(
 
     return apm.action_list
 
+def ADSS_sub_move_to_ref_measurement(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    reference_position_name: str = "builtin_ref_motorxy_2",
+):
+    apm = ActionPlanMaker()
+    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+    apm.add(
+        MOTOR_server,
+        "solid_get_builtin_specref",
+        {"ref_position_name": apm.pars.reference_position_name},
+        to_globalexp_params=["_refxy"],
+    )
+    if apm.pars.reference_position_name == "builtin_ref_motorxy": # if using clean cell position with this experiment, then use platexy. otherwise motorxy
+        apm.add(
+            MOTOR_server,
+            "move",
+            {
+                "axis": ["x", "y"],
+                "mode": MoveModes.absolute,
+                "transformation": TransformationModes.platexy,
+            },
+            from_globalexp_params={"_refxy": "d_mm"},
+        )
+    else:
+        apm.add(
+            MOTOR_server,
+            "move",
+            {
+                "axis": ["x", "y"],
+                "mode": MoveModes.absolute,
+                "transformation": TransformationModes.motorxy,
+            },
+            from_globalexp_params={"_refxy": "d_mm"},
+        )
+    apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
+
+    return apm.action_list
 
 # def ADSS_sub_refill_syringes(
 #     experiment: Experiment,
@@ -2137,3 +2221,95 @@ def ADSS_sub_refill_syringe(
 
 
     return apm.action_list
+
+def ADSS_sub_gasvalve_toggle(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    open: bool = True,
+):
+ #true for N2 flow
+    apm = ActionPlanMaker()
+    apm.add(
+        NI_server,
+        "gasvalve",
+        {"gasvalve": "V1", "on": apm.pars.open}
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_gasvalve_N2flow(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    open: bool = True,
+):
+ #true for N2 flow
+    apm = ActionPlanMaker()
+    apm.add(
+        NI_server,
+        "gasvalve",
+        {"gasvalve": "O2N2toggle", "on": apm.pars.open}
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_transfer_liquid_in(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    liquid_sample_no: int = 1,
+    aliquot_volume_ul: int = 200,
+    source_tray: int = 2,
+    source_slot: int = 2,
+    source_vial: int = 54,
+    destination: str = "cell1_we",
+    PAL_Injector: str = "LS 4",
+    PAL_Injector_id: str = "fill serial number here",
+    rinse_1: int = 1,
+    rinse_2: int = 0,
+    rinse_3: int = 0,
+    rinse_4: int = 0,
+):
+    apm = ActionPlanMaker()
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid",
+        {
+            "custom": apm.pars.destination,
+            "source_liquid_in": LiquidSample(
+                **{
+                    "sample_no": apm.pars.liquid_sample_no,
+                    "machine_name": gethostname(),
+                }
+            ).model_dump(),
+            "volume_ml": apm.pars.aliquot_volume_ul,
+            "combine_liquids": True,
+            "dilute_liquids": False,
+        },
+        technique_name="liquid_addition",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    apm.add(
+        PAL_server,
+        "PAL_transfer_tray_custom",
+        {
+            "volume_ul": apm.pars.aliquot_volume_ul,
+            "source_tray": apm.pars.source_tray,
+            "source_slot": apm.pars.source_slot,
+            "source_vial": apm.pars.source_vial,
+            "dest": apm.pars.destination,
+            "tool": apm.pars.PAL_Injector,
+            "wash1": apm.pars.rinse_1,
+            "wash2": apm.pars.rinse_2,
+            "wash3": apm.pars.rinse_3,
+            "wash4": apm.pars.rinse_4,
+
+        },
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
