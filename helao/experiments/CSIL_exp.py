@@ -441,7 +441,7 @@ def CCSI_sub_initialization_firstpart(
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 1,  # move co2 monitoring to separate exp
+    experiment_version: int = 2,  # move co2 monitoring to separate exp
     #    experiment_version: int = 10, #ver 6to7 implements multivalve, #10 gas push between
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
@@ -450,29 +450,27 @@ def CCSI_sub_cellfill(
     Waterclean_volume_ul: float = 2500,
     Syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
+    previous_liquid: bool = False,
+
     #    co2measure_duration: float = 20,
     #    co2measure_acqrate: float = 0.5,
 ):
     apm = ActionPlanMaker()
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_globalexp_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-    )
+    # apm.add(
+    #     PAL_server,
+    #     "archive_custom_query_sample",
+    #     {
+    #         "custom": "cell1_we",
+    #     },
+    #     to_globalexp_params=[
+    #         "_fast_samples_in"
+    #     ],  # save new liquid_sample_no of eche cell to globals
+    # )
 
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    ### CO2 acquisition that matters //// does not.
-    # during first infusion
-    #    inf1_acqtime = Solution_volume_ul/Syringe_rate_ulsec + .25
-    #    apm.add(CO2S_server, "acquire_co2", {"duration": inf1_acqtime, "acquisition_rate": apm.pars.co2measure_acqrate})
 
     if apm.pars.Solution_volume_ul == 0:
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -494,6 +492,8 @@ def CCSI_sub_cellfill(
                 experiment=experiment,
                 reservoir_liquid_sample_no = apm.pars.Solution_reservoir_sample_no,
                 volume_ul_cell_liquid = apm.pars.Solution_volume_ul,
+                water_True_False = apm.pars.previous_liquid,
+                combine_True_False = apm.pars.previous_liquid,
             )
         )
         apm.add(
