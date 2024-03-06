@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 class GamryDtaqSink:
     """Event sink for reading data from Gamry device."""
@@ -29,4 +29,8 @@ class GamryDtaqSink:
 @dataclass
 class DummySink:
     """Dummy class for when the Gamry is not used."""
+    dtaq: object = None
     status: str = "idle"
+    acquired_points: list = field(default_factory=list)
+    status: str = "idle"
+    buffer_size: int = 0

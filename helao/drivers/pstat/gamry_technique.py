@@ -1,45 +1,30 @@
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional
 from enum import StrEnum
 
+from .gamry_dtaq import GamryDtaq, DTAQ_CPIV
+from .gamry_signal import GamrySignal, SIGNAL_VRAMP
 
-class ControlMode(StrEnum):
-    PstatMode = "PstatMode"
-    GstatMode = "GstatMode"
+# define enums to match GamryCOM
 
 
-class DtaqType(StrEnum):
-    ChronoPot = "ChronoPot"
-    ChronoAmp = "ChronoAmp"
+class OnMethod(StrEnum):
+    CellMon = "CellMon"
+    CellOn = "CellOn"
 
 
 @dataclass
 class GamryTechnique:
-    control_mode: ControlMode
-    dtaq_mode: str
-    dtaq_type: Optional[DtaqType] = None
-    dtaq_keys: List[str]
+    on_method: OnMethod
+    dtaq: GamryDtaq
+    signal: GamrySignal
     set_vchrangemode: Optional[bool] = None
     set_ierangemode: Optional[bool] = None
-    signal_function: str
-    signal_params: List[str]
 
 
 LSV = GamryTechnique(
-    control_mode=ControlMode.PstatMode,
-    dtaq_mode="GamryCOM.GamryDtaqCpiv",
-    dtaq_keys=[
-        "t_s",
-        "Ewe_V",
-        "Vu",
-        "I_A",
-        "Vsig",
-        "Ach_V",
-        "IERange",
-        "Overload_HEX",
-        "StopTest",
-        "unknown1",
-    ],
-    signal_function="GamryCOM.GamrySignalRamp",
-    signal_params=["Vinit__V", "Vfinal__V", "ScanRate__V_s", "AcqInterval__s"],
+    on_method=OnMethod.CellOn,
+    dtaq=DTAQ_CPIV,
+    signal=SIGNAL_VRAMP,
+    set_vchrangemode=False,
 )

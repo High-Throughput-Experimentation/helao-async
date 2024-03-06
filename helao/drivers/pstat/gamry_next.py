@@ -16,12 +16,12 @@ else:
 import comtypes
 import comtypes.client as client
 import psutil
+from enum import Enum
 
 
 from helao.drivers.helao_driver import (
     HelaoDriver,
     DriverResponse,
-    DriverData,
     DriverStatus,
     DriverResponseType,
 )
@@ -120,7 +120,14 @@ class GamryDriver(HelaoDriver):
             )
         return response
 
-    def setup(self, technique: GamryTechnique) -> DriverResponse:
+    def setup(
+        self,
+        technique: GamryTechnique,
+        signal_params: dict = {},
+        dtaq_params: dict = {},
+        ttl_params: dict = {},
+        ierange: Enum = "auto",
+    ) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
         #
         return DriverResponse()
