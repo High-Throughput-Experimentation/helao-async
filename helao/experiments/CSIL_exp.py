@@ -286,9 +286,16 @@ def CCSI_sub_drain(
 
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
     if apm.pars.recirculation:
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration} )
-        #apm.add(ORCH_server, "wait", {"waittime": apm.pars.recirculation_duration})
-        #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, )
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration/3} )
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},)
+        apm.add(ORCH_server, "wait", {"waittime": 10})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, )
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration/3} )
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},)
+        apm.add(ORCH_server, "wait", {"waittime": 10})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, )
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration/3} )
 
     if apm.pars.initialization:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
