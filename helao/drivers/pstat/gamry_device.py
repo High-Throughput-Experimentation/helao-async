@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from helao.drivers.pstat.enum import (
+from .enum import (
     # Gamry_IErange_dflt,
     Gamry_IErange_IFC1010,
     Gamry_IErange_PCI4G300,

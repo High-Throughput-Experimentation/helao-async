@@ -26,8 +26,9 @@ from helao.drivers.helao_driver import (
     DriverResponseType,
 )
 
-from helao.drivers.pstat.gamry_device import GamryPstat, GAMRY_DEVICES
-from helao.drivers.pstat.gamry_sink import GamryDtaqSink, DummySink
+from .gamry_device import GamryPstat, GAMRY_DEVICES
+from .gamry_sink import GamryDtaqSink, DummySink
+from .gamry_technique import GamryTechnique
 
 
 class GamryDriver(HelaoDriver):
@@ -42,7 +43,10 @@ class GamryDriver(HelaoDriver):
         self.dtaq = None  # from client.CreateObject
         self.dtaqsink = DummySink()
         self.com = client.GetModule(["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0])
+        # get params from config or use defaults
         self.device_id = self.config.get("device_id", None)
+        self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
+        self.grounded = int(self.config.get("grounded", True))
         logger.info(f"using device_id {self.device_id} from config")
 
     def connect(self) -> DriverResponse:
@@ -52,12 +56,16 @@ class GamryDriver(HelaoDriver):
             self.device_name = devices.EnumSections()[self.device_id]
             self.model = GAMRY_DEVICES[self.device_name]
             self.pstat = client.CreateObject(self.model.device)
+            self.pstat.Init(self.device_name)
             self.pstat.Open()
+            logger.info(
+                f"connected to {self.device_name} on device_id {self.device_id}"
+            )
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
-            logger.error("connect failed", exc_info=True)
+            logger.error("connection failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -66,7 +74,18 @@ class GamryDriver(HelaoDriver):
 
     def get_status(self) -> DriverResponse:
         """Return current driver status."""
-        return DriverResponse()
+        try:
+            state = self.pstat.State()
+            state = dict([x.split("\t") for x in state.split("\r\n") if x])
+            response = DriverResponse(
+                response=DriverResponseType.success, data=state, status=DriverStatus.ok
+            )
+        except Exception:
+            logger.error("get_status failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
 
     def stop(self) -> DriverResponse:
         """General stop method to abort all active methods e.g. motion, I/O, compute."""
@@ -101,9 +120,15 @@ class GamryDriver(HelaoDriver):
             )
         return response
 
-    def setup_measurement(self) -> DriverResponse:
+    def setup(self, technique: GamryTechnique) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
+        #
         return DriverResponse()
 
-    def start_measurement(self) -> DriverResponse:
+    def measure(self) -> DriverResponse:
         """Apply signal and begin data acquisition."""
+        return DriverResponse()
+
+    def pump_events(self) -> DriverResponse:
+        """Retrieve data from device buffer."""
+        return DriverResponse()
