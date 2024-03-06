@@ -75,7 +75,7 @@ servers:
         D: 0.0003169786106003353
       z_height_mm:
         contact: 11.0
-        seal: 16.0
+        seal: 20.0
         load: 5.0
       galil_ip_str: 192.168.200.23
       def_speed_count_sec: 10000
