@@ -59,15 +59,10 @@ class DriverMessage:
 
 
 @dataclass
-class DriverData(DriverMessage):
-    data: dict = field(default_factory=dict)
-        
-
-@dataclass
 class DriverResponse(DriverMessage):
     response: DriverResponseType = DriverResponseType.not_implemented
     message: str = "not implemented"
-    data: DriverData = field(default_factory=DriverData)
+    data: dict = field(default_factory=dict)
     status: DriverStatus = DriverStatus.unknown
 
 
@@ -87,8 +82,14 @@ class HelaoDriver(ABC):
 
 
     @property
-    def _timestamp_str(self):
+    def _created_at(self):
+        """Instantiation timestamp"""
         return self.timestamp.strftime('%F %T,%f')[:-3]
+    
+    @property
+    def _uptime(self):
+        """Driver uptime"""
+        return (datetime.now() - self.timestamp).strftime('%F %T,%f')[:-3]
 
     @abstractmethod
     def connect(self) -> DriverResponse:
