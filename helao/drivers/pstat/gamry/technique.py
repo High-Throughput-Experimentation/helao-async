@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 from enum import StrEnum
 
 from .dtaq import (
@@ -35,8 +35,11 @@ class GamryTechnique:
     on_method: OnMethod
     dtaq: GamryDtaq
     signal: GamrySignal
+    set_decimation: Optional[bool] = None
     set_vchrangemode: Optional[bool] = None
     set_ierangemode: Optional[bool] = None
+    vchrange_keys: Optional[List[str]] = None
+    ierange_keys: Optional[List[str]] = None
 
 
 TECH_LSV = GamryTechnique(
@@ -44,13 +47,15 @@ TECH_LSV = GamryTechnique(
     dtaq=DTAQ_CPIV,
     signal=VSIGNAL_RAMP,
     set_vchrangemode=False,
+    vchrange_keys=["Vinit__V", "Vfinal__V"]
 )
 
 TECH_LSA = GamryTechnique(
     on_method=OnMethod.CellOn,
     dtaq=DTAQ_CPIV,
     signal=ISIGNAL_RAMP,
-    set_vchrangemode=False,
+    set_ierangemode=False,
+    ierange_keys=["Iinit__A", "Ifinal__A"]
 )
 
 TECH_CA = GamryTechnique(
@@ -58,18 +63,23 @@ TECH_CA = GamryTechnique(
     dtaq=DTAQ_CHRONOA,
     signal=VSIGNAL_CONST,
     set_vchrangemode=False,
+    set_decimation=True,
+    vchrange_keys=["Vval__V"],
 )
 TECH_CP = GamryTechnique(
     on_method=OnMethod.CellOn,
     dtaq=DTAQ_CHRONOP,
     signal=ISIGNAL_CONST,
-    set_vchrangemode=False,
+    set_ierangemode=False,
+    set_decimation=True,
+    ierange_keys=["Ival__A"]
 )
 TECH_CV = GamryTechnique(
     on_method=OnMethod.CellOn,
     dtaq=DTAQ_RCV,
     signal=VSIGNAL_RUPDN,
     set_vchrangemode=False,
+    vchrange_keys=["Vinit__V", "Vapex1__V", "Vapex2__V", "Vfinal__V"]
 )
 TECH_OCV = GamryTechnique(
     on_method=OnMethod.CellMon,

@@ -13,6 +13,7 @@ class GamrySignal:
     name: str
     param_keys: List[str] = field(default_factory=list)
     mode: ControlMode
+    init_keys: List[str] = field(default_factory=list)
 
 
 VSIGNAL_RAMP = GamrySignal(
@@ -31,6 +32,13 @@ VSIGNAL_CONST = GamrySignal(
     name="GamryCOM.GamrySignalConst",
     param_keys=["Vval__V", "Tval__s", "AcqInterval__s"],
     mode=ControlMode.PstatMode,
+)
+
+EISSIGNAL_CONST = GamrySignal(
+    name="GamryCOM.GamrySignalConst",
+    param_keys=["Vval__V", "Tval__s", "AcqInterval__s"],
+    mode=ControlMode.PstatMode,
+    init_keys=["Freq", "RMS", "Precision"]
 )
 
 OCVSIGNAL_CONST = GamrySignal(

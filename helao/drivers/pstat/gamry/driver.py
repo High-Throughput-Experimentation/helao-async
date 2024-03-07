@@ -18,6 +18,7 @@ import comtypes.client as client
 import psutil
 from enum import Enum
 
+import numpy as np
 
 from helao.drivers.helao_driver import (
     HelaoDriver,
@@ -31,6 +32,9 @@ from .sink import GamryDtaqSink, DummySink
 from .technique import GamryTechnique
 
 
+GAMRYCOM = client.GetModule(["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0])
+
+
 class GamryDriver(HelaoDriver):
     dtaqsink: GamryDtaqSink
     device_name: str
@@ -42,7 +46,6 @@ class GamryDriver(HelaoDriver):
         self.device_name = "unknown"
         self.dtaq = None  # from client.CreateObject
         self.dtaqsink = DummySink()
-        self.com = client.GetModule(["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0])
         # get params from config or use defaults
         self.device_id = self.config.get("device_id", None)
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
@@ -61,6 +64,42 @@ class GamryDriver(HelaoDriver):
             logger.info(
                 f"connected to {self.device_name} on device_id {self.device_id}"
             )
+
+            # apply initial configuration
+            self.pstat.SetCell(GAMRYCOM.CellOff)
+            self.pstat.SetPosFeedEnable(False)
+            self.pstat.SetIEStability(GAMRYCOM.StabilityFast)
+            self.pstat.SetSenseSpeedMode(self.model.set_sensemode)
+            self.pstat.SetIConvention(GAMRYCOM.Anodic)
+            self.pstat.SetGround(self.config.get("grounded", True))
+            # maximum anticipated voltage (in Volts).
+            ichrangeval = self.pstat.TestIchRange(3.0)
+            self.pstat.SetIchRange(ichrangeval)
+            self.pstat.SetIchRangeMode(True)  # auto-set
+            self.pstat.SetIchOffsetEnable(False)
+            # call TestIchFilter before setting SetIchFilter
+            ichfilterval = self.pstat.TestIchFilter(
+                self.config.get("filterfreq_hz", 1000.0)
+            )
+            self.pstat.SetIchFilter(ichfilterval)
+            # voltage channel range.
+            vchrangeval = self.pstat.TestVchRange(12.0)
+            self.pstat.SetVchRange(vchrangeval)
+            self.pstat.SetVchRangeMode(True)
+            self.pstat.SetVchOffsetEnable(False)
+            # call TestVchFilter before setting SetVchFilter
+            vchfilterval = self.pstat.TestVchFilter(
+                self.config.get("filterfreq_hz", 1000.0)
+            )
+            self.pstat.SetVchFilter(vchfilterval)
+            # set the range of the Auxiliary A/D input.
+            self.pstat.SetAchRange(3.0)
+            # set the I/E Range of the potentiostat.
+            self.pstat.SetIERange(0.03)
+            self.pstat.SetIERangeMode(self.model.set_rangemode)
+            self.pstat.SetAnalogOut(0.0)
+            self.pstat.SetIruptMode(GAMRYCOM.IruptOff)
+
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -108,7 +147,7 @@ class GamryDriver(HelaoDriver):
     def disconnect(self) -> DriverResponse:
         """Release connection to resource."""
         try:
-            self.pstat.SetCell(self.com.CellOff)
+            self.pstat.SetCell(GAMRYCOM.CellOff)
             self.pstat.Close()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
@@ -129,8 +168,48 @@ class GamryDriver(HelaoDriver):
         ierange: Enum = "auto",
     ) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
-        #
-        return DriverResponse()
+        try:
+            # set control mode and ranges
+            self.pstat.SetCtrlMode(getattr(GAMRYCOM, technique.signal.mode.value))
+            if technique.set_vchrangemode is not None:
+                self.pstat.SetVchRangeMode(technique.set_vchrangemode)
+            if technique.vchrange_keys is not None:
+                setpointv = np.max([np.abs(signal_params[x]) for x in technique.vchrange_keys])
+                vchrangeval = self.pstat.TestVchRange(setpointv * 1.1)
+                self.pstat.SetVchRange(vchrangeval)
+            if technique.set_ierangemode is not None:
+                self.pstat.SetIERangeMode(technique.set_ierangemode)
+            if technique.ierange_keys is not None:
+                setpointie = np.max([np.abs(signal_params[x]) for x in technique.ierange_keys])
+                ierangeval = self.pstat.TestIERange(setpointie)
+                self.pstat.SetIERange(ierangeval)
+            if technique.set_decimation is not None:
+                self.pstat.SetDecimation(technique.set_decimation)
+            # initialize dtaq
+            self.dtaq = client.CreateObject(technique.dtaq.name)
+            dtaq_init_args = (signal_params[x] for x in technique.signal.init_keys)
+            if technique.dtaq.dtaq_type is not None:
+                self.dtaq.Init(self.pstat, technique.dtaq.dtaq_type, *dtaq_init_args)
+            else:
+                self.dtaq.Init(self.pstat, *dtaq_init_args)
+            # apply dtaq limits
+            for dtaq_key in technique.dtaq.int_param_keys:
+                    val = dtaq_params.get(dtaq_key, 1)
+                    getattr(self.dtaq, dtaq_key)(val)
+            for dtaq_key in technique.dtaq.bool_param_keys:
+                    val = dtaq_params.get(dtaq_key, 0.0)
+                    enable = dtaq_key in dtaq_params
+                    getattr(self.dtaq, dtaq_key)(enable, val)
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+
+        except Exception:
+            logger.error("setup failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
 
     def measure(self) -> DriverResponse:
         """Apply signal and begin data acquisition."""

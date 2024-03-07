@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-from enum import Enum
-from ..enum import (
-    # Gamry_IErange_dflt,
+from enum import StrEnum
+from .range import (
     Gamry_IErange_IFC1010,
     Gamry_IErange_PCI4G300,
     Gamry_IErange_PCI4G750,
@@ -12,7 +11,7 @@ from ..enum import (
 @dataclass
 class GamryPstat:
     device: str
-    ierange: Enum
+    ierange: StrEnum
     set_sensemode: bool
     set_rangemode: bool
 
