@@ -20,6 +20,15 @@ servers:
       bokeh_port: 5002
       seqspec_parser_path: helao\specifications\last3months.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
+  PAL:
+    host: hte-icpm-01.htejcap.caltech.edu
+    port: 8007
+    group: action
+    fast: pal_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
   DB:
     host: hte-icpm-01.htejcap.caltech.edu
     port: 8010
