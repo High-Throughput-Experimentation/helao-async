@@ -319,7 +319,7 @@ def ECMS_series_pulseCA(
     Tstep__s: float = 5.0,
     Cycles: int = 60,
     AcqInterval__s: float = 0.01,  # acquisition rate
-    run_OCV: str ="no",
+    run_OCV: bool = False,
     Tocv__s: float = 60.0,
 ):
 

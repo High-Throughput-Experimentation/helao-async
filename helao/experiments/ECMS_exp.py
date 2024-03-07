@@ -520,7 +520,7 @@ def ECMS_sub_pulseCA(
     Tstep__s: float = 0.5,
     Cycles: int = 5,
     AcqInterval__s: float = 0.01,  # acquisition rate
-    run_OCV: str ="no",
+    run_OCV: bool = False,
     Tocv__s: float = 60.0,
     IErange: str = "auto",
     WE_versus: str = "ref",
@@ -547,7 +547,7 @@ def ECMS_sub_pulseCA(
         {"custom": "cell1_we"},
         to_globalexp_params=["_fast_samples_in"],
     )
-    if run_OCV=='yes':
+    if apm.pars.run_OCV:
         # OCV
         apm.add(
             PSTAT_server,
@@ -589,7 +589,7 @@ def ECMS_sub_pulseCA(
                 ProcessContrib.samples_out,
             ],
         )
-    if run_OCV=='no':
+    else:
         apm.add(
             PSTAT_server,
             "run_RCA",
