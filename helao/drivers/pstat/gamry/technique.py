@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 from enum import StrEnum
 
-from .gamry_dtaq import (
+from .dtaq import (
     GamryDtaq,
     DTAQ_CPIV,
     DTAQ_CHRONOA,
@@ -11,7 +11,7 @@ from .gamry_dtaq import (
     DTAQ_OCV,
     DTAQ_UNIV,
 )
-from .gamry_signal import (
+from .signal import (
     GamrySignal,
     VSIGNAL_RAMP,
     ISIGNAL_RAMP,

@@ -26,9 +26,9 @@ from helao.drivers.helao_driver import (
     DriverResponseType,
 )
 
-from .gamry_device import GamryPstat, GAMRY_DEVICES
-from .gamry_sink import GamryDtaqSink, DummySink
-from .gamry_technique import GamryTechnique
+from .device import GamryPstat, GAMRY_DEVICES
+from .sink import GamryDtaqSink, DummySink
+from .technique import GamryTechnique
 
 
 class GamryDriver(HelaoDriver):
