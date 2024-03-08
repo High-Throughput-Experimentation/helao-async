@@ -1658,8 +1658,6 @@ class Active:
         # now re-init current action
         # force action init (new action uuid and timestamp)
         self.action.init_act(time_offset=self.base.ntp_offset, force=True)
-        # prepend new action to previous action list
-        self.action_list = [self.action] + self.action_list
         # add new action uuid to listen_uuids
         self.add_new_listen_uuid(self.action.action_uuid)
 
@@ -1709,6 +1707,9 @@ class Active:
         # TODO:
         # update other action settings?
         # - sample name
+
+        # prepend new action to previous action list
+        self.action_list = [self.action] + self.action_list
 
         # send status for new split action
         await self.add_status()
