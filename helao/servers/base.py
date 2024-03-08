@@ -9,7 +9,7 @@ import pathlib
 from random import randint
 from socket import gethostname
 from time import ctime, time, time_ns, sleep
-from typing import List, Dict
+from typing import List, Dict, Optional
 from uuid import UUID, uuid1
 import hashlib
 from copy import deepcopy, copy
@@ -1629,8 +1629,8 @@ class Active:
 
     async def split(
         self,
-        uuid_list: List[UUID] = None,
-        new_fileconnparams: FileConnParams = None,
+        uuid_list: Optional[List[UUID]] = None,
+        new_fileconnparams: Optional[FileConnParams] = None,
     ) -> List[UUID]:
         """splits the current action and
         finishes all previous action in uuid_list
@@ -1658,6 +1658,8 @@ class Active:
         # now re-init current action
         # force action init (new action uuid and timestamp)
         self.action.init_act(time_offset=self.base.ntp_offset, force=True)
+        # prepend new action to previous action list
+        self.action_list = [self.action] + self.action_list
         # add new action uuid to listen_uuids
         self.add_new_listen_uuid(self.action.action_uuid)
 
@@ -1707,12 +1709,6 @@ class Active:
         # TODO:
         # update other action settings?
         # - sample name
-
-        # add prev_action to action_list to 2nd spot
-        if len(self.action_list) == 1:
-            self.action_list.append(prev_action)
-        else:
-            self.action_list.insert(1, prev_action)
 
         # send status for new split action
         await self.add_status()
