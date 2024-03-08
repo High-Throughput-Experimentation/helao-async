@@ -8,6 +8,14 @@ from .range import (
 )
 
 
+TTL_OUTPUTS = {
+    0: (1, 1),
+    1: (2, 2),
+    2: (4, 4),
+    3: (8, 8),
+}
+
+
 @dataclass
 class GamryPstat:
     device: str

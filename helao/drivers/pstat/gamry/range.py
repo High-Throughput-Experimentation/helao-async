@@ -8,6 +8,26 @@ if logging.LOGGER is None:
 else:
     logger = logging.LOGGER
 
+
+RANGES = {
+    "mode0": 0,
+    "mode1": 1,
+    "mode2": 2,
+    "mode3": 3,
+    "mode4": 4,
+    "mode5": 5,
+    "mode6": 6,
+    "mode7": 7,
+    "mode8": 8,
+    "mode9": 9,
+    "mode10": 10,
+    "mode11": 11,
+    "mode12": 12,
+    "mode13": 13,
+    "mode14": 14,
+    "mode15": 15,
+}
+
 # for IFC1010
 class Gamry_IErange_IFC1010(StrEnum):
     # NOTE: The ranges listed below are for 300 mA or 30 mA models. For 750 mA models, multiply the ranges by 2.5. For 600 mA models, multiply the ranges by 2.0.

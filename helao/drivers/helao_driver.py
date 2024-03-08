@@ -39,6 +39,7 @@ else:
 
 class DriverStatus(StrEnum):
     ok = "ok"
+    busy = "busy"
     error = "error"
     uninitialized = "uninitialized"
     unknown = "unknown"
@@ -61,7 +62,7 @@ class DriverMessage:
 @dataclass
 class DriverResponse(DriverMessage):
     response: DriverResponseType = DriverResponseType.not_implemented
-    message: str = "not implemented"
+    message: str = ""
     data: dict = field(default_factory=dict)
     status: DriverStatus = DriverStatus.unknown
 

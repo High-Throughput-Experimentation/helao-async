@@ -32,5 +32,4 @@ class DummySink:
     dtaq: object = None
     status: str = "idle"
     acquired_points: list = field(default_factory=list)
-    status: str = "idle"
     buffer_size: int = 0

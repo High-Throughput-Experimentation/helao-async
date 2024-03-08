@@ -32,6 +32,7 @@ class OnMethod(StrEnum):
 
 @dataclass
 class GamryTechnique:
+    name: str
     on_method: OnMethod
     dtaq: GamryDtaq
     signal: GamrySignal
@@ -43,6 +44,7 @@ class GamryTechnique:
 
 
 TECH_LSV = GamryTechnique(
+    name="LSV",
     on_method=OnMethod.CellOn,
     dtaq=DTAQ_CPIV,
     signal=VSIGNAL_RAMP,
@@ -51,6 +53,7 @@ TECH_LSV = GamryTechnique(
 )
 
 TECH_LSA = GamryTechnique(
+    name="LSA",
     on_method=OnMethod.CellOn,
     dtaq=DTAQ_CPIV,
     signal=ISIGNAL_RAMP,
@@ -59,6 +62,7 @@ TECH_LSA = GamryTechnique(
 )
 
 TECH_CA = GamryTechnique(
+    name="CA",
     on_method=OnMethod.CellOn,
     dtaq=DTAQ_CHRONOA,
     signal=VSIGNAL_CONST,
@@ -67,6 +71,7 @@ TECH_CA = GamryTechnique(
     vchrange_keys=["Vval__V"],
 )
 TECH_CP = GamryTechnique(
+    name="CP",
     on_method=OnMethod.CellOn,
     dtaq=DTAQ_CHRONOP,
     signal=ISIGNAL_CONST,
@@ -75,6 +80,7 @@ TECH_CP = GamryTechnique(
     ierange_keys=["Ival__A"]
 )
 TECH_CV = GamryTechnique(
+    name="CV",
     on_method=OnMethod.CellOn,
     dtaq=DTAQ_RCV,
     signal=VSIGNAL_RUPDN,
@@ -82,12 +88,14 @@ TECH_CV = GamryTechnique(
     vchrange_keys=["Vinit__V", "Vapex1__V", "Vapex2__V", "Vfinal__V"]
 )
 TECH_OCV = GamryTechnique(
+    name="OCV",
     on_method=OnMethod.CellMon,
     dtaq=DTAQ_OCV,
     signal=OCVSIGNAL_CONST,
     set_vchrangemode=True,
 )
 TECH_RCA = GamryTechnique(
+    name="RCA",
     on_method=OnMethod.CellOn,
     dtaq=DTAQ_UNIV,
     signal=VSIGNAL_ARRAY,

@@ -14,7 +14,7 @@ class GamryDtaq:
     dtaq_type: Optional[DtaqType] = None
     output_keys: List[str] = field(default_factory=list)
     int_param_keys: List[str] = field(default_factory=list)
-    bool_param_keys: List[str] = field(default_factor=list)
+    bool_param_keys: List[str] = field(default_factory=list)
 
 
 DTAQ_CPIV = GamryDtaq(

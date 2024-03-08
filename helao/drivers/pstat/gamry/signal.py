@@ -11,8 +11,8 @@ class ControlMode(StrEnum):
 @dataclass
 class GamrySignal:
     name: str
-    param_keys: List[str] = field(default_factory=list)
     mode: ControlMode
+    param_keys: List[str] = field(default_factory=list)
     init_keys: List[str] = field(default_factory=list)
 
 
