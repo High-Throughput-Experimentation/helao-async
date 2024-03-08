@@ -911,7 +911,6 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
     DeltaDilute1_duration: float = 15,
     #initcleans: int = 3,
     drainrecirc: bool = True,
-    recirculation_rate_uL_min: int = 10000,
     
     drainclean_volume_ul: float = 10000,
     #headspace_purge_cycles: int = 2,
