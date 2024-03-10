@@ -49,7 +49,7 @@ TECH_LSV = GamryTechnique(
     dtaq=DTAQ_CPIV,
     signal=VSIGNAL_RAMP,
     set_vchrangemode=False,
-    vchrange_keys=["Vinit__V", "Vfinal__V"]
+    vchrange_keys=["Vinit__V", "Vfinal__V"]  # max absolute value of these params to set range
 )
 
 TECH_LSA = GamryTechnique(
@@ -58,7 +58,7 @@ TECH_LSA = GamryTechnique(
     dtaq=DTAQ_CPIV,
     signal=ISIGNAL_RAMP,
     set_ierangemode=False,
-    ierange_keys=["Iinit__A", "Ifinal__A"]
+    ierange_keys=["Iinit__A", "Ifinal__A"]  # max absolute value of these params to set rang
 )
 
 TECH_CA = GamryTechnique(

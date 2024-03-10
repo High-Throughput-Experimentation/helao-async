@@ -9,7 +9,7 @@ All public methods must return a DriverResponse.
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="default_helao")
+    logger = logging.make_logger(logger_name="gamry_driver_standalone")
 else:
     logger = logging.LOGGER
 
@@ -51,6 +51,8 @@ class GamryDriver(HelaoDriver):
         self.dtaqsink = DUMMY_SINK
         self.events = None
         self.technique = None
+        self.pstat = None
+        self.ready = False
         # get params from config or use defaults
         self.device_id = self.config.get("device_id", None)
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
@@ -105,7 +107,7 @@ class GamryDriver(HelaoDriver):
             # set the I/E Range of the potentiostat.
             self.pstat.SetAnalogOut(0.0)
             self.pstat.SetIruptMode(self.GamryCOM.IruptOff)
-
+            self.ready = True
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -171,6 +173,8 @@ class GamryDriver(HelaoDriver):
             self.GamryCOM = client.GetModule(
                 ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
             )
+            self.pstat = None
+            self.ready = False
             self.connect()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
@@ -187,6 +191,8 @@ class GamryDriver(HelaoDriver):
         try:
             self.pstat.SetCell(self.GamryCOM.CellOff)
             self.pstat.Close()
+            self.pstat = None
+            self.ready = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -351,10 +357,10 @@ class GamryDriver(HelaoDriver):
             )
         return response
 
-    def get_data(self) -> DriverResponse:
+    def get_data(self, pump_rate: float) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
-            client.PumpEvents(0.001) 
+            client.PumpEvents(pump_rate) 
             total_points = len(self.dtaqsink.acquired_points)
             if self.counter < total_points:
                 new_data = self.dtaqsink.acquired_points[self.counter:total_points]
