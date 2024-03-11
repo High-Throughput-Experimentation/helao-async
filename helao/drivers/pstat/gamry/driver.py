@@ -1,6 +1,7 @@
 """Gamry potentiostat driver using HelaoDriver abstract base class
 
-This Gamry driver has zero dependencies on action server base object.
+This Gamry driver has zero dependencies on action server base object, and all
+exposed methods are intended to be blocking. Async should be handled in the server.
 All public methods must return a DriverResponse.
 
 """
@@ -212,6 +213,10 @@ class GamryDriver(HelaoDriver):
     ) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
         try:
+            if not isinstance(self.dtaqsink, DummySink):
+                raise TypeError(
+                    "dtaqsink is not of type DummySink. Another technique may be running."
+                )
             # set device-specific ranges
             self.technique = technique
             self.pstat.SetIERange(0.03)  # default range
@@ -286,24 +291,18 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
             self.reset()
+            self.cleanup()
         except Exception:
             logger.error("setup failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
+            self.cleanup()
         return response
 
     def measure(self, ttl_params: dict = {}) -> DriverResponse:
         """Apply signal and begin data acquisition."""
         try:
-            # # wait for TTL input -- do this in Executor to decouple async
-            # if ttl_params.get("TTLwait", -1) > 0:
-            #     bits = self.pstat.DigitalIn()
-            #     logger.info(f"Gamry DIbits: {bits}, waiting for trigger.")
-            #     while not bits:
-            #         await asyncio.sleep(0.01)
-            #         bits = self.pstat.DigitalIn()
-
             # emit TTL output
             ttl_send = ttl_params.get("TTLsend", -1)
             if ttl_send > 0:
@@ -360,11 +359,16 @@ class GamryDriver(HelaoDriver):
     def get_data(self, pump_rate: float) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
-            client.PumpEvents(pump_rate) 
+            client.PumpEvents(pump_rate)
             total_points = len(self.dtaqsink.acquired_points)
             if self.counter < total_points:
-                new_data = self.dtaqsink.acquired_points[self.counter:total_points]
-                data_dict = {k: v for k, v in zip(self.technique.dtaq.output_keys, np.matrix(new_data).T.tolist())}
+                new_data = self.dtaqsink.acquired_points[self.counter : total_points]
+                data_dict = {
+                    k: v
+                    for k, v in zip(
+                        self.technique.dtaq.output_keys, np.matrix(new_data).T.tolist()
+                    )
+                }
             else:
                 data_dict = {}
             sink_state = self.dtaqsink.status
