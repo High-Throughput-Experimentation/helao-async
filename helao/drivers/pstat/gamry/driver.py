@@ -59,6 +59,7 @@ class GamryDriver(HelaoDriver):
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config.get("grounded", True))
         logger.info(f"using device_id {self.device_id} from config")
+        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open connection to resource."""
