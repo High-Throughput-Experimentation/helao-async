@@ -12,6 +12,7 @@ from fastapi import Body, WebSocket, Request
 from fastapi.routing import APIRoute
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from helao.drivers.helao_driver import HelaoDriver
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
@@ -140,8 +141,11 @@ class OrchAPI(HelaoFastAPI):
             self.orch = Orch(fastapp=self)
             
             self.orch.myinit()
-            if driver_class:
-                self.driver = driver_class(self.orch)
+            if driver_class is not None:
+                if issubclass(driver_class, HelaoDriver):
+                    self.driver = driver_class(config=self.server_params)
+                else:
+                    self.driver = driver_class(self.base)
             self.orch.endpoint_queues_init()
 
         @self.on_event("startup")

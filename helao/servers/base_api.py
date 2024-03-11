@@ -125,7 +125,7 @@ class BaseAPI(HelaoFastAPI):
 
             self.base.myinit()
             if driver_class is not None:
-                if isinstance(driver_class, HelaoDriver):
+                if issubclass(driver_class, HelaoDriver):
                     self.driver = driver_class(config=self.server_params)
                 else:
                     self.driver = driver_class(self.base)
