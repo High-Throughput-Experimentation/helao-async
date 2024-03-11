@@ -972,7 +972,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "flowrate_sccm": flowrate_sccm,
             "flowramp_sccm": flowramp_sccm,
             "target_co2_ppm": target_co2_ppm,
-            "headspace_scc": gas_volume,
+            "headspace_scc": gas_volume/1000,
             "refill_freq_sec": refill_freq_sec,
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
