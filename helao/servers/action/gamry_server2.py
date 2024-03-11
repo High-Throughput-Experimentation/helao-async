@@ -62,20 +62,20 @@ class GamryExec(Executor):
             # split action params into dtaq and signal dicts
             self.dtaq_params = {
                 k: v
-                for k, v in self.active.action.action_params
+                for k, v in self.action_params.items()
                 if k
                 in self.technique.dtaq.int_param_keys
                 + self.technique.dtaq.bool_param_keys
             }
             self.signal_params = {
                 k: v
-                for k, v in self.active.action.action_params
+                for k, v in self.action_params.items()
                 if k
                 in self.technique.signal.param_keys + self.technique.signal.init_keys
             }
-            self.ierange = self.active.action.action_params.get("IErange", "auto")
+            self.ierange = self.action_params.get("IErange", "auto")
             self.ttl_params = {
-                k: self.active.action.action_params.get(k, -1)
+                k: self.action_params.get(k, -1)
                 for k in ("TTLwait", "TTLsend")
             }
             logger.info("GamryExec initialized.")
