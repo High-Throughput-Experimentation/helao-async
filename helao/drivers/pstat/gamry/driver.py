@@ -19,7 +19,6 @@ import comtypes.client as client
 import psutil
 import time
 from enum import Enum
-from collections import defaultdict
 
 # import asyncio
 import numpy as np

@@ -6,6 +6,7 @@ import faulthandler
 from copy import copy
 from socket import gethostname
 
+from helao.drivers.helao_driver import HelaoDriver
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
 from helao.servers.base import Base
@@ -124,7 +125,10 @@ class BaseAPI(HelaoFastAPI):
 
             self.base.myinit()
             if driver_class is not None:
-                self.driver = driver_class(self.base)
+                if isinstance(driver_class, HelaoDriver):
+                    self.driver = driver_class(config=self.server_params)
+                else:
+                    self.driver = driver_class(self.base)
             self.base.dyn_endpoints_init()
 
         @self.on_event("startup")
