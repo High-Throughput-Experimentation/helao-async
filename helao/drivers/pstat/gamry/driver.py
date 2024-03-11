@@ -393,3 +393,8 @@ class GamryDriver(HelaoDriver):
                 status=DriverStatus.error,
             )
         return response
+
+    def shutdown(self):
+        """Pass-through shutdown events for BaseAPI."""
+        self.cleanup()
+        self.disconnect()
