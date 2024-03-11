@@ -72,43 +72,9 @@ class GamryDriver(HelaoDriver):
             self.model = GAMRY_DEVICES[self.device_name.split("-")[0]]
             self.pstat = client.CreateObject(self.model.device)
             self.pstat.Init(self.device_name)
-            self.pstat.Open()
             logger.info(
-                f"connected to {self.device_name} on device_id {self.device_id}"
+                f"initialized {self.device_name} on device_id {self.device_id}"
             )
-
-            # apply initial configuration
-            self.pstat.SetCell(self.GamryCOM.CellOff)
-            self.pstat.SetPosFeedEnable(False)
-            self.pstat.SetIEStability(self.GamryCOM.StabilityFast)
-            self.pstat.SetSenseSpeedMode(self.model.set_sensemode)
-            self.pstat.SetIConvention(self.GamryCOM.Anodic)
-            self.pstat.SetGround(self.config.get("grounded", True))
-            # maximum anticipated voltage (in Volts).
-            ichrangeval = self.pstat.TestIchRange(3.0)
-            self.pstat.SetIchRange(ichrangeval)
-            self.pstat.SetIchRangeMode(True)  # auto-set
-            self.pstat.SetIchOffsetEnable(False)
-            # call TestIchFilter before setting SetIchFilter
-            ichfilterval = self.pstat.TestIchFilter(
-                self.config.get("filterfreq_hz", 1000.0)
-            )
-            self.pstat.SetIchFilter(ichfilterval)
-            # voltage channel range.
-            vchrangeval = self.pstat.TestVchRange(12.0)
-            self.pstat.SetVchRange(vchrangeval)
-            self.pstat.SetVchRangeMode(True)
-            self.pstat.SetVchOffsetEnable(False)
-            # call TestVchFilter before setting SetVchFilter
-            vchfilterval = self.pstat.TestVchFilter(
-                self.config.get("filterfreq_hz", 1000.0)
-            )
-            self.pstat.SetVchFilter(vchfilterval)
-            # set the range of the Auxiliary A/D input.
-            self.pstat.SetAchRange(3.0)
-            # set the I/E Range of the potentiostat.
-            self.pstat.SetAnalogOut(0.0)
-            self.pstat.SetIruptMode(self.GamryCOM.IruptOff)
             self.ready = True
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
@@ -214,10 +180,56 @@ class GamryDriver(HelaoDriver):
     ) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
         try:
+            # check for ongoing measurement via dtaqsink
             if not isinstance(self.dtaqsink, DummySink):
                 raise TypeError(
                     "dtaqsink is not of type DummySink. Another technique may be running."
                 )
+
+            self.pstat.Open()
+            logger.info(
+                f"connected to {self.device_name} on device_id {self.device_id}"
+            )
+
+            # apply initial configuration
+            self.pstat.SetCell(self.GamryCOM.CellOff)
+            self.pstat.SetPosFeedEnable(False)
+            self.pstat.SetIEStability(self.GamryCOM.StabilityFast)
+            self.pstat.SetSenseSpeedMode(self.model.set_sensemode)
+            self.pstat.SetIConvention(self.GamryCOM.Anodic)
+            self.pstat.SetGround(self.config.get("grounded", True))
+
+            # maximum anticipated voltage (in Volts).
+            ichrangeval = self.pstat.TestIchRange(3.0)
+            self.pstat.SetIchRange(ichrangeval)
+            self.pstat.SetIchRangeMode(True)  # auto-set
+            self.pstat.SetIchOffsetEnable(False)
+
+            # call TestIchFilter before setting SetIchFilter
+            ichfilterval = self.pstat.TestIchFilter(
+                self.config.get("filterfreq_hz", 1000.0)
+            )
+            self.pstat.SetIchFilter(ichfilterval)
+
+            # voltage channel range.
+            vchrangeval = self.pstat.TestVchRange(12.0)
+            self.pstat.SetVchRange(vchrangeval)
+            self.pstat.SetVchRangeMode(True)
+            self.pstat.SetVchOffsetEnable(False)
+
+            # call TestVchFilter before setting SetVchFilter
+            vchfilterval = self.pstat.TestVchFilter(
+                self.config.get("filterfreq_hz", 1000.0)
+            )
+            self.pstat.SetVchFilter(vchfilterval)
+
+            # set the range of the Auxiliary A/D input.
+            self.pstat.SetAchRange(3.0)
+
+            # set the I/E Range of the potentiostat.
+            self.pstat.SetAnalogOut(0.0)
+            self.pstat.SetIruptMode(self.GamryCOM.IruptOff)
+
             # set device-specific ranges
             self.technique = technique
             self.pstat.SetIERange(0.03)  # default range
@@ -226,6 +238,7 @@ class GamryDriver(HelaoDriver):
                 self.pstat.SetIERangeMode(self.model.set_rangemode)
             else:
                 self.pstat.SetIERange(RANGES[range_enum.name])
+
             # override device-specific ranges with technique ranges if given
             self.pstat.SetCtrlMode(getattr(self.GamryCOM, technique.signal.mode.value))
             if technique.set_vchrangemode is not None:
@@ -244,6 +257,7 @@ class GamryDriver(HelaoDriver):
                 )
                 ierangeval = self.pstat.TestIERange(setpointie)
                 self.pstat.SetIERange(ierangeval)
+
             # initialize dtaq
             self.dtaq = client.CreateObject(technique.dtaq.name)
             dtaq_init_args = (signal_params[x] for x in technique.signal.init_keys)
@@ -253,6 +267,7 @@ class GamryDriver(HelaoDriver):
                 self.dtaq.Init(self.pstat, *dtaq_init_args)
             if technique.set_decimation is not None:
                 self.dtaq.SetDecimation(technique.set_decimation)
+
             # apply dtaq limits
             for dtaq_key, val in dtaq_params.items():
                 if val is None:
@@ -261,8 +276,10 @@ class GamryDriver(HelaoDriver):
                     getattr(self.dtaq, dtaq_key)(val)
                 elif dtaq_key in technique.dtaq.bool_param_keys:
                     getattr(self.dtaq, dtaq_key)(True, val)
+
             # create event sink
             self.dtaqsink = GamryDtaqSink(self.dtaq)
+
             # check for missing parameter keys
             missing_keys = [
                 key
