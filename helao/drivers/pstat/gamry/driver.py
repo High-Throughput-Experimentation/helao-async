@@ -389,15 +389,15 @@ class GamryDriver(HelaoDriver):
                 }
             else:
                 data_dict = {}
+            
             sink_state = self.dtaqsink.status
             if sink_state == "measuring":
                 status = DriverStatus.busy
             elif sink_state == "done":
-                logger.info("measurement complete, DtaqSink received DataDone")
                 status = DriverStatus.ok
             else:
-                logger.info("dtaq is idle")
                 status = DriverStatus.ok
+            logger.info(f"dtaq is {sink_state}")
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message=sink_state,
