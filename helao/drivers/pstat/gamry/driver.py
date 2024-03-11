@@ -52,6 +52,7 @@ class GamryDriver(HelaoDriver):
         self.events = None
         self.technique = None
         self.pstat = None
+        self.signal = None
         self.ready = False
         self.counter = 0
         # get params from config or use defaults
@@ -295,9 +296,9 @@ class GamryDriver(HelaoDriver):
                 + [signal_params[key] for key in technique.signal.param_keys]
                 + [getattr(self.GamryCOM, self.technique.signal.mode.value)]
             )
-            signal = client.CreateObject(technique.signal.name)
-            signal.Init(*signal_paramlist)
-            self.pstat.SetSignal(signal)
+            self.signal = client.CreateObject(technique.signal.name)
+            self.signal.Init(*signal_paramlist)
+            self.pstat.SetSignal(self.signal)
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="setup complete",
@@ -323,13 +324,14 @@ class GamryDriver(HelaoDriver):
         try:
             # emit TTL output
             ttl_send = ttl_params.get("TTLsend", -1)
-            if ttl_send > 0:
+            if ttl_send > -1:
                 self.pstat.SetDigitalOut(*TTL_OUTPUTS[ttl_send])
             # energize cell
             self.pstat.SetCell(getattr(self.GamryCOM, self.technique.on_method.value))
             # run data acquisition
             self.events = client.GetEvents(self.dtaq, self.dtaqsink)
             self.dtaq.Run(True)
+            time.sleep(0.01)
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="measurement started",
@@ -360,6 +362,7 @@ class GamryDriver(HelaoDriver):
             self.dtaq = None
             self.dtaqsink = DUMMY_SINK
             self.technique = None
+            self.signal = None
             self.counter = 0
             response = DriverResponse(
                 response=DriverResponseType.success,
@@ -391,12 +394,13 @@ class GamryDriver(HelaoDriver):
                 data_dict = {}
             
             sink_state = self.dtaqsink.status
-            if sink_state == "measuring":
+            if sink_state == "measuring" or self.counter < len(total_points):
                 status = DriverStatus.busy
             elif sink_state == "done":
                 status = DriverStatus.ok
             else:
                 status = DriverStatus.ok
+            self.counter = total_points
             logger.info(f"dtaq is {sink_state}")
             response = DriverResponse(
                 response=DriverResponseType.success,
