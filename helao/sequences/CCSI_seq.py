@@ -934,7 +934,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
 
         epm.add_experiment("CCSI_sub_unload_cell",{})
 
-        gas_volume= total_cell_volume_ul - total_sample_volume_ul,
+        gas_volume = total_cell_volume_ul - total_sample_volume_ul
 
         epm.add_experiment("CCSI_sub_load_gas", {
             "reservoir_gas_sample_no": initial_gas_sample_no,
