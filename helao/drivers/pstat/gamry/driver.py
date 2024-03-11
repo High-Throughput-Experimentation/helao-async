@@ -244,8 +244,6 @@ class GamryDriver(HelaoDriver):
                 )
                 ierangeval = self.pstat.TestIERange(setpointie)
                 self.pstat.SetIERange(ierangeval)
-            if technique.set_decimation is not None:
-                self.pstat.SetDecimation(technique.set_decimation)
             # initialize dtaq
             self.dtaq = client.CreateObject(technique.dtaq.name)
             dtaq_init_args = (signal_params[x] for x in technique.signal.init_keys)
@@ -253,6 +251,8 @@ class GamryDriver(HelaoDriver):
                 self.dtaq.Init(self.pstat, technique.dtaq.dtaq_type, *dtaq_init_args)
             else:
                 self.dtaq.Init(self.pstat, *dtaq_init_args)
+            if technique.set_decimation is not None:
+                self.dtaq.SetDecimation(technique.set_decimation)
             # apply dtaq limits
             for dtaq_key, val in dtaq_params.items():
                 if val is None:
