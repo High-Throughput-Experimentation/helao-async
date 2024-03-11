@@ -163,7 +163,7 @@ async def gamry_dyn_endpoints(app=None):
             use 4bit bitmask for triggers
             IErange depends on gamry model used (test actual limit before using)"""
             active = await app.base.setup_and_contain_action()
-            active.action_abbr = "LSV"
+            active.action.action_abbr = "LSV"
             executor = GamryExec(active=active, oneoff=False, technique=TECH_LSV)
             active_action_dict = active.start_executor(executor)
             return active_action_dict
@@ -189,7 +189,7 @@ async def gamry_dyn_endpoints(app=None):
             IErange depends on gamry model used
             (test actual limit before using)"""
             active = await app.base.setup_and_contain_action()
-            active.action_abbr = "CA"
+            active.action.action_abbr = "CA"
             executor = GamryExec(active=active, oneoff=False, technique=TECH_CA)
             active_action_dict = active.start_executor(executor)
             return active_action_dict
@@ -214,7 +214,7 @@ async def gamry_dyn_endpoints(app=None):
             use 4bit bitmask for triggers
             IErange depends on gamry model used (test actual limit before using)"""
             active = await app.base.setup_and_contain_action()
-            active.action_abbr = "CP"
+            active.action.action_abbr = "CP"
             executor = GamryExec(active=active, oneoff=False, technique=TECH_CP)
             active_action_dict = active.start_executor(executor)
             return active_action_dict
@@ -244,7 +244,7 @@ async def gamry_dyn_endpoints(app=None):
             use 4bit bitmask for triggers
             IErange depends on gamry model used (test actual limit before using)"""
             active = await app.base.setup_and_contain_action()
-            active.action_abbr = "CV"
+            active.action.action_abbr = "CV"
             executor = GamryExec(active=active, oneoff=False, technique=TECH_CV)
             active_action_dict = active.start_executor(executor)
             return active_action_dict
@@ -266,7 +266,7 @@ async def gamry_dyn_endpoints(app=None):
             use 4bit bitmask for triggers
             IErange depends on gamry model used (test actual limit before using)"""
             active = await app.base.setup_and_contain_action()
-            active.action_abbr = "OCV"
+            active.action.action_abbr = "OCV"
             executor = GamryExec(active=active, oneoff=False, technique=TECH_OCV)
             active_action_dict = active.start_executor(executor)
             return active_action_dict
@@ -288,7 +288,7 @@ async def gamry_dyn_endpoints(app=None):
         ):
             """Measure pulsed voltammetry"""
             active = await app.base.setup_and_contain_action()
-            active.action_abbr = "RCA"
+            active.action.action_abbr = "RCA"
             executor = GamryExec(active=active, oneoff=False, technique=TECH_RCA)
             active_action_dict = active.start_executor(executor)
             return active_action_dict
@@ -315,7 +315,7 @@ async def gamry_dyn_endpoints(app=None):
         #     use 4bit bitmask for triggers
         #     IErange depends on gamry model used (test actual limit before using)"""
         #     active = await app.base.setup_and_contain_action()
-        #     active.action_abbr = "EIS"
+        #     active.action.action_abbr = "EIS"
         #     executor = GamryExec(active=active, oneoff=False, technique=TECH_EIS)
         #     active_action_dict = active.start_executor(executor)
         #     return active_action_dict

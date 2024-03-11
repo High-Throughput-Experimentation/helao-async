@@ -253,13 +253,11 @@ class GamryDriver(HelaoDriver):
             else:
                 self.dtaq.Init(self.pstat, *dtaq_init_args)
             # apply dtaq limits
-            for dtaq_key in technique.dtaq.int_param_keys:
-                val = dtaq_params.get(dtaq_key, 1)
-                getattr(self.dtaq, dtaq_key)(val)
-            for dtaq_key in technique.dtaq.bool_param_keys:
-                val = dtaq_params.get(dtaq_key, 0.0)
-                enable = dtaq_key in dtaq_params
-                getattr(self.dtaq, dtaq_key)(enable, val)
+            for dtaq_key, val in dtaq_params.items():
+                if dtaq_key in technique.dtaq.int_param_keys:
+                    getattr(self.dtaq, dtaq_key)(val)
+                elif dtaq_key in technique.dtaq.bool_param_keys:
+                    getattr(self.dtaq, dtaq_key)(True, val)
             # create event sink
             self.dtaqsink = GamryDtaqSink(self.dtaq)
             # check for missing parameter keys
