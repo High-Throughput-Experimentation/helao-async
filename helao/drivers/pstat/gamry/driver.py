@@ -53,6 +53,7 @@ class GamryDriver(HelaoDriver):
         self.technique = None
         self.pstat = None
         self.ready = False
+        self.counter = 0
         # get params from config or use defaults
         self.device_id = self.config.get("dev_id", None)
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
