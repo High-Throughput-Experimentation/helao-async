@@ -55,7 +55,7 @@ class GamryDriver(HelaoDriver):
         self.pstat = None
         self.ready = False
         # get params from config or use defaults
-        self.device_id = self.config.get("device_id", None)
+        self.device_id = self.config.get("dev_id", None)
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config.get("grounded", True))
         logger.info(f"using device_id {self.device_id} from config")
