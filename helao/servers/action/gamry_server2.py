@@ -87,7 +87,7 @@ class GamryExec(Executor):
         resp = self.driver.setup(
             self.technique, self.signal_params, self.dtaq_params, self.ierange
         )
-        error = ErrorCodes.none if resp.reponse == "success" else ErrorCodes.setup
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         return {"error": error}
 
     async def _exec(self) -> dict:
@@ -99,25 +99,25 @@ class GamryExec(Executor):
                 await asyncio.sleep(0.001)
                 bits = self.driver.pstat.DigitalIn()
         resp = self.driver.measure(self.ttl_params)
-        error = ErrorCodes.none if resp.reponse == "success" else ErrorCodes.critical
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error}
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
         resp = self.driver.get_data(self.poll_rate)
-        error = ErrorCodes.none if resp.reponse == "success" else ErrorCodes.critical
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         status = HloStatus.active if resp.status=="busy" else HloStatus.finished
         return {"error": error, "status": status, "data": resp.data}
 
     async def _post_exec(self):
         resp = self.driver.cleanup()
-        error = ErrorCodes.none if resp.reponse == "success" else ErrorCodes.critical
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": {}}
 
     async def _manual_stop(self) -> dict:
         """Interrupt measurement and disconnect cell."""
         resp = self.driver.stop()
-        error = ErrorCodes.none if resp.reponse == "success" else ErrorCodes.stop
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.stop
         return {"error": error}
 
 
