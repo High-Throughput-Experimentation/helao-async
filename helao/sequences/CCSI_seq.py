@@ -888,12 +888,14 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 
 def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization performed previously
     sequence_version: int = 6, #4 new threshold criteria 5, sample purgetime, 6 no preclean
-    gas_sample_no: int = 2,
+    initial_gas_sample_no: int = 2,
+    pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [2000,2000, 2000],
     Solution_reservoir_sample_no: int = 2,
     Solution_name: str = "acetonitrile",
     total_sample_volume_ul: float = 2000,
-    volume_ul_cell_gas: float= 10500,
+    total_cell_volume_ul: float = 12500,
+#    volume_ul_cell_gas: float= 10500,
     Waterclean_reservoir_sample_no: int = 1,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
@@ -903,15 +905,15 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
     flowrate_sccm: float = 0.5,
     flowramp_sccm: float = 0,
     target_co2_ppm: float = 1e5,
-    headspace_scc: float = 10.5,
+#    headspace_scc: float = 10.5,
     refill_freq_sec: float = 10.0,
     recirculation_rate_uL_min: int = 10000,
     
-    HSpurge_duration: float = 15,
-    DeltaDilute1_duration: float = 15,
+#    HSpurge_duration: float = 15,
+    DeltaDilute1_duration: float = 0,
     #initcleans: int = 3,
     drainrecirc: bool = True,
-    
+    recirculation_duration: float = 60,
     drainclean_volume_ul: float = 10000,
     #headspace_purge_cycles: int = 2,
 #    liquid_purge_cycles: int = 1,
@@ -932,9 +934,11 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
 
         epm.add_experiment("CCSI_sub_unload_cell",{})
 
+        gas_volume= total_cell_volume_ul - total_sample_volume_ul,
+
         epm.add_experiment("CCSI_sub_load_gas", {
-            "reservoir_gas_sample_no": gas_sample_no,
-            "volume_ul_cell_gas": volume_ul_cell_gas,
+            "reservoir_gas_sample_no": initial_gas_sample_no,
+            "volume_ul_cell_gas": gas_volume,
         })
         if solnvolume != 0:
             epm.add_experiment("CCSI_sub_load_liquid", {
@@ -968,13 +972,16 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "flowrate_sccm": flowrate_sccm,
             "flowramp_sccm": flowramp_sccm,
             "target_co2_ppm": target_co2_ppm,
-            "headspace_scc": headspace_scc,
+            "headspace_scc": gas_volume,
             "refill_freq_sec": refill_freq_sec,
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
+        epm.add_experiment("CCSI_sub_load_gas", {
+            "reservoir_gas_sample_no": pureco2_sample_no,
+            "volume_ul_cell_gas": 1, #need calculated volume from mfc maintain concentration 
+        })        
         
-        
-        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
+        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": 0,"recirculation":drainrecirc,"recirculation_duration":recirculation_duration})
 ##############################################3
 #continue below
 # =============================================================================

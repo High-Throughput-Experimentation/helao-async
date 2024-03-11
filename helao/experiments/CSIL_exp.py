@@ -968,6 +968,7 @@ def CCSI_sub_co2massdose(
 def CCSI_sub_co2maintainconcentration(
     experiment: Experiment,
     experiment_version: int = 2,
+    pureco2_sample_number: int = 1,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
@@ -1020,6 +1021,7 @@ def CCSI_sub_co2maintainconcentration(
         asc.no_wait,
         nonblocking=True,
     )
+
     apm.add(
         CO2S_server,
         "acquire_co2",
