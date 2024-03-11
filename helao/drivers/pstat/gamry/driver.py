@@ -44,7 +44,7 @@ class GamryDriver(HelaoDriver):
     model: GamryPstat
 
     def __init__(self, config: dict = {}):
-        super().__init__()
+        super().__init__(config=config)
         #
         self.device_name = "unknown"
         self.dtaq = None
