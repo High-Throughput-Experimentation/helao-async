@@ -24,6 +24,7 @@ class Executor:
         poll_rate: float = 0.2,
         oneoff: bool = True,
         exec_id: str = None,
+        **kwargs
     ):
         self.active = active
         self.oneoff = oneoff
