@@ -394,7 +394,7 @@ class GamryDriver(HelaoDriver):
                 data_dict = {}
             
             sink_state = self.dtaqsink.status
-            if sink_state == "measuring" or self.counter < len(total_points):
+            if sink_state == "measuring" or self.counter < total_points:
                 status = DriverStatus.busy
             elif sink_state == "done":
                 status = DriverStatus.ok
