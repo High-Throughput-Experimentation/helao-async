@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Dict, Union
 from enum import StrEnum
 
 
@@ -14,6 +14,7 @@ class GamrySignal:
     mode: ControlMode
     param_keys: List[str] = field(default_factory=list)
     init_keys: List[str] = field(default_factory=list)
+    map_keys: Dict[Union[int, float, str]] = field(default_factory=dict)
 
 
 VSIGNAL_RAMP = GamrySignal(
@@ -38,13 +39,14 @@ EISSIGNAL_CONST = GamrySignal(
     name="GamryCOM.GamrySignalConst",
     param_keys=["Vval__V", "Tval__s", "AcqInterval__s"],
     mode=ControlMode.PstatMode,
-    init_keys=["Freq", "RMS", "Precision"]
+    init_keys=["Freq", "RMS", "Precision"],
 )
 
 OCVSIGNAL_CONST = GamrySignal(
     name="GamryCOM.GamrySignalConst",
-    param_keys=["Tval__s", "AcqInterval__s"],
+    param_keys=["Vval__V", "Tval__s", "AcqInterval__s"],
     mode=ControlMode.PstatMode,
+    map_keys={"Vval__V": 0.0},
 )
 
 ISIGNAL_CONST = GamrySignal(
@@ -70,6 +72,14 @@ VSIGNAL_RUPDN = GamrySignal(
         "Cycles",
     ],
     mode=ControlMode.PstatMode,
+    map_keys={
+        "ScanInit__V_s": "ScanRate__V_s",
+        "ScanApex__V_s": "ScanRate__V_s",
+        "ScanFinal__V_s": "ScanRate__V_s",
+        "HoldTime0__s": 0.0,
+        "HoldTime1__s": 0.0,
+        "HoldTime2__s": 0.0,
+    },
 )
 
 ISIGNAL_RUPDN = GamrySignal(

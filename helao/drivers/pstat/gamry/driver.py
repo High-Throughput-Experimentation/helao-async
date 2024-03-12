@@ -19,6 +19,7 @@ import comtypes.client as client
 import psutil
 import time
 from enum import Enum
+from copy import copy
 
 # import asyncio
 import numpy as np
@@ -282,11 +283,21 @@ class GamryDriver(HelaoDriver):
             # create event sink
             self.dtaqsink = GamryDtaqSink(self.dtaq)
 
+            # map action params to signal params (e.g. OCV and CV cases)
+            mapped_signal_params = copy(signal_params)
+            for dest_key, val in technique.signal.map_keys.items():
+                if dest_key in signal_params:
+                    continue
+                elif isinstance(val, str) and val in signal_params:
+                    mapped_signal_params[dest_key] = signal_params[val]
+                elif dest_key not in signal_params:
+                    mapped_signal_params[dest_key] = val
+
             # check for missing parameter keys
             missing_keys = [
                 key
                 for key in technique.signal.param_keys + technique.signal.init_keys
-                if key not in signal_params
+                if key not in mapped_signal_params
             ]
             if missing_keys:
                 raise KeyError(
@@ -294,7 +305,7 @@ class GamryDriver(HelaoDriver):
                 )
             signal_paramlist = (
                 [self.pstat]
-                + [signal_params[key] for key in technique.signal.param_keys]
+                + [mapped_signal_params[key] for key in technique.signal.param_keys]
                 + [getattr(self.GamryCOM, self.technique.signal.mode.value)]
             )
             self.signal = client.CreateObject(technique.signal.name)
