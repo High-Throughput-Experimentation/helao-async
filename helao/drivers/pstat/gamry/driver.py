@@ -180,6 +180,7 @@ class GamryDriver(HelaoDriver):
         technique: GamryTechnique,
         signal_params: dict = {},
         dtaq_params: dict = {},
+        action_params: dict = {},  # for mapping action keys to signal keys
         ierange: Enum = "auto",
     ) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
@@ -288,9 +289,11 @@ class GamryDriver(HelaoDriver):
             for dest_key, val in technique.signal.map_keys.items():
                 if dest_key in signal_params:
                     continue
-                elif isinstance(val, str) and val in signal_params:
-                    mapped_signal_params[dest_key] = signal_params[val]
-                elif dest_key not in signal_params:
+                elif isinstance(val, str) and val in action_params:
+                    mapped_signal_params[dest_key] = action_params[val]
+                elif (
+                    isinstance(val, float) or isinstance(val, int)
+                ) and dest_key not in signal_params:
                     mapped_signal_params[dest_key] = val
 
             # check for missing parameter keys

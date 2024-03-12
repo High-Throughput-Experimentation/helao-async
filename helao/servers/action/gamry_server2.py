@@ -75,8 +75,7 @@ class GamryExec(Executor):
             }
             self.ierange = self.action_params.get("IErange", "auto")
             self.ttl_params = {
-                k: self.action_params.get(k, -1)
-                for k in ("TTLwait", "TTLsend")
+                k: self.action_params.get(k, -1) for k in ("TTLwait", "TTLsend")
             }
             logger.info("GamryExec initialized.")
         except Exception:
@@ -85,7 +84,11 @@ class GamryExec(Executor):
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
         resp = self.driver.setup(
-            self.technique, self.signal_params, self.dtaq_params, self.ierange
+            self.technique,
+            self.signal_params,
+            self.dtaq_params,
+            self.action_params,
+            self.ierange,
         )
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         return {"error": error}
@@ -106,7 +109,7 @@ class GamryExec(Executor):
         """Return data and status from dtaq event sink."""
         resp = self.driver.get_data(self.poll_rate)
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
-        status = HloStatus.active if resp.status=="busy" else HloStatus.finished
+        status = HloStatus.active if resp.status == "busy" else HloStatus.finished
         return {"error": error, "status": status, "data": resp.data}
 
     async def _post_exec(self):
