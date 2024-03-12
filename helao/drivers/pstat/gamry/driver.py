@@ -73,9 +73,11 @@ class GamryDriver(HelaoDriver):
             self.model = GAMRY_DEVICES[self.device_name.split("-")[0]]
             self.pstat = client.CreateObject(self.model.device)
             self.pstat.Init(self.device_name)
+            self.pstat.Open()
             logger.info(
-                f"initialized {self.device_name} on device_id {self.device_id}"
+                f"connected to {self.device_name} on device_id {self.device_id}"
             )
+
             self.ready = True
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
@@ -186,11 +188,6 @@ class GamryDriver(HelaoDriver):
                 raise TypeError(
                     "dtaqsink is not of type DummySink. Another technique may be running."
                 )
-
-            self.pstat.Open()
-            logger.info(
-                f"connected to {self.device_name} on device_id {self.device_id}"
-            )
 
             # apply initial configuration
             self.pstat.SetCell(self.GamryCOM.CellOff)
@@ -331,7 +328,7 @@ class GamryDriver(HelaoDriver):
             # run data acquisition
             self.events = client.GetEvents(self.dtaq, self.dtaqsink)
             self.dtaq.Run(True)
-            time.sleep(0.01)
+            # time.sleep(0.01)
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="measurement started",
@@ -355,7 +352,7 @@ class GamryDriver(HelaoDriver):
         return response
 
     def cleanup(self):
-        """Release state objects."""
+        """Release state objects but don't close pstat."""
         try:
             self.pstat.SetCell(self.GamryCOM.CellOff)
             self.events = None
@@ -401,7 +398,6 @@ class GamryDriver(HelaoDriver):
             else:
                 status = DriverStatus.ok
             self.counter = total_points
-            logger.info(f"dtaq is {sink_state}")
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message=sink_state,
