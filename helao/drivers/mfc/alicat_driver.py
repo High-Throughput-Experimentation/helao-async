@@ -348,6 +348,7 @@ class AliCatMFC:
 class MfcExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.start_time = time.time()
         self.device_name = self.active.action.action_params["device_name"]
         # current plan is 1 flow controller per COM
         self.active.base.print_message("MfcExec initialized.")
@@ -634,11 +635,26 @@ class MfcConstConcExec(MfcExec):
     async def _exec(self):
         "Begin loop."
         self.start_time = time.time()
+        self.last_acq_time = self.start_time
+        self.last_acq_flow = 0
+        self.total_scc = 0
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
         """Read flow from live buffer."""
         iter_time = time.time()
+        live_dict, _ = self.active.base.get_lbuf(self.device_name)
+        live_flow = max(live_dict["mass_flow"], 0)
+        iter_time = time.time()
+        elapsed_time = iter_time - self.start_time
+        self.total_scc += (
+            (iter_time - self.last_acq_time)
+            / 60
+            * (live_flow + self.last_acq_flow)
+            / 2
+        )
+        self.last_acq_time = iter_time
+        self.last_acq_flow = live_flow
         fill_time, fill_scc = self.eval_conc()
         # self.active.base.print_message(f"eval_conc() returned {fill_time}, {fill_scc}")
         if (
@@ -679,6 +695,7 @@ class MfcConstConcExec(MfcExec):
     async def _post_exec(self):
         "Restore valve hold."
         self.active.base.print_message("MfcConstConcExec running cleanup methods.")
+        self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
