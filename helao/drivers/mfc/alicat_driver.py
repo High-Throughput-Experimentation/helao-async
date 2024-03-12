@@ -21,7 +21,6 @@ from collections import defaultdict
 from typing import Union, Optional
 
 import numpy as np
-import scipy.ndimage as ndi
 
 from helaocore.error import ErrorCodes
 from helao.servers.base import Base
@@ -114,7 +113,6 @@ class AliCatMFC:
         while self.polling:
             self.base.print_message("waiting for polling loop to stop")
             await asyncio.sleep(0.1)
-            
 
     async def poll_signal_loop(self):
         while True:
@@ -353,7 +351,6 @@ class MfcExec(Executor):
         self.device_name = self.active.action.action_params["device_name"]
         # current plan is 1 flow controller per COM
         self.active.base.print_message("MfcExec initialized.")
-        self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 
     async def _pre_exec(self):
@@ -373,6 +370,9 @@ class MfcExec(Executor):
     async def _exec(self):
         "Cancel valve hold."
         self.start_time = time.time()
+        self.last_acq_time = self.start_time
+        self.last_acq_flow = 0
+        self.total_scc = 0
         if self.flowrate_sccm is not None:
             openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
                 device_name=self.device_name,
@@ -384,8 +384,17 @@ class MfcExec(Executor):
         """Read flow from live buffer."""
         live_dict, epoch_s = self.active.base.get_lbuf(self.device_name)
         live_dict["epoch_s"] = epoch_s
+        live_flow = max(live_dict["mass_flow"], 0)
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
+        self.total_scc += (
+            (iter_time - self.last_acq_time)
+            / 60
+            * (live_flow + self.last_acq_flow)
+            / 2
+        )
+        self.last_acq_time = iter_time
+        self.last_acq_flow = live_flow
         if (self.duration < 0) or (elapsed_time < self.duration):
             status = HloStatus.active
         else:
@@ -400,6 +409,7 @@ class MfcExec(Executor):
     async def _post_exec(self):
         "Restore valve hold."
         self.active.base.print_message("MfcExec running cleanup methods.")
+        self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
@@ -430,6 +440,9 @@ class PfcExec(MfcExec):
     async def _exec(self):
         "Cancel valve hold."
         self.start_time = time.time()
+        self.last_acq_time = self.start_time
+        self.last_acq_flow = 0
+        self.total_scc = 0
         if self.pressure_psia is not None:
             openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
                 device_name=self.device_name,
@@ -473,12 +486,26 @@ class MfcConstPresExec(MfcExec):
     async def _exec(self):
         "Cancel valve hold."
         self.start_time = time.time()
+        self.last_acq_time = self.start_time
+        self.last_acq_flow = 0
+        self.total_scc = 0
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
         """Read flow from live buffer."""
         iter_time = time.time()
         live_dict, _ = self.active.base.get_lbuf(self.device_name)
+        live_flow = max(live_dict["mass_flow"], 0)
+        iter_time = time.time()
+        elapsed_time = iter_time - self.start_time
+        self.total_scc += (
+            (iter_time - self.last_acq_time)
+            / 60
+            * (live_flow + self.last_acq_flow)
+            / 2
+        )
+        self.last_acq_time = iter_time
+        self.last_acq_flow = live_flow
         fill_time, fill_scc = self.eval_pressure(live_dict["pressure"])
         if (
             fill_time
@@ -518,6 +545,7 @@ class MfcConstPresExec(MfcExec):
     async def _post_exec(self):
         "Restore valve hold."
         self.active.base.print_message("MfcConstPresExec running cleanup methods.")
+        self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
@@ -612,7 +640,7 @@ class MfcConstConcExec(MfcExec):
         """Read flow from live buffer."""
         iter_time = time.time()
         fill_time, fill_scc = self.eval_conc()
-        # self.active.base.print_message(f"eval_conc() returned {fill_time}, {fill_scc}") 
+        # self.active.base.print_message(f"eval_conc() returned {fill_time}, {fill_scc}")
         if (
             fill_time > 0
             and not self.filling
@@ -929,7 +957,7 @@ class FlowMeter(object):
             holdlockd[key] = has_stat
             if has_stat:
                 values.pop(values.index(stat))
-        
+
         if address != self.address:
             raise ValueError("Flow controller address mismatch.")
         if len(values) == 5 and len(self.status_keys) == 6:
