@@ -1824,28 +1824,30 @@ class Active:
                     f" {[action.data_stream_status for action in self.action_list]}",
                     info=True,
                 )
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.1)
                 retry_counter += 1
-            for action in self.action_list:
-                if action.data_stream_status != HloStatus.active:
-                    self.enqueue_data_nowait(
-                        datamodel=DataModel(
-                            data={}, errors=[], status=HloStatus.finished
-                        )
-                    )
-                    self.base.print_message(
-                        f"Setting datastream to finished:"
-                        f" {[action.data_stream_status for action in self.action_list]}",
-                        info=True,
-                    )
-            # self.action_list[-1] is the very first action
-            if self.action_list[-1].manual_action:
-                await self.finish_manual_action()
 
             self.base.print_message("checking if all queued data has written.")
             while self.num_data_queued > self.num_data_written:
                 self.base.print_message(f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 1 second.")
-                await asyncio.sleep(1)
+                for action in self.action_list:
+                    if action.data_stream_status != HloStatus.active:
+                        await self.enqueue_data(
+                            datamodel=DataModel(
+                                data={}, errors=[], status=HloStatus.finished
+                            )
+                        )
+                        self.base.print_message(
+                            f"Setting datastream to finished:"
+                            f" {action.data_stream_status}",
+                            info=True,
+                        )
+                asyncio.sleep(0.1)
+
+            # self.action_list[-1] is the very first action
+            if self.action_list[-1].manual_action:
+                await self.finish_manual_action()
+
             # all actions are finished
             self.base.print_message("finishing data logging.")
             for filekey in self.file_conn_dict:
