@@ -887,7 +887,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # =============================================================================
 
 def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization performed previously
-    sequence_version: int = 6, #4 new threshold criteria 5, sample purgetime, 6 no preclean
+    sequence_version: int = 7, #4 new threshold criteria 5, sample purgetime, 6 no preclean 7 remove unused params
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [2000,2000, 2000],
@@ -910,22 +910,22 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
     recirculation_rate_uL_min: int = 10000,
     
 #    HSpurge_duration: float = 15,
-    DeltaDilute1_duration: float = 0,
+  #  DeltaDilute1_duration: float = 0,
     #initcleans: int = 3,
     drainrecirc: bool = True,
     recirculation_duration: float = 60,
-    drainclean_volume_ul: float = 10000,
+  #  drainclean_volume_ul: float = 10000,
     #headspace_purge_cycles: int = 2,
 #    liquid_purge_cycles: int = 1,
-    headspace_co2measure_duration: float = 30,
-    clean_co2measure_duration: float = 120,
+  #  headspace_co2measure_duration: float = 30,
+  #  clean_co2measure_duration: float = 120,
     SamplePurge_duration: float = 60,
-    LiquidCleanPurge_duration: float = 100,
-    use_co2_check: bool = False,
-    clean_co2_ppm_thresh: float = 51500,
-    max_repeats: int = 5,
-    purge_if: Union[str, float] = 0.03,
-    need_fill: bool = False,
+  #  LiquidCleanPurge_duration: float = 100,
+  #  use_co2_check: bool = False,
+  #  clean_co2_ppm_thresh: float = 51500,
+  #  max_repeats: int = 5,
+  #  purge_if: Union[str, float] = 0.03,
+  #  need_fill: bool = False,
     
 ):
 
