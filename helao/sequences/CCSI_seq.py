@@ -887,7 +887,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # =============================================================================
 
 def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization performed previously
-    sequence_version: int = 7, #4 new threshold criteria 5, sample purgetime, 6 no preclean 7 remove unused params
+    sequence_version: int = 8, #4 new threshold criteria 5, sample purgetime, 6 no preclean 7 remove unused params 8 redundant loads
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [2000,2000, 2000],
@@ -940,21 +940,21 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "reservoir_gas_sample_no": initial_gas_sample_no,
             "volume_ul_cell_gas": gas_volume,
         })
-        if solnvolume != 0:
-            epm.add_experiment("CCSI_sub_load_liquid", {
-                "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
-                "volume_ul_cell_liquid": solnvolume,
-                "combine_True_False": False,
-                "water_True_False": False,
-            })
+        # if solnvolume != 0:
+        #     epm.add_experiment("CCSI_sub_load_liquid", {
+        #         "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
+        #         "volume_ul_cell_liquid": solnvolume,
+        #         "combine_True_False": False,
+        #         "water_True_False": False,
+        #     })
         watervolume = total_sample_volume_ul - solnvolume
-        if watervolume != 0:
-            epm.add_experiment("CCSI_sub_load_liquid", {
-                "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
-                "volume_ul_cell_liquid": watervolume,
-                "combine_True_False": True,
-                "water_True_False": True,
-            })
+        # if watervolume != 0:
+        #     epm.add_experiment("CCSI_sub_load_liquid", {
+        #         "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+        #         "volume_ul_cell_liquid": watervolume,
+        #         "combine_True_False": True,
+        #         "water_True_False": True,
+        #     })
 
         epm.add_experiment("CCSI_sub_cellfill", {
             "Solution_description": Solution_name,
@@ -969,6 +969,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
         epm.add_experiment("CCSI_sub_co2maintainconcentration", {
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
+            "pureco2_sample_no": pureco2_sample_no,
             "flowrate_sccm": flowrate_sccm,
             "flowramp_sccm": flowramp_sccm,
             "target_co2_ppm": target_co2_ppm,
@@ -976,10 +977,10 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "refill_freq_sec": refill_freq_sec,
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
-        epm.add_experiment("CCSI_sub_load_gas", {
-            "reservoir_gas_sample_no": pureco2_sample_no,
-            "volume_ul_cell_gas": 1, #need calculated volume from mfc maintain concentration 
-        })        
+        # epm.add_experiment("CCSI_sub_load_gas", {
+        #     "reservoir_gas_sample_no": pureco2_sample_no,
+        #     "volume_ul_cell_gas": 1, #need calculated volume from mfc maintain concentration 
+        # })        
         
         epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": 0,"recirculation":drainrecirc,"recirculation_duration":recirculation_duration})
 ##############################################3

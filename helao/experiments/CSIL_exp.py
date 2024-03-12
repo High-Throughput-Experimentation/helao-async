@@ -256,7 +256,7 @@ def CCSI_sub_headspace_purge_and_measure(
 
 def CCSI_sub_drain(
     experiment: Experiment,
-    experiment_version: int = 6,  
+    experiment_version: int = 7,  #empty cell accounting
     HSpurge_duration: float = 20,  
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
@@ -285,6 +285,9 @@ def CCSI_sub_drain(
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
 
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
+
+    apm.add(PAL_server, "archive_custom_unloadall", {})
+
     if apm.pars.recirculation:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, )
         apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration/3} )
@@ -968,7 +971,7 @@ def CCSI_sub_co2massdose(
 def CCSI_sub_co2maintainconcentration(
     experiment: Experiment,
     experiment_version: int = 2,
-    pureco2_sample_number: int = 1,
+    pureco2_sample_no: int = 1,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
@@ -1001,6 +1004,9 @@ def CCSI_sub_co2maintainconcentration(
         },
         nonblocking=True,
         technique_name="Measure_added_co2",
+        to_globalexp_params=[
+            "total_scc"
+        ],  
         process_finish=False,
         process_contrib=[
             ProcessContrib.action_params,
@@ -1020,6 +1026,12 @@ def CCSI_sub_co2maintainconcentration(
         },
         asc.no_wait,
         nonblocking=True,
+        technique_name="Adding_co2",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+        ],
     )
 
     apm.add(
@@ -1049,6 +1061,20 @@ def CCSI_sub_co2maintainconcentration(
         MFC_server,
         "cancel_acquire_flowrate",
         {},
+        technique_name="Measure_added_co2",
+        process_finish=True,
+    )
+
+    apm.add(
+        PAL_server,
+        "archive_custom_load",  
+        {
+            "custom": "cell1_we",
+            "load_sample_in": GasSample(
+                sample_no=apm.pars.pureco2_sample_no, machine_name=ORCH_HOST
+            ).model_dump(),
+        },
+        from_globalexp_params={"total_scc": "volume_ml"},
     )
 
     return apm.action_list
