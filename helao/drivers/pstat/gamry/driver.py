@@ -308,6 +308,7 @@ class GamryDriver(HelaoDriver):
                 + [mapped_signal_params[key] for key in technique.signal.param_keys]
                 + [getattr(self.GamryCOM, self.technique.signal.mode.value)]
             )
+            logger.debug(signal_paramlist)
             self.signal = client.CreateObject(technique.signal.name)
             self.signal.Init(*signal_paramlist)
             self.pstat.SetSignal(self.signal)
