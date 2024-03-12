@@ -315,6 +315,7 @@ class GamryDriver(HelaoDriver):
             self.signal = client.CreateObject(technique.signal.name)
             self.signal.Init(*signal_paramlist)
             self.pstat.SetSignal(self.signal)
+            time.sleep(0.01)
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="setup complete",
