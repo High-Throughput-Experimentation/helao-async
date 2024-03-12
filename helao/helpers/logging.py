@@ -9,8 +9,8 @@ Usage:
 
 """
 
-import logging
-from logging.handlers import TimedRotatingFileHandler
+import picologging as logging
+from picologging.handlers import TimedRotatingFileHandler
 from colorlog import ColoredFormatter
 import tempfile
 import os

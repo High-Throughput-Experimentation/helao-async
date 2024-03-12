@@ -30,6 +30,7 @@ dependencies:
   - numpy
   - pandas
   - paramiko
+  - picologging
   - pip
   - psutil
   - psycopg2
