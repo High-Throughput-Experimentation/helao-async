@@ -46,6 +46,7 @@ dependencies:
   - charset-normalizer=3.3.2
   - click=8.1.7
   - colorama=0.4.6
+  - colorlog=6.8.2
   - comm=0.2.1
   - comtypes=1.2.1
   - contourpy=1.2.0

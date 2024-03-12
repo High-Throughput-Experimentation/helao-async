@@ -17,6 +17,7 @@ dependencies:
   - boto3
   - botocore
   - colorama
+  - colorlog
   - fastapi
   - filelock
   - git
