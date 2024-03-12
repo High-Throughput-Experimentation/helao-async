@@ -33,14 +33,14 @@ def make_logger(
     format_string = "%(asctime)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(levelname)-8s %(message)s"
     formatter = logging.Formatter(format_string)
     # for stream output
-    colored_format_string = "%(log_color)s%(asctime)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(levelname)-8s%(reset)s %(blue)s%(message)s"
+    colored_format_string = "%(log_color)s%(asctime)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(levelname)-8s%(reset)s %(light_blue)s%(message)s"
     colored_formatter = ColoredFormatter(
         colored_format_string,
         log_colors={
             "DEBUG": "cyan",
-            "INFO": "green",
+            "INFO": "light_green",
             "WARNING": "yellow",
-            "ERROR": "red",
+            "ERROR": "light_red",
             "CRITICAL": "red,bg_white",
         },
         secondary_log_colors={},
