@@ -2543,6 +2543,7 @@ def ADSS_PA_CV_TRI_new(
     ReturnLineReverseWait_sec: float = 5,
     
     #cell clean info
+    number_of_cleans: int = 2,
     clean_volume_ul: float = 12000,
     clean_recirculate_sec: float = 60,
     clean_drain_sec: float = 120,
@@ -2753,25 +2754,26 @@ def ADSS_PA_CV_TRI_new(
         #clean cell
         if move_to_clean_and_clean:
             epm.add_experiment("ADSS_sub_move_to_clean_cell", {})
-            epm.add_experiment("ADSS_sub_clean_cell",
-                            {
-                                "Clean_volume_ul": clean_volume_ul,
-                                "ReturnLineWait_s": clean_recirculate_sec,
-                                "DrainWait_s": clean_drain_sec,
-                            }
-                        )
-            #if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
-            if clean_volume_ul > 10000:
-                volume = 6000 + clean_volume_ul
-            else:
-                volume = clean_volume_ul
+            for i in range(number_of_cleans):
+                epm.add_experiment("ADSS_sub_clean_cell",
+                                {
+                                    "Clean_volume_ul": clean_volume_ul,
+                                    "ReturnLineWait_s": clean_recirculate_sec,
+                                    "DrainWait_s": clean_drain_sec,
+                                }
+                            )
+                #if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
+                if clean_volume_ul > 10000:
+                    volume = 6000 + clean_volume_ul
+                else:
+                    volume = clean_volume_ul
 
-            epm.add_experiment("ADSS_sub_refill_syringe", {
-                "syringe": "waterclean",
-                "fill_volume_ul": volume,
-                "Syringe_rate_ulsec": 300,
-                }
-            )       
+                epm.add_experiment("ADSS_sub_refill_syringe", {
+                    "syringe": "waterclean",
+                    "fill_volume_ul": volume,
+                    "Syringe_rate_ulsec": 300,
+                    }
+                )  
   
     #for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
     for lpl, upl, sample_no in zip(LPL_list, UPL_list, plate_sample_no_list):
@@ -3202,25 +3204,26 @@ def ADSS_PA_CV_TRI_new(
 
         if move_to_clean_and_clean:
             epm.add_experiment("ADSS_sub_move_to_clean_cell", {})
-            epm.add_experiment("ADSS_sub_clean_cell",
-                            {
-                                "Clean_volume_ul": clean_volume_ul,
-                                "ReturnLineWait_s": clean_recirculate_sec,
-                                "DrainWait_s": clean_drain_sec,
-                            }
-                        )
-            #if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
-            if clean_volume_ul > 10000:
-                volume = 6000 + clean_volume_ul
-            else:
-                volume = clean_volume_ul
+            for i in range(number_of_cleans):
+                epm.add_experiment("ADSS_sub_clean_cell",
+                                {
+                                    "Clean_volume_ul": clean_volume_ul,
+                                    "ReturnLineWait_s": clean_recirculate_sec,
+                                    "DrainWait_s": clean_drain_sec,
+                                }
+                            )
+                #if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
+                if clean_volume_ul > 10000:
+                    volume = 6000 + clean_volume_ul
+                else:
+                    volume = clean_volume_ul
 
-            epm.add_experiment("ADSS_sub_refill_syringe", {
-                "syringe": "waterclean",
-                "fill_volume_ul": volume,
-                "Syringe_rate_ulsec": 300,
-                }
-            )
+                epm.add_experiment("ADSS_sub_refill_syringe", {
+                    "syringe": "waterclean",
+                    "fill_volume_ul": volume,
+                    "Syringe_rate_ulsec": 300,
+                    }
+                )
 
     #ref measurement at end of sequence
     if measure_ref_Pt_at_end:
@@ -3413,24 +3416,25 @@ def ADSS_PA_CV_TRI_new(
         #clean cell
         if move_to_clean_and_clean:
             epm.add_experiment("ADSS_sub_move_to_clean_cell", {})
-            epm.add_experiment("ADSS_sub_clean_cell",
-                            {
-                                "Clean_volume_ul": clean_volume_ul,
-                                "ReturnLineWait_s": clean_recirculate_sec,
-                                "DrainWait_s": clean_drain_sec,
-                            }
-                        )
-            #if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
-            if clean_volume_ul > 10000:
-                volume = 6000 + clean_volume_ul
-            else:
-                volume = clean_volume_ul
+            for i in range(number_of_cleans):
+                epm.add_experiment("ADSS_sub_clean_cell",
+                                {
+                                    "Clean_volume_ul": clean_volume_ul,
+                                    "ReturnLineWait_s": clean_recirculate_sec,
+                                    "DrainWait_s": clean_drain_sec,
+                                }
+                            )
+                #if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
+                if clean_volume_ul > 10000:
+                    volume = 6000 + clean_volume_ul
+                else:
+                    volume = clean_volume_ul
 
-            epm.add_experiment("ADSS_sub_refill_syringe", {
-                "syringe": "waterclean",
-                "fill_volume_ul": volume,
-                "Syringe_rate_ulsec": 300,
-                }
-            )       
+                epm.add_experiment("ADSS_sub_refill_syringe", {
+                    "syringe": "waterclean",
+                    "fill_volume_ul": volume,
+                    "Syringe_rate_ulsec": 300,
+                    }
+                )       
 
     return epm.experiment_plan_list  # returns complete experiment list
