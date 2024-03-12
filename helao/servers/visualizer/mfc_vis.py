@@ -302,6 +302,8 @@ class C_mfc:
                 source=self.datasource,
                 legend_label=f"{dev_name} rolling mean",
             )
+        self.plot.legend.border_line_alpha = 0.2
+        self.plot.legend.background_fill_alpha = 0.2
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active
