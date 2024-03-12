@@ -244,6 +244,11 @@ async def gamry_dyn_endpoints(app=None):
             use 4bit bitmask for triggers
             IErange depends on gamry model used (test actual limit before using)"""
             active = await app.base.setup_and_contain_action()
+            # patch scanrate and hold times
+            for k in ('ScanInit__V_s', 'ScanApex__V_s', 'ScanFinal__V_s'):
+                active.action.action_params[k] = active.action.action_params["ScanRate__V_s"]
+            for k in ("holdtime0__s", "holdtime1__s", "holdtime2__s"):
+                active.action.action_params[k] = 0.0
             active.action.action_abbr = "CV"
             executor = GamryExec(active=active, oneoff=False, technique=TECH_CV)
             active_action_dict = active.start_executor(executor)

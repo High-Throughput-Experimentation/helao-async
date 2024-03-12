@@ -328,7 +328,6 @@ class GamryDriver(HelaoDriver):
             # run data acquisition
             self.events = client.GetEvents(self.dtaq, self.dtaqsink)
             self.dtaq.Run(True)
-            # time.sleep(0.01)
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="measurement started",
