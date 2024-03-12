@@ -291,6 +291,23 @@ async def gamry_dyn_endpoints(app=None):
         ):
             """Measure pulsed voltammetry"""
             active = await app.base.setup_and_contain_action()
+
+            # custom signal array can't be done with mapping, generate array here
+            Vinit = active.action.action_params["Vinit__V"]
+            Tinit = active.action.action_params["Tinit__s"]
+            Vstep = active.action.action_params["Vstep__V"]
+            Tstep = active.action.action_params["Tstep__s"]
+            AcqInt = active.action.action_params["AcqInterval__s"]
+
+            cycle_time = Tinit + Tstep
+            points_per_cycle = round(
+                cycle_time / AcqInt
+            )
+            active.action.action_params["AcqPointsPerCycle"] = points_per_cycle
+            active.action.action_params["SignalArray__V"] = [
+                Vinit if i * AcqInt <= Tinit else Vstep for i in range(points_per_cycle)
+            ]
+
             active.action.action_abbr = "RCA"
             executor = GamryExec(active=active, oneoff=False, technique=TECH_RCA)
             active_action_dict = active.start_executor(executor)

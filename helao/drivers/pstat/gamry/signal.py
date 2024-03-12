@@ -111,12 +111,10 @@ ISIGNAL_RUPDN = GamrySignal(
 VSIGNAL_ARRAY = GamrySignal(
     name="GamryCOM.GamrySignalArray",
     param_keys=[
-        "Vinit__V",
-        "Tinit__s",
-        "Vstep__V",
-        "Tstep__s",
         "Cycles",
         "AcqInterval__s",
+        "AcqPointsPerCycle",
+        "SignalArray__V"
     ],
     mode=ControlMode.PstatMode,
 )
@@ -124,12 +122,10 @@ VSIGNAL_ARRAY = GamrySignal(
 ISIGNAL_ARRAY = GamrySignal(
     name="GamryCOM.GamrySignalArray",
     param_keys=[
-        "Iinit__A",
-        "Tinit__s",
-        "Istep__A",
-        "Tstep__s",
         "Cycles",
         "AcqInterval__s",
+        "AcqPointsPerCycle",
+        "SignalArray__V"
     ],
     mode=ControlMode.GstatMode,
 )
