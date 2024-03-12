@@ -63,11 +63,11 @@ VSIGNAL_RUPDN = GamrySignal(
         "ScanInit__V_s",
         "ScanApex__V_s",
         "ScanFinal__V_s",
-        "holdtime0__s",
-        "holdtime1__s",
-        "holdtime2__s",
+        "HoldTime0__s",  # hold at Apex 1 in seconds
+        "HoldTime1__s",  # hold at Apex 2 in seconds
+        "HoldTime2__s",  # Time to hold at Vfinal in seconds
         "AcqInterval__s",
-        "cycles",
+        "Cycles",
     ],
     mode=ControlMode.PstatMode,
 )

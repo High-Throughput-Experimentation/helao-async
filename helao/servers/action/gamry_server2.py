@@ -247,7 +247,7 @@ async def gamry_dyn_endpoints(app=None):
             # patch scanrate and hold times
             for k in ('ScanInit__V_s', 'ScanApex__V_s', 'ScanFinal__V_s'):
                 active.action.action_params[k] = active.action.action_params["ScanRate__V_s"]
-            for k in ("holdtime0__s", "holdtime1__s", "holdtime2__s"):
+            for k in ("HoldTime0__s", "HoldTime1__s", "HoldTime2__s"):
                 active.action.action_params[k] = 0.0
             active.action.action_abbr = "CV"
             executor = GamryExec(active=active, oneoff=False, technique=TECH_CV)
