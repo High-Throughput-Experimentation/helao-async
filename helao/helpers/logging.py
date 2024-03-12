@@ -30,10 +30,10 @@ def make_logger(
     """Creates a logger (use once per process)."""
     log_dir = tempfile.gettempdir() if log_dir is None else log_dir
     log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
-    format_string = "%(asctime)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(levelname)-8s %(message)s"
+    format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
     formatter = logging.Formatter(format_string)
     # for stream output
-    colored_format_string = "%(log_color)s%(asctime)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(levelname)-8s%(reset)s %(light_blue)s%(message)s"
+    colored_format_string = "%(log_color)s%(asctime)s | %(levelname)-8s | %(name)s %(reset)s%(white)s:: %(funcName)s @ %(filename)s:%(lineno)d - %(reset)s%(light_blue)s%(message)s"
     colored_formatter = ColoredFormatter(
         colored_format_string,
         log_colors={
