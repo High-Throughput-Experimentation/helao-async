@@ -14,7 +14,7 @@ class GamrySignal:
     mode: ControlMode
     param_keys: List[str] = field(default_factory=list)
     init_keys: List[str] = field(default_factory=list)
-    map_keys: Dict[Union[int, float, str]] = field(default_factory=dict)
+    map_keys: Dict[str, Union[int, float, str]] = field(default_factory=dict)
 
 
 VSIGNAL_RAMP = GamrySignal(
