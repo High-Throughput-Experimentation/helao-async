@@ -12,6 +12,9 @@ __all__ = ["makeApp"]
 import asyncio
 import time
 from typing import Optional, List
+from collections import defaultdict, deque
+
+import numpy as np
 from fastapi import Body, Query
 
 from helaocore.error import ErrorCodes
@@ -50,6 +53,7 @@ class GamryExec(Executor):
         try:
             self.poll_rate = 0.01  # pump events every 10 millisecond
             self.start_time = time.time()
+            self.data_buffer = defaultdict(lambda: deque(maxlen=1000))
 
             # link attrs for convenience
             self.action_params = self.active.action.action_params
@@ -108,12 +112,22 @@ class GamryExec(Executor):
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
         resp = self.driver.get_data(self.poll_rate)
+        # populate executor buffer for output calculation
+        for k, v in resp.data.items():
+            self.data_buffer[k].extend(v)
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         status = HloStatus.active if resp.status == "busy" else HloStatus.finished
         return {"error": error, "status": status, "data": resp.data}
 
     async def _post_exec(self):
         resp = self.driver.cleanup()
+
+        # parse calculate outputs from data buffer:
+        for k in ["t_s", "Ewe_V", "I_A"]:
+            if k in self.data_buffer:
+                meanv = np.nanmean(np.array(self.data_buffer[k])[-5:])
+                self.active.action.action_params[f"{k}__mean_final"] = meanv
+
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": {}}
 

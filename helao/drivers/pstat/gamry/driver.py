@@ -106,75 +106,6 @@ class GamryDriver(HelaoDriver):
             )
         return response
 
-    def stop(self) -> DriverResponse:
-        """General stop method to abort all active methods e.g. motion, I/O, compute."""
-        try:
-            self.dtaq.Run(False)
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception:
-            logger.error("stop failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-        return response
-
-    def reset(self) -> DriverResponse:
-        """Reinitialize driver, force-close old connection if necessary."""
-        try:
-            process_ids = {
-                p.pid: p
-                for p in psutil.process_iter(["name", "connections"])
-                if p.info["name"].startswith("GamryCom")
-            }
-
-            for pid in process_ids:
-                logger.info(f"killing GamryCOM on PID: {pid}")
-                p = psutil.Process(pid)
-                for _ in range(3):
-                    p.terminate()
-                    time.sleep(0.5)
-                    if not psutil.pid_exists(p.pid):
-                        logger.info("Successfully terminated GamryCom.")
-                if psutil.pid_exists(p.pid):
-                    logger.warning(
-                        "Failed to terminate server GamryCom after 3 retries."
-                    )
-                    raise SystemError(f"GamryCOM on PID: {pid} is still running.")
-            self.GamryCOM = client.GetModule(
-                ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
-            )
-            self.pstat = None
-            self.ready = False
-            self.connect()
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception:
-            logger.error("reset error", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-        return response
-
-    def disconnect(self) -> DriverResponse:
-        """Release connection to resource."""
-        try:
-            self.pstat.SetCell(self.GamryCOM.CellOff)
-            self.pstat.Close()
-            self.pstat = None
-            self.ready = False
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception:
-            logger.error("disconnect failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-        return response
-
     def setup(
         self,
         technique: GamryTechnique,
@@ -370,29 +301,6 @@ class GamryDriver(HelaoDriver):
             self.cleanup()
         return response
 
-    def cleanup(self):
-        """Release state objects but don't close pstat."""
-        try:
-            self.pstat.SetCell(self.GamryCOM.CellOff)
-            self.events = None
-            self.dtaq = None
-            self.dtaqsink = DUMMY_SINK
-            self.technique = None
-            self.signal = None
-            self.counter = 0
-            response = DriverResponse(
-                response=DriverResponseType.success,
-                message="measurement started",
-                status=DriverStatus.ok,
-            )
-        except Exception:
-            logger.error("cleanup failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed,
-                status=DriverStatus.error,
-            )
-        return response
-
     def get_data(self, pump_rate: float) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
@@ -431,7 +339,99 @@ class GamryDriver(HelaoDriver):
             )
         return response
 
-    def shutdown(self):
+    def stop(self) -> DriverResponse:
+        """General stop method to abort all active methods e.g. motion, I/O, compute."""
+        try:
+            self.dtaq.Run(False)
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            logger.error("stop failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+    def cleanup(self):
+        """Release state objects but don't close pstat."""
+        try:
+            self.pstat.SetCell(self.GamryCOM.CellOff)
+            self.events = None
+            self.dtaq = None
+            self.dtaqsink = DUMMY_SINK
+            self.technique = None
+            self.signal = None
+            self.counter = 0
+            response = DriverResponse(
+                response=DriverResponseType.success,
+                message="measurement started",
+                status=DriverStatus.ok,
+            )
+        except Exception:
+            logger.error("cleanup failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed,
+                status=DriverStatus.error,
+            )
+        return response
+
+    def disconnect(self) -> DriverResponse:
+        """Release connection to resource."""
+        try:
+            self.pstat.SetCell(self.GamryCOM.CellOff)
+            self.pstat.Close()
+            self.pstat = None
+            self.ready = False
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            logger.error("disconnect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+    def reset(self) -> DriverResponse:
+        """Reinitialize driver, force-close old connection if necessary."""
+        try:
+            process_ids = {
+                p.pid: p
+                for p in psutil.process_iter(["name", "connections"])
+                if p.info["name"].startswith("GamryCom")
+            }
+
+            for pid in process_ids:
+                logger.info(f"killing GamryCOM on PID: {pid}")
+                p = psutil.Process(pid)
+                for _ in range(3):
+                    p.terminate()
+                    time.sleep(0.5)
+                    if not psutil.pid_exists(p.pid):
+                        logger.info("Successfully terminated GamryCom.")
+                if psutil.pid_exists(p.pid):
+                    logger.warning(
+                        "Failed to terminate server GamryCom after 3 retries."
+                    )
+                    raise SystemError(f"GamryCOM on PID: {pid} is still running.")
+            self.GamryCOM = client.GetModule(
+                ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
+            )
+            self.pstat = None
+            self.ready = False
+            self.connect()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            logger.error("reset error", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+    def shutdown(self) -> None:
         """Pass-through shutdown events for BaseAPI."""
         self.cleanup()
         self.disconnect()
