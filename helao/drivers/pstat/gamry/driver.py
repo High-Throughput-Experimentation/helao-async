@@ -260,7 +260,11 @@ class GamryDriver(HelaoDriver):
             self.dtaq = client.CreateObject(technique.dtaq.name)
             dtaq_init_args = (signal_params[x] for x in technique.signal.init_keys)
             if technique.dtaq.dtaq_type is not None:
-                self.dtaq.Init(self.pstat, technique.dtaq.dtaq_type, *dtaq_init_args)
+                self.dtaq.Init(
+                    self.pstat,
+                    getattr(self.GamryCOM, technique.dtaq.dtaq_type.value),
+                    *dtaq_init_args,
+                )
             else:
                 self.dtaq.Init(self.pstat, *dtaq_init_args)
             if technique.set_decimation is not None:
@@ -388,7 +392,7 @@ class GamryDriver(HelaoDriver):
                 }
             else:
                 data_dict = {}
-            
+
             sink_state = self.dtaqsink.status
             if sink_state == "measuring" or self.counter < total_points:
                 status = DriverStatus.busy
