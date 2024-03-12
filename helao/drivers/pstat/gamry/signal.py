@@ -1,3 +1,9 @@
+"""Dataclass and instances for Gamry potentiostat signals.
+
+Parameter keys are ordered according to GamryCOM.GamrySignal* Init() args, and names are
+modified as little as possible with the exception of ScanRate -> AcqInterval__s.
+
+"""
 from dataclasses import dataclass, field
 from typing import List, Dict, Union
 from enum import StrEnum

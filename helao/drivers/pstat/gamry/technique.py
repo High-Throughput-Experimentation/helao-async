@@ -1,3 +1,5 @@
+"""Dataclass and instances for Gamry potentiostat techniques."""
+
 from dataclasses import dataclass
 from typing import Optional, List
 from enum import StrEnum
