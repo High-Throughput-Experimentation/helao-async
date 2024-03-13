@@ -73,13 +73,14 @@ class BaseAPI(HelaoFastAPI):
                     action_dict["action_params"] = action_dict.get("action_params", {})
                     action_dict["action_params"]["delayed_on_actserv"] = True
                     extra_params = {}
+                    action = Action(**action_dict)
                     for d in (
                         request.query_params,
                         request.path_params,
                     ):
                         for k, v in d.items():
                             extra_params[k] = eval_val(v)
-                    action = Action(**action_dict)
+                            setattr(action, k, eval_val(v))
                     action.action_name = request.url.path.strip("/").split("/")[-1]
                     action.action_server = MachineModel(
                         server_name=server_key, machine_name=gethostname().lower()
@@ -93,7 +94,7 @@ class BaseAPI(HelaoFastAPI):
                     self.base.endpoint_queues[endpoint].put(
                         (
                             action,
-                            extra_params,
+                            {},
                         )
                     )
             else:
