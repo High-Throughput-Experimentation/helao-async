@@ -2464,6 +2464,7 @@ def ADSS_PA_CV_TRI_new(
     purge_wait_O2_to_N2_min: int = 15,
 
     #electrolyte info
+    rinse_with_electrolyte_bf_prefill: bool = True,
     ph: float = 1.24,
     liquid_sample_no: int = 1053,
     liquid_sample_volume_ul: float = 7000,
@@ -2585,6 +2586,39 @@ def ADSS_PA_CV_TRI_new(
             }
         )
 
+        #rinse with electrolyte to remove cleaning liquid residuals
+        if rinse_with_electrolyte_bf_prefill:
+            epm.add_experiment(
+                "ADSS_sub_cellfill_prefilled",
+                {
+                    "Solution_volume_ul": 3000,
+                    "Syringe_rate_ulsec": 300,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "forward",
+                    "wait_time_s": 60,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_drain_cell",
+                {
+                    "DrainWait_s": 30,
+                    "ReturnLineReverseWait_s": 5,
+                #    "ResidualWait_s": ResidualWait_s,
+                }
+            )
+            epm.add_experiment("ADSS_sub_refill_syringe", {
+                "syringe": "electrolyte",
+                "fill_volume_ul": 3000,
+                "Syringe_rate_ulsec": 300,
+                }
+            )         
+
+
+        #electrolyte filling for experiment
         epm.add_experiment(
             "ADSS_sub_cellfill_prefilled",
             {
@@ -2810,6 +2844,38 @@ def ADSS_PA_CV_TRI_new(
             }
         )
 
+        #rinse with electrolyte to remove cleaning liquid residuals
+        if rinse_with_electrolyte_bf_prefill:
+            epm.add_experiment(
+                "ADSS_sub_cellfill_prefilled",
+                {
+                    "Solution_volume_ul": 3000,
+                    "Syringe_rate_ulsec": 300,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "forward",
+                    "wait_time_s": 60,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_drain_cell",
+                {
+                    "DrainWait_s": 30,
+                    "ReturnLineReverseWait_s": 5,
+                #    "ResidualWait_s": ResidualWait_s,
+                }
+            )
+            epm.add_experiment("ADSS_sub_refill_syringe", {
+                "syringe": "electrolyte",
+                "fill_volume_ul": 3000,
+                "Syringe_rate_ulsec": 300,
+                }
+            )
+
+        #electrolyte filling for experiment
         if not use_current_electrolyte:
             epm.add_experiment(
                 "ADSS_sub_cellfill_prefilled",
@@ -3247,6 +3313,38 @@ def ADSS_PA_CV_TRI_new(
             }
         )
 
+        #rinse with electrolyte to remove cleaning liquid residuals
+        if rinse_with_electrolyte_bf_prefill:
+            epm.add_experiment(
+                "ADSS_sub_cellfill_prefilled",
+                {
+                    "Solution_volume_ul": 3000,
+                    "Syringe_rate_ulsec": 300,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "forward",
+                    "wait_time_s": 60,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_drain_cell",
+                {
+                    "DrainWait_s": 30,
+                    "ReturnLineReverseWait_s": 5,
+                #    "ResidualWait_s": ResidualWait_s,
+                }
+            )
+            epm.add_experiment("ADSS_sub_refill_syringe", {
+                "syringe": "electrolyte",
+                "fill_volume_ul": 3000,
+                "Syringe_rate_ulsec": 300,
+                }
+            )
+
+        #electrolyte filling for experiment
         epm.add_experiment(
             "ADSS_sub_cellfill_prefilled",
             {
