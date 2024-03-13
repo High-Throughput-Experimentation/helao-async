@@ -999,7 +999,7 @@ def CCSI_sub_co2maintainconcentration(
         "acquire_flowrate",
         {
             "flowrate_sccm": None,
-            "duration": -1,
+            "duration": apm.pars.co2measure_duration + 60,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
         #nonblocking=True,
@@ -1007,7 +1007,7 @@ def CCSI_sub_co2maintainconcentration(
         to_globalexp_params=[
             "total_scc"
         ],  
-        process_finish=False,
+        process_finish=True,
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -1057,13 +1057,13 @@ def CCSI_sub_co2maintainconcentration(
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
-    apm.add(
-        MFC_server,
-        "cancel_acquire_flowrate",
-        {},
-        technique_name="Measure_added_co2",
-        process_finish=True,
-    )
+    # apm.add(
+    #     MFC_server,
+    #     "cancel_acquire_flowrate",
+    #     {},
+    #     technique_name="Measure_added_co2",
+    #     process_finish=True,
+    # )
 
     apm.add(
         PAL_server,
