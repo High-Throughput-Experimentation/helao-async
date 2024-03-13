@@ -144,6 +144,7 @@ class KDS100:
         self.sio.write(command_str)
         self.sio.flush()
         resp = [x.strip() for x in self.sio.readlines() if x.strip()]
+        print("polling status returned", resp)
         # look for "\x11" end of response character when POLL is on
         if resp:
             while not resp[-1].endswith("\x11"):
