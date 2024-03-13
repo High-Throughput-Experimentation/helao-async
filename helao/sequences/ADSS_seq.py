@@ -2465,6 +2465,9 @@ def ADSS_PA_CV_TRI_new(
 
     #electrolyte info
     rinse_with_electrolyte_bf_prefill: bool = True,
+    rinse_with_electrolyte_bf_prefill_volume_uL: float = 3000,
+    rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec: float = 30,
+    rinse_with_electrolyte_bf_prefill_drain_time_sec: float = 30,
     ph: float = 1.24,
     liquid_sample_no: int = 1053,
     liquid_sample_volume_ul: float = 7000,
@@ -2591,29 +2594,29 @@ def ADSS_PA_CV_TRI_new(
             epm.add_experiment(
                 "ADSS_sub_cellfill_prefilled",
                 {
-                    "Solution_volume_ul": 3000,
-                    "Syringe_rate_ulsec": 300,
+                    "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 }
             )
             epm.add_experiment(
                 "ADSS_sub_recirculate",
                 {
                     "direction_forward_or_reverse": "forward",
-                    "wait_time_s": 60,
+                    "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
                 }
             )
             epm.add_experiment(
                 "ADSS_sub_drain_cell",
                 {
-                    "DrainWait_s": 30,
+                    "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
                     "ReturnLineReverseWait_s": 5,
                 #    "ResidualWait_s": ResidualWait_s,
                 }
             )
             epm.add_experiment("ADSS_sub_refill_syringe", {
                 "syringe": "electrolyte",
-                "fill_volume_ul": 3000,
-                "Syringe_rate_ulsec": 300,
+                "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 }
             )         
 
@@ -2849,29 +2852,29 @@ def ADSS_PA_CV_TRI_new(
             epm.add_experiment(
                 "ADSS_sub_cellfill_prefilled",
                 {
-                    "Solution_volume_ul": 3000,
-                    "Syringe_rate_ulsec": 300,
+                    "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 }
             )
             epm.add_experiment(
                 "ADSS_sub_recirculate",
                 {
                     "direction_forward_or_reverse": "forward",
-                    "wait_time_s": 60,
+                    "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
                 }
             )
             epm.add_experiment(
                 "ADSS_sub_drain_cell",
                 {
-                    "DrainWait_s": 30,
+                    "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
                     "ReturnLineReverseWait_s": 5,
                 #    "ResidualWait_s": ResidualWait_s,
                 }
             )
             epm.add_experiment("ADSS_sub_refill_syringe", {
                 "syringe": "electrolyte",
-                "fill_volume_ul": 3000,
-                "Syringe_rate_ulsec": 300,
+                "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 }
             )
 
@@ -3318,29 +3321,29 @@ def ADSS_PA_CV_TRI_new(
             epm.add_experiment(
                 "ADSS_sub_cellfill_prefilled",
                 {
-                    "Solution_volume_ul": 3000,
-                    "Syringe_rate_ulsec": 300,
+                    "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 }
             )
             epm.add_experiment(
                 "ADSS_sub_recirculate",
                 {
                     "direction_forward_or_reverse": "forward",
-                    "wait_time_s": 60,
+                    "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
                 }
             )
             epm.add_experiment(
                 "ADSS_sub_drain_cell",
                 {
-                    "DrainWait_s": 30,
+                    "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
                     "ReturnLineReverseWait_s": 5,
                 #    "ResidualWait_s": ResidualWait_s,
                 }
             )
             epm.add_experiment("ADSS_sub_refill_syringe", {
                 "syringe": "electrolyte",
-                "fill_volume_ul": 3000,
-                "Syringe_rate_ulsec": 300,
+                "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 }
             )
 
