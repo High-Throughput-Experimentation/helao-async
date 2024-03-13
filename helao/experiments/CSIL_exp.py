@@ -1061,7 +1061,8 @@ def CCSI_sub_co2maintainconcentration(
         MFC_server,
         "cancel_acquire_flowrate",
         {},
-        start_condition=ActionStartCondition.wait_for_previous,        technique_name="Measure_added_co2",
+        asc.wait_for_previous,
+        technique_name="Measure_added_co2",
         process_finish=True,
     )
 
