@@ -1002,7 +1002,7 @@ def CCSI_sub_co2maintainconcentration(
             "duration": -1,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
-        nonblocking=True,
+        #nonblocking=True,
         technique_name="Measure_added_co2",
         to_globalexp_params=[
             "total_scc"
