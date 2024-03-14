@@ -1702,7 +1702,10 @@ class Active:
             # add the new one to active file conn dict
             self.file_conn_dict[new_file_conn.params.file_conn_key] = new_file_conn
             # and add the new file_conn_uuid to the new split action
-            self.action.file_conn_keys.append(new_file_conn.params.file_conn_key)
+            self.action.file_conn_keys = [new_file_conn.params.file_conn_key] + self.action.file_conn_keys
+            self.num_data_queued = 0
+            self.num_data_written = 0
+
 
         # TODO:
         # update other action settings?
