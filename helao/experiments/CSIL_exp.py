@@ -971,7 +971,7 @@ def CCSI_sub_co2massdose(
 
 def CCSI_sub_co2maintainconcentration(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3, #time into acquire
     pureco2_sample_no: int = 1,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
@@ -1000,7 +1000,7 @@ def CCSI_sub_co2maintainconcentration(
         "acquire_flowrate",
         {
             "flowrate_sccm": None,
-            "duration": -1,
+            "duration": apm.pars.co2measure_duration + 4,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
         #nonblocking=True,
@@ -1008,7 +1008,7 @@ def CCSI_sub_co2maintainconcentration(
         to_globalexp_params=[
             "total_scc"
         ],  
-        process_finish=False,
+        process_finish=True,
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -1020,7 +1020,7 @@ def CCSI_sub_co2maintainconcentration(
         {
             "flowrate_sccm": apm.pars.flowrate_sccm,
             "ramp_sccm_sec": apm.pars.flowramp_sccm,
-            "duration": apm.pars.co2measure_duration + 30,  # arbitrary time to allow for final correction
+            "duration": apm.pars.co2measure_duration + 2,  # arbitrary time to allow for final correction
             "target_co2_ppm": apm.pars.target_co2_ppm,
             "headspace_scc": apm.pars.headspace_scc,
             "refill_freq_sec": apm.pars.refill_freq_sec,
@@ -1058,14 +1058,14 @@ def CCSI_sub_co2maintainconcentration(
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
-    apm.add(
-        MFC_server,
-        "cancel_acquire_flowrate",
-        {},
-        asc.wait_for_previous,
-        technique_name="Measure_added_co2",
-        process_finish=True,
-    )
+    # apm.add(
+    #     MFC_server,
+    #     "cancel_acquire_flowrate",
+    #     {},
+    #     asc.wait_for_previous,
+    #     technique_name="Measure_added_co2",
+    #     process_finish=True,
+    # )
 
     apm.add(
         PAL_server,
