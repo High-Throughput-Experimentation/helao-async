@@ -20,8 +20,9 @@ __all__ = [
     "CCSI_sub_co2mass_temp",
     "CCSI_sub_co2massdose",
     "CCSI_sub_co2maintainconcentration",
-    "CCSI_sub_co2topup_mfcmassdose",
+#    "CCSI_sub_co2topup_mfcmassdose",
     "CCSI_sub_co2monitoring",
+    "CCSI_sub_co2pressuremonitor_nopump",
     "CCSI_sub_co2monitoring_mfcmasscotwo",
     "CCSI_sub_clean_inject",
     "CCSI_sub_refill_clean",
@@ -1459,4 +1460,32 @@ def CCSI_leaktest_co2(
     if apm.pars.recirculate:
         apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
 
+    return apm.action_list
+
+def CCSI_sub_co2pressuremonitor_nopump(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    co2measure_duration: float = 1200,
+    co2measure_acqrate: float = 1,
+):
+    apm = ActionPlanMaker()
+    apm.add(
+        MFC_server,
+        "acquire_flowrate",
+        {
+            "flowrate_sccm": None,
+            "duration": apm.pars.co2measure_duration,
+            "acquisition_rate": apm.pars.co2measure_acqrate,
+        },
+    )
+
+    apm.add(
+        CO2S_server,
+        "acquire_co2",
+        {
+            "duration": apm.pars.co2measure_duration,
+            "acquisition_rate": apm.pars.co2measure_acqrate,
+        },
+        asc.no_wait,
+    )
     return apm.action_list
