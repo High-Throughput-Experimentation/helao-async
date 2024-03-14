@@ -257,7 +257,7 @@ def CCSI_sub_headspace_purge_and_measure(
 
 def CCSI_sub_drain(
     experiment: Experiment,
-    experiment_version: int = 7,  #empty cell accounting
+    experiment_version: int = 8,  #7empty cell accounting, 8 added more valve actions
     HSpurge_duration: float = 20,  
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
@@ -291,15 +291,22 @@ def CCSI_sub_drain(
 
     if apm.pars.recirculation:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, )
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
         apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration/3} )
         apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},)
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
         apm.add(ORCH_server, "wait", {"waittime": 10})
         apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, )
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
         apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration/3} )
         apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},)
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
         apm.add(ORCH_server, "wait", {"waittime": 10})
         apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, )
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
         apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration/3} )
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},)
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
 
     if apm.pars.initialization:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
