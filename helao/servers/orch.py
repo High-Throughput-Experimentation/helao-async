@@ -684,15 +684,15 @@ class Orch(Base):
                         )
                 elif A.start_condition == ActionStartCondition.wait_for_previous:
                     self.print_message("orch is waiting for previous action to finish")
-                    previous_action_free = (
+                    previous_action_active = (
                         self.last_action_uuid
-                        not in self.globalstatusmodel.active_dict.keys()
+                        in self.globalstatusmodel.active_dict.keys()
                     )
-                    while not previous_action_free:
+                    while previous_action_active:
                         await self.wait_for_interrupt()
-                        previous_action_free = (
+                        previous_action_active = (
                             self.last_action_uuid
-                            not in self.globalstatusmodel.active_dict.keys()
+                            in self.globalstatusmodel.active_dict.keys()
                         )
                 elif A.start_condition == ActionStartCondition.wait_for_all:
                     await self.orch_wait_for_all_actions()
@@ -814,15 +814,6 @@ class Orch(Base):
                                     f"{actstat} not found in globalstatus.nonactive_dict"
                                 )
 
-            # this will recursively call the next no_wait action in queue, and return its error
-            if self.action_dq and not self.step_thru_actions:
-                nextA = self.action_dq[0]
-                if nextA.start_condition == ActionStartCondition.no_wait:
-                    error_code = await self.loop_task_dispatch_action()
-
-            if error_code is not ErrorCodes.none:
-                return error_code
-
             try:
                 result_action = Action(**result_actiondict)
             except Exception as e:
@@ -887,7 +878,14 @@ class Orch(Base):
                                     {k2: result_action.action_params[k1]}
                                 )
 
-                # self.print_message("done copying global vars back to experiment")
+            # # this will recursively call the next no_wait action in queue, and return its error
+            # if self.action_dq and not self.step_thru_actions:
+            #     nextA = self.action_dq[0]
+            #     if nextA.start_condition == ActionStartCondition.no_wait:
+            #         error_code = await self.loop_task_dispatch_action()
+
+            # if error_code is not ErrorCodes.none:
+            #     return error_code
 
         return ErrorCodes.none
 
