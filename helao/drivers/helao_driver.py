@@ -24,6 +24,7 @@ base object.
 
 """
 
+import asyncio
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from datetime import datetime
@@ -32,7 +33,7 @@ from dataclasses import dataclass, field
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="default_helao")
+    logger = logging.make_logger(logger_name="default_helaodriver")
 else:
     logger = logging.LOGGER
 
@@ -43,6 +44,7 @@ class DriverStatus(StrEnum):
     error = "error"
     uninitialized = "uninitialized"
     unknown = "unknown"
+
 
 class DriverResponseType(StrEnum):
     success = "success"
@@ -56,7 +58,7 @@ class DriverMessage:
 
     @property
     def timestamp_str(self):
-        return self.timestamp.strftime('%F %T,%f')[:-3]
+        return self.timestamp.strftime("%F %T,%f")[:-3]
 
 
 @dataclass
@@ -69,11 +71,12 @@ class DriverResponse(DriverMessage):
 
 class HelaoDriver(ABC):
     """Generic class for helao drivers w/o base.py dependency.
-    
-    Note: 
+
+    Note:
         All public methods must return a DriverResponse object.
-    
+
     """
+
     timestamp: datetime
     config: dict
 
@@ -81,16 +84,15 @@ class HelaoDriver(ABC):
         self.timestamp = datetime.now()
         self.config = config
 
-
     @property
     def _created_at(self):
         """Instantiation timestamp"""
-        return self.timestamp.strftime('%F %T,%f')[:-3]
-    
+        return self.timestamp.strftime("%F %T,%f")[:-3]
+
     @property
     def _uptime(self):
         """Driver uptime"""
-        return (datetime.now() - self.timestamp).strftime('%F %T,%f')[:-3]
+        return (datetime.now() - self.timestamp).strftime("%F %T,%f")[:-3]
 
     @abstractmethod
     def connect(self) -> DriverResponse:
@@ -112,3 +114,64 @@ class HelaoDriver(ABC):
     def disconnect(self) -> DriverResponse:
         """Release connection to resource."""
 
+
+class DriverPoller:
+    """Generic class for helao driver polling w/optional base dependency.
+
+    Subclasses must implement get_data() which returns a dictionary of polled values.
+
+    """
+
+    driver: HelaoDriver
+    wait_time: float
+    last_update: datetime
+    live_dict: dict
+    polling: bool
+
+    def __init__(self, driver: HelaoDriver, wait_time: float = 0.05) -> None:
+        self.driver = driver
+        self.wait_time = wait_time
+        self.aloop = asyncio.get_running_loop()
+        self.live_dict = {}
+        self.last_update = datetime.now()
+        self.polling = True
+        self.poll_signalq = asyncio.Queue(1)
+        self.poll_signal_task = self.aloop.create_task(self._poll_signal_loop())
+        self.polling_task = self.aloop.create_task(self._poll_sensor_loop())
+        self._base_hook = None
+
+    async def _start_polling(self):
+        logger.info("got 'start_polling' request, raising signal")
+        await self.poll_signalq.put(True)
+        while not self.polling:
+            logger.info("waiting for polling loop to start")
+            await asyncio.sleep(0.1)
+
+    async def _stop_polling(self):
+        logger.info("got 'stop_polling' request, raising signal")
+        await self.poll_signalq.put(False)
+        while self.polling:
+            logger.info("waiting for polling loop to stop")
+            await asyncio.sleep(0.1)
+
+    async def _poll_signal_loop(self):
+        while True:
+            self.polling = await self.poll_signalq.get()
+            logger.info("polling signal received")
+
+    async def _poll_sensor_loop(self):
+        logger.info("polling task has started")
+        while True:
+            if self.polling:
+                resp = self.get_data()
+                if resp.data:
+                    self.last_update = resp.timestamp
+                    self.live_dict.update(resp.data)
+                    self.live_dict["last_updated"] = self.last_update
+                    if self._base_hook is not None:
+                        await self._base_hook.put_lbuf(resp.data)
+            await asyncio.sleep(self.wait_time)
+
+    def get_data(self) -> DriverResponse:
+        logger.info("DriverPoller.get_data() has not been implemented")
+        return DriverResponse()
