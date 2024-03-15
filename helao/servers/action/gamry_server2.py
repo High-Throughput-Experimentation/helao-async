@@ -15,6 +15,7 @@ from typing import Optional, List
 from collections import defaultdict, deque
 
 import numpy as np
+import pandas as pd
 from fastapi import Body, Query
 
 from helaocore.error import ErrorCodes
@@ -26,6 +27,7 @@ from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 from helao.helpers.executor import Executor
 from helao.helpers import logging  # get logger from BaseAPI instance
+from helao.helpers.bubble_detection import bubble_detection
 from helao.drivers.pstat.gamry.driver import GamryDriver
 from helao.drivers.pstat.gamry.technique import (
     GamryTechnique,
@@ -127,6 +129,21 @@ class GamryExec(Executor):
             if k in self.data_buffer:
                 meanv = np.nanmean(np.array(self.data_buffer[k])[-5:])
                 self.active.action.action_params[f"{k}__mean_final"] = meanv
+
+        if self.active.action.action_name == "run_OCV":
+            data_df = pd.DataFrame(self.data_buffer)
+            rsd_thresh = self.action_params.get("RSD_threshold", 1)
+            simple_thresh = self.action_params.get("simple_threshold", 1)
+            signal_change_thresh = self.action_params.get("signal_change_threshold", 1)
+            amplitude_thresh = self.action_params.get("amplitude_threshold", 1)
+            has_bubble = bubble_detection(
+                data_df,
+                rsd_thresh,
+                simple_thresh,
+                signal_change_thresh,
+                amplitude_thresh,
+            )
+            self.active.action.action_params["has_bubble"] = has_bubble
 
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": {}}
@@ -273,6 +290,10 @@ async def gamry_dyn_endpoints(app=None):
             fast_samples_in: List[SampleUnion] = Body([], embed=True),
             Tval__s: float = 10.0,
             AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+            RSD_threshold: float = 1,
+            simple_threshold: float = 0.3,
+            signal_change_threshold: float = 0.01,
+            amplitude_threshold: float = 0.05,
             TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
             TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
             IErange: app.driver.model.ierange = "auto",
@@ -314,9 +335,7 @@ async def gamry_dyn_endpoints(app=None):
             AcqInt = active.action.action_params["AcqInterval__s"]
 
             cycle_time = Tinit + Tstep
-            points_per_cycle = round(
-                cycle_time / AcqInt
-            )
+            points_per_cycle = round(cycle_time / AcqInt)
             active.action.action_params["AcqPointsPerCycle"] = points_per_cycle
             active.action.action_params["SignalArray__V"] = [
                 Vinit if i * AcqInt <= Tinit else Vstep for i in range(points_per_cycle)
