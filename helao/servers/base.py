@@ -1774,7 +1774,6 @@ class Active:
                 new_status=HloStatus.finished,
             )
 
-
             # send globalparams
             if finish_action.to_globalexp_params:
                 export_params = {
