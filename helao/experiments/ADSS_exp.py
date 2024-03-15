@@ -1082,6 +1082,10 @@ def ADSS_sub_OCV(
     rinse_1: int = 1,
     rinse_4: int = 0,
     check_bubble: bool = False,
+    RSD_threshold: float = 1,
+    simple_threshold: float = 0.3,
+    signal_change_threshold: float = 0.01,
+    amplitude_threshold: float = 0.05,
     bubble_pump_reverse_time_s: float = 15,
     bubble_pump_forward_time_s: float = 10,
     run_use: RunUse = "data",
@@ -1109,6 +1113,11 @@ def ADSS_sub_OCV(
             "Tval__s": apm.pars.Tval__s,
             "AcqInterval__s": apm.pars.samplerate_sec,
             "IErange": apm.pars.gamry_i_range,
+            "RSD_threshold": apm.pars.RSD_threshold,
+            "simple_threshold": apm.pars.simple_threshold,
+            "signal_change_threshold": apm.pars.signal_change_threshold,
+            "amplitude_threshold": apm.pars.amplitude_threshold,
+
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         to_globalexp_params=["has_bubble"],
@@ -1143,13 +1152,18 @@ def ADSS_sub_OCV(
             ORCH_server,
             "conditional_exp",
             {
+                "check_parameter": "has_bubble",
                 "check_condition": "equals",
                 "check_value": True,
                 "conditional_experiment_name": "ADSS_sub_remove_bubble",
-                "conditional_experiment_params": {"pump_reverse_time_s": apm.pars.bubble_pump_reverse_time_s,
-                                                  "pump_forward_time_s": apm.pars.bubble_pump_forward_time_s},
+                "conditional_experiment_params": {  "pump_reverse_time_s": apm.pars.bubble_pump_reverse_time_s,
+                                                    "pump_forward_time_s": apm.pars.bubble_pump_forward_time_s,
+                                                    "RSD_threshold": apm.pars.RSD_threshold,
+                                                    "simple_threshold": apm.pars.simple_threshold,
+                                                    "signal_change_threshold": apm.pars.signal_change_threshold,
+                                                    "amplitude_threshold": apm.pars.amplitude_threshold},
             },
-            from_globalexp_params={"has_bubble": "check_parameter"},
+            from_globalexp_params={"has_bubble": "has_bubble"},
         )
 
     return apm.action_list  # returns complete action list to orch
@@ -2343,6 +2357,10 @@ def ADSS_sub_remove_bubble(
     ref_type: str = "inhouse",
     ref_offset__V: float = -0.01,
     check_bubble: bool = True,
+    RSD_threshold: float = 1,
+    simple_threshold: float = 0.3,
+    signal_change_threshold: float = 0.01,
+    amplitude_threshold: float = 0.05,
     bubble_pump_reverse_time_s: float = 15,
     bubble_pump_forward_time_s: float = 10,
     run_use: RunUse = "data",
@@ -2361,9 +2379,14 @@ def ADSS_sub_remove_bubble(
             ph=apm.pars.ph,
             ref_type=apm.pars.ref_type,
             check_bubble=apm.pars.check_bubble,
+            RSD_threshold=apm.pars.RSD_threshold,
+            simple_threshold=apm.pars.simple_threshold,
+            signal_change_threshold=apm.pars.signal_change_threshold,
+            amplitude_threshold=apm.pars.amplitude_threshold,
             bubble_pump_forward_time_s=apm.pars.bubble_pump_forward_time_s,
             bubble_pump_reverse_time_s=apm.pars.bubble_pump_reverse_time_s,
             run_use=apm.pars.run_use,
+
         )
     )
     return apm.action_list
