@@ -1082,6 +1082,8 @@ def ADSS_sub_OCV(
     rinse_1: int = 1,
     rinse_4: int = 0,
     check_bubble: bool = False,
+    bubble_pump_reverse_time_s: float = 15,
+    bubble_pump_forward_time_s: float = 10,
     run_use: RunUse = "data",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -1144,7 +1146,8 @@ def ADSS_sub_OCV(
                 "check_condition": "equals",
                 "check_value": True,
                 "conditional_experiment_name": "ADSS_sub_remove_bubble",
-                "conditional_experiment_params": {},
+                "conditional_experiment_params": {"pump_reverse_time_s": apm.pars.bubble_pump_reverse_time_s,
+                                                  "pump_forward_time_s": apm.pars.bubble_pump_forward_time_s},
             },
             from_globalexp_params={"has_bubble": "check_parameter"},
         )
@@ -2327,3 +2330,18 @@ def ADSS_sub_transfer_liquid_in(
     )
 
     return apm.action_list  # returns complete action list to orch
+
+
+def ADSS_sub_remove_bubble(
+    experiment: Experiment,
+    pump_reverse_time_s: float = 20,
+    pump_forward_time_s: float = 10,
+):
+    apm = ActionPlanMaker()
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.pump_reverse_time_s})
+    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.pump_forward_time_s})
+
+    return apm.action_list
