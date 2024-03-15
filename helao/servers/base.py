@@ -1877,14 +1877,12 @@ class Active:
                 "all active action are done, closing active", info=True
             )
 
-            # write final act meta file (overwrite existing one)
-            await self.base.write_act(action=finish_action)
-
-            # send the last status
-            await self.add_status(action=finish_action)
-
             # DB server call to finish_yml if DB exists
             for action in self.action_list:
+                # write final act meta file (overwrite existing one)
+                await self.base.write_act(action=action)
+                # send the last status
+                await self.add_status(action=action)
                 self.base.aloop.create_task(move_dir(action, base=self.base))
 
             # since all sub-actions of active are finished process endpoint queue
