@@ -165,13 +165,8 @@ class PAL:
             self.base.print_message(f"PAL done trigger port: {self.triggerport_done}")
             self.triggers = True
 
-        self.action = (
-            None  # for passing action object from technique method to measure loop
-        )
-
-        self.active = (
-            None  # for holding active action object, clear this at end of measurement
-        )
+        # for passing action object from technique method to measure loop
+        self.action = None  
 
         # for global IOloop
         self.IO_do_meas = False
@@ -2197,7 +2192,7 @@ class PAL:
         # need to check here again in case estop was triggered during
         # measurement
         # need to set the current meas to idle first
-        if self.active:
+        if self.active is not None:
             last_active = self.active
             self.active = None
             self.action = None
@@ -2880,7 +2875,7 @@ class PAL:
         if self.IO_do_meas:
             if switch:
                 await self.set_IO_signalq(False)
-                if self.active:
+                if self.active is not None:
                     self.active.set_estop()
         return switch
 
