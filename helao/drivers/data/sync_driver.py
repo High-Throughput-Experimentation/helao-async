@@ -510,10 +510,6 @@ class HelaoSyncer:
         if task_name in self.running_tasks:
             # self.base.print_message(f"Removing {task_name} from running_tasks.")
             self.running_tasks.pop(task_name)
-            try:
-                self.task_set.remove(task_name)
-            except KeyError:
-                pass
         # else:
         #     self.base.print_message(
         #         f"{task_name} was already removed from running_tasks."
@@ -525,6 +521,7 @@ class HelaoSyncer:
             if len(self.running_tasks) < self.max_tasks:
                 # self.base.print_message("Getting next yml_target from queue.")
                 rank, yml_target = await self.task_queue.get()
+                self.task_set.remove(yml_target.name)
                 # self.base.print_message(
                 #     f"Acquired {yml_target.name} with priority {rank}."
                 # )
@@ -573,6 +570,11 @@ class HelaoSyncer:
     async def enqueue_yml(self, upath: Union[Path, str], rank: int = 5):
         """Adds yml to sync queue, defaulting to lowest priority."""
         yml_path = Path(upath) if isinstance(upath, str) else upath
+        if yml_path.name in self.task_set:
+            self.base.print_message(
+                f"{str(yml_path)} was already queued, skipping enqueue request."
+            )
+            return None
         self.task_set.add(yml_path.name)
         await self.task_queue.put((rank, yml_path))
         self.base.print_message(
@@ -642,10 +644,6 @@ class HelaoSyncer:
                 #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
                 # )
                 self.running_tasks.pop(prog.yml.target.name)
-                try:
-                    self.task_set.remove(prog.yml.target.name)
-                except KeyError:
-                    pass
                 await self.enqueue_yml(prog.yml.target, rank - 1)
                 self.base.print_message(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
