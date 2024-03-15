@@ -2334,8 +2334,18 @@ def ADSS_sub_transfer_liquid_in(
 
 def ADSS_sub_remove_bubble(
     experiment: Experiment,
-    pump_reverse_time_s: float = 20,
+    pump_reverse_time_s: float = 15,
     pump_forward_time_s: float = 10,
+    Tval__s: float = 10.0,
+    gamry_i_range: str = "auto",
+    samplerate_sec: float = 0.1,
+    ph: float = 1.24,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = -0.01,
+    check_bubble: bool = True,
+    bubble_pump_reverse_time_s: float = 15,
+    bubble_pump_forward_time_s: float = 10,
+    run_use: RunUse = "data",
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
@@ -2343,5 +2353,17 @@ def ADSS_sub_remove_bubble(
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.pump_reverse_time_s})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.pump_forward_time_s})
-
+    apm.add_action_list(
+        ADSS_sub_OCV(
+            Tval__s=apm.pars.Tval_s,
+            gamry_i_range=apm.pars.gamry_i_range,
+            samplerate_sec=apm.pars.samplerate_sec,
+            ph=apm.pars.ph,
+            ref_type=apm.pars.ref_type,
+            check_bubble=apm.pars.check_bubble,
+            bubble_pump_forward_time_s=apm.pars.bubble_pump_forward_time_s,
+            bubble_pump_reverse_time_s=apm.pars.bubble_pump_reverse_time_s,
+            run_use=apm.pars.run_use,
+        )
+    )
     return apm.action_list
