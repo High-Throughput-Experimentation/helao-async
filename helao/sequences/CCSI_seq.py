@@ -913,13 +913,13 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
   #  DeltaDilute1_duration: float = 0,
     #initcleans: int = 3,
     drainrecirc: bool = True,
-    recirculation_duration: float = 60,
+    recirculation_duration: float = 20,
   #  drainclean_volume_ul: float = 10000,
     #headspace_purge_cycles: int = 2,
 #    liquid_purge_cycles: int = 1,
   #  headspace_co2measure_duration: float = 30,
   #  clean_co2measure_duration: float = 120,
-    SamplePurge_duration: float = 60,
+    SamplePurge_duration: float = 20,
   #  LiquidCleanPurge_duration: float = 100,
   #  use_co2_check: bool = False,
   #  clean_co2_ppm_thresh: float = 51500,
@@ -982,7 +982,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
         #     "volume_ul_cell_gas": 1, #need calculated volume from mfc maintain concentration 
         # })        
         
-        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": 0,"recirculation":drainrecirc,"recirculation_duration":recirculation_duration})
+        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": 0,"recirculation":drainrecirc,"recirculation_duration":recirculation_duration, "recirculation_rate_uL_min":recirculation_rate_uL_min})
 ##############################################3
 #continue below
 # =============================================================================
