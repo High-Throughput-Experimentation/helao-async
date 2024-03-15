@@ -572,14 +572,18 @@ class HelaoSyncer:
         yml_path = Path(upath) if isinstance(upath, str) else upath
         if yml_path.name in self.task_set:
             self.base.print_message(
-                f"{str(yml_path)} was already queued, skipping enqueue request."
+                f"{str(yml_path)} is already queued, skipping enqueue request."
             )
-            return None
-        self.task_set.add(yml_path.name)
-        await self.task_queue.put((rank, yml_path))
-        self.base.print_message(
-            f"Added {str(yml_path)} to syncer queue with priority {rank}."
-        )
+        elif yml_path.name in self.running_tasks:
+            self.base.print_message(
+                f"{str(yml_path)} is already running, skipping enqueue request."
+            )
+        else:
+            self.task_set.add(yml_path.name)
+            await self.task_queue.put((rank, yml_path))
+            self.base.print_message(
+                f"Added {str(yml_path)} to syncer queue with priority {rank}."
+            )
 
     async def sync_yml(
         self,
