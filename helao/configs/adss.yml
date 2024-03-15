@@ -96,7 +96,7 @@ servers:
     host: hte-adss-01.htejcap.caltech.edu
     port: 8004
     group: action
-    fast: gamry_server
+    fast: gamry_server2
     params:
       allow_no_sample: true
       dev_id: 0
