@@ -13,8 +13,9 @@ from scipy.stats import binned_statistic
 from helaocore.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 
+from .base_analysis import BaseAnalysis
 from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
-from .echeuvis_stability import EcheUvisAnalysis, refadjust, parse_spechlo
+from .echeuvis_stability import refadjust, parse_spechlo
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],
@@ -79,6 +80,7 @@ class DryUvisInputs:
     ref_light_spec_acts: List[HelaoAction]
     insitu_spec: HelaoProcess
     insitu_spec_act: HelaoAction
+    process_params: dict
 
     def __init__(
         self,
@@ -118,6 +120,7 @@ class DryUvisInputs:
             bdf.sort_values("action_timestamp").iloc[0].process_uuid,
             query_df,
         )
+        self.process_params = self.insitu.process_params
         self.insitu_spec_act = HelaoAction(
             bdf.query("action_name=='acquire_spec_adv'")
             .sort_values("action_timestamp")
@@ -155,7 +158,7 @@ class DryUvisOutputs(BaseModel):
     insitu_max_rescaled: bool
 
 
-class DryUvisAnalysis(EcheUvisAnalysis):
+class DryUvisAnalysis(BaseAnalysis):
     """Dry UVIS Analysis for GCLD demonstration."""
 
     analysis_timestamp: datetime
@@ -192,6 +195,9 @@ class DryUvisAnalysis(EcheUvisAnalysis):
         rdtups = [parse_spechlo(x) for x in self.inputs.ref_dark_spec]
         rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
         btup = parse_spechlo(self.inputs.insitu_spec)
+
+        if any([x is False for x in rdtups + rltups + [btup]]):
+            return False
 
         ap = self.analysis_params
         aggfunc = np.mean if ap["agg_method"] == "mean" else np.median
@@ -270,3 +276,4 @@ class DryUvisAnalysis(EcheUvisAnalysis):
             insitu_min_rescaled=insitu_min_rscl,
             insitu_max_rescaled=insitu_max_rscl,
         )
+        return True

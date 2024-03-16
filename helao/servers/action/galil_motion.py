@@ -368,9 +368,10 @@ async def galil_dyn_endpoints(app=None):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             specref_code: int = 1,
+            ref_position_name: str = "builtin_ref_motorxy"
         ):
             active = await app.base.setup_and_contain_action()
-            refxy = app.base.world_cfg["builtin_ref_motorxy"]
+            refxy = app.base.world_cfg[active.action.action_params["ref_position_name"]]
             active.action.action_params.update({"_refxy": refxy})
             await active.enqueue_data_dflt(datadict={"_refxy": refxy})
             finished_action = await active.finish()

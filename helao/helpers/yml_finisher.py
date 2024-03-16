@@ -15,33 +15,43 @@ from helao.helpers.print_message import print_message
 from helao.helpers.premodels import Sequence, Experiment, Action
 
 
-async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
-    ymld = yml_load(Path(yml_path))
-    yml_type = ymld["file_type"]
+async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
+    yp = Path(yml_path)
 
     def print_msg(msg):
-        if base is not None:
-            base.print_message(msg, info=True)
-        else:
-            print_message({}, "yml_finisher", msg, info=True)
+        # if base is not None:
+        #     base.print_message(msg, info=True)
+        # else:
+        print_message({}, "yml_finisher", msg, info=True)
 
-    if "DB" in base.world_cfg["servers"].keys():
-        dbp_host = base.world_cfg["servers"]["DB"]["host"]
-        dbp_port = base.world_cfg["servers"]["DB"]["port"]
-    else:
+    if "host" not in db_config or "port" not in db_config:
+        print_msg(f"DB server not defined in config, {yml_path} will not sync.")
         return False
+    else:
+        dbp_port = db_config["port"]
+        dbp_host = db_config["host"]
+
+    if not yp.exists():
+        print_msg(f"{yml_path} was not found, was it already moved?")
+        return False
+
+    ymld = yml_load(yp)
+    yml_type = ymld["file_type"]
 
     req_params = {"yml_path": yml_path}
     req_url = f"http://{dbp_host}:{dbp_port}/finish_yml"
     async with aiohttp.ClientSession() as session:
         for i in range(retry):
-            async with session.post(req_url, params=req_params) as resp:
-                if resp.status == 200:
-                    print_msg(f"Finished {yml_type}: {yml_path}.")
-                    return True
-                else:
-                    print_msg(f"Retry [{i}/{retry}] finish {yml_type} {yml_path}.")
-                    await asyncio.sleep(1)
+            try:
+                async with session.post(req_url, params=req_params) as resp:
+                    if resp.status == 200:
+                        print_msg(f"Finished {yml_type}: {yml_path}.")
+                        return True
+                    else:
+                        print_msg(f"Retry [{i}/{retry}] finish {yml_type} {yml_path}.")
+                        await asyncio.sleep(1)
+            except asyncio.TimeoutError:
+                continue
         print_msg(f"Could not finish {yml_path} after {retry} tries.")
         return False
 
@@ -125,9 +135,7 @@ async def move_dir(
             )
             rm_files_done = [f for f in rm_files if not os.path.exists(f)]
             if len(rm_files_done) == len(rm_files):
-                await asyncio.gather(
-                    aiofiles.os.rmdir(yml_dir), return_exceptions=True
-                )
+                await asyncio.gather(aiofiles.os.rmdir(yml_dir), return_exceptions=True)
                 if not os.path.exists(yml_dir):
                     rm_success = True
                     timestamp = getattr(hobj, f"{obj_type}_timestamp").strftime(
@@ -135,7 +143,7 @@ async def move_dir(
                     )
                     yml_path = os.path.join(new_dir, f"{timestamp}-{obj_type[:3]}.yml")
                     if not is_manual:
-                        await yml_finisher(yml_path, base=base)
+                        await yml_finisher(yml_path, db_config=base.world_cfg.get("servers", {}).get("DB", {}))
                 if rm_success and obj_type == "action" and is_manual:
                     # remove active sequence and experiment dirs
                     exp_dir = os.path.dirname(yml_dir)

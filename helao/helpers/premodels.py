@@ -35,7 +35,7 @@ class Sequence(SequenceModel):
 
     # not in SequenceModel:
     globalseq_params: Optional[dict] = {}
-    experimentmodel_list: List[ExperimentModel] = []
+    experimentmodel_list: List[ExperimentModel] = []  # running tally of completed experiments
 
     def __repr__(self):
         return f"<sequence_name:{self.sequence_name}>"

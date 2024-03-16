@@ -143,6 +143,7 @@ class HelaoPath(type(Path())):
 
 class HelaoYml:
     def __init__(self, path: Union[HelaoPath, str], uuid_test: Optional[dict] = None):
+        self.yml_path = path
         self.uuid_test = uuid_test  # regenerate uuid for testing
         self.parse_yml(path)
 
@@ -199,7 +200,7 @@ class HelaoYml:
         progress_parts[-1] = progress_parts[-1].replace(".yml", ".progress")
         self.progress_path = HelaoPath(os.path.join(*progress_parts))
         # print(f"!!! Loading progress from {self.progress_path}")
-        self.progress = Progress(self)
+        self.progress = Progress(self.yml_path)
         # print(f"!!! Successfully loaded progress from {self.progress_path}")
         if (self.status == "FINISHED") and (self.file_type != "experiment"):
             meta_json = modmap[self.file_type](**self.dict).clean_dict()

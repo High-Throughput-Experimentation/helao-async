@@ -17,10 +17,11 @@ def read_hlo(path: str) -> Tuple[dict, dict]:
     path_to_hlo = Path(path)
     with path_to_hlo.open() as f:
         lines = f.readlines()
-
+        
     sep_index = lines.index("%%\n")
-
-    meta = dict(yml_load("".join(lines[:sep_index])))
+    meta =  {}
+    if sep_index > 0:
+        meta = dict(yml_load("".join(lines[:sep_index])))
 
     data = defaultdict(list)
     for line in lines[sep_index + 1 :]:

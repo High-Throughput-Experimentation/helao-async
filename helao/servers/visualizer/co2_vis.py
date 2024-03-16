@@ -111,7 +111,7 @@ class C_co2:
                 [self.plot, Spacer(width=20), self.table],
                 Spacer(height=10),
             ],
-            background="#C0C0C0",
+            background="#D6DBDF",
             width=1024,
         )
 

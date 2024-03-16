@@ -4,19 +4,102 @@
 
 __all__ = ["makeApp"]
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    logger = logging.make_logger(logger_name="kinesis_server_standalone")
+else:
+    logger = logging.LOGGER
+
+import time
+import asyncio
 from typing import Optional
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
 from helao.drivers.motion.kinesis_driver import (
     KinesisMotor,
+    KinesisPoller,
     MoveModes,
-    KinesisMotorExec,
+    MOTION_STATES,
 )
 from helao.helpers.config_loader import config_loader
 
+from helaocore.error import ErrorCodes
+from helao.helpers.executor import Executor
+from helaocore.models.hlostatus import HloStatus
 
-async def mfc_dyn_endpoints(app=None):
+class KinesisMotorExec(Executor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # shortcut attribs
+        self.base = self.active.base
+        self.driver = self.base.fastapp.driver
+        self.live_dict = self.driver.live_dict
+        
+        # action params and axis config
+        self.action_params = self.active.action.action_params
+        self.axis_name = self.action_params["axis"]
+        self.axis_params = self.base.server_params["axes"][self.axis_name]
+        logger.info("KinesisMotorExec initialized.")
+
+    async def _pre_exec(self):
+        "Set velocity and acceleration."
+        logger.info("KinesisMotorExec running setup methods.")
+        velocity = self.action_params.get("velocity_mm_s", None)
+        acceleration = self.action_params.get(
+            "acceleration_mm_s2", None
+        )
+        logger.info("KinesisMotorExec checking velocity and accel.")
+        resp = self.driver.setup(self.axis, velocity=velocity, acceleration=acceleration)
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
+        logger.info("KinesisMotorExec setup complete.")
+        return {"error": error}
+
+    async def _exec(self):
+        "Execute motion."
+        logger.info("KinesisMotorExec validating move mode & limit.")
+        move_mode = self.action_params.get("move_mode", "relative")
+        move_value = self.action_params.get("value_mm", 0.0)
+        current_position = self.live_dict[self.axis_name].get("position_mm", 9999)
+        target_position = move_value
+        if move_mode == MoveModes.relative:
+            target_position += current_position
+
+        self.start_time = time.time()
+        if target_position < self.axis_params.get("move_limit_mm", 3.0):
+            logger.info("KinesisMotorExec starting motion.")
+            resp = self.driver.move(self.axis_name, move_mode, move_value)
+            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            return {"error": error}
+        else:
+            logger.info(
+                f"final position {target_position} is greater than motion limit, ignoring motion request."
+            )
+            return {"error": ErrorCodes.motor}
+
+    async def _poll(self):
+        """Read position and status from driver live_dict."""
+        live_dict, epoch_s = self.base.get_lbuf(self.axis_name)
+        live_dict["epoch_s"] = epoch_s
+        if any([x in MOTION_STATES for x in live_dict["status"]]):
+            status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        await asyncio.sleep(0.01)
+        return {
+            "error": ErrorCodes.none,
+            "status": status,
+            "data": {"position_mm": live_dict["position_mm"]},
+        }
+
+    async def _manual_stop(self):
+        "Perform device manual stop, return error state."
+        self.axis.stop(immediate=True, sync=True)
+        self.stop_err = ErrorCodes.none
+        return {"error": self.stop_err}
+
+async def kinesis_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
     motors = list(app.base.server_params["axes"].keys())
 
@@ -104,9 +187,10 @@ def makeApp(confPrefix, server_key, helao_root):
         server_key=server_key,
         server_title=server_key,
         description="Kinesis motor server",
-        version=0.1,
+        version=0.2,
         driver_class=KinesisMotor,
-        dyn_endpoints=mfc_dyn_endpoints,
+        poller_class=KinesisPoller,
+        dyn_endpoints=kinesis_dyn_endpoints,
     )
 
     return app

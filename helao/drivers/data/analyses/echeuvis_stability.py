@@ -3,6 +3,7 @@ from copy import copy
 from typing import List
 from uuid import UUID
 from datetime import datetime
+import traceback
 
 import pandas as pd
 import numpy as np
@@ -10,16 +11,10 @@ from pydantic import BaseModel
 from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
 
-from helaocore.models.analysis import (
-    AnalysisDataModel,
-    AnalysisOutputModel,
-    AnalysisModel,
-)
 from helaocore.version import get_filehash
-from helaocore.models.s3locator import S3Locator
 from helao.helpers.gen_uuid import gen_uuid
-from helao.helpers.set_time import set_time
 
+from .base_analysis import BaseAnalysis
 from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 
 ANALYSIS_DEFAULTS = {
@@ -81,14 +76,21 @@ WHERE
 
 def parse_spechlo(hlod: dict):
     """Read spectrometer hlo into wavelength, epoch, spectra tuple."""
-    wl = np.array(hlod["meta"]["optional"]["wl"])
-    epochs = np.array(hlod["data"]["epoch_s"])
-    specarr = (
-        pd.DataFrame(hlod["data"])
-        .sort_index(axis=1)
-        .drop([x for x in hlod["data"].keys() if not x.startswith("ch_")], axis=1)
-        .to_numpy()
-    )
+    try:
+        wl = np.array(hlod["meta"]["optional"]["wl"])
+        epochs = np.array(hlod["data"]["epoch_s"])
+        specarr = (
+            pd.DataFrame(hlod["data"])
+            .sort_index(axis=1)
+            .drop([x for x in hlod["data"].keys() if not x.startswith("ch_")], axis=1)
+            .to_numpy()
+        )
+    except Exception as err:
+        str_err = "".join(
+            traceback.format_exception(type(err), err, err.__traceback__)
+        )
+        print(str_err)
+        return False
     return wl, epochs, specarr
 
 
@@ -124,6 +126,7 @@ class EcheUvisInputs:
     insitu: HelaoProcess
     insitu_spec_act: HelaoAction
     insitu_ca_act: HelaoAction
+    process_params: dict
     # solid_samples: list
 
     def __init__(
@@ -134,9 +137,11 @@ class EcheUvisInputs:
         query_df: pd.DataFrame,
     ):
         self.insitu = HelaoProcess(insitu_process_uuid, query_df)
+        self.process_params = self.insitu.process_params
         self.insitu_spec_act = HelaoAction(
             query_df.query(
                 "process_uuid==@insitu_process_uuid & action_name=='acquire_spec_extrig'"
+                # "process_uuid==@insitu_process_uuid & action_name=='acquire_spec_adv'"
             )
             .iloc[0]
             .action_uuid,
@@ -182,6 +187,7 @@ class EcheUvisInputs:
         )
         self.baseline_spec_act = HelaoAction(
             bdf.query("action_name=='acquire_spec_extrig'")
+            # bdf.query("action_name=='acquire_spec_adv'")
             .sort_values("action_timestamp")
             .iloc[0]
             .action_uuid,
@@ -246,7 +252,7 @@ class EcheUvisOutputs(BaseModel):
     mean_abs_omT_diff: float  # mean over wavelengths
 
 
-class EcheUvisAnalysis:
+class EcheUvisAnalysis(BaseAnalysis):
     """ECHEUVIS Optical Stability Analysis for GCLD demonstration."""
 
     analysis_timestamp: datetime
@@ -270,7 +276,7 @@ class EcheUvisAnalysis:
         self.analysis_uuid = gen_uuid()
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
         self.analysis_params.update(analysis_params)
-        pdf = query_df.query("process_uuid==@process_uuid")
+        pdf = query_df.query("process_uuid==@process_uuid").reset_index(drop=True)
         # print("filtered data has shape:", pdf.shape)
         self.plate_id = int(pdf.iloc[0].plate_id)
         self.sample_no = int(pdf.iloc[0].sample_no)
@@ -289,6 +295,9 @@ class EcheUvisAnalysis:
         rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
         btup = parse_spechlo(self.inputs.baseline_spec)
         itup = parse_spechlo(self.inputs.insitu_spec)
+
+        if any([x is False for x in rdtups + rltups + [btup, itup]]):
+            return False
 
         ap = self.analysis_params
         aggfunc = np.mean if ap["agg_method"] == "mean" else np.median
@@ -404,78 +413,5 @@ class EcheUvisAnalysis:
             ),
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
         )
+        return True
 
-    def export_analysis(
-        self, analysis_name: str, bucket: str, region: str, dummy: bool = True
-    ):
-        action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
-        inputs = []
-
-        for ak in action_keys:
-            euis = vars(self.inputs)[ak]
-            ru = ak.split("_spec")[0].replace("insitu", "data")
-            if not isinstance(euis, list):
-                euis = [euis]
-            for eui in euis:
-                raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
-                if ru in ["data", "baseline"]:
-                    global_sample = (
-                        f"legacy__solid__{int(self.plate_id):d}_{int(self.sample_no):d}"
-                    )
-                else:
-                    global_sample = None
-                adm = AnalysisDataModel(
-                    action_uuid=eui.action_uuid,
-                    run_use=ru,
-                    raw_data_path=raw_data_path,
-                    global_sample_label=global_sample,
-                )
-                inputs.append(adm)
-
-        scalar_outputs = [
-            k for k, v in self.outputs.model_dump().items() if not isinstance(v, list)
-        ]
-        array_outputs = [
-            k for k in self.outputs.model_dump().keys() if k not in scalar_outputs
-        ]
-
-        outputs = []
-
-        for label, output_keys in [
-            ("scalar", scalar_outputs),
-            ("array", array_outputs),
-        ]:
-            if output_keys:
-                out_model = AnalysisOutputModel(
-                    analysis_output_path=S3Locator(
-                        bucket=bucket,
-                        key=f"analysis/{self.analysis_uuid}_output_{label}.json",
-                        region=region,
-                    ),
-                    content_type="application/json",
-                    output_keys=output_keys,
-                    output_name=label,
-                    output={
-                        k: self.outputs.model_dump()[k]
-                        for k in output_keys
-                        if not isinstance(self.outputs.model_dump()[k], list)  # only scalars
-                    },
-                )
-                outputs.append(out_model)
-
-        if not outputs:
-            print("!!! analysis does not contain any outputs")
-
-        ana_model = AnalysisModel(
-            analysis_name=analysis_name,
-            analysis_timestamp=set_time(),
-            analysis_params=self.analysis_params,
-            analysis_codehash=self.analysis_codehash,
-            analysis_uuid=self.analysis_uuid,
-            process_uuid=self.process_uuid,
-            process_params=self.inputs.insitu.process_params,
-            inputs=inputs,
-            outputs=outputs,
-            dummy=dummy,
-        )
-        return ana_model.clean_dict(), self.outputs.model_dump()

@@ -28,9 +28,9 @@ def constructor(
         sequence_params=seq_params,
         sequence_uuid=seq_uuid,
         data_request_id=data_request_id,
-        experiment_list=experiment_list,
+        experiment_list=[],
         experiment_plan_list=experiment_list,
-        experimentmodel_list=experiment_list,
+        experimentmodel_list=[],
     )
     seq.sequence_uuid = seq_uuid
     return seq

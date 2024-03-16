@@ -4,6 +4,8 @@ __all__ = [
     "create_assembly_sample",
     "sort_plate_sample_no_list",
     "generate_sample_no_list",
+    "load_liquid_sample",
+    "orch_sub_wait"
 ]
 
 
@@ -24,8 +26,12 @@ from helaocore.models.machine import MachineModel
 
 EXPERIMENTS = __all__
 
-PAL_server = MachineModel(server_name="PAL", machine_name=gethostname().lower()).as_dict()
+PAL_server = MachineModel(
+    server_name="PAL", machine_name=gethostname().lower()
+).as_dict()
 
+ORCH_HOST = gethostname()
+ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 
 def create_liquid_sample(
     experiment: Experiment,
@@ -239,4 +245,42 @@ def generate_sample_no_list(
         },
     )
 
+
+def load_liquid_sample(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    liquid_sample_no: int = 0,
+    machine_name: str = "hte-xxxx-xx",
+    tray: int = 0,
+    slot: int = 0,
+    vial: int = 0
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    liquid = LiquidSample(
+        sample_no=apm.pars.liquid_sample_no, machine_name=apm.pars.machine_name
+    )
+
+    apm.add(
+        PAL_server,
+        "archive_tray_load",
+        {
+            "load_sample_in": liquid,
+            "tray": apm.pars.tray,
+            "slot": apm.pars.slot,
+            "vial": apm.pars.vial
+        },
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+
+def orch_sub_wait(
+    experiment: Experiment,
+    experiment_version: int = 2,
+    wait_time_s: float = 10,
+):
+    apm = ActionPlanMaker()
+       
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time_s})
     return apm.action_list  # returns complete action list to orch

@@ -1,3 +1,4 @@
+import time
 from types import MethodType
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
@@ -24,6 +25,7 @@ class Executor:
         poll_rate: float = 0.2,
         oneoff: bool = True,
         exec_id: str = None,
+        **kwargs
     ):
         self.active = active
         self.oneoff = oneoff
@@ -33,6 +35,8 @@ class Executor:
         else:
             self.exec_id = exec_id
         self.active.action.exec_id = self.exec_id
+        self.start_time = time.time()
+        self.duration = self.active.action.action_params.get("duration", -1)
 
     async def _pre_exec(self):
         "Setup methods, return error state."

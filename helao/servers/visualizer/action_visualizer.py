@@ -40,10 +40,10 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
                     text=f"<b>Action visualizer on {gethostname().lower()} -- config: {confPrefix}.py</b>",
                     width=1004,
                     height=32,
-                    style={"font-size": "200%", "color": "red"},
+                    style={"font-size": "200%", "color": "#CB4335"},
                 ),
             ],
-            background="#C0C0C0",
+            # background="#D6DBDF",
             width=1024,
         )
     )
@@ -55,6 +55,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
     vis_map = {
         "potentiostat_server": ("gamry_vis", "C_potvis"),
         "gamry_server": ("gamry_vis", "C_potvis"),
+        "gamry_server2": ("gamry_vis", "C_potvis"),
         "spec_server": ("spec_vis", "C_specvis"),
         "nidaqmx_server": ("nidaqmx_vis", "C_nidaqmxvis"),
         "pal_server": ("pal_vis", "C_palvis"),

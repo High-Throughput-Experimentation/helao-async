@@ -1,9 +1,12 @@
+import os
 import json
 import time
 import asyncio
+import faulthandler
 from copy import copy
-
 from socket import gethostname
+
+from helao.drivers.helao_driver import HelaoDriver
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
 from helao.servers.base import Base
@@ -16,9 +19,12 @@ from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
-from starlette.types import Message
 from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK
+
+from helao.helpers import logging
+
+global logger
 
 
 class BaseAPI(HelaoFastAPI):
@@ -31,6 +37,7 @@ class BaseAPI(HelaoFastAPI):
         version,
         driver_class=None,
         dyn_endpoints=None,
+        poller_class=None,
     ):
         super().__init__(
             helao_cfg=config,
@@ -40,26 +47,21 @@ class BaseAPI(HelaoFastAPI):
             version=str(version),
         )
         self.driver = None
-
-        async def set_body(request: Request, body: bytes):
-            async def receive() -> Message:
-                return {"type": "http.request", "body": body}
-
-            request._receive = receive
-
-        async def get_body(request: Request) -> bytes:
-            body = await request.body()
-            await set_body(request, body)
-            return body
+        self.poller = None
+        logger = logging.LOGGER
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.method == "HEAD":  # comes from endpoint checker, session.head()
+                logger.info("got HEAD request in middleware")
                 response = Response()
-            elif request.url.path.strip("/").startswith(f"{server_key}/"):
-                await set_body(request, await request.body())
-                body_bytes = await get_body(request)
+            elif (
+                request.url.path.strip("/").startswith(f"{server_key}/")
+                and request.method == "POST"
+            ):
+                logger.info("got action POST request in middleware")
+                body_bytes = await request.body()
                 body_dict = json.loads(body_bytes)
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
@@ -69,18 +71,26 @@ class BaseAPI(HelaoFastAPI):
                     == 0
                     or start_cond == ASC.no_wait
                 ):
+                    logger.info("action endpoint is available")
                     response = await call_next(request)
                 else:  # collision between two base requests for one resource, queue
+                    logger.info("action endpoint is busy, queuing")
                     action_dict["action_params"] = action_dict.get("action_params", {})
                     action_dict["action_params"]["delayed_on_actserv"] = True
                     extra_params = {}
+                    action = Action(**action_dict)
                     for d in (
                         request.query_params,
                         request.path_params,
                     ):
                         for k, v in d.items():
-                            extra_params[k] = eval_val(v)
-                    action = Action(**action_dict)
+                            if k in [
+                                "action_version",
+                                "start_condition",
+                                "from_globalexp_params",
+                                "to_globalexp_params",
+                            ]:
+                                extra_params[k] = eval_val(v)
                     action.action_name = request.url.path.strip("/").split("/")[-1]
                     action.action_server = MachineModel(
                         server_name=server_key, machine_name=gethostname().lower()
@@ -94,10 +104,11 @@ class BaseAPI(HelaoFastAPI):
                     self.base.endpoint_queues[endpoint].put(
                         (
                             action,
-                            extra_params,
+                            {},
                         )
                     )
             else:
+                logger.info("got non-action POST request")
                 response = await call_next(request)
             return response
 
@@ -114,9 +125,25 @@ class BaseAPI(HelaoFastAPI):
         @self.on_event("startup")
         def startup_event():
             self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
+
+            self.root_dir = self.base.world_cfg.get("root", None)
+            if self.root_dir is not None:
+                self.fault_dir = os.path.join(self.root_dir, "FAULTS")
+                os.makedirs(self.fault_dir, exist_ok=True)
+                fault_path = os.path.join(self.fault_dir, f"{server_key}_faults.txt")
+                self.fault_file = open(fault_path, "a")
+                faulthandler.enable(self.fault_file)
+
             self.base.myinit()
             if driver_class is not None:
-                self.driver = driver_class(self.base)
+                if issubclass(driver_class, HelaoDriver):
+                    self.driver = driver_class(config=self.server_params)
+                    if poller_class is not None:
+                        self.poller = poller_class(
+                            self.driver, self.server_cfg.get("polling_time", 0.05)
+                        )
+                else:
+                    self.driver = driver_class(self.base)
             self.base.dyn_endpoints_init()
 
         @self.on_event("startup")
@@ -127,7 +154,6 @@ class BaseAPI(HelaoFastAPI):
                     new_route.methods = {"HEAD"}
                     new_route.include_in_schema = False
                     self.routes.append(new_route)
-
 
         @self.websocket("/ws_status")
         async def websocket_status(websocket: WebSocket):
@@ -214,10 +240,11 @@ class BaseAPI(HelaoFastAPI):
         @self.post("/_raise_async_exception", tags=["private"])
         async def _raise_async_exception():
             async def sleep_then_error():
-                print(f'Start time: {time.time()}')
+                print(f"Start time: {time.time()}")
                 await asyncio.sleep(10)
-                print(f'End time: {time.time()}')
+                print(f"End time: {time.time()}")
                 raise Exception("test async exception for error recovery debugging")
+
             loop = asyncio.get_running_loop()
             loop.create_task(sleep_then_error())
             return True
@@ -257,6 +284,10 @@ class BaseAPI(HelaoFastAPI):
                     "driver has NO async_shutdown function", info=True
                 )
                 retvals["async_shutdown"] = None
+
+            if self.root_dir is not None:
+                faulthandler.disable()
+                self.fault_file.close()
             return retvals
 
         @self.post(f"/{server_key}/estop", tags=["action"])

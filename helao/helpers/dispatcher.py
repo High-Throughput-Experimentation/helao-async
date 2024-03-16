@@ -153,9 +153,9 @@ async def endpoints_available(req_list: list):
     responses = []
     states = []
     for req in req_list:
+        isavail = False
         try:
             status = await check_endpoint(req)
-            isavail = False
             cent = status // 100
             if cent == 2:
                 isavail = True
