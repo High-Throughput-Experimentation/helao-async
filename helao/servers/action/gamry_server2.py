@@ -114,7 +114,6 @@ class GamryExec(Executor):
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
-        logger.debug("getting data")
         resp = self.driver.get_data(self.poll_rate)
         # populate executor buffer for output calculation
         for k, v in resp.data.items():
