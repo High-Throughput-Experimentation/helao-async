@@ -120,7 +120,7 @@ class GamryExec(Executor):
         for k, v in resp.data.items():
             self.data_buffer[k].extend(v)
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
-        status = HloStatus.active if resp.status != "done" else HloStatus.finished
+        status = HloStatus.active if resp.message != "done" else HloStatus.finished
         return {"error": error, "status": status, "data": resp.data}
 
     async def _post_exec(self):
