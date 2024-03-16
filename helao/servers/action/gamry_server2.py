@@ -107,12 +107,14 @@ class GamryExec(Executor):
             while not bits:
                 await asyncio.sleep(0.001)
                 bits = self.driver.pstat.DigitalIn()
+        logger.debug("starting measurement")
         resp = self.driver.measure(self.ttl_params)
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error}
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
+        logger.debug("getting data")
         resp = self.driver.get_data(self.poll_rate)
         # populate executor buffer for output calculation
         for k, v in resp.data.items():
