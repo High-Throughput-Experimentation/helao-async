@@ -17,6 +17,8 @@ import asyncio
 import time
 import psutil
 import traceback
+from collections import defaultdict
+
 import numpy as np
 
 from helao.helpers.premodels import Action
@@ -43,9 +45,7 @@ def gamry_error_decoder(e):
     if isinstance(e, comtypes.COMError):
         hresult = 2**32 + e.args[0]
         if hresult & 0x20000000:
-            return GamryCOMError(
-                "0x{0:08x}: {1}".format(2**32 + e.args[0], e.args[1])
-            )
+            return GamryCOMError("0x{0:08x}: {1}".format(2**32 + e.args[0], e.args[1]))
     return e
 
 
@@ -127,6 +127,8 @@ class gamry:
         self.Gamry_devid = self.config_dict.get("dev_id", 0)
         self.filterfreq_hz = 1.0 * self.config_dict.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config_dict.get("grounded", True))
+        self.data_buffer_size = 100
+        self.data_buffer = defaultdict(list)
 
         asyncio.gather(self.init_Gamry(self.Gamry_devid))
 
@@ -356,6 +358,7 @@ class gamry:
         need to initialize and open connection to gamry first"""
         await asyncio.sleep(0.01)
         error = ErrorCodes.none
+        self.data_buffer = defaultdict(list) 
         if self.pstat:
             try:
                 IErangesdict = dict(
@@ -541,7 +544,7 @@ class gamry:
                     ierangeval = self.pstat.TestIERange(setpointie)
                     self.pstat.SetIERange(ierangeval)
                     # subset of stop conditions
-                    
+
                     self.base.print_message(
                         f"Using vmin threshold = {act_params['stop_vmin']}, {type(act_params['stop_vmin'])}"
                     )
@@ -861,6 +864,24 @@ class gamry:
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADVMax(False, 0.0))
                         # dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMax(False, 0.0))
+                elif mode == Gamry_modes.RCA:
+                    Dtaqmode = "GamryCOM.GamryDtaqUniv"
+                    Dtaqtype = None
+                    self.FIFO_column_headings = [
+                        "t_s",
+                        "Ewe_V",
+                        "Vu",
+                        "I_A",
+                        "Vsig",
+                        "Ach_V",
+                        "IERange",
+                        "Overload_HEX",
+                        "unknown1",
+                    ]
+                    self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                    self.pstat.SetVchRangeMode(True)
+
+                # Gamry Signal not available
                 else:
                     self.base.print_message(f"'mode {mode} not supported'", error=True)
                     error = ErrorCodes.not_available
@@ -1024,6 +1045,7 @@ class gamry:
                 return {"measure": "run_error"}
 
             realtime = await self.active.get_realtime()
+
             if self.active:
                 self.active.finish_hlo_header(
                     realtime=realtime,
@@ -1054,6 +1076,12 @@ class gamry:
                 tmpc = len(self.dtaqsink.acquired_points)
                 if counter < tmpc:
                     tmp_datapoints = self.dtaqsink.acquired_points[counter:tmpc]
+                    for tup in tmp_datapoints:
+                        for k, v in zip(self.FIFO_column_headings, tup):
+                            if len(self.data_buffer[k])>self.data_buffer_size:
+                                self.data_buffer[k].pop(0)
+                            self.data_buffer[k].append(v)
+                    
                     # print(counter, tmpc, len(tmp_datapoints))
                     # EIS needs to be tested and fixed
                     # # Need to get additional data for EIS
@@ -1099,6 +1127,12 @@ class gamry:
                     # self.base.print_message(f"counter: {counter}, tmpc: {tmpc}")
                     counter = tmpc
                     sink_status = self.dtaqsink.status
+
+            # check if we have Ewe_V or I_A in data_buffer, add means to action params
+            for k in ["Ewe_V", "I_A"]:
+                if k in self.data_buffer:
+                    meanv = np.mean(self.data_buffer[k][-5:])
+                    self.active.action.action_params[f"{k}__mean_final"] = meanv
 
             self.close_pstat_connection()
             return {"measure": f"done_{self.IO_meas_mode}"}
@@ -1684,6 +1718,66 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
+            eta=eta,
+        )
+        return activeDict
+
+    async def technique_RCA(self, A: Action):
+        """Repeating CA definition"""
+        Vinit = A.action_params["Vinit__V"]
+        Tinit = A.action_params["Tinit__s"]
+        Vstep = A.action_params["Vstep__V"]
+        Tstep = A.action_params["Tstep__s"]
+        Cycles = A.action_params["Cycles"]
+        AcqInt = A.action_params["AcqInterval__s"]
+
+        TTLwait = A.action_params["TTLwait"]
+        TTLsend = A.action_params["TTLsend"]
+        IErange = A.action_params["IErange"]
+        """This technique is used to run pulse voltammetry experiments such as Normal 
+        Pulse or Differential Pulse voltammetry. It is normally combined with the PV 
+        dtaq for data acquisition. The values passed in for Vinit and Vpv, Vpulse, will 
+        be interpreted as volts for potentiostat mode or amps for galvanostat mode."""
+
+        # calculate signal array
+        cycle_time = Tinit + Tstep
+        points_per_cycle = round(cycle_time / AcqInt)
+        signal_array = [Vinit if i*AcqInt <= Tinit else Vstep for i in range(points_per_cycle)]
+
+        eta = cycle_time * Cycles
+
+        sigfunc_params = [
+            self.pstat,
+            Cycles,
+            AcqInt,
+            points_per_cycle,
+            signal_array,
+            self.GamryCOM.PstatMode,
+        ]
+        sigfunc = "GamryCOM.GamrySignalArray"
+        measmode = Gamry_modes.RCA
+
+        # setup partial header which will be completed in measure loop
+        self.FIFO_gamryheader = {
+            "Vinit__V": Vinit,
+            "Tinit__s": Tinit,
+            "Vstep__V": Vstep,
+            "Tstep__s": Tstep,
+            "Cycles": Cycles,
+            "AcqInterval__s": AcqInt,
+        }
+
+        # common
+        self.IO_IErange = self.ierangefinder(requested_range=IErange)
+        self.IO_TTLwait = TTLwait
+        self.IO_TTLsend = TTLsend
+
+        activeDict = await self.technique_wrapper(
+            act=A,
+            measmode=measmode,
+            sigfunc=sigfunc,
+            sigfunc_params=sigfunc_params,
+            samplerate=AcqInt,
             eta=eta,
         )
         return activeDict

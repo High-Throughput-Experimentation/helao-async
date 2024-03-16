@@ -33,6 +33,7 @@ VALID_ACTION_NAME = (
     "run_CV",
     "run_EIS",
     "run_OCV",
+    "run_RCA",
 )
 
 
@@ -149,7 +150,7 @@ class C_potvis:
                 [self.plot, Spacer(width=20), self.plot_prev],
                 Spacer(height=10),
             ],
-            background="#C0C0C0",
+            background="#D6DBDF",
             width=1024,
         )
 

@@ -9,7 +9,7 @@ from helao.helpers.print_message import print_message
 from helaocore.models.helaodirs import HelaoDirs
 
 
-def helao_dirs(world_cfg: dict, server_name: str) -> HelaoDirs:
+def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
     def check_dir(path):
         if not os.path.isdir(path):
             print_message(
@@ -57,42 +57,43 @@ def helao_dirs(world_cfg: dict, server_name: str) -> HelaoDirs:
             process_root=process_root,
         )
 
-        # zip and remove old txt logs (start new log for every helao launch)
-        old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
-        nots_counter = 0
-        for old_log in old_log_txts:
-            print_message({}, "launcher", f"Compressing: {old_log}")
-            try:
-                timestamp_found = False
-                timestamp = ""
-                with open(old_log, "r") as f:
-                    for line in f:
-                        if line.replace("error_[", "[").strip().startswith("["):
-                            timestamp_found = True
-                            timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line)[
-                                0
-                            ].replace(":", "")
-                            zipname = old_log.replace(".txt", f"{timestamp}.zip")
-                            arcname = os.path.basename(old_log).replace(
-                                ".txt", f"{timestamp}.txt"
-                            )
-                            break
-                if not timestamp_found:
-                    while os.path.exists(
-                        old_log.replace(".txt", f"__{nots_counter}.zip")
-                    ):
-                        nots_counter += 1
-                    zipname = old_log.replace(".txt", f"__{nots_counter}.zip")
-                    arcname = os.path.basename(old_log).replace(
-                        ".txt", f"__{nots_counter}.txt"
-                    )
-                with zipfile.ZipFile(
-                    zipname, "w", compression=zipfile.ZIP_DEFLATED
-                ) as zf:
-                    zf.write(old_log, arcname)
-                os.remove(old_log)
-            except:
-                print_message({}, "launcher", f"Error compressing log: {old_log}")
+        if server_name is not None:
+            # zip and remove old txt logs (start new log for every helao launch)
+            old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
+            nots_counter = 0
+            for old_log in old_log_txts:
+                print_message({}, "launcher", f"Compressing: {old_log}")
+                try:
+                    timestamp_found = False
+                    timestamp = ""
+                    with open(old_log, "r") as f:
+                        for line in f:
+                            if line.replace("error_[", "[").strip().startswith("["):
+                                timestamp_found = True
+                                timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line)[
+                                    0
+                                ].replace(":", "")
+                                zipname = old_log.replace(".txt", f"{timestamp}.zip")
+                                arcname = os.path.basename(old_log).replace(
+                                    ".txt", f"{timestamp}.txt"
+                                )
+                                break
+                    if not timestamp_found:
+                        while os.path.exists(
+                            old_log.replace(".txt", f"__{nots_counter}.zip")
+                        ):
+                            nots_counter += 1
+                        zipname = old_log.replace(".txt", f"__{nots_counter}.zip")
+                        arcname = os.path.basename(old_log).replace(
+                            ".txt", f"__{nots_counter}.txt"
+                        )
+                    with zipfile.ZipFile(
+                        zipname, "w", compression=zipfile.ZIP_DEFLATED
+                    ) as zf:
+                        zf.write(old_log, arcname)
+                    os.remove(old_log)
+                except Exception as e:
+                    print_message({}, "launcher", f"Error compressing log: {old_log}, {e}")
 
     else:
         helaodirs = HelaoDirs(

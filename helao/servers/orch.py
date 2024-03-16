@@ -46,7 +46,7 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.servers.base import Base, Active
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.zdeque import zdeque
-
+from helao.drivers.data.sync_driver import HelaoSyncer
 
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
@@ -86,6 +86,10 @@ class Orch(Base):
             server_name=self.server.server_name,
             user_sequence_path=self.helaodirs.user_seq,
         )
+
+        self.use_db = "DB" in self.world_cfg["servers"].keys()
+        if self.use_db:
+            self.syncer = HelaoSyncer(action_serv=self, db_server_name="DB")
 
         # instantiate experiment/experiment queue, action queue
         self.sequence_dq = zdeque([])
@@ -395,8 +399,9 @@ class Orch(Base):
         """Subscribe to global status queue and send messages to websocket client."""
         self.print_message("got new global status subscriber")
         await websocket.accept()
+        gs_sub = self.globstat_q.subscribe()
         try:
-            async for globstat_msg in self.globstat_q.subscribe():
+            async for globstat_msg in gs_sub:
                 await websocket.send_text(json.dumps(globstat_msg.as_dict()))
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -404,6 +409,8 @@ class Orch(Base):
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 warning=True,
             )
+            if gs_sub in self.globstat_q.subscribers:
+                self.globstat_q.remove(gs_sub)
 
     async def globstat_broadcast_task(self):
         """Consume globstat_q. Does nothing for now."""
@@ -470,6 +477,14 @@ class Orch(Base):
 
             self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
+            if self.use_db:
+                meta_s3_key = f"sequence/{self.seq_model.sequence_uuid}.json"
+                self.print_message(
+                    f"uploading initial active sequence json to s3 ({meta_s3_key})"
+                )
+                await self.syncer.to_s3(
+                    self.seq_model.clean_dict(strip_private=True), meta_s3_key
+                )
 
             # add all experiments from sequence to experiment queue
             # todo: use seq model instead to initialize some parameters
@@ -589,7 +604,17 @@ class Orch(Base):
         )
 
         # write a temporary exp
+        self.exp_model = self.active_experiment.get_exp()
         await self.write_active_experiment_exp()
+        if self.use_db:
+            meta_s3_key = f"experiment/{self.exp_model.experiment_uuid}.json"
+            self.print_message(
+                f"uploading initial active experiment json to s3 ({meta_s3_key})"
+            )
+            await self.syncer.to_s3(
+                self.exp_model.clean_dict(strip_private=True), meta_s3_key
+            )
+
         return ErrorCodes.none
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
@@ -629,41 +654,46 @@ class Orch(Base):
                     self.print_message(
                         "orch is waiting for endpoint to become available"
                     )
-                    while True:
+                    endpoint_free = self.globalstatusmodel.endpoint_free(
+                        action_server=A.action_server, endpoint_name=A.action_name
+                    )
+                    while not endpoint_free:
                         await self.wait_for_interrupt()
                         endpoint_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.action_server, endpoint_name=A.action_name
                         )
-                        if endpoint_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_server:
                     self.print_message("orch is waiting for server to become available")
-                    while True:
+                    server_free = self.globalstatusmodel.server_free(
+                        action_server=A.action_server
+                    )
+                    while not server_free:
                         await self.wait_for_interrupt()
                         server_free = self.globalstatusmodel.server_free(
                             action_server=A.action_server
                         )
-                        if server_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_orch:
                     self.print_message("orch is waiting for wait action to end")
-                    while True:
+                    wait_free = self.globalstatusmodel.endpoint_free(
+                        action_server=A.orchestrator, endpoint_name="wait"
+                    )
+                    while not wait_free:
                         await self.wait_for_interrupt()
                         wait_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.orchestrator, endpoint_name="wait"
                         )
-                        if wait_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_previous:
                     self.print_message("orch is waiting for previous action to finish")
-                    while True:
+                    previous_action_active = (
+                        self.last_action_uuid
+                        in self.globalstatusmodel.active_dict.keys()
+                    )
+                    while previous_action_active:
                         await self.wait_for_interrupt()
-                        previous_action_free = (
+                        previous_action_active = (
                             self.last_action_uuid
-                            not in self.globalstatusmodel.active_dict.keys()
+                            in self.globalstatusmodel.active_dict.keys()
                         )
-                        if previous_action_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_all:
                     await self.orch_wait_for_all_actions()
 
@@ -711,13 +741,23 @@ class Orch(Base):
                     )
                     error_code = ErrorCodes.http
 
-                if error_code != ErrorCodes.none:
-                    stop_message = f"Dispatching action {A.action_name} did not return status code 200. Pausing orch."
-                    self.stop_message = stop_message
-                    await self.stop()
-                    self.action_dq.insert(0, A)
-                    await self.update_operator(True)
-                    return ErrorCodes.none
+                for cond, stop_message in [
+                    (
+                        error_code != ErrorCodes.none,
+                        f"Dispatching {A.action_name} did not return status 200. Pausing orch.",
+                    ),
+                    (
+                        result_actiondict is None,
+                        f"Dispatching {A.action_name} returned None object. Pausing orch.",
+                    ),
+                ]:
+                    if cond:
+                        self.stop_message = stop_message
+                        await self.stop()
+                        self.print_message(f"Re-queuing {A.action_name}")
+                        self.action_dq.insert(0, A)
+                        await self.update_operator(True)
+                        return ErrorCodes.none
 
                 # except asyncio.exceptions.TimeoutError:
                 #     result_actiondict, error_code = await async_private_dispatcher(
@@ -773,15 +813,6 @@ class Orch(Base):
                                 self.print_message(
                                     f"{actstat} not found in globalstatus.nonactive_dict"
                                 )
-
-            # this will recursively call the next no_wait action in queue, and return its error
-            if self.action_dq and not self.step_thru_actions:
-                nextA = self.action_dq[0]
-                if nextA.start_condition == ActionStartCondition.no_wait:
-                    error_code = await self.loop_task_dispatch_action()
-
-            if error_code is not ErrorCodes.none:
-                return error_code
 
             try:
                 result_action = Action(**result_actiondict)
@@ -847,7 +878,14 @@ class Orch(Base):
                                     {k2: result_action.action_params[k1]}
                                 )
 
-                # self.print_message("done copying global vars back to experiment")
+            # # this will recursively call the next no_wait action in queue, and return its error
+            # if self.action_dq and not self.step_thru_actions:
+            #     nextA = self.action_dq[0]
+            #     if nextA.start_condition == ActionStartCondition.no_wait:
+            #         error_code = await self.loop_task_dispatch_action()
+
+            # if error_code is not ErrorCodes.none:
+            #     return error_code
 
         return ErrorCodes.none
 
@@ -1033,7 +1071,7 @@ class Orch(Base):
         # reset loop intend
         await self.intend_none()
 
-        self.current_stop_message("E-STOP" + reason_suffix)
+        self.current_stop_message = "E-STOP" + reason_suffix
         await self.update_operator(True)
 
     async def stop_loop(self):

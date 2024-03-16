@@ -67,7 +67,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         sequence_uuid: str = "",
         plate_id: Union[int, None] = None,
-        recent: bool = True,
+        recent: bool = False,
         params: dict = {},
     ):
         """Generates dry UVIS-T analyses from sequence_uuid."""
@@ -88,7 +88,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         sequence_uuid: str = "",
         plate_id: Union[int, None] = None,
-        recent: bool = True,
+        recent: bool = False,
         params: dict = {},
     ):
         """Generates ECHEUVIS stability analyses from sequence_uuid."""
@@ -99,6 +99,23 @@ def makeApp(confPrefix, server_key, helao_root):
             sequence_uuid=UUID(active.action.action_params['sequence_uuid']),
             params=active.action.action_params['params'],
             recent=active.action.action_params['recent'],
+        )
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{server_key}/analyze_icpms_local", tags=["action"])
+    async def analyze_icpms_local(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        sequence_zip_path: str = "",
+        params: dict = {},
+    ):
+        """Generates ICPMS concentration analyses from sequence zip path."""
+        active = await app.base.setup_and_contain_action()
+            
+        await app.driver.batch_calc_icpms_local(
+            sequence_zip_path=active.action.action_params['sequence_zip_path'],
+            params=active.action.action_params['params'],
         )
         finished_action = await active.finish()
         return finished_action.as_dict()

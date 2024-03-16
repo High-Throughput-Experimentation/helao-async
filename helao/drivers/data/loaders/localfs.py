@@ -1,11 +1,11 @@
 import os
-import builtins
 import json
 from glob import glob
 from uuid import UUID
 from datetime import datetime
 from zipfile import ZipFile
 from collections import defaultdict
+from typing import Optional
 
 import pandas as pd
 
@@ -22,13 +22,14 @@ class LocalLoader:
         self.seq_cache = {}
         self.prc_cache = {}
         self._yml_paths = {}
-        self.target = os.path.abspath(os.path.normpath(data_path))
+        self.target = os.path.abspath(os.path.normpath(data_path.strip('"').strip("'")))
         target_state = self.target.split("RUNS_")[-1].split(os.sep)[0]
         states = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED", "RUNS_DIAG")
         state_dir = f"RUNS_{target_state}"
+        process_dir = os.path.dirname(self.target).replace(state_dir, "PROCESSES") 
         check_dirs = [
             f"{self.target.replace(state_dir, x)}" for x in states
-        ] + [self.target.replace(state_dir, "PROCESSES")]
+        ] + [process_dir]
         if not os.path.exists(self.target):
             raise FileNotFoundError(
                 "data_path argument is not a valid file or folder path"
@@ -38,6 +39,7 @@ class LocalLoader:
             with ZipFile(self.target, "r") as zf:
                 zip_contents = zf.namelist()
             _yml_paths = [x for x in zip_contents if x.endswith(".yml")]
+            _yml_paths += glob(os.path.join(process_dir, "**", "*-prc.yml"), recursive=True)
         elif os.path.isdir(self.target):
             for check_dir in check_dirs:
                 _yml_paths += glob(os.path.join(check_dir, "**", "*.yml"), recursive=True)
@@ -148,6 +150,7 @@ class LocalLoader:
             _, exp_name = yml_dir.split("__")
             yml_file = os.path.basename(ymlp)
             idx, prc_uuid, techname = yml_file.replace("-prc.yml", "").split("__")
+            prc_uuid = UUID(prc_uuid)
             prc_idx = int(idx)
             exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%Y%m%d.%H%M%S%f")
             prc_parts.append(
@@ -182,9 +185,9 @@ class LocalLoader:
         self.prc_cache = {}
 
     def get_yml(self, path: str):
-        if self.target.endswith(".zip"):
+        if self.target.endswith(".zip") and not path.endswith("-prc.yml"):
             with ZipFile(self.target, "r") as zf:
-                metad = dict(yml_load(zf.open(path).read().decode("utf-8")))
+                metad = dict(yml_load(zf.open(path).read().replace(b'\x89', b'%').decode("utf-8")))
         else:
             # metad = yml_load("".join(builtins.open(path, "r").readlines()))
             FM = FileMapper(path)
@@ -229,7 +232,7 @@ class LocalLoader:
 
     def get_hlo(self, yml_path: str, hlo_fn: str):
         if self.target.endswith(".zip"):
-            hlotarget = os.path.join(os.path.dirname(yml_path), hlo_fn)
+            hlotarget ="/".join([os.path.dirname(yml_path), hlo_fn])
             with ZipFile(self.target, "r") as zf:
                 lines = zf.open(hlotarget).readlines()
 
@@ -361,3 +364,137 @@ class HelaoProcess(HelaoModel):
         self.process_timestamp = self.timestamp
         self.process_params = self.params
         self.technique_name = self.name
+
+
+class EcheUvisLoader(LocalLoader):
+    """ECHEUVIS process dataloader"""
+
+    def __init__(
+        self,
+        data_path: str
+    ):
+        super().__init__(data_path)
+
+    def get_recent(
+        self,
+        query: str,
+        min_date: str = "2023-04-26",
+        plate_id: Optional[int] = None,
+        sample_no: Optional[int] = None,
+    ):
+        conditions = []
+        conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
+        recent_md = sorted(
+            [md for md, pi, sn in self.recent_cache if pi is None and sn is None]
+        )
+        recent_mdpi = sorted(
+            [md for md, pi, sn in self.recent_cache if pi == plate_id and sn is None]
+        )
+        recent_mdsn = sorted(
+            [md for md, pi, sn in self.recent_cache if pi is None and sn == sample_no]
+        )
+        query_parts = ""
+        if plate_id is not None:
+            query_parts += f" & plate_id=={plate_id}"
+        if sample_no is not None:
+            query_parts += f" & sample_no=={sample_no}"
+
+        if (
+            min_date,
+            plate_id,
+            sample_no,
+        ) not in self.recent_cache or not self.cache_sql:
+            data = self.run_raw_query(query + "\n".join(conditions))
+            pdf = pd.DataFrame(data)
+            # print("!!! dataframe shape:", pdf.shape)
+            # print("!!! dataframe cols:", pdf.columns)
+            pdf["plate_id"] = pdf.global_label.apply(
+                lambda x: int(x.split("_")[-2])
+                if "solid" in x and "None" not in x
+                else None
+            )
+            pdf["sample_no"] = pdf.global_label.apply(
+                lambda x: int(x.split("_")[-1])
+                if "solid" in x and "None" not in x
+                else None
+            )
+            # assign solid samples from sequence params
+            for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
+                subdf = pdf.query("sequence_uuid==@suuid")
+                spars = subdf.iloc[0]["sequence_params"]
+                pid = spars["plate_id"]
+                solid_samples = spars["plate_sample_no_list"]
+                assemblies = sorted(
+                    set(
+                        subdf.query(
+                            "global_label.str.contains('assembly')"
+                        ).global_label
+                    )
+                )
+                for slab, alab in zip(solid_samples, assemblies):
+                    pdf.loc[
+                        pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
+                        "plate_id",
+                    ] = pid
+                    pdf.loc[
+                        pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
+                        "sample_no",
+                    ] = slab
+            # self.recent_cache[
+            #     (
+            #         min_date,
+            #         plate_id,
+            #         sample_no,
+            #     )
+            # ] = pdf.sort_values("process_timestamp")
+
+        elif recent_md and min_date >= recent_md[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_md[0],
+                    None,
+                    None,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+        elif recent_mdpi and min_date >= recent_mdpi[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_mdpi[0],
+                    plate_id,
+                    None,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+        elif recent_mdsn and min_date >= recent_mdsn[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_mdsn[0],
+                    None,
+                    sample_no,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+
+        return self.recent_cache[
+            (
+                min_date,
+                plate_id,
+                sample_no,
+            )
+        ].reset_index(drop=True)

@@ -4,20 +4,20 @@ channels:
   - defaults
 dependencies:
   - pip:
+    - aiodebug
     - aioshutil
     - plumbum
-    - psycopg2
     - pyft232
     - pylablib
+    - sqlmodel
     - git+https://github.com/spomjaksilp/pyMeCom
-    - sqlalchemy
-    - sqlmodel>=0.0.14
   - aiofiles
   - aiohttp
   - bokeh=2
   - boto3
   - botocore
   - colorama
+  - colorlog
   - fastapi
   - filelock
   - git
@@ -30,8 +30,10 @@ dependencies:
   - numpy
   - pandas
   - paramiko
+  - picologging
   - pip
   - psutil
+  - psycopg2
   - pyaml
   - pybase64
   - pydantic-settings
@@ -52,6 +54,7 @@ dependencies:
   - scikit-learn
   - scipy
   - shortuuid
+  - sqlalchemy
   - sqlite
   - sshtunnel
   - starlette

@@ -9,7 +9,9 @@ from bokeh.server.server import Server
 import colorama
 from helao.helpers.print_message import print_message
 from helao.helpers.config_loader import config_loader
+from helao.helpers import logging
 
+global logger
 
 if __name__ == "__main__":
     log_root = "."
@@ -18,6 +20,10 @@ if __name__ == "__main__":
     server_key = sys.argv[2]
     confArg = sys.argv[1]
     config = config_loader(confArg, helao_root)
+    log_root = os.path.join(config["root"], "LOGS") if "root" in config else None
+    if logging.LOGGER is None:
+        logging.LOGGER = logging.make_logger(logger_name=server_key, log_dir=log_root)
+    logger = logging.LOGGER
 
     C = config["servers"]
     S = C[server_key]

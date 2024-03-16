@@ -1,7 +1,7 @@
 dummy: true
 simulation: false
 experiment_libraries:
-  - CCSI_exp
+  - CSIL_exp
   - samples_exp
 experiment_params:
   gamrychannelwait: -1
@@ -50,29 +50,29 @@ servers:
     fast: nidaqmx_server
     params:
       dev_gasvalve:
-        1A: cDAQ1Mod1/port0/line0
-        1B: cDAQ1Mod1/port0/line1
-        7A: cDAQ1Mod1/port1/line1
-        7B: cDAQ1Mod1/port1/line2
+        1A: dev1/port0/line1
+        1B: dev1/port0/line0
+        7A: dev1/port1/line1
+        7B: dev1/port1/line2
       dev_multivalve:
-        multi_CMD0: cDAQ1Mod1/port1/line4
-        multi_CMD1: cDAQ1Mod1/port1/line5
-        multi_CMD2: cDAQ1Mod1/port1/line6
-        multi_CMD3: cDAQ1Mod1/port1/line7
-        multichannel_valve_done: cDAQ1Mod1/port2/line7
-        multichannel_valve_error: cDAQ1Mod1/port2/line6
+        multi_CMD0: dev1/port1/line4
+        multi_CMD1: dev1/port1/line5
+        multi_CMD2: dev1/port1/line6
+        multi_CMD3: dev1/port1/line7
+        multichannel_valve_done: dev1/port2/line7
+        multichannel_valve_error: dev1/port2/line6
       dev_liquidvalve:
-        '2': cDAQ1Mod1/port0/line2
-        '3': cDAQ1Mod1/port0/line3
-        '4': cDAQ1Mod1/port0/line4
-        5A-cell: cDAQ1Mod1/port0/line5
-        5B-waste: cDAQ1Mod1/port0/line6
-        6A-waste: cDAQ1Mod1/port0/line7
-        6B: cDAQ1Mod1/port1/line0
-       # '8': cDAQ1Mod1/port0/line11
-        #'9': cDAQ1Mod1/port0/line12
-      dev_pump:
-        RecirculatingPeriPump1: cDAQ1Mod1/port0/line12
+        '2': dev1/port0/line2
+        '3': dev1/port0/line3
+        '4': dev1/port0/line4
+        5A-cell: dev1/port0/line5
+        5B-waste: dev1/port0/line6
+        6A-waste: dev1/port0/line7
+        6B: dev1/port1/line0
+        '8': dev1/port1/line3
+        #'9': dev1/port0/line12
+      # dev_pump:
+      #   RecirculatingPeriPump1: dev1/port0/line12
   PAL:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8007
@@ -103,7 +103,7 @@ servers:
     group: action
     fast: co2sensor_server
     params:
-      port: COM4
+      port: COM12
       start_margin: 0
     verbose: false
   SYRINGE0:
@@ -116,7 +116,7 @@ servers:
       pumps:
         zero:
           address: 0
-          diameter: 26.7
+          diameter: 20.05
   SYRINGE1:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8014
@@ -127,7 +127,15 @@ servers:
       pumps:
         one:
           address: 1
-          diameter: 26.7
+          diameter: 20.05
+  DOSEPUMP:
+    host: hte-ccsi-02.htejcap.caltech.edu
+    port: 8016
+    group: action
+    fast: diapump_server
+    params:
+      port: COM7
+      address: 0
   MFC:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8009
@@ -149,7 +157,7 @@ servers:
       devices:
         N2:
           port: COM5
-          unit_id: B
+          unit_id: A
 
 
   CALC:

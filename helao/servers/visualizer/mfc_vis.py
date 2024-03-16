@@ -58,6 +58,7 @@ class C_mfc:
             # "total_flow",
             "volumetric_flow",
             "hold_valve",
+            "lock_display",
             # "time_now",
         ]
 
@@ -129,7 +130,7 @@ class C_mfc:
                 [self.plot, Spacer(width=20), self.table],
                 Spacer(height=10),
             ],
-            background="#C0C0C0",
+            background="#D6DBDF",
             width=1024,
         )
         self.control_mode = "mass flow"
@@ -301,6 +302,8 @@ class C_mfc:
                 source=self.datasource,
                 legend_label=f"{dev_name} rolling mean",
             )
+        self.plot.legend.border_line_alpha = 0.2
+        self.plot.legend.background_fill_alpha = 0.2
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active

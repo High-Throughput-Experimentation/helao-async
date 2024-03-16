@@ -36,10 +36,11 @@ class HelaoOperator:
                 path_params,
                 json_params,
             )
-        except ConnectionError:
+        except Exception:
             resp = {
                 k: "unreachable" for k in ("orch_state", "loop_state", "loop_intent")
             }
+            error_code = ErrorCodes.not_available
         if error_code != ErrorCodes.none:
             print("HelaoOperator request got non-200 response.")
         return resp

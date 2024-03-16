@@ -242,6 +242,33 @@ async def gamry_dyn_endpoints(app=None):
             return active_dict
 
 
+        @app.post(f"/{server_key}/run_RCA", tags=["action"])
+        async def run_RCA(
+            action: Action = Body({}, embed=True),
+            action_version: int = 1,
+            fast_samples_in: List[SampleUnion] = Body([], embed=True),
+            Vinit__V: float = 0.0,
+            Tinit__s: float = 0.5,
+            Vstep__V: float = 0.5,
+            Tstep__s: float = 0.5,
+            Cycles: int = 5,
+            AcqInterval__s: float = 0.01,  # acquisition rate
+
+            TTLwait: int = Query(
+                -1, ge=-1, le=3
+            ),  # -1 disables, else select TTL 0-3
+            TTLsend: int = Query(
+                -1, ge=-1, le=3
+            ),  # -1 disables, else select TTL 0-3
+            IErange: app.driver.gamry_range_enum = "auto",
+        ):
+            """Measure pulsed voltammetry"""
+            A =  app.base.setup_action()
+            A.action_abbr = "RCA"
+            # A.save_data = True
+            active_dict = await app.driver.technique_RCA(A)
+            return active_dict
+
 def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)

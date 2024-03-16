@@ -160,6 +160,7 @@ servers:
       aws_bucket: helao.data
       api_host: caltech-api.modelyst.com
       testing: false
+    verbose: true
   TEC:
     host: hte-anec-03.htejcap.caltech.edu
     port: 8008

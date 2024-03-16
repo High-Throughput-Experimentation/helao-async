@@ -1,6 +1,6 @@
 """Sequence library for ANEC"""
 
-__all__ = ["ANEC_sample_ready", "ANEC_series_CA", "ANEC_series_CAliquidOnly", "ANEC_OCV","ANEC_photo_CA", "ANEC_photo_CV", "ANEC_cleanup_disengage","ANEC_repeat_CA", "ANEC_repeat_TentHeatCAgasonly","ANEC_heatOCV","ANEC_repeat_TentHeatCA","ANEC_repeat_HeatCA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_gasonly_CA", "ANEC_ferricyanide_simpleprotocol", "ANEC_ferricyanide_protocol", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
+__all__ = ["ANEC_sample_ready", "ANEC_series_CA", "ANEC_series_CAliquidOnly", "ANEC_OCV","ANEC_photo_CA", "ANEC_photo_CAgasonly", "ANEC_photo_CV", "ANEC_cleanup_disengage","ANEC_repeat_CA", "ANEC_repeat_TentHeatCAgasonly","ANEC_heatOCV","ANEC_repeat_TentHeatCA","ANEC_repeat_HeatCA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_gasonly_CA", "ANEC_ferricyanide_simpleprotocol", "ANEC_ferricyanide_protocol", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
 
 from typing import List
 from typing import Optional
@@ -502,6 +502,119 @@ def ANEC_photo_CA(
                 "wash2": wash2,
                 "wash3": wash3,
                 "wash4": wash4,
+            },
+        )
+
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
+    if len(WE_potential__V)>1:
+        epm.add_experiment("ANEC_sub_alloff", {})
+    return epm.experiment_plan_list
+
+def ANEC_photo_CAgasonly(
+    sequence_version: int = 3,
+    plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    reservoir_liquid_sample_no: int = 1511,
+    volume_ul_cell_liquid: float = 1000,
+    WE_potential__V: List[float] = [-0.2, -0.3, -0.4, -0.5, -0.6],
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    CA_duration_sec: List[float] = [600, 600, 600, 600, 600],
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    gamrychannelwait: int= -1,
+    gamrychannelsend: int= 0,
+    ref_offset__V: float = 0.0,
+    led_wavelengths_nm: float = 450.0,
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_intensities_mw: float = 9.0,
+    led_name_CA: str = "Thorlab_led",
+    toggleCA_illum_duty: float = 0.5,
+    toggleCA_illum_period: float = 1.0,
+    toggleCA_dark_time_init: float = 0,
+    toggleCA_illum_time: float = -1,
+    toolGC: str = "HS 2",
+    volume_ul_GC: int = 300,
+    liquid_flush_time: float = 60.0,
+    liquidDrain_time: float = 80.0,
+):
+    """Repeat CA and aliquot sampling at the cell1_we position.
+
+    Flush and fill cell, run CA, and drain.
+
+    (1) Fill cell with liquid for 90 seconds
+    (2) Equilibrate for 15 seconds
+    (3) run CA
+    (4) mix product
+    (5) Drain cell and purge with CO2 for 60 seconds
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+
+
+    """
+
+    epm = ExperimentPlanMaker()
+
+    # housekeeping
+    epm.add_experiment("ANEC_sub_unload_cell", {})
+
+    #epm.add_experiment("ANEC_sub_normal_state", {})
+
+    epm.add_experiment(
+        "ANEC_sub_load_solid",
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    )
+
+    for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
+        print(f" ... cycle {cycle} potential:", potential, f" ... cycle {cycle} duration:", time)
+
+        epm.add_experiment(
+            "ANEC_sub_flush_fill_cell",
+            {
+                "liquid_flush_time": liquid_flush_time,
+                "co2_purge_time": 15,
+                "equilibration_time": 1.0,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "volume_ul_cell_liquid": volume_ul_cell_liquid,
+            },
+        )
+
+        epm.add_experiment(
+            "ANEC_sub_photo_CA",
+            {
+                "WE_potential__V": potential,
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "ref_offset__V": ref_offset__V,
+                "CA_duration_sec": time,
+                "SampleRate": SampleRate,
+                "IErange": IErange,
+                "gamrychannelwait": gamrychannelwait,
+                "gamrychannelsend": gamrychannelsend,
+                "illumination_source": led_name_CA,
+                "illumination_wavelength": led_wavelengths_nm,
+                "illumination_intensity": led_intensities_mw,
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "toggle_illum_duty": toggleCA_illum_duty,
+                "toggle_illum_period": toggleCA_illum_period,
+                "toggle_illum_time": toggleCA_illum_time,
+                "toggle_dark_time_init": toggleCA_dark_time_init,
+            },
+        )
+
+        epm.add_experiment(
+            "ANEC_sub_GC_preparation",
+            {
+                "toolGC": toolGC,
+                "volume_ul_GC": volume_ul_GC,
             },
         )
 

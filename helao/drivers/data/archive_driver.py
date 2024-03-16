@@ -341,6 +341,8 @@ class Archive:
         slot: int = None,
         vial: int = None,
         load_sample_in: SampleUnion = None,
+        *args,
+        **kwargs,
     ) -> Tuple[ErrorCodes, SampleUnion]:
         vial -= 1
         sample = NoneSample()

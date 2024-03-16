@@ -27,10 +27,11 @@ from datetime import datetime
 from typing import Union, Optional, Dict, List
 import traceback
 from collections import defaultdict
+from copy import copy
 
 import botocore.exceptions
 import boto3
-from filelock import FileLock
+# from filelock import FileLock
 
 from helao.servers.base import Base
 from helaocore.models.process import ProcessModel
@@ -83,9 +84,10 @@ def move_to_synced(file_path: Path):
     target_path = Path(*parts)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        file_path.replace(target_path)
-        return target_path
+        new_path = file_path.replace(target_path)
+        return new_path
     except PermissionError:
+        print(f"Permission error when moving {file_path} to {target_path}")
         return False
 
 
@@ -97,30 +99,36 @@ def revert_to_finished(file_path: Path):
     target_path = Path(*parts)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        file_path.replace(target_path)
-        return target_path
+        new_path = file_path.replace(target_path)
+        return new_path
     except PermissionError:
+        print(f"Permission error when moving {file_path} to {target_path}")
         return False
 
 
 class HelaoYml:
     target: Path
-    dir: Path
-    parts: list
+    targetdir: Path
 
     def __init__(self, target: Union[Path, str]):
         if isinstance(target, str):
             self.target = Path(target)
         else:
             self.target = target
-        self.parts = list(Path(target).parts)
         self.check_paths()
-        self.filelockpath = str(self.target) + ".lock"
-        self.filelock = FileLock(self.filelockpath)
-        if not os.path.exists(self.filelockpath):
-            os.makedirs(os.path.dirname(self.filelockpath), exist_ok=True)
-            with open(self.filelockpath, "w") as _:
-                pass
+        # self.filelockpath = str(self.target) + ".lock"
+        # self.filelock = FileLock(self.filelockpath)
+        # if not os.path.exists(self.filelockpath):
+        #     os.makedirs(os.path.dirname(self.filelockpath), exist_ok=True)
+        #     with open(self.filelockpath, "w") as _:
+        #         pass
+        # with self.filelock:
+        #     self.meta = yml_load(self.target)
+        self.meta = yml_load(self.target)
+
+    @property
+    def parts(self):
+        return list(self.target.parts)
 
     def check_paths(self):
         if not self.exists:
@@ -129,34 +137,34 @@ class HelaoYml:
                 if self.exists:
                     break
             if not self.exists:
-                raise ValueError(f"{self.target} does not exist")
+                print(f"{self.target} does not exist")
         if self.target.is_dir():
-            self.dir = self.target
+            self.targetdir = self.target
             possible_ymls = [
                 x
-                for x in list(self.dir.glob("*.yml"))
+                for x in list(self.targetdir.glob("*.yml"))
                 if x.stem.endswith("-seq")
                 or x.stem.endswith("-exp")
                 or x.stem.endswith("-act")
             ]
             if len(possible_ymls) > 1:
                 raise ValueError(
-                    f"{self.dir} contains multiple .yml files and is not a valid Helao directory"
+                    f"{self.targetdir} contains multiple .yml files and is not a valid Helao directory"
                 )
             elif not possible_ymls:
                 raise ValueError(
-                    f"{self.dir} does not contain any .yml files and is not a valid Helao dir"
+                    f"{self.targetdir} does not contain any .yml files and is not a valid Helao dir"
                 )
             self.target = possible_ymls[0]
         else:
-            self.dir = self.target.parent
-        self.parts = list(self.target.parts)
-        if not any([x.startswith("RUNS_") for x in self.dir.parts]):
+            self.targetdir = self.target.parent
+        # self.parts = list(self.target.parts)
+        if not any([x.startswith("RUNS_") for x in self.targetdir.parts]):
             raise ValueError(
                 f"{self.target} is not located with a Helao RUNS_* directory"
             )
-        self.filelockpath = str(self.target) + ".lock"
-        self.filelock = FileLock(self.filelockpath)
+        # self.filelockpath = str(self.target) + ".lock"
+        # self.filelock = FileLock(self.filelockpath)
 
     @property
     def exists(self):
@@ -176,7 +184,7 @@ class HelaoYml:
 
     @property
     def status(self):
-        path_parts = [x for x in self.dir.parts if x.startswith("RUNS_")]
+        path_parts = [x for x in self.targetdir.parts if x.startswith("RUNS_")]
         status = path_parts[0].split("_")[-1].lower()
         return status
 
@@ -208,7 +216,7 @@ class HelaoYml:
 
     def cleanup(self):
         """Remove empty directories in RUNS_ACTIVE or RUNS_FINISHED."""
-        if not self.target.exists():
+        if not self.target.exists() or self.target==self.synced_path:
             return "success"
         tempparts = list(self.parts)
         steps = len(tempparts) - self.status_idx
@@ -217,6 +225,7 @@ class HelaoYml:
             contents = [x for x in check_dir.glob("*") if x != check_dir]
             if contents:
                 print(f"{str(check_dir)} is not empty")
+                print(contents)
                 return "failed"
             try:
                 check_dir.rmdir()
@@ -255,7 +264,7 @@ class HelaoYml:
     def misc_files(self) -> List[Path]:
         return [
             x
-            for x in self.dir.glob("*")
+            for x in self.targetdir.glob("*")
             if x.is_file()
             and not x.suffix == ".yml"
             and not x.suffix == ".hlo"
@@ -264,11 +273,11 @@ class HelaoYml:
 
     @property
     def lock_files(self) -> List[Path]:
-        return [x for x in self.dir.glob("*") if x.is_file() and x.suffix == ".lock"]
+        return [x for x in self.targetdir.glob("*") if x.is_file() and x.suffix == ".lock"]
 
     @property
     def hlo_files(self) -> List[Path]:
-        return [x for x in self.dir.glob("*") if x.is_file() and x.suffix == ".hlo"]
+        return [x for x in self.targetdir.glob("*") if x.is_file() and x.suffix == ".hlo"]
 
     @property
     def parent_path(self) -> Path:
@@ -281,89 +290,90 @@ class HelaoYml:
             ]
             return [p[0] for p in possible_parents if p][0]
 
-    @property
-    def meta(self):
-        with self.filelock:
-            ymld = yml_load(self.target)
-        return ymld
+    # @property
+    # def meta(self):
+    #     with self.filelock:
+    #         ymld = yml_load(self.target)
+    #     return ymld
 
     def write_meta(self, meta_dict: dict):
-        with self.filelock:
-            self.target.write_text(
-                str(
-                    yml_dumps(meta_dict),
-                    encoding="utf-8",
-                )
+        # with self.filelock:
+        self.target.write_text(
+            str(
+                yml_dumps(meta_dict),
+                encoding="utf-8",
             )
+        )
 
 
 class Progress:
-    yml: HelaoYml
+    ymlpath: HelaoYml
     prg: Path
     dict: Dict
 
-    def __init__(self, path: Union[HelaoYml, Path, str]):
+    def __init__(self, path: Union[Path, str]):
         """Loads and saves progress for a given Helao yml or prg file."""
 
-        if isinstance(path, HelaoYml):
-            self.yml = path
-        elif isinstance(path, Path):
+        if isinstance(path, Path):
             if path.suffix == ".yml":
-                self.yml = HelaoYml(path)
+                self.ymlpath = path
             elif path.suffix == ".prg":
                 self.prg = path
         else:
             if path.endswith(".yml"):
-                self.yml = HelaoYml(path)
+                self.ymlpath = Path(path)
             elif path.endswith(".prg"):
                 self.prg = Path(path)
             else:
                 raise ValueError(f"{path} is not a valid Helao .yml or .prg file")
 
-        if not hasattr(self, "yml"):
-            self.read_dict()
-            self.yml = HelaoYml(self.dict["yml"])
+        # if not hasattr(self, "yml"):
+        #     self.read_dict()
+        #     self.yml = HelaoYml(self.dict["yml"])
 
         if not hasattr(self, "prg"):
             self.prg = self.yml.synced_path.with_suffix(".prg")
 
-        self.prglockpath = str(self.prg) + ".lock"
-        self.prglock = FileLock(self.prglockpath)
-        if not os.path.exists(self.prglockpath):
-            os.makedirs(os.path.dirname(self.prglockpath), exist_ok=True)
-            with open(self.prglockpath, "w") as _:
-                pass
+        # self.prglockpath = str(self.prg) + ".lock"
+        # self.prglock = FileLock(self.prglockpath)
+        # if not os.path.exists(self.prglockpath):
+        #     os.makedirs(os.path.dirname(self.prglockpath), exist_ok=True)
+        #     with open(self.prglockpath, "w") as _:
+        #         pass
 
-        with self.prglock:
-            # first time, write progress dict
-            if not self.prg.exists():
-                self.prg.parent.mkdir(parents=True, exist_ok=True)
-                self.dict = {
-                    "yml": self.yml.target.__str__(),
-                    "api": False,
-                    "s3": False,
+        # first time, write progress dict
+        if not self.prg.exists():
+            self.prg.parent.mkdir(parents=True, exist_ok=True)
+            self.dict = {
+                "yml": self.yml.target.__str__(),
+                "api": False,
+                "s3": False,
+            }
+            if self.yml.type == "action":
+                act_dict = {
+                    "files_pending": [],
+                    "files_s3": {},
                 }
-                if self.yml.type == "action":
-                    act_dict = {
-                        "files_pending": [],
-                        "files_s3": {},
-                    }
-                    self.dict.update(act_dict)
-                if self.yml.type == "experiment":
-                    process_groups = self.yml.meta.get("process_order_groups", {})
-                    exp_dict = {
-                        "process_actions_done": {},  # {action submit order: yml.target.name}
-                        "process_groups": process_groups,  # {process_idx: contributor action indices}
-                        "process_metas": {},  # {process_idx: yml_dict}
-                        "process_s3": [],  # list of process_idx with S3 done
-                        "process_api": [],  # list of process_idx with API done
-                        "legacy_finisher_idxs": [],  # end action indicies (submit order)
-                        "legacy_experiment": False if process_groups else True,
-                    }
-                    self.dict.update(exp_dict)
-                self.write_dict()
-            else:
-                self.read_dict()
+                self.dict.update(act_dict)
+            if self.yml.type == "experiment":
+                process_groups = self.yml.meta.get("process_order_groups", {})
+                exp_dict = {
+                    "process_actions_done": {},  # {action submit order: yml.target.name}
+                    "process_groups": process_groups,  # {process_idx: contributor action indices}
+                    "process_metas": {},  # {process_idx: yml_dict}
+                    "process_s3": [],  # list of process_idx with S3 done
+                    "process_api": [],  # list of process_idx with API done
+                    "legacy_finisher_idxs": [],  # end action indicies (submit order)
+                    "legacy_experiment": False if process_groups else True,
+                }
+                self.dict.update(exp_dict)
+            self.write_dict()
+        else:
+            self.read_dict()
+
+    @property
+    def yml(self):
+        return HelaoYml(self.ymlpath)
 
     def list_unfinished_procs(self):
         """Returns pair of lists with non-synced s3 and api processes."""
@@ -386,6 +396,7 @@ class Progress:
 
     def write_dict(self, new_dict: Optional[Dict] = None):
         out_dict = self.dict if new_dict is None else new_dict
+        # with self.prglock:
         self.prg.write_text(str(yml_dumps(out_dict)), encoding="utf-8")
 
     @property
@@ -397,6 +408,7 @@ class Progress:
         return self.dict["api"]
 
     def remove_prg(self):
+        # with self.prglock:
         self.prg.unlink()
 
 
@@ -405,12 +417,20 @@ class HelaoSyncer:
     base: Base
     running_tasks: dict
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: Base, db_server_name: str = "DB"):
         """Pushes yml to S3 and API."""
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
-        self.max_tasks = self.config_dict.get("max_tasks", 4)
+        self.max_tasks = self.config_dict.get("max_tasks", 8)
+        # to load this driver on orch, we check the default "DB" key or take a manually-specified key
+        if (
+            not self.config_dict.get("aws_config_path", False)
+            and db_server_name in self.world_config["servers"]
+        ):
+            self.config_dict = self.world_config["servers"][db_server_name].get(
+                "params", {}
+            )
         if "aws_config_path" in self.config_dict:
             os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
             self.aws_session = boto3.Session(
@@ -423,7 +443,7 @@ class HelaoSyncer:
         self.bucket = self.config_dict["aws_bucket"]
         self.api_host = self.config_dict["api_host"]
 
-        self.progress = {}
+        # self.progress = {}
         self.sequence_objs = {}
         self.task_queue = asyncio.PriorityQueue()
         self.task_set = set()
@@ -490,10 +510,6 @@ class HelaoSyncer:
         if task_name in self.running_tasks:
             # self.base.print_message(f"Removing {task_name} from running_tasks.")
             self.running_tasks.pop(task_name)
-            try:
-                self.task_set.remove(task_name)
-            except KeyError:
-                pass
         # else:
         #     self.base.print_message(
         #         f"{task_name} was already removed from running_tasks."
@@ -505,6 +521,7 @@ class HelaoSyncer:
             if len(self.running_tasks) < self.max_tasks:
                 # self.base.print_message("Getting next yml_target from queue.")
                 rank, yml_target = await self.task_queue.get()
+                self.task_set.remove(yml_target.name)
                 # self.base.print_message(
                 #     f"Acquired {yml_target.name} with priority {rank}."
                 # )
@@ -532,31 +549,41 @@ class HelaoSyncer:
         #         pass
         # ymllock = FileLock(ymllockpath)
         # with ymllock:
-        if yml_path.name in self.progress:
-            prog = self.progress[yml_path.name]
-            if not prog.yml.exists:
-                prog.yml.check_paths()
-                prog.dict.update({"yml": str(prog.yml.target)})
-                prog.write_dict()
+        # if yml_path.name in self.progress:
+        #     prog = self.progress[yml_path.name]
+        #     if not prog.yml.exists:
+        #         prog.yml.check_paths()
+        #         prog.dict.update({"yml": str(prog.yml.target)})
+        #         prog.write_dict()
+        # else:
+        if not yml_path.exists():
+            hy = HelaoYml(yml_path)
+            hy.check_paths()
+            prog = Progress(hy.target)
+            prog.write_dict()
         else:
-            if not yml_path.exists():
-                hy = HelaoYml(yml_path)
-                hy.check_paths()
-                prog = Progress(hy.target)
-                prog.write_dict()
-            else:
-                prog = Progress(yml_path)
-        self.progress[yml_path.name] = prog
-        return self.progress[yml_path.name]
+            prog = Progress(yml_path)
+        # self.progress[yml_path.name] = prog
+        # return self.progress[yml_path.name]
+        return prog
 
     async def enqueue_yml(self, upath: Union[Path, str], rank: int = 5):
         """Adds yml to sync queue, defaulting to lowest priority."""
         yml_path = Path(upath) if isinstance(upath, str) else upath
-        self.task_set.add(yml_path.name)
-        await self.task_queue.put((rank, yml_path))
-        self.base.print_message(
-            f"Added {str(yml_path)} to syncer queue with priority {rank}."
-        )
+        if yml_path.name in self.task_set:
+            self.base.print_message(
+                f"{str(yml_path)} is already queued, skipping enqueue request."
+            )
+        elif yml_path.name in self.running_tasks:
+            self.base.print_message(
+                f"{str(yml_path)} is already running, skipping enqueue request."
+            )
+        else:
+            self.task_set.add(yml_path.name)
+            await self.task_queue.put((rank, yml_path))
+            self.base.print_message(
+                f"Added {str(yml_path)} to syncer queue with priority {rank}."
+            )
 
     async def sync_yml(
         self,
@@ -579,63 +606,61 @@ class HelaoSyncer:
             # )
             return True
 
-        yml = prog.yml
-        meta = yml.meta
+        meta = copy(prog.yml.meta)
 
-        if yml.status == "synced":
+        if prog.yml.status == "synced":
             # self.base.print_message(
-            #     f"Cannot sync {str(yml.target)}, status is already 'synced'."
+            #     f"Cannot sync {str(prog.yml.target)}, status is already 'synced'."
             # )
             return True
 
         # self.base.print_message(
-        #     f"{str(yml.target)} status is not synced, checking for finished."
+        #     f"{str(prog.yml.target)} status is not synced, checking for finished."
         # )
 
-        if yml.status == "active":
+        if prog.yml.status == "active":
             # self.base.print_message(
-            #     f"Cannot sync {str(yml.target)}, status is not 'finished'."
+            #     f"Cannot sync {str(prog.yml.target)}, status is not 'finished'."
             # )
             return False
 
-        # self.base.print_message(f"{str(yml.target)} status is finished, proceeding.")
+        # self.base.print_message(f"{str(prog.yml.target)} status is finished, proceeding.")
 
         # first check if child objects are registered with API (non-actions)
-        if yml.type != "action":
-            if yml.active_children:
+        if prog.yml.type != "action":
+            if prog.yml.active_children:
                 self.base.print_message(
-                    f"Cannot sync {str(yml.target)}, children are still 'active'."
+                    f"Cannot sync {str(prog.yml.target)}, children are still 'active'."
                 )
                 return False
-            if yml.finished_children:
+            if prog.yml.finished_children:
                 # self.base.print_message(
-                #     f"Cannot sync {str(yml.target)}, children are not 'synced'."
+                #     f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
                 # )
                 # self.base.print_message(
                 #     "Adding 'finished' children to sync queue with highest priority."
                 # )
-                for child in yml.finished_children:
+                for child in prog.yml.finished_children:
                     if child.target.name not in self.running_tasks:
                         await self.enqueue_yml(child.target, rank - 2)
                         self.base.print_message(str(child.target))
                 # self.base.print_message(
-                #     f"Re-adding {str(yml.target)} to sync queue with high priority."
+                #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
                 # )
-                self.running_tasks.pop(yml.target.name)
-                self.task_set.remove(yml.target.name)
-                await self.enqueue_yml(yml.target, rank - 1)
-                self.base.print_message(f"{str(yml.target)} re-queued, exiting.")
+                self.running_tasks.pop(prog.yml.target.name)
+                await self.enqueue_yml(prog.yml.target, rank - 1)
+                self.base.print_message(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
 
-        # self.base.print_message(f"{str(yml.target)} children are synced, proceeding.")
+        # self.base.print_message(f"{str(prog.yml.target)} children are synced, proceeding.")
 
         # next push files to S3 (actions only)
-        if yml.type == "action":
+        if prog.yml.type == "action":
             # re-check file lists
-            # self.base.print_message(f"Checking file lists for {yml.target.name}")
+            # self.base.print_message(f"Checking file lists for {prog.yml.target.name}")
             prog.dict["files_pending"] += [
                 str(p)
-                for p in yml.hlo_files + yml.misc_files
+                for p in prog.yml.hlo_files + prog.yml.misc_files
                 if p not in prog.dict["files_pending"]
                 and p not in prog.dict["files_s3"]
             ]
@@ -643,15 +668,21 @@ class HelaoSyncer:
             while prog.dict.get("files_pending", []):
                 for sp in prog.dict["files_pending"]:
                     fp = Path(sp)
-                    self.base.print_message(
-                        f"Pushing {sp} to S3 for {yml.target.name}"
-                    )
+                    self.base.print_message(f"Pushing {sp} to S3 for {prog.yml.target.name}")
                     if fp.suffix == ".hlo":
-                        file_s3_key = (
-                            f"raw_data/{meta['action_uuid']}/{fp.name}.json"
-                        )
+                        file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                         self.base.print_message("Parsing hlo dicts.")
-                        file_meta, file_data = read_hlo(sp)
+                        try:
+                            file_meta, file_data = read_hlo(sp)
+                        except Exception as err:
+                            str_err = "".join(
+                                traceback.format_exception(
+                                    type(err), err, err.__traceback__
+                                )
+                            )
+                            self.base.print_message(str_err)
+                            file_meta = {}
+                            file_data = {}
                         msg = {"meta": file_meta, "data": file_data}
                     else:
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}"
@@ -667,12 +698,11 @@ class HelaoSyncer:
                         prog.dict["files_s3"].update({fp.name: file_s3_key})
                         self.base.print_message(f"Updating progress: {prog.dict}")
 
-                        with prog.prglock:
-                            prog.write_dict()
+                        prog.write_dict()
 
-        # if yml is an experiment first check processes before pushing to API
-        if yml.type == "experiment":
-            self.base.print_message(f"Finishing processes for {yml.target.name}")
+        # if prog.yml is an experiment first check processes before pushing to API
+        if prog.yml.type == "experiment":
+            self.base.print_message(f"Finishing processes for {prog.yml.target.name}")
             retry_count = 0
             s3_unf, api_unf = prog.list_unfinished_procs()
             while s3_unf or api_unf:
@@ -683,7 +713,7 @@ class HelaoSyncer:
                 retry_count += 1
             if s3_unf or api_unf:
                 self.base.print_message(
-                    f"Processes in {str(yml.target)} did not sync after 3 tries."
+                    f"Processes in {str(prog.yml.target)} did not sync after 3 tries."
                 )
                 return False
             if prog.dict["process_metas"]:
@@ -692,49 +722,52 @@ class HelaoSyncer:
                     for _, d in sorted(prog.dict["process_metas"].items())
                 ]
 
-        self.base.print_message(f"Patching model for {yml.target.name}")
+        self.base.print_message(f"Patching model for {prog.yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
-        yml_model = MOD_MAP[yml.type](**patched_meta).clean_dict(strip_private=True)
+        prog.yml_model = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(strip_private=True)
 
-        # patch technique lists in yml_model
-        tech_name = yml_model.get("technique_name", "NA")
+        # patch technique lists in prog.yml_model
+        tech_name = prog.yml_model.get("technique_name", "NA")
         if isinstance(tech_name, list):
-            split_technique = tech_name[yml_model.get("action_split", 0)]
-            yml_model["technique_name"] = split_technique
+            split_technique = tech_name[prog.yml_model.get("action_split", 0)]
+            prog.yml_model["technique_name"] = split_technique
 
-        # next push yml to S3
+        # next push prog.yml to S3
         if not prog.s3_done or force_s3:
             self.base.print_message(
-                f"Pushing yml->json to S3 for {yml.target.name}"
+                f"Pushing prog.yml->json to S3 for {prog.yml.target.name}"
             )
-            uuid_key = patched_meta[f"{yml.type}_uuid"]
-            meta_s3_key = f"{yml.type}/{uuid_key}.json"
-            s3_success = await self.to_s3(yml_model, meta_s3_key)
+            uuid_key = patched_meta[f"{prog.yml.type}_uuid"]
+            meta_s3_key = f"{prog.yml.type}/{uuid_key}.json"
+            s3_success = await self.to_s3(prog.yml_model, meta_s3_key)
             if s3_success:
                 prog.dict["s3"] = True
-                with prog.prglock:
-                    prog.write_dict()
+                prog.write_dict()
 
-        # next push yml to API
+        # next push prog.yml to API
         if not prog.api_done or force_api:
-            self.base.print_message(f"Pushing yml to API for {yml.target.name}")
-            api_success = await self.to_api(yml_model, yml.type)
+            self.base.print_message(f"Pushing prog.yml to API for {prog.yml.target.name}")
+            api_success = await self.to_api(prog.yml_model, prog.yml.type)
             self.base.print_message(
-                f"API push returned {api_success} for {yml.target.name}"
+                f"API push returned {api_success} for {prog.yml.target.name}"
             )
             if api_success:
                 prog.dict["api"] = True
-                with prog.prglock:
-                    prog.write_dict()
+                prog.write_dict()
+
+        # get yml target name for popping later (after seq zip removes yml)
+        yml_target_name = prog.yml.target.name
+        yml_type = prog.yml.type
 
         # move to synced
         if prog.s3_done and prog.api_done:
+            
             self.base.print_message(
-                f"Moving files to RUNS_SYNCED for {yml.target.name}"
+                f"Moving files to RUNS_SYNCED for {yml_target_name}"
             )
-            for lock_path in yml.lock_files:
+            for lock_path in prog.yml.lock_files:
                 lock_path.unlink()
-            for file_path in yml.misc_files + yml.hlo_files:
+            for file_path in prog.yml.misc_files + prog.yml.hlo_files:
                 self.base.print_message(f"Moving {str(file_path)}")
                 move_success = move_to_synced(file_path)
                 while not move_success:
@@ -743,58 +776,59 @@ class HelaoSyncer:
                     move_success = move_to_synced(file_path)
 
             # finally move yaml and update target
-            self.base.print_message(f"Moving {yml.target.name} to RUNS_SYNCED")
+            self.base.print_message(f"Moving {yml_target_name} to RUNS_SYNCED")
+            # with prog.yml.filelock:
             yml_success = move_to_synced(yml_path)
             if yml_success:
-                result = yml.cleanup()
-                self.base.print_message(f"Cleanup {yml.target.name} {result}.")
+                result = prog.yml.cleanup()
+                self.base.print_message(f"Cleanup {yml_target_name} {result}.")
                 if result == "success":
                     self.base.print_message("yml_success")
-                    prog.yml = HelaoYml(yml_success)
-                    yml = prog.yml
+                    prog = self.get_progress(Path(yml_success))
+                    self.base.print_message("reassigning prog")
                     prog.dict["yml"] = str(yml_success)
-                    with prog.prglock:
-                        prog.write_dict()
+                    self.base.print_message("updating progress")
+                    prog.write_dict()
 
             # pop children from progress dict
-            if yml.type in ["experiment", "sequence"]:
-                children = yml.children
+            if yml_type in ["experiment", "sequence"]:
+                children = prog.yml.children
                 self.base.print_message(
                     f"Removing children from progress: {children}."
                 )
                 for childyml in children:
-                    # self.base.print_message(f"Clearing {childyml.target.name}")
+                    # self.base.print_message(f"Clearing {childprog.yml.target.name}")
                     finished_child_path = childyml.finished_path.parent
                     if finished_child_path.exists():
                         self.try_remove_empty(str(finished_child_path))
-                    try:
-                        self.progress.pop(childyml.target.name)
-                    except Exception as err:
-                        self.base.print_message(
-                            f"Could not remove {childyml.target.name}: {err}"
-                        )
-                self.try_remove_empty(str(yml.finished_path.parent))
+                    # try:
+                    #     self.progress.pop(childprog.yml.target.name)
+                    # except Exception as err:
+                    #     self.base.print_message(
+                    #         f"Could not remove {childprog.yml.target.name}: {err}"
+                    #     )
+                self.try_remove_empty(str(prog.yml.finished_path.parent))
 
-            if yml.type == "sequence":
-                self.base.print_message(f"Zipping {yml.target.parent.name}.")
-                zip_target = yml.target.parent.parent.joinpath(
-                    f"{yml.target.parent.name}.zip"
+            if yml_type == "sequence":
+                self.base.print_message(f"Zipping {prog.yml.target.parent.name}.")
+                zip_target = prog.yml.target.parent.parent.joinpath(
+                    f"{prog.yml.target.parent.name}.zip"
                 )
                 self.base.print_message(
                     f"Full sequence has synced, creating zip: {str(zip_target)}"
                 )
-                zip_dir(yml.target.parent, zip_target)
+                zip_dir(prog.yml.target.parent, zip_target)
                 self.cleanup_root()
                 # self.base.print_message(f"Removing sequence from progress.")
-                self.progress.pop(yml.target.name)
+                # self.progress.pop(prog.yml.target.name)
 
-            # self.base.print_message(f"Removing task from running_tasks.")
-            self.running_tasks.pop(yml.target.name)
+            self.base.print_message(f"Removing {yml_target_name} from running_tasks.")
+            self.running_tasks.pop(yml_target_name)
 
-        # if action contributes processes, update processes
-        if yml.type == "action" and meta.get("process_contrib", False):
-            exp_prog = self.update_process(yml, meta)
-            await self.sync_process(exp_prog)
+            # if action contributes processes, update processes
+            if yml_type == "action" and meta.get("process_contrib", False):
+                exp_prog = self.update_process(prog.yml, meta)
+                await self.sync_process(exp_prog)
 
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
         return return_dict
@@ -803,31 +837,31 @@ class HelaoSyncer:
         """Takes action yml and updates processes in exp parent."""
         exp_path = Path(act_yml.parent_path)
         exp_prog = self.get_progress(exp_path)
-        with exp_prog.prglock:
-            act_idx = act_meta["action_order"]
-            # handle legacy experiments (no process list)
-            if exp_prog.dict["legacy_experiment"]:
-                # if action is a process finisher, add to exp progress
-                if act_meta["process_finish"]:
-                    exp_prog.dict["legacy_finisher_idxs"] = sorted(
-                        set(exp_prog.dict["legacy_finisher_idxs"]).union([act_idx])
-                    )
-                pf_idxs = exp_prog.dict["legacy_finisher_idxs"]
-                pidx = (
-                    len(pf_idxs)
-                    if act_idx > max(pf_idxs + [-1])
-                    else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
+        # with exp_prog.prglock:
+        act_idx = act_meta["action_order"]
+        # handle legacy experiments (no process list)
+        if exp_prog.dict["legacy_experiment"]:
+            # if action is a process finisher, add to exp progress
+            if act_meta["process_finish"]:
+                exp_prog.dict["legacy_finisher_idxs"] = sorted(
+                    set(exp_prog.dict["legacy_finisher_idxs"]).union([act_idx])
                 )
-                exp_prog.dict["process_groups"][pidx] = exp_prog.dict[
-                    "process_groups"
-                ].get(pidx, [])
-                exp_prog.dict["process_groups"][pidx].append(act_idx)
-            else:
-                pidx = [
-                    k
-                    for k, l in exp_prog.dict["process_groups"].items()
-                    if act_idx in l
-                ][0]
+            pf_idxs = exp_prog.dict["legacy_finisher_idxs"]
+            pidx = (
+                len(pf_idxs)
+                if act_idx > max(pf_idxs + [-1])
+                else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
+            )
+            exp_prog.dict["process_groups"][pidx] = exp_prog.dict[
+                "process_groups"
+            ].get(pidx, [])
+            exp_prog.dict["process_groups"][pidx].append(act_idx)
+        else:
+            pidx = [
+                k
+                for k, l in exp_prog.dict["process_groups"].items()
+                if act_idx in l
+            ][0]
 
             # if exp_prog doesn't yet have metadict, create one
             if pidx not in exp_prog.dict["process_metas"]:
@@ -857,7 +891,11 @@ class HelaoSyncer:
                 )
                 process_list = exp_prog.yml.meta.get("process_list", [])
                 process_input_str = f"{exp_prog.yml.meta['experiment_uuid']}__{pidx}"
-                process_uuid = process_list[pidx] if process_list else str(gen_uuid(process_input_str))
+                process_uuid = (
+                    process_list[pidx]
+                    if process_list
+                    else str(gen_uuid(process_input_str))
+                )
                 process_meta["process_uuid"] = process_uuid
                 process_meta["process_group_index"] = pidx
                 process_meta["action_list"] = []
@@ -1086,16 +1124,19 @@ class HelaoSyncer:
                 fail_url = f"https://{self.api_host}/failed"
                 async with aiohttp.ClientSession() as session:
                     for _ in range(retries):
-                        async with session.post(fail_url, json=fail_model) as resp:
-                            if resp.status == 200:
+                        try:
+                            async with session.post(fail_url, json=fail_model) as resp:
+                                if resp.status == 200:
+                                    self.base.print_message(
+                                        f"successful debug API push for {meta_type}: {meta_uuid}"
+                                    )
+                                    break
                                 self.base.print_message(
-                                    f"successful debug API push for {meta_type}: {meta_uuid}"
+                                    f"failed debug API push for {meta_type}: {meta_uuid}"
                                 )
-                                break
-                            self.base.print_message(
-                                f"failed debug API push for {meta_type}: {meta_uuid}"
-                            )
-                            self.base.print_message(f"response: {await resp.json()}")
+                                self.base.print_message(f"response: {await resp.json()}")
+                        except TimeoutError:
+                                self.base.print_message(f"unable to post failure model for {meta_type}: {meta_uuid}")
         return api_success
 
     def list_pending(self, omit_manual_exps: bool = True):
@@ -1147,7 +1188,8 @@ class HelaoSyncer:
                     os.path.basename(sync_path).replace(".zip", ""),
                 )
                 os.makedirs(dest, exist_ok=True)
-                zf.extractall(dest)
+                no_lock_prg = [x for x in zf.namelist() if not x.endswith(".prg") and not x.endswith(".lock")]
+                zf.extractall(dest, members=no_lock_prg)
                 zf.close()
                 if not os.path.exists(sync_path.replace(".zip", ".orig")):
                     shutil.move(sync_path, sync_path.replace(".zip", ".orig"))
@@ -1162,37 +1204,37 @@ class HelaoSyncer:
             base_prgs = [
                 x
                 for x in glob(os.path.join(sync_path, "**", "*-*.pr*"), recursive=True)
-                if x.endswith(".progress") or x.endswith(".prg")
+                if x.endswith(".progress") or x.endswith(".prg") or x.endswith(".lock")
             ]
-            seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
-            for x in seq_prgs:
-                base_prgs = [
-                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
-                ]
-            exp_prgs = [x for x in base_prgs if "-exp.pr" in x]
-            for x in exp_prgs:
-                base_prgs = [
-                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
-                ]
-            act_prgs = [x for x in base_prgs if "-act.pr" in x]
-            for x in act_prgs:
-                base_prgs = [
-                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
-                ]
+            # seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
+            # for x in seq_prgs:
+            #     base_prgs = [
+            #         y for y in base_prgs if not y.startswith(os.path.dirname(x))
+            #     ]
+            # exp_prgs = [x for x in base_prgs if "-exp.pr" in x]
+            # for x in exp_prgs:
+            #     base_prgs = [
+            #         y for y in base_prgs if not y.startswith(os.path.dirname(x))
+            #     ]
+            # act_prgs = [x for x in base_prgs if "-act.pr" in x]
+            # for x in act_prgs:
+            #     base_prgs = [
+            #         y for y in base_prgs if not y.startswith(os.path.dirname(x))
+            #     ]
 
-            base_prgs = act_prgs + exp_prgs + seq_prgs
+            # base_prgs = act_prgs + exp_prgs + seq_prgs
 
             if not base_prgs:
                 self.base.print_message(
                     f"Did not find any .prg or .progress files in subdirectories of {sync_path}"
                 )
                 self.unsync_dir(sync_path)
-                
+
             else:
                 self.base.print_message(
-                    f"Found {len(base_prgs)} .prg or .progress files in subdirectories of {sync_path}"
+                    f"Found {len(base_prgs)} .prg, .progress, or .lock files in subdirectories of {sync_path}"
                 )
-                # remove all .prg files
+                # remove all .prg files and lock files
                 for prg in base_prgs:
                     base_dir = os.path.dirname(prg)
                     sub_prgs = [
@@ -1202,10 +1244,16 @@ class HelaoSyncer:
                         )
                         if x.endswith(".progress") or x.endswith(".prg")
                     ]
+                    sub_lock = [
+                        x
+                        for x in glob(
+                            os.path.join(base_dir, "**", "*.lock"), recursive=True
+                        )
+                    ]
                     self.base.print_message(
-                        f"Removing {len(base_prgs)} prg and progress files in subdirectories of {base_dir}"
+                        f"Removing {len(base_prgs) + len(sub_lock)} prg and progress files in subdirectories of {base_dir}"
                     )
-                    for sp in sub_prgs:
+                    for sp in sub_prgs + sub_lock:
                         os.remove(sp)
 
                     # move path back to RUNS_FINISHED
@@ -1231,13 +1279,10 @@ class HelaoSyncer:
 
     def unsync_dir(self, sync_dir: str):
         for fp in glob(os.path.join(sync_dir, "**", "*"), recursive=True):
-            if fp.endswith(".lock"):
+            if fp.endswith(".lock") or fp.endswith(".progress") or fp.endswith(".prg"):
                 os.remove(fp)
             elif not os.path.isdir(fp):
-                shutil.move(
-                    fp,
-                    os.path.dirname(
-                        fp.replace("RUNS_SYNCED", "RUNS_FINISHED")
-                    ),
-                )
+                tp = os.path.dirname( fp.replace("RUNS_SYNCED", "RUNS_FINISHED"))
+                os.makedirs(tp, exist_ok=True)
+                shutil.move(fp, tp)
         self.base.print_message(f"Successfully reverted {sync_dir}")

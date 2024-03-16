@@ -113,7 +113,7 @@ class C_gpsimlivevis:
                 [Div(text=tableheader, width=1004, height=15)],
                 [Spacer(width=10), self.table, Spacer(width=10)],
             ],
-            background="#C0C0C0",
+            background="#D6DBDF",
             width=1024,
         )
 
