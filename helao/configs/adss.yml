@@ -213,7 +213,7 @@ servers:
     group: action
     fast: syringe_server
     params:
-      port: COM6
+      port: COM4
       pumps:
         one:
           address: 1
