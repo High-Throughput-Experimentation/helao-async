@@ -31,6 +31,8 @@ __all__ = [
 #    "CCSI_sub_full_fill_syringe",
     "CCSI_leaktest_co2",
     "CCSI_sub_flowflush",
+    "CCSI_sub_n2drain",
+    "CCSI_sub_n2flush",
 ]
 
 ###
@@ -60,6 +62,7 @@ IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
 CALC_server = MachineModel(server_name="CALC", machine_name=ORCH_HOST).as_dict()
 CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
 MFC_server = MachineModel(server_name="MFC", machine_name=ORCH_HOST).as_dict()
+N2MFC_server = MachineModel(server_name="N2MFC", machine_name=ORCH_HOST).as_dict()
 DOSEPUMP_server = MachineModel(server_name="DOSEPUMP", machine_name=ORCH_HOST).as_dict()
 SOLUTIONPUMP_server = MachineModel(
     server_name="SYRINGE0", machine_name=ORCH_HOST
@@ -317,6 +320,77 @@ def CCSI_sub_drain(
 
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
+    apm.add(ORCH_server, "wait", {"waittime": 1.25})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
+    if apm.pars.initialization:
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
+
+    return apm.action_list
+
+def CCSI_sub_n2drain(
+    experiment: Experiment,
+    experiment_version: int = 1,  #n2 version of reg drain v8
+    n2flowrate_sccm: float = 10,
+    HSpurge_duration: float = 20,  
+    DeltaDilute1_duration: float = 0,
+    initialization: bool = False,
+    recirculation: bool = False,
+    recirculation_duration: float = 20,
+    recirculation_rate_uL_min: int = 10000,
+):
+
+    apm = ActionPlanMaker()
+    if apm.pars.DeltaDilute1_duration == 0:
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    else:
+
+#
+# DILUTION PURGE        
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.DeltaDilute1_duration} )
+        #apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  # DeltaDilute time usually 15
+
+#
+# MAIN HEADSPACE PURGE and FILL
+   # apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
+#n2 gas on
+    apm.add(
+        N2MFC_server,
+        "acquire_flowrate",
+        {
+            "flowrate_sccm": apm.pars.n2flowrate_sccm,
+            "duration": apm.pars.HSpurge_duration,
+            #"acquisition_rate": apm.pars.,
+        },
+    )
+#    apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
+
+    apm.add(PAL_server, "archive_custom_unloadall", {})
+
+    if apm.pars.recirculation:
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
+        apm.add(ORCH_server, "wait", {"waittime": 5})
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration/3} )
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
+        apm.add(N2MFC_server,"acquire_flowrate",{"flowrate_sccm": apm.pars.n2flowrate_sccm,"duration": 10,},)
+        #apm.add(ORCH_server, "wait", {"waittime": 10})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
+        apm.add(ORCH_server, "wait", {"waittime": 5})
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration/3} )
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
+        apm.add(N2MFC_server,"acquire_flowrate",{"flowrate_sccm": apm.pars.n2flowrate_sccm,"duration": 10,},)
+        #apm.add(ORCH_server, "wait", {"waittime": 10})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
+        apm.add(ORCH_server, "wait", {"waittime": 5})
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration/3} )
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
+
+    if apm.pars.initialization:
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.5})
+
     apm.add(ORCH_server, "wait", {"waittime": 1.25})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
     if apm.pars.initialization:
@@ -1498,4 +1572,167 @@ def CCSI_sub_co2pressuremonitor_nopump(
         },
         asc.no_wait,
     )
+    return apm.action_list
+
+
+def CCSI_sub_n2flush(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    n2flowrate_sccm: float = 10,
+    HSpurge1_duration: float = 60,
+    HSpurge_duration: float = 20, 
+    DeltaDilute1_duration: float = 0,
+    Manpurge1_duration: float = 10,
+    Alphapurge1_duration: float = 10,
+    Probepurge1_duration: float = 10,
+    Sensorpurge1_duration: float = 15,
+    recirculation_rate_uL_min: int = 10000,
+    #    DeltaDilute1_duration: float = 15,
+    initialization: bool = False,
+    co2measure_duration: float = 20,
+    co2measure_acqrate: float = 0.1,
+    co2_ppm_thresh: float = 90000,
+    purge_if: Union[str, float] = "below",
+    max_repeats: int = 5,
+
+):
+ #   
+    apm = ActionPlanMaker()
+    apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0}, asc.no_wait)
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+
+#
+# MAIN HEADSPACE PURGE and FILL
+    # headspace flow purge cell
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1})
+    apm.add(
+        N2MFC_server,
+        "acquire_flowrate",
+        {
+            "flowrate_sccm": apm.pars.n2flowrate_sccm,
+            "duration": apm.pars.HSpurge1_duration,
+            #"acquisition_rate": apm.pars.,
+        },
+    )
+
+    # line purge via v2 v5
+
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
+    apm.add(
+        N2MFC_server,
+        "acquire_flowrate",
+        {
+            "flowrate_sccm": apm.pars.n2flowrate_sccm,
+            "duration": apm.pars.Alphapurge1_duration,
+            #"acquisition_rate": apm.pars.,
+        },
+    )
+#
+# AUX PROBE PURGE
+    # eche probe flow purge via v5
+    apm.add(
+        N2MFC_server,
+        "acquire_flowrate",
+        {
+            "flowrate_sccm": apm.pars.n2flowrate_sccm,
+            "duration": apm.pars.Probepurge1_duration,
+            #"acquisition_rate": apm.pars.,
+        },
+    )
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.Probepurge1_duration} )
+   # apm.add(ORCH_server, "wait", {"waittime": apm.pars.Probepurge1_duration},)
+
+#
+# pCO2 SENSOR PURGE
+    # only valve 3 closed //differ from probe purge
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})# , asc.no_wait) no wait in error?
+    apm.add(
+        N2MFC_server,
+        "acquire_flowrate",
+        {
+            "flowrate_sccm": apm.pars.n2flowrate_sccm,
+            "duration": apm.pars.Sensorpurge1_duration,
+            #"acquisition_rate": apm.pars.,
+        },
+    )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.Sensorpurge1_duration} )
+    #apm.add(ORCH_server, "wait", {"waittime": apm.pars.Sensorpurge1_duration})
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0}, asc.no_wait)
+
+# headspace purge and measure
+
+    if apm.pars.DeltaDilute1_duration == 0:
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    else:
+
+#
+# DILUTION PURGE        
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.DeltaDilute1_duration} )
+        #apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  # DeltaDilute time usually 15
+
+#
+# MAIN HEADSPACE PURGE
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
+    apm.add(
+        N2MFC_server,
+        "acquire_flowrate",
+        {
+            "flowrate_sccm": apm.pars.n2flowrate_sccm,
+            "duration": apm.pars.HSpurge_duration,
+            #"acquisition_rate": apm.pars.,
+        },
+    )
+
+    if apm.pars.initialization:
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.5})
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
+ 
+    if apm.pars.initialization:
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+
+#
+# HEADSPACE EVALUATION
+    apm.add(
+        CO2S_server,
+        "acquire_co2",
+        {
+            "duration": apm.pars.co2measure_duration,
+            "acquisition_rate": apm.pars.co2measure_acqrate,
+        },
+        technique_name="gas_purge",
+        process_finish=True,
+        process_contrib=[ProcessContrib.files],
+    )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+
+
     return apm.action_list

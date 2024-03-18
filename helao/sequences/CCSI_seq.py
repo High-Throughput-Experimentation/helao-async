@@ -24,7 +24,7 @@ SEQUENCES = __all__
 
 
 def CCSI_initialization(
-    sequence_version: int = 4, #removed subdrain, added clean inject
+    sequence_version: int = 5, #removed subdrain, added clean inject/made cleaninjects optional
     headspace_purge_cycles: int = 6,
     HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
@@ -42,7 +42,8 @@ def CCSI_initialization(
     LiquidCleanWait_s: float = 15,
     use_co2_check: bool = True,
     need_fill: bool = False,
-    max_repeats: int = 5,
+    #max_repeats: int = 5,
+    clean_injects: bool = True,
     drainrecirc: bool = True,
     recirculation_rate_uL_min: int = 10000,
     
@@ -75,36 +76,37 @@ def CCSI_initialization(
         })
 #    
 # PRE CLEAN PROCEDURE
-    epm.add_experiment("CCSI_sub_clean_inject", {
-        "Waterclean_volume_ul": Waterclean_volume_ul,
-        "Syringe_rate_ulsec": Syringe_rate_ulsec,
-        "LiquidCleanWait_s": LiquidCleanWait_s,
-        "use_co2_check": use_co2_check,
-        "LiquidCleanPurge_duration": HSpurge_duration, 
-        "DeltaDilute1_duration": DeltaDilute1_duration,
-        "initialization": True,
-        "co2measure_duration": CO2measure_duration, 
-        "co2measure_acqrate": CO2measure_acqrate, 
-        "use_co2_check": False,
-        "co2_ppm_thresh": CO2threshold, 
-        "purge_if": "below",
-        "drainrecirc": drainrecirc,
-        "recirculation_rate_uL_min": recirculation_rate_uL_min,
-        })
-    epm.add_experiment("CCSI_sub_clean_inject", {
-        "Waterclean_volume_ul": Waterclean_volume_ul,
-        "Syringe_rate_ulsec": Syringe_rate_ulsec,
-        "LiquidCleanWait_s": LiquidCleanWait_s,
-        "use_co2_check": use_co2_check,
-        "LiquidCleanPurge_duration": HSpurge_duration, 
-        "DeltaDilute1_duration": DeltaDilute1_duration,
-        "initialization": True,
-        "co2measure_duration": 0, 
-        "use_co2_check": False,
-        "drainrecirc": drainrecirc,
-        "recirculation_rate_uL_min": recirculation_rate_uL_min,
-        "need_fill": need_fill,
-        })
+    if clean_injects:
+        epm.add_experiment("CCSI_sub_clean_inject", {
+            "Waterclean_volume_ul": Waterclean_volume_ul,
+            "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            "LiquidCleanWait_s": LiquidCleanWait_s,
+            "use_co2_check": use_co2_check,
+            "LiquidCleanPurge_duration": HSpurge_duration, 
+            "DeltaDilute1_duration": DeltaDilute1_duration,
+            "initialization": True,
+            "co2measure_duration": CO2measure_duration, 
+            "co2measure_acqrate": CO2measure_acqrate, 
+            "use_co2_check": False,
+            "co2_ppm_thresh": CO2threshold, 
+            "purge_if": "below",
+            "drainrecirc": drainrecirc,
+            "recirculation_rate_uL_min": recirculation_rate_uL_min,
+            })
+        epm.add_experiment("CCSI_sub_clean_inject", {
+            "Waterclean_volume_ul": Waterclean_volume_ul,
+            "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            "LiquidCleanWait_s": LiquidCleanWait_s,
+            "use_co2_check": use_co2_check,
+            "LiquidCleanPurge_duration": HSpurge_duration, 
+            "DeltaDilute1_duration": DeltaDilute1_duration,
+            "initialization": True,
+            "co2measure_duration": 0, 
+            "use_co2_check": False,
+            "drainrecirc": drainrecirc,
+            "recirculation_rate_uL_min": recirculation_rate_uL_min,
+            "need_fill": need_fill,
+            })
 
 
     epm.add_experiment("CCSI_sub_initialization_end_state", {})
