@@ -682,6 +682,9 @@ class Base:
                     f"{status_msg.action_server.disp_name()} "
                     f"to subscribers ({self.status_clients})."
                 )
+                if len(self.status_clients)==0 and self.orch_key is not None:
+                    await self.attach_client(self.orch_key, self.orch_host, self.orch_port)
+                    
                 for combo_key in self.status_clients.copy():
                     client_servkey, client_host, client_port = combo_key
                     self.print_message(
