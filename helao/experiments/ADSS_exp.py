@@ -2378,6 +2378,7 @@ def ADSS_sub_remove_bubble(
             samplerate_sec=apm.pars.samplerate_sec,
             ph=apm.pars.ph,
             ref_type=apm.pars.ref_type,
+            ref_offset__V=apm.pars.ref_offset__V,
             check_bubble=apm.pars.check_bubble,
             RSD_threshold=apm.pars.RSD_threshold,
             simple_threshold=apm.pars.simple_threshold,
