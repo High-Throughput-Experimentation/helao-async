@@ -2373,7 +2373,7 @@ def ADSS_sub_remove_bubble(
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.pump_forward_time_s})
     apm.add_action_list(
         ADSS_sub_OCV(
-            Tval__s=apm.pars.Tval_s,
+            Tval__s=apm.pars.Tval__s,
             gamry_i_range=apm.pars.gamry_i_range,
             samplerate_sec=apm.pars.samplerate_sec,
             ph=apm.pars.ph,
