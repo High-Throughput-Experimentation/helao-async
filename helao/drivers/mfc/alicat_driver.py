@@ -134,7 +134,16 @@ class AliCatMFC:
                         # self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     # self.base.print_message(f"Retrieving {dev_name} MFC status")
-                    resp_dict = fc.get_status()
+                    try:
+                        resp_dict = fc.get_status()
+                    except Exception as e:
+                        self.base.print_message(
+                            f"Exception occured on get_status() {e}. Resetting MFC."
+                        )
+                        self.make_fc_instance(
+                            dev_name, self.config_dict["device"][dev_name]
+                        )
+                        resp_dict = fc.get_status()
                     if (
                         resp_dict["acquire_time"] == self.last_acquire[dev_name]
                         or not resp_dict
