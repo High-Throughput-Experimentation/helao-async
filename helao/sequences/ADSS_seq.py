@@ -2452,6 +2452,7 @@ def ADSS_PA_CV_TRI_new(
     same_sample: bool = False,
     use_bubble_removal: bool = True,
     use_current_electrolyte: bool = False,
+    pump_reversal_during_filling: bool = False,
     keep_electrolyte_at_end: bool = False,
     move_to_clean_and_clean: bool = True,
     measure_ref_Pt_at_beginning: bool = True,
@@ -2482,9 +2483,8 @@ def ADSS_PA_CV_TRI_new(
     liquid_sample_no: int = 1053,
     liquid_sample_volume_ul: float = 7000,
     Syringe_rate_ulsec: float = 300,
-    fill_recirculate_wait_time_sec: float = 30,
-    pump_reversal_during_filling: bool = False,
-    fill_recirculate_reverse_wait_time_sec: float = 1,
+    fill_recirculate_wait_time_sec: float = 30,    
+    fill_recirculate_reverse_wait_time_sec: float = 15,
     
     #phosphoric acid injection info
     Inject_PA: bool= True,
@@ -2534,7 +2534,7 @@ def ADSS_PA_CV_TRI_new(
     #CV_O2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
     #CV_O2_samplerate_sec: float = 0.05,
 
-    #final OCP info
+    #OCP info
     OCP_samplerate_sec: float = 0.5,
 
     #Pstat and ref info
