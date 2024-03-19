@@ -334,7 +334,7 @@ def CCSI_sub_n2drain(
     HSpurge_duration: float = 240,  
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
-    recirculation: bool = False,
+    recirculation: bool = True,
     recirculation_duration: float = 120,
     recirculation_rate_uL_min: int = 10000,
 ):
@@ -371,7 +371,7 @@ def CCSI_sub_n2drain(
 
     if apm.pars.recirculation:
         apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration/2},asc.no_wait)
-        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration} )
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.recirculation_duration}, asc.wait_for_previous )
         # apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
         # apm.add(N2MFC_server,"acquire_flowrate",{"flowrate_sccm": apm.pars.n2flowrate_sccm,"duration": 10,},)
         # #apm.add(ORCH_server, "wait", {"waittime": 10})
