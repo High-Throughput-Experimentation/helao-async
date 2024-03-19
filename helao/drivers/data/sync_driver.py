@@ -567,10 +567,14 @@ class HelaoSyncer:
         # return self.progress[yml_path.name]
         return prog
 
-    async def enqueue_yml(self, upath: Union[Path, str], rank: int = 5):
+    async def enqueue_yml(self, upath: Union[Path, str], rank: int = 5, rank_limit: int = -5):
         """Adds yml to sync queue, defaulting to lowest priority."""
         yml_path = Path(upath) if isinstance(upath, str) else upath
-        if yml_path.name in self.task_set:
+        if rank < rank_limit:
+            self.base.print_message(
+                f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request."
+            )
+        elif yml_path.name in self.task_set:
             self.base.print_message(
                 f"{str(yml_path)} is already queued, skipping enqueue request."
             )
