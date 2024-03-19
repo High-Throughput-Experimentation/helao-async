@@ -1585,6 +1585,8 @@ def CCSI_sub_n2flush(
     Alphapurge1_duration: float = 10,
     Probepurge1_duration: float = 10,
     Sensorpurge1_duration: float = 15,
+    recirculation: bool = True,
+    #recirculation_duration: float = 120,
     recirculation_rate_uL_min: int = 10000,
     #    DeltaDilute1_duration: float = 15,
     initialization: bool = False,
@@ -1657,7 +1659,7 @@ def CCSI_sub_n2flush(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.Probepurge1_duration} )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.Probepurge1_duration-1},asc.wait_for_orch )
    # apm.add(ORCH_server, "wait", {"waittime": apm.pars.Probepurge1_duration},)
 
 #
@@ -1673,7 +1675,7 @@ def CCSI_sub_n2flush(
             #"acquisition_rate": apm.pars.,
         },
     )
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.Sensorpurge1_duration} )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.Sensorpurge1_duration},asc.wait_for_orch  )
     #apm.add(ORCH_server, "wait", {"waittime": apm.pars.Sensorpurge1_duration})
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
@@ -1706,6 +1708,9 @@ def CCSI_sub_n2flush(
             #"acquisition_rate": apm.pars.,
         },
     )
+    if apm.pars.recirculation:
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration/2},asc.no_wait)
+        apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.HSpurge_duration/2 -1}, asc.wait_for_orch )
 
     if apm.pars.initialization:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
