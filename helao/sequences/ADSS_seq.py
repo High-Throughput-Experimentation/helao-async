@@ -2437,7 +2437,7 @@ def ADSS_PA_CV_TRI(
 
 
 def ADSS_PA_CV_TRI_new(
-    sequence_version: int = 3, #add ref measurements
+    sequence_version: int = 4, #bubble removal
     #note: str = "need as many samples as you expect combinations of UPL and LPL",
     
     #sample info
@@ -2450,6 +2450,7 @@ def ADSS_PA_CV_TRI_new(
 
     #side info
     same_sample: bool = False,
+    use_bubble_removal: bool = True,
     use_current_electrolyte: bool = False,
     keep_electrolyte_at_end: bool = False,
     move_to_clean_and_clean: bool = True,
@@ -2458,6 +2459,15 @@ def ADSS_PA_CV_TRI_new(
     measure_ref_Pt_at_end: bool = True,
     name_ref_Pt_at_end: str = "builtin_ref_motorxy_3",
     
+    #bubble removal OCV
+    bubble_removal_OCV_t_s: int = 10,
+    bubble_removal_pump_reverse_t_s: int = 15,
+    bubble_removal_pump_forward_t_s: int = 10,
+    bubble_removal_RSD_threshold: float = 0.2,
+    bubble_removal_simple_threshold: float = 0.3,
+    bubble_removal_signal_change_threshold: float = 0.01,
+    bubble_removal_amplitude_threshold: float = 0.05,
+
     #purge wait times
     purge_wait_initialN2_min: int = 10,
     purge_wait_N2_to_O2_min: int = 5,
@@ -2561,11 +2571,24 @@ def ADSS_PA_CV_TRI_new(
 
 ):
 
-    """tbd
+    """
+    This sequence is the most recent one for the TRI Pt dissolution project using ADSS.
+    Included features:
+    - scheduled aliquotes and injection of phosphoric acid
+    - track gas saturation with OCV during N2-O2 and O2-N2 switches
+    - automatic refill of syringes
+    - you can define number of cleaning cycles (to make sure we are cleaning off Co and Ni residues)
+    - include reference Pt measurements before and after sequence
+    - generating sample-LPL-UPL combinations
+    - bubble removal using OCV. bubble removal = reversal of pumps for some seconds 
 
-    last functionality test: tbd"""
+    """
 
     epm = ExperimentPlanMaker()
+
+###################################################################
+#REF MEASUREMENT AT BEGINNING OF SEQUENCE
+###################################################################
 
     #ref measurement at beginning of sequence
     if measure_ref_Pt_at_beginning:
@@ -2584,7 +2607,7 @@ def ADSS_PA_CV_TRI_new(
                 "solid_sample_no": 1,################### can i use the sample id for all ref measurements?
                 "previous_liquid": use_current_electrolyte,
                 "liquid_custom_position": "cell1_we",
-                "liquid_sample_no": liquid_sample_no,            
+                "liquid_sample_no": liquid_sample_no,
                 "liquid_sample_volume_ul": liquid_sample_volume_ul,
             }
         )
@@ -2668,6 +2691,27 @@ def ADSS_PA_CV_TRI_new(
                 "Syringe_rate_ulsec": 300,
                 }
             )
+
+        #check for bubbles that could interfere with echem measurments with OCV
+        if use_bubble_removal:
+            epm.add_experiment("ADSS_sub_OCV",
+                               {
+                                "check_bubble": True,
+                                "Tval__s": bubble_removal_OCV_t_s,
+                                "samplerate_sec": 0.1,
+                                "gamry_i_range": gamry_i_range,
+                                "ph": ph,
+                                "ref_type": ref_type,
+                                "ref_offset__V": ref_offset__V,
+                                "aliquot_insitu": False,
+                                "run_use": "ref",
+                                "RSD_threshold": bubble_removal_RSD_threshold,
+                                "simple_threshold": bubble_removal_simple_threshold,
+                                "signal_change_threshold": bubble_removal_signal_change_threshold,
+                                "amplitude_threshold": bubble_removal_amplitude_threshold,
+                                "bubble_pump_reverse_time_s": bubble_removal_pump_reverse_t_s,
+                                "bubble_pump_forward_time_s": bubble_removal_pump_forward_t_s,
+                                })
 
         #saturate electrolyte with N2 and measure OCV while saturation
         epm.add_experiment("ADSS_sub_OCV", 
@@ -2811,7 +2855,11 @@ def ADSS_PA_CV_TRI_new(
                     "Syringe_rate_ulsec": 300,
                     }
                 )  
-  
+
+###################################################################
+#SEQUENCE FOR ACTUAL SAMPLE
+###################################################################
+
     #for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
     for lpl, upl, sample_no in zip(LPL_list, UPL_list, plate_sample_no_list):
         print("##########################################################\n" +
@@ -2950,6 +2998,26 @@ def ADSS_PA_CV_TRI_new(
                     "rinse_4": washfour,
                 }
             )
+
+        #check for bubbles that could interfere with echem measurments with OCV
+        if use_bubble_removal:
+            epm.add_experiment("ADSS_sub_OCV",
+                               {
+                                "check_bubble": True,
+                                "Tval__s": bubble_removal_OCV_t_s,
+                                "samplerate_sec": 0.1,
+                                "gamry_i_range": gamry_i_range,
+                                "ph": ph,
+                                "ref_type": ref_type,
+                                "ref_offset__V": ref_offset__V,
+                                "aliquot_insitu": False,
+                                "RSD_threshold": bubble_removal_RSD_threshold,
+                                "simple_threshold": bubble_removal_simple_threshold,
+                                "signal_change_threshold": bubble_removal_signal_change_threshold,
+                                "amplitude_threshold": bubble_removal_amplitude_threshold,
+                                "bubble_pump_reverse_time_s": bubble_removal_pump_reverse_t_s,
+                                "bubble_pump_forward_time_s": bubble_removal_pump_forward_t_s,
+                                })
 
         #saturate electrolyte with N2
         epm.add_experiment("ADSS_sub_OCV", 
@@ -3294,6 +3362,10 @@ def ADSS_PA_CV_TRI_new(
                     }
                 )
 
+###################################################################
+#REF MEASUREMENT AT END OF SEQUENCE
+###################################################################
+
     #ref measurement at end of sequence
     if measure_ref_Pt_at_end:
         epm.add_experiment(
@@ -3393,7 +3465,28 @@ def ADSS_PA_CV_TRI_new(
                 "fill_volume_ul": liquid_sample_volume_ul,
                 "Syringe_rate_ulsec": 300,
                 }
-            )
+            )       
+
+        #check for bubbles that could interfere with echem measurments with OCV
+        if use_bubble_removal:
+            epm.add_experiment("ADSS_sub_OCV",
+                               {
+                                "check_bubble": True,
+                                "Tval__s": bubble_removal_OCV_t_s,
+                                "samplerate_sec": 0.1,
+                                "gamry_i_range": gamry_i_range,
+                                "ph": ph,
+                                "ref_type": ref_type,
+                                "ref_offset__V": ref_offset__V,
+                                "aliquot_insitu": False,
+                                "run_use": "ref",
+                                "RSD_threshold": bubble_removal_RSD_threshold,
+                                "simple_threshold": bubble_removal_simple_threshold,
+                                "signal_change_threshold": bubble_removal_signal_change_threshold,
+                                "amplitude_threshold": bubble_removal_amplitude_threshold,
+                                "bubble_pump_reverse_time_s": bubble_removal_pump_reverse_t_s,
+                                "bubble_pump_forward_time_s": bubble_removal_pump_forward_t_s,
+                                })
 
         #saturate electrolyte with N2
         epm.add_experiment("ADSS_sub_OCV", 
