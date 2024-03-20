@@ -5,7 +5,7 @@ from socket import gethostname
 from time import strftime
 
 from fastapi import Body, Query
-from typing import Optional, List  # , Tuple
+from typing import Optional, List, Union
 
 from helao.servers.base_api import BaseAPI
 from helao.drivers.robot.pal_driver import (
@@ -585,7 +585,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def archive_tray_load(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        load_sample_in: SampleUnion = Body(
+        load_sample_in: Union[SampleUnion, dict] = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
             embed=True,
         ),
@@ -994,9 +994,11 @@ def makeApp(confPrefix, server_key, helao_root):
         active.action.samples_in = []
         active.action.samples_out = []
         await active.append_sample(samples=samples, IO="out")
-        datadict = {"samples": [sample.as_dict() for sample in samples]}
+        sample_out_dicts = [sample.as_dict() for sample in samples]
+        datadict = {"samples": sample_out_dicts}
         datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
         active.enqueue_data_nowait(datamodel, action=active.action)
+        active.action.action_params["_fast_sample_out"] = sample_out_dicts[0]
         finished_action = await active.finish()
         return finished_action.as_dict()
 
