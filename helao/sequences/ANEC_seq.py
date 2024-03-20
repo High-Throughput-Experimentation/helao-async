@@ -1,6 +1,6 @@
 """Sequence library for ANEC"""
 
-__all__ = ["ANEC_sample_ready", "ANEC_series_CA", "ANEC_series_CAliquidOnly", "ANEC_OCV","ANEC_photo_CA", "ANEC_photo_CAgasonly", "ANEC_photo_CV", "ANEC_cleanup_disengage","ANEC_repeat_CA", "ANEC_repeat_TentHeatCAgasonly","ANEC_heatOCV","ANEC_repeat_TentHeatCA","ANEC_repeat_HeatCA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_gasonly_CA", "ANEC_ferricyanide_simpleprotocol", "ANEC_ferricyanide_protocol", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
+__all__ = ["ANEC_sample_ready", "ANEC_series_CA", "ANEC_series_CAliquidOnly", "ANEC_OCV","ANEC_photo_CA", "ANEC_photo_CAgasonly", "ANEC_photo_CV", "ANEC_cleanup_disengage","ANEC_repeat_CA", "ANEC_repeat_TentHeatCAgasonly","ANEC_heatOCV","ANEC_repeat_TentHeatCA","ANEC_repeat_HeatCA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_gasonly_CA", "ANEC_ferricyanide_simpleprotocol", "ANEC_ferricyanide_protocol", "ANEC_create_liquid_sample", "ANEC_create_liquid_tray", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
 
 from typing import List
 from typing import Optional
@@ -1682,6 +1682,48 @@ def ANEC_ferricyanide_protocol(
             )
     epm.add_experiment("ANEC_sub_heatoff",{})
     epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
+
+    return epm.experiment_plan_list
+
+def ANEC_create_liquid_sample(
+    sequence_version: int = 1,
+    no_of_samples: int = 5,
+    volume_ml: float = 0.84,
+    source: List[str] = ["autoGDE"],
+    partial_molarity: List[str] = ["unknown"],
+    chemical: List[str] = ["unknown"],
+    ph: float = 7.8,
+    supplier: List[str] = ["N/A"],
+    lot_number: List[str] = ["N/A"],
+    electrolyte_name: str = "1M KHCO3",
+    prep_date: str = "2024-03-19",
+    
+
+):
+    epm = ExperimentPlanMaker()
+    for _ in range(no_of_samples):
+        epm.add_experiment(
+            "create_liquid_sample",
+            {"volume_ml": volume_ml, "source": source, "partial_molarity":partial_molarity, "chemical":chemical, "ph":ph, "supplier":supplier, "lot_number":lot_number,"electrolyte_name":electrolyte_name, "prep_date":prep_date},
+        )
+
+    return epm.experiment_plan_list
+
+def ANEC_create_liquid_tray(
+    sequence_version: int = 1,
+    liquid_sample_no: List[int] = [1, 1, 1, 1, 1],
+    machine_name: str = "hte-ecms-01",
+    slot: int = 1,
+    vial: List[int] = [1, 2, 3, 4, 5],
+    
+
+):
+    epm = ExperimentPlanMaker()
+    for num, (sample_no, vial_no) in enumerate(zip(liquid_sample_no, vial)):
+        epm.add_experiment(
+            "load_liquid_sample",
+            {"liquid_sample_no": sample_no, "machine_name": machine_name, "tray":2, "slot":slot, "vial":vial_no},
+        )
 
     return epm.experiment_plan_list
 
