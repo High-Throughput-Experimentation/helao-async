@@ -5,6 +5,7 @@ __all__ = [
     "sort_plate_sample_no_list",
     "generate_sample_no_list",
     "load_liquid_sample",
+    "create_and_load_liquid_sample",
     "orch_sub_wait"
 ]
 
