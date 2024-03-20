@@ -48,6 +48,7 @@ __all__ = [
     "ADSS_sub_tray_icpms_export",
     "ADSS_sub_move_to_ref_measurement",
     "ADSS_sub_remove_bubble",
+    "ADSS_sub_cellfill_prefilled_nosampleload"
 ]
 
 
@@ -1722,6 +1723,78 @@ def ADSS_sub_stopheat(
     )
     return apm.action_list  # returns complete action list to orch
 
+def ADSS_sub_cellfill_prefilled_nosampleload(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Solution_volume_ul: float = 3000,
+    Syringe_rate_ulsec: float = 300,
+    #    deadvolume_ul: int = 0,
+    #    PurgeWait_s: float = 2,
+    ReturnLineWait_s: float = 0,
+):
+    apm = ActionPlanMaker()
+    
+    apm.add(
+        NI_server,
+        "gasvalve",
+        {"gasvalve": "V1", "on": 0},
+        start_condition=ActionStartCondition.wait_for_orch,
+    )
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+    # apm.add(
+    #     SOLUTIONPUMP_server,
+    #     "withdraw",
+    #     {
+    #         "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+    #         "volume_uL": apm.pars.Solution_volume_ul,
+    #     },
+    # )
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+    apm.add(
+        SOLUTIONPUMP_server,
+        "infuse",
+        {
+            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+            "volume_uL": apm.pars.Solution_volume_ul,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        technique_name="cell_fill",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+        ],
+        start_condition=ActionStartCondition.wait_for_orch,
+    )
+    if apm.pars.ReturnLineWait_s != 0:
+        apm.add(
+            NI_server,
+            "pump",
+            {"pump": "direction", "on": 0},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+        apm.add(
+            NI_server,
+            "pump",
+            {"pump": "peripump", "on": 1},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+        apm.add(
+            ORCH_server,
+            "wait",
+            {"waittime": apm.pars.ReturnLineWait_s},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+        apm.add(
+            NI_server,
+            "pump",
+            {"pump": "peripump", "on": 0},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+
+    #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+
+    return apm.action_list
 
 def ADSS_sub_cellfill_prefilled(
     experiment: Experiment,

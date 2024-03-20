@@ -3544,7 +3544,7 @@ def ADSS_PA_CV_TRI_new(
             #rinse with electrolyte to remove cleaning liquid residuals
             if rinse_with_electrolyte_bf_prefill:
                 epm.add_experiment(
-                    "ADSS_sub_cellfill_prefilled",
+                    "ADSS_sub_cellfill_prefilled_nosampleload",
                     {
                         "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
                         "Syringe_rate_ulsec": Syringe_rate_ulsec,
@@ -4049,7 +4049,7 @@ def ADSS_PA_CV_TRI_new(
             #rinse with electrolyte to remove cleaning liquid residuals
             if rinse_with_electrolyte_bf_prefill:
                 epm.add_experiment(
-                    "ADSS_sub_cellfill_prefilled",
+                    "ADSS_sub_cellfill_prefilled_nosampleload",
                     {
                         "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
                         "Syringe_rate_ulsec": Syringe_rate_ulsec,
@@ -4318,7 +4318,7 @@ def ADSS_PA_CV_TRI_new(
             #rinse with electrolyte to remove cleaning liquid residuals
             if rinse_with_electrolyte_bf_prefill:
                 epm.add_experiment(
-                    "ADSS_sub_cellfill_prefilled",
+                    "ADSS_sub_cellfill_prefilled_nosampleload",
                     {
                         "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
                         "Syringe_rate_ulsec": Syringe_rate_ulsec,
