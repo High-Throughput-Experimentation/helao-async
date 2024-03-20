@@ -274,6 +274,65 @@ def load_liquid_sample(
 
     return apm.action_list  # returns complete action list to orch
 
+def create_and_load_liquid_sample(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    volume_ml: float = 1.0,
+    source: List[str] = ["source1", "source2"],
+    partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
+    chemical: List[str] = ["chemical1", "chemical2"],
+    ph: float = 7.0,
+    supplier: List[str] = ["supplier1", "supplier2"],
+    lot_number: List[str] = ["lot1", "lot2"],
+    electrolyte_name: str = "name",
+    prep_date: str = "2000-01-01",
+    comment: str = "comment",
+    tray: int = 0,
+    slot: int = 0,
+    vial: int = 0
+):
+    """creates a custom liquid sample
+    input fields contain json strings"""
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    apm.add(
+        PAL_server,
+        "db_new_samples",
+        {
+            "fast_samples_in": [
+                LiquidSample(
+                    **{
+                        "machine_name": gethostname().lower(),
+                        "source": apm.pars.source,
+                        "volume_ml": apm.pars.volume_ml,
+                        "chemical": apm.pars.chemical,
+                        "partial_molarity": apm.pars.partial_molarity,
+                        "ph": apm.pars.ph,
+                        "supplier": apm.pars.supplier,
+                        "lot_number": apm.pars.lot_number,
+                        "electrolyte": apm.pars.electrolyte_name,
+                        "prep_date": apm.pars.prep_date,
+                        "comment": apm.pars.comment,
+                    }
+                )
+            ],
+        },
+        to_globalexp_params=["_fast_sample_out"]
+    )
+
+    
+    apm.add(
+        PAL_server,
+        "archive_tray_load",
+        {
+            "tray": apm.pars.tray,
+            "slot": apm.pars.slot,
+            "vial": apm.pars.vial
+        },
+        from_globalexp_params={"_fast_sample_out": "load_sample_in"}
+    )
+
+    return apm.action_list  # returns complete action list to orch
 
 def orch_sub_wait(
     experiment: Experiment,

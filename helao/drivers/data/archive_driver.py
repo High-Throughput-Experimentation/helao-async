@@ -16,7 +16,7 @@ import asyncio
 import os
 from datetime import datetime
 from copy import deepcopy
-from typing import List, Tuple
+from typing import List, Tuple, Union
 import traceback
 
 from socket import gethostname
@@ -340,7 +340,7 @@ class Archive:
         tray: int = None,
         slot: int = None,
         vial: int = None,
-        load_sample_in: SampleUnion = None,
+        load_sample_in: Union[SampleUnion, dict] = None,
         *args,
         **kwargs,
     ) -> Tuple[ErrorCodes, SampleUnion]:
@@ -351,9 +351,14 @@ class Archive:
         if load_sample_in is None:
             return False, NoneSample(), {}
 
+        if isinstance(load_sample_in, dict):
+            sample_in = LiquidSample(**load_sample_in)
+        else:
+            sample_in = load_sample_in
+
         # check if sample actually exists
         load_samples_in = await self.unified_db.get_samples(
-            samples=[object_to_sample(load_sample_in)]
+            samples=[object_to_sample(sample_in)]
         )
 
         if not load_samples_in:
