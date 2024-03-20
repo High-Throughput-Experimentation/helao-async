@@ -3166,7 +3166,10 @@ def ADSS_PA_CV_TRI_new(
 
     #side info
     same_sample: bool = False,
+    aliquot_init: bool = True,
+    Inject_PA: bool= True,
     use_bubble_removal: bool = True,
+    rinse_with_electrolyte_bf_prefill: bool = True,
     use_current_electrolyte: bool = False,
     pump_reversal_during_filling: bool = False,
     keep_electrolyte_at_end: bool = False,
@@ -3191,7 +3194,6 @@ def ADSS_PA_CV_TRI_new(
     purge_wait_O2_to_N2_min: int = 15,
 
     #electrolyte info
-    rinse_with_electrolyte_bf_prefill: bool = True,
     rinse_with_electrolyte_bf_prefill_volume_uL: float = 3000,
     rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec: float = 30,
     rinse_with_electrolyte_bf_prefill_drain_time_sec: float = 30,
@@ -3203,7 +3205,6 @@ def ADSS_PA_CV_TRI_new(
     fill_recirculate_reverse_wait_time_sec: float = 15,
     
     #phosphoric acid injection info
-    Inject_PA: bool= True,
     phosphoric_sample_no: int = 1261,
     phosphoric_location: List[int] = [2,3,54],
     phosphoric_quantity_ul: int = 90,
@@ -3259,7 +3260,6 @@ def ADSS_PA_CV_TRI_new(
     ref_offset__V: float = -0.005,
     
     #aliquote info
-    aliquot_init: bool = True,
     aliquot_after_cleaningCV: List[int] = [0],
     aliquote_after_CV_init: List[int] = [1],
     aliquote_CV_O2: List[int] = [1,1,1],
