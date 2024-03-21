@@ -59,6 +59,7 @@ class C_mfc:
             "volumetric_flow",
             "hold_valve",
             "lock_display",
+            "acquire_time",
             # "time_now",
         ]
 
