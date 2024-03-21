@@ -361,6 +361,7 @@ class Archive:
             print_message({}, "archive", "Sample does not exist in DB.", error=True)
             return error, sample
 
+        position_found = False
         if tray in self.positions.trays_dict:
             if self.positions.trays_dict[tray] is not None:
                 if slot in self.positions.trays_dict[tray]:
@@ -373,6 +374,10 @@ class Archive:
                             sample = self.positions.trays_dict[tray][slot].load(
                                 vial=vial + 1, sample=load_samples_in[0]
                             )
+                            position_found = True
+        if not position_found:
+            print_message({}, "archive", f"could not find tray {tray}, slot {slot}, vial {vial} in defined positions or set position is already occupied.")   
+        
         # update with information from db
         sample = await self._update_samples(sample)
         return error, sample
