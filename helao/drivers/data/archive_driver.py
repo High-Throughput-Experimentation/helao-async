@@ -351,14 +351,10 @@ class Archive:
         if load_sample_in is None:
             return False, NoneSample(), {}
 
-        if isinstance(load_sample_in, dict):
-            sample_in = LiquidSample(**load_sample_in)
-        else:
-            sample_in = load_sample_in
-
+        print("!!!load_sample_in:", load_sample_in)
         # check if sample actually exists
         load_samples_in = await self.unified_db.get_samples(
-            samples=[object_to_sample(sample_in)]
+            samples=[load_sample_in]
         )
 
         if not load_samples_in:
