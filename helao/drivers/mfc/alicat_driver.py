@@ -48,6 +48,9 @@ class AliCatMFC:
 
         self.dev_mfcs = make_str_enum("dev_mfcs", {key: key for key in self.fcs})
 
+        for fc in self.fcs.values():
+            fc.close()
+
         self.base.print_message(f"Managing {len(self.fcs)} devices:\n{self.fcs.keys()}")
         # query status with self.mfc.get()
         # query pid settings with self.mfc.get_pid()
@@ -100,16 +103,16 @@ class AliCatMFC:
 
     async def start_polling(self):
         self.base.print_message("got 'start_polling' request, raising signal")
-        async with self.base.aiolock:
-            await self.poll_signalq.put(True)
+        # async with self.base.aiolock:
+        await self.poll_signalq.put(True)
         while not self.polling:
             self.base.print_message("waiting for polling loop to start")
             await asyncio.sleep(0.1)
 
     async def stop_polling(self):
         self.base.print_message("got 'stop_polling' request, raising signal")
-        async with self.base.aiolock:
-            await self.poll_signalq.put(False)
+        # async with self.base.aiolock:
+        await self.poll_signalq.put(False)
         while self.polling:
             self.base.print_message("waiting for polling loop to stop")
             await asyncio.sleep(0.1)
@@ -124,9 +127,11 @@ class AliCatMFC:
         self.last_acquire = {dev_name: 0 for dev_name in self.fcs.keys()}
         lastupdate = 0
         while True:
-            for dev_name, fc in self.fcs.items():
-                # self.base.print_message(f"Refreshing {dev_name} MFC")
-                if self.polling:
+            if self.polling:
+                for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
+                    self.make_fc_instance(dev_name, dev_dict)
+                for dev_name, fc in self.fcs.items():
+                    # self.base.print_message(f"Refreshing {dev_name} MFC")
                     fc.flush()
                     checktime = time.time()
                     # self.base.print_message(f"{dev_name} MFC checked at {checktime}")
@@ -180,10 +185,13 @@ class AliCatMFC:
                             self.base.print_message(
                                 f"!!Received unexpected dict: {resp_dict}"
                             )
-                await asyncio.sleep(waittime)
+                for fc in self.fcs.values():
+                    fc.close()
+            await asyncio.sleep(waittime)
 
     def list_gases(self, device_name: str):
-        return self.fcinfo.get(device_name, {}).get("gases", {})
+        gaslist =  self.fcinfo.get(device_name, {}).get("gases", {})
+        return gaslist
 
     async def set_pressure(
         self,
@@ -196,8 +204,10 @@ class AliCatMFC:
         """Set control mode to pressure, set point = pressure_psi, ramping psi/sec or zero to disable."""
         resp = []
         await self.stop_polling()
+        self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
         resp.append(self._send(device_name, f"SR {ramp_psi_sec} 4"))
         resp.append(self.fcs[device_name].set_pressure(pressure_psia))
+        self.fcs[device_name].close()
         await self.start_polling()
         return resp
 
@@ -212,15 +222,19 @@ class AliCatMFC:
         """Set control mode to mass flow, set point = flowrate_scc, ramping flowrate_sccm or zero to disable."""
         resp = []
         await self.stop_polling()
+        self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
         resp.append(self._send(device_name, f"SR {ramp_sccm_sec} 4"))
         resp.append(self.fcs[device_name].set_flow_rate(flowrate_sccm))
+        self.fcs[device_name].close()
         await self.start_polling()
         return resp
 
     async def set_gas(self, device_name: str, gas: Union[int, str]):
         "Set MFC to pure gas"
         await self.stop_polling()
+        self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
         resp = self.fcs[device_name].set_gas(gas)
+        self.fcs[device_name].close()
         await self.start_polling()
         return resp
 
@@ -231,11 +245,13 @@ class AliCatMFC:
             return {}
         else:
             await self.stop_polling()
+            self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
             self.fcs[device_name].delete_mix(236)
             self.fcs[device_name].create_mix(
                 mix_no=236, name="HELAO_mix", gases=gas_dict
             )
             resp = self.fcs[device_name].set_gas(236)
+            self.fcs[device_name].close()
             await self.start_polling()
             return resp
 
@@ -244,11 +260,17 @@ class AliCatMFC:
         await self.stop_polling()
         if device_name is None:
             resp = []
+            for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
+                self.make_fc_instance(dev_name, dev_dict)
             for dev_name, fc in self.fcs.items():
                 lock_resp = fc.lock()
                 resp.append({dev_name: lock_resp})
+            for fc in self.fcs.values():
+                fc.close()
         else:
+            self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
             resp = self.fcs[device_name].lock()
+            self.fcs[device_name].close()
         await self.start_polling()
         return resp
 
@@ -257,11 +279,17 @@ class AliCatMFC:
         await self.stop_polling()
         if device_name is None:
             resp = []
+            for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
+                self.make_fc_instance(dev_name, dev_dict)
             for dev_name, fc in self.fcs.items():
                 unlock_resp = fc.unlock()
                 resp.append({dev_name: unlock_resp})
+            for fc in self.fcs.values():
+                fc.close()
         else:
+            self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
             resp = self.fcs[device_name].unlock()
+            self.fcs[device_name].close()
         await self.start_polling()
         return resp
 
@@ -270,11 +298,17 @@ class AliCatMFC:
         await self.stop_polling()
         if device_name is None:
             resp = []
+            for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
+                self.make_fc_instance(dev_name, dev_dict)
             for dev_name, fc in self.fcs.items():
                 hold_resp = fc.hold()
                 resp.append({dev_name: hold_resp})
+            for fc in self.fcs.values():
+                fc.close()
         else:
+            self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
             resp = self.fcs[device_name].hold()
+            self.fcs[device_name].close()
         await self.start_polling()
         return resp
 
@@ -283,12 +317,18 @@ class AliCatMFC:
         await self.stop_polling()
         if device_name is None:
             resp = []
+            for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
+                self.make_fc_instance(dev_name, dev_dict)
             for dev_name, _ in self.fcs.items():
                 await self.set_flowrate(dev_name, 0)
                 chold_resp = self._send(dev_name, "hc")
                 resp.append({dev_name: chold_resp})
+            for fc in self.fcs.values():
+                fc.close()
         else:
+            self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
             resp = self._send(device_name, "hc")
+            self.fcs[device_name].close()
         await self.start_polling()
         return resp
 
@@ -297,11 +337,17 @@ class AliCatMFC:
         await self.stop_polling()
         if device_name is None:
             resp = []
+            for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
+                self.make_fc_instance(dev_name, dev_dict)
             for dev_name, fc in self.fcs.items():
                 cancel_resp = fc.cancel_hold()
                 resp.append({dev_name: cancel_resp})
+            for fc in self.fcs.values():
+                fc.close()
         else:
+            self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
             resp = self.fcs[device_name].cancel_hold()
+            self.fcs[device_name].close()
         await self.start_polling()
         return resp
 
@@ -310,11 +356,17 @@ class AliCatMFC:
         await self.stop_polling()
         if device_name is None:
             resp = []
+            for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
+                self.make_fc_instance(dev_name, dev_dict)
             for dev_name, fc in self.fcs.items():
                 tarev_resp = fc.tare_volumetric()
                 resp.append({dev_name: tarev_resp})
+            for fc in self.fcs.values():
+                fc.close()
         else:
+            self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
             resp = self.fcs[device_name].tare_volumetric()
+            self.fcs[device_name].close()
         await self.start_polling()
         return resp
 
@@ -323,11 +375,17 @@ class AliCatMFC:
         await self.stop_polling()
         if device_name is None:
             resp = []
+            for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
+                self.make_fc_instance(dev_name, dev_dict)
             for dev_name, fc in self.fcs.items():
                 tarep_resp = fc.tare_pressure()
                 resp.append({dev_name: tarep_resp})
+            for fc in self.fcs.values():
+                fc.close()
         else:
+            self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
             resp = self.fcs[device_name].tare_pressure()
+            self.fcs[device_name].close()
         await self.start_polling()
         return resp
 
