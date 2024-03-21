@@ -44,31 +44,7 @@ class AliCatMFC:
         self.fcinfo = {}
 
         for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
-            self.fcs[dev_name] = FlowController(
-                port=dev_dict["port"], address=dev_dict["unit_id"]
-            )
-            # setpoint control mode: serial
-            self._send(dev_name, "lsss")
-            # close valves and hold
-            self._send(dev_name, "hc")
-            # retrieve gas list
-            gas_resp = self._send(dev_name, "??g*")
-            # device information (model, serial, calib date...)
-            mfg_resp = self._send(dev_name, "??m*")
-
-            gas_list = [
-                x.replace(f"{dev_dict['unit_id']} G", "").strip() for x in gas_resp
-            ]
-            gas_dict = {int(gas.split()[0]): gas.split()[-1] for gas in gas_list}
-
-            mfg_list = [
-                x.replace(f"{dev_dict['unit_id']} M", "").strip() for x in mfg_resp
-            ]
-            mfg_dict = {
-                " ".join(line.split()[:-1]): line.split()[-1] for line in mfg_list
-            }
-
-            self.fcinfo[dev_name] = {"gases": gas_dict, "info": mfg_dict}
+            self.make_fc_instance(dev_name, dev_dict)
 
         self.dev_mfcs = make_str_enum("dev_mfcs", {key: key for key in self.fcs})
 
@@ -82,6 +58,30 @@ class AliCatMFC:
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
         self.last_state = "unknown"
+
+    def make_fc_instance(self, device_name: str, device_config: dict):
+        self.fcs[device_name] = FlowController(
+            port=device_config["port"], address=device_config["unit_id"]
+        )
+        # setpoint control mode: serial
+        self._send(device_name, "lsss")
+        # close valves and hold
+        self._send(device_name, "hc")
+        # retrieve gas list
+        gas_resp = self._send(device_name, "??g*")
+        # device information (model, serial, calib date...)
+        mfg_resp = self._send(device_name, "??m*")
+
+        gas_list = [
+            x.replace(f"{device_config['unit_id']} G", "").strip() for x in gas_resp
+        ]
+        gas_dict = {int(gas.split()[0]): gas.split()[-1] for gas in gas_list}
+
+        mfg_list = [
+            x.replace(f"{device_config['unit_id']} M", "").strip() for x in mfg_resp
+        ]
+        mfg_dict = {" ".join(line.split()[:-1]): line.split()[-1] for line in mfg_list}
+        self.fcinfo[device_name] = {"gases": gas_dict, "info": mfg_dict}
 
     def _send(self, device_name: str, command: str):
         unit_id = self.config_dict["devices"][device_name]["unit_id"]
@@ -119,8 +119,9 @@ class AliCatMFC:
             self.polling = await self.poll_signalq.get()
             self.base.print_message("polling signal received")
 
-    async def poll_sensor_loop(self, waittime: float = 0.05):
+    async def poll_sensor_loop(self, waittime: float = 0.1):
         self.base.print_message("MFC background task has started")
+        self.last_acquire = {dev_name: 0 for dev_name in self.fcs.keys()}
         lastupdate = 0
         while True:
             for dev_name, fc in self.fcs.items():
@@ -133,8 +134,28 @@ class AliCatMFC:
                         # self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     # self.base.print_message(f"Retrieving {dev_name} MFC status")
-                    resp_dict = fc.get_status()
-                    if resp_dict is not None:
+                    try:
+                        resp_dict = fc.get_status()
+                    except Exception as e:
+                        self.base.print_message(
+                            f"Exception occured on get_status() {e}. Resetting MFC."
+                        )
+                        self.make_fc_instance(
+                            dev_name, self.config_dict["device"][dev_name]
+                        )
+                        resp_dict = fc.get_status()
+                    if (
+                        resp_dict["acquire_time"] == self.last_acquire[dev_name]
+                        or not resp_dict
+                    ):
+                        self.base.print_message(
+                            "Did not receive an updated status. Resetting MFC."
+                        )
+                        fc.close()
+                        self.make_fc_instance(
+                            dev_name, self.config_dict["device"][dev_name]
+                        )
+                    else:
                         # self.base.print_message(
                         #     f"Received {dev_name} MFC status:\n{resp_dict}"
                         # )
@@ -389,10 +410,7 @@ class MfcExec(Executor):
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
         self.total_scc += (
-            (iter_time - self.last_acq_time)
-            / 60
-            * (live_flow + self.last_acq_flow)
-            / 2
+            (iter_time - self.last_acq_time) / 60 * (live_flow + self.last_acq_flow) / 2
         )
         self.last_acq_time = iter_time
         self.last_acq_flow = live_flow
@@ -500,10 +518,7 @@ class MfcConstPresExec(MfcExec):
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
         self.total_scc += (
-            (iter_time - self.last_acq_time)
-            / 60
-            * (live_flow + self.last_acq_flow)
-            / 2
+            (iter_time - self.last_acq_time) / 60 * (live_flow + self.last_acq_flow) / 2
         )
         self.last_acq_time = iter_time
         self.last_acq_flow = live_flow
@@ -648,10 +663,7 @@ class MfcConstConcExec(MfcExec):
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
         self.total_scc += (
-            (iter_time - self.last_acq_time)
-            / 60
-            * (live_flow + self.last_acq_flow)
-            / 2
+            (iter_time - self.last_acq_time) / 60 * (live_flow + self.last_acq_flow) / 2
         )
         self.last_acq_time = iter_time
         self.last_acq_flow = live_flow
@@ -988,6 +1000,7 @@ class FlowMeter(object):
             for k, v in zip(self.status_keys, values)
         }
         return_dict.update(holdlockd)
+        return_dict["acquire_time"] = time.time()
 
         return return_dict
 
