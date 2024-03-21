@@ -682,6 +682,9 @@ class Base:
                     f"{status_msg.action_server.disp_name()} "
                     f"to subscribers ({self.status_clients})."
                 )
+                if len(self.status_clients)==0 and self.orch_key is not None:
+                    await self.attach_client(self.orch_key, self.orch_host, self.orch_port)
+                    
                 for combo_key in self.status_clients.copy():
                     client_servkey, client_host, client_port = combo_key
                     self.print_message(
@@ -1833,8 +1836,10 @@ class Active:
                 retry_counter += 1
 
             self.base.print_message("checking if all queued data has written.")
-            while self.num_data_queued > self.num_data_written:
-                self.base.print_message(f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 1 second.")
+            write_retries = 5
+            write_iter = 0
+            while self.num_data_queued > self.num_data_written and write_iter < write_retries:
+                self.base.print_message(f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 0.1 second.")
                 for action in self.action_list:
                     if action.data_stream_status != HloStatus.active:
                         await self.enqueue_data(
@@ -1847,6 +1852,7 @@ class Active:
                             f" {action.data_stream_status}",
                             info=True,
                         )
+                write_iter += 1
                 asyncio.sleep(0.1)
 
             # self.action_list[-1] is the very first action
