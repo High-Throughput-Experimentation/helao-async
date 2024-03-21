@@ -32,14 +32,14 @@ sequence_params:
 run_type: eche
 root: C:\INST_hlo
 servers:
-  # ORCH:
-  #   host: hte-eche-05.htejcap.caltech.edu
-  #   port: 8001
-  #   group: orchestrator
-  #   fast: async_orch2
-  #   params:
-  #     enable_op: true
-  #     bokeh_port: 5002
+  ORCH:
+    host: hte-eche-05.htejcap.caltech.edu
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params:
+      enable_op: true
+      bokeh_port: 5002
   # MOTOR:
   #   host: hte-eche-05.htejcap.caltech.edu
   #   port: 8003
