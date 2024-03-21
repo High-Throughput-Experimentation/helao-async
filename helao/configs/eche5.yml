@@ -2,6 +2,7 @@ dummy: true
 simulation: false
 experiment_libraries:
   - ECHE_exp
+  - TEST_exp
   - samples_exp
 experiment_params:
   gamrychannelwait: -1
@@ -107,15 +108,15 @@ servers:
   #       doric_led2: 5
   #       doric_led3: 7
   #       doric_led4: 8
-  # PAL:
-  #   host: hte-eche-05.htejcap.caltech.edu
-  #   port: 8007
-  #   group: action
-  #   fast: pal_server
-  #   params:
-  #     positions:
-  #       custom:
-  #         cell1_we: cell
+  PAL:
+    host: hte-eche-05.htejcap.caltech.edu
+    port: 8007
+    group: action
+    fast: pal_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
   VIS:
     host: hte-eche-05.htejcap.caltech.edu
     port: 5001
