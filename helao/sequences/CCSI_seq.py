@@ -930,7 +930,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
   #  max_repeats: int = 5,
   #  purge_if: Union[str, float] = 0.03,
   #  need_fill: bool = False,
-    
+    temp_monitor_time = int =600,
 ):
 
     epm = ExperimentPlanMaker()
@@ -1014,27 +1014,28 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
         })
 
         epm.add_experiment("CCSI_sub_refill_clean", {"Waterclean_volume_ul":drainclean_volume_ul,"Syringe_rate_ulsec": syringe_rate_ulsec})
+        epm.add_experiment("CCSI_sub_co2pressuremonitor_nopump", {"co2measure_duration":temp_monitor_time,"co2measure_acqrate": co2measure_acqrate})
 
-        epm.add_experiment("CCSI_sub_initialization_firstpart", {
-            "HSpurge1_duration": 60,
-            "Manpurge1_duration": 30,
-            "Alphapurge1_duration": 30,
-            "Probepurge1_duration": 30,
-            "Sensorpurge1_duration": 45,
-            "recirculation_rate_uL_min": recirculation_rate_uL_min,
-            })
+    #     epm.add_experiment("CCSI_sub_initialization_firstpart", {
+    #         "HSpurge1_duration": 60,
+    #         "Manpurge1_duration": 30,
+    #         "Alphapurge1_duration": 30,
+    #         "Probepurge1_duration": 30,
+    #         "Sensorpurge1_duration": 45,
+    #         "recirculation_rate_uL_min": recirculation_rate_uL_min,
+    #         })
 
-    #
-    # DILUTION PURGE, MAIN HEADSPACE PURGE AND HEADSPACE EVALUATION
-        epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
-            "HSpurge_duration": 60, 
-            "DeltaDilute1_duration": 30,
-            "initialization": True,
-            "recirculation_rate_uL_min": recirculation_rate_uL_min,
-            "co2measure_duration": clean_co2measure_duration, 
-            "co2measure_acqrate": co2measure_acqrate, 
-            })
-        epm.add_experiment("CCSI_sub_initialization_end_state", {})
+    # #
+    # # DILUTION PURGE, MAIN HEADSPACE PURGE AND HEADSPACE EVALUATION
+    #     epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
+    #         "HSpurge_duration": 60, 
+    #         "DeltaDilute1_duration": 30,
+    #         "initialization": True,
+    #         "recirculation_rate_uL_min": recirculation_rate_uL_min,
+    #         "co2measure_duration": clean_co2measure_duration, 
+    #         "co2measure_acqrate": co2measure_acqrate, 
+    #         })
+    #     epm.add_experiment("CCSI_sub_initialization_end_state", {})
 
 
 
