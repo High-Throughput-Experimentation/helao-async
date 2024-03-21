@@ -11,7 +11,7 @@ git fetch --prune --all
 
 git reset --hard
 
-git pull
+git pull --all
 
 git reset --hard
 
@@ -27,7 +27,7 @@ git fetch --prune --all
 
 git reset --hard
 
-git pull
+git pull --all
 
 git reset --hard
 
