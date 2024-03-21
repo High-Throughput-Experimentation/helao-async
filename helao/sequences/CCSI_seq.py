@@ -930,7 +930,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
   #  max_repeats: int = 5,
   #  purge_if: Union[str, float] = 0.03,
   #  need_fill: bool = False,
-    temp_monitor_time = int =600,
+    temp_monitor_time: int =600,
 ):
 
     epm = ExperimentPlanMaker()
