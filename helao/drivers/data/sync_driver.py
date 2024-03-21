@@ -446,7 +446,7 @@ class HelaoSyncer:
         # self.progress = {}
         self.sequence_objs = {}
         self.task_queue = asyncio.PriorityQueue()
-        self.task_set = set()
+        # self.task_set = set()
         self.running_tasks = {}
         self.aiolock = asyncio.Lock()
         # push happens via async task queue
@@ -520,20 +520,20 @@ class HelaoSyncer:
         while True:
             if len(self.running_tasks) < self.max_tasks:
                 # self.base.print_message("Getting next yml_target from queue.")
-                rank, yml_target = await self.task_queue.get()
-                self.task_set.remove(yml_target.name)
+                rank, yml_path = await self.task_queue.get()
+                # self.task_set.remove(yml_path.name)
                 # self.base.print_message(
                 #     f"Acquired {yml_target.name} with priority {rank}."
                 # )
-                if yml_target.name not in self.running_tasks:
+                if yml_path.name not in self.running_tasks:
                     # self.base.print_message(
                     #     f"Creating sync task for {yml_target.name}."
                     # )
-                    self.running_tasks[yml_target.name] = asyncio.create_task(
-                        self.sync_yml(yml_path=yml_target, rank=rank),
-                        name=yml_target.name,
+                    self.running_tasks[yml_path.name] = asyncio.create_task(
+                        self.sync_yml(yml_path=yml_path, rank=rank),
+                        name=yml_path.name,
                     )
-                    self.running_tasks[yml_target.name].add_done_callback(
+                    self.running_tasks[yml_path.name].add_done_callback(
                         self.sync_exit_callback
                     )
                 # else:
@@ -567,19 +567,23 @@ class HelaoSyncer:
         # return self.progress[yml_path.name]
         return prog
 
-    async def enqueue_yml(self, upath: Union[Path, str], rank: int = 5):
+    async def enqueue_yml(self, upath: Union[Path, str], rank: int = 5, rank_limit: int = -5):
         """Adds yml to sync queue, defaulting to lowest priority."""
         yml_path = Path(upath) if isinstance(upath, str) else upath
-        if yml_path.name in self.task_set:
+        if rank < rank_limit:
             self.base.print_message(
-                f"{str(yml_path)} is already queued, skipping enqueue request."
+                f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request."
             )
+        # elif yml_path.name in self.task_set:
+        #     self.base.print_message(
+        #         f"{str(yml_path)} is already queued, skipping enqueue request."
+        #     )
         elif yml_path.name in self.running_tasks:
             self.base.print_message(
                 f"{str(yml_path)} is already running, skipping enqueue request."
             )
         else:
-            self.task_set.add(yml_path.name)
+            # self.task_set.add(yml_path.name)
             await self.task_queue.put((rank, yml_path))
             self.base.print_message(
                 f"Added {str(yml_path)} to syncer queue with priority {rank}."
@@ -642,13 +646,13 @@ class HelaoSyncer:
                 # )
                 for child in prog.yml.finished_children:
                     if child.target.name not in self.running_tasks:
-                        await self.enqueue_yml(child.target, rank - 2)
+                        await self.enqueue_yml(child.target, rank - 1)
                         self.base.print_message(str(child.target))
                 # self.base.print_message(
                 #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
                 # )
                 self.running_tasks.pop(prog.yml.target.name)
-                await self.enqueue_yml(prog.yml.target, rank - 1)
+                await self.enqueue_yml(prog.yml.target, rank)
                 self.base.print_message(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
 
