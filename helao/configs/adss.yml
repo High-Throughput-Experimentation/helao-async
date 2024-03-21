@@ -147,7 +147,7 @@ servers:
         '8': PXI-6284/port2/line1
         '9': PXI-6284/port2/line2
       dev_pump:
-        peripump: "PXI-6284/port0/line4\t"
+        peripump: PXI-6284/port0/line4
         direction: PXI-6284/port0/line0
       dev_fsw:
         done: PXI-6284/port2/line4
