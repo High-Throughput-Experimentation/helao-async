@@ -48,6 +48,7 @@ __all__ = [
     "ADSS_sub_tray_icpms_export",
     "ADSS_sub_move_to_ref_measurement",
     "ADSS_sub_remove_bubble",
+    "ADSS_sub_cellfill_prefilled_nosampleload"
 ]
 
 
@@ -1156,12 +1157,22 @@ def ADSS_sub_OCV(
                 "check_condition": "equals",
                 "check_value": True,
                 "conditional_experiment_name": "ADSS_sub_remove_bubble",
-                "conditional_experiment_params": {  "pump_reverse_time_s": apm.pars.bubble_pump_reverse_time_s,
-                                                    "pump_forward_time_s": apm.pars.bubble_pump_forward_time_s,
-                                                    "RSD_threshold": apm.pars.RSD_threshold,
-                                                    "simple_threshold": apm.pars.simple_threshold,
-                                                    "signal_change_threshold": apm.pars.signal_change_threshold,
-                                                    "amplitude_threshold": apm.pars.amplitude_threshold},
+                "conditional_experiment_params": {  
+                    "Tval__s": apm.pars.Tval__s,
+                    "gamry_i_range": apm.pars.gamry_i_range,
+                    "samplerate_sec": apm.pars.samplerate_sec,
+                    "ph": apm.pars.ph,
+                    "ref_type": apm.pars.ref_type,
+                    "ref_offset__V": apm.pars.ref_offset__V,                    
+                    "pump_reverse_time_s": apm.pars.bubble_pump_reverse_time_s,
+                    "pump_forward_time_s": apm.pars.bubble_pump_forward_time_s,
+                    "RSD_threshold": apm.pars.RSD_threshold,
+                    "simple_threshold": apm.pars.simple_threshold,
+                    "signal_change_threshold": apm.pars.signal_change_threshold,
+                    "amplitude_threshold": apm.pars.amplitude_threshold,
+                    "run_use": apm.pars.run_use,
+                    }
+                    
             },
             from_globalexp_params={"has_bubble": "has_bubble"},
         )
@@ -1712,6 +1723,78 @@ def ADSS_sub_stopheat(
     )
     return apm.action_list  # returns complete action list to orch
 
+def ADSS_sub_cellfill_prefilled_nosampleload(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Solution_volume_ul: float = 3000,
+    Syringe_rate_ulsec: float = 300,
+    #    deadvolume_ul: int = 0,
+    #    PurgeWait_s: float = 2,
+    ReturnLineWait_s: float = 0,
+):
+    apm = ActionPlanMaker()
+    
+    apm.add(
+        NI_server,
+        "gasvalve",
+        {"gasvalve": "V1", "on": 0},
+        start_condition=ActionStartCondition.wait_for_orch,
+    )
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+    # apm.add(
+    #     SOLUTIONPUMP_server,
+    #     "withdraw",
+    #     {
+    #         "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+    #         "volume_uL": apm.pars.Solution_volume_ul,
+    #     },
+    # )
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+    apm.add(
+        SOLUTIONPUMP_server,
+        "infuse",
+        {
+            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+            "volume_uL": apm.pars.Solution_volume_ul,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        technique_name="cell_fill",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+        ],
+        start_condition=ActionStartCondition.wait_for_orch,
+    )
+    if apm.pars.ReturnLineWait_s != 0:
+        apm.add(
+            NI_server,
+            "pump",
+            {"pump": "direction", "on": 0},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+        apm.add(
+            NI_server,
+            "pump",
+            {"pump": "peripump", "on": 1},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+        apm.add(
+            ORCH_server,
+            "wait",
+            {"waittime": apm.pars.ReturnLineWait_s},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+        apm.add(
+            NI_server,
+            "pump",
+            {"pump": "peripump", "on": 0},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+
+    #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+
+    return apm.action_list
 
 def ADSS_sub_cellfill_prefilled(
     experiment: Experiment,
@@ -2357,7 +2440,7 @@ def ADSS_sub_remove_bubble(
     ref_type: str = "inhouse",
     ref_offset__V: float = -0.01,
     check_bubble: bool = True,
-    RSD_threshold: float = 1,
+    RSD_threshold: float = 0.2,
     simple_threshold: float = 0.3,
     signal_change_threshold: float = 0.01,
     amplitude_threshold: float = 0.05,
@@ -2373,11 +2456,13 @@ def ADSS_sub_remove_bubble(
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.pump_forward_time_s})
     apm.add_action_list(
         ADSS_sub_OCV(
-            Tval__s=apm.pars.Tval_s,
+            experiment=experiment,
+            Tval__s=apm.pars.Tval__s,
             gamry_i_range=apm.pars.gamry_i_range,
             samplerate_sec=apm.pars.samplerate_sec,
             ph=apm.pars.ph,
             ref_type=apm.pars.ref_type,
+            ref_offset__V=apm.pars.ref_offset__V,
             check_bubble=apm.pars.check_bubble,
             RSD_threshold=apm.pars.RSD_threshold,
             simple_threshold=apm.pars.simple_threshold,

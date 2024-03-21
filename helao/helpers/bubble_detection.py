@@ -101,4 +101,4 @@ def bubble_detection(
     ]:
         logger.debug(f"{label}: {test}")
 
-    return has_bubble
+    return bool(has_bubble)
