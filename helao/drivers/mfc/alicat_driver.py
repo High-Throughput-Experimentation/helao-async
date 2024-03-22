@@ -64,7 +64,6 @@ class AliCatMFC:
         self.fcs[device_name] = FlowController(
             port=device_config["port"], address=device_config["unit_id"]
         )
-        self.fcs[device_name].flush()
         # setpoint control mode: serial
         self._send(device_name, "lsss")
         # close valves and hold
@@ -854,6 +853,7 @@ class FlowMeter(object):
             self.connection = serial.Serial(port, 19200, timeout=1.0)
             FlowMeter.open_ports[port] = (self.connection, 1)
 
+        self.flush()
         self.status_keys = [
             "pressure",
             "temperature",
