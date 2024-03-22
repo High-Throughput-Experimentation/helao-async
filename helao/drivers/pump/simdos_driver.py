@@ -261,8 +261,14 @@ class SIMDOS:
             else:
                 await asyncio.sleep(0.05)
 
-    def get_mode(self):
+    def get_mode(self, retries: int = 5):
+        retry_num = 5
         resp = self.send("?MS")
+        while resp is None and retry_num < retries:
+            resp = self.send("?MS")
+            retry_num += 1
+        if resp is None:
+            return False
         return PumpMode(int(resp))
 
     def set_mode(self, mode: PumpMode):

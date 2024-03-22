@@ -301,6 +301,23 @@ class OrchAPI(HelaoFastAPI):
             )
             return await self.orch.update_status(actionservermodel=actionservermodel)
 
+        @self.post("/clear_actives", tags=["private"])
+        async def clear_actives():
+            cleared_actives = []
+            for actionservermodel in list(self.orch.globalstatusmodel.server_dict.values()):
+                updatemodel = copy(actionservermodel)
+                for endpointmodel in actionservermodel.endpoints.values():
+                    active_items = list(endpointmodel.active_dict.items())
+                    for uuid, statusmodel in active_items:
+                        endpointmodel.active_dict.pop(uuid)
+                        cleared_actives.append(uuid)
+                        self.orch.globalstatusmodel.active_dict.pop(uuid)
+                        if HloStatus.skipped not in endpointmodel.nonactive_dict:
+                            endpointmodel[HloStatus.skipped] = {}
+                        endpointmodel.nonactive_dict[HloStatus.skipped].update({uuid: statusmodel})
+                await self.orch.update_status(actionservermodel=updatemodel)
+            return cleared_actives 
+
         @self.post("/update_nonblocking", tags=["private"])
         async def update_nonblocking(
             actionmodel: ActionModel = Body({}, embed=True),
