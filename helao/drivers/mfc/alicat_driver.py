@@ -41,6 +41,7 @@ class AliCatMFC:
         self.unified_db = UnifiedSampleDataAPI(self.base)
 
         self.fcs = {}
+        self.fcs_last_mode = {}
         self.fcinfo = {}
 
         for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
@@ -66,7 +67,7 @@ class AliCatMFC:
         # setpoint control mode: serial
         self._send(device_name, "lsss")
         # close valves and hold
-        self._send(device_name, "hc")
+        # self._send(device_name, "hc")
         # retrieve gas list
         gas_resp = self._send(device_name, "??g*")
         # device information (model, serial, calib date...)
@@ -140,6 +141,7 @@ class AliCatMFC:
                             f"Exception occured on get_status() {e}. Resetting MFC."
                         )
                         self.make_fc_instance(dev_name, self.config_dict["devices"][dev_name])
+                        self.fcs[dev_name]._set_control_point(self.fcs_last_mode[dev_name], 5)
                         self.base.print_message("MFC connection restored")
                         continue
                     # self.base.print_message(
@@ -156,6 +158,7 @@ class AliCatMFC:
                             )
                         ]
                     ):
+                        self.fcs_last_mode[dev_name] = resp_dict["control_point"]
                         status_dict = {dev_name: resp_dict}
                         lastupdate = time.time()
                         # self.base.print_message(f"Live buffer updated at {checktime}")
