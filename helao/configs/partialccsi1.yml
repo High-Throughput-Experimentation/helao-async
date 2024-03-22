@@ -25,24 +25,24 @@ servers:
       seqspec_parser_path: helao\specifications\last3months.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
     verbose: false
-  IO:
-    host: hte-ccsi-01.htejcap.caltech.edu
-    port: 8005
-    group: action
-    fast: galil_io
-    params:
-      galil_ip_str: 192.168.200.232
-      dev_ai:
-        cell_pressure_psi: 1
-      dev_ao: {}
-      dev_di:
-        multichannel_valve_done: 1
-        multichannel_valve_error: 2
-      dev_do:
-        gamry_aux: 1
-        Thorlab_led: 7
-      monitor_ai:
-        cell_pressure_psi: 5.0
+  # IO:
+  #   host: hte-ccsi-01.htejcap.caltech.edu
+  #   port: 8005
+  #   group: action
+  #   fast: galil_io
+  #   params:
+  #     galil_ip_str: 192.168.200.232
+  #     dev_ai:
+  #       cell_pressure_psi: 1
+  #     dev_ao: {}
+  #     dev_di:
+  #       multichannel_valve_done: 1
+  #       multichannel_valve_error: 2
+  #     dev_do:
+  #       gamry_aux: 1
+  #       Thorlab_led: 7
+  #     monitor_ai:
+  #       cell_pressure_psi: 5.0
   NI:
     host: hte-ccsi-01.htejcap.caltech.edu
     port: 8006
