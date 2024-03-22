@@ -140,9 +140,12 @@ class AliCatMFC:
                         self.base.print_message(
                             f"Exception occured on get_status() {e}. Resetting MFC."
                         )
+                        await self.stop_polling()
+                        self.fcs[dev_name].close()
                         self.make_fc_instance(
                             dev_name, self.config_dict["device"][dev_name]
                         )
+                        await self.start_polling()
                         continue
                     # self.base.print_message(
                     #     f"Received {dev_name} MFC status:\n{resp_dict}"
