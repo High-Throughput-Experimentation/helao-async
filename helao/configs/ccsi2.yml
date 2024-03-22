@@ -14,81 +14,81 @@ sequence_params:
 run_type: ccsi
 root: C:\INST_hlo
 servers:
-  ORCH:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8001
-    group: orchestrator
-    fast: async_orch2
-    params:
-      enable_op: true
-      bokeh_port: 5002
-      seqspec_parser_path: helao\specifications\last3months.py
-      seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
-    verbose: false
-  # IO:
+  # ORCH:
   #   host: hte-ccsi-02.htejcap.caltech.edu
-  #   port: 8005
-  #   group: action
-  #   fast: galil_io
+  #   port: 8001
+  #   group: orchestrator
+  #   fast: async_orch2
   #   params:
-  #     galil_ip_str: 192.168.200.232
-  #     dev_ai:
-  #       cell_pressure_psi: 1
-  #     dev_ao: {}
-  #     dev_di:
-  #       multichannel_valve_done: 1
-  #       multichannel_valve_error: 2
-  #     dev_do:
-  #       gamry_aux: 1
-  #       Thorlab_led: 7
-  #     monitor_ai:
-  #       cell_pressure_psi: 5.0
-  NI:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8006
-    group: action
-    fast: nidaqmx_server
-    params:
-      dev_gasvalve:
-        1A: dev1/port0/line1
-        1B: dev1/port0/line0
-        7A: dev1/port1/line1
-        7B: dev1/port1/line2
-      dev_multivalve:
-        multi_CMD0: dev1/port1/line4
-        multi_CMD1: dev1/port1/line5
-        multi_CMD2: dev1/port1/line6
-        multi_CMD3: dev1/port1/line7
-        multichannel_valve_done: dev1/port2/line7
-        multichannel_valve_error: dev1/port2/line6
-      dev_liquidvalve:
-        '2': dev1/port0/line2
-        '3': dev1/port0/line3
-        '4': dev1/port0/line4
-        5A-cell: dev1/port0/line5
-        5B-waste: dev1/port0/line6
-        6A-waste: dev1/port0/line7
-        6B: dev1/port1/line0
-        '8': dev1/port1/line3
-        #'9': dev1/port0/line12
-      # dev_pump:
-      #   RecirculatingPeriPump1: dev1/port0/line12
-  PAL:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8007
-    group: action
-    fast: pal_server
-    params:
-      positions:
-        custom:
-          cell1_we: cell
-  VIS:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: CCSI Visualizer
+  #     enable_op: true
+  #     bokeh_port: 5002
+  #     seqspec_parser_path: helao\specifications\last3months.py
+  #     seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
+  #   verbose: false
+  # # IO:
+  # #   host: hte-ccsi-02.htejcap.caltech.edu
+  # #   port: 8005
+  # #   group: action
+  # #   fast: galil_io
+  # #   params:
+  # #     galil_ip_str: 192.168.200.232
+  # #     dev_ai:
+  # #       cell_pressure_psi: 1
+  # #     dev_ao: {}
+  # #     dev_di:
+  # #       multichannel_valve_done: 1
+  # #       multichannel_valve_error: 2
+  # #     dev_do:
+  # #       gamry_aux: 1
+  # #       Thorlab_led: 7
+  # #     monitor_ai:
+  # #       cell_pressure_psi: 5.0
+  # NI:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 8006
+  #   group: action
+  #   fast: nidaqmx_server
+  #   params:
+  #     dev_gasvalve:
+  #       1A: dev1/port0/line1
+  #       1B: dev1/port0/line0
+  #       7A: dev1/port1/line1
+  #       7B: dev1/port1/line2
+  #     dev_multivalve:
+  #       multi_CMD0: dev1/port1/line4
+  #       multi_CMD1: dev1/port1/line5
+  #       multi_CMD2: dev1/port1/line6
+  #       multi_CMD3: dev1/port1/line7
+  #       multichannel_valve_done: dev1/port2/line7
+  #       multichannel_valve_error: dev1/port2/line6
+  #     dev_liquidvalve:
+  #       '2': dev1/port0/line2
+  #       '3': dev1/port0/line3
+  #       '4': dev1/port0/line4
+  #       5A-cell: dev1/port0/line5
+  #       5B-waste: dev1/port0/line6
+  #       6A-waste: dev1/port0/line7
+  #       6B: dev1/port1/line0
+  #       '8': dev1/port1/line3
+  #       #'9': dev1/port0/line12
+  #     # dev_pump:
+  #     #   RecirculatingPeriPump1: dev1/port0/line12
+  # PAL:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 8007
+  #   group: action
+  #   fast: pal_server
+  #   params:
+  #     positions:
+  #       custom:
+  #         cell1_we: cell
+  # VIS:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 5001
+  #   group: visualizer
+  #   bokeh: action_visualizer
+  #   params:
+  #     doc_name: CCSI Visualizer
   LIVE:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 5004
@@ -97,45 +97,45 @@ servers:
     params:
       doc_name: Sensor Visualizer
     verbose: false
-  CO2SENSOR:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8012
-    group: action
-    fast: co2sensor_server
-    params:
-      port: COM12
-      start_margin: 0
-    verbose: false
-  SYRINGE0:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8013
-    group: action
-    fast: syringe_server
-    params:
-      port: COM8
-      pumps:
-        zero:
-          address: 0
-          diameter: 20.05
-  SYRINGE1:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8014
-    group: action
-    fast: syringe_server
-    params:
-      port: COM9
-      pumps:
-        one:
-          address: 1
-          diameter: 20.05
-  DOSEPUMP:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8016
-    group: action
-    fast: diapump_server
-    params:
-      port: COM7
-      address: 0
+  # CO2SENSOR:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 8012
+  #   group: action
+  #   fast: co2sensor_server
+  #   params:
+  #     port: COM12
+  #     start_margin: 0
+  #   verbose: false
+  # SYRINGE0:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 8013
+  #   group: action
+  #   fast: syringe_server
+  #   params:
+  #     port: COM8
+  #     pumps:
+  #       zero:
+  #         address: 0
+  #         diameter: 20.05
+  # SYRINGE1:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 8014
+  #   group: action
+  #   fast: syringe_server
+  #   params:
+  #     port: COM9
+  #     pumps:
+  #       one:
+  #         address: 1
+  #         diameter: 20.05
+  # DOSEPUMP:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 8016
+  #   group: action
+  #   fast: diapump_server
+  #   params:
+  #     port: COM7
+  #     address: 0
   MFC:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8009
@@ -158,23 +158,21 @@ servers:
         N2:
           port: COM5
           unit_id: A
-
-
-  CALC:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8011
-    group: action
-    fast: calc_server
-    params: {}
-    verbose: false
-  DB:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8010
-    group: action
-    fast: dbpack_server
-    params:
-      aws_config_path: k:/users/hte/.credentials/aws_config.ini
-      aws_profile: default
-      aws_bucket: helao.data
-      api_host: caltech-api.modelyst.com
-      testing: false
+  # CALC:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 8011
+  #   group: action
+  #   fast: calc_server
+  #   params: {}
+  #   verbose: false
+  # DB:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 8010
+  #   group: action
+  #   fast: dbpack_server
+  #   params:
+  #     aws_config_path: k:/users/hte/.credentials/aws_config.ini
+  #     aws_profile: default
+  #     aws_bucket: helao.data
+  #     api_host: caltech-api.modelyst.com
+  #     testing: false
