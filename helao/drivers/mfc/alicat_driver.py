@@ -853,7 +853,6 @@ class FlowMeter(object):
             self.connection = serial.Serial(port, 19200, timeout=1.0)
             FlowMeter.open_ports[port] = (self.connection, 1)
 
-        self.flush()
         self.status_keys = [
             "pressure",
             "temperature",
@@ -896,6 +895,7 @@ class FlowMeter(object):
         ]
 
         self.open = True
+        self.flush()
 
     @classmethod
     def is_connected(cls, port, address="A"):
