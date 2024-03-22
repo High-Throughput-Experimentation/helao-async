@@ -107,13 +107,12 @@ class AliCatMFC:
             await asyncio.sleep(0.1)
 
     async def stop_polling(self):
-        self.base.print_message("'stop_polling' has been disabled")
-        # self.base.print_message("got 'stop_polling' request, raising signal")
+        self.base.print_message("got 'stop_polling' request, raising signal")
         # async with self.base.aiolock:
-        # await self.poll_signalq.put(False)
-        # while self.polling:
-        #     self.base.print_message("waiting for polling loop to stop")
-        #     await asyncio.sleep(0.1)
+        await self.poll_signalq.put(False)
+        while self.polling:
+            self.base.print_message("waiting for polling loop to stop")
+            await asyncio.sleep(0.1)
 
     async def poll_signal_loop(self):
         while True:
@@ -126,13 +125,24 @@ class AliCatMFC:
         lastupdate = 0
         while True:
             for dev_name, fc in self.fcs.items():
-                try:
                 # self.base.print_message(f"Refreshing {dev_name} MFC")
-                # if self.polling:
+                if self.polling:
                     fc.flush()
                     checktime = time.time()
+                    # self.base.print_message(f"{dev_name} MFC checked at {checktime}")
                     if checktime - lastupdate < waittime:
+                        # self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
+                    # self.base.print_message(f"Retrieving {dev_name} MFC status")
+                    try:
+                        resp_dict = fc.get_status()
+                    except Exception as e:
+                        self.base.print_message(
+                            f"Exception occured on get_status() {e}. Resetting MFC."
+                        )
+                        self.make_fc_instance(
+                            dev_name, self.config_dict["device"][dev_name]
+                        )
                         resp_dict = fc.get_status()
                     if (
                         resp_dict["acquire_time"] == self.last_acquire[dev_name]
@@ -170,15 +180,6 @@ class AliCatMFC:
                             self.base.print_message(
                                 f"!!Received unexpected dict: {resp_dict}"
                             )
-                            raise ValueError("unexpected response")
-                except Exception as e:
-                    del self.fcs[dev_name]
-                    self.base.print_message(
-                        f"Exception occured on get_status() {e}. Resetting MFC."
-                    )
-                    self.make_fc_instance(
-                        dev_name, self.config_dict["device"][dev_name]
-                    )
                 await asyncio.sleep(waittime)
 
     def list_gases(self, device_name: str):
