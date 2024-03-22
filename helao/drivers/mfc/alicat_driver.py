@@ -124,9 +124,6 @@ class AliCatMFC:
         self.last_acquire = {dev_name: 0 for dev_name in self.fcs.keys()}
         lastupdate = 0
         while True:
-            for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
-                if dev_name not in self.fcs:
-                    self.make_fc_instance(dev_name, dev_dict)
             for dev_name, fc in self.fcs.items():
                 # self.base.print_message(f"Refreshing {dev_name} MFC")
                 if self.polling:
@@ -142,8 +139,8 @@ class AliCatMFC:
                         self.base.print_message(
                             f"Exception occured on get_status() {e}. Resetting MFC."
                         )
-                        self.fcs[dev_name].close()
-                        self.fcs.pop(dev_name)
+                        self.make_fc_instance(dev_name, self.config_dict["devices"][dev_name])
+                        self.base.print_message("MFC connection restored")
                         continue
                     # self.base.print_message(
                     #     f"Received {dev_name} MFC status:\n{resp_dict}"
