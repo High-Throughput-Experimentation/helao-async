@@ -124,8 +124,10 @@ class AliCatMFC:
         self.last_acquire = {dev_name: 0 for dev_name in self.fcs.keys()}
         lastupdate = 0
         while True:
-            fc_iteritems = self.fcs.items()  # in case of reinstantiation
-            for dev_name, fc in fc_iteritems:
+            for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
+                if dev_name not in self.fcs:
+                    self.make_fc_instance(dev_name, dev_dict)
+            for dev_name, fc in self.fcs.items():
                 # self.base.print_message(f"Refreshing {dev_name} MFC")
                 if self.polling:
                     checktime = time.time()
@@ -140,12 +142,8 @@ class AliCatMFC:
                         self.base.print_message(
                             f"Exception occured on get_status() {e}. Resetting MFC."
                         )
-                        await self.stop_polling()
                         self.fcs[dev_name].close()
-                        self.make_fc_instance(
-                            dev_name, self.config_dict["device"][dev_name]
-                        )
-                        await self.start_polling()
+                        self.fcs.pop(dev_name)
                         continue
                     # self.base.print_message(
                     #     f"Received {dev_name} MFC status:\n{resp_dict}"
