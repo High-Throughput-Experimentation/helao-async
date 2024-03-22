@@ -134,31 +134,43 @@ class AliCatMFC:
                     if checktime - lastupdate < waittime:
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                         resp_dict = fc.get_status()
-                        self.base.print_message(
-                            f"Received {dev_name} MFC status:\n{resp_dict}"
-                        )
-                        if all(
-                            [
-                                x in resp_dict
-                                for x in (
-                                    "mass_flow",
-                                    "pressure",
-                                    "setpoint",
-                                    "control_point",
-                                )
-                            ]
+                        if (
+                            resp_dict["acquire_time"] == self.last_acquire[dev_name]
+                            or not resp_dict
                         ):
-                            status_dict = {dev_name: resp_dict}
-                            lastupdate = time.time()
-                            self.base.print_message(f"Live buffer updated at {checktime}")
-                            # async with self.base.aiolock:
-                            await self.base.put_lbuf(status_dict)
-                            # self.base.print_message("status sent to live buffer")
-                        else:
                             self.base.print_message(
-                                f"!!Received unexpected dict: {resp_dict}"
+                                "Did not receive an updated status. Resetting MFC."
                             )
-                            raise ValueError("unexpected response")
+                            fc.close()
+                            self.make_fc_instance(
+                                dev_name, self.config_dict["device"][dev_name]
+                            )
+                        else:
+                            # self.base.print_message(
+                            #     f"Received {dev_name} MFC status:\n{resp_dict}"
+                            # )
+                            if all(
+                                [
+                                    x in resp_dict
+                                    for x in (
+                                        "mass_flow",
+                                        "pressure",
+                                        "setpoint",
+                                        "control_point",
+                                    )
+                                ]
+                            ):
+                                status_dict = {dev_name: resp_dict}
+                                lastupdate = time.time()
+                                # self.base.print_message(f"Live buffer updated at {checktime}")
+                                # async with self.base.aiolock:
+                                await self.base.put_lbuf(status_dict)
+                                # self.base.print_message("status sent to live buffer")
+                            else:
+                                self.base.print_message(
+                                    f"!!Received unexpected dict: {resp_dict}"
+                                )
+                                raise ValueError("unexpected response")
                 except Exception as e:
                     del self.fcs[dev_name]
                     self.base.print_message(
@@ -167,7 +179,7 @@ class AliCatMFC:
                     self.make_fc_instance(
                         dev_name, self.config_dict["device"][dev_name]
                     )
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(waittime)
 
     def list_gases(self, device_name: str):
         return self.fcinfo.get(device_name, {}).get("gases", {})
