@@ -96,7 +96,6 @@ class AliCatMFC:
         while next_line.strip() != "":
             lines.append(next_line)
             next_line = self.fcs[device_name]._readline()
-        self.fcs[device_name].flush()
         return lines
 
     async def start_polling(self):
@@ -1169,6 +1168,7 @@ class FlowMeter(object):
         self._test_controller_open()
 
         for _ in range(retries + 1):
+            self.flush()
             self.connection.write(command.encode("ascii"))
             line = self._readline()
             if line:
