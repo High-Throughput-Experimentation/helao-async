@@ -1,5 +1,10 @@
 """Orchestrator class and FastAPI server templating function
 
+TODO:
+1. track loaded samples, so we don't have to query; orch can either query PAL server or hold state
+2. replace globalexp_params with global state dict and persist state on disk
+3. investigate multi-driver servers; orch can request from itself, or try to bypass fastapi endpoint and execute function directly
+
 """
 
 __all__ = ["Orch"]
