@@ -26,7 +26,10 @@ class LocalLoader:
         target_state = self.target.split("RUNS_")[-1].split(os.sep)[0]
         states = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED", "RUNS_DIAG")
         state_dir = f"RUNS_{target_state}"
-        process_dir = os.path.dirname(self.target).replace(state_dir, "PROCESSES") 
+        if self.target.endswith(".zip"):
+            process_dir = self.target.replace(state_dir, "PROCESSES").replace(".zip", "")
+        else:
+            process_dir = os.path.dirname(self.target).replace(state_dir, "PROCESSES") 
         check_dirs = [
             f"{self.target.replace(state_dir, x)}" for x in states
         ] + [process_dir]
