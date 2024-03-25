@@ -1576,7 +1576,7 @@ def CCSI_sub_co2pressuremonitor_nopump(
 
 def CCSI_sub_n2flush(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     n2flowrate_sccm: float = 10,
     HSpurge1_duration: float = 60,
     HSpurge_duration: float = 20, 
@@ -1592,9 +1592,9 @@ def CCSI_sub_n2flush(
     initialization: bool = False,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
-    co2_ppm_thresh: float = 90000,
-    purge_if: Union[str, float] = "below",
-    max_repeats: int = 5,
+    #co2_ppm_thresh: float = 90000,
+    #purge_if: Union[str, float] = "below",
+    #max_repeats: int = 5,
 
 ):
  #   
@@ -1737,6 +1737,103 @@ def CCSI_sub_n2flush(
     )
     apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+
+
+    return apm.action_list
+
+def CCSI_sub_n2clean(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Waterclean_reservoir_sample_no: int = 1,
+    Waterclean_volume_ul: float = 10000,
+    Syringe_rate_ulsec: float = 300,
+    LiquidFillWait_s: float = 15,
+    n2flowrate_sccm: float = 50,
+    drain_HSpurge_duration: float = 300, 
+    drain_recirculation_duration: float = 150,
+    flush_HSpurge1_duration: float = 30,
+    flush_HSpurge_duration: float = 60, 
+    DeltaDilute1_duration: float = 0,
+    Manpurge1_duration: float = 30,
+    Alphapurge1_duration: float = 10,
+    Probepurge1_duration: float = 30,
+    Sensorpurge1_duration: float = 30,
+    recirculation: bool = True,
+    #recirculation_duration: float = 120,
+    recirculation_rate_uL_min: int = 10000,
+    #    DeltaDilute1_duration: float = 15,
+    initialization: bool = False,
+    co2measure_duration: float = 2,
+    co2measure_acqrate: float = 0.5,
+    use_co2_check: bool = False,
+    co2_ppm_thresh: float = 1400,
+    purge_if: Union[str, float] = "above",
+    max_repeats: int = 2,
+
+):
+ #   
+    apm = ActionPlanMaker()
+
+    apm.add_action_list(
+        CCSI_sub_cellfill(
+            experiment=experiment,
+            Solution_reservoir_sample_no = 1,
+            Solution_volume_ul = 0,
+            Waterclean_reservoir_sample_no = apm.pars.Waterclean_reservoir_sample_no,
+            Waterclean_volume_ul = apm.pars.Waterclean_volume_ul,
+            Syringe_rate_ulsec = apm.pars.Syringe_rate_ulsec,
+        )
+    )
+
+    apm.add_action_list(
+        CCSI_sub_n2drain(
+            experiment=experiment,
+            n2flowrate_sccm = apm.pars.n2flowrate_sccm,
+            HSpurge_duration = apm.pars.drain_HSpurge_duration,
+            DeltaDilute1_duration = apm.pars.DeltaDilute1_duration,
+            recirculation_duration = apm.pars.drain_recirculation_duration,
+            recirculation_rate_uL_min = apm.pars.recirculation_rate_uL_min,
+        )
+    )
+
+    apm.add_action_list(
+        CCSI_sub_refill_clean(
+            experiment=experiment,
+            Waterclean_volume_ul = apm.pars.Waterclean_volume_ul,
+            Syringe_rate_ulsec = 100,
+        )
+    )
+
+    apm.add_action_list(
+        CCSI_sub_n2flush(
+            experiment=experiment,
+            n2flowrate_sccm = apm.pars.n2flowrate_sccm,
+            HSpurge1_duration = apm.pars.flush_HSpurge_duration,
+            HSpurge_duration = apm.pars.flush_HSpurge_duration,
+            DeltaDilute1_duration = apm.pars.DeltaDilute1_duration,
+            Manpurge1_duration = apm.pars.Manpurge1_duration,
+            Alphapurge1_duration = apm.pars.Alphapurge1_duration,
+            Probepurge1_duration = apm.pars.Probepurge1_duration,
+            Sensorpurge1_duration = apm.pars.Sensorpurge1_duration,
+            co2measure_duration = apm.pars.co2measure_duration,
+            co2measure_acqrate = apm.pars.co2measure_acqrate,
+        )
+    )
+    if apm.pars.use_co2_check:
+        apm.add(
+            CALC_server,
+            "check_co2_purge",
+            {
+                "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
+                "purge_if": apm.pars.purge_if,
+                "repeat_experiment_name": "CCSI_sub_n2clean",
+                "repeat_experiment_params": {
+                    k: v
+                    for k, v in vars(apm.pars).items()
+                    if not k.startswith("experiment")
+                },
+            },
+        )
 
 
     return apm.action_list
