@@ -11,6 +11,7 @@ __all__ = [
     "CCSI_sub_load_gas",
     "CCSI_sub_alloff",
     "CCSI_sub_headspace_purge_and_measure",
+    "CCSI_sub_headspace_measure",
     "CCSI_sub_drain",
     "CCSI_sub_initialization_end_state",
     "CCSI_sub_peripumpoff",
@@ -251,6 +252,49 @@ def CCSI_sub_headspace_purge_and_measure(
         technique_name="gas_purge",
         process_finish=True,
         process_contrib=[ProcessContrib.files],
+    )
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
+    #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
+
+
+    return apm.action_list
+
+def CCSI_sub_headspace_measure(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    recirculation_rate_uL_min: int = 10000,
+    co2measure_duration: float = 10,
+    co2measure_acqrate: float = 0.5,
+):
+    apm = ActionPlanMaker()
+
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ], 
+    )
+
+#
+# HEADSPACE EVALUATION
+    apm.add(
+        CO2S_server,
+        "acquire_co2",
+        {
+            "duration": apm.pars.co2measure_duration,
+            "acquisition_rate": apm.pars.co2measure_acqrate,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        technique_name="initial_co2_concentration",
+        process_finish=True,
+        process_contrib=[
+        ProcessContrib.files,
+        ProcessContrib.samples_in,
+        ],
     )
     apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
@@ -1114,6 +1158,7 @@ def CCSI_sub_co2maintainconcentration(
         technique_name="Adding_co2",
         process_finish=True,
         process_contrib=[
+            ProcessContrib.samples_in,
             ProcessContrib.action_params,
             ProcessContrib.files,
         ],
@@ -1160,7 +1205,7 @@ def CCSI_sub_co2maintainconcentration(
                 sample_no=apm.pars.pureco2_sample_no, machine_name=ORCH_HOST
             ).model_dump(),
         },
-        from_globalexp_params={"total_scc": "volume_ml"},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in","total_scc": "volume_ml"},
     )
 
     return apm.action_list
