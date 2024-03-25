@@ -39,34 +39,38 @@ else:
 
 
 class DriverStatus(StrEnum):
-    ok = "ok"
-    busy = "busy"
-    error = "error"
-    uninitialized = "uninitialized"
-    unknown = "unknown"
+    """Enumerated driver status strings for DriverResponse objects."""
+
+    ok = "ok"  # driver is working as expected
+    busy = "busy"  # driver is operating or using a resource
+    error = "error"  # driver returned a low-level error
+    uninitialized = (
+        "uninitialized"  # driver connection to device has not been established
+    )
+    unknown = "unknown"  # driver is in an unknown state
 
 
 class DriverResponseType(StrEnum):
-    success = "success"
-    failed = "failed"
-    not_implemented = "not_implemented"
+    """Success or failure flag for a public driver method's response."""
+
+    success = "success"  # method executed successfully
+    failed = "failed"  # method did not execute successfully
+    not_implemented = "not_implemented"  # method is not implemented
 
 
 @dataclass
-class DriverMessage:
+class DriverResponse:
+    """Standardized response for all public driver methods."""
+
+    response: DriverResponseType = DriverResponseType.not_implemented
+    message: str = ""
+    data: dict = field(default_factory=dict)
+    status: DriverStatus = DriverStatus.unknown
     timestamp: datetime = datetime.now()
 
     @property
     def timestamp_str(self):
         return self.timestamp.strftime("%F %T,%f")[:-3]
-
-
-@dataclass
-class DriverResponse(DriverMessage):
-    response: DriverResponseType = DriverResponseType.not_implemented
-    message: str = ""
-    data: dict = field(default_factory=dict)
-    status: DriverStatus = DriverStatus.unknown
 
 
 class HelaoDriver(ABC):
