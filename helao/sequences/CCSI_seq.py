@@ -947,6 +947,13 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "reservoir_gas_sample_no": initial_gas_sample_no,
             "volume_ul_cell_gas": gas_volume,
         })
+
+        epm.add_experiment("CCSI_sub_headspace_measure", {
+            "recirculation_rate_uL_min": recirculation_rate_uL_min,
+            "co2measure_duration": check_co2measure_duration,
+            "co2measure_acqrate": co2measure_acqrate,
+        })
+
         # if solnvolume != 0:
         #     epm.add_experiment("CCSI_sub_load_liquid", {
         #         "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
