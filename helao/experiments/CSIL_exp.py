@@ -33,6 +33,7 @@ __all__ = [
     "CCSI_sub_flowflush",
     "CCSI_sub_n2drain",
     "CCSI_sub_n2flush",
+    "CCSI_sub_n2clean",
 ]
 
 ###
