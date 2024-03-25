@@ -410,12 +410,16 @@ class CO2MonExec(Executor):
         self.active.base.print_message("CO2MonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
+        self.total = 0
+        self.num_acqs = 0
 
     async def _poll(self):
         """Read CO2 ppm from live buffer."""
         live_dict = {}
         co2_ppm, epoch_s = self.active.base.get_lbuf("co2_ppm")
         # self.active.base.print_message(f"got from live buffer: {co2_ppm}")
+        self.total += co2_ppm
+        self.num_acqs += 1
         live_dict["co2_ppm"] = co2_ppm
         live_dict["epoch_s"] = epoch_s
         iter_time = time.time()
@@ -432,3 +436,10 @@ class CO2MonExec(Executor):
             "status": status,
             "data": live_dict,
         }
+
+    async def _post_exec(self):
+        "Cleanup methods, return error state."
+        self.cleanup_err = ErrorCodes.none
+        if self.num_acqs > 0:
+            self.active.action.action_params["mean_co2_ppm"] = self.total / self.num_acqs
+        return {"data": {}, "error": self.cleanup_err}
