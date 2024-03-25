@@ -46,7 +46,7 @@ def makeApp(confPrefix, server_key, helao_root):
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_acquire_o2", tags=["action"])
-    async def cancel_acquire_co2(
+    async def cancel_acquire_o2(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
