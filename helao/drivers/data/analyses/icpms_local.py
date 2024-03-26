@@ -2,6 +2,7 @@ import sys
 from copy import copy
 from uuid import UUID
 from datetime import datetime
+from typing import List
 
 from pydantic import BaseModel
 
@@ -9,6 +10,7 @@ from helaocore.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 
 from .base_analysis import BaseAnalysis
+from helaocore.models.analysis import AnalysisDataModel
 from helao.drivers.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
 
 ANALYSIS_DEFAULTS = {
@@ -46,6 +48,14 @@ class IcpmsInputs:
     def mass_spec(self):
         return self.icpms_act.hlo
 
+    def get_datamodels(self, global_sample_label: str) -> List[AnalysisDataModel]:
+        adm = AnalysisDataModel(
+            action_uuid=self.icpms_act.action_uuid,
+            run_use=self.icpms_act.run_use,
+            raw_data_path=f"raw_data/{self.icpms_act.action_uuid}/{self.icpms_act.hlo_file}.json",
+            global_sample_label=self.global_sample_label,
+        )
+        return [adm]
 
 class IcpmsOutputs(BaseModel):
     element: list
