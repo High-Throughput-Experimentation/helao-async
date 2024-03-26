@@ -7,6 +7,7 @@ from helaocore.models.analysis import (
     AnalysisModel,
 )
 from helaocore.models.s3locator import S3Locator
+from helaocore.models.run_use import RunUse
 from helao.helpers.set_time import set_time
 
 
@@ -25,33 +26,12 @@ class BaseAnalysis:
         region: str,
         dummy: bool = True,
         global_sample_label: str = None,
-        action_attr: str = "spec_act",
     ):
-        action_keys = [k for k in vars(self.inputs).keys() if action_attr in k]
-        inputs = []
-
-        for ak in action_keys:
-            euis = vars(self.inputs)[ak]
-            ru = ak.split("_spec")[0].replace("insitu", "data")
-            if not isinstance(euis, list):
-                euis = [euis]
-            for eui in euis:
-                raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
-                if global_sample_label is not None:
-                    global_sample = global_sample_label
-                elif ru in ["data", "baseline"]:
-                    global_sample = (
-                        f"legacy__solid__{int(self.plate_id):d}_{int(self.sample_no):d}"
-                    )
-                else:
-                    global_sample = None
-                adm = AnalysisDataModel(
-                    action_uuid=eui.action_uuid,
-                    run_use=ru,
-                    raw_data_path=raw_data_path,
-                    global_sample_label=global_sample,
-                )
-                inputs.append(adm)
+        input_data_models = self.inputs.get_datamodels(global_sample_label)
+        if global_sample_label is None:
+            ru_data = [x for x in input_data_models if x.run_use==RunUse.data]
+            if ru_data:
+                global_sample_label = ru_data[0].global_sample_label
 
         scalar_outputs = [
             k for k, v in self.outputs.model_dump().items() if not isinstance(v, list)
@@ -60,7 +40,7 @@ class BaseAnalysis:
             k for k in self.outputs.model_dump().keys() if k not in scalar_outputs
         ]
 
-        outputs = []
+        output_data_models = []
 
         for label, output_keys in [
             ("scalar", scalar_outputs),
@@ -84,9 +64,9 @@ class BaseAnalysis:
                         )  # only scalars
                     },
                 )
-                outputs.append(out_model)
+                output_data_models.append(out_model)
 
-        if not outputs:
+        if not output_data_models:
             print("!!! analysis does not contain any outputs")
 
         ana_model = AnalysisModel(
@@ -94,11 +74,12 @@ class BaseAnalysis:
             analysis_timestamp=set_time(),
             analysis_params=self.analysis_params,
             analysis_codehash=self.analysis_codehash,
+            global_sample_label=global_sample_label,
             analysis_uuid=self.analysis_uuid,
             process_uuid=self.process_uuid,
             process_params=self.inputs.process_params,
-            inputs=inputs,
-            outputs=outputs,
+            inputs=input_data_models,
+            outputs=output_data_models,
             dummy=dummy,
         )
         return ana_model.clean_dict(), self.outputs.model_dump()

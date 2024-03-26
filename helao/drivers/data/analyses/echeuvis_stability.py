@@ -15,6 +15,7 @@ from helaocore.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 
 from .base_analysis import BaseAnalysis
+from helaocore.models.analysis import AnalysisDataModel
 from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 
 ANALYSIS_DEFAULTS = {
@@ -227,6 +228,32 @@ class EcheUvisInputs:
     def insitu_ca(self):
         return self.insitu_ca_act.hlo
 
+    def get_datamodels(self, global_sample_label: str) -> List[AnalysisDataModel]:
+        action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
+        inputs = []
+        for ak in action_keys:
+            euis = vars(self.inputs)[ak]
+            ru = ak.split("_spec")[0].replace("insitu", "data")
+            if not isinstance(euis, list):
+                euis = [euis]
+            for eui in euis:
+                raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
+                if global_sample_label is not None:
+                    global_sample = global_sample_label
+                elif ru in ["data", "baseline"]:
+                    global_sample = (
+                        f"legacy__solid__{int(self.plate_id):d}_{int(self.sample_no):d}"
+                    )
+                else:
+                    global_sample = None
+                adm = AnalysisDataModel(
+                    action_uuid=eui.action_uuid,
+                    run_use=ru,
+                    raw_data_path=raw_data_path,
+                    global_sample_label=global_sample,
+                )
+                inputs.append(adm)
+        return inputs
 
 class EcheUvisOutputs(BaseModel):
     wavelength: list
