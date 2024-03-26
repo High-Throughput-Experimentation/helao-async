@@ -142,7 +142,7 @@ class DryUvisInputs:
     def insitu_spec(self):
         return self.insitu_spec_act.hlo
 
-    def get_datamodels(self, global_sample_label: str) -> List[AnalysisDataModel]:
+    def get_datamodels(self, global_sample_label: str, *args, **kwargs) -> List[AnalysisDataModel]:
         action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
         inputs = []
         for ak in action_keys:
