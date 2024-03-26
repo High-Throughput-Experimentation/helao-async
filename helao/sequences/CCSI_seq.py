@@ -889,7 +889,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # =============================================================================
 
 def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization performed previously
-    sequence_version: int = 10, #9 n2 purge/drains, 10 co2check cleans
+    sequence_version: int = 11, #9 n2 purge/drains, 10 co2check cleans
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [2000,2000, 2000],
@@ -923,6 +923,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
     n2flowrate_sccm: float = 50,
     SamplePurge_duration: float = 60,
     LiquidCleanPurge_duration: float = 180,
+    LiquidCleanPurge_recirc_duration: float = 90,
     FlushPurge_duration: float = 30,
     flush_Manpurge1_duration: float = 30,
     flush_Alphapurge1_duration: float = 10,
@@ -1009,7 +1010,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "drain_HSpurge_duration": LiquidCleanPurge_duration,
             "DeltaDilute1_duration": 0,
             "recirculation":drainrecirc,
-            "drain_recirculation_duration":LiquidCleanPurge_duration/2, 
+            "drain_recirculation_duration":LiquidCleanPurge_recirc_duration, 
             "recirculation_rate_uL_min":recirculation_rate_uL_min,
             "flush_HSpurge1_duration": FlushPurge_duration,
             "flush_HSpurge_duration": FlushPurge_duration*2,
