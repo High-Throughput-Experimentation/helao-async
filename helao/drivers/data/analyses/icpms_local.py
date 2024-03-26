@@ -48,7 +48,7 @@ class IcpmsInputs:
     def mass_spec(self):
         return self.icpms_act.hlo
 
-    def get_datamodels(self, global_sample_label: str) -> List[AnalysisDataModel]:
+    def get_datamodels(self, *args, **kwargs) -> List[AnalysisDataModel]:
         adm = AnalysisDataModel(
             action_uuid=self.icpms_act.action_uuid,
             run_use=self.icpms_act.run_use,
