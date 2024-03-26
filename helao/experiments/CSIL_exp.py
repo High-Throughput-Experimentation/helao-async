@@ -293,7 +293,7 @@ def CCSI_sub_headspace_measure(
         process_finish=True,
         process_contrib=[
         ProcessContrib.files,
-        ProcessContrib.samples_in,
+    #    ProcessContrib.samples_in,
         ],
     )
     apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.co2measure_duration}, asc.no_wait )
