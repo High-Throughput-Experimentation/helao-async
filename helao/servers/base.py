@@ -1657,6 +1657,7 @@ class Active:
             self.action.action_status.append(HloStatus.split)
         # make a copy of prev_action
         prev_action = deepcopy(self.action)
+        prev_action_list = deepcopy(self.action_list)
         # set the data_stream_status
         prev_action.data_stream_status = HloStatus.split
         self.action.data_stream_status = HloStatus.active
@@ -1668,7 +1669,7 @@ class Active:
         # now re-init current action
         # force action init (new action uuid and timestamp)
         self.action.init_act(time_offset=self.base.ntp_offset, force=True)
-        self.action_list = [self.action] + prev_action.action_list
+        self.action_list += prev_action_list
         # add new action uuid to listen_uuids
         self.add_new_listen_uuid(self.action.action_uuid)
         # remove previous listen_uuid to stop writing to previous hlo file
@@ -1766,45 +1767,51 @@ class Active:
             if finish_uuid_list is None:
                 finish_uuid_list = [action.action_uuid for action in self.action_list]
 
-            # get the actions of active which should be finished
-            # and are not finished yet (no HloStatus.finished status)
-            finish_action_list = []
-            for finish_uuid in finish_uuid_list:
-                # await asyncio.sleep(0.1)
-                for action in self.action_list:
-                    if (
-                        action.action_uuid == finish_uuid
-                        and HloStatus.finished not in action.action_status
-                    ):
-                        finish_action_list.append(action)
+            # # get the actions of active which should be finished
+            # # and are not finished yet (no HloStatus.finished status)
+            # finish_action_list = []
+            # for finish_uuid in finish_uuid_list:
+            #     # await asyncio.sleep(0.1)
+            #     for action in self.action_list:
+            #         if (
+            #             action.action_uuid == finish_uuid
+            #             and HloStatus.finished not in action.action_status
+            #         ):
+            #             finish_action_list.append(action)
 
-            # now finish all the actions in the list
-            for finish_action in finish_action_list:
+            # # now finish all the actions in the list
+            # for finish_action in finish_action_list:
+            for action in self.action_list:
+                if action.action_uuid not in finish_uuid_list:
+                    continue
+                if HloStatus.finished in action.action_status:
+                    continue
+                
                 # set status to finish
                 # (replace active with finish)
                 self.base.replace_status(
-                    status_list=finish_action.action_status,
+                    status_list=action.action_status,
                     old_status=HloStatus.active,
                     new_status=HloStatus.finished,
                 )
 
                 # send globalparams
-                if finish_action.to_globalexp_params:
+                if action.to_globalexp_params:
                     export_params = {
-                        k: finish_action.action_params[k]
-                        for k in finish_action.to_globalexp_params
+                        k: action.action_params[k]
+                        for k in action.to_globalexp_params
                     }
                     _, error_code = await async_private_dispatcher(
-                        server_key=finish_action.orch_key,
-                        host=finish_action.orch_host,
-                        port=finish_action.orch_port,
+                        server_key=action.orch_key,
+                        host=action.orch_host,
+                        port=action.orch_port,
                         private_action="update_globalexp_params",
                         json_dict=export_params,
                     )
                     if error_code == ErrorCodes.none:
                         self.base.print_message("Successfully updated globalexp params.")
 
-                if finish_action.to_globalseq_params:
+                if action.to_globalseq_params:
                     pass
 
             # check if all actions are fininshed
