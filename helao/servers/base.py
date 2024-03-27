@@ -1,5 +1,12 @@
 __all__ = ["Base", "ActiveParams", "Active", "DummyBase"]
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    logger = logging.make_logger(logger_name="gamry_driver_standalone")
+else:
+    logger = logging.LOGGER
+
 import asyncio
 import json
 import os
@@ -1749,159 +1756,164 @@ class Active:
         """Close file_conn, finish exp, copy aux,
         set endpoint status, and move active dict to past.
         for action uuids of active defined in finish_uuid_list.
-        default None finsihes all
+        default None finishes all
         """
+        try:
 
-        # default behaviour
-        # finishes all
-        # and returns the last action (the one in self.action)
-        if finish_uuid_list is None:
-            finish_uuid_list = [action.action_uuid for action in self.action_list]
+            # default behaviour
+            # finishes all
+            # and returns the last action (the one in self.action)
+            if finish_uuid_list is None:
+                finish_uuid_list = [action.action_uuid for action in self.action_list]
 
-        # get the actions of active which should be finished
-        # and are not finished yet (no HloStatus.finished status)
-        finish_action_list = []
-        for finish_uuid in finish_uuid_list:
-            await asyncio.sleep(0.1)
+            # get the actions of active which should be finished
+            # and are not finished yet (no HloStatus.finished status)
+            finish_action_list = []
+            for finish_uuid in finish_uuid_list:
+                await asyncio.sleep(0.1)
+                for action in self.action_list:
+                    if (
+                        action.action_uuid == finish_uuid
+                        and HloStatus.finished not in action.action_status
+                    ):
+                        finish_action_list.append(action)
+
+            # now finish all the actions in the list
+            for finish_action in finish_action_list:
+                # set status to finish
+                # (replace active with finish)
+                self.base.replace_status(
+                    status_list=finish_action.action_status,
+                    old_status=HloStatus.active,
+                    new_status=HloStatus.finished,
+                )
+
+                # send globalparams
+                if finish_action.to_globalexp_params:
+                    export_params = {
+                        k: finish_action.action_params[k]
+                        for k in finish_action.to_globalexp_params
+                    }
+                    _, error_code = await async_private_dispatcher(
+                        server_key=finish_action.orch_key,
+                        host=finish_action.orch_host,
+                        port=finish_action.orch_port,
+                        private_action="update_globalexp_params",
+                        json_dict=export_params,
+                    )
+                    if error_code == ErrorCodes.none:
+                        self.base.print_message("Successfully updated globalexp params.")
+
+                if finish_action.to_globalseq_params:
+                    pass
+
+            # check if all actions are fininshed
+            # if yes close datalogger etc
+            all_finished = True
             for action in self.action_list:
-                if (
-                    action.action_uuid == finish_uuid
-                    and HloStatus.finished not in action.action_status
-                ):
-                    finish_action_list.append(action)
+                if HloStatus.finished not in action.action_status:
+                    # at least one is not finished
+                    all_finished = False
+                    break
 
-        # now finish all the actions in the list
-        for finish_action in finish_action_list:
-            # set status to finish
-            # (replace active with finish)
-            self.base.replace_status(
-                status_list=finish_action.action_status,
-                old_status=HloStatus.active,
-                new_status=HloStatus.finished,
-            )
-
-            # send globalparams
-            if finish_action.to_globalexp_params:
-                export_params = {
-                    k: finish_action.action_params[k]
-                    for k in finish_action.to_globalexp_params
-                }
-                _, error_code = await async_private_dispatcher(
-                    server_key=finish_action.orch_key,
-                    host=finish_action.orch_host,
-                    port=finish_action.orch_port,
-                    private_action="update_globalexp_params",
-                    json_dict=export_params,
-                )
-                if error_code == ErrorCodes.none:
-                    self.base.print_message("Successfully updated globalexp params.")
-
-            if finish_action.to_globalseq_params:
-                pass
-
-        # check if all actions are fininshed
-        # if yes close datalogger etc
-        all_finished = True
-        for action in self.action_list:
-            if HloStatus.finished not in action.action_status:
-                # at least one is not finished
-                all_finished = False
-                break
-
-        if all_finished:
-            self.base.print_message(
-                "finish active: sending finish data_stream_status package",
-                info=True,
-            )
-            retry_counter = 0
-            while (
-                not all(
-                    [
-                        action.data_stream_status != HloStatus.active
-                        for action in self.action_list
-                    ]
-                )
-                and retry_counter < 5
-            ):
-                await self.enqueue_data(
-                    datamodel=DataModel(data={}, errors=[], status=HloStatus.finished)
-                )
+            if all_finished:
                 self.base.print_message(
-                    f"Waiting for data_stream finished"
-                    f" package: "
-                    f" {[action.data_stream_status for action in self.action_list]}",
+                    "finish active: sending finish data_stream_status package",
                     info=True,
                 )
-                await asyncio.sleep(0.1)
-                retry_counter += 1
+                retry_counter = 0
+                while (
+                    not all(
+                        [
+                            action.data_stream_status != HloStatus.active
+                            for action in self.action_list
+                        ]
+                    )
+                    and retry_counter < 5
+                ):
+                    await self.enqueue_data(
+                        datamodel=DataModel(data={}, errors=[], status=HloStatus.finished)
+                    )
+                    self.base.print_message(
+                        f"Waiting for data_stream finished"
+                        f" package: "
+                        f" {[action.data_stream_status for action in self.action_list]}",
+                        info=True,
+                    )
+                    await asyncio.sleep(0.1)
+                    retry_counter += 1
 
-            self.base.print_message("checking if all queued data has written.")
-            write_retries = 5
-            write_iter = 0
-            while self.num_data_queued > self.num_data_written and write_iter < write_retries:
-                self.base.print_message(f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 0.1 second.")
-                for action in self.action_list:
-                    if action.data_stream_status != HloStatus.active:
-                        await self.enqueue_data(
-                            datamodel=DataModel(
-                                data={}, errors=[], status=HloStatus.finished
+                self.base.print_message("checking if all queued data has written.")
+                write_retries = 5
+                write_iter = 0
+                while self.num_data_queued > self.num_data_written and write_iter < write_retries:
+                    self.base.print_message(f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 0.1 second.")
+                    for action in self.action_list:
+                        if action.data_stream_status != HloStatus.active:
+                            await self.enqueue_data(
+                                datamodel=DataModel(
+                                    data={}, errors=[], status=HloStatus.finished
+                                )
                             )
-                        )
-                        self.base.print_message(
-                            f"Setting datastream to finished:"
-                            f" {action.data_stream_status}",
-                            info=True,
-                        )
-                write_iter += 1
-                asyncio.sleep(0.1)
+                            self.base.print_message(
+                                f"Setting datastream to finished:"
+                                f" {action.data_stream_status}",
+                                info=True,
+                            )
+                    write_iter += 1
+                    asyncio.sleep(0.1)
 
-            # self.action_list[-1] is the very first action
-            if self.action_list[-1].manual_action:
-                await self.finish_manual_action()
+                # self.action_list[-1] is the very first action
+                if self.action_list[-1].manual_action:
+                    await self.finish_manual_action()
 
-            # all actions are finished
-            self.base.print_message("finishing data logging.")
-            for filekey in self.file_conn_dict:
-                if self.file_conn_dict[filekey].file:
-                    await self.file_conn_dict[filekey].file.close()
-            self.file_conn_dict = {}
+                # all actions are finished
+                self.base.print_message("finishing data logging.")
+                for filekey in self.file_conn_dict:
+                    if self.file_conn_dict[filekey].file:
+                        await self.file_conn_dict[filekey].file.close()
+                self.file_conn_dict = {}
 
-            # finish the data writer
-            self.data_logger.cancel()
-            l10 = self.base.actives.pop(self.active_uuid, None)
-            if l10 is not None:
-                i10 = [
-                    i
-                    for i, (x, _) in enumerate(self.base.last_10_active)
-                    if x == self.active_uuid
-                ]
-                if i10:
-                    self.base.last_10_active.pop(i10[0])
-                if len(self.base.last_10_active) > 10:
-                    self.base.last_10_active.pop(0)
-                self.base.last_10_active.append((l10.action.action_uuid, l10))
+                # finish the data writer
+                self.data_logger.cancel()
+                l10 = self.base.actives.pop(self.active_uuid, None)
+                if l10 is not None:
+                    i10 = [
+                        i
+                        for i, (x, _) in enumerate(self.base.last_10_active)
+                        if x == self.active_uuid
+                    ]
+                    if i10:
+                        self.base.last_10_active.pop(i10[0])
+                    if len(self.base.last_10_active) > 10:
+                        self.base.last_10_active.pop(0)
+                    self.base.last_10_active.append((l10.action.action_uuid, l10))
 
-            self.base.print_message(
-                "all active action are done, closing active", info=True
-            )
+                self.base.print_message(
+                    "all active action are done, closing active", info=True
+                )
 
-            # DB server call to finish_yml if DB exists
-            for action in self.action_list:
-                # write final act meta file (overwrite existing one)
-                await self.base.write_act(action=action)
-                # send the last status
-                await self.add_status(action=action)
-                self.base.aloop.create_task(move_dir(action, base=self.base))
+                # DB server call to finish_yml if DB exists
+                for action in self.action_list:
+                    # write final act meta file (overwrite existing one)
+                    await self.base.write_act(action=action)
+                    # send the last status
+                    await self.add_status(action=action)
+                    self.base.aloop.create_task(move_dir(action, base=self.base))
 
-            # since all sub-actions of active are finished process endpoint queue
-            if self.base.endpoint_queues[action.action_name].qsize() > 0:
-                self.base.print_message(f"{action.action_name} was previously queued")
-                qact, qpars = self.base.endpoint_queues[action.action_name].get()
-                self.base.print_message(f"running queued {action.action_name}")
-                qact.start_condition = ASC.no_wait
-                await async_action_dispatcher(self.base.world_cfg, qact, qpars)
+                # since all sub-actions of active are finished process endpoint queue
+                if self.base.endpoint_queues[action.action_name].qsize() > 0:
+                    self.base.print_message(f"{action.action_name} was previously queued")
+                    qact, qpars = self.base.endpoint_queues[action.action_name].get()
+                    self.base.print_message(f"running queued {action.action_name}")
+                    qact.start_condition = ASC.no_wait
+                    await async_action_dispatcher(self.base.world_cfg, qact, qpars)
 
-        # always returns the most recent action of active
+            # always returns the most recent action of active
+        except Exception as e:
+            logger.error("Active.finish() failed", exc_info=True)
+            raise e
+
         return self.action
 
     async def track_file(
