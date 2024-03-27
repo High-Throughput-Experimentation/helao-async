@@ -1668,7 +1668,7 @@ class Active:
         # now re-init current action
         # force action init (new action uuid and timestamp)
         self.action.init_act(time_offset=self.base.ntp_offset, force=True)
-        self.action_list = [self.action]
+        self.action_list = [self.action] + prev_action.action_list
         # add new action uuid to listen_uuids
         self.add_new_listen_uuid(self.action.action_uuid)
         # remove previous listen_uuid to stop writing to previous hlo file
@@ -1724,8 +1724,8 @@ class Active:
         # update other action settings?
         # - sample name
 
-        # prepend new action to previous action list
-        self.action_list.append(prev_action)
+        # # prepend new action to previous action list
+        # self.action_list.append(prev_action)
 
         # send status for new split action
         await self.add_status()
@@ -1770,7 +1770,7 @@ class Active:
             # and are not finished yet (no HloStatus.finished status)
             finish_action_list = []
             for finish_uuid in finish_uuid_list:
-                await asyncio.sleep(0.1)
+                # await asyncio.sleep(0.1)
                 for action in self.action_list:
                     if (
                         action.action_uuid == finish_uuid
