@@ -1649,98 +1649,101 @@ class Active:
         returns new file_conn_key
         """
 
-        new_file_conn_keys = []
+        try:
+            new_file_conn_keys = []
 
-        self.base.print_message("got split action request", info=True)
-        # add split status to current action
-        if HloStatus.split not in self.action.action_status:
-            self.action.action_status.append(HloStatus.split)
-        # make a copy of prev_action
-        prev_action = deepcopy(self.action)
-        prev_action_list = deepcopy(self.action_list)
-        # set the data_stream_status
-        prev_action.data_stream_status = HloStatus.split
-        self.action.data_stream_status = HloStatus.active
-        # increase split counter for new action
-        # needs to happen before init_act
-        # as its also used in the fodler name
-        self.action.action_split += 1
+            self.base.print_message("got split action request", info=True)
+            # add split status to current action
+            if HloStatus.split not in self.action.action_status:
+                self.action.action_status.append(HloStatus.split)
+            # make a copy of prev_action
+            prev_action = deepcopy(self.action)
+            prev_action_list = deepcopy(self.action_list)
+            # set the data_stream_status
+            prev_action.data_stream_status = HloStatus.split
+            self.action.data_stream_status = HloStatus.active
+            # increase split counter for new action
+            # needs to happen before init_act
+            # as its also used in the fodler name
+            self.action.action_split += 1
 
-        # now re-init current action
-        # force action init (new action uuid and timestamp)
-        self.action.init_act(time_offset=self.base.ntp_offset, force=True)
-        self.action_list += prev_action_list
-        # add new action uuid to listen_uuids
-        self.add_new_listen_uuid(self.action.action_uuid)
-        # remove previous listen_uuid to stop writing to previous hlo file
-        self.listen_uuids.remove(prev_action.action_uuid)
+            # now re-init current action
+            # force action init (new action uuid and timestamp)
+            self.action.init_act(time_offset=self.base.ntp_offset, force=True)
+            self.action_list += prev_action_list
+            # add new action uuid to listen_uuids
+            self.add_new_listen_uuid(self.action.action_uuid)
+            # remove previous listen_uuid to stop writing to previous hlo file
+            self.listen_uuids.remove(prev_action.action_uuid)
 
-        # add child and parent action uuids
-        prev_action.child_action_uuid = self.action.action_uuid
-        self.action.parent_action_uuid = prev_action.action_uuid
+            # add child and parent action uuids
+            prev_action.child_action_uuid = self.action.action_uuid
+            self.action.parent_action_uuid = prev_action.action_uuid
 
-        # reset action sample list and others
-        self.action.samples_in = []
-        self.action.samples_out = []
-        self.action.child_action_uuid = None
-        self.action.files = []
+            # reset action sample list and others
+            self.action.samples_in = []
+            self.action.samples_out = []
+            self.action.child_action_uuid = None
+            self.action.files = []
 
-        # reset all of the new actions file_conn uuids
-        self.action.file_conn_keys = []
+            # reset all of the new actions file_conn uuids
+            self.action.file_conn_keys = []
 
-        # grab all fileconns from prev_action
-        # some action are multi file out and each split action
-        # needs to create the same number of new files
-        for file_conn_key in prev_action.file_conn_keys:
-            # await asyncio.sleep(0.1)
-            self.base.print_message(
-                "Creating new file_conn for split action", info=True
-            )
-            new_file_conn_key = self.base.new_file_conn_key(
-                key=str(self.get_realtime_nowait())
-            )
-            if new_fileconnparams is None:
-                # get last file conn
-                new_file_conn = self.file_conn_dict[file_conn_key].deepcopy()
-                # modify last file_conn
-                new_file_conn.params.file_conn_key = new_file_conn_key
-                # reset some of the file conn parameters
-                new_file_conn.reset_file_conn()
-                # add new timestamp
-                new_file_conn.params.hloheader.epoch_ns = self.get_realtime_nowait()
+            # grab all fileconns from prev_action
+            # some action are multi file out and each split action
+            # needs to create the same number of new files
+            for file_conn_key in prev_action.file_conn_keys:
+                # await asyncio.sleep(0.1)
+                self.base.print_message(
+                    "Creating new file_conn for split action", info=True
+                )
+                new_file_conn_key = self.base.new_file_conn_key(
+                    key=str(self.get_realtime_nowait())
+                )
+                if new_fileconnparams is None:
+                    # get last file conn
+                    new_file_conn = self.file_conn_dict[file_conn_key].deepcopy()
+                    # modify last file_conn
+                    new_file_conn.params.file_conn_key = new_file_conn_key
+                    # reset some of the file conn parameters
+                    new_file_conn.reset_file_conn()
+                    # add new timestamp
+                    new_file_conn.params.hloheader.epoch_ns = self.get_realtime_nowait()
+                else:
+                    new_file_conn = FileConn(params=new_fileconnparams)
+                    new_file_conn.params.file_conn_key = new_file_conn_key
+
+                new_file_conn_keys.append(new_file_conn_key)
+                # add the new one to active file conn dict
+                self.file_conn_dict[new_file_conn.params.file_conn_key] = new_file_conn
+                # and add the new file_conn_uuid to the new split action
+                self.action.file_conn_keys = [new_file_conn.params.file_conn_key] + self.action.file_conn_keys
+                self.num_data_queued = 0
+                self.num_data_written = 0
+
+
+            # TODO:
+            # update other action settings?
+            # - sample name
+
+            # # prepend new action to previous action list
+            # self.action_list.append(prev_action)
+
+            # send status for new split action
+            await self.add_status()
+
+            # finish selected actions
+            if uuid_list is None:
+                # default: finish all except current one
+                await self.finish(
+                    finish_uuid_list=[act.action_uuid for act in self.action_list[1:]]
+                )
+
             else:
-                new_file_conn = FileConn(params=new_fileconnparams)
-                new_file_conn.params.file_conn_key = new_file_conn_key
-
-            new_file_conn_keys.append(new_file_conn_key)
-            # add the new one to active file conn dict
-            self.file_conn_dict[new_file_conn.params.file_conn_key] = new_file_conn
-            # and add the new file_conn_uuid to the new split action
-            self.action.file_conn_keys = [new_file_conn.params.file_conn_key] + self.action.file_conn_keys
-            self.num_data_queued = 0
-            self.num_data_written = 0
-
-
-        # TODO:
-        # update other action settings?
-        # - sample name
-
-        # # prepend new action to previous action list
-        # self.action_list.append(prev_action)
-
-        # send status for new split action
-        await self.add_status()
-
-        # finish selected actions
-        if uuid_list is None:
-            # default: finish all except current one
-            await self.finish(
-                finish_uuid_list=[act.action_uuid for act in self.action_list[1:]]
-            )
-
-        else:
-            # use the supplied uuid list
-            await self.finish(finish_uuid_list=uuid_list)
+                # use the supplied uuid list
+                await self.finish(finish_uuid_list=uuid_list)
+        except Exception:
+            logger.error("Active.split() failed", exc_info=True)
 
         return new_file_conn_keys
 
