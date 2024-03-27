@@ -173,7 +173,7 @@ class PAL:
             self.triggers = True
 
         # for passing action object from technique method to measure loop
-        self.action = None  
+        self.action = None
 
         # for global IOloop
         self.IO_do_meas = False
@@ -386,7 +386,7 @@ class PAL:
 
         # wait for each microcam cam
         self.base.print_message("Waiting now for all microcams")
-        for microcam in palcam.microcams:
+        for i, microcam in enumerate(palcam.microcams):
 
             if not self.IO_signalq.empty():
                 self.IO_measuring = await self.IO_signalq.get()
@@ -409,10 +409,9 @@ class PAL:
                 # this also writes the action meta file for the parent action
                 # if split, last action is finished when pal endpoint is done
                 # and will update exp and seq
-
-                if self.IO_action_run_counter > 0:
+                if i > 0:
                     _ = await self.active.split()
-                self.IO_action_run_counter += 1
+
                 self.active.action.samples_in = []
                 self.active.action.samples_out = []
                 self.active.action.action_sub_name = microcam.method
@@ -657,6 +656,8 @@ class PAL:
                     samples=self.IO_palcam.samples_out, IO="out"
                 )
 
+                self.IO_action_run_counter += 1
+
         # wait another 20sec for program to close
         # after final done
         tmp_time = 20
@@ -842,7 +843,6 @@ class PAL:
         )
 
     async def _sendcommand_check_source(self, microcam: PalMicroCam) -> ErrorCodes:
-
         """Checks if a sample is present in the source position.
         An error is returned if no sample is found.
         Else the sample in the source postion is added to sample in.
@@ -1455,7 +1455,6 @@ class PAL:
         )
 
     async def _sendcommand_check_dest(self, microcam: PalMicroCam) -> ErrorCodes:
-
         """Checks if the destination position is empty or contains a sample.
         If it finds a sample, it either creates an assembly or
         will dilute it (if liquid is added to liquid).
@@ -2081,7 +2080,9 @@ class PAL:
                             )
                         elif self.IO_palcam.spacingmethod == Spacingmethod.geometric:
                             self.base.print_message("PAL geometric scheduling")
-                            timepoint = (self.IO_palcam.spacingfactor**run) * sampleperiod
+                            timepoint = (
+                                self.IO_palcam.spacingfactor**run
+                            ) * sampleperiod
                             self.base.print_message(
                                 f"time since last PAL run {(cur_time-last_run_time)}",
                                 info=True,
