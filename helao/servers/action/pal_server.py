@@ -32,6 +32,13 @@ from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 
+from helao.helpers import logging  # get logger from BaseAPI instance
+global logger
+if logging.LOGGER is None:
+    logger = logging.make_logger(logger_name="pal_server_standalone")
+else:
+    logger = logging.LOGGER
+
 
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
