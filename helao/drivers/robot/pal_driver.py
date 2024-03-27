@@ -1,5 +1,12 @@
 __all__ = ["Spacingmethod", "PALtools", "PALposition", "PAL", "GCsampletype"]
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    logger = logging.make_logger(logger_name="pal_driver_standalone")
+else:
+    logger = logging.LOGGER
+
 import asyncio
 import os
 import paramiko
@@ -1935,66 +1942,68 @@ class PAL:
     async def _init_PAL_IOloop(self, A: Action, palcam: PalCam) -> dict:
         """initializes the main PAL IO loop after an action was submitted"""
         activeDict = {}
-        if (
-            self.sshhost is not None
-            and not self.IO_do_meas
-            and not self.IO_measuring
-            and not self.base.actionservermodel.estop
-        ):
-            self.base.print_message("init PAL IO loop", info=True)
-            self.IO_error = ErrorCodes.none
-            # do a check of the PAL tool
-            for microcam in palcam.microcams:
-                microcam.tool = self.check_tool(req_tool=microcam.tool)
-                if microcam.tool is None:
-                    self.IO_error = ErrorCodes.not_available
-                    break
+        try:
+            if (
+                self.sshhost is not None
+                and not self.IO_do_meas
+                and not self.IO_measuring
+                and not self.base.actionservermodel.estop
+            ):
+                self.base.print_message("init PAL IO loop", info=True)
+                self.IO_error = ErrorCodes.none
+                # do a check of the PAL tool
+                for microcam in palcam.microcams:
+                    microcam.tool = self.check_tool(req_tool=microcam.tool)
+                    if microcam.tool is None:
+                        self.IO_error = ErrorCodes.not_available
+                        break
 
-            A.error_code = self.IO_error
-            self.IO_palcam = palcam
-            self.action = A
+                A.error_code = self.IO_error
+                self.IO_palcam = palcam
+                self.action = A
 
-            self.active = await self.base.contain_action(
-                ActiveParams(
-                    action=self.action,
-                    file_conn_params_dict={
-                        self.base.dflt_file_conn_key(): FileConnParams(
-                            file_conn_key=self.base.dflt_file_conn_key(),
-                            # sample_global_labels=[],
-                            file_type="pal_helao__file",
-                        )
-                    },
+                self.active = await self.base.contain_action(
+                    ActiveParams(
+                        action=self.action,
+                        file_conn_params_dict={
+                            self.base.dflt_file_conn_key(): FileConnParams(
+                                file_conn_key=self.base.dflt_file_conn_key(),
+                                # sample_global_labels=[],
+                                file_type="pal_helao__file",
+                            )
+                        },
+                    )
                 )
-            )
 
-            if self.IO_error is ErrorCodes.none:
-                self.IO_continue = False
-                await self.set_IO_signalq(True)
-                # wait for first continue trigger
-                # self.base.print_message("waiting for first continue", info=True)
-                # while not self.IO_continue:
-                #     await asyncio.sleep(0.01)
-                # self.base.print_message("got first continue", info=True)
+                if self.IO_error is ErrorCodes.none:
+                    self.IO_continue = False
+                    await self.set_IO_signalq(True)
+                    # wait for first continue trigger
+                    # self.base.print_message("waiting for first continue", info=True)
+                    # while not self.IO_continue:
+                    #     await asyncio.sleep(0.01)
+                    # self.base.print_message("got first continue", info=True)
+                else:
+                    self.base.print_message("Error during PAL IOloop init", error=True)
+
+                activeDict = self.active.action.as_dict()
+
+            elif self.base.actionservermodel.estop:
+                self.base.print_message("PAL is in estop.", error=True)
+                A.error_code = ErrorCodes.estop
+                activeDict = A.as_dict()
+
+            elif self.sshhost is None:
+                self.base.print_message("No PAL host specified.", error=True)
+                A.error_code = ErrorCodes.not_available
+                activeDict = A.as_dict()
+
             else:
-                self.base.print_message("Error during PAL IOloop init", error=True)
-
-            activeDict = self.active.action.as_dict()
-
-        elif self.base.actionservermodel.estop:
-            self.base.print_message("PAL is in estop.", error=True)
-            A.error_code = ErrorCodes.estop
-            activeDict = A.as_dict()
-
-        elif self.sshhost is None:
-            self.base.print_message("No PAL host specified.", error=True)
-            A.error_code = ErrorCodes.not_available
-            activeDict = A.as_dict()
-
-        else:
-            self.base.print_message("PAL method already in progress.", error=True)
-            A.error_code = ErrorCodes.in_progress
-            activeDict = A.as_dict()
-
+                self.base.print_message("PAL method already in progress.", error=True)
+                A.error_code = ErrorCodes.in_progress
+                activeDict = A.as_dict()
+        except Exception:
+            logger.error("init_PAL_IOloop failed", exc_info=True)
         return activeDict
 
     async def _PAL_IOloop(self) -> None:
@@ -2003,140 +2012,143 @@ class PAL:
         and works on the current content of self.IO_palcam."""
         self.IOloop_run = True
         while self.IOloop_run:
-            # await asyncio.sleep(0.01)
-            self.IO_do_meas = await self.IO_signalq.get()
-            if self.IO_do_meas:
-                self.IO_measuring = True
-                # create active and check sample_in
-                await self._PAL_IOloop_meas_start_helper()
+            try:
+                # await asyncio.sleep(0.01)
+                self.IO_do_meas = await self.IO_signalq.get()
+                if self.IO_do_meas:
+                    self.IO_measuring = True
+                    # create active and check sample_in
+                    await self._PAL_IOloop_meas_start_helper()
 
-                # gets some internal timing references
-                start_time = time.time()  # this is only internal
-                # time when the io loop was
-                # started
-                last_run_time = start_time  # the time of the last PAL run
-                prev_timepoint = 0.0
-                diff_time = 0.0
+                    # gets some internal timing references
+                    start_time = time.time()  # this is only internal
+                    # time when the io loop was
+                    # started
+                    last_run_time = start_time  # the time of the last PAL run
+                    prev_timepoint = 0.0
+                    diff_time = 0.0
 
-                # for multipe runs we don't wait for first trigger
-                if self.IO_palcam.totalruns > 1:
-                    self.IO_continue = True
+                    # for multipe runs we don't wait for first trigger
+                    if self.IO_palcam.totalruns > 1:
+                        self.IO_continue = True
 
-                # loop over the requested runs of one complete
-                # microcam list run
-                for run in range(self.IO_palcam.totalruns):
-                    self.base.print_message(
-                        f"PAL run {run+1} of {self.IO_palcam.totalruns}"
-                    )
-                    # need to make a deepcopy as we modify this object during the run
-                    # but each run should start from the same initial
-                    # params again
-                    run_palcam = deepcopy(self.IO_palcam)
-                    run_palcam.cur_run = run
-
-                    # # if sampleperiod list is empty
-                    # # set it to default
-                    # if not self.IO_palcam.sampleperiod:
-                    #     self.IO_palcam.sampleperiod = [0.0]
-
-                    # get the scheduled time for next PAL command
-                    # self.IO_palcam.timeoffset corrects for offset
-                    # between send ssh and continue (or any other offset)
-
-                    if len(self.IO_palcam.sampleperiod) < (run + 1):
+                    # loop over the requested runs of one complete
+                    # microcam list run
+                    for run in range(self.IO_palcam.totalruns):
                         self.base.print_message(
-                            "len(sampleperiod) < (run), using 0.0", info=True
+                            f"PAL run {run+1} of {self.IO_palcam.totalruns}"
                         )
-                        sampleperiod = 0.0
-                    else:
-                        sampleperiod = self.IO_palcam.sampleperiod[run]
+                        # need to make a deepcopy as we modify this object during the run
+                        # but each run should start from the same initial
+                        # params again
+                        run_palcam = deepcopy(self.IO_palcam)
+                        run_palcam.cur_run = run
 
-                    cur_time = time.time()
-                    if self.IO_palcam.spacingmethod == Spacingmethod.linear:
-                        self.base.print_message("PAL linear scheduling")
-                        self.base.print_message(
-                            f"time since last PAL run {(cur_time-last_run_time)}",
-                            info=True,
-                        )
-                        self.base.print_message(
-                            f"requested time between "
-                            f"PAL runs "
-                            f"{sampleperiod-self.IO_palcam.timeoffset}",
-                            info=True,
-                        )
-                        diff_time = (
-                            sampleperiod
-                            - (cur_time - last_run_time)
-                            - self.IO_palcam.timeoffset
-                        )
-                    elif self.IO_palcam.spacingmethod == Spacingmethod.geometric:
-                        self.base.print_message("PAL geometric scheduling")
-                        timepoint = (self.IO_palcam.spacingfactor**run) * sampleperiod
-                        self.base.print_message(
-                            f"time since last PAL run {(cur_time-last_run_time)}",
-                            info=True,
-                        )
-                        self.base.print_message(
-                            f"requested time between "
-                            f"PAL runs {timepoint-prev_timepoint-self.IO_palcam.timeoffset}",
-                            info=True,
-                        )
-                        diff_time = (
-                            timepoint
-                            - prev_timepoint
-                            - (cur_time - last_run_time)
-                            - self.IO_palcam.timeoffset
-                        )
-                        prev_timepoint = timepoint  # todo: consider time lag
-                    elif self.IO_palcam.spacingmethod == Spacingmethod.custom:
-                        self.base.print_message("PAL custom scheduling")
-                        self.base.print_message(
-                            f"time since PAL start {(cur_time-start_time)}",
-                            info=True,
-                        )
-                        self.base.print_message(
-                            f"time for next PAL run "
-                            f"since start "
-                            f"{sampleperiod-self.IO_palcam.timeoffset}",
-                            info=True,
-                        )
-                        diff_time = (
-                            sampleperiod
-                            - (cur_time - start_time)
-                            - self.IO_palcam.timeoffset
-                        )
+                        # # if sampleperiod list is empty
+                        # # set it to default
+                        # if not self.IO_palcam.sampleperiod:
+                        #     self.IO_palcam.sampleperiod = [0.0]
 
-                    # only wait for positive time
-                    self.base.print_message(
-                        f"PAL waits {diff_time} for sending next command", info=True
-                    )
-                    if diff_time > 0:
-                        await asyncio.sleep(diff_time)
+                        # get the scheduled time for next PAL command
+                        # self.IO_palcam.timeoffset corrects for offset
+                        # between send ssh and continue (or any other offset)
 
-                    # if PAL is still busy, enter a wait loop for non-busy status
-                    if not self.IO_measuring:
+                        if len(self.IO_palcam.sampleperiod) < (run + 1):
+                            self.base.print_message(
+                                "len(sampleperiod) < (run), using 0.0", info=True
+                            )
+                            sampleperiod = 0.0
+                        else:
+                            sampleperiod = self.IO_palcam.sampleperiod[run]
+
+                        cur_time = time.time()
+                        if self.IO_palcam.spacingmethod == Spacingmethod.linear:
+                            self.base.print_message("PAL linear scheduling")
+                            self.base.print_message(
+                                f"time since last PAL run {(cur_time-last_run_time)}",
+                                info=True,
+                            )
+                            self.base.print_message(
+                                f"requested time between "
+                                f"PAL runs "
+                                f"{sampleperiod-self.IO_palcam.timeoffset}",
+                                info=True,
+                            )
+                            diff_time = (
+                                sampleperiod
+                                - (cur_time - last_run_time)
+                                - self.IO_palcam.timeoffset
+                            )
+                        elif self.IO_palcam.spacingmethod == Spacingmethod.geometric:
+                            self.base.print_message("PAL geometric scheduling")
+                            timepoint = (self.IO_palcam.spacingfactor**run) * sampleperiod
+                            self.base.print_message(
+                                f"time since last PAL run {(cur_time-last_run_time)}",
+                                info=True,
+                            )
+                            self.base.print_message(
+                                f"requested time between "
+                                f"PAL runs {timepoint-prev_timepoint-self.IO_palcam.timeoffset}",
+                                info=True,
+                            )
+                            diff_time = (
+                                timepoint
+                                - prev_timepoint
+                                - (cur_time - last_run_time)
+                                - self.IO_palcam.timeoffset
+                            )
+                            prev_timepoint = timepoint  # todo: consider time lag
+                        elif self.IO_palcam.spacingmethod == Spacingmethod.custom:
+                            self.base.print_message("PAL custom scheduling")
+                            self.base.print_message(
+                                f"time since PAL start {(cur_time-start_time)}",
+                                info=True,
+                            )
+                            self.base.print_message(
+                                f"time for next PAL run "
+                                f"since start "
+                                f"{sampleperiod-self.IO_palcam.timeoffset}",
+                                info=True,
+                            )
+                            diff_time = (
+                                sampleperiod
+                                - (cur_time - start_time)
+                                - self.IO_palcam.timeoffset
+                            )
+
+                        # only wait for positive time
                         self.base.print_message(
-                            "PAL still busy after sleep interval, wait for release.",
-                            info=True,
+                            f"PAL waits {diff_time} for sending next command", info=True
                         )
-                        while True:
-                            self.IO_measuring = await self.IO_signalq.get()
-                            if not self.IO_measuring:
-                                break
+                        if diff_time > 0:
+                            await asyncio.sleep(diff_time)
 
-                    # finally submit a single PAL run
-                    last_run_time = time.time()
-                    self.base.print_message("PAL sendcommand def start", info=True)
-                    self.IO_error = await self._sendcommand_main(run_palcam)
-                    self.base.print_message("PAL sendcommand def end", info=True)
+                        # if PAL is still busy, enter a wait loop for non-busy status
+                        if not self.IO_measuring:
+                            self.base.print_message(
+                                "PAL still busy after sleep interval, wait for release.",
+                                info=True,
+                            )
+                            while True:
+                                self.IO_measuring = await self.IO_signalq.get()
+                                if not self.IO_measuring:
+                                    break
 
-                    if self.IO_trigger_task is not None:
-                        self.IO_trigger_task.cancel()
-                        self.IO_trigger_task = None
+                        # finally submit a single PAL run
+                        last_run_time = time.time()
+                        self.base.print_message("PAL sendcommand def start", info=True)
+                        self.IO_error = await self._sendcommand_main(run_palcam)
+                        self.base.print_message("PAL sendcommand def end", info=True)
 
-                # update samples_in/out in exp
-                # and other cleanup
-                await self._PAL_IOloop_meas_end_helper()
+                        if self.IO_trigger_task is not None:
+                            self.IO_trigger_task.cancel()
+                            self.IO_trigger_task = None
+
+                    # update samples_in/out in exp
+                    # and other cleanup
+                    await self._PAL_IOloop_meas_end_helper()
+            except Exception:
+                logger.error("_PAL_IOloop failed", exc_info=True)
 
     async def _PAL_IOloop_meas_start_helper(self) -> None:
         """sets active object and
