@@ -581,7 +581,7 @@ def CCSI_sub_initialization_firstpart(
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 2,  # move co2 monitoring to separate exp
+    experiment_version: int = 3,  # move co2 monitoring to separate exp, #3  n2 push
     #    experiment_version: int = 10, #ver 6to7 implements multivalve, #10 gas push between
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
@@ -591,6 +591,7 @@ def CCSI_sub_cellfill(
     Syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
     previous_liquid: bool = False,
+    n2_push: bool = False,
 
     #    co2measure_duration: float = 20,
     #    co2measure_acqrate: float = 0.5,
@@ -720,18 +721,43 @@ def CCSI_sub_cellfill(
             process_contrib=proccontrib,
         )
         apm.add(ORCH_server, "wait", {"waittime": 5.25})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
-        apm.add(
-            NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait
-        )
-        apm.add(
-            NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait
-        )
-        apm.add(
-            NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait
-        )
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
+        if not apm.pars.n2_push: 
+
+            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait
+            )
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait
+            )
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait
+            )
+            apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
+
+        else:
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 0}, asc.no_wait
+            )
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 1}, asc.no_wait
+            )
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait
+            )
+            apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s})
+        #switch back to co2 source
+            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait
+            )
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait
+            )
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait
+            )
 
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 1.75})
@@ -1790,11 +1816,12 @@ def CCSI_sub_n2flush(
 
 def CCSI_sub_n2clean(
     experiment: Experiment,
-    experiment_version: int = 2, #added n2headspace
+    experiment_version: int = 3, #added n2headspace, n2 push
     Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
+    n2_push: bool = True,
     n2flowrate_sccm: float = 50,
     HSHSpurge_duration: float = 120, 
     HSrecirculation: bool = True,
@@ -1832,6 +1859,7 @@ def CCSI_sub_n2clean(
             Waterclean_reservoir_sample_no = apm.pars.Waterclean_reservoir_sample_no,
             Waterclean_volume_ul = apm.pars.Waterclean_volume_ul,
             Syringe_rate_ulsec = apm.pars.Syringe_rate_ulsec,
+            n2_push = apm.pars.n2_push,
         )
     )
 
