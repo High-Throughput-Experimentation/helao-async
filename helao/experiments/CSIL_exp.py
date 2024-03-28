@@ -721,22 +721,8 @@ def CCSI_sub_cellfill(
             process_contrib=proccontrib,
         )
         apm.add(ORCH_server, "wait", {"waittime": 5.25})
-        if not apm.pars.n2_push: 
-
-            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
-            apm.add(
-                NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait
-            )
-            apm.add(
-                NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait
-            )
-            apm.add(
-                NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait
-            )
-            apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s})
-            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
-
-        else:
+        if apm.pars.n2_push: 
+        #switch back to n2 source
             apm.add(
                 NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 0}, asc.no_wait
             )
@@ -758,6 +744,22 @@ def CCSI_sub_cellfill(
             apm.add(
                 NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait
             )
+
+        else:
+            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait
+            )
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait
+            )
+            apm.add(
+                NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait
+            )
+            apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
+
+
 
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 1.75})
@@ -1816,16 +1818,16 @@ def CCSI_sub_n2flush(
 
 def CCSI_sub_n2clean(
     experiment: Experiment,
-    experiment_version: int = 3, #added n2headspace, n2 push
+    experiment_version: int = 4, #added n2headspace, n2 push remove n2headspace
     Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
     n2_push: bool = True,
     n2flowrate_sccm: float = 50,
-    HSHSpurge_duration: float = 120, 
-    HSrecirculation: bool = True,
-    HSrecirculation_duration: float = 60,
+    # HSHSpurge_duration: float = 120, 
+    # HSrecirculation: bool = True,
+    # HSrecirculation_duration: float = 60,
     drain_HSpurge_duration: float = 300, 
     drain_recirculation_duration: float = 150,
     flush_HSpurge1_duration: float = 30,
@@ -1840,7 +1842,7 @@ def CCSI_sub_n2clean(
     recirculation_rate_uL_min: int = 10000,
     #    DeltaDilute1_duration: float = 15,
     initialization: bool = False,
-    co2measure_duration: float = 2,
+    co2measure_duration: float = 5,
     co2measure_acqrate: float = 0.5,
     use_co2_check: bool = False,
     co2_ppm_thresh: float = 1400,
@@ -1863,16 +1865,16 @@ def CCSI_sub_n2clean(
         )
     )
 
-    apm.add_action_list(
-        CCSI_sub_n2headspace(
-            experiment=experiment,
-            n2flowrate_sccm = apm.pars.n2flowrate_sccm,
-            HSpurge_duration = apm.pars.HSHSpurge_duration,
-            recirculation = apm.pars.HSrecirculation,
-            recirculation_duration = apm.pars.HSrecirculation_duration,
-            recirculation_rate_uL_min = apm.pars.recirculation_rate_uL_min,
-        )
-    )
+    # apm.add_action_list(
+    #     CCSI_sub_n2headspace(
+    #         experiment=experiment,
+    #         n2flowrate_sccm = apm.pars.n2flowrate_sccm,
+    #         HSpurge_duration = apm.pars.HSHSpurge_duration,
+    #         recirculation = apm.pars.HSrecirculation,
+    #         recirculation_duration = apm.pars.HSrecirculation_duration,
+    #         recirculation_rate_uL_min = apm.pars.recirculation_rate_uL_min,
+    #     )
+    # )
 
     apm.add_action_list(
         CCSI_sub_n2drain(
