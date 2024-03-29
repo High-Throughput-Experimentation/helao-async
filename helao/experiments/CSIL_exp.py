@@ -724,7 +724,7 @@ def CCSI_sub_cellfill(
         if apm.pars.n2_push: 
         #switch back to n2 source
             apm.add(
-                NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 0}, asc.no_wait
+                NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 0},
             )
             apm.add(
                 NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 1}, asc.no_wait
@@ -734,9 +734,8 @@ def CCSI_sub_cellfill(
             )
             apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s})
         #switch back to co2 source
-            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
             apm.add(
-                NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait
+                NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0},
             )
             apm.add(
                 NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait
@@ -1733,8 +1732,8 @@ def CCSI_sub_n2flush(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)
-    apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.Probepurge1_duration-1},asc.wait_for_orch )
+#    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(DOSEPUMP_server, "run_continuous", {"rate_uL_min": apm.pars.recirculation_rate_uL_min, "duration_sec": apm.pars.Probepurge1_duration-1},asc.no_wait)#asc.wait_for_orch )
    # apm.add(ORCH_server, "wait", {"waittime": apm.pars.Probepurge1_duration},)
 
 #
