@@ -1581,3 +1581,42 @@ class Orch(Base):
                     await self.stop()
                     await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
+
+    async def ping_action_servers(self):
+        """Periodically monitor all action servers."""
+        status_summary = {}
+        for serv_key, serv_dict in self.world_cfg["servers"].items():
+            if "bokeh" not in serv_dict:
+                serv_addr = serv_dict["host"]
+                serv_port = serv_dict["port"]
+                try:
+                    response, error_code = await async_private_dispatcher(
+                        server_key=serv_key,
+                        host=serv_addr,
+                        port=serv_port,
+                        private_action="get_status",
+                        params_dict={
+                            "client_servkey": self.server.server_name,
+                            "client_host": self.server_cfg["host"],
+                            "client_port": self.server_cfg["port"],
+                        },
+                        json_dict={},
+                    )
+                    if response is not None and error_code == ErrorCodes.none:
+                        busy_endpoints = []
+                        for endpoint, active_dict in response.items():
+                            if active_dict:
+                                busy_endpoints.append(endpoint)
+                        if busy_endpoints:
+                            busy_str = ", ".join(busy_endpoints)
+                            status_summary[serv_key] = f"busy [{busy_str}] - okay"
+                        else:
+                            status_summary[serv_key] = "idle - okay"
+                except aiohttp.client_exceptions.ClientConnectorError:
+                    status_summary[serv_key] = "unreachable - error"
+        return status_summary
+    
+    async def action_server_monitor(self):
+        while True:
+            status_summary = await self.ping_action_servers()
+            await asyncio.sleep(self.heartbeat_interval)

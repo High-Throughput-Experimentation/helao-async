@@ -206,7 +206,14 @@ class BaseAPI(HelaoFastAPI):
 
         @self.post("/get_status", tags=["private"])
         def get_status():
-            return self.base.actionservermodel
+            status_dict = self.base.actionservermodel.model_dump()
+            if issubclass(self.driver, HelaoDriver):
+                resp = self.driver.get_status()
+                driver_status = resp.status
+                status_dict['driver_status'] = driver_status
+            else:
+                driver_status = 'not implemented'
+            return status_dict
 
         @self.post("/attach_client", tags=["private"])
         async def attach_client(
