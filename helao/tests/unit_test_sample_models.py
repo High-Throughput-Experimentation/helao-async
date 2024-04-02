@@ -13,7 +13,7 @@ from helaocore.models.sample import (
                                     SolidSample,
                                     AssemblySample,
                                     NoneSample,
-                                    SampleList
+                                    SampleUnion,
                                    )
 
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
@@ -99,7 +99,7 @@ def sample_model_unit_test():
         
         try:
             print(f"sample_model test {testcounter} ",end = "")
-            test_sample_list = SampleList(samples=[test_liquid,test_gas,test_solid,test_assembly,test_assembly2])
+            test_sample_list = SampleUnion(samples=[test_liquid,test_gas,test_solid,test_assembly,test_assembly2])
             print(passed_msg)
         except Exception as e:
             tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -214,7 +214,7 @@ def sample_model_unit_test():
         # testing sample list basemodel functions
         try:
             print(f"sample_model test {testcounter} ",end = "")
-            test_sample_list = SampleList(samples=[test_liquid.model_dump(),test_gas.model_dump(),test_solid.model_dump(),test_assembly.model_dump(), test_assembly2.model_dump()])
+            test_sample_list = SampleUnion(samples=[test_liquid.model_dump(),test_gas.model_dump(),test_solid.model_dump(),test_assembly.model_dump(), test_assembly2.model_dump()])
             print(passed_msg)
         except Exception as e:
             tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
