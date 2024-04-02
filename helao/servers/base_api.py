@@ -210,9 +210,9 @@ class BaseAPI(HelaoFastAPI):
             if issubclass(self.driver, HelaoDriver):
                 resp = self.driver.get_status()
                 driver_status = resp.status
-                status_dict['driver_status'] = driver_status
             else:
                 driver_status = 'not implemented'
+            status_dict['_driver_status'] = driver_status
             return status_dict
 
         @self.post("/attach_client", tags=["private"])

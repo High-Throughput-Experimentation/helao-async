@@ -144,6 +144,7 @@ class Orch(Base):
         self.step_thru_actions = False
         self.step_thru_experiments = False
         self.step_thru_sequences = False
+        self.status_summary = {}
 
     def exception_handler(self, loop, context):
         self.print_message(f"Got exception from coroutine: {context}", error=True)
@@ -175,6 +176,7 @@ class Orch(Base):
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
         self.heartbeat_monitor = asyncio.create_task(self.active_action_monitor())
+        self.driver_monitor = asyncio.create_task(self.action_server_monitor())
 
     def endpoint_queues_init(self):
         for urld in self.fast_urls:
@@ -1604,19 +1606,24 @@ class Orch(Base):
                     )
                     if response is not None and error_code == ErrorCodes.none:
                         busy_endpoints = []
-                        for endpoint, active_dict in response.items():
-                            if active_dict:
+                        driver_status = "unknown"
+                        for endpoint, val in response.items():
+                            if endpoint == "_driver_status":
+                                driver_status = val
+                            elif val:
                                 busy_endpoints.append(endpoint)
                         if busy_endpoints:
                             busy_str = ", ".join(busy_endpoints)
-                            status_summary[serv_key] = f"busy [{busy_str}] - okay"
+                            status_str = f"busy [{busy_str}]"
                         else:
-                            status_summary[serv_key] = "idle - okay"
+                            status_str = "idle"
+                        status_summary[serv_key] = (status_str, driver_status)
                 except aiohttp.client_exceptions.ClientConnectorError:
-                    status_summary[serv_key] = "unreachable - error"
+                    status_summary[serv_key] = ("unreachable", "unknown")
         return status_summary
     
     async def action_server_monitor(self):
         while True:
-            status_summary = await self.ping_action_servers()
+            self.status_summary = await self.ping_action_servers()
+            await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
