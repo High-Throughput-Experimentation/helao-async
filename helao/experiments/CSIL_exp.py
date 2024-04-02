@@ -1650,7 +1650,7 @@ def CCSI_sub_co2pressuremonitor_nopump(
 
 def CCSI_sub_n2flush(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3, #3 delayed co2 measurement
     n2flowrate_sccm: float = 10,
     HSpurge1_duration: float = 60,
     HSpurge_duration: float = 20, 
@@ -1664,6 +1664,7 @@ def CCSI_sub_n2flush(
     recirculation_rate_uL_min: int = 10000,
     #    DeltaDilute1_duration: float = 15,
     initialization: bool = False,
+    co2measure_delay: float = 120,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
     #co2_ppm_thresh: float = 90000,
@@ -1798,6 +1799,8 @@ def CCSI_sub_n2flush(
 
 #
 # HEADSPACE EVALUATION
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_delay})
+
     apm.add(
         CO2S_server,
         "acquire_co2",
@@ -1817,7 +1820,7 @@ def CCSI_sub_n2flush(
 
 def CCSI_sub_n2clean(
     experiment: Experiment,
-    experiment_version: int = 4, #added n2headspace, n2 push remove n2headspace
+    experiment_version: int = 5, #added n2headspace, n2 push remove n2headspace, 5 measure delay
     Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 300,
@@ -1841,6 +1844,7 @@ def CCSI_sub_n2clean(
     recirculation_rate_uL_min: int = 10000,
     #    DeltaDilute1_duration: float = 15,
     initialization: bool = False,
+    co2measure_delay: float = 120,
     co2measure_duration: float = 5,
     co2measure_acqrate: float = 0.5,
     use_co2_check: bool = False,
@@ -1905,6 +1909,7 @@ def CCSI_sub_n2clean(
             Alphapurge1_duration = apm.pars.Alphapurge1_duration,
             Probepurge1_duration = apm.pars.Probepurge1_duration,
             Sensorpurge1_duration = apm.pars.Sensorpurge1_duration,
+            co2measure_delay = apm.pars.co2measure_delay,
             co2measure_duration = apm.pars.co2measure_duration,
             co2measure_acqrate = apm.pars.co2measure_acqrate,
         )
