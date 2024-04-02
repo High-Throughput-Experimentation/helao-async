@@ -889,7 +889,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # =============================================================================
 
 def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization performed previously
-    sequence_version: int = 12, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included
+    sequence_version: int = 13, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [0,0,0],
@@ -942,6 +942,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
     use_co2_check: bool = True,
     check_co2measure_duration: float = 10,
     clean_co2_ppm_thresh: float = 1400,
+    clean_co2measure_delay: float = 120,
     max_repeats: int = 5,
     purge_if: Union[str, float] = "above",
     temp_monitor_time: int =600,
@@ -1031,6 +1032,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "co2_ppm_thresh": clean_co2_ppm_thresh,
             "purge_if": purge_if,
             "max_repeats": max_repeats,
+            "co2measure_delay":clean_co2measure_delay,
             "co2measure_duration": check_co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate, 
             "Manpurge1_duration": flush_Manpurge1_duration,
