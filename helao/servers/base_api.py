@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import time
 import asyncio
@@ -21,6 +22,9 @@ from helaocore.models.hlostatus import HloStatus
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK
+
+if sys.platform == "win32":
+    import comtypes
 
 from helao.helpers import logging
 
@@ -208,6 +212,8 @@ class BaseAPI(HelaoFastAPI):
         def get_status():
             status_dict = self.base.actionservermodel.model_dump()
             if isinstance(self.driver, HelaoDriver):
+                if sys.platform == "win32":
+                    comtypes.CoInitialize()
                 resp = self.driver.get_status()
                 driver_status = resp.status
             else:
