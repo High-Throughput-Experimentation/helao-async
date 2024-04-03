@@ -971,7 +971,7 @@ class BokehOperator:
         self.active_action_source.data = self.active_action_lists
         self.vis.print_message(f"current active actions: {self.active_action_lists}")
     
-    def get_orch_status_summary(self):
+    async def get_orch_status_summary(self):
         for key in self.action_server_lists:
             self.action_server_lists[key] = []
             
