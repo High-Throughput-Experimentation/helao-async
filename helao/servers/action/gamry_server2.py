@@ -46,8 +46,6 @@ if logging.LOGGER is None:
 else:
     logger = logging.LOGGER
 
-global get_pstat_status
-
 
 class GamryExec(Executor):
     technique: GamryTechnique
@@ -171,22 +169,6 @@ async def gamry_dyn_endpoints(app=None):
         enable_pstat = True
 
     if enable_pstat:
-
-        print("!!! printing status")
-        print(app.driver.get_status().data)
-        get_pstat_status = lambda: app.driver.get_status()
-
-        # need to redefine get_status due to single-thread comtypes resource
-        @app.post("/get_status", tags=["private"])
-        def get_status():
-            status_dict = app.base.actionservermodel.model_dump()
-            if isinstance(app.driver, HelaoDriver):
-                resp = get_pstat_status()
-                driver_status = resp.status
-            else:
-                driver_status = 'not implemented'
-            status_dict['_driver_status'] = driver_status
-            return status_dict
 
         @app.post(f"/{server_key}/run_LSV", tags=["action"])
         async def run_LSV(

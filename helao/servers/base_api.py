@@ -208,11 +208,10 @@ class BaseAPI(HelaoFastAPI):
         @self.post("/get_status", tags=["private"])
         def get_status():
             status_dict = self.base.actionservermodel.model_dump()
-            if isinstance(self.driver, HelaoDriver):
-                resp = self.driver.get_status()
-                driver_status = resp.status
-            else:
-                driver_status = 'not implemented'
+            driver_status = "not_implemented"
+            # if isinstance(self.driver, HelaoDriver):
+            #     resp = self.driver.get_status()
+            #     driver_status = resp.status
             status_dict['_driver_status'] = driver_status
             return status_dict
 
