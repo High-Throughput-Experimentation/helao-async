@@ -145,6 +145,7 @@ class Orch(Base):
         self.step_thru_experiments = False
         self.step_thru_sequences = False
         self.status_summary = {}
+        self.global_params = {}
 
     def exception_handler(self, loop, context):
         self.print_message(f"Got exception from coroutine: {context}", error=True)
@@ -526,11 +527,11 @@ class Orch(Base):
 
         # self.print_message("copying global vars to experiment")
         # copy requested global param to experiment params
-        for k, v in self.active_experiment.from_globalseq_params.items():
+        for k, v in self.active_experiment.from_globalexp_params.items():
             self.print_message(f"{k}:{v}")
-            if k in self.active_sequence.globalseq_params:
+            if k in self.global_params:
                 self.active_experiment.experiment_params.update(
-                    {v: self.active_sequence.globalseq_params[k]}
+                    {v: self.global_params[k]}
                 )
 
         self.print_message(
@@ -711,9 +712,9 @@ class Orch(Base):
             # copy requested global param to action params
             for k, v in A.from_globalexp_params.items():
                 self.print_message(f"{k}:{v}")
-                if k in self.active_experiment.globalexp_params:
+                if k in self.global_params:
                     A.action_params.update(
-                        {v: self.active_experiment.globalexp_params[k]}
+                        {v: self.global_params[k]}
                     )
 
             actserv_exists, _ = await endpoints_available([A.url])
@@ -858,13 +859,13 @@ class Orch(Base):
                         if k in result_action.action_params:
                             if (
                                 result_action.action_params[k] is None
-                                and k in self.active_experiment.globalexp_params
+                                and k in self.global_params
                             ):
                                 self.print_message(f"clearing {k} in global vars")
-                                self.active_experiment.globalexp_params.pop(k)
+                                self.global_params.pop(k)
                             else:
                                 self.print_message(f"updating {k} in global vars")
-                                self.active_experiment.globalexp_params.update(
+                                self.global_params.update(
                                     {k: result_action.action_params[k]}
                                 )
                 elif isinstance(result_action.to_globalexp_params, dict):
@@ -875,13 +876,13 @@ class Orch(Base):
                         if k1 in result_action.action_params:
                             if (
                                 result_action.action_params[k1] is None
-                                and k2 in self.active_experiment.globalexp_params
+                                and k2 in self.global_params
                             ):
                                 self.print_message(f"clearing {k2} in global vars")
-                                self.active_experiment.globalexp_params.pop(k2)
+                                self.global_params.pop(k2)
                             else:
                                 self.print_message(f"updating {k2} in global vars")
-                                self.active_experiment.globalexp_params.update(
+                                self.global_params.update(
                                     {k2: result_action.action_params[k1]}
                                 )
 
@@ -1467,48 +1468,6 @@ class Orch(Base):
             self.active_sequence.experimentmodel_list.append(
                 deepcopy(self.active_experiment.get_exp())
             )
-
-            if (
-                self.active_experiment.to_globalseq_params
-                and self.active_experiment.orch_key == self.orch_key
-                and self.active_experiment.orch_host == self.orch_host
-                and self.active_experiment.orch_port == self.orch_port
-            ):
-                if isinstance(self.active_experiment.to_globalseq_params, list):
-                    # self.print_message(
-                    #     f"copying global vars {', '.join(self.active_experiment.to_globalseq_params)} back to sequence"
-                    # )
-                    for k in self.active_experiment.to_globalseq_params:
-                        if k in self.active_experiment.experiment_params:
-                            if (
-                                self.active_experiment.experiment_params[k] is None
-                                and k in self.active_sequence.globalseq_params
-                            ):
-                                self.print_message(f"clearing {k} in global vars")
-                                self.active_sequence.globalseq_params.pop(k)
-                            else:
-                                self.print_message(f"updating {k} in global vars")
-                                self.active_sequence.globalseq_params.update(
-                                    {k: self.active_experiment.experiment_params[k]}
-                                )
-                elif isinstance(self.active_experiment.to_globalseq_params, dict):
-                    # self.print_message(
-                    #     f"copying global vars {', '.join(self.active_experiment.to_globalseq_params.keys())} back to sequence"
-                    # )
-                    for k1, k2 in self.active_experiment.to_globalseq_params.items():
-                        if k1 in self.active_experiment.experiment_params:
-                            if (
-                                self.active_experiment.experiment_params[k1] is None
-                                and k2 in self.active_sequence.globalseq_params
-                            ):
-                                self.print_message(f"clearing {k2} in global vars")
-                                self.active_sequence.globalseq_params.pop(k2)
-                            else:
-                                self.print_message(f"updating {k2} in global vars")
-                                self.active_sequence.globalseq_params.update(
-                                    {k2: self.active_experiment.experiment_params[k1]}
-                                )
-                # self.print_message("done copying global vars back to sequence")
 
             # write new updated seq
             await self.write_active_sequence_seq()
