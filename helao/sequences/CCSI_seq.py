@@ -1008,7 +1008,13 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
         #     "volume_ul_cell_gas": 1, #need calculated volume from mfc maintain concentration 
         # })        
         
-        epm.add_experiment("CCSI_sub_n2drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": 0,"recirculation":drainrecirc,"recirculation_duration":recirculation_duration, "recirculation_rate_uL_min":recirculation_rate_uL_min})
+        epm.add_experiment("CCSI_sub_n2drain", {
+            "n2flowrate_sccm":n2flowrate_sccm,
+            "HSpurge_duration": SamplePurge_duration,
+            "DeltaDilute1_duration": 0,
+            "recirculation":drainrecirc,
+            "recirculation_duration":recirculation_duration, 
+            "recirculation_rate_uL_min":recirculation_rate_uL_min})
 ##############################################3
 #temp fixed drain/flush here. will put in new n2 clean inject after repeat criteria determined
 
