@@ -192,7 +192,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/get_status", tags=["private"])
         def get_status():
-            status_dict = self.orch.actionservermodel
+            status_dict = self.orch.actionservermodel.model_dump()
             if isinstance(self.driver, HelaoDriver):
                 resp = self.driver.get_status()
                 driver_status = resp.status
