@@ -66,7 +66,6 @@ class GamryDriver(HelaoDriver):
     def connect(self) -> DriverResponse:
         """Open connection to resource."""
         try:
-            comtypes.CoInitialize()
             self.GamryCOM = client.GetModule(
                 ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
             )
@@ -384,7 +383,6 @@ class GamryDriver(HelaoDriver):
         try:
             self.pstat.SetCell(self.GamryCOM.CellOff)
             self.pstat.Close()
-            comtypes.CoUninitialize()
             self.pstat = None
             self.ready = False
             response = DriverResponse(
