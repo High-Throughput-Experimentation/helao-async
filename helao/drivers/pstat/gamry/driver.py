@@ -95,7 +95,9 @@ class GamryDriver(HelaoDriver):
     def get_status(self) -> DriverResponse:
         """Return current driver status."""
         try:
+            comtypes.CoInitialize()
             state = self.pstat.State()
+            comtypes.CoUninitialize()
             state = dict([x.split("\t") for x in state.split("\r\n") if x])
             response = DriverResponse(
                 response=DriverResponseType.success, data=state, status=DriverStatus.ok
