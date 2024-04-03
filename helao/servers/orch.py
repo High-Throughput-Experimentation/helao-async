@@ -1565,12 +1565,10 @@ class Orch(Base):
                     )
                     if response is not None and error_code == ErrorCodes.none:
                         busy_endpoints = []
-                        driver_status = "unknown"
-                        for endpoint, val in response.items():
-                            if endpoint == "_driver_status":
-                                driver_status = val
-                            elif val:
-                                busy_endpoints.append(endpoint)
+                        driver_status = response.get("_driver_status", "unknown")
+                        for endpoint_name, endpoint_dict in response.get("endpoints", {}).items():
+                            if endpoint_dict["active_dict"]:
+                                busy_endpoints.append(endpoint_name)
                         if busy_endpoints:
                             busy_str = ", ".join(busy_endpoints)
                             status_str = f"busy [{busy_str}]"
