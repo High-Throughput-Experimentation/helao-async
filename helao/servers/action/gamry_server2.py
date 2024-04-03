@@ -28,6 +28,7 @@ from helao.helpers.config_loader import config_loader
 from helao.helpers.executor import Executor
 from helao.helpers import logging  # get logger from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
+from helao.drivers.helao_driver import HelaoDriver
 from helao.drivers.pstat.gamry.driver import GamryDriver
 from helao.drivers.pstat.gamry.technique import (
     GamryTechnique,
@@ -44,6 +45,8 @@ if logging.LOGGER is None:
     logger = logging.make_logger(logger_name="gamry_server_standalone")
 else:
     logger = logging.LOGGER
+
+global get_pstat_status
 
 
 class GamryExec(Executor):
@@ -171,6 +174,19 @@ async def gamry_dyn_endpoints(app=None):
 
         print("!!! printing status")
         print(app.driver.get_status().data)
+        get_pstat_status = lambda: app.driver.get_status()
+
+        # need to redefine get_status due to single-thread comtypes resource
+        @app.post("/get_status", tags=["private"])
+        def get_status():
+            status_dict = app.base.actionservermodel.model_dump()
+            if isinstance(app.driver, HelaoDriver):
+                resp = get_pstat_status()
+                driver_status = resp.status
+            else:
+                driver_status = 'not implemented'
+            status_dict['_driver_status'] = driver_status
+            return status_dict
 
         @app.post(f"/{server_key}/run_LSV", tags=["action"])
         async def run_LSV(
