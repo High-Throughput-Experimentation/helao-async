@@ -169,6 +169,9 @@ async def gamry_dyn_endpoints(app=None):
 
     if enable_pstat:
 
+        print("!!! printing status")
+        print(app.driver.get_status().data)
+
         @app.post(f"/{server_key}/run_LSV", tags=["action"])
         async def run_LSV(
             action: Action = Body({}, embed=True),
