@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import time
 import asyncio
@@ -206,7 +207,13 @@ class BaseAPI(HelaoFastAPI):
 
         @self.post("/get_status", tags=["private"])
         def get_status():
-            return self.base.actionservermodel
+            status_dict = self.base.actionservermodel.model_dump()
+            driver_status = "not_implemented"
+            if isinstance(self.driver, HelaoDriver):
+                resp = self.driver.get_status()
+                driver_status = resp.status
+            status_dict['_driver_status'] = driver_status
+            return status_dict
 
         @self.post("/attach_client", tags=["private"])
         async def attach_client(

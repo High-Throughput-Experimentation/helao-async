@@ -70,6 +70,13 @@ class BokehOperator:
         self.loaded_config_path = self.vis.world_cfg.get("loaded_config_path", "")
         self.pal_name = None
         self.update_q = asyncio.Queue()
+        self.num_actserv = len(
+            [
+                k
+                for k, v in self.vis.world_cfg["servers"].items()
+                if "bokeh" not in v and "demovis" not in v
+            ]
+        )
         # find pal server if configured in world config
         for server_name, server_config in self.vis.world_cfg["servers"].items():
             if server_config.get("fast", "") == "pal_server":
@@ -104,31 +111,27 @@ class BokehOperator:
         self.seqspec_private_input = []
 
         self.sequence = None
-        self.experiment_plan_list = {}
-        self.experiment_plan_list["sequence_name"] = []
-        self.experiment_plan_list["sequence_label"] = []
-        self.experiment_plan_list["experiment_name"] = []
+        self.experiment_plan_lists = {
+            k: [] for k in ["sequence_name", "sequence_label", "experiment_name"]
+        }
 
-        self.sequence_list = {}
-        self.sequence_list["sequence_name"] = []
-        self.sequence_list["sequence_label"] = []
-        self.sequence_list["sequence_uuid"] = []
+        self.sequence_lists = {
+            k: [] for k in ["sequence_name", "sequence_label", "sequence_uuid"]
+        }
 
-        self.experiment_list = {}
-        self.experiment_list["experiment_name"] = []
-        self.experiment_list["experiment_uuid"] = []
+        self.experiment_lists = {k: [] for k in ["experiment_name", "experiment_uuid"]}
 
-        self.action_list = {}
-        self.action_list["action_name"] = []
-        self.action_list["action_server"] = []
-        self.action_list["action_uuid"] = []
+        self.action_lists = {
+            k: [] for k in ["action_name", "action_server", "action_uuid"]
+        }
 
-        self.active_action_list = {}
-        self.active_action_list["action_name"] = []
-        self.active_action_list["action_server"] = []
-        self.active_action_list["action_uuid"] = []
-        self.active_action_list["samples_in"] = []
-        self.active_action_list["solids_in"] = []
+        self.active_action_lists = {
+            k: [] for k in ["action_name", "action_server", "action_uuid"]
+        }
+
+        self.action_server_lists = {
+            k: [] for k in ["action_server", "server_status", "driver_status"]
+        }
 
         self.sequence_select_list = []
         self.sequences = []
@@ -167,10 +170,11 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.get_experiments))
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
+        self.vis.doc.add_next_tick_callback(partial(self.get_orch_status_summary))
 
-        self.experiment_plan_source = ColumnDataSource(data=self.experiment_plan_list)
+        self.experiment_plan_source = ColumnDataSource(data=self.experiment_plan_lists)
         self.columns_expplan = [
-            TableColumn(field=key, title=key) for key in self.experiment_plan_list
+            TableColumn(field=key, title=key) for key in self.experiment_plan_lists
         ]
         self.experiment_plan_table = DataTable(
             source=self.experiment_plan_source,
@@ -180,9 +184,9 @@ class BokehOperator:
             autosize_mode="fit_columns",
         )
 
-        self.sequence_source = ColumnDataSource(data=self.sequence_list)
+        self.sequence_source = ColumnDataSource(data=self.sequence_lists)
         self.columns_seq = [
-            TableColumn(field=key, title=key) for key in self.sequence_list
+            TableColumn(field=key, title=key) for key in self.sequence_lists
         ]
         self.sequence_table = DataTable(
             source=self.sequence_source,
@@ -192,9 +196,9 @@ class BokehOperator:
             autosize_mode="fit_columns",
         )
 
-        self.experiment_source = ColumnDataSource(data=self.experiment_list)
+        self.experiment_source = ColumnDataSource(data=self.experiment_lists)
         self.columns_exp = [
-            TableColumn(field=key, title=key) for key in self.experiment_list
+            TableColumn(field=key, title=key) for key in self.experiment_lists
         ]
         self.experiment_table = DataTable(
             source=self.experiment_source,
@@ -204,9 +208,9 @@ class BokehOperator:
             autosize_mode="fit_columns",
         )
 
-        self.action_source = ColumnDataSource(data=self.action_list)
+        self.action_source = ColumnDataSource(data=self.action_lists)
         self.columns_act = [
-            TableColumn(field=key, title=key) for key in self.action_list
+            TableColumn(field=key, title=key) for key in self.action_lists
         ]
         self.action_table = DataTable(
             source=self.action_source,
@@ -215,18 +219,37 @@ class BokehOperator:
             height=200,
             autosize_mode="fit_columns",
         )
+        self.action_server_source = ColumnDataSource(data=self.action_server_lists)
+        self.columns_actserv = [
+            TableColumn(field=key, title=key) for key in self.action_server_lists
+        ]
+        self.action_server_table = DataTable(
+            source=self.action_server_source,
+            columns=self.columns_actserv,
+            width=self.max_width - 20,
+            height=200,
+            autosize_mode="fit_columns",
+        )
 
         self.sequence_tab = Panel(child=self.sequence_table, title="Sequences")
         self.experiment_tab = Panel(child=self.experiment_table, title="Experiments")
         self.action_tab = Panel(child=self.action_table, title="Actions")
+        self.action_server_tab = Panel(
+            child=self.action_server_table, title="Action Servers"
+        )
         self.queue_tabs = Tabs(
-            tabs=[self.sequence_tab, self.experiment_tab, self.action_tab],
+            tabs=[
+                self.sequence_tab,
+                self.experiment_tab,
+                self.action_tab,
+                self.action_server_tab,
+            ],
             height_policy="min",
         )
 
-        self.active_action_source = ColumnDataSource(data=self.active_action_list)
+        self.active_action_source = ColumnDataSource(data=self.active_action_lists)
         self.columns_active_action = [
-            TableColumn(field=key, title=key) for key in self.active_action_list
+            TableColumn(field=key, title=key) for key in self.active_action_lists
         ]
         self.active_action_table = DataTable(
             source=self.active_action_source,
@@ -881,22 +904,24 @@ class BokehOperator:
     async def get_sequences(self):
         """get experiment list from orch"""
         sequences = self.orch.list_sequences()
-        for key in self.sequence_list:
-            self.sequence_list[key] = []
+        for key in self.sequence_lists:
+            self.sequence_lists[key] = []
 
+        sequence_count = 0
         for seq in sequences:
             seqdict = seq.as_dict()
-            self.sequence_list["sequence_name"].append(
+            self.sequence_lists["sequence_name"].append(
                 seqdict.get("sequence_name", None)
             )
-            self.sequence_list["sequence_label"].append(
+            self.sequence_lists["sequence_label"].append(
                 seqdict.get("sequence_label", None)
             )
-            self.sequence_list["sequence_uuid"].append(
+            self.sequence_lists["sequence_uuid"].append(
                 seqdict.get("sequence_uuid", None)
             )
+            sequence_count += 1
 
-        self.sequence_source.data = self.sequence_list
+        self.sequence_source.stream(self.sequence_lists, rollover=sequence_count)
         self.vis.print_message(
             f"current queued sequences: ({len(self.orch.sequence_dq)})"
         )
@@ -904,19 +929,21 @@ class BokehOperator:
     async def get_experiments(self):
         """get experiment list from orch"""
         experiments = self.orch.list_experiments()
-        for key in self.experiment_list:
-            self.experiment_list[key] = []
+        for key in self.experiment_lists:
+            self.experiment_lists[key] = []
 
+        experiment_count = 0
         for exp in experiments:
             expdict = exp.as_dict()
-            self.experiment_list["experiment_name"].append(
+            self.experiment_lists["experiment_name"].append(
                 expdict.get("experiment_name", None)
             )
-            self.experiment_list["experiment_uuid"].append(
+            self.experiment_lists["experiment_uuid"].append(
                 expdict.get("experiment_uuid", None)
             )
+            experiment_count += 1
 
-        self.experiment_source.data = self.experiment_list
+        self.experiment_source.stream(self.experiment_lists, rollover=experiment_count)
         self.vis.print_message(
             f"current queued experiments: ({len(self.orch.experiment_dq)})"
         )
@@ -924,23 +951,26 @@ class BokehOperator:
     async def get_actions(self):
         """get action list from orch"""
         actions = self.orch.list_actions()
-        for key in self.action_list:
-            self.action_list[key] = []
+        for key in self.action_lists:
+            self.action_lists[key] = []
 
+        action_count = 0
         for act in actions:
             actdict = act.as_dict()
-            self.action_list["action_name"].append(actdict.get("action_name", None))
-            self.action_list["action_server"].append(act.action_server.disp_name())
-            self.action_list["action_uuid"].append(actdict.get("action_uuid", None))
+            self.action_lists["action_name"].append(actdict.get("action_name", None))
+            self.action_lists["action_server"].append(act.action_server.disp_name())
+            self.action_lists["action_uuid"].append(actdict.get("action_uuid", None))
+            action_count += 1
 
-        self.action_source.data = self.action_list
+        self.action_source.stream(self.action_lists, rollover=action_count)
         self.vis.print_message(f"current queued actions: ({len(self.orch.action_dq)})")
 
     async def get_active_actions(self):
         """get action list from orch"""
         actions = self.orch.list_active_actions()
-        for key in self.active_action_list:
-            self.active_action_list[key] = []
+        for key in self.active_action_lists:
+            self.active_action_lists[key] = []
+        action_count = 0
         for act in actions:
             actdict = act.as_dict()
             liquid_list, solid_list, gas_list = unpack_samples_helper(
@@ -949,24 +979,29 @@ class BokehOperator:
             self.vis.print_message(
                 f"solids_in: {[s.get_global_label() for s in solid_list]}", sample=True
             )
-            self.active_action_list["action_name"].append(
+            self.active_action_lists["action_name"].append(
                 actdict.get("action_name", None)
             )
-            self.active_action_list["action_server"].append(
+            self.active_action_lists["action_server"].append(
                 act.action_server.disp_name()
             )
-            self.active_action_list["action_uuid"].append(
+            self.active_action_lists["action_uuid"].append(
                 actdict.get("action_uuid", None)
             )
-            self.active_action_list["samples_in"].append(
-                [s.get_global_label() for s in act.samples_in]
-            )
-            self.active_action_list["solids_in"].append(
-                [s.get_global_label() for s in solid_list]
-            )
+            action_count += 1
 
-        self.active_action_source.data = self.active_action_list
-        self.vis.print_message(f"current active actions: {self.active_action_list}")
+        self.active_action_source.stream(self.active_action_lists, rollover=action_count)
+        self.vis.print_message(f"current active actions: {self.active_action_lists}")
+
+    async def get_orch_status_summary(self):
+        for key in self.action_server_lists:
+            self.action_server_lists[key] = []
+
+        for server_name, (status_str, driver_str) in self.orch.status_summary.items():
+            self.action_server_lists["action_server"].append(server_name)
+            self.action_server_lists["server_status"].append(status_str)
+            self.action_server_lists["driver_status"].append(driver_str)
+            self.action_server_source.stream(self.action_server_lists, rollover=self.num_actserv)
 
     def update_selector_layout(self, attr, old, new):
         if new == 2:
@@ -1967,20 +2002,24 @@ class BokehOperator:
         await self.get_experiments()
         await self.get_actions()
         await self.get_active_actions()
+        await self.get_orch_status_summary()
         self.update_queuecount_labels()
-        for key in self.experiment_plan_list:
-            self.experiment_plan_list[key] = []
+        for key in self.experiment_plan_lists:
+            self.experiment_plan_lists[key] = []
+        
+        plan_count = 0
         if self.sequence is not None:
             for D in self.sequence.experiment_plan_list:
-                self.experiment_plan_list["sequence_name"].append(
+                self.experiment_plan_lists["sequence_name"].append(
                     self.sequence.sequence_name
                 )
-                self.experiment_plan_list["sequence_label"].append(
+                self.experiment_plan_lists["sequence_label"].append(
                     self.sequence.sequence_label
                 )
-                self.experiment_plan_list["experiment_name"].append(D.experiment_name)
+                self.experiment_plan_lists["experiment_name"].append(D.experiment_name)
+                plan_count += 1
 
-        self.experiment_plan_source.data = self.experiment_plan_list
+        self.experiment_plan_source.stream(self.experiment_plan_lists, rollover=plan_count)
 
         if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
             self.orch_status_button.label = "running"

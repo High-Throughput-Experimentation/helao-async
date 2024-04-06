@@ -144,6 +144,8 @@ class Orch(Base):
         self.step_thru_actions = False
         self.step_thru_experiments = False
         self.step_thru_sequences = False
+        self.status_summary = {}
+        self.global_params = {}
 
     def exception_handler(self, loop, context):
         self.print_message(f"Got exception from coroutine: {context}", error=True)
@@ -175,6 +177,7 @@ class Orch(Base):
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
         self.heartbeat_monitor = asyncio.create_task(self.active_action_monitor())
+        self.driver_monitor = asyncio.create_task(self.action_server_monitor())
 
     def endpoint_queues_init(self):
         for urld in self.fast_urls:
@@ -261,7 +264,7 @@ class Orch(Base):
         """Subscribe to all fastapi servers in config."""
         fails = []
         for serv_key, serv_dict in self.world_cfg["servers"].items():
-            if "bokeh" not in serv_dict:
+            if "bokeh" not in serv_dict and "demovis" not in serv_dict:
                 self.print_message(f"trying to subscribe to {serv_key} status")
 
                 success = False
@@ -524,11 +527,11 @@ class Orch(Base):
 
         # self.print_message("copying global vars to experiment")
         # copy requested global param to experiment params
-        for k, v in self.active_experiment.from_globalseq_params.items():
+        for k, v in self.active_experiment.from_globalexp_params.items():
             self.print_message(f"{k}:{v}")
-            if k in self.active_sequence.globalseq_params:
+            if k in self.global_params:
                 self.active_experiment.experiment_params.update(
-                    {v: self.active_sequence.globalseq_params[k]}
+                    {v: self.global_params[k]}
                 )
 
         self.print_message(
@@ -709,10 +712,8 @@ class Orch(Base):
             # copy requested global param to action params
             for k, v in A.from_globalexp_params.items():
                 self.print_message(f"{k}:{v}")
-                if k in self.active_experiment.globalexp_params:
-                    A.action_params.update(
-                        {v: self.active_experiment.globalexp_params[k]}
-                    )
+                if k in self.global_params:
+                    A.action_params.update({v: self.global_params[k]})
 
             actserv_exists, _ = await endpoints_available([A.url])
             if not actserv_exists:
@@ -856,13 +857,13 @@ class Orch(Base):
                         if k in result_action.action_params:
                             if (
                                 result_action.action_params[k] is None
-                                and k in self.active_experiment.globalexp_params
+                                and k in self.global_params
                             ):
                                 self.print_message(f"clearing {k} in global vars")
-                                self.active_experiment.globalexp_params.pop(k)
+                                self.global_params.pop(k)
                             else:
                                 self.print_message(f"updating {k} in global vars")
-                                self.active_experiment.globalexp_params.update(
+                                self.global_params.update(
                                     {k: result_action.action_params[k]}
                                 )
                 elif isinstance(result_action.to_globalexp_params, dict):
@@ -873,13 +874,13 @@ class Orch(Base):
                         if k1 in result_action.action_params:
                             if (
                                 result_action.action_params[k1] is None
-                                and k2 in self.active_experiment.globalexp_params
+                                and k2 in self.global_params
                             ):
                                 self.print_message(f"clearing {k2} in global vars")
-                                self.active_experiment.globalexp_params.pop(k2)
+                                self.global_params.pop(k2)
                             else:
                                 self.print_message(f"updating {k2} in global vars")
-                                self.active_experiment.globalexp_params.update(
+                                self.global_params.update(
                                     {k2: result_action.action_params[k1]}
                                 )
 
@@ -1466,48 +1467,6 @@ class Orch(Base):
                 deepcopy(self.active_experiment.get_exp())
             )
 
-            if (
-                self.active_experiment.to_globalseq_params
-                and self.active_experiment.orch_key == self.orch_key
-                and self.active_experiment.orch_host == self.orch_host
-                and self.active_experiment.orch_port == self.orch_port
-            ):
-                if isinstance(self.active_experiment.to_globalseq_params, list):
-                    # self.print_message(
-                    #     f"copying global vars {', '.join(self.active_experiment.to_globalseq_params)} back to sequence"
-                    # )
-                    for k in self.active_experiment.to_globalseq_params:
-                        if k in self.active_experiment.experiment_params:
-                            if (
-                                self.active_experiment.experiment_params[k] is None
-                                and k in self.active_sequence.globalseq_params
-                            ):
-                                self.print_message(f"clearing {k} in global vars")
-                                self.active_sequence.globalseq_params.pop(k)
-                            else:
-                                self.print_message(f"updating {k} in global vars")
-                                self.active_sequence.globalseq_params.update(
-                                    {k: self.active_experiment.experiment_params[k]}
-                                )
-                elif isinstance(self.active_experiment.to_globalseq_params, dict):
-                    # self.print_message(
-                    #     f"copying global vars {', '.join(self.active_experiment.to_globalseq_params.keys())} back to sequence"
-                    # )
-                    for k1, k2 in self.active_experiment.to_globalseq_params.items():
-                        if k1 in self.active_experiment.experiment_params:
-                            if (
-                                self.active_experiment.experiment_params[k1] is None
-                                and k2 in self.active_sequence.globalseq_params
-                            ):
-                                self.print_message(f"clearing {k2} in global vars")
-                                self.active_sequence.globalseq_params.pop(k2)
-                            else:
-                                self.print_message(f"updating {k2} in global vars")
-                                self.active_sequence.globalseq_params.update(
-                                    {k2: self.active_experiment.experiment_params[k1]}
-                                )
-                # self.print_message("done copying global vars back to sequence")
-
             # write new updated seq
             await self.write_active_sequence_seq()
 
@@ -1580,4 +1539,48 @@ class Orch(Base):
                     )
                     await self.stop()
                     await self.update_operator(True)
+            await asyncio.sleep(self.heartbeat_interval)
+
+    async def ping_action_servers(self):
+        """Periodically monitor all action servers."""
+        status_summary = {}
+        for serv_key, serv_dict in self.world_cfg["servers"].items():
+            if "bokeh" not in serv_dict and "demovis" not in serv_dict:
+                serv_addr = serv_dict["host"]
+                serv_port = serv_dict["port"]
+                try:
+                    response, error_code = await async_private_dispatcher(
+                        server_key=serv_key,
+                        host=serv_addr,
+                        port=serv_port,
+                        private_action="get_status",
+                        params_dict={
+                            "client_servkey": self.server.server_name,
+                            "client_host": self.server_cfg["host"],
+                            "client_port": self.server_cfg["port"],
+                        },
+                        json_dict={},
+                    )
+                    if response is not None and error_code == ErrorCodes.none:
+                        busy_endpoints = []
+                        driver_status = response.get("_driver_status", "unknown")
+                        for endpoint_name, endpoint_dict in response.get(
+                            "endpoints", {}
+                        ).items():
+                            if endpoint_dict["active_dict"]:
+                                busy_endpoints.append(endpoint_name)
+                        if busy_endpoints:
+                            busy_str = ", ".join(busy_endpoints)
+                            status_str = f"busy [{busy_str}]"
+                        else:
+                            status_str = "idle"
+                        status_summary[serv_key] = (status_str, driver_status)
+                except aiohttp.client_exceptions.ClientConnectorError:
+                    status_summary[serv_key] = ("unreachable", "unknown")
+        return status_summary
+
+    async def action_server_monitor(self):
+        while True:
+            self.status_summary = await self.ping_action_servers()
+            await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)

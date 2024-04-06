@@ -34,7 +34,6 @@ class Sequence(SequenceModel):
     "Experiment grouping class."
 
     # not in SequenceModel:
-    globalseq_params: Optional[dict] = {}
     experimentmodel_list: List[ExperimentModel] = []  # running tally of completed experiments
 
     def __repr__(self):
@@ -87,11 +86,8 @@ class Experiment(Sequence, ExperimentModel):
     "Sample-action grouping class."
 
     # not in ExperimentModel:
-    globalexp_params: Optional[dict] = {}
     actionmodel_list: List[ActionModel] = []
-
-    from_globalseq_params: dict = {}
-    to_globalseq_params: Union[list, dict] = []
+    from_globalexp_params: dict = {}
 
     def __repr__(self):
         return f"<experiment_name:{self.experiment_name}>"
