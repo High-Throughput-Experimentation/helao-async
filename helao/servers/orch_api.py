@@ -44,6 +44,7 @@ class OrchAPI(HelaoFastAPI):
         description,
         version,
         driver_class=None,
+        poller_class=None,
     ):
         super().__init__(
             helao_cfg=config,
@@ -144,8 +145,12 @@ class OrchAPI(HelaoFastAPI):
             if driver_class is not None:
                 if issubclass(driver_class, HelaoDriver):
                     self.driver = driver_class(config=self.server_params)
+                    if poller_class is not None:
+                        self.poller = poller_class(
+                            self.driver, self.server_cfg.get("polling_time", 0.05)
+                        )
                 else:
-                    self.driver = driver_class(self.base)
+                    self.driver = driver_class(self.orch)
             self.orch.endpoint_queues_init()
 
         @self.on_event("startup")
@@ -187,7 +192,13 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/get_status", tags=["private"])
         def get_status():
-            return self.orch.actionservermodel
+            status_dict = self.orch.actionservermodel.model_dump()
+            driver_status = "not_implemented"
+            if isinstance(self.driver, HelaoDriver):
+                resp = self.driver.get_status()
+                driver_status = resp.status
+            status_dict['_driver_status'] = driver_status
+            return status_dict
 
         @self.post("/attach_client", tags=["private"])
         async def attach_client(

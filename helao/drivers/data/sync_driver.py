@@ -944,7 +944,9 @@ class HelaoSyncer:
                     dedupe_dict = defaultdict(list)
                     deduped_samples = []
                     for si, x in enumerate(sample_list):
-                        sample_label = x["global_label"]
+                        sample_label = x.get("global_label", False)
+                        if not sample_label:
+                            continue
                         actuuid = [
                             y for y in x["action_uuid"] if y in actuuid_order.keys()
                         ]
