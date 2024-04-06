@@ -170,6 +170,10 @@ async def gamry_dyn_endpoints(app=None):
         logger.info("waiting for gamry init")
         await asyncio.sleep(1)
 
+    app.driver.connect()
+    model_ierange = app.driver.model.ierange
+    app.driver.disconnect()
+
     @app.post(f"/{server_key}/run_LSV", tags=["action"])
     async def run_LSV(
         action: Action = Body({}, embed=True),
@@ -181,7 +185,7 @@ async def gamry_dyn_endpoints(app=None):
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-        IErange: app.driver.model.ierange = "auto",
+        IErange: model_ierange = "auto",
         SetStopIMin: Optional[float] = None,
         SetStopIMax: Optional[float] = None,
         SetStopDIMin: Optional[float] = None,
@@ -214,7 +218,7 @@ async def gamry_dyn_endpoints(app=None):
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-        IErange: app.driver.model.ierange = "auto",
+        IErange: model_ierange = "auto",
         SetStopXMin: Optional[float] = None,
         SetStopXMax: Optional[float] = None,
         SetStopAtDelayXMin: Optional[int] = None,
@@ -240,7 +244,7 @@ async def gamry_dyn_endpoints(app=None):
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-        IErange: app.driver.model.ierange = "auto",
+        IErange: model_ierange = "auto",
         SetStopXMin: Optional[float] = None,
         SetStopXMax: Optional[float] = None,
         SetStopAtDelayXMin: Optional[int] = None,
@@ -269,7 +273,7 @@ async def gamry_dyn_endpoints(app=None):
         Cycles: int = 1,
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-        IErange: app.driver.model.ierange = "auto",
+        IErange: model_ierange = "auto",
         SetStopIMin: Optional[float] = None,
         SetStopIMax: Optional[float] = None,
         SetStopAtDelayIMin: Optional[int] = None,
@@ -298,7 +302,7 @@ async def gamry_dyn_endpoints(app=None):
         amplitude_threshold: float = 0.05,
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-        IErange: app.driver.model.ierange = "auto",
+        IErange: model_ierange = "auto",
         SetStopADVMin: Optional[float] = None,
         SetStopADVMax: Optional[float] = None,
     ):
@@ -324,7 +328,7 @@ async def gamry_dyn_endpoints(app=None):
         AcqInterval__s: float = 0.01,  # acquisition rate
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-        IErange: app.driver.model.ierange = "auto",
+        IErange: model_ierange = "auto",
     ):
         """Measure pulsed voltammetry"""
         active = await app.base.setup_and_contain_action()
@@ -363,7 +367,7 @@ async def gamry_dyn_endpoints(app=None):
     #     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
     #     TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
     #     TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-    #     IErange: app.driver.model.ierange = "auto",
+    #     IErange: model_ierange = "auto",
     # ):
     #     """Electrochemical Impendance Spectroscopy
     #     NOT TESTED
