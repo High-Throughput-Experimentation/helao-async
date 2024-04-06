@@ -54,18 +54,19 @@ class GamryDriver(HelaoDriver):
         self.technique = None
         self.pstat = None
         self.signal = None
-        self.ready = False
+        self.ready = True
         self.counter = 0
         # get params from config or use defaults
         self.device_id = self.config.get("dev_id", None)
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config.get("grounded", True))
         logger.info(f"using device_id {self.device_id} from config")
-        self.connect()
+        # self.connect()
 
     def connect(self) -> DriverResponse:
         """Open connection to resource."""
         try:
+            comtypes.CoInitialize()
             self.GamryCOM = client.GetModule(
                 ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
             )
@@ -79,7 +80,7 @@ class GamryDriver(HelaoDriver):
                 f"connected to {self.device_name} on device_id {self.device_id}"
             )
 
-            self.ready = True
+            # self.ready = True
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -93,17 +94,24 @@ class GamryDriver(HelaoDriver):
 
     def get_status(self) -> DriverResponse:
         """Return current driver status."""
-        try:
-            state = self.pstat.State()
-            state = dict([x.split("\t") for x in state.split("\r\n") if x])
+        if self.pstat is not None:
             response = DriverResponse(
-                response=DriverResponseType.success, data=state, status=DriverStatus.ok
+                response=DriverResponseType.success, status=DriverStatus.busy
             )
-        except Exception:
-            logger.error("get_status failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
+        else:
+            try:
+                self.connect()
+                state = self.pstat.State()
+                state = dict([x.split("\t") for x in state.split("\r\n") if x])
+                response = DriverResponse(
+                    response=DriverResponseType.success, data=state, status=DriverStatus.ok
+                )
+                self.disconnect()
+            except Exception:
+                logger.error("get_status failed", exc_info=True)
+                response = DriverResponse(
+                    response=DriverResponseType.failed, status=DriverStatus.error
+                )
         return response
 
     def setup(
@@ -356,7 +364,8 @@ class GamryDriver(HelaoDriver):
     def cleanup(self):
         """Release state objects but don't close pstat."""
         try:
-            self.pstat.SetCell(self.GamryCOM.CellOff)
+            if self.pstat is not None:
+                self.pstat.SetCell(self.GamryCOM.CellOff)
             self.events = None
             self.dtaq = None
             self.dtaqsink = DUMMY_SINK
@@ -379,10 +388,12 @@ class GamryDriver(HelaoDriver):
     def disconnect(self) -> DriverResponse:
         """Release connection to resource."""
         try:
-            self.pstat.SetCell(self.GamryCOM.CellOff)
-            self.pstat.Close()
-            self.pstat = None
-            self.ready = False
+            if self.pstat is not None:
+                self.pstat.SetCell(self.GamryCOM.CellOff)
+                self.pstat.Close()
+                self.pstat = None
+                comtypes.CoUninitialize()
+            # self.ready = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -419,8 +430,8 @@ class GamryDriver(HelaoDriver):
                 ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
             )
             self.pstat = None
-            self.ready = False
-            self.connect()
+            # self.ready = False
+            # self.connect()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )

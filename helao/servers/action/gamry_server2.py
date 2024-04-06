@@ -28,6 +28,7 @@ from helao.helpers.config_loader import config_loader
 from helao.helpers.executor import Executor
 from helao.helpers import logging  # get logger from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
+from helao.drivers.helao_driver import HelaoDriver
 from helao.drivers.pstat.gamry.driver import GamryDriver
 from helao.drivers.pstat.gamry.technique import (
     GamryTechnique,
@@ -89,6 +90,10 @@ class GamryExec(Executor):
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
+        while self.driver.pstat is not None:
+            logger.info("Waiting for pstat resource to be available.")
+            await asyncio.sleep(1)
+        self.driver.connect()
         resp = self.driver.setup(
             self.technique,
             self.signal_params,
@@ -124,6 +129,7 @@ class GamryExec(Executor):
 
     async def _post_exec(self):
         resp = self.driver.cleanup()
+        self.driver.disconnect()
 
         # parse calculate outputs from data buffer:
         for k in ["t_s", "Ewe_V", "I_A"]:
@@ -145,6 +151,8 @@ class GamryExec(Executor):
                 amplitude_thresh,
             )
             self.active.action.action_params["has_bubble"] = has_bubble
+        
+        
 
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": {}}
@@ -158,221 +166,219 @@ class GamryExec(Executor):
 
 async def gamry_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
-    enable_pstat = False
 
     while not app.driver.ready:
         logger.info("waiting for gamry init")
         await asyncio.sleep(1)
 
-    if app.driver.pstat is not None:
-        enable_pstat = True
+    app.driver.connect()
+    model_ierange = app.driver.model.ierange
+    app.driver.disconnect()
 
-    if enable_pstat:
+    @app.post(f"/{server_key}/run_LSV", tags=["action"])
+    async def run_LSV(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        Vinit__V: float = 0.0,  # Initial value in volts or amps.
+        Vfinal__V: float = 1.0,  # Final value in volts or amps.
+        ScanRate__V_s: float = 1.0,  # Scan rate in volts/sec or amps/sec.
+        AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
+        TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        IErange: model_ierange = "auto",
+        SetStopIMin: Optional[float] = None,
+        SetStopIMax: Optional[float] = None,
+        SetStopDIMin: Optional[float] = None,
+        SetStopDIMax: Optional[float] = None,
+        SetStopADIMin: Optional[float] = None,
+        SetStopADIMax: Optional[float] = None,
+        SetStopAtDelayIMin: Optional[int] = None,
+        SetStopAtDelayIMax: Optional[int] = None,
+        SetStopAtDelayDIMin: Optional[int] = None,
+        SetStopAtDelayDIMax: Optional[int] = None,
+        SetStopAtDelayADIMin: Optional[int] = None,
+        SetStopAtDelayADIMax: Optional[int] = None,
+    ):
+        """Linear Sweep Voltammetry (unlike CV no backward scan is done)
+        use 4bit bitmask for triggers
+        IErange depends on gamry model used (test actual limit before using)"""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "LSV"
+        executor = GamryExec(active=active, oneoff=False, technique=TECH_LSV)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
 
-        @app.post(f"/{server_key}/run_LSV", tags=["action"])
-        async def run_LSV(
-            action: Action = Body({}, embed=True),
-            action_version: int = 2,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
-            Vinit__V: float = 0.0,  # Initial value in volts or amps.
-            Vfinal__V: float = 1.0,  # Final value in volts or amps.
-            ScanRate__V_s: float = 1.0,  # Scan rate in volts/sec or amps/sec.
-            AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
-            TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            IErange: app.driver.model.ierange = "auto",
-            SetStopIMin: Optional[float] = None,
-            SetStopIMax: Optional[float] = None,
-            SetStopDIMin: Optional[float] = None,
-            SetStopDIMax: Optional[float] = None,
-            SetStopADIMin: Optional[float] = None,
-            SetStopADIMax: Optional[float] = None,
-            SetStopAtDelayIMin: Optional[int] = None,
-            SetStopAtDelayIMax: Optional[int] = None,
-            SetStopAtDelayDIMin: Optional[int] = None,
-            SetStopAtDelayDIMax: Optional[int] = None,
-            SetStopAtDelayADIMin: Optional[int] = None,
-            SetStopAtDelayADIMax: Optional[int] = None,
-        ):
-            """Linear Sweep Voltammetry (unlike CV no backward scan is done)
-            use 4bit bitmask for triggers
-            IErange depends on gamry model used (test actual limit before using)"""
-            active = await app.base.setup_and_contain_action()
-            active.action.action_abbr = "LSV"
-            executor = GamryExec(active=active, oneoff=False, technique=TECH_LSV)
-            active_action_dict = active.start_executor(executor)
-            return active_action_dict
+    @app.post(f"/{server_key}/run_CA", tags=["action"])
+    async def run_CA(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        Vval__V: float = 0.0,
+        Tval__s: float = 10.0,
+        AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
+        TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        IErange: model_ierange = "auto",
+        SetStopXMin: Optional[float] = None,
+        SetStopXMax: Optional[float] = None,
+        SetStopAtDelayXMin: Optional[int] = None,
+        SetStopAtDelayXMax: Optional[int] = None,
+    ):
+        """Chronoamperometry (current response on amplied potential)
+        use 4bit bitmask for triggers
+        IErange depends on gamry model used
+        (test actual limit before using)"""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "CA"
+        executor = GamryExec(active=active, oneoff=False, technique=TECH_CA)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
 
-        @app.post(f"/{server_key}/run_CA", tags=["action"])
-        async def run_CA(
-            action: Action = Body({}, embed=True),
-            action_version: int = 2,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
-            Vval__V: float = 0.0,
-            Tval__s: float = 10.0,
-            AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
-            TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            IErange: app.driver.model.ierange = "auto",
-            SetStopXMin: Optional[float] = None,
-            SetStopXMax: Optional[float] = None,
-            SetStopAtDelayXMin: Optional[int] = None,
-            SetStopAtDelayXMax: Optional[int] = None,
-        ):
-            """Chronoamperometry (current response on amplied potential)
-            use 4bit bitmask for triggers
-            IErange depends on gamry model used
-            (test actual limit before using)"""
-            active = await app.base.setup_and_contain_action()
-            active.action.action_abbr = "CA"
-            executor = GamryExec(active=active, oneoff=False, technique=TECH_CA)
-            active_action_dict = active.start_executor(executor)
-            return active_action_dict
+    @app.post(f"/{server_key}/run_CP", tags=["action"])
+    async def run_CP(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        Ival__A: float = 0.0,
+        Tval__s: float = 10.0,
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        IErange: model_ierange = "auto",
+        SetStopXMin: Optional[float] = None,
+        SetStopXMax: Optional[float] = None,
+        SetStopAtDelayXMin: Optional[int] = None,
+        SetStopAtDelayXMax: Optional[int] = None,
+    ):
+        """Chronopotentiometry (Potential response on controlled current)
+        use 4bit bitmask for triggers
+        IErange depends on gamry model used (test actual limit before using)"""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "CP"
+        executor = GamryExec(active=active, oneoff=False, technique=TECH_CP)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
 
-        @app.post(f"/{server_key}/run_CP", tags=["action"])
-        async def run_CP(
-            action: Action = Body({}, embed=True),
-            action_version: int = 2,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
-            Ival__A: float = 0.0,
-            Tval__s: float = 10.0,
-            AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-            TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            IErange: app.driver.model.ierange = "auto",
-            SetStopXMin: Optional[float] = None,
-            SetStopXMax: Optional[float] = None,
-            SetStopAtDelayXMin: Optional[int] = None,
-            SetStopAtDelayXMax: Optional[int] = None,
-        ):
-            """Chronopotentiometry (Potential response on controlled current)
-            use 4bit bitmask for triggers
-            IErange depends on gamry model used (test actual limit before using)"""
-            active = await app.base.setup_and_contain_action()
-            active.action.action_abbr = "CP"
-            executor = GamryExec(active=active, oneoff=False, technique=TECH_CP)
-            active_action_dict = active.start_executor(executor)
-            return active_action_dict
+    @app.post(f"/{server_key}/run_CV", tags=["action"])
+    async def run_CV(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        Vinit__V: float = 0.0,  # Initial value in volts or amps.
+        Vapex1__V: float = 1.0,  # Apex 1 value in volts or amps.
+        Vapex2__V: float = -1.0,  # Apex 2 value in volts or amps.
+        Vfinal__V: float = 0.0,  # Final value in volts or amps.
+        ScanRate__V_s: float = 1.0,  # Scan rate in volts/sec or amps/sec.
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        Cycles: int = 1,
+        TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        IErange: model_ierange = "auto",
+        SetStopIMin: Optional[float] = None,
+        SetStopIMax: Optional[float] = None,
+        SetStopAtDelayIMin: Optional[int] = None,
+        SetStopAtDelayIMax: Optional[int] = None,
+    ):
+        """Cyclic Voltammetry (most widely used technique
+        for acquireing information about electrochemical reactions)
+        use 4bit bitmask for triggers
+        IErange depends on gamry model used (test actual limit before using)"""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "CV"
+        executor = GamryExec(active=active, oneoff=False, technique=TECH_CV)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
 
-        @app.post(f"/{server_key}/run_CV", tags=["action"])
-        async def run_CV(
-            action: Action = Body({}, embed=True),
-            action_version: int = 2,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
-            Vinit__V: float = 0.0,  # Initial value in volts or amps.
-            Vapex1__V: float = 1.0,  # Apex 1 value in volts or amps.
-            Vapex2__V: float = -1.0,  # Apex 2 value in volts or amps.
-            Vfinal__V: float = 0.0,  # Final value in volts or amps.
-            ScanRate__V_s: float = 1.0,  # Scan rate in volts/sec or amps/sec.
-            AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-            Cycles: int = 1,
-            TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            IErange: app.driver.model.ierange = "auto",
-            SetStopIMin: Optional[float] = None,
-            SetStopIMax: Optional[float] = None,
-            SetStopAtDelayIMin: Optional[int] = None,
-            SetStopAtDelayIMax: Optional[int] = None,
-        ):
-            """Cyclic Voltammetry (most widely used technique
-            for acquireing information about electrochemical reactions)
-            use 4bit bitmask for triggers
-            IErange depends on gamry model used (test actual limit before using)"""
-            active = await app.base.setup_and_contain_action()
-            active.action.action_abbr = "CV"
-            executor = GamryExec(active=active, oneoff=False, technique=TECH_CV)
-            active_action_dict = active.start_executor(executor)
-            return active_action_dict
+    @app.post(f"/{server_key}/run_OCV", tags=["action"])
+    async def run_OCV(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        Tval__s: float = 10.0,
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        RSD_threshold: float = 1,
+        simple_threshold: float = 0.3,
+        signal_change_threshold: float = 0.01,
+        amplitude_threshold: float = 0.05,
+        TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        IErange: model_ierange = "auto",
+        SetStopADVMin: Optional[float] = None,
+        SetStopADVMax: Optional[float] = None,
+    ):
+        """mesasures open circuit potential
+        use 4bit bitmask for triggers
+        IErange depends on gamry model used (test actual limit before using)"""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "OCV"
+        executor = GamryExec(active=active, oneoff=False, technique=TECH_OCV)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
 
-        @app.post(f"/{server_key}/run_OCV", tags=["action"])
-        async def run_OCV(
-            action: Action = Body({}, embed=True),
-            action_version: int = 2,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
-            Tval__s: float = 10.0,
-            AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-            RSD_threshold: float = 1,
-            simple_threshold: float = 0.3,
-            signal_change_threshold: float = 0.01,
-            amplitude_threshold: float = 0.05,
-            TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            IErange: app.driver.model.ierange = "auto",
-            SetStopADVMin: Optional[float] = None,
-            SetStopADVMax: Optional[float] = None,
-        ):
-            """mesasures open circuit potential
-            use 4bit bitmask for triggers
-            IErange depends on gamry model used (test actual limit before using)"""
-            active = await app.base.setup_and_contain_action()
-            active.action.action_abbr = "OCV"
-            executor = GamryExec(active=active, oneoff=False, technique=TECH_OCV)
-            active_action_dict = active.start_executor(executor)
-            return active_action_dict
+    @app.post(f"/{server_key}/run_RCA", tags=["action"])
+    async def run_RCA(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        Vinit__V: float = 0.0,
+        Tinit__s: float = 0.5,
+        Vstep__V: float = 0.5,
+        Tstep__s: float = 0.5,
+        Cycles: int = 5,
+        AcqInterval__s: float = 0.01,  # acquisition rate
+        TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+        IErange: model_ierange = "auto",
+    ):
+        """Measure pulsed voltammetry"""
+        active = await app.base.setup_and_contain_action()
 
-        @app.post(f"/{server_key}/run_RCA", tags=["action"])
-        async def run_RCA(
-            action: Action = Body({}, embed=True),
-            action_version: int = 2,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
-            Vinit__V: float = 0.0,
-            Tinit__s: float = 0.5,
-            Vstep__V: float = 0.5,
-            Tstep__s: float = 0.5,
-            Cycles: int = 5,
-            AcqInterval__s: float = 0.01,  # acquisition rate
-            TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-            IErange: app.driver.model.ierange = "auto",
-        ):
-            """Measure pulsed voltammetry"""
-            active = await app.base.setup_and_contain_action()
+        # custom signal array can't be done with mapping, generate array here
+        Vinit = active.action.action_params["Vinit__V"]
+        Tinit = active.action.action_params["Tinit__s"]
+        Vstep = active.action.action_params["Vstep__V"]
+        Tstep = active.action.action_params["Tstep__s"]
+        AcqInt = active.action.action_params["AcqInterval__s"]
 
-            # custom signal array can't be done with mapping, generate array here
-            Vinit = active.action.action_params["Vinit__V"]
-            Tinit = active.action.action_params["Tinit__s"]
-            Vstep = active.action.action_params["Vstep__V"]
-            Tstep = active.action.action_params["Tstep__s"]
-            AcqInt = active.action.action_params["AcqInterval__s"]
+        cycle_time = Tinit + Tstep
+        points_per_cycle = round(cycle_time / AcqInt)
+        active.action.action_params["AcqPointsPerCycle"] = points_per_cycle
+        active.action.action_params["SignalArray__V"] = [
+            Vinit if i * AcqInt <= Tinit else Vstep for i in range(points_per_cycle)
+        ]
 
-            cycle_time = Tinit + Tstep
-            points_per_cycle = round(cycle_time / AcqInt)
-            active.action.action_params["AcqPointsPerCycle"] = points_per_cycle
-            active.action.action_params["SignalArray__V"] = [
-                Vinit if i * AcqInt <= Tinit else Vstep for i in range(points_per_cycle)
-            ]
+        active.action.action_abbr = "RCA"
+        executor = GamryExec(active=active, oneoff=False, technique=TECH_RCA)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
 
-            active.action.action_abbr = "RCA"
-            executor = GamryExec(active=active, oneoff=False, technique=TECH_RCA)
-            active_action_dict = active.start_executor(executor)
-            return active_action_dict
-
-        # @app.post(f"/{server_key}/run_EIS", tags=["action"])
-        # async def run_EIS(
-        #     action: Action = Body({}, embed=True),
-        #     action_version: int = 1,
-        #     fast_samples_in: List[SampleUnion] = Body([], embed=True),
-        #     Vval__V: float = 0.0,
-        #     Tval__s: float = 10.0,
-        #     Freq: float = 1000.0,
-        #     RMS: float = 0.02,
-        #     Precision: Optional[
-        #         float
-        #     ] = 0.001,  # The precision is used in a Correlation Coefficient (residual power) based test to determine whether or not to measure another cycle.
-        #     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        #     TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-        #     TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-        #     IErange: app.driver.model.ierange = "auto",
-        # ):
-        #     """Electrochemical Impendance Spectroscopy
-        #     NOT TESTED
-        #     use 4bit bitmask for triggers
-        #     IErange depends on gamry model used (test actual limit before using)"""
-        #     active = await app.base.setup_and_contain_action()
-        #     active.action.action_abbr = "EIS"
-        #     executor = GamryExec(active=active, oneoff=False, technique=TECH_EIS)
-        #     active_action_dict = active.start_executor(executor)
-        #     return active_action_dict
+    # @app.post(f"/{server_key}/run_EIS", tags=["action"])
+    # async def run_EIS(
+    #     action: Action = Body({}, embed=True),
+    #     action_version: int = 1,
+    #     fast_samples_in: List[SampleUnion] = Body([], embed=True),
+    #     Vval__V: float = 0.0,
+    #     Tval__s: float = 10.0,
+    #     Freq: float = 1000.0,
+    #     RMS: float = 0.02,
+    #     Precision: Optional[
+    #         float
+    #     ] = 0.001,  # The precision is used in a Correlation Coefficient (residual power) based test to determine whether or not to measure another cycle.
+    #     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+    #     TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+    #     TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+    #     IErange: model_ierange = "auto",
+    # ):
+    #     """Electrochemical Impendance Spectroscopy
+    #     NOT TESTED
+    #     use 4bit bitmask for triggers
+    #     IErange depends on gamry model used (test actual limit before using)"""
+    #     active = await app.base.setup_and_contain_action()
+    #     active.action.action_abbr = "EIS"
+    #     executor = GamryExec(active=active, oneoff=False, technique=TECH_EIS)
+    #     active_action_dict = active.start_executor(executor)
+    #     return active_action_dict
 
 
 def makeApp(confPrefix, server_key, helao_root):

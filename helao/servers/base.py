@@ -1814,8 +1814,6 @@ class Active:
                     if error_code == ErrorCodes.none:
                         self.base.print_message("Successfully updated globalexp params.")
 
-                if action.to_globalseq_params:
-                    pass
 
             # check if all actions are fininshed
             # if yes close datalogger etc
