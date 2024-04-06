@@ -70,6 +70,13 @@ class BokehOperator:
         self.loaded_config_path = self.vis.world_cfg.get("loaded_config_path", "")
         self.pal_name = None
         self.update_q = asyncio.Queue()
+        self.num_actserv = len(
+            [
+                k
+                for k, v in self.vis.world_cfg["servers"].items()
+                if "bokeh" not in v and "demovis" not in v
+            ]
+        )
         # find pal server if configured in world config
         for server_name, server_config in self.vis.world_cfg["servers"].items():
             if server_config.get("fast", "") == "pal_server":
@@ -227,9 +234,16 @@ class BokehOperator:
         self.sequence_tab = Panel(child=self.sequence_table, title="Sequences")
         self.experiment_tab = Panel(child=self.experiment_table, title="Experiments")
         self.action_tab = Panel(child=self.action_table, title="Actions")
-        self.action_server_tab = Panel(child=self.action_server_table, title="Action Servers")
+        self.action_server_tab = Panel(
+            child=self.action_server_table, title="Action Servers"
+        )
         self.queue_tabs = Tabs(
-            tabs=[self.sequence_tab, self.experiment_tab, self.action_tab, self.action_server_tab],
+            tabs=[
+                self.sequence_tab,
+                self.experiment_tab,
+                self.action_tab,
+                self.action_server_tab,
+            ],
             height_policy="min",
         )
 
@@ -893,6 +907,7 @@ class BokehOperator:
         for key in self.sequence_lists:
             self.sequence_lists[key] = []
 
+        sequence_count = 0
         for seq in sequences:
             seqdict = seq.as_dict()
             self.sequence_lists["sequence_name"].append(
@@ -904,8 +919,9 @@ class BokehOperator:
             self.sequence_lists["sequence_uuid"].append(
                 seqdict.get("sequence_uuid", None)
             )
+            sequence_count += 1
 
-        self.sequence_source.data = self.sequence_lists
+        self.sequence_source.stream(self.sequence_lists, rollover=sequence_count)
         self.vis.print_message(
             f"current queued sequences: ({len(self.orch.sequence_dq)})"
         )
@@ -916,6 +932,7 @@ class BokehOperator:
         for key in self.experiment_lists:
             self.experiment_lists[key] = []
 
+        experiment_count = 0
         for exp in experiments:
             expdict = exp.as_dict()
             self.experiment_lists["experiment_name"].append(
@@ -924,8 +941,9 @@ class BokehOperator:
             self.experiment_lists["experiment_uuid"].append(
                 expdict.get("experiment_uuid", None)
             )
+            experiment_count += 1
 
-        self.experiment_source.data = self.experiment_lists
+        self.experiment_source.stream(self.experiment_lists, rollover=experiment_count)
         self.vis.print_message(
             f"current queued experiments: ({len(self.orch.experiment_dq)})"
         )
@@ -936,13 +954,15 @@ class BokehOperator:
         for key in self.action_lists:
             self.action_lists[key] = []
 
+        action_count = 0
         for act in actions:
             actdict = act.as_dict()
             self.action_lists["action_name"].append(actdict.get("action_name", None))
             self.action_lists["action_server"].append(act.action_server.disp_name())
             self.action_lists["action_uuid"].append(actdict.get("action_uuid", None))
+            action_count += 1
 
-        self.action_source.data = self.action_lists
+        self.action_source.stream(self.action_lists, rollover=action_count)
         self.vis.print_message(f"current queued actions: ({len(self.orch.action_dq)})")
 
     async def get_active_actions(self):
@@ -950,6 +970,7 @@ class BokehOperator:
         actions = self.orch.list_active_actions()
         for key in self.active_action_lists:
             self.active_action_lists[key] = []
+        action_count = 0
         for act in actions:
             actdict = act.as_dict()
             liquid_list, solid_list, gas_list = unpack_samples_helper(
@@ -967,19 +988,20 @@ class BokehOperator:
             self.active_action_lists["action_uuid"].append(
                 actdict.get("action_uuid", None)
             )
+            action_count += 1
 
-        self.active_action_source.data = self.active_action_lists
+        self.active_action_source.stream(self.active_action_lists, rollover=action_count)
         self.vis.print_message(f"current active actions: {self.active_action_lists}")
-    
+
     async def get_orch_status_summary(self):
         for key in self.action_server_lists:
             self.action_server_lists[key] = []
-            
+
         for server_name, (status_str, driver_str) in self.orch.status_summary.items():
             self.action_server_lists["action_server"].append(server_name)
             self.action_server_lists["server_status"].append(status_str)
             self.action_server_lists["driver_status"].append(driver_str)
-            self.action_server_source.data = self.action_server_lists
+            self.action_server_source.stream(self.action_server_lists, rollover=self.num_actserv)
 
     def update_selector_layout(self, attr, old, new):
         if new == 2:
@@ -1984,6 +2006,8 @@ class BokehOperator:
         self.update_queuecount_labels()
         for key in self.experiment_plan_lists:
             self.experiment_plan_lists[key] = []
+        
+        plan_count = 0
         if self.sequence is not None:
             for D in self.sequence.experiment_plan_list:
                 self.experiment_plan_lists["sequence_name"].append(
@@ -1993,8 +2017,9 @@ class BokehOperator:
                     self.sequence.sequence_label
                 )
                 self.experiment_plan_lists["experiment_name"].append(D.experiment_name)
+                plan_count += 1
 
-        self.experiment_plan_source.data = self.experiment_plan_lists
+        self.experiment_plan_source.stream(self.experiment_plan_lists, rollover=plan_count)
 
         if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
             self.orch_status_button.label = "running"

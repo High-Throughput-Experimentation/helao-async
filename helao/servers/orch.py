@@ -264,7 +264,7 @@ class Orch(Base):
         """Subscribe to all fastapi servers in config."""
         fails = []
         for serv_key, serv_dict in self.world_cfg["servers"].items():
-            if "bokeh" not in serv_dict:
+            if "bokeh" not in serv_dict and "demovis" not in serv_dict:
                 self.print_message(f"trying to subscribe to {serv_key} status")
 
                 success = False
@@ -1545,7 +1545,7 @@ class Orch(Base):
         """Periodically monitor all action servers."""
         status_summary = {}
         for serv_key, serv_dict in self.world_cfg["servers"].items():
-            if "bokeh" not in serv_dict:
+            if "bokeh" not in serv_dict and "demovis" not in serv_dict:
                 serv_addr = serv_dict["host"]
                 serv_port = serv_dict["port"]
                 try:
