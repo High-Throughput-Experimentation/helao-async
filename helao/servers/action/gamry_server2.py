@@ -90,6 +90,10 @@ class GamryExec(Executor):
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
+        while self.driver.pstat is not None:
+            logger.info("Waiting for pstat resource to be available.")
+            await asyncio.sleep(1)
+        self.driver.connect()
         resp = self.driver.setup(
             self.technique,
             self.signal_params,
@@ -146,6 +150,8 @@ class GamryExec(Executor):
                 amplitude_thresh,
             )
             self.active.action.action_params["has_bubble"] = has_bubble
+        
+        
 
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": {}}

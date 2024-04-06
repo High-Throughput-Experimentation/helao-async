@@ -713,9 +713,7 @@ class Orch(Base):
             for k, v in A.from_globalexp_params.items():
                 self.print_message(f"{k}:{v}")
                 if k in self.global_params:
-                    A.action_params.update(
-                        {v: self.global_params[k]}
-                    )
+                    A.action_params.update({v: self.global_params[k]})
 
             actserv_exists, _ = await endpoints_available([A.url])
             if not actserv_exists:
@@ -1566,7 +1564,9 @@ class Orch(Base):
                     if response is not None and error_code == ErrorCodes.none:
                         busy_endpoints = []
                         driver_status = response.get("_driver_status", "unknown")
-                        for endpoint_name, endpoint_dict in response.get("endpoints", {}).items():
+                        for endpoint_name, endpoint_dict in response.get(
+                            "endpoints", {}
+                        ).items():
                             if endpoint_dict["active_dict"]:
                                 busy_endpoints.append(endpoint_name)
                         if busy_endpoints:
@@ -1578,7 +1578,7 @@ class Orch(Base):
                 except aiohttp.client_exceptions.ClientConnectorError:
                     status_summary[serv_key] = ("unreachable", "unknown")
         return status_summary
-    
+
     async def action_server_monitor(self):
         while True:
             self.status_summary = await self.ping_action_servers()
