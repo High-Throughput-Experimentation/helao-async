@@ -129,6 +129,7 @@ class GamryExec(Executor):
 
     async def _post_exec(self):
         resp = self.driver.cleanup()
+        self.driver.disconnect()
 
         # parse calculate outputs from data buffer:
         for k in ["t_s", "Ewe_V", "I_A"]:
