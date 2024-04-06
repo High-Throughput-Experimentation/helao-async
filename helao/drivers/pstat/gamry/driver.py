@@ -364,7 +364,8 @@ class GamryDriver(HelaoDriver):
     def cleanup(self):
         """Release state objects but don't close pstat."""
         try:
-            self.pstat.SetCell(self.GamryCOM.CellOff)
+            if self.pstat is not None:
+                self.pstat.SetCell(self.GamryCOM.CellOff)
             self.events = None
             self.dtaq = None
             self.dtaqsink = DUMMY_SINK
