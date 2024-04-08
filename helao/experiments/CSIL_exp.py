@@ -1156,7 +1156,7 @@ def CCSI_sub_co2maintainconcentration(
         "acquire_flowrate",
         {
             "flowrate_sccm": None,
-            "duration": apm.pars.co2measure_duration + 4,
+            "duration": apm.pars.co2measure_duration,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
         #nonblocking=True,
@@ -1176,7 +1176,7 @@ def CCSI_sub_co2maintainconcentration(
         {
             "flowrate_sccm": apm.pars.flowrate_sccm,
             "ramp_sccm_sec": apm.pars.flowramp_sccm,
-            "duration": apm.pars.co2measure_duration + 2,  # arbitrary time to allow for final correction
+            "duration": apm.pars.co2measure_duration,  
             "target_co2_ppm": apm.pars.target_co2_ppm,
             "headspace_scc": apm.pars.headspace_scc,
             "refill_freq_sec": apm.pars.refill_freq_sec,
@@ -1215,14 +1215,15 @@ def CCSI_sub_co2maintainconcentration(
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     #apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
-    # apm.add(
-    #     MFC_server,
-    #     "cancel_acquire_flowrate",
-    #     {},
-    #     asc.wait_for_previous,
-    #     technique_name="Measure_added_co2",
-    #     process_finish=True,
-    # )
+    apm.add(
+        MFC_server,
+        "cancel_acquire_flowrate",
+        {},
+#        asc.wait_for_previous,
+        technique_name="Measure_added_co2",
+        process_finish=True,
+    )
+    apm.add(ORCH_server, "wait", {"waittime": 3})
 
     apm.add(
         PAL_server,
