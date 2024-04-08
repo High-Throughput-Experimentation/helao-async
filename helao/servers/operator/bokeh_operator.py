@@ -2023,7 +2023,8 @@ class BokehOperator:
                 self.experiment_plan_lists["experiment_name"].append(D.experiment_name)
                 plan_count += 1
 
-        self.experiment_plan_source.stream(self.experiment_plan_lists, rollover=plan_count)
+        # self.experiment_plan_source.stream(self.experiment_plan_lists, rollover=plan_count)
+        self.experiment_plan_source.data = self.experiment_plan_lists
 
         if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
             self.orch_status_button.label = "running"
