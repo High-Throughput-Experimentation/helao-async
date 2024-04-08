@@ -718,6 +718,14 @@ class OrchAPI(HelaoFastAPI):
             loop.create_task(sleep_then_error())
             return True
 
+        @self.post("/clear_global_params", tags=["private"])
+        def clear_global_params():
+            current_params = list(self.orch.global_params.keys())
+            self.orch.global_params = {}
+            if current_params:
+                return "\n".join(["removed:"] + current_params)
+            else:
+                return "global_params was empty"
 
 class WaitExec(Executor):
     def __init__(self, *args, **kwargs):
