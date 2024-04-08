@@ -910,6 +910,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
 #    headspace_scc: float = 10.5,
     refill_freq_sec: float = 10.0,
     recirculation_rate_uL_min: int = 10000,
+    clean_recirculation_rate_uL_min: int = 20000,
     
 #    HSpurge_duration: float = 15,
   #  DeltaDilute1_duration: float = 0,
@@ -1014,7 +1015,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "DeltaDilute1_duration": 0,
             "recirculation":drainrecirc,
             "recirculation_duration":recirculation_duration, 
-            "recirculation_rate_uL_min":recirculation_rate_uL_min})
+            "recirculation_rate_uL_min":clean_recirculation_rate_uL_min})
 ##############################################3
 #temp fixed drain/flush here. will put in new n2 clean inject after repeat criteria determined
 
@@ -1031,7 +1032,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "DeltaDilute1_duration": 0,
             "recirculation":drainrecirc,
             "drain_recirculation_duration":LiquidCleanPurge_recirc_duration, 
-            "recirculation_rate_uL_min":recirculation_rate_uL_min,
+            "recirculation_rate_uL_min":clean_recirculation_rate_uL_min,
             "flush_HSpurge1_duration": FlushPurge_duration,
             "flush_HSpurge_duration": FlushPurge_duration*2,
             "use_co2_check": use_co2_check,
@@ -1060,7 +1061,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "Alphapurge1_duration": init_Alphapurge1_duration,
             "Probepurge1_duration": init_Probepurge1_duration,
             "Sensorpurge1_duration": init_Sensorpurge1_duration,
-            "recirculation_rate_uL_min": recirculation_rate_uL_min,
+            "recirculation_rate_uL_min": clean_recirculation_rate_uL_min,
             })
 
     #
@@ -1069,7 +1070,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "HSpurge_duration": init_HSpurge_duration, 
             "DeltaDilute1_duration": init_DeltaDilute1_duration,
             "initialization": True,
-            "recirculation_rate_uL_min": recirculation_rate_uL_min,
+            "recirculation_rate_uL_min": clean_recirculation_rate_uL_min,
             "co2measure_duration": check_co2measure_duration, 
             "co2measure_acqrate": co2measure_acqrate, 
             })

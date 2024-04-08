@@ -1661,7 +1661,7 @@ def CCSI_sub_n2flush(
     Sensorpurge1_duration: float = 30,
     recirculation: bool = True,
     #recirculation_duration: float = 120,
-    recirculation_rate_uL_min: int = 10000,
+    recirculation_rate_uL_min: int = 20000,
     #    DeltaDilute1_duration: float = 15,
     initialization: bool = False,
     co2measure_delay: float = 120,
