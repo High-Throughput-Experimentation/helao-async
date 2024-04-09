@@ -1234,6 +1234,8 @@ def CCSI_sub_co2maintainconcentration(
             "load_sample_in": GasSample(
                 sample_no=apm.pars.pureco2_sample_no, machine_name=ORCH_HOST
             ).model_dump(),
+            "volume_ml": 1,
+
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in","total_scc": "volume_ml"},
     )
