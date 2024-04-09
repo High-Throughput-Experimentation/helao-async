@@ -901,7 +901,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
     Waterclean_reservoir_sample_no: int = 1,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
-    
+    SyringePushWait_s: float = 60,    
     co2measure_duration: float = 1200,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
@@ -990,6 +990,7 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
             "Waterclean_volume_ul": watervolume,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
+            "SyringePushWait_s": SyringePushWait_s,
             "LiquidFillWait_s": LiquidFillWait_s,
         })
         
