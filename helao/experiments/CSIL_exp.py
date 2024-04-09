@@ -581,7 +581,7 @@ def CCSI_sub_initialization_firstpart(
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 4,  # move co2 monitoring to separate exp, #3  n2 push, #4 change positions
+    experiment_version: int = 5,  # move co2 monitoring to separate exp, #3  n2 push, #4 change multivalve positions,5-syringepushwait
     #    experiment_version: int = 10, #ver 6to7 implements multivalve, #10 gas push between
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
@@ -589,6 +589,7 @@ def CCSI_sub_cellfill(
     Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 2500,
     Syringe_rate_ulsec: float = 300,
+    SyringePushWait_s: float = 6,
     LiquidFillWait_s: float = 15,
     previous_liquid: bool = False,
     n2_push: bool = False,
@@ -652,7 +653,7 @@ def CCSI_sub_cellfill(
                 ProcessContrib.samples_in,
             ],
         )
-        apm.add(ORCH_server, "wait", {"waittime": 5.25})
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.SyringePushWait_s})
         apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
         apm.add(
             NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 1}, asc.no_wait
