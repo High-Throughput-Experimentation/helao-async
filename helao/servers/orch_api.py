@@ -350,15 +350,17 @@ class OrchAPI(HelaoFastAPI):
         @self.post("/update_globalexp_params", tags=["private"])
         async def update_globalexp_params(params: dict):
             """Updates globalexp_params for active experiment"""
-            if self.orch.active_experiment is not None:
-                self.orch.active_experiment.globalexp_params.update(params)
-                self.orch.print_message(f"Updated globalexp params with {params}.")
-                return True
-            else:
-                self.orch.print_message(
-                    "No active experiment, could not update globalexp params."
-                )
-                return False
+            # if self.orch.active_experiment is not None:
+            #     self.orch.active_experiment.globalexp_params.update(params)
+            #     self.orch.print_message(f"Updated globalexp params with {params}.")
+            #     return True
+            # else:
+            #     self.orch.print_message(
+            #         "No active experiment, could not update globalexp params."
+            #     )
+            #     return False
+            self.orch.global_params.update(params)
+            return True
 
         @self.post("/start", tags=["private"])
         async def start():
@@ -726,6 +728,10 @@ class OrchAPI(HelaoFastAPI):
                 return "\n".join(["removed:"] + current_params)
             else:
                 return "global_params was empty"
+
+        @self.post("/get_global_params", tags=["private"])
+        def get_global_params():
+            return self.orch.global_params
 
 class WaitExec(Executor):
     def __init__(self, *args, **kwargs):
