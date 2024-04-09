@@ -530,9 +530,7 @@ class Orch(Base):
         for k, v in self.active_experiment.from_globalexp_params.items():
             self.print_message(f"{k}:{v}")
             if k in self.global_params:
-                self.active_experiment.experiment_params.update(
-                    {v: self.global_params[k]}
-                )
+                self.active_experiment.experiment_params[v] = self.global_params[k]
 
         self.print_message(
             f"new active experiment is {self.active_experiment.experiment_name}"
@@ -713,7 +711,7 @@ class Orch(Base):
             for k, v in A.from_globalexp_params.items():
                 self.print_message(f"{k}:{v}")
                 if k in self.global_params:
-                    A.action_params.update({v: self.global_params[k]})
+                    A.action_params[v] = self.global_params[k]
 
             actserv_exists, _ = await endpoints_available([A.url])
             if not actserv_exists:
@@ -855,34 +853,16 @@ class Orch(Base):
                     # )
                     for k in result_action.to_globalexp_params:
                         if k in result_action.action_params:
-                            if (
-                                result_action.action_params[k] is None
-                                and k in self.global_params
-                            ):
-                                self.print_message(f"clearing {k} in global vars")
-                                self.global_params.pop(k)
-                            else:
-                                self.print_message(f"updating {k} in global vars")
-                                self.global_params.update(
-                                    {k: result_action.action_params[k]}
-                                )
+                            self.print_message(f"updating {k} in global vars")
+                            self.global_params[k] = result_action.action_params[k]
                 elif isinstance(result_action.to_globalexp_params, dict):
                     # self.print_message(
                     #     f"copying global vars {', '.join(result_action.to_globalexp_params.keys())} back to experiment"
                     # )
                     for k1, k2 in result_action.to_globalexp_params.items():
                         if k1 in result_action.action_params:
-                            if (
-                                result_action.action_params[k1] is None
-                                and k2 in self.global_params
-                            ):
-                                self.print_message(f"clearing {k2} in global vars")
-                                self.global_params.pop(k2)
-                            else:
-                                self.print_message(f"updating {k2} in global vars")
-                                self.global_params.update(
-                                    {k2: result_action.action_params[k1]}
-                                )
+                            self.print_message(f"updating {k2} in global vars")
+                            self.global_params[k2] = result_action.action_params[k1]
 
             # # this will recursively call the next no_wait action in queue, and return its error
             # if self.action_dq and not self.step_thru_actions:
