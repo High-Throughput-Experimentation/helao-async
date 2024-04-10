@@ -1050,10 +1050,11 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
         })
 
         #refill dilution volume
-        epm.add_experiment("CCSI_sub_refill_clean", {
-            "Waterclean_volume_ul": watervolume,
-            "Syringe_rate_ulsec": syringe_rate_ulsec,
-        })
+        if watervolume != 0:
+            epm.add_experiment("CCSI_sub_refill_clean", {
+                "Waterclean_volume_ul": watervolume,
+                "Syringe_rate_ulsec": syringe_rate_ulsec,
+            })
 
         #initialization part
         epm.add_experiment("CCSI_sub_initialization_firstpart", {
