@@ -1408,8 +1408,8 @@ def CCSI_sub_co2maintainconcentration(
         "cancel_acquire_flowrate",
         {},
         #        asc.wait_for_previous,
-        technique_name="Measure_added_co2",
-        process_finish=True,
+        # technique_name="Measure_added_co2",
+        # process_finish=True,
     )
     apm.add(ORCH_server, "wait", {"waittime": 3})
 
