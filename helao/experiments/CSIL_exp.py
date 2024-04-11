@@ -1365,7 +1365,7 @@ def CCSI_sub_co2maintainconcentration(
         asc.no_wait,
         nonblocking=True,
         technique_name="Adding_co2",
-        process_finish=True,
+        process_finish=False,
         process_contrib=[
             ProcessContrib.samples_in,
             ProcessContrib.action_params,
@@ -1384,7 +1384,7 @@ def CCSI_sub_co2maintainconcentration(
         # nonblocking=True,
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="Measure_recirculated_headspace",
-        process_finish=True,
+        process_finish=False,
         process_contrib=[
             ProcessContrib.files,
             ProcessContrib.samples_in,
