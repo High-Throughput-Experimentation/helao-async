@@ -10,6 +10,7 @@ dependencies:
     - pyft232
     - pylablib
     - sqlmodel
+    - uuid7
     - git+https://github.com/spomjaksilp/pyMeCom
   - aiofiles
   - aiohttp
