@@ -1614,6 +1614,203 @@ class Archive:
 
         return error, samples_in_initial, samples_out
 
+    async def custom_add_gas(
+        self,
+        custom: str = None,
+        source_gas_in: GasSample = None,
+        volume_ml: float = 0.0,
+        action: Action = None,
+    ) -> Tuple[bool, List[SampleUnion], List[SampleUnion]]:
+        """adds new gas from a 'reservoir' to a custom position"""
+
+        error = ErrorCodes.none
+        samples_in = []
+        samples_in_initial = []
+        samples_out = []
+
+        # (1) check if source_gas_in is not None
+        # and its a valid sample (add it to samples_in list)
+        if source_gas_in is None:
+            error = ErrorCodes.no_sample
+            return error, [], []
+        else:
+            # check if source_gas_in is valid
+            # converts source_gas_in to a list
+            source_gas_in = object_to_sample(source_gas_in)
+            samples_in = await self.unified_db.get_samples(samples=[source_gas_in])
+
+            if not samples_in:
+                self.base.print_message(
+                    f"source_gas_in '{source_gas_in}' is not in db",
+                    error=True,
+                )
+                error = ErrorCodes.no_sample
+                return error, [], []
+
+        if samples_in[0].sample_type != SampleType.gas:
+            self.base.print_message("Not a gas Sample", error=True)
+            return ErrorCodes.not_allowed, [], []
+
+        if samples_in[0].volume_ml < volume_ml:
+            self.base.print_message("Not enough volume available", error=True)
+            return ErrorCodes.not_available, [], []
+
+        samples_in[0].inheritance = SampleInheritance.give_only
+        samples_in[0].status = [SampleStatus.preserved]
+        # save a deepcopy of initial state as we will return only initial
+        # samples_in and final samples_out
+        samples_in_initial.append(deepcopy(samples_in[0]))
+
+        # (2) verify if custom is a valid position
+        # and get sample from custom position
+        if custom in self.positions.customs_dict:
+            custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
+            self.base.print_message(f"custom sample in valid position: {custom_sample}")
+        else:
+            error = ErrorCodes.not_available
+            return error, [], []
+
+        # (3) check if sample in custom position is valid
+        if custom_sample != NoneSample():
+            custom_samples_in = await self.unified_db.get_samples(
+                samples=[custom_sample]
+            )
+            if not custom_samples_in:
+                self.base.print_message("invalid sample in custom position", error=True)
+                error = ErrorCodes.critical
+                return error, [], []
+            else:
+                custom_sample = custom_samples_in[0]
+
+        self.base.print_message(
+            f"sample in custom position '{custom}' is {custom_sample.exp_dict()}"
+        )
+
+        # (4) create a new ref sample first for the amount we
+        # take from samples_in
+        # always sets reference status and inheritance to:
+        # status=[SampleStatus.created]
+        # inheritance=SampleInheritance.receive_only
+        error, ref_samples_out = await self.new_ref_samples(
+            # sample check converted source_gas_in
+            # to a list already
+            samples_in=samples_in,
+            sample_out_type=SampleType.gas,
+            sample_position=custom,
+            action=action,
+        )
+
+        if error != ErrorCodes.none:
+            return error, [], []
+
+        # set the volume to the requested value
+        ref_samples_out[0].sample_position = custom
+        ref_samples_out[0].volume_ml = volume_ml
+
+        # update volume of samples_in
+        # also sets status to destroyed if vol <= 0
+        # never dilute reservoir
+        update_vol(samples_in[0], delta_vol_ml=-volume_ml, dilute=False)
+
+        # (5) now decide what the new sample should be
+        # (5-1) custom is empty --> new sample is ref_samples_out[0]
+        # (5-2) we combine liquid from custom with ref_samples_out[0]
+        #       and create a new liquid (combine_liquids is True)
+        # (5-3) we create an assembly with custom_sample and ref_samples_out[0]
+
+        # (5-1)
+        if custom_sample == NoneSample():
+            # cannot always convert reference sample to real sample
+            # as at last 5-3 not always can do that
+            samples_out = await self.unified_db.new_samples(samples=ref_samples_out)
+            if not samples_out:
+                error = ErrorCodes.no_sample
+                return error, [], []
+
+            # replace sample in custom position
+            replaced, sample = await self.custom_replace_sample(
+                custom=custom, sample=samples_out[0]
+            )
+
+            if not replaced:
+                self.base.print_message(
+                    "could not replace sample with assembly when adding gas",
+                    error=True,
+                )
+                error = ErrorCodes.critical
+
+        # (5-3)
+        # custom holds a sample and we need to create an assembly
+        elif self.custom_assembly_allowed(custom=custom):
+            # convert the ref samples that gets added to a real sample
+            samples_out = await self.unified_db.new_samples(samples=ref_samples_out)
+            if not samples_out:
+                error = ErrorCodes.no_sample
+                return error, [], []
+
+            # set sample status
+            custom_sample.inheritance = SampleInheritance.allow_both
+            custom_sample.status = [SampleStatus.incorporated]
+            samples_out[0].status.append(SampleStatus.incorporated)
+
+            # add the custom sample to the samples_in
+            samples_in.append(custom_sample)
+            samples_in_initial.append(deepcopy(custom_sample))
+
+            # create a new ref sample first
+            error, ref_samples_out2 = await self.new_ref_samples(
+                # input for assembly is the custom sample
+                # and the new sample from source_gas_in
+                samples_in=[custom_sample, samples_out[0]],
+                sample_out_type=SampleType.assembly,
+                sample_position=custom,
+                action=action,
+            )
+
+            if error != ErrorCodes.none:
+                # something went wrong when creating the reference assembly
+                return error, [], []
+
+            # a reference assembly was successfully created
+            # convert it now to a real sample
+            samples_out2 = await self.unified_db.new_samples(samples=ref_samples_out2)
+            if not samples_out2:
+                # reference could not be converted to a real sample
+                self.base.print_message(
+                    "could not convert reference assembly to real assembly",
+                    error=True,
+                )
+                return ErrorCodes.critical, [], []
+
+            # add new reference to samples out list
+            samples_out.append(samples_out2[0])
+
+            # and update the custom position with the new sample
+            replaced, sample = await self.custom_replace_sample(
+                custom=custom, sample=samples_out2[0]
+            )
+            if not replaced:
+                self.base.print_message(
+                    "could not replace sample with assembly when adding gas",
+                    error=True,
+                )
+                return ErrorCodes.critical, [], []
+
+        else:
+            # nothing else possible
+            self.base.print_message(
+                f"Cannot add sample to position {custom}", error=True
+            )
+            return ErrorCodes.not_allowed, [], []
+
+        # update all samples_out in the db
+        await self.unified_db.update_samples(samples=samples_out)
+
+        # update all samples_in in the db
+        await self.unified_db.update_samples(samples=samples_in)
+
+        return error, samples_in_initial, samples_out
+
     async def destroy_sample(self, sample: SampleUnion = None) -> bool:
         """will mark a sample as destroyed in the sample db
         and update its parameters accordingly"""

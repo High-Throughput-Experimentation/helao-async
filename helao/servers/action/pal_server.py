@@ -23,6 +23,7 @@ from helao.drivers.data.archive_driver import ScanDirection, ScanOperator
 from helaocore.models.sample import (
     SampleType,
     LiquidSample,
+    GasSample,
     SampleUnion,
     NoneSample,
     SolidSample,
@@ -33,6 +34,7 @@ from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 
 from helao.helpers import logging  # get logger from BaseAPI instance
+
 global logger
 if logging.LOGGER is None:
     logger = logging.make_logger(logger_name="pal_server_standalone")
@@ -863,7 +865,7 @@ def makeApp(confPrefix, server_key, helao_root):
         if first_unloaded_liquid is None:
             unloaded_vol = 0
         else:
-            unloaded_vol = first_unloaded_liquid['volume_ml']
+            unloaded_vol = first_unloaded_liquid["volume_ml"]
         active.action.action_params.update({"_unloaded_solid": first_unloaded_solid})
         active.action.action_params.update({"_unloaded_liquid": first_unloaded_liquid})
         active.action.action_params.update({"_unloaded_liquid_vol": unloaded_vol})
@@ -928,6 +930,47 @@ def makeApp(confPrefix, server_key, helao_root):
             volume_ml=active.action.action_params["volume_ml"],
             combine_liquids=active.action.action_params["combine_liquids"],
             dilute_liquids=active.action.action_params["dilute_liquids"],
+            action=active.action,
+        )
+        active.action.error_code = error_code
+        await active.append_sample(samples=samples_in, IO="in")
+        await active.append_sample(samples=samples_out, IO="out")
+        datadict = {"error_code": error_code}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{server_key}/archive_custom_add_gas", tags=["action"])
+    async def archive_custom_add_gas(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        custom: dev_customitems = None,
+        source_gas_in: GasSample = Body(
+            GasSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            embed=True,
+        ),
+        volume_ml: float = 0.0,
+    ):
+        """Adds 'volume_ml' of 'source_gas_in' to the sample 'custom'.
+        Args:
+             custom: custom position where gas will be added
+             source_liquid_in: the gas from which volume_ml will be added
+                               to custom
+             volume_ml: the volume in ml which will be added
+        """
+
+        active = await app.base.setup_and_contain_action(
+            action_abbr="add_gas",
+        )
+        (
+            error_code,
+            samples_in,
+            samples_out,
+        ) = await app.driver.archive.custom_add_gas(
+            custom=active.action.action_params["custom"],
+            source_gas_in=active.action.action_params["source_gas_in"],
+            volume_ml=active.action.action_params["volume_ml"],
             action=active.action,
         )
         active.action.error_code = error_code
