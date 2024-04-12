@@ -734,6 +734,7 @@ class Orch(Base):
             ] += 1
 
             A.init_act(time_offset=self.ntp_offset)
+            result_actiondict = None
             async with self.aiolock:
                 try:
                     result_actiondict, error_code = await async_action_dispatcher(
