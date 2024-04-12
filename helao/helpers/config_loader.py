@@ -6,8 +6,11 @@ from importlib.util import spec_from_file_location
 from importlib.util import module_from_spec
 from importlib.machinery import SourceFileLoader
 
-from helao.helpers.print_message import print_message
-from helao.helpers.yml_tools import yml_load
+from .print_message import print_message
+from .yml_tools import yml_load
+
+
+CONFIG = None 
 
 
 def config_loader(confArg, helao_root):
