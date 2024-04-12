@@ -7,11 +7,11 @@ from typing import List
 from pydantic import BaseModel
 
 from helaocore.version import get_filehash
-from helao.helpers.gen_uuid import gen_uuid
+from helaocore.models.analysis import AnalysisDataModel
 
 from .base_analysis import BaseAnalysis
-from helaocore.models.analysis import AnalysisDataModel
-from helao.drivers.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
+from ...data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
+from ....helpers.gen_uuid import gen_uuid
 
 ANALYSIS_DEFAULTS = {
     "fom_key": "ExtCal.Concentration_ppb",
