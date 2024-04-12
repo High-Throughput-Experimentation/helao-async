@@ -1,7 +1,7 @@
 __all__ = ["gen_uuid"]
 
 import uuid
-from uuid7 import uuid7
+from uuid_extensions import uuid7
 
 
 def gen_uuid(input:str = None):
