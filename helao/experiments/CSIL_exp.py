@@ -1333,7 +1333,6 @@ def CCSI_sub_co2maintainconcentration(
         ],  # save new liquid_sample_no of eche cell to globals
     )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    #    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, }, nonblocking=True)
     apm.add(
         MFC_server,
         "acquire_flowrate",
@@ -1342,10 +1341,7 @@ def CCSI_sub_co2maintainconcentration(
             "duration": apm.pars.co2measure_duration,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
-        # nonblocking=True,
-        technique_name="Measure_added_co2",
         to_globalexp_params=["total_scc"],
-        process_finish=True,
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -1365,9 +1361,7 @@ def CCSI_sub_co2maintainconcentration(
         asc.no_wait,
         nonblocking=True,
         technique_name="Adding_co2",
-        process_finish=False,
         process_contrib=[
-            ProcessContrib.samples_in,
             ProcessContrib.action_params,
             ProcessContrib.files,
         ],
@@ -1381,14 +1375,9 @@ def CCSI_sub_co2maintainconcentration(
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
         asc.no_wait,
-        # nonblocking=True,
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        technique_name="Measure_recirculated_headspace",
-        process_finish=False,
         process_contrib=[
             ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
         ],
     )
     apm.add(
@@ -1400,34 +1389,32 @@ def CCSI_sub_co2maintainconcentration(
         },
         asc.no_wait,
     )
-
-    #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
-    # apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
     apm.add(
         MFC_server,
         "cancel_acquire_flowrate",
         {},
-        #        asc.wait_for_previous,
-        # technique_name="Measure_added_co2",
-        # process_finish=True,
     )
     apm.add(ORCH_server, "wait", {"waittime": 3})
 
     apm.add(
         PAL_server,
-        "archive_custom_load",
+        "archive_custom_add_gas",
         {
             "custom": "cell1_we",
-            "load_sample_in": GasSample(
+            "source_gas_in": GasSample(
                 sample_no=apm.pars.pureco2_sample_no, machine_name=ORCH_HOST
             ).model_dump(),
-            "volume_ml": 1,
-
         },
         from_globalexp_params={
             "_fast_samples_in": "fast_samples_in",
             "total_scc": "volume_ml",
         },
+        technique_name="measure_absorbed_co2",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     return apm.action_list
