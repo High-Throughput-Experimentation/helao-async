@@ -1,17 +1,18 @@
 __all__ = []
 
-import traceback
 import sys
 import os
 from functools import partial
 from importlib import import_module
 from bokeh.server.server import Server
 import colorama
-from helao.helpers.print_message import print_message
-from helao.helpers.config_loader import config_loader
-from helao.helpers import logging
+from .helao.helpers.print_message import print_message
+from .helao.helpers import logging
+from .helao.helpers import config_loader
 
 global logger
+global global_config
+
 
 if __name__ == "__main__":
     log_root = "."
@@ -19,12 +20,13 @@ if __name__ == "__main__":
     helao_root = os.path.dirname(os.path.realpath(__file__))
     server_key = sys.argv[2]
     confArg = sys.argv[1]
-    config = config_loader(confArg, helao_root)
+    config = config_loader.config_loader(confArg, helao_root)
     log_root = os.path.join(config["root"], "LOGS") if "root" in config else None
     if logging.LOGGER is None:
         logging.LOGGER = logging.make_logger(logger_name=server_key, log_dir=log_root)
     logger = logging.LOGGER
-
+    if config_loader.CONFIG is None:
+        config_loader.CONFIG = config
     C = config["servers"]
     S = C[server_key]
     servHost = S["host"]
@@ -32,9 +34,7 @@ if __name__ == "__main__":
     servPy = S["bokeh"]
     launch_browser = S.get("params", {}).get("launch_browser", False)
 
-    makeApp = import_module(
-        f"helao.servers.{S['group']}.{S['bokeh']}"
-    ).makeBokehApp
+    makeApp = import_module(f"helao.servers.{S['group']}.{S['bokeh']}").makeBokehApp
     root = config.get("root", None)
     if root is not None:
         log_root = os.path.join(root, "LOGS")
@@ -49,7 +49,14 @@ if __name__ == "__main__":
     )
 
     bokehapp = Server(
-        {f"/{servPy}": partial(makeApp, confPrefix=confArg, server_key=server_key, helao_root=helao_root)},
+        {
+            f"/{servPy}": partial(
+                makeApp,
+                confPrefix=confArg,
+                server_key=server_key,
+                helao_root=helao_root,
+            )
+        },
         port=servPort,
         address=servHost,
         allow_websocket_origin=[f"{servHost}:{servPort}"],
