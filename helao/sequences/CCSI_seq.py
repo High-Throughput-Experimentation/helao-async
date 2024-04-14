@@ -901,7 +901,8 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
     Waterclean_reservoir_sample_no: int = 1,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
-    SyringePushWait_s: float = 60,    
+    SyringePushWait_s: float = 60,
+    n2_push: bool = False,    
     co2measure_duration: float = 1200,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
@@ -992,6 +993,8 @@ def CCSI_Solution_test_co2maintainconcentration(  #assumes initialization perfor
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "SyringePushWait_s": SyringePushWait_s,
             "LiquidFillWait_s": LiquidFillWait_s,
+            "n2_push": n2_push,
+            "co2_fill_after_n2push": n2_push,   #may need filltime adjust, default 30
         })
         
         epm.add_experiment("CCSI_sub_co2maintainconcentration", {
