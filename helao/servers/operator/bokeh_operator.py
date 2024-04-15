@@ -923,9 +923,9 @@ class BokehOperator:
 
         # self.sequence_source.stream(self.sequence_lists, rollover=sequence_count)
         self.sequence_source.data = self.sequence_lists
-        self.vis.print_message(
-            f"current queued sequences: ({len(self.orch.sequence_dq)})"
-        )
+        # self.vis.print_message(
+        #     f"current queued sequences: ({len(self.orch.sequence_dq)})"
+        # )
 
     async def get_experiments(self):
         """get experiment list from orch"""
@@ -946,9 +946,9 @@ class BokehOperator:
 
         # self.experiment_source.stream(self.experiment_lists, rollover=experiment_count)
         self.experiment_source.data = self.experiment_lists
-        self.vis.print_message(
-            f"current queued experiments: ({len(self.orch.experiment_dq)})"
-        )
+        # self.vis.print_message(
+        #     f"current queued experiments: ({len(self.orch.experiment_dq)})"
+        # )
 
     async def get_actions(self):
         """get action list from orch"""
@@ -966,7 +966,7 @@ class BokehOperator:
 
         # self.action_source.stream(self.action_lists, rollover=action_count)
         self.action_source.data = self.action_lists
-        self.vis.print_message(f"current queued actions: ({len(self.orch.action_dq)})")
+        # self.vis.print_message(f"current queued actions: ({len(self.orch.action_dq)})")
 
     async def get_active_actions(self):
         """get action list from orch"""
@@ -995,7 +995,7 @@ class BokehOperator:
 
         # self.active_action_source.stream(self.active_action_lists, rollover=action_count)
         self.active_action_source.data = self.active_action_lists
-        self.vis.print_message(f"current active actions: {self.active_action_lists}")
+        # self.vis.print_message(f"current active actions: {self.active_action_lists}")
 
     async def get_orch_status_summary(self):
         for key in self.action_server_lists:
