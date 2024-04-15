@@ -64,7 +64,6 @@ class KinesisMotor(HelaoDriver):
         super().__init__(config=config)
         self.motors = {}
         self.last_state = "unknown"
-        self.live_buffer = {}
         self.connect()
 
     def connect(self) -> DriverResponse:
@@ -97,19 +96,6 @@ class KinesisMotor(HelaoDriver):
         return response
 
     def get_status(self) -> DriverResponse:
-        if not self.live_buffer:
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.uninitialized
-            )
-        else:
-            response = DriverResponse(
-                response=DriverResponseType.success,
-                data=self.live_buffer,
-                status=DriverStatus.ok,
-            )
-        return response
-
-    def _get_status(self) -> DriverResponse:
         try:
             state = {}
             for axis, motor in self.motors.items():
@@ -236,5 +222,4 @@ class KinesisMotor(HelaoDriver):
 class KinesisPoller(DriverPoller):
     def get_data(self):
         poll_data = self.driver._get_status()
-        self.driver.live_buffer.update(poll_data)
         return poll_data
