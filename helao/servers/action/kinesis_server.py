@@ -41,6 +41,8 @@ class KinesisMotorExec(Executor):
         # action params and axis config
         self.action_params = self.active.action.action_params
         self.axis_name = self.action_params["axis"]
+        if not isinstance(self.axis_name, str):
+            self.axis_name = self.axis_name.value
         self.axis_params = self.base.server_params["axes"][self.axis_name]
         logger.info("KinesisMotorExec initialized.")
 
