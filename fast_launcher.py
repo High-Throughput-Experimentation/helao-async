@@ -59,4 +59,4 @@ if __name__ == "__main__":
         log_dir=log_root,
         info=True,
     )
-    fastapp = uvicorn.run(app, host=S["host"], port=S["port"])
+    fastapp = uvicorn.run(app, host=S["host"], port=S["port"], log_level="warning")
