@@ -1869,7 +1869,7 @@ class Active:
                                 info=True,
                             )
                     write_iter += 1
-                    asyncio.sleep(0.1)
+                    await asyncio.sleep(0.1)
 
                 # self.action_list[-1] is the very first action
                 if self.action_list[-1].manual_action:

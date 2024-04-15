@@ -149,10 +149,10 @@ class KinesisMotor(HelaoDriver):
         try:
             if move_mode == MoveModes.relative:
                 move_func = self.motors[axis].move_by
-            elif self.move_mode == MoveModes.absolute:
+            elif move_mode == MoveModes.absolute:
                 move_func = self.motors[axis].move_to
                 logger.info("kinesis motor starting motion")
-            move_func(self.move_value)
+            move_func(value)
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="move started",
