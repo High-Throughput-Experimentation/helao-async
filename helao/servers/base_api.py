@@ -109,7 +109,7 @@ class BaseAPI(HelaoFastAPI):
                         )
                     )
             else:
-                logger.info("got non-action POST request")
+                logger.debug("got non-action POST request")
                 response = await call_next(request)
             return response
 
