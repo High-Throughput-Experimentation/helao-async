@@ -27,7 +27,7 @@ LOGGER = None
 def make_logger(
     logger_name: Optional[str] = None,
     log_dir: Optional[str] = None,
-    log_level: int = 10,
+    log_level: int = 20,  # 10 (DEBUG), 20 (INFO), 30 (WARNING), 40 (ERROR), 50 (CRITICAL)
 ):
     """Creates a logger (use once per process)."""
     log_dir = tempfile.gettempdir() if log_dir is None else log_dir
