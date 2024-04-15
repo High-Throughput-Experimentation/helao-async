@@ -7,7 +7,7 @@ import faulthandler
 from copy import copy
 from socket import gethostname
 
-from helao.drivers.helao_driver import HelaoDriver
+from helao.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
 from helao.servers.base import Base
@@ -209,7 +209,12 @@ class BaseAPI(HelaoFastAPI):
         def get_status():
             status_dict = self.base.actionservermodel.model_dump()
             driver_status = "not_implemented"
-            if isinstance(self.driver, HelaoDriver):
+            # first check if poller is available
+            if isinstance(self.poller, DriverPoller):
+                resp = self.poller.live_dict
+                driver_status = DriverStatus.ok
+            # if no poller, but HelaoDriver, use get_status method
+            elif isinstance(self.driver, HelaoDriver):
                 resp = self.driver.get_status()
                 driver_status = resp.status
             status_dict['_driver_status'] = driver_status
