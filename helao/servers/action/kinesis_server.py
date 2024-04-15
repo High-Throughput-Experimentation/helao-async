@@ -29,6 +29,7 @@ from helaocore.error import ErrorCodes
 from helao.helpers.executor import Executor
 from helaocore.models.hlostatus import HloStatus
 
+
 class KinesisMotorExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -36,7 +37,7 @@ class KinesisMotorExec(Executor):
         self.base = self.active.base
         self.driver = self.base.fastapp.driver
         self.live_dict = self.base.fastapp.poller.live_dict
-        
+
         # action params and axis config
         self.action_params = self.active.action.action_params
         self.axis_name = self.action_params["axis"]
@@ -47,11 +48,11 @@ class KinesisMotorExec(Executor):
         "Set velocity and acceleration."
         logger.info("KinesisMotorExec running setup methods.")
         velocity = self.action_params.get("velocity_mm_s", None)
-        acceleration = self.action_params.get(
-            "acceleration_mm_s2", None
-        )
+        acceleration = self.action_params.get("acceleration_mm_s2", None)
         logger.info("KinesisMotorExec checking velocity and accel.")
-        resp = self.driver.setup(self.axis, velocity=velocity, acceleration=acceleration)
+        resp = self.driver.setup(
+            axis=self.axis_name, velocity=velocity, acceleration=acceleration
+        )
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         logger.info("KinesisMotorExec setup complete.")
         return {"error": error}
@@ -70,7 +71,9 @@ class KinesisMotorExec(Executor):
         if target_position < self.axis_params.get("move_limit_mm", 3.0):
             logger.info("KinesisMotorExec starting motion.")
             resp = self.driver.move(self.axis_name, move_mode, move_value)
-            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            error = (
+                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            )
             return {"error": error}
         else:
             logger.info(
@@ -98,6 +101,7 @@ class KinesisMotorExec(Executor):
         self.axis.stop(immediate=True, sync=True)
         self.stop_err = ErrorCodes.none
         return {"error": self.stop_err}
+
 
 async def kinesis_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
