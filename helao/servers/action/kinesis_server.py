@@ -174,12 +174,12 @@ async def kinesis_dyn_endpoints(app=None):
 
         @app.post("/start_polling", tags=["private"])
         async def start_polling():
-            await app.driver.start_polling()
+            await app.poller.start_polling()
             return "start_polling: ok"
 
         @app.post("/stop_polling", tags=["private"])
         async def stop_polling():
-            await app.driver.stop_polling()
+            await app.poller.stop_polling()
             return "stop_polling: ok"
 
 
