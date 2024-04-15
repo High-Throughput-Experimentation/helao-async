@@ -141,7 +141,7 @@ class BaseAPI(HelaoFastAPI):
                     self.driver = driver_class(config=self.server_params)
                     if poller_class is not None:
                         self.poller = poller_class(
-                            self.driver, self.server_cfg.get("polling_time", 0.05)
+                            self.driver, self.server_cfg.get("polling_time", 0.1)
                         )
                 else:
                     self.driver = driver_class(self.base)
