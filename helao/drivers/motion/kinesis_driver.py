@@ -63,7 +63,6 @@ class KinesisMotor(HelaoDriver):
     def __init__(self, config: dict = {}):
         super().__init__(config=config)
         self.motors = {}
-        self.last_state = "unknown"
         self.connect()
 
     def connect(self) -> DriverResponse:
