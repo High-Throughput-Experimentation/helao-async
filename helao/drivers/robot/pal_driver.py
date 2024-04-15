@@ -174,6 +174,7 @@ class PAL:
 
         # for passing action object from technique method to measure loop
         self.action = None
+        self.active = None
 
         # for global IOloop
         self.IO_do_meas = False
