@@ -143,6 +143,7 @@ class BaseAPI(HelaoFastAPI):
                         self.poller = poller_class(
                             self.driver, self.server_cfg.get("polling_time", 0.1)
                         )
+                        self.poller._base_hook = self.base
                 else:
                     self.driver = driver_class(self.base)
             self.base.dyn_endpoints_init()

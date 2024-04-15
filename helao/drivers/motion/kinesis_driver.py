@@ -220,5 +220,5 @@ class KinesisMotor(HelaoDriver):
 
 class KinesisPoller(DriverPoller):
     def get_data(self):
-        poll_data = self.driver._get_status()
+        poll_data = self.driver.get_status()
         return poll_data
