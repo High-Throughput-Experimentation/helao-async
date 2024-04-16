@@ -108,27 +108,27 @@ def ECHEUVIS_sub_CV_led(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     CV_duration_sec = (
-        abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.scanrate_voltsec
+        abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
     )
     CV_duration_sec += (
-        abs(apm.pars.Vfinal_vsRHE - apm.pars.Vapex2_vsRHE) / apm.pars.scanrate_voltsec
+        abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
     )
     CV_duration_sec += (
-        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
-        / apm.pars.scanrate_voltsec
-        * apm.pars.cycles
+        abs(Vapex2_vsRHE - Vapex1_vsRHE)
+        / scanrate_voltsec
+        * cycles
     )
     CV_duration_sec += (
-        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
-        / apm.pars.scanrate_voltsec
+        abs(Vapex2_vsRHE - Vapex1_vsRHE)
+        / scanrate_voltsec
         * 2.0
-        * (apm.pars.cycles - 1)
+        * (cycles - 1)
     )
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = CV_duration_sec
-    if int(round(apm.pars.toggle2_time)) == -1:
-        apm.pars.toggle2_time = CV_duration_sec
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CV_duration_sec
+    if int(round(toggle2_time)) == -1:
+        toggle2_time = CV_duration_sec
 
     # get sample for gamry
     apm.add(
@@ -150,18 +150,18 @@ def ECHEUVIS_sub_CV_led(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name": [illumination_source, toggle2_source],
             "out_name_gamry": None,
             "toggle_init_delay": [
-                apm.pars.toggle_dark_time_init,
-                apm.pars.toggle2_init_delay,
+                toggle_dark_time_init,
+                toggle2_init_delay,
             ],
-            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_duty": [toggle_illum_duty, toggle2_duty],
             "toggle_period": [
-                apm.pars.toggle_illum_period,
-                apm.pars.toggle2_period,
+                toggle_illum_period,
+                toggle2_period,
             ],
-            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+            "toggle_duration": [toggle_illum_time, toggle2_time],
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         process_finish=False,
@@ -177,7 +177,7 @@ def ECHEUVIS_sub_CV_led(
     #     IO_server,
     #     "set_digital_out",
     #     {
-    #         "do_item": apm.pars.illumination_source,
+    #         "do_item": illumination_source,
     #         "on": True,
     #     },
     # )
@@ -190,18 +190,18 @@ def ECHEUVIS_sub_CV_led(
         nonblocking=True,
     )
 
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+    for ss in SPECSRV_MAP[spec_technique]:
         apm.add(
             ss,
             "acquire_spec_extrig",
             {
-                "int_time": apm.pars.spec_int_time_ms,
-                "n_avg": apm.pars.spec_n_avg,
-                "duration": apm.pars.toggle2_time,
+                "int_time": spec_int_time_ms,
+                "n_avg": spec_n_avg,
+                "duration": toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            technique_name=apm.pars.spec_technique,
+            technique_name=spec_technique,
             process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
@@ -211,13 +211,13 @@ def ECHEUVIS_sub_CV_led(
         #     ss,
         #     "acquire_spec_adv",
         #     {
-        #         "int_time_ms": apm.pars.spec_int_time_ms,
-        #         "n_avg": apm.pars.spec_n_avg,
-        #         "duration_sec": apm.pars.toggle2_time,
+        #         "int_time_ms": spec_int_time_ms,
+        #         "n_avg": spec_n_avg,
+        #         "duration_sec": toggle2_time,
         #     },
         #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         #     run_use="data",
-        #     technique_name=apm.pars.spec_technique,
+        #     technique_name=spec_technique,
         #     process_finish=False,
         #     process_contrib=[
         #         ProcessContrib.files,
@@ -232,24 +232,24 @@ def ECHEUVIS_sub_CV_led(
         PSTAT_server,
         "run_CV",
         {
-            "Vinit__V": apm.pars.Vinit_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
-            - 0.059 * apm.pars.solution_ph,
-            "Vapex1__V": apm.pars.Vapex1_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
-            - 0.059 * apm.pars.solution_ph,
-            "Vapex2__V": apm.pars.Vapex2_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
-            - 0.059 * apm.pars.solution_ph,
-            "Vfinal__V": apm.pars.Vfinal_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
-            - 0.059 * apm.pars.solution_ph,
-            "ScanRate__V_s": apm.pars.scanrate_voltsec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "Cycles": apm.pars.cycles,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.gamry_i_range,
+            "Vinit__V": Vinit_vsRHE
+            - 1.0 * ref_vs_nhe
+            - 0.059 * solution_ph,
+            "Vapex1__V": Vapex1_vsRHE
+            - 1.0 * ref_vs_nhe
+            - 0.059 * solution_ph,
+            "Vapex2__V": Vapex2_vsRHE
+            - 1.0 * ref_vs_nhe
+            - 0.059 * solution_ph,
+            "Vfinal__V": Vfinal_vsRHE
+            - 1.0 * ref_vs_nhe
+            - 0.059 * solution_ph,
+            "ScanRate__V_s": scanrate_voltsec,
+            "AcqInterval__s": samplerate_sec,
+            "Cycles": cycles,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_server,
@@ -266,7 +266,7 @@ def ECHEUVIS_sub_CV_led(
     #     IO_server,
     #     "set_digital_out",
     #     {
-    #         "do_item": apm.pars.illumination_source,
+    #         "do_item": illumination_source,
     #         "on": False,
     #     },
     # )
@@ -313,10 +313,10 @@ def ECHEUVIS_sub_CA_led(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.CA_duration_sec
-    if int(round(apm.pars.toggle2_time)) == -1:
-        apm.pars.toggle2_time = apm.pars.CA_duration_sec
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CA_duration_sec
+    if int(round(toggle2_time)) == -1:
+        toggle2_time = CA_duration_sec
 
     # get sample for gamry
     apm.add(
@@ -338,18 +338,18 @@ def ECHEUVIS_sub_CA_led(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name": [illumination_source, toggle2_source],
             "out_name_gamry": None,
             "toggle_init_delay": [
-                apm.pars.toggle_dark_time_init,
-                apm.pars.toggle2_init_delay,
+                toggle_dark_time_init,
+                toggle2_init_delay,
             ],
-            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_duty": [toggle_illum_duty, toggle2_duty],
             "toggle_period": [
-                apm.pars.toggle_illum_period,
-                apm.pars.toggle2_period,
+                toggle_illum_period,
+                toggle2_period,
             ],
-            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+            "toggle_duration": [toggle_illum_time, toggle2_time],
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         process_finish=False,
@@ -365,7 +365,7 @@ def ECHEUVIS_sub_CA_led(
     #     IO_server,
     #     "set_digital_out",
     #     {
-    #         "do_item": apm.pars.illumination_source,
+    #         "do_item": illumination_source,
     #         "on": True,
     #     },
     # )
@@ -373,23 +373,23 @@ def ECHEUVIS_sub_CA_led(
     apm.add(
         CAM_server,
         "acquire_image",
-        {"duration": min(apm.pars.CA_duration_sec, 10), "acqusition_rate": 0.5},
+        {"duration": min(CA_duration_sec, 10), "acqusition_rate": 0.5},
         start_condition=ActionStartCondition.no_wait,
         nonblocking=True,
     )
 
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+    for ss in SPECSRV_MAP[spec_technique]:
         apm.add(
             ss,
             "acquire_spec_extrig",
             {
-                "int_time": apm.pars.spec_int_time_ms,
-                "n_avg": apm.pars.spec_n_avg,
-                "duration": apm.pars.toggle2_time,
+                "int_time": spec_int_time_ms,
+                "n_avg": spec_n_avg,
+                "duration": toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            technique_name=apm.pars.spec_technique,
+            technique_name=spec_technique,
             process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
@@ -399,13 +399,13 @@ def ECHEUVIS_sub_CA_led(
         #     ss,
         #     "acquire_spec_adv",
         #     {
-        #         "int_time_ms": apm.pars.spec_int_time_ms,
-        #         "n_avg": apm.pars.spec_n_avg,
-        #         "duration_sec": apm.pars.toggle2_time,
+        #         "int_time_ms": spec_int_time_ms,
+        #         "n_avg": spec_n_avg,
+        #         "duration_sec": toggle2_time,
         #     },
         #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         #     run_use="data",
-        #     technique_name=apm.pars.spec_technique,
+        #     technique_name=spec_technique,
         #     process_finish=False,
         #     process_contrib=[
         #         ProcessContrib.files,
@@ -417,9 +417,9 @@ def ECHEUVIS_sub_CA_led(
 
     # apply potential
     potential = (
-        apm.pars.CA_potential_vsRHE
-        - 1.0 * apm.pars.ref_vs_nhe
-        - 0.059 * apm.pars.solution_ph
+        CA_potential_vsRHE
+        - 1.0 * ref_vs_nhe
+        - 0.059 * solution_ph
     )
     print(f"ECHE_sub_CA potential: {potential}")
 
@@ -428,11 +428,11 @@ def ECHEUVIS_sub_CA_led(
         "run_CA",
         {
             "Vval__V": potential,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.gamry_i_range,
+            "Tval__s": CA_duration_sec,
+            "AcqInterval__s": samplerate_sec,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_server,
@@ -449,7 +449,7 @@ def ECHEUVIS_sub_CA_led(
     #     IO_server,
     #     "set_digital_out",
     #     {
-    #         "do_item": apm.pars.illumination_source,
+    #         "do_item": illumination_source,
     #         "on": False,
     #     },
     # )
@@ -496,10 +496,10 @@ def ECHEUVIS_sub_CP_led(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.CP_duration_sec
-    if int(round(apm.pars.toggle2_time)) == -1:
-        apm.pars.toggle2_time = apm.pars.CP_duration_sec
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CP_duration_sec
+    if int(round(toggle2_time)) == -1:
+        toggle2_time = CP_duration_sec
 
     # get sample for gamry
     apm.add(
@@ -521,18 +521,18 @@ def ECHEUVIS_sub_CP_led(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name": [illumination_source, toggle2_source],
             "out_name_gamry": None,
             "toggle_init_delay": [
-                apm.pars.toggle_dark_time_init,
-                apm.pars.toggle2_init_delay,
+                toggle_dark_time_init,
+                toggle2_init_delay,
             ],
-            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_duty": [toggle_illum_duty, toggle2_duty],
             "toggle_period": [
-                apm.pars.toggle_illum_period,
-                apm.pars.toggle2_period,
+                toggle_illum_period,
+                toggle2_period,
             ],
-            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+            "toggle_duration": [toggle_illum_time, toggle2_time],
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         process_finish=False,
@@ -548,7 +548,7 @@ def ECHEUVIS_sub_CP_led(
     #     IO_server,
     #     "set_digital_out",
     #     {
-    #         "do_item": apm.pars.illumination_source,
+    #         "do_item": illumination_source,
     #         "on": True,
     #     },
     # )
@@ -556,23 +556,23 @@ def ECHEUVIS_sub_CP_led(
     apm.add(
         CAM_server,
         "acquire_image",
-        {"duration": min(apm.pars.CP_duration_sec, 10), "acqusition_rate": 0.5},
+        {"duration": min(CP_duration_sec, 10), "acqusition_rate": 0.5},
         start_condition=ActionStartCondition.no_wait,
         nonblocking=True,
     )
     
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+    for ss in SPECSRV_MAP[spec_technique]:
         apm.add(
             ss,
             "acquire_spec_extrig",
             {
-                "int_time": apm.pars.spec_int_time_ms,
-                "n_avg": apm.pars.spec_n_avg,
-                "duration": apm.pars.toggle2_time,
+                "int_time": spec_int_time_ms,
+                "n_avg": spec_n_avg,
+                "duration": toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            technique_name=apm.pars.spec_technique,
+            technique_name=spec_technique,
             process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
@@ -582,13 +582,13 @@ def ECHEUVIS_sub_CP_led(
         #     ss,
         #     "acquire_spec_adv",
         #     {
-        #         "int_time_ms": apm.pars.spec_int_time_ms,
-        #         "n_avg": apm.pars.spec_n_avg,
-        #         "duration_sec": apm.pars.toggle2_time,
+        #         "int_time_ms": spec_int_time_ms,
+        #         "n_avg": spec_n_avg,
+        #         "duration_sec": toggle2_time,
         #     },
         #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         #     run_use="data",
-        #     technique_name=apm.pars.spec_technique,
+        #     technique_name=spec_technique,
         #     process_finish=False,
         #     process_contrib=[
         #         ProcessContrib.files,
@@ -603,12 +603,12 @@ def ECHEUVIS_sub_CP_led(
         PSTAT_server,
         "run_CP",
         {
-            "Ival__A": apm.pars.CP_current,
-            "Tval__s": apm.pars.CP_duration_sec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.gamry_i_range,
+            "Ival__A": CP_current,
+            "Tval__s": CP_duration_sec,
+            "AcqInterval__s": samplerate_sec,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_server,
@@ -625,7 +625,7 @@ def ECHEUVIS_sub_CP_led(
     #     IO_server,
     #     "set_digital_out",
     #     {
-    #         "do_item": apm.pars.illumination_source,
+    #         "do_item": illumination_source,
     #         "on": False,
     #     },
     # )
@@ -639,7 +639,7 @@ def ECHEUVIS_sub_interrupt(
     reason: str = "wait",
 ):
     apm = ActionPlanMaker()
-    apm.add(ORCH_server, "interrupt", {"reason": apm.pars.reason})
+    apm.add(ORCH_server, "interrupt", {"reason": reason})
     return apm.action_list
 
 
@@ -681,10 +681,10 @@ def ECHEUVIS_sub_OCV_led(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.OCV_duration_sec
-    if int(round(apm.pars.toggle2_time)) == -1:
-        apm.pars.toggle2_time = apm.pars.OCV_duration_sec
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = OCV_duration_sec
+    if int(round(toggle2_time)) == -1:
+        toggle2_time = OCV_duration_sec
 
     # get sample for gamry
     apm.add(
@@ -706,18 +706,18 @@ def ECHEUVIS_sub_OCV_led(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name": [illumination_source, toggle2_source],
             "out_name_gamry": None,
             "toggle_init_delay": [
-                apm.pars.toggle_dark_time_init,
-                apm.pars.toggle2_init_delay,
+                toggle_dark_time_init,
+                toggle2_init_delay,
             ],
-            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_duty": [toggle_illum_duty, toggle2_duty],
             "toggle_period": [
-                apm.pars.toggle_illum_period,
-                apm.pars.toggle2_period,
+                toggle_illum_period,
+                toggle2_period,
             ],
-            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+            "toggle_duration": [toggle_illum_time, toggle2_time],
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         process_finish=False,
@@ -733,7 +733,7 @@ def ECHEUVIS_sub_OCV_led(
     #     IO_server,
     #     "set_digital_out",
     #     {
-    #         "do_item": apm.pars.illumination_source,
+    #         "do_item": illumination_source,
     #         "on": True,
     #     },
     # )
@@ -741,23 +741,23 @@ def ECHEUVIS_sub_OCV_led(
     apm.add(
         CAM_server,
         "acquire_image",
-        {"duration": min(apm.pars.OCV_duration_sec, 10), "acqusition_rate": 0.5},
+        {"duration": min(OCV_duration_sec, 10), "acqusition_rate": 0.5},
         start_condition=ActionStartCondition.wait_for_orch,
         nonblocking=True,
     )
 
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+    for ss in SPECSRV_MAP[spec_technique]:
         apm.add(
             ss,
             "acquire_spec_extrig",
             {
-                "int_time": apm.pars.spec_int_time_ms,
-                "n_avg": apm.pars.spec_n_avg,
-                "duration": apm.pars.toggle2_time,
+                "int_time": spec_int_time_ms,
+                "n_avg": spec_n_avg,
+                "duration": toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            technique_name=apm.pars.spec_technique,
+            technique_name=spec_technique,
             process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
@@ -767,13 +767,13 @@ def ECHEUVIS_sub_OCV_led(
         #     ss,
         #     "acquire_spec_adv",
         #     {
-        #         "int_time_ms": apm.pars.spec_int_time_ms,
-        #         "n_avg": apm.pars.spec_n_avg,
-        #         "duration_sec": apm.pars.toggle2_time,
+        #         "int_time_ms": spec_int_time_ms,
+        #         "n_avg": spec_n_avg,
+        #         "duration_sec": toggle2_time,
         #     },
         #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         #     run_use="data",
-        #     technique_name=apm.pars.spec_technique,
+        #     technique_name=spec_technique,
         #     process_finish=False,
         #     process_contrib=[
         #         ProcessContrib.files,
@@ -787,11 +787,11 @@ def ECHEUVIS_sub_OCV_led(
         PSTAT_server,
         "run_OCV",
         {
-            "Tval__s": apm.pars.OCV_duration_sec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.gamry_i_range,
+            "Tval__s": OCV_duration_sec,
+            "AcqInterval__s": samplerate_sec,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_server,
@@ -808,7 +808,7 @@ def ECHEUVIS_sub_OCV_led(
         IO_server,
         "set_digital_out",
         {
-            "do_item": apm.pars.illumination_source,
+            "do_item": illumination_source,
             "on": False,
         },
     )
@@ -826,8 +826,8 @@ def ECHEUVIS_sub_disengage(
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     for clear_flag, items in (
-        (apm.pars.clear_ce, ("ce_vent", "ce_pump")),
-        (apm.pars.clear_we, ("we_vent", "we_pump")),
+        (clear_ce, ("ce_vent", "ce_pump")),
+        (clear_we, ("we_vent", "we_pump")),
     ):
         for item in items:
             apm.add(
@@ -836,10 +836,10 @@ def ECHEUVIS_sub_disengage(
                 {"do_item": item, "on": clear_flag},
                 ActionStartCondition.no_wait,
             )
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.vent_wait})
+    apm.add(ORCH_server, "wait", {"waittime": vent_wait})
     # lower z (disengage)
     apm.add(
-        KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height}
+        KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height}
     )
     for i, item in enumerate(["we_vent", "we_pump", "ce_vent", "ce_pump"]):
         apm.add(
@@ -864,7 +864,7 @@ def ECHEUVIS_sub_engage(
     # raise z (engage)
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
-        KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height}
+        KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height}
     )
     # close vent valves
     for item in ("we_vent", "ce_vent"):
@@ -876,9 +876,9 @@ def ECHEUVIS_sub_engage(
         )
     # pull electrolyte through WE and CE chambers
     for item, flow_flag in (
-        ("we_flow", apm.pars.flow_we),
-        ("we_pump", apm.pars.flow_we),
-        ("ce_pump", apm.pars.flow_ce),
+        ("we_flow", flow_we),
+        ("we_pump", flow_we),
+        ("ce_pump", flow_ce),
     ):
         apm.add(
             IO_server,
@@ -887,10 +887,10 @@ def ECHEUVIS_sub_engage(
             ActionStartCondition.no_wait,
         )
     # wait for specified time (seconds)
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.fill_wait})
+    apm.add(ORCH_server, "wait", {"waittime": fill_wait})
     # stop high speed flow, but keep low speed flow if flow_we is True
     for i, (item, flow_flag) in enumerate(
-        [("we_flow", apm.pars.flow_we), ("we_pump", False), ("ce_pump", False)]
+        [("we_flow", flow_we), ("we_pump", False), ("ce_pump", False)]
     ):
         apm.add(
             IO_server,
@@ -916,10 +916,10 @@ def ECHEUVIS_analysis_stability(
         ANA_server,
         "analyze_echeuvis",
         {
-            "sequence_uuid": apm.pars.sequence_uuid,
-            "plate_id": apm.pars.plate_id,
-            "recent": apm.pars.recent,
-            "params": apm.pars.params,
+            "sequence_uuid": sequence_uuid,
+            "plate_id": plate_id,
+            "recent": recent,
+            "params": params,
         },
     )
     return apm.action_list
