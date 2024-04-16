@@ -16,13 +16,13 @@ __all__ = [
     "ECHEUVIS_analysis_stability",
 ]
 
-from ..helpers import logging
+from helao.helpers import logging
 if logging.LOGGER is None:
     logger = logging.make_logger(logger_name="gamry_driver_standalone")
 else:
     logger = logging.LOGGER
 
-from ..helpers import config_loader
+from helao.helpers import config_loader
 if config_loader.CONFIG is None:
     rootcfg = {}
 else:
@@ -31,9 +31,9 @@ else:
 from typing import Optional
 from socket import gethostname
 
-from ..helpers.premodels import Experiment, ActionPlanMaker
-from ..helpers.spec_map import SPECSRV_MAP
-from ..drivers.io.enum import TriggerType
+from helao.helpers.premodels import Experiment, ActionPlanMaker
+from helao.helpers.spec_map import SPECSRV_MAP
+from helao.drivers.io.enum import TriggerType
 
 from helaocore.models.action_start_condition import ActionStartCondition
 from helaocore.models.machine import MachineModel as MM
