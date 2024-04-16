@@ -16,6 +16,7 @@ from typing import List
 from uuid import UUID
 import json
 import traceback
+import inspect
 
 import time
 from functools import partial
@@ -560,8 +561,15 @@ class Orch(Base):
         # self.print_message(
         #     f"unpacking actions for {self.active_experiment.experiment_name}"
         # )
+        exp_func = self.experiment_lib[self.active_experiment.experiment_name]
+        exp_func_args = inspect.getfullargspec(exp_func).args
+        supplied_params = {
+            k: v
+            for k, v in self.active_experiment.experiment_params.items()
+            if k in exp_func_args
+        }
         unpacked_acts = self.experiment_lib[self.active_experiment.experiment_name](
-            self.active_experiment
+            self.active_experiment, **supplied_params
         )
         self.active_experiment.experiment_codehash = self.experiment_codehash_lib[
             self.active_experiment.experiment_name

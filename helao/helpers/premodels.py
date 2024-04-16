@@ -27,7 +27,12 @@ from helaocore.models.sequence import SequenceModel
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.action_start_condition import ActionStartCondition
 
-# from helaocore.models.error import ErrorCodes
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    logger = logging.make_logger(logger_name="default_premodels")
+else:
+    logger = logging.LOGGER
 
 
 class Sequence(SequenceModel):
@@ -282,6 +287,9 @@ class ActionPlanMaker:
         self.pars = self._C()
 
         exp_paramdict = {}
+        
+        logger.debug(f"args {_args}")
+        logger.debug(f"locals {_locals}")
 
         # find the Experiment Basemodel
         # and add all other params to a dict
@@ -309,19 +317,22 @@ class ActionPlanMaker:
                     )
             else:
                 exp_paramdict.update({arg: argparam})
-
+        logger.debug(f"exp_paramdict {exp_paramdict}")
+              
         # check if an Experiment was detected
         if self._experiment is None:
             print_message(
                 {},
                 "actionplanmaker",
-                f"{self.expname}: critical error: "
+                f"{self.expname}: warning: "
                 f"no Experiment BaseModel was found "
                 f"by ActionPlanMaker, "
                 f"using blank Experiment.",
-                error=True,
+                warning=True,
             )
             self._experiment = Experiment()
+
+        logger.debug(f"experiment.experiment_params {self._experiment.experiment_params}")
 
         # add all experiment_params under self.pars
         if self._experiment.experiment_params is not None:
