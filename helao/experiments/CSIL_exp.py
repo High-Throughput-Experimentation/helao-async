@@ -2166,9 +2166,11 @@ def CCSI_sub_n2flush(
 
 def CCSI_sub_n2clean(
     experiment: Experiment,
-    experiment_version: int = 5,  # added n2headspace, n2 push remove n2headspace, 5 measure delay
+    experiment_version: int = 6,  # added n2headspace, n2 push remove n2headspace, 5 measure delay 6 add rinses
     Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 10000,
+    total_sample_volume_ul: float = 5000,
+    number_full_rinses: int = 2,
     Syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
     n2_push: bool = True,
@@ -2201,28 +2203,18 @@ def CCSI_sub_n2clean(
     #
     apm = ActionPlanMaker()
 
+#initial sample volume rinse
     apm.add_action_list(
         CCSI_sub_cellfill(
             experiment=experiment,
             Solution_reservoir_sample_no=1,
             Solution_volume_ul=0,
             Waterclean_reservoir_sample_no=apm.pars.Waterclean_reservoir_sample_no,
-            Waterclean_volume_ul=apm.pars.Waterclean_volume_ul,
+            Waterclean_volume_ul=apm.pars.total_sample_volume_ul,
             Syringe_rate_ulsec=apm.pars.Syringe_rate_ulsec,
             n2_push=apm.pars.n2_push,
         )
     )
-
-    # apm.add_action_list(
-    #     CCSI_sub_n2headspace(
-    #         experiment=experiment,
-    #         n2flowrate_sccm = apm.pars.n2flowrate_sccm,
-    #         HSpurge_duration = apm.pars.HSHSpurge_duration,
-    #         recirculation = apm.pars.HSrecirculation,
-    #         recirculation_duration = apm.pars.HSrecirculation_duration,
-    #         recirculation_rate_uL_min = apm.pars.recirculation_rate_uL_min,
-    #     )
-    # )
 
     apm.add_action_list(
         CCSI_sub_n2drain(
@@ -2242,6 +2234,50 @@ def CCSI_sub_n2clean(
             Syringe_rate_ulsec=100,
         )
     )
+
+#rinse cycles
+    for i in range(number_full_rinses):
+        apm.add_action_list(
+            CCSI_sub_cellfill(
+                experiment=experiment,
+                Solution_reservoir_sample_no=1,
+                Solution_volume_ul=0,
+                Waterclean_reservoir_sample_no=apm.pars.Waterclean_reservoir_sample_no,
+                Waterclean_volume_ul=apm.pars.Waterclean_volume_ul,
+                Syringe_rate_ulsec=apm.pars.Syringe_rate_ulsec,
+                n2_push=apm.pars.n2_push,
+            )
+        )
+
+        # apm.add_action_list(
+        #     CCSI_sub_n2headspace(
+        #         experiment=experiment,
+        #         n2flowrate_sccm = apm.pars.n2flowrate_sccm,
+        #         HSpurge_duration = apm.pars.HSHSpurge_duration,
+        #         recirculation = apm.pars.HSrecirculation,
+        #         recirculation_duration = apm.pars.HSrecirculation_duration,
+        #         recirculation_rate_uL_min = apm.pars.recirculation_rate_uL_min,
+        #     )
+        # )
+
+        apm.add_action_list(
+            CCSI_sub_n2drain(
+                experiment=experiment,
+                n2flowrate_sccm=apm.pars.n2flowrate_sccm,
+                HSpurge_duration=apm.pars.drain_HSpurge_duration,
+                DeltaDilute1_duration=apm.pars.DeltaDilute1_duration,
+                recirculation_duration=apm.pars.drain_recirculation_duration,
+                recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
+            )
+        )
+
+        apm.add_action_list(
+            CCSI_sub_refill_clean(
+                experiment=experiment,
+                Waterclean_volume_ul=apm.pars.Waterclean_volume_ul,
+                Syringe_rate_ulsec=100,
+            )
+        )
 
     apm.add_action_list(
         CCSI_sub_n2flush(
