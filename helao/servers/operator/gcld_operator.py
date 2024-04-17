@@ -10,7 +10,6 @@ from pprint import pprint
 
 from helao.servers.operator.helao_operator import HelaoOperator
 
-# from helao.helpers.gcld_client import DataRequestsClient
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
 from data_request_client.models import Status
 from helao.helpers.premodels import Sequence
@@ -23,65 +22,12 @@ from helaocore.models.orchstatus import LoopStatus
 
 TEST = True
 
-# TEST_SMPS_2286 = [
-#     {
-#         "sample_no": 14060,
-#         "composition": {"Fe": 0.516317, "Sb": 0.483683},
-#         "parameters": {"z_start": 1.0, "z_direction": "up"},
-#     },
-#     {
-#         "sample_no": 10695,
-#         "composition": {"Fe": 0.301409, "Sb": 0.698591},
-#         "parameters": {"z_start": 0.2, "z_direction": "down"},
-#     },
-#     {
-#         "sample_no": 3175,
-#         "composition": {"Fe": 0.756378, "Sb": 0.243622},
-#         "parameters": {"z_start": 0.6, "z_direction": "down"},
-#     },
-#     {
-#         "sample_no": 9030,
-#         "composition": {"Fe": 0.298030, "Sb": 0.701970},
-#         "parameters": {"z_start": 2.0, "z_direction": "up"},
-#     },
-#     {
-#         "sample_no": 18984,
-#         "composition": {"Fe": 0.217839, "Sb": 0.782161},
-#         "parameters": {"z_start": 1.4, "z_direction": "down"},
-#     },
-# ]
-
-# print({k: v for k, v in os.environ.items() if k in ('API_KEY', 'BASE_URL')})
-
-TEST_SMPS_2286 = [
-    {
-        "sample_no": 14060,
-        "composition": {"Fe": 0.516317, "Sb": 0.483683},
-        "parameters": {"z_start": 1.0, "z_direction": "up"},
-    },
-    {
-        "sample_no": 10695,
-        "composition": {"Fe": 0.301409, "Sb": 0.698591},
-        "parameters": {"z_start": 0.2, "z_direction": "down"},
-    },
-    {
-        "sample_no": 3175,
-        "composition": {"Fe": 0.756378, "Sb": 0.243622},
-        "parameters": {"z_start": 0.6, "z_direction": "down"},
-    },
-    {
-        "sample_no": 9030,
-        "composition": {"Fe": 0.298030, "Sb": 0.701970},
-        "parameters": {"z_start": 2.0, "z_direction": "up"},
-    },
-    {
-        "sample_no": 18984,
-        "composition": {"Fe": 0.217839, "Sb": 0.782161},
-        "parameters": {"z_start": 1.4, "z_direction": "down"},
-    },
+MEASURED_6083 = [
+    766, 802, 1872, 3096, 3113, 3131, 4479, 4550, 7571, 7633, 9012, 9056, 9065, 9083,
+    9109, 10739, 12439, 13989, 13989, 14069, 14087, 14122, 15654, 15760, 17319, 17319,
+    17346, 17461, 19028, 19117, 20461, 22035, 22044, 22079, 23579, 23606, 23641, 24980,
+    26230, 26283, 27300, 27362,
 ]
-
-MEASURED_6083 = [766, 802, 1872, 3096, 3113, 3131, 4479, 4550, 7571, 7633, 9012, 9056, 9065, 9083, 9109, 10739, 12439, 13989, 13989, 14069, 14087, 14122, 15654, 15760, 17319, 17319, 17346, 17461, 19028, 19117, 20461, 22035, 22044, 22079, 23579, 23606, 23641, 24980, 26230, 26283, 27300, 27362,]
 
 TEST_SMPS_6083 = [{"sample_no": s, "composition": {"Mn": 0.5, "Sb": 0.5}, "parameters": {"z_start": 1.2, "z_direction": "up"}} for s in MEASURED_6083]
 
@@ -333,17 +279,6 @@ def main():
 
             sample_no = int(data_request.sample_label.split("_")[-1])
 
-            # # DRY MEASUREMENT
-            # seq = seq_constructor(
-            #     PLATE_ID,
-            #     sample_no,
-            #     data_request.id,
-            #     UVIS_T,
-            #     "UVIS_T",
-            #     "gcld-mvp-demo",
-            #     UVIS_T_defaults,
-            # )
-
             # INSITU params
             z_start = data_request.parameters["z_start"]
             scan_down = (
@@ -446,17 +381,6 @@ def main():
                 )
                 time.sleep(10)
                 num_sync_tasks = num_uploads(db_cfg)
-
-            # # DRY ANALYSIS
-            # ana = ana_constructor(
-            #     PLATE_ID,
-            #     str(seq.sequence_uuid),
-            #     data_request.id,
-            #     UVIS_T_postseq,
-            #     "UVIS_T_postseq",
-            #     "gcld-mvp-demo-analysis",
-            #     UVIS_T_postseq_defaults,
-            # )
 
             # INSITU ANALYSIS
             ana_seq = ana_constructor(
