@@ -889,8 +889,8 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # =============================================================================
 
 def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed previously
-    sequence_version: int = 14, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
-#                   v 14, list for solution/total sample volumes+ extra clean
+    sequence_version: int = 15, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
+#                   v 14, list for solution/total sample volumes+ extra clean 15 added rinses
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [0,0,0],
@@ -929,8 +929,9 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     # HSHSPurge_duration: float = 120, 
     # HSrecirculation: bool = True,
     # HSrecirculation_duration: float = 60,
-    LiquidCleanPurge_duration: float = 400,
-    LiquidCleanPurge_recirc_duration: float = 200,
+    LiquidClean_full_rinses: int = 2,
+    LiquidCleanPurge_duration: float = 100,
+    LiquidCleanPurge_recirc_duration: float = 50,
     FlushPurge_duration: float = 30,
     flush_Manpurge1_duration: float = 30,
     flush_Alphapurge1_duration: float = 10,
@@ -1028,6 +1029,8 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
         epm.add_experiment("CCSI_sub_n2clean", {
             "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
             "Waterclean_volume_ul": drainclean_volume_ul,
+            "total_sample_volume_ul": total_sample_volume_ul,
+            "number_full_rinses": LiquidClean_full_rinses,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidFillWait_s": LiquidFillWait_s,
             "n2flowrate_sccm":n2flowrate_sccm,
