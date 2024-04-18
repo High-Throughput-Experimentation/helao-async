@@ -72,7 +72,7 @@ class BaseAPI(HelaoFastAPI):
                     == 0
                     or start_cond == ASC.no_wait
                 ):
-                    logger.info("action endpoint is available")
+                    logger.debug("action endpoint is available")
                     response = await call_next(request)
                 else:  # collision between two base requests for one resource, queue
                     logger.info("action endpoint is busy, queuing")
