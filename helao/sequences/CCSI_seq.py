@@ -1058,7 +1058,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
 
         epm.add_experiment("CCSI_sub_n2clean", {
             "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-            "Waterclean_volume_ul": drainclean_volume_ul,
+            "waterclean_volume_ul": drainclean_volume_ul,
             "total_sample_volume_ul": total_sample_volume_ul[i],
             "number_full_rinses": LiquidClean_full_rinses,
             "rinse_agitation": LiquidClean_rinse_agitation,
