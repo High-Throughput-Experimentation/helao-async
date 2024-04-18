@@ -2166,9 +2166,9 @@ def CCSI_sub_n2flush(
 
 def CCSI_sub_n2clean(
     experiment: Experiment,
-    experiment_version: int = 7,  # added n2headspace, n2 push remove n2headspace, 5 measure delay 6 add rinses/7agitation
+    experiment_version: int = 8,  # added n2headspace, n2 push remove n2headspace, 5 measure delay 6 add rinses/7agitation/8renamevolumeparam
     Waterclean_reservoir_sample_no: int = 1,
-    Waterclean_volume_ul: float = 10000,
+    waterclean_volume_ul: float = 10000,
     total_sample_volume_ul: float = 5000,
     number_full_rinses: int = 2,
     rinse_agitation: bool = False,
@@ -2240,7 +2240,7 @@ def CCSI_sub_n2clean(
     apm.add_action_list(
         CCSI_sub_refill_clean(
             experiment=experiment,
-            Waterclean_volume_ul=apm.pars.Waterclean_volume_ul,
+            Waterclean_volume_ul=apm.pars.total_sample_volume_ul,
             Syringe_rate_ulsec=800,
         )
     )
@@ -2255,7 +2255,7 @@ def CCSI_sub_n2clean(
                 Solution_reservoir_sample_no=1,
                 Solution_volume_ul=0,
                 Waterclean_reservoir_sample_no=apm.pars.Waterclean_reservoir_sample_no,
-                Waterclean_volume_ul=apm.pars.Waterclean_volume_ul,
+                Waterclean_volume_ul=apm.pars.waterclean_volume_ul,
                 Syringe_rate_ulsec=apm.pars.Syringe_rate_ulsec,
                 n2_push=apm.pars.n2_push,
             )
@@ -2285,7 +2285,7 @@ def CCSI_sub_n2clean(
         apm.add_action_list(
             CCSI_sub_refill_clean(
                 experiment=experiment,
-                Waterclean_volume_ul=apm.pars.Waterclean_volume_ul,
+                Waterclean_volume_ul=apm.pars.waterclean_volume_ul,
                 Syringe_rate_ulsec=800,
             )
         )
