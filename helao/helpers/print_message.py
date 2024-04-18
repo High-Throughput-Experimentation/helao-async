@@ -27,7 +27,7 @@ def print_message(server_cfg={}, server_name=None, *args, **kwargs):
     if "error" in kwargs:
         precolor = f"{Style.BRIGHT}{Fore.WHITE}{Back.RED}"
         msg_type = "error_"
-    elif "warning" in kwargs:
+    elif "warning" in kwargs or "warn" in kwargs:
         precolor = f"{Fore.BLACK}{Back.YELLOW}"
         msg_type = "warning_"
     elif "info" in kwargs:
@@ -40,7 +40,7 @@ def print_message(server_cfg={}, server_name=None, *args, **kwargs):
         precolor = f"{Style.RESET_ALL}"
 
     srv_type = server_cfg.get("group", "")
-    cmd_print = server_cfg.get("cmd_print", True)
+    cmd_print = server_cfg.get("cmd_print", False)
     style = ""
     if srv_type == "orchestrator":
         style = f"{Style.BRIGHT}{Fore.GREEN}"
@@ -55,7 +55,7 @@ def print_message(server_cfg={}, server_name=None, *args, **kwargs):
 
     msg_part1 = f"[{strftime('%H:%M:%S')}_{server_name}]:"
 
-    if cmd_print:
+    if cmd_print or server_cfg.get("verbose", False) or ("errror" in kwargs or "warning" in kwargs):
         with colorama_text():
             if "error" in kwargs:
                 cprint(
