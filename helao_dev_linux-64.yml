@@ -7,6 +7,8 @@ dependencies:
     - aiodebug
     - aioshutil
     - plumbum
+    - pydantic-settings==2
+    - pydantic==2
     - pyft232
     - pylablib
     - sqlmodel
@@ -37,8 +39,6 @@ dependencies:
   - psycopg2
   - pyaml
   - pybase64
-  - pydantic-settings
-  - pydantic=2
   - pyfiglet
   - pyftdi
   - pymodbus
