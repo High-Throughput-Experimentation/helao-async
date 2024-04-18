@@ -54,7 +54,7 @@ CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
 ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
-toggle_triggertype = TriggerType.rising_edge
+toggle_triggertype = TriggerType.risingedge
 
 
 def ECHEUVIS_sub_startup(experiment: Experiment):
