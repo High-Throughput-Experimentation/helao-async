@@ -2166,11 +2166,12 @@ def CCSI_sub_n2flush(
 
 def CCSI_sub_n2clean(
     experiment: Experiment,
-    experiment_version: int = 6,  # added n2headspace, n2 push remove n2headspace, 5 measure delay 6 add rinses
+    experiment_version: int = 7,  # added n2headspace, n2 push remove n2headspace, 5 measure delay 6 add rinses/7agitation
     Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 10000,
     total_sample_volume_ul: float = 5000,
     number_full_rinses: int = 2,
+    rinse_agitation: bool = False,
     Syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
     n2_push: bool = True,
@@ -2215,6 +2216,15 @@ def CCSI_sub_n2clean(
             n2_push=apm.pars.n2_push,
         )
     )
+    if apm.pars.rinse_agitation:
+        apm.add(
+            DOSEPUMP_server,
+            "run_continuous",
+            {
+                "rate_uL_min": apm.pars.recirculation_rate_uL_min,
+                "duration_sec": apm.pars.Sensorpurge1_duration,  #arbitrarily set to this
+            },  
+        )
 
     apm.add_action_list(
         CCSI_sub_n2drain(
@@ -2231,12 +2241,14 @@ def CCSI_sub_n2clean(
         CCSI_sub_refill_clean(
             experiment=experiment,
             Waterclean_volume_ul=apm.pars.Waterclean_volume_ul,
-            Syringe_rate_ulsec=100,
+            Syringe_rate_ulsec=800,
         )
     )
 
 #rinse cycles
-    for i in range(number_full_rinses):
+    if apm.pars.number_full_rinses == 0:
+        apm.pars.number_full_rinses += 1
+    for i in range(apm.pars.number_full_rinses-1):
         apm.add_action_list(
             CCSI_sub_cellfill(
                 experiment=experiment,
@@ -2249,16 +2261,15 @@ def CCSI_sub_n2clean(
             )
         )
 
-        # apm.add_action_list(
-        #     CCSI_sub_n2headspace(
-        #         experiment=experiment,
-        #         n2flowrate_sccm = apm.pars.n2flowrate_sccm,
-        #         HSpurge_duration = apm.pars.HSHSpurge_duration,
-        #         recirculation = apm.pars.HSrecirculation,
-        #         recirculation_duration = apm.pars.HSrecirculation_duration,
-        #         recirculation_rate_uL_min = apm.pars.recirculation_rate_uL_min,
-        #     )
-        # )
+        if apm.pars.rinse_agitation:
+            apm.add(
+                DOSEPUMP_server,
+                "run_continuous",
+                {
+                    "rate_uL_min": apm.pars.recirculation_rate_uL_min,
+                    "duration_sec": apm.pars.Sensorpurge1_duration,  #arbitrarily set to this
+                },  
+            )
 
         apm.add_action_list(
             CCSI_sub_n2drain(
@@ -2275,7 +2286,7 @@ def CCSI_sub_n2clean(
             CCSI_sub_refill_clean(
                 experiment=experiment,
                 Waterclean_volume_ul=apm.pars.Waterclean_volume_ul,
-                Syringe_rate_ulsec=100,
+                Syringe_rate_ulsec=800,
             )
         )
 
