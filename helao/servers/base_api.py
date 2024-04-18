@@ -55,13 +55,13 @@ class BaseAPI(HelaoFastAPI):
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.method == "HEAD":  # comes from endpoint checker, session.head()
-                logger.info("got HEAD request in middleware")
+                logger.debug("got HEAD request in middleware")
                 response = Response()
             elif (
                 request.url.path.strip("/").startswith(f"{server_key}/")
                 and request.method == "POST"
             ):
-                logger.info("got action POST request in middleware")
+                logger.debug("got action POST request in middleware")
                 body_bytes = await request.body()
                 body_dict = json.loads(body_bytes)
                 action_dict = body_dict.get("action", {})
