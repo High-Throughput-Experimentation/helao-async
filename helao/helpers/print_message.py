@@ -55,7 +55,7 @@ def print_message(server_cfg={}, server_name=None, *args, **kwargs):
 
     msg_part1 = f"[{strftime('%H:%M:%S')}_{server_name}]:"
 
-    if cmd_print or server_cfg.get("verbose", False) or ("errror" in kwargs or "warning" in kwargs):
+    if cmd_print or server_cfg.get("verbose", False) or any([k in kwargs for k in ["error", "warn", "warning", "info"]]):
         with colorama_text():
             if "error" in kwargs:
                 cprint(
@@ -72,7 +72,7 @@ def print_message(server_cfg={}, server_name=None, *args, **kwargs):
 
     output_path = kwargs.get("log_dir", None)
     if output_path is not None and (
-        ("error" in kwargs or "warning" in kwargs) or server_cfg.get("verbose", False)
+        any([k in kwargs for k in ["error", "warn", "warning"]]) or server_cfg.get("verbose", False)
     ):
         write_log_file(
             server_name=server_name,
