@@ -58,7 +58,6 @@ dependencies:
   - scipy
   - shortuuid
   - sqlalchemy
-  - sqlite
   - sshtunnel
   - starlette
   - termcolor
