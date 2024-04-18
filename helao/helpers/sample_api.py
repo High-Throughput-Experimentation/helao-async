@@ -849,7 +849,7 @@ class UnifiedSampleDataAPI:
         retval = []
 
         for i,sample_ in enumerate(samples):
-            print("sample", i, ":", sample_)
+            # print("sample", i, ":", sample_)
             sample = object_to_sample(sample_)
             self._base.print_message(
                 f"retrieving sample {sample.get_global_label()} of sample_type {sample.sample_type}",
