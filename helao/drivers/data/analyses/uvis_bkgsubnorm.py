@@ -90,6 +90,8 @@ class DryUvisInputs:
         sample_no: int,
         query_df: pd.DataFrame,
     ):
+        self.plate_id = plate_id
+        self.sample_no = sample_no
         suuid = (
             query_df.query("process_uuid==@insitu_process_uuid").iloc[0].sequence_uuid
         )
@@ -143,10 +145,10 @@ class DryUvisInputs:
         return self.insitu_spec_act.hlo
 
     def get_datamodels(self, global_sample_label: str, *args, **kwargs) -> List[AnalysisDataModel]:
-        action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
+        action_keys = [k for k in vars(self).keys() if "spec_act" in k]
         inputs = []
         for ak in action_keys:
-            euis = vars(self.inputs)[ak]
+            euis = vars(self)[ak]
             ru = ak.split("_spec")[0].replace("insitu", "data")
             if not isinstance(euis, list):
                 euis = [euis]
