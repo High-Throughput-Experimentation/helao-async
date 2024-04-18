@@ -2246,9 +2246,7 @@ def CCSI_sub_n2clean(
     )
 
 #rinse cycles
-    if apm.pars.number_full_rinses == 0:
-        apm.pars.number_full_rinses += 1
-    for i in range(apm.pars.number_full_rinses-1):
+    for i in range(apm.pars.number_full_rinses):
         apm.add_action_list(
             CCSI_sub_cellfill(
                 experiment=experiment,
