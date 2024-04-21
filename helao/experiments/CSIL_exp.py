@@ -459,12 +459,12 @@ def CCSI_sub_drain(
 
 def CCSI_sub_n2drain(
     experiment: Experiment,
-    experiment_version: int = 3,  # new recirculation 3 new wait
+    experiment_version: int = 4,  # new recirculation 3 new wait 4 rename recirculation
     n2flowrate_sccm: float = 10,
     HSpurge_duration: float = 240,
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
-    recirculation: bool = True,
+    drain_recirculation: bool = True,
     recirculation_duration: float = 120,
     recirculation_rate_uL_min: int = 10000,
 ):
@@ -506,7 +506,7 @@ def CCSI_sub_n2drain(
 
     apm.add(PAL_server, "archive_custom_unloadall", {}, asc.no_wait)
 
-    if apm.pars.recirculation:
+    if apm.pars.drain_recirculation:
         apm.add(
             ORCH_server,
             "wait",
@@ -2236,7 +2236,7 @@ def CCSI_sub_n2clean(
             # DeltaDilute1_duration=apm.pars.DeltaDilute1_duration,
             # recirculation_duration=apm.pars.drain_recirculation_duration,
             # recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
-            recirculation= False,
+            drain_recirculation= False,
         )
     )
 
@@ -2280,7 +2280,7 @@ def CCSI_sub_n2clean(
                 # DeltaDilute1_duration=apm.pars.DeltaDilute1_duration,
                 # recirculation_duration=apm.pars.drain_recirculation_duration,
                 # recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
-                recirculation= False,
+                drain_recirculation= False,
             )
         )
 
