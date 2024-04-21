@@ -459,7 +459,7 @@ def CCSI_sub_drain(
 
 def CCSI_sub_n2drain(
     experiment: Experiment,
-    experiment_version: int = 2,  # new recirculation
+    experiment_version: int = 3,  # new recirculation 3 new wait
     n2flowrate_sccm: float = 10,
     HSpurge_duration: float = 240,
     DeltaDilute1_duration: float = 0,
@@ -510,7 +510,7 @@ def CCSI_sub_n2drain(
         apm.add(
             ORCH_server,
             "wait",
-            {"waittime": apm.pars.HSpurge_duration / 2},
+            {"waittime": apm.pars.HSpurge_duration - apm.pars.recirculation_duration},
             asc.no_wait,
         )
         apm.add(
@@ -2167,6 +2167,7 @@ def CCSI_sub_n2flush(
 def CCSI_sub_n2clean(
     experiment: Experiment,
     experiment_version: int = 8,  # added n2headspace, n2 push remove n2headspace, 5 measure delay 6 add rinses/7agitation/8renamevolumeparam
+                            #9change to no recirc drains, add one
     Waterclean_reservoir_sample_no: int = 1,
     waterclean_volume_ul: float = 10000,
     total_sample_volume_ul: float = 5000,
@@ -2179,6 +2180,7 @@ def CCSI_sub_n2clean(
     # HSHSpurge_duration: float = 120,
     # HSrecirculation: bool = True,
     # HSrecirculation_duration: float = 60,
+    rinse_HSpurge_duration: float = 80,
     drain_HSpurge_duration: float = 300,
     drain_recirculation_duration: float = 150,
     flush_HSpurge1_duration: float = 30,
@@ -2230,10 +2232,11 @@ def CCSI_sub_n2clean(
         CCSI_sub_n2drain(
             experiment=experiment,
             n2flowrate_sccm=apm.pars.n2flowrate_sccm,
-            HSpurge_duration=apm.pars.drain_HSpurge_duration,
-            DeltaDilute1_duration=apm.pars.DeltaDilute1_duration,
-            recirculation_duration=apm.pars.drain_recirculation_duration,
-            recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
+            HSpurge_duration=apm.pars.rinse_HSpurge_duration,
+            # DeltaDilute1_duration=apm.pars.DeltaDilute1_duration,
+            # recirculation_duration=apm.pars.drain_recirculation_duration,
+            # recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
+            recirculation= False,
         )
     )
 
@@ -2273,10 +2276,11 @@ def CCSI_sub_n2clean(
             CCSI_sub_n2drain(
                 experiment=experiment,
                 n2flowrate_sccm=apm.pars.n2flowrate_sccm,
-                HSpurge_duration=apm.pars.drain_HSpurge_duration,
-                DeltaDilute1_duration=apm.pars.DeltaDilute1_duration,
-                recirculation_duration=apm.pars.drain_recirculation_duration,
-                recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
+                HSpurge_duration=apm.pars.rinse_HSpurge_duration,
+                # DeltaDilute1_duration=apm.pars.DeltaDilute1_duration,
+                # recirculation_duration=apm.pars.drain_recirculation_duration,
+                # recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
+                recirculation= False,
             )
         )
 
@@ -2287,6 +2291,17 @@ def CCSI_sub_n2clean(
                 Syringe_rate_ulsec=800,
             )
         )
+
+    apm.add_action_list(
+        CCSI_sub_n2drain(
+            experiment=experiment,
+            n2flowrate_sccm=apm.pars.n2flowrate_sccm,
+            HSpurge_duration=apm.pars.drain_HSpurge_duration,
+            DeltaDilute1_duration=apm.pars.DeltaDilute1_duration,
+            recirculation_duration=apm.pars.drain_recirculation_duration,
+            recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
+        )
+    )
 
     apm.add_action_list(
         CCSI_sub_n2flush(
