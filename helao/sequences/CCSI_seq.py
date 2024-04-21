@@ -1023,7 +1023,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "n2flowrate_sccm":n2flowrate_sccm,
             "HSpurge_duration": SamplePurge_duration,
             "DeltaDilute1_duration": 0,
-            "recirculation":drainrecirc,
+            "drain_recirculation":drainrecirc,
             "recirculation_duration":recirculation_duration, 
             "recirculation_rate_uL_min":clean_recirculation_rate_uL_min})
 ##############################################3
