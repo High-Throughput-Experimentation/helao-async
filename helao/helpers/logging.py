@@ -20,7 +20,6 @@ import os
 from typing import Optional
 from pathlib import Path
 
-
 LOGGER = None
 
 
@@ -49,8 +48,8 @@ def make_logger(
         style='%'
     )
 
-    logger = logging.getLogger(logger_name)
-    logger.setLevel(log_level)
+    logger_instance = logging.getLogger(logger_name)
+    logger_instance.setLevel(log_level)
 
     # create handlers
     console = logging.StreamHandler()
@@ -64,7 +63,7 @@ def make_logger(
     handlers = [console, timed_rotation]
     for handler in handlers:
         handler.setLevel(log_level)
-        logger.addHandler(handler)
+        logger_instance.addHandler(handler)
 
-    logger.info(f"writing log events to {log_path}")
-    return logger
+    logger_instance.info(f"writing log events to {log_path}")
+    return logger_instance

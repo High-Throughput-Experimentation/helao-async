@@ -33,9 +33,9 @@ from dataclasses import dataclass, field
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="default_helaodriver")
+    LOGGER = logging.make_logger(logger_name="default_helaodriver")
 else:
-    logger = logging.LOGGER
+    LOGGER = logging.LOGGER
 
 
 class DriverStatus(StrEnum):
@@ -145,26 +145,26 @@ class DriverPoller:
         self._base_hook = None
 
     async def _start_polling(self):
-        logger.info("got 'start_polling' request, raising signal")
+        LOGGER.info("got 'start_polling' request, raising signal")
         await self.poll_signalq.put(True)
         while not self.polling:
-            logger.info("waiting for polling loop to start")
+            LOGGER.info("waiting for polling loop to start")
             await asyncio.sleep(0.1)
 
     async def _stop_polling(self):
-        logger.info("got 'stop_polling' request, raising signal")
+        LOGGER.info("got 'stop_polling' request, raising signal")
         await self.poll_signalq.put(False)
         while self.polling:
-            logger.info("waiting for polling loop to stop")
+            LOGGER.info("waiting for polling loop to stop")
             await asyncio.sleep(0.1)
 
     async def _poll_signal_loop(self):
         while True:
             self.polling = await self.poll_signalq.get()
-            logger.info("polling signal received")
+            LOGGER.info("polling signal received")
 
     async def _poll_sensor_loop(self):
-        logger.info("polling task has started")
+        LOGGER.info("polling task has started")
         while True:
             if self.polling:
                 resp = self.get_data()
@@ -177,5 +177,5 @@ class DriverPoller:
             await asyncio.sleep(self.wait_time)
 
     def get_data(self) -> DriverResponse:
-        logger.info("DriverPoller.get_data() has not been implemented")
+        LOGGER.info("DriverPoller.get_data() has not been implemented")
         return DriverResponse()

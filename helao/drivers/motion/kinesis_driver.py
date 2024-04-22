@@ -24,9 +24,9 @@ stage.get_full_status()
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="kinesis_driver_standalone")
+    LOGGER = logging.make_logger(logger_name="kinesis_driver_standalone")
 else:
-    logger = logging.LOGGER
+    LOGGER = logging.LOGGER
 
 from enum import Enum
 from typing import Optional
@@ -81,13 +81,13 @@ class KinesisMotor(HelaoDriver):
                 "dev_kinesis", {key: key for key in self.motors}
             )
 
-            logger.info(f"Managing {len(self.motors)} devices:\n{self.motors.keys()}")
+            LOGGER.info(f"Managing {len(self.motors)} devices:\n{self.motors.keys()}")
 
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
-            logger.error("connection failed", exc_info=True)
+            LOGGER.error("connection failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -113,7 +113,7 @@ class KinesisMotor(HelaoDriver):
                 response=DriverResponseType.success, data=state, status=DriverStatus.ok
             )
         except Exception:
-            logger.error("get_status failed", exc_info=True)
+            LOGGER.error("get_status failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -130,16 +130,16 @@ class KinesisMotor(HelaoDriver):
                 self.motors[axis].setup_velocity(
                     acceleration=acceleration, max_velocity=velocity, scale=True
                 )
-                logger.info(f"velocity and acceleration set for axis: {axis}")
+                LOGGER.info(f"velocity and acceleration set for axis: {axis}")
             else:
-                logger.info("neither velocity nor acceleration were specified")
+                LOGGER.info("neither velocity nor acceleration were specified")
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="setup complete",
                 status=DriverStatus.ok,
             )
         except Exception:
-            logger.error("setup failed", exc_info=True)
+            LOGGER.error("setup failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -151,7 +151,7 @@ class KinesisMotor(HelaoDriver):
                 move_func = self.motors[axis].move_by
             elif move_mode == MoveModes.absolute:
                 move_func = self.motors[axis].move_to
-                logger.info("kinesis motor starting motion")
+                LOGGER.info("kinesis motor starting motion")
             move_func(value)
             response = DriverResponse(
                 response=DriverResponseType.success,
@@ -159,7 +159,7 @@ class KinesisMotor(HelaoDriver):
                 status=DriverStatus.ok,
             )
         except Exception:
-            logger.error("move failed", exc_info=True)
+            LOGGER.error("move failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -176,7 +176,7 @@ class KinesisMotor(HelaoDriver):
                 status=DriverStatus.ok,
             )
         except Exception:
-            logger.error("stop failed", exc_info=True)
+            LOGGER.error("stop failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -194,7 +194,7 @@ class KinesisMotor(HelaoDriver):
                 status=DriverStatus.ok,
             )
         except Exception:
-            logger.error("reset failed", exc_info=True)
+            LOGGER.error("reset failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -203,7 +203,7 @@ class KinesisMotor(HelaoDriver):
     def disconnect(self) -> DriverResponse:
         try:
             for axis_name, kmotor in self.motors.items():
-                logger.info(f"closing connection to {axis_name}")
+                LOGGER.info(f"closing connection to {axis_name}")
                 kmotor.close()
             response = DriverResponse(
                 response=DriverResponseType.success,
@@ -211,7 +211,7 @@ class KinesisMotor(HelaoDriver):
                 status=DriverStatus.ok,
             )
         except Exception:
-            logger.error("disconnect failed", exc_info=True)
+            LOGGER.error("disconnect failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )

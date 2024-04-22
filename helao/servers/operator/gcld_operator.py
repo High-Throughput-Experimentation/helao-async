@@ -193,7 +193,7 @@ def ana_constructor(
         data_request_id=data_request_id,
         experiment_list=[],
         experiment_plan_list=experiment_list,
-        experimentmodel_list=experiment_list,
+        experimentmodel_list=[],
         dummy=TEST,
     )
     return seq

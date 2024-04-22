@@ -31,6 +31,7 @@ from copy import copy
 
 import botocore.exceptions
 import boto3
+
 # from filelock import FileLock
 
 from helao.servers.base import Base
@@ -43,6 +44,12 @@ from helao.helpers.read_hlo import read_hlo
 from helao.helpers.yml_tools import yml_dumps, yml_load
 from helao.helpers.zip_dir import zip_dir
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="sync_driver_standalone")
+else:
+    LOGGER = logging.LOGGER
 
 from time import sleep
 from glob import glob
@@ -216,7 +223,7 @@ class HelaoYml:
 
     def cleanup(self):
         """Remove empty directories in RUNS_ACTIVE or RUNS_FINISHED."""
-        if not self.target.exists() or self.target==self.synced_path:
+        if not self.target.exists() or self.target == self.synced_path:
             return "success"
         tempparts = list(self.parts)
         steps = len(tempparts) - self.status_idx
@@ -273,11 +280,15 @@ class HelaoYml:
 
     @property
     def lock_files(self) -> List[Path]:
-        return [x for x in self.targetdir.glob("*") if x.is_file() and x.suffix == ".lock"]
+        return [
+            x for x in self.targetdir.glob("*") if x.is_file() and x.suffix == ".lock"
+        ]
 
     @property
     def hlo_files(self) -> List[Path]:
-        return [x for x in self.targetdir.glob("*") if x.is_file() and x.suffix == ".hlo"]
+        return [
+            x for x in self.targetdir.glob("*") if x.is_file() and x.suffix == ".hlo"
+        ]
 
     @property
     def parent_path(self) -> Path:
@@ -567,7 +578,9 @@ class HelaoSyncer:
         # return self.progress[yml_path.name]
         return prog
 
-    async def enqueue_yml(self, upath: Union[Path, str], rank: int = 5, rank_limit: int = -5):
+    async def enqueue_yml(
+        self, upath: Union[Path, str], rank: int = 5, rank_limit: int = -5
+    ):
         """Adds yml to sync queue, defaulting to lowest priority."""
         yml_path = Path(upath) if isinstance(upath, str) else upath
         if rank < rank_limit:
@@ -585,7 +598,7 @@ class HelaoSyncer:
         else:
             # self.task_set.add(yml_path.name)
             await self.task_queue.put((rank, yml_path))
-            self.base.print_message(
+            LOGGER.info(
                 f"Added {str(yml_path)} to syncer queue with priority {rank}."
             )
 
@@ -672,7 +685,9 @@ class HelaoSyncer:
             while prog.dict.get("files_pending", []):
                 for sp in prog.dict["files_pending"]:
                     fp = Path(sp)
-                    self.base.print_message(f"Pushing {sp} to S3 for {prog.yml.target.name}")
+                    self.base.print_message(
+                        f"Pushing {sp} to S3 for {prog.yml.target.name}"
+                    )
                     if fp.suffix == ".hlo":
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                         self.base.print_message("Parsing hlo dicts.")
@@ -728,7 +743,9 @@ class HelaoSyncer:
 
         self.base.print_message(f"Patching model for {prog.yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
-        prog.yml_model = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(strip_private=True)
+        prog.yml_model = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(
+            strip_private=True
+        )
 
         # patch technique lists in prog.yml_model
         tech_name = prog.yml_model.get("technique_name", "NA")
@@ -750,9 +767,11 @@ class HelaoSyncer:
 
         # next push prog.yml to API
         if not prog.api_done or force_api:
-            self.base.print_message(f"Pushing prog.yml to API for {prog.yml.target.name}")
-            api_success = await self.to_api(prog.yml_model, prog.yml.type)
             self.base.print_message(
+                f"Pushing prog.yml to API for {prog.yml.target.name}"
+            )
+            api_success = await self.to_api(prog.yml_model, prog.yml.type)
+            LOGGER.info(
                 f"API push returned {api_success} for {prog.yml.target.name}"
             )
             if api_success:
@@ -765,7 +784,7 @@ class HelaoSyncer:
 
         # move to synced
         if prog.s3_done and prog.api_done:
-            
+
             self.base.print_message(
                 f"Moving files to RUNS_SYNCED for {yml_target_name}"
             )
@@ -780,7 +799,7 @@ class HelaoSyncer:
                     move_success = move_to_synced(file_path)
 
             # finally move yaml and update target
-            self.base.print_message(f"Moving {yml_target_name} to RUNS_SYNCED")
+            LOGGER.info(f"Moving {yml_target_name} to RUNS_SYNCED")
             # with prog.yml.filelock:
             yml_success = move_to_synced(yml_path)
             if yml_success:
@@ -797,9 +816,7 @@ class HelaoSyncer:
             # pop children from progress dict
             if yml_type in ["experiment", "sequence"]:
                 children = prog.yml.children
-                self.base.print_message(
-                    f"Removing children from progress: {children}."
-                )
+                self.base.print_message(f"Removing children from progress: {children}.")
                 for childyml in children:
                     # self.base.print_message(f"Clearing {childprog.yml.target.name}")
                     finished_child_path = childyml.finished_path.parent
@@ -818,9 +835,7 @@ class HelaoSyncer:
                 zip_target = prog.yml.target.parent.parent.joinpath(
                     f"{prog.yml.target.parent.name}.zip"
                 )
-                self.base.print_message(
-                    f"Full sequence has synced, creating zip: {str(zip_target)}"
-                )
+                LOGGER.info(f"Full sequence has synced, creating zip: {str(zip_target)}")
                 zip_dir(prog.yml.target.parent, zip_target)
                 self.cleanup_root()
                 # self.base.print_message(f"Removing sequence from progress.")
@@ -856,15 +871,13 @@ class HelaoSyncer:
                 if act_idx > max(pf_idxs + [-1])
                 else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
             )
-            exp_prog.dict["process_groups"][pidx] = exp_prog.dict[
-                "process_groups"
-            ].get(pidx, [])
+            exp_prog.dict["process_groups"][pidx] = exp_prog.dict["process_groups"].get(
+                pidx, []
+            )
             exp_prog.dict["process_groups"][pidx].append(act_idx)
         else:
             pidx = [
-                k
-                for k, l in exp_prog.dict["process_groups"].items()
-                if act_idx in l
+                k for k, l in exp_prog.dict["process_groups"].items() if act_idx in l
             ][0]
 
             # if exp_prog doesn't yet have metadict, create one
@@ -1140,9 +1153,13 @@ class HelaoSyncer:
                                 self.base.print_message(
                                     f"failed debug API push for {meta_type}: {meta_uuid}"
                                 )
-                                self.base.print_message(f"response: {await resp.json()}")
+                                self.base.print_message(
+                                    f"response: {await resp.json()}"
+                                )
                         except TimeoutError:
-                                self.base.print_message(f"unable to post failure model for {meta_type}: {meta_uuid}")
+                            self.base.print_message(
+                                f"unable to post failure model for {meta_type}: {meta_uuid}"
+                            )
         return api_success
 
     def list_pending(self, omit_manual_exps: bool = True):
@@ -1194,7 +1211,11 @@ class HelaoSyncer:
                     os.path.basename(sync_path).replace(".zip", ""),
                 )
                 os.makedirs(dest, exist_ok=True)
-                no_lock_prg = [x for x in zf.namelist() if not x.endswith(".prg") and not x.endswith(".lock")]
+                no_lock_prg = [
+                    x
+                    for x in zf.namelist()
+                    if not x.endswith(".prg") and not x.endswith(".lock")
+                ]
                 zf.extractall(dest, members=no_lock_prg)
                 zf.close()
                 if not os.path.exists(sync_path.replace(".zip", ".orig")):
@@ -1288,7 +1309,7 @@ class HelaoSyncer:
             if fp.endswith(".lock") or fp.endswith(".progress") or fp.endswith(".prg"):
                 os.remove(fp)
             elif not os.path.isdir(fp):
-                tp = os.path.dirname( fp.replace("RUNS_SYNCED", "RUNS_FINISHED"))
+                tp = os.path.dirname(fp.replace("RUNS_SYNCED", "RUNS_FINISHED"))
                 os.makedirs(tp, exist_ok=True)
                 shutil.move(fp, tp)
         self.base.print_message(f"Successfully reverted {sync_dir}")
