@@ -4,9 +4,9 @@ from enum import StrEnum
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="default_helao")
+    LOGGER = logging.make_logger(logger_name="default_gamryrange")
 else:
-    logger = logging.LOGGER
+    LOGGER = logging.LOGGER
 
 
 RANGES = {
@@ -163,10 +163,10 @@ def to_amps(number: float, unit: str) -> Union[float, None]:
 def get_range(requested_range: Union[str, None], range_enum: StrEnum):
 
     if requested_range is None:
-        logger.warn("could not detect IErange, using 'auto'")
+        LOGGER.warn("could not detect IErange, using 'auto'")
         return range_enum.auto
 
-    logger.info(f"got IErange request for {requested_range}")
+    LOGGER.info(f"got IErange request for {requested_range}")
     names = [e.name.lower() for e in range_enum]
     vals = [e.value.lower() for e in range_enum]
     lookupvals = [e.value for e in range_enum]
@@ -206,11 +206,11 @@ def get_range(requested_range: Union[str, None], range_enum: StrEnum):
                 break
 
         if idx is None:
-            logger.error(
+            LOGGER.error(
                 "could not detect IErange, using 'auto'"
             )
             return range_enum.auto
 
     ret_range = range_enum(lookupvals[idx])
-    logger.info(f"detected IErange: {ret_range}")
+    LOGGER.info(f"detected IErange: {ret_range}")
     return ret_range

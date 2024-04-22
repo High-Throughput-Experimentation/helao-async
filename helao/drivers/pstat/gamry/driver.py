@@ -10,9 +10,9 @@ All public methods must return a DriverResponse.
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="gamry_driver_standalone")
+    LOGGER = logging.make_logger(logger_name="gamry_driver_standalone")
 else:
-    logger = logging.LOGGER
+    LOGGER = logging.LOGGER
 
 import comtypes
 import comtypes.client as client
@@ -60,7 +60,7 @@ class GamryDriver(HelaoDriver):
         self.device_id = self.config.get("dev_id", None)
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config.get("grounded", True))
-        logger.info(f"using device_id {self.device_id} from config")
+        LOGGER.info(f"using device_id {self.device_id} from config")
         # self.connect()
 
     def connect(self) -> DriverResponse:
@@ -76,7 +76,7 @@ class GamryDriver(HelaoDriver):
             self.pstat = client.CreateObject(self.model.device)
             self.pstat.Init(self.device_name)
             self.pstat.Open()
-            logger.info(
+            LOGGER.info(
                 f"connected to {self.device_name} on device_id {self.device_id}"
             )
 
@@ -85,7 +85,7 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
-            logger.error("connection failed", exc_info=True)
+            LOGGER.error("connection failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -108,7 +108,7 @@ class GamryDriver(HelaoDriver):
                 )
                 self.disconnect()
             except Exception:
-                logger.error("get_status failed", exc_info=True)
+                LOGGER.error("get_status failed", exc_info=True)
                 response = DriverResponse(
                     response=DriverResponseType.failed, status=DriverStatus.error
                 )
@@ -250,7 +250,7 @@ class GamryDriver(HelaoDriver):
                 + [mapped_signal_params[key] for key in technique.signal.param_keys]
                 + [getattr(self.GamryCOM, self.technique.signal.mode.value)]
             )
-            logger.debug(signal_paramlist)
+            LOGGER.debug(signal_paramlist)
             self.signal = client.CreateObject(technique.signal.name)
             self.signal.Init(*signal_paramlist)
             self.pstat.SetSignal(self.signal)
@@ -261,14 +261,14 @@ class GamryDriver(HelaoDriver):
                 status=DriverStatus.ok,
             )
         except comtypes.COMError:
-            logger.error("setup failed on COMError", exc_info=True)
+            LOGGER.error("setup failed on COMError", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
             self.reset()
             self.cleanup()
         except Exception:
-            logger.error("setup failed", exc_info=True)
+            LOGGER.error("setup failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -293,7 +293,7 @@ class GamryDriver(HelaoDriver):
                 status=DriverStatus.busy,
             )
         except comtypes.COMError:
-            logger.error("measure failed on COMError", exc_info=True)
+            LOGGER.error("measure failed on COMError", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
@@ -301,7 +301,7 @@ class GamryDriver(HelaoDriver):
             self.reset()
             self.cleanup()
         except Exception:
-            logger.error("measure failed", exc_info=True)
+            LOGGER.error("measure failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
@@ -340,7 +340,7 @@ class GamryDriver(HelaoDriver):
                 status=status,
             )
         except Exception:
-            logger.error("get_data failed", exc_info=True)
+            LOGGER.error("get_data failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
@@ -355,7 +355,7 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
-            logger.error("stop failed", exc_info=True)
+            LOGGER.error("stop failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -378,7 +378,7 @@ class GamryDriver(HelaoDriver):
                 status=DriverStatus.ok,
             )
         except Exception:
-            logger.error("cleanup failed", exc_info=True)
+            LOGGER.error("cleanup failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
@@ -398,7 +398,7 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
-            logger.error("disconnect failed", exc_info=True)
+            LOGGER.error("disconnect failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -414,15 +414,15 @@ class GamryDriver(HelaoDriver):
             }
 
             for pid in process_ids:
-                logger.info(f"killing GamryCOM on PID: {pid}")
+                LOGGER.info(f"killing GamryCOM on PID: {pid}")
                 p = psutil.Process(pid)
                 for _ in range(3):
                     p.terminate()
                     time.sleep(0.5)
                     if not psutil.pid_exists(p.pid):
-                        logger.info("Successfully terminated GamryCom.")
+                        LOGGER.info("Successfully terminated GamryCom.")
                 if psutil.pid_exists(p.pid):
-                    logger.warning(
+                    LOGGER.warning(
                         "Failed to terminate server GamryCom after 3 retries."
                     )
                     raise SystemError(f"GamryCOM on PID: {pid} is still running.")
@@ -436,7 +436,7 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
-            logger.error("reset error", exc_info=True)
+            LOGGER.error("reset error", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )

@@ -30,9 +30,9 @@ from helaocore.models.action_start_condition import ActionStartCondition
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="default_premodels")
+    LOGGER = logging.make_logger(logger_name="default_premodels")
 else:
-    logger = logging.LOGGER
+    LOGGER = logging.LOGGER
 
 
 class Sequence(SequenceModel):
@@ -229,9 +229,9 @@ class Action(Experiment, ActionModel):
     # internal
     file_conn_keys: List[UUID] = Field(default=[])
 
-    # flag for datalogger
+    # flag for dataLOGGER
     # None will signal default behaviour as before
-    # will be updated by data logger only if it finds the status
+    # will be updated by data LOGGER only if it finds the status
     # in the data stream
     data_stream_status: Optional[HloStatus] = None
 
@@ -288,8 +288,8 @@ class ActionPlanMaker:
 
         exp_paramdict = {}
         
-        logger.debug(f"args {_args}")
-        logger.debug(f"locals {_locals}")
+        LOGGER.debug(f"args {_args}")
+        LOGGER.debug(f"locals {_locals}")
 
         # find the Experiment Basemodel
         # and add all other params to a dict
@@ -317,7 +317,7 @@ class ActionPlanMaker:
                     )
             else:
                 exp_paramdict.update({arg: argparam})
-        logger.debug(f"exp_paramdict {exp_paramdict}")
+        LOGGER.debug(f"exp_paramdict {exp_paramdict}")
               
         # check if an Experiment was detected
         if self._experiment is None:
@@ -332,7 +332,7 @@ class ActionPlanMaker:
             )
             self._experiment = Experiment()
 
-        logger.debug(f"experiment.experiment_params {self._experiment.experiment_params}")
+        LOGGER.debug(f"experiment.experiment_params {self._experiment.experiment_params}")
 
         # add all experiment_params under self.pars
         if self._experiment.experiment_params is not None:

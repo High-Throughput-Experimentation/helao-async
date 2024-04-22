@@ -3,9 +3,9 @@ __all__ = ["Spacingmethod", "PALtools", "PALposition", "PAL", "GCsampletype"]
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="pal_driver_standalone")
+    LOGGER = logging.make_logger(logger_name="pal_driver_standalone")
 else:
-    logger = logging.LOGGER
+    LOGGER = logging.LOGGER
 
 import asyncio
 import os
@@ -2003,7 +2003,7 @@ class PAL:
                 A.error_code = ErrorCodes.in_progress
                 activeDict = A.as_dict()
         except Exception:
-            logger.error("init_PAL_IOloop failed", exc_info=True)
+            LOGGER.error("init_PAL_IOloop failed", exc_info=True)
         return activeDict
 
     async def _PAL_IOloop(self) -> None:
@@ -2150,7 +2150,7 @@ class PAL:
                     # and other cleanup
                     await self._PAL_IOloop_meas_end_helper()
             except Exception:
-                logger.error("_PAL_IOloop failed", exc_info=True)
+                LOGGER.error("_PAL_IOloop failed", exc_info=True)
 
     async def _PAL_IOloop_meas_start_helper(self) -> None:
         """sets active object and
