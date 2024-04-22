@@ -2327,6 +2327,7 @@ def CCSI_sub_n2rinse(
                 recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
             )
         )
+    return apm.action_list
 
 
 def CCSI_sub_n2headspace(
