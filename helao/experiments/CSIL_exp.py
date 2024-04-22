@@ -510,6 +510,7 @@ def CCSI_sub_n2drain(
     drain_wait = apm.pars.HSpurge_duration - apm.pars.recirculation_duration
     if drain_wait < 0:
         drain_wait = 0
+        
     if apm.pars.drain_recirculation:
         apm.add(
             ORCH_server,
@@ -2325,6 +2326,13 @@ def CCSI_sub_n2rinse(
                 drain_recirculation=apm.pars.recirculation,
                 recirculation_duration=apm.pars.drain_recirculation_duration,
                 recirculation_rate_uL_min=apm.pars.recirculation_rate_uL_min,
+            )
+        )
+        apm.add_action_list(
+            CCSI_sub_refill_clean(
+                experiment=experiment,
+                Waterclean_volume_ul=apm.pars.waterclean_volume_ul,
+                Syringe_rate_ulsec=500,
             )
         )
     return apm.action_list
