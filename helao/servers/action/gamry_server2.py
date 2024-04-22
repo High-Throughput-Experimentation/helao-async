@@ -26,7 +26,7 @@ from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 from helao.helpers.executor import Executor
-from helao.helpers import logging  # get logger from BaseAPI instance
+from helao.helpers import logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.drivers.helao_driver import HelaoDriver
 from helao.drivers.pstat.gamry.driver import GamryDriver
@@ -40,11 +40,11 @@ from helao.drivers.pstat.gamry.technique import (
     TECH_RCA,
 )
 
-global logger
+global LOGGER
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="gamry_server_standalone")
+    LOGGER = logging.make_LOGGER(LOGGER_name="gamry_server_standalone")
 else:
-    logger = logging.LOGGER
+    LOGGER = logging.LOGGER
 
 
 class GamryExec(Executor):
@@ -84,14 +84,14 @@ class GamryExec(Executor):
             self.ttl_params = {
                 k: self.action_params.get(k, -1) for k in ("TTLwait", "TTLsend")
             }
-            logger.info("GamryExec initialized.")
+            LOGGER.info("GamryExec initialized.")
         except Exception:
-            logger.error("GamryExec was not initialized.", exc_info=True)
+            LOGGER.error("GamryExec was not initialized.", exc_info=True)
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
         while self.driver.pstat is not None:
-            logger.info("Waiting for pstat resource to be available.")
+            LOGGER.info("Waiting for pstat resource to be available.")
             await asyncio.sleep(1)
         self.driver.connect()
         resp = self.driver.setup(
@@ -108,11 +108,11 @@ class GamryExec(Executor):
         """Begin measurement or wait for TTL trigger if specified."""
         if self.ttl_params["TTLwait"] > -1:
             bits = self.driver.pstat.DigitalIn()
-            logger.info(f"Gamry DIbits: {bits}, waiting for trigger.")
+            LOGGER.info(f"Gamry DIbits: {bits}, waiting for trigger.")
             while not bits:
                 await asyncio.sleep(0.001)
                 bits = self.driver.pstat.DigitalIn()
-        logger.debug("starting measurement")
+        LOGGER.debug("starting measurement")
         resp = self.driver.measure(self.ttl_params)
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error}
@@ -168,7 +168,7 @@ async def gamry_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
 
     while not app.driver.ready:
-        logger.info("waiting for gamry init")
+        LOGGER.info("waiting for gamry init")
         await asyncio.sleep(1)
 
     app.driver.connect()

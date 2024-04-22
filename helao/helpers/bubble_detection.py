@@ -2,13 +2,13 @@ from scipy.signal import find_peaks
 import statistics
 import pandas as pd
 
-from helao.helpers import logging  # get logger from BaseAPI instance
+from helao.helpers import logging  # get LOGGER from BaseAPI instance
 
-global logger
+global LOGGER
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="bubble_detection_standalone")
+    LOGGER = logging.make_LOGGER(LOGGER_name="bubble_detection_standalone")
 else:
-    logger = logging.LOGGER
+    LOGGER = logging.LOGGER
 
 
 def bubble_detection(
@@ -99,6 +99,6 @@ def bubble_detection(
         ("single_change_test", signal_change_result),
         ("amplitude_test", amplitude_test_result),
     ]:
-        logger.debug(f"{label}: {test}")
+        LOGGER.debug(f"{label}: {test}")
 
     return bool(has_bubble)
