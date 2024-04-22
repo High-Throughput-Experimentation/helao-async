@@ -29,7 +29,14 @@ MEASURED_6083 = [
     26230, 26283, 27300, 27362,
 ]
 
-TEST_SMPS_6083 = [{"sample_no": s, "composition": {"Mn": 0.5, "Sb": 0.5}, "parameters": {"z_start": 1.2, "z_direction": "up"}} for s in MEASURED_6083]
+TEST_SMPS_6083 = [
+    {
+        "sample_no": s,
+        "composition": {"Mn": 0.5, "Sb": 0.5},
+        "parameters": {"z_start": 1.2, "z_direction": "up"},
+    }
+    for s in MEASURED_6083
+]
 
 
 UVIS_T_defaults = {
