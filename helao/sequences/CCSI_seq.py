@@ -932,8 +932,11 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     # HSrecirculation_duration: float = 60,
     LiquidClean_full_rinses: int = 2,
     LiquidClean_rinse_agitation: bool = False,
-    LiquidCleanPurge_duration: float = 100,
-    LiquidCleanPurge_recirc_duration: float = 50,
+    rinsePurge_duration: float = 300,
+    rinse_recirc: bool = True,
+    rinsePurge_recirc_duration: float = 150,
+    LiquidCleanPurge_duration: float = 300,
+    LiquidCleanPurge_recirc_duration: float = 150,
     FlushPurge_duration: float = 30,
     flush_Manpurge1_duration: float = 30,
     flush_Alphapurge1_duration: float = 10,
@@ -1056,25 +1059,24 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
 #             "Sensorpurge1_duration": flush_Sensorpurge1_duration,
 #         })
 
-        epm.add_experiment("CCSI_sub_n2clean", {
+        epm.add_experiment("CCSI_sub_n2rinse", {
             "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
             "waterclean_volume_ul": drainclean_volume_ul,
-            "total_sample_volume_ul": total_sample_volume_ul[i],
-            "number_full_rinses": LiquidClean_full_rinses,
-            "rinse_agitation": LiquidClean_rinse_agitation,
-            "Syringe_rate_ulsec": syringe_rate_ulsec,
+            "rinse_cycles": LiquidClean_full_rinses,
             "LiquidFillWait_s": LiquidFillWait_s,
+            "drain_HSpurge_duration": rinsePurge_duration,
+            "recirculation":rinse_recirc,
+            "drain_recirculation_duration":rinsePurge_recirc_duration, 
+            "recirculation_rate_uL_min":clean_recirculation_rate_uL_min,
+        })
+
+        epm.add_experiment("CCSI_sub_n2flush", {
             "n2flowrate_sccm":n2flowrate_sccm,
-            # "HSHSpurge_duration": HSHSPurge_duration,
-            # "HSrecirculation": HSrecirculation,
-            # "HSrecirculation_duration": HSrecirculation_duration,
-            "drain_HSpurge_duration": LiquidCleanPurge_duration,
-            "DeltaDilute1_duration": 0,
             "recirculation":drainrecirc,
             "drain_recirculation_duration":LiquidCleanPurge_recirc_duration, 
             "recirculation_rate_uL_min":clean_recirculation_rate_uL_min,
-            "flush_HSpurge1_duration": FlushPurge_duration,
-            "flush_HSpurge_duration": FlushPurge_duration*2,
+            "HSpurge1_duration": FlushPurge_duration,
+            "HSpurge_duration": FlushPurge_duration*2,
             "use_co2_check": use_co2_check,
             "co2_ppm_thresh": clean_co2_ppm_thresh,
             "purge_if": purge_if,
@@ -1087,6 +1089,32 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "Probepurge1_duration": flush_Probepurge1_duration,
             "Sensorpurge1_duration": flush_Sensorpurge1_duration,
         })
+
+        # epm.add_experiment("CCSI_sub_n2clean", {
+        #     "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
+        #     "waterclean_volume_ul": drainclean_volume_ul,
+        #     "Syringe_rate_ulsec": syringe_rate_ulsec,
+        #     "LiquidFillWait_s": LiquidFillWait_s,
+        #     "n2flowrate_sccm":n2flowrate_sccm,
+        #     "drain_HSpurge_duration": LiquidCleanPurge_duration,
+        #     "DeltaDilute1_duration": 0,
+        #     "recirculation":drainrecirc,
+        #     "drain_recirculation_duration":LiquidCleanPurge_recirc_duration, 
+        #     "recirculation_rate_uL_min":clean_recirculation_rate_uL_min,
+        #     "flush_HSpurge1_duration": FlushPurge_duration,
+        #     "flush_HSpurge_duration": FlushPurge_duration*2,
+        #     "use_co2_check": use_co2_check,
+        #     "co2_ppm_thresh": clean_co2_ppm_thresh,
+        #     "purge_if": purge_if,
+        #     "max_repeats": max_repeats,
+        #     "co2measure_delay":clean_co2measure_delay,
+        #     "co2measure_duration": check_co2measure_duration,
+        #     "co2measure_acqrate": co2measure_acqrate, 
+        #     "Manpurge1_duration": flush_Manpurge1_duration,
+        #     "Alphapurge1_duration": flush_Alphapurge1_duration,
+        #     "Probepurge1_duration": flush_Probepurge1_duration,
+        #     "Sensorpurge1_duration": flush_Sensorpurge1_duration,
+        # })
 
         #refill dilution volume
         if watervolume != 0:
