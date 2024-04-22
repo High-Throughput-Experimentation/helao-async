@@ -471,18 +471,16 @@ class Orch(Base):
                 self.active_sequence.simulation = True
             self.active_sequence.init_seq(time_offset=self.ntp_offset)
 
-            # todo: this is for later, for now the operator needs to unpack the sequence
-            # in order to also use a semi manual op mode
-
-            # self.print_message(f"unpacking experiments for {self.active_sequence.sequence_name}")
-            # if self.active_sequence.sequence_name in self.sequence_lib:
-            #     unpacked_exps = self.sequence_lib[self.active_sequence.sequence_name](**self.active_sequence.sequence_params)
-            # else:
-            #     unpacked_exps = []
-
-            # for exp in unpacked_exps:
-            #     D = Experiment(**exp.as_dict())
-            #     self.active_sequence.experiment_plan_list.append(D)
+            # if experiment_plan_list is empty, unpack sequence,
+            # otherwise operator already populated experiment_plan_list
+            if not self.active_sequence.experiment_plan_list:
+                unpacked_exps = self.unpack_sequence(
+                    self.active_sequence.sequence_name,
+                    self.active_sequence.sequence_params,
+                )
+                self.active_sequence.experiment_plan_list = [
+                    Experiment(**exp.as_dict()) for exp in unpacked_exps
+                ]
 
             self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
@@ -494,10 +492,6 @@ class Orch(Base):
                 await self.syncer.to_s3(
                     self.seq_model.clean_dict(strip_private=True), meta_s3_key
                 )
-
-            # add all experiments from sequence to experiment queue
-            # todo: use seq model instead to initialize some parameters
-            # of the experiment
 
             self.aloop.create_task(self.seq_unpacker())
             await asyncio.sleep(1)
