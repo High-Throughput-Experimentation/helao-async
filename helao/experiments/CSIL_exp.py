@@ -2311,7 +2311,7 @@ def CCSI_sub_n2rinse(
                 Solution_reservoir_sample_no=1,
                 Solution_volume_ul=0,
                 Waterclean_reservoir_sample_no=apm.pars.Waterclean_reservoir_sample_no,
-                Waterclean_volume_ul=apm.pars.Waterclean_volume_ul,
+                Waterclean_volume_ul=apm.pars.waterclean_volume_ul,
                 Syringe_rate_ulsec=apm.pars.Syringe_rate_ulsec,
                 n2_push=apm.pars.n2_push,
             )
