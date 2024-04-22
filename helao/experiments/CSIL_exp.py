@@ -35,6 +35,7 @@ __all__ = [
     "CCSI_sub_n2drain",
     "CCSI_sub_n2flush",
     "CCSI_sub_n2clean",
+    "CCSI_sub_n2rinse",
     "CCSI_sub_n2headspace",
 ]
 
