@@ -3,9 +3,9 @@ __all__ = ["Base", "ActiveParams", "Active", "DummyBase"]
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="gamry_driver_standalone")
+    LOGGER = logging.make_logger(logger_name="base_standalone")
 else:
-    logger = logging.LOGGER
+    LOGGER = logging.LOGGER
 
 import asyncio
 import json
@@ -222,7 +222,7 @@ class Base:
         self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
-        self.status_logger = self.aloop.create_task(self.log_status_task())
+        self.status_LOGGER = self.aloop.create_task(self.log_status_task())
 
     def dyn_endpoints_init(self):
         asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
@@ -735,7 +735,7 @@ class Base:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.print_message(
-                f"status logger task was cancelled with error: {repr(e), tb,}",
+                f"status LOGGER task was cancelled with error: {repr(e), tb,}",
                 error=True,
             )
 
@@ -801,7 +801,7 @@ class Base:
     async def shutdown(self):
         self.sync_ntp_task_run = False
         await self.detach_subscribers()
-        self.status_logger.cancel()
+        self.status_LOGGER.cancel()
         self.ntp_syncer.cancel()
 
     async def write_act(self, action):
@@ -1056,7 +1056,7 @@ class Active:
         await self.base.write_act(self.action)
 
     async def myinit(self):
-        self.data_logger = self.base.aloop.create_task(self.log_data_task())
+        self.data_LOGGER = self.base.aloop.create_task(self.log_data_task())
         if self.action.save_act:
             os.makedirs(
                 os.path.join(
@@ -1260,7 +1260,7 @@ class Active:
         )
 
     def add_new_listen_uuid(self, new_uuid: UUID):
-        """adds a new uuid to the current data logger UUID list"""
+        """adds a new uuid to the current data LOGGER UUID list"""
         self.listen_uuids.append(new_uuid)
 
     def _get_action_for_file_conn_key(self, file_conn_key: UUID):
@@ -1281,7 +1281,7 @@ class Active:
 
         if output_action is None:
             self.base.print_message(
-                "data logger could not find action for file_conn_key", error=True
+                "data LOGGER could not find action for file_conn_key", error=True
             )
             return
 
@@ -1351,7 +1351,7 @@ class Active:
             return
 
         # self.base.print_message(
-        #     f"starting data logger for active action: {self.action.action_uuid}",
+        #     f"starting data LOGGER for active action: {self.action.action_uuid}",
         #     info=True,
         # )
 
@@ -1384,7 +1384,7 @@ class Active:
                     )
                     if output_action is None:
                         self.base.print_message(
-                            "data logger could not find action for file_conn_key",
+                            "data LOGGER could not find action for file_conn_key",
                             error=True,
                         )
                         continue
@@ -1471,7 +1471,7 @@ class Active:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
-                f"data logger task failed with error: {repr(e), tb,}",
+                f"data LOGGER task failed with error: {repr(e), tb,}",
                 error=True,
             )
 
@@ -1743,7 +1743,7 @@ class Active:
                 # use the supplied uuid list
                 await self.finish(finish_uuid_list=uuid_list)
         except Exception:
-            logger.error("Active.split() failed", exc_info=True)
+            LOGGER.error("Active.split() failed", exc_info=True)
 
         return new_file_conn_keys
 
@@ -1816,7 +1816,7 @@ class Active:
 
 
             # check if all actions are fininshed
-            # if yes close datalogger etc
+            # if yes close dataLOGGER etc
             all_finished = True
             for action in self.action_list:
                 if HloStatus.finished not in action.action_status:
@@ -1883,7 +1883,7 @@ class Active:
                 self.file_conn_dict = {}
 
                 # finish the data writer
-                self.data_logger.cancel()
+                self.data_LOGGER.cancel()
                 l10 = self.base.actives.pop(self.active_uuid, None)
                 if l10 is not None:
                     i10 = [
@@ -1919,7 +1919,7 @@ class Active:
 
             # always returns the most recent action of active
         except Exception as e:
-            logger.error("Active.finish() failed", exc_info=True)
+            LOGGER.error("Active.finish() failed", exc_info=True)
             raise e
 
         return self.action

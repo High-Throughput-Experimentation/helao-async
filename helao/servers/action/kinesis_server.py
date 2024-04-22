@@ -7,9 +7,9 @@ __all__ = ["makeApp"]
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="kinesis_server_standalone")
+    LOGGER = logging.make_logger(logger_name="kinesis_server_standalone")
 else:
-    logger = logging.LOGGER
+    LOGGER = logging.LOGGER
 
 import time
 import asyncio
@@ -44,24 +44,24 @@ class KinesisMotorExec(Executor):
         if not isinstance(self.axis_name, str):
             self.axis_name = self.axis_name.value
         self.axis_params = self.base.server_params["axes"][self.axis_name]
-        logger.info("KinesisMotorExec initialized.")
+        LOGGER.info("KinesisMotorExec initialized.")
 
     async def _pre_exec(self):
         "Set velocity and acceleration."
-        logger.info("KinesisMotorExec running setup methods.")
+        LOGGER.info("KinesisMotorExec running setup methods.")
         velocity = self.action_params.get("velocity_mm_s", None)
         acceleration = self.action_params.get("acceleration_mm_s2", None)
-        logger.info("KinesisMotorExec checking velocity and accel.")
+        LOGGER.info("KinesisMotorExec checking velocity and accel.")
         resp = self.driver.setup(
             axis=self.axis_name, velocity=velocity, acceleration=acceleration
         )
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
-        logger.info("KinesisMotorExec setup complete.")
+        LOGGER.info("KinesisMotorExec setup complete.")
         return {"error": error}
 
     async def _exec(self):
         "Execute motion."
-        logger.info("KinesisMotorExec validating move mode & limit.")
+        LOGGER.info("KinesisMotorExec validating move mode & limit.")
         move_mode = self.action_params.get("move_mode", "relative")
         move_value = self.action_params.get("value_mm", 0.0)
         current_position = self.live_dict[self.axis_name].get("position_mm", 9999)
@@ -71,14 +71,14 @@ class KinesisMotorExec(Executor):
 
         self.start_time = time.time()
         if target_position < self.axis_params.get("move_limit_mm", 3.0):
-            logger.info("KinesisMotorExec starting motion.")
+            LOGGER.info("KinesisMotorExec starting motion.")
             resp = self.driver.move(self.axis_name, move_mode, move_value)
             error = (
                 ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
             )
             return {"error": error}
         else:
-            logger.info(
+            LOGGER.info(
                 f"final position {target_position} is greater than motion limit, ignoring motion request."
             )
             return {"error": ErrorCodes.motor}
