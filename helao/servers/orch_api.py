@@ -34,6 +34,10 @@ from helao.helpers import logging
 
 global LOGGER
 
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="orch_api_standalone")
+else:
+    LOGGER = logging.LOGGER
 
 class OrchAPI(HelaoFastAPI):
     def __init__(
@@ -744,7 +748,7 @@ class WaitExec(Executor):
         self.last_print_time = self.start_time
 
     async def _exec(self):
-        self.active.base.print_message(f" ... wait action: {self.duration}")
+        LOGGER.info(f" ... wait action: {self.duration}")
         return {"data": {}, "error": ErrorCodes.none}
 
     async def _poll(self):
@@ -752,7 +756,7 @@ class WaitExec(Executor):
         check_time = time.time()
         elapsed_time = check_time - self.start_time
         if check_time - self.last_print_time > self.print_every_secs - 0.01:
-            self.active.base.print_message(
+            LOGGER.info(
                 f" ... orch waited {elapsed_time:.1f} sec / {self.duration:.1f} sec"
             )
             self.last_print_time = check_time
