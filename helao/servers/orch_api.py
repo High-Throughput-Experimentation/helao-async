@@ -58,7 +58,6 @@ class OrchAPI(HelaoFastAPI):
             version=str(version),
         )
         self.driver = None
-        LOGGER = logging.LOGGER
 
         async def set_body(request: Request, body: bytes):
             async def receive() -> Message:
