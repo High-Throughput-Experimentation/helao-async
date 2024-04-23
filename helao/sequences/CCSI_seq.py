@@ -1145,12 +1145,14 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             })
         epm.add_experiment("CCSI_sub_initialization_end_state", {})
 
-    epm.add_experiment("CCSI_sub_monitorcell", {
-        "co2measure_duration":temp_monitor_time,
-        "co2measure_acqrate": co2measure_acqrate,
-        "recirculation": True,
-        "recirculation_rate_uL_min": recirculation_rate_uL_min,
-        })
+    if temp_monitor_time != 0:
+
+        epm.add_experiment("CCSI_sub_monitorcell", {
+            "co2measure_duration":temp_monitor_time,
+            "co2measure_acqrate": co2measure_acqrate,
+            "recirculation": True,
+            "recirculation_rate_uL_min": recirculation_rate_uL_min,
+            })
 
 
 
