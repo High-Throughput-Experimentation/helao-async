@@ -76,7 +76,7 @@ class GamryDriver(HelaoDriver):
             self.pstat = client.CreateObject(self.model.device)
             self.pstat.Init(self.device_name)
             self.pstat.Open()
-            LOGGER.info(
+            LOGGER.debug(
                 f"connected to {self.device_name} on device_id {self.device_id}"
             )
 
