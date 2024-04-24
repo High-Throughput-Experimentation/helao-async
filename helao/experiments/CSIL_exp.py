@@ -2036,6 +2036,7 @@ def CCSI_sub_n2flush(
         },
     )
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)
@@ -2078,6 +2079,7 @@ def CCSI_sub_n2flush(
     # apm.add(ORCH_server, "wait", {"waittime": Sensorpurge1_duration})
     # apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0}, asc.no_wait)
 
@@ -2104,6 +2106,7 @@ def CCSI_sub_n2flush(
     # apm.add(DOSEPUMP_server, "cancel_run_continuous", {} )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
     apm.add(
         N2MFC_server,
@@ -2133,12 +2136,14 @@ def CCSI_sub_n2flush(
 
     if initialization:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
         apm.add(ORCH_server, "wait", {"waittime": 0.5})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
 
     if initialization:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     #
