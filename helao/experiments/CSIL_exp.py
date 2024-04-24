@@ -2233,7 +2233,7 @@ def CCSI_sub_n2clean(
             Solution_reservoir_sample_no=1,
             Solution_volume_ul=0,
             Waterclean_reservoir_sample_no=Waterclean_reservoir_sample_no,
-            Waterclean_volume_ul=Waterclean_volume_ul,
+            Waterclean_volume_ul=waterclean_volume_ul,
             Syringe_rate_ulsec=Syringe_rate_ulsec,
             n2_push=n2_push,
         )
@@ -2244,6 +2244,7 @@ def CCSI_sub_n2clean(
             n2flowrate_sccm=n2flowrate_sccm,
             HSpurge_duration=drain_HSpurge_duration,
             DeltaDilute1_duration=DeltaDilute1_duration,
+            drain_recirculation = recirculation,
             recirculation_duration=drain_recirculation_duration,
             recirculation_rate_uL_min=recirculation_rate_uL_min,
         )
@@ -2252,7 +2253,7 @@ def CCSI_sub_n2clean(
     apm.add_action_list(
         CCSI_sub_refill_clean(
             experiment=experiment,
-            Waterclean_volume_ul=Waterclean_volume_ul,
+            Waterclean_volume_ul=waterclean_volume_ul,
             Syringe_rate_ulsec=500,
         )
     )
@@ -2262,7 +2263,7 @@ def CCSI_sub_n2clean(
         CCSI_sub_n2flush(
             experiment=experiment,
             n2flowrate_sccm=n2flowrate_sccm,
-            HSpurge1_duration=flush_HSpurge_duration,
+            HSpurge1_duration=flush_HSpurge1_duration,
             HSpurge_duration=flush_HSpurge_duration,
             DeltaDilute1_duration=DeltaDilute1_duration,
             Manpurge1_duration=Manpurge1_duration,
