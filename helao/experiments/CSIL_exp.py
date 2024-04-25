@@ -1984,10 +1984,11 @@ def CCSI_sub_n2flush(
 
     if flush_cycles > 0:
         use_co2_check =False
+        flush_reps = flush_cycles
     else:
-        flush_cycles = 1
+        flush_reps = 1
 
-    for n in range(flush_cycles):
+    for n in range(flush_reps):
         apm.add(DOSEPUMP_server, "cancel_run_continuous", {})
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
         apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
