@@ -2336,8 +2336,8 @@ def CCSI_sub_n2rinse(
             )
         )
         if rinse_agitation:
-
-
+            apm.add(ORCH_server, "wait", {"waittime": rinse_agitation_wait})
+            apm.add(DOSEPUMP_server,"run_continuous",{"rate_uL_min": recirculation_rate_uL_min, "duration_sec": rinse_agitation_duration,})
 
         apm.add_action_list(
             CCSI_sub_n2drain(
