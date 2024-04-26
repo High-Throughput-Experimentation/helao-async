@@ -20,6 +20,7 @@ import psutil
 import time
 from enum import Enum
 from copy import copy
+from _ctypes import COMError
 
 # import asyncio
 import numpy as np
@@ -107,6 +108,17 @@ class GamryDriver(HelaoDriver):
                     response=DriverResponseType.success, data=state, status=DriverStatus.ok
                 )
                 self.disconnect()
+            except COMError as exc:
+                _, _, err_tup = exc.args
+                if "In use by another script" in err_tup[0]:
+                    response = DriverResponse(
+                        response=DriverResponseType.success, status=DriverStatus.busy
+                    )
+                else:
+                    LOGGER.error("get_status failed", exc_info=True)
+                    response = DriverResponse(
+                        response=DriverResponseType.failed, status=DriverStatus.error
+                    )
             except Exception:
                 LOGGER.error("get_status failed", exc_info=True)
                 response = DriverResponse(
