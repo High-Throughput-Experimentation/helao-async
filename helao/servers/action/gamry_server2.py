@@ -93,15 +93,26 @@ class GamryExec(Executor):
         while self.driver.pstat is not None:
             LOGGER.info("Waiting for pstat resource to be available.")
             await asyncio.sleep(1)
-        self.driver.connect()
-        resp = self.driver.setup(
-            self.technique,
-            self.signal_params,
-            self.dtaq_params,
-            self.action_params,
-            self.ierange,
-        )
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
+        retry_count = 0
+        connect_success = False
+        while not connect_success and retry_count < 5:
+            resp = self.driver.connect()
+            if resp.response == "success":
+                connect_success = True
+            retry_count += 1
+            await asyncio.sleep(1)
+        if not connect_success:
+            LOGGER.error("Failed to connect to device.", exc_info=True)
+            error = ErrorCodes.not_available
+        else:
+            resp = self.driver.setup(
+                self.technique,
+                self.signal_params,
+                self.dtaq_params,
+                self.action_params,
+                self.ierange,
+            )
+            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         return {"error": error}
 
     async def _exec(self) -> dict:
