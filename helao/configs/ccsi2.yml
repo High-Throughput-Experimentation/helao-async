@@ -22,7 +22,7 @@ servers:
     params:
       enable_op: true
       bokeh_port: 5002
-      seqspec_parser_path: helao\specifications\last3months.py
+      seqspec_parser_path: helao\specifications\last2weeks.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
     verbose: false
   # IO:
