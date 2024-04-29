@@ -1718,3 +1718,4 @@ def CCSI_Solution_testing_cleans(  #assumes initialization performed previously
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
             })
 
+    return epm.experiment_plan_list
