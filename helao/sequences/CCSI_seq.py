@@ -1062,7 +1062,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "rinse_agitation": LiquidClean_rinse_agitation,
             "rinse_agitation_wait": LiquidClean_rinse_agitation_wait,
             "rinse_agitation_duration": LiquidClean_rinse_agitation_duration,
-            "LiquidFillWait_s": LiquidFillWait_s,
+            "LiquidFillWait_s": Waterclean_FillWait_s,
             "drain_HSpurge_duration": rinsePurge_duration,
             "recirculation":rinse_recirc,
             "drain_recirculation_duration":rinsePurge_recirc_duration, 
