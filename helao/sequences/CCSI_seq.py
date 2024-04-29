@@ -890,18 +890,21 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # =============================================================================
 
 def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed previously
-    sequence_version: int = 16, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
+    sequence_version: int = 17, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
 #                   v 14, list for solution/total sample volumes+ extra clean 15 added rinses/16agitation
+#                   17 repeat cleans/rinses/flushes
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [0,0,0],
     Solution_reservoir_sample_no: int = 2,
     Solution_name: str = "acetonitrile",
-    total_sample_volume_ul: List[float] = [5000],
+    total_sample_volume_ul: List[float] = [5000,5000,5000],
     total_cell_volume_ul: float = 12500,
 
     Waterclean_reservoir_sample_no: int = 1,
-    syringe_rate_ulsec: float = 300,
+    Waterclean_syringe_rate_ulsec: float = 300,
+    Waterclean_FillWait_s: float = 15,
+    syringe_rate_ulsec: float = 80,
     LiquidFillWait_s: float = 15,
     SyringePushWait_s: float = 60,
     n2_push: bool = False,  
@@ -916,27 +919,31 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     refill_freq_sec: float = 10.0,
     recirculation_rate_uL_min: int = 10000,
     clean_recirculation_rate_uL_min: int = 20000,
-    
-#    HSpurge_duration: float = 15,
-  #  DeltaDilute1_duration: float = 0,
-    #initcleans: int = 3,
+
+
     drainrecirc: bool = True,
-    SamplePurge_duration: float = 240,
-    recirculation_duration: float = 120,
+    SamplePurge_duration: float = 300,
+    recirculation_duration: float = 150,
     drainclean_volume_ul: float = 10000,
-    #headspace_purge_cycles: int = 2,
-#    liquid_purge_cycles: int = 1,
-  #  headspace_co2measure_duration: float = 30,
     n2flowrate_sccm: float = 50,
-    # HSHSPurge_duration: float = 120, 
-    # HSrecirculation: bool = True,
-    # HSrecirculation_duration: float = 60,
-    LiquidClean_full_rinses: int = 2,
+
+####
+    prerinse_cleans: int = 2,
+    perform_init: bool = False,
+    fixed_flushes: int = 2,  #instead of threshold ~550
+
+####
+    LiquidClean_full_rinses: int = 5,
     LiquidClean_rinse_agitation: bool = False,
+    LiquidClean_rinse_agitation_wait: float = 10,
+    LiquidClean_rinse_agitation_duration: float = 60,
+    LiquidClean_rinse_agitation_rate: int = 15000,
     rinsePurge_duration: float = 300,
+
+
     rinse_recirc: bool = True,
     rinsePurge_recirc_duration: float = 150,
-    LiquidCleanPurge_duration: float = 300,
+    LiquidCleanPurge_duration: float = 210,
     LiquidCleanPurge_recirc_duration: float = 150,
     FlushPurge_duration: float = 30,
     flush_Manpurge1_duration: float = 30,
@@ -950,13 +957,15 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     init_Sensorpurge1_duration: float = 120,
     init_DeltaDilute1_duration: float = 60,
     init_HSpurge_duration: float = 60, 
+
+
     use_co2_check: bool = True,
     check_co2measure_duration: float = 10,
     clean_co2_ppm_thresh: float = 1400,
     clean_co2measure_delay: float = 120,
     max_repeats: int = 5,
     purge_if: Union[str, float] = "above",
-    temp_monitor_time: int =600,
+    temp_monitor_time: int =0,
 ):
 
     epm = ExperimentPlanMaker()
@@ -977,21 +986,9 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "co2measure_acqrate": co2measure_acqrate,
         })
 
-        # if solnvolume != 0:
-        #     epm.add_experiment("CCSI_sub_load_liquid", {
-        #         "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
-        #         "volume_ul_cell_liquid": solnvolume,
-        #         "combine_True_False": False,
-        #         "water_True_False": False,
-        #     })
+
         watervolume = total_sample_volume_ul[i] - solnvolume
-        # if watervolume != 0:
-        #     epm.add_experiment("CCSI_sub_load_liquid", {
-        #         "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
-        #         "volume_ul_cell_liquid": watervolume,
-        #         "combine_True_False": True,
-        #         "water_True_False": True,
-        #     })
+
 
         epm.add_experiment("CCSI_sub_cellfill", {
             "Solution_description": Solution_name,
@@ -1030,48 +1027,50 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "drain_recirculation":drainrecirc,
             "recirculation_duration":recirculation_duration, 
             "recirculation_rate_uL_min":clean_recirculation_rate_uL_min})
-##############################################3
-# #  first n2clean no co2 check... to ensure at least 2 cleans
-#         epm.add_experiment("CCSI_sub_n2clean", {
-#             "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-#             "Waterclean_volume_ul": drainclean_volume_ul,
-#             "total_sample_volume_ul": total_sample_volume_ul,
-#             "number_full_rinses": LiquidClean_full_rinses,
-#             "Syringe_rate_ulsec": syringe_rate_ulsec,
-#             "LiquidFillWait_s": LiquidFillWait_s,
-#             "n2flowrate_sccm":n2flowrate_sccm,
-#             # "HSHSpurge_duration": HSHSPurge_duration,
-#             # "HSrecirculation": HSrecirculation,
-#             # "HSrecirculation_duration": HSrecirculation_duration,
-#             "drain_HSpurge_duration": LiquidCleanPurge_duration,
-#             "DeltaDilute1_duration": 0,
-#             "recirculation":drainrecirc,
-#             "drain_recirculation_duration":LiquidCleanPurge_recirc_duration, 
-#             "recirculation_rate_uL_min":clean_recirculation_rate_uL_min,
-#             "flush_HSpurge1_duration": FlushPurge_duration,
-#             "flush_HSpurge_duration": FlushPurge_duration*2,
-#             "use_co2_check": False,
-#             "co2measure_delay":clean_co2measure_delay,
-#             "co2measure_duration": check_co2measure_duration,
-#             "co2measure_acqrate": co2measure_acqrate, 
-#             "Manpurge1_duration": flush_Manpurge1_duration,
-#             "Alphapurge1_duration": flush_Alphapurge1_duration,
-#             "Probepurge1_duration": flush_Probepurge1_duration,
-#             "Sensorpurge1_duration": flush_Sensorpurge1_duration,
-#         })
+
+        if prerinse_cleans > 0:
+
+            for r in range(prerinse_cleans):
+                epm.add_experiment("CCSI_sub_n2clean", {
+                    "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
+                    "waterclean_volume_ul": drainclean_volume_ul,
+                    "Syringe_rate_ulsec": Waterclean_syringe_rate_ulsec,
+                    "LiquidFillWait_s": Waterclean_FillWait_s,
+                    "n2flowrate_sccm":n2flowrate_sccm,
+                    "drain_HSpurge_duration": LiquidCleanPurge_duration,
+                    "DeltaDilute1_duration": 0,
+                    "recirculation":drainrecirc,
+                    "drain_recirculation_duration":LiquidCleanPurge_recirc_duration, 
+                    "recirculation_rate_uL_min":clean_recirculation_rate_uL_min,
+                    "flush_HSpurge1_duration": FlushPurge_duration,
+                    "flush_HSpurge_duration": FlushPurge_duration*2,
+                    "use_co2_check": False,
+                    "co2measure_delay":clean_co2measure_delay,
+                    "co2measure_duration": check_co2measure_duration,
+                    "co2measure_acqrate": co2measure_acqrate, 
+                    "Manpurge1_duration": flush_Manpurge1_duration,
+                    "Alphapurge1_duration": flush_Alphapurge1_duration,
+                    "Probepurge1_duration": flush_Probepurge1_duration,
+                    "Sensorpurge1_duration": flush_Sensorpurge1_duration,
+                })
+
 
         epm.add_experiment("CCSI_sub_n2rinse", {
             "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
             "waterclean_volume_ul": drainclean_volume_ul,
             "rinse_cycles": LiquidClean_full_rinses,
+            "rinse_agitation": LiquidClean_rinse_agitation,
+            "rinse_agitation_wait": LiquidClean_rinse_agitation_wait,
+            "rinse_agitation_duration": LiquidClean_rinse_agitation_duration,
             "LiquidFillWait_s": LiquidFillWait_s,
             "drain_HSpurge_duration": rinsePurge_duration,
             "recirculation":rinse_recirc,
             "drain_recirculation_duration":rinsePurge_recirc_duration, 
-            "recirculation_rate_uL_min":clean_recirculation_rate_uL_min,
+            "recirculation_rate_uL_min":LiquidClean_rinse_agitation_rate,
         })
 
         epm.add_experiment("CCSI_sub_n2flush", {
+            "flush_cycles":fixed_flushes,
             "n2flowrate_sccm":n2flowrate_sccm,
             "recirculation":drainrecirc,
             "drain_recirculation_duration":LiquidCleanPurge_recirc_duration, 
@@ -1091,32 +1090,6 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "Sensorpurge1_duration": flush_Sensorpurge1_duration,
         })
 
-        # epm.add_experiment("CCSI_sub_n2clean", {
-        #     "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-        #     "waterclean_volume_ul": drainclean_volume_ul,
-        #     "Syringe_rate_ulsec": syringe_rate_ulsec,
-        #     "LiquidFillWait_s": LiquidFillWait_s,
-        #     "n2flowrate_sccm":n2flowrate_sccm,
-        #     "drain_HSpurge_duration": LiquidCleanPurge_duration,
-        #     "DeltaDilute1_duration": 0,
-        #     "recirculation":drainrecirc,
-        #     "drain_recirculation_duration":LiquidCleanPurge_recirc_duration, 
-        #     "recirculation_rate_uL_min":clean_recirculation_rate_uL_min,
-        #     "flush_HSpurge1_duration": FlushPurge_duration,
-        #     "flush_HSpurge_duration": FlushPurge_duration*2,
-        #     "use_co2_check": use_co2_check,
-        #     "co2_ppm_thresh": clean_co2_ppm_thresh,
-        #     "purge_if": purge_if,
-        #     "max_repeats": max_repeats,
-        #     "co2measure_delay":clean_co2measure_delay,
-        #     "co2measure_duration": check_co2measure_duration,
-        #     "co2measure_acqrate": co2measure_acqrate, 
-        #     "Manpurge1_duration": flush_Manpurge1_duration,
-        #     "Alphapurge1_duration": flush_Alphapurge1_duration,
-        #     "Probepurge1_duration": flush_Probepurge1_duration,
-        #     "Sensorpurge1_duration": flush_Sensorpurge1_duration,
-        # })
-
         #refill dilution volume
         if watervolume != 0:
             epm.add_experiment("CCSI_sub_refill_clean", {
@@ -1124,27 +1097,28 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
                 "Syringe_rate_ulsec": 800, #syringe_rate_ulsec,
             })
 
+        if perform_init:
         #initialization part
-        epm.add_experiment("CCSI_sub_initialization_firstpart", {
-            "HSpurge1_duration": init_HSpurge1_duration,
-            "Manpurge1_duration": init_Manpurge1_duration,
-            "Alphapurge1_duration": init_Alphapurge1_duration,
-            "Probepurge1_duration": init_Probepurge1_duration,
-            "Sensorpurge1_duration": init_Sensorpurge1_duration,
-            "recirculation_rate_uL_min": clean_recirculation_rate_uL_min,
-            })
+            epm.add_experiment("CCSI_sub_initialization_firstpart", {
+                "HSpurge1_duration": init_HSpurge1_duration,
+                "Manpurge1_duration": init_Manpurge1_duration,
+                "Alphapurge1_duration": init_Alphapurge1_duration,
+                "Probepurge1_duration": init_Probepurge1_duration,
+                "Sensorpurge1_duration": init_Sensorpurge1_duration,
+                "recirculation_rate_uL_min": clean_recirculation_rate_uL_min,
+                })
 
-    #
-    # DILUTION PURGE, MAIN HEADSPACE PURGE AND HEADSPACE EVALUATION
-        epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
-            "HSpurge_duration": init_HSpurge_duration, 
-            "DeltaDilute1_duration": init_DeltaDilute1_duration,
-            "initialization": True,
-            "recirculation_rate_uL_min": clean_recirculation_rate_uL_min,
-            "co2measure_duration": check_co2measure_duration, 
-            "co2measure_acqrate": co2measure_acqrate, 
-            })
-        epm.add_experiment("CCSI_sub_initialization_end_state", {})
+        #
+        # DILUTION PURGE, MAIN HEADSPACE PURGE AND HEADSPACE EVALUATION
+            epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
+                "HSpurge_duration": init_HSpurge_duration, 
+                "DeltaDilute1_duration": init_DeltaDilute1_duration,
+                "initialization": True,
+                "recirculation_rate_uL_min": clean_recirculation_rate_uL_min,
+                "co2measure_duration": check_co2measure_duration, 
+                "co2measure_acqrate": co2measure_acqrate, 
+                })
+            epm.add_experiment("CCSI_sub_initialization_end_state", {})
 
     if temp_monitor_time != 0:
 
@@ -1155,34 +1129,6 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
             })
 
-
-
-
-#continue below
-# =============================================================================
-#         epm.add_experiment("CCSI_sub_clean_inject", {
-#             "Waterclean_volume_ul": drainclean_volume_ul,
-#             "Syringe_rate_ulsec": syringe_rate_ulsec,
-#             "LiquidCleanWait_s": LiquidFillWait_s,
-#             "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
-#             "co2measure_duration": clean_co2measure_duration,
-#             "co2measure_acqrate": co2measure_acqrate,
-#             "use_co2_check": use_co2_check,
-#             "co2_ppm_thresh": clean_co2_ppm_thresh,
-#             "purge_if": purge_if,
-#             "max_repeats": max_repeats,
-#             "drainrecirc": drainrecirc,
-#             #  "HSpurge_duration": LiquidCleanPurge_duration,
-#         })
-# =============================================================================
-
-# =============================================================================
-#         for _ in range(headspace_purge_cycles):
-#             epm.add_experiment("CCSI_sub_drain", {
-#                 "HSpurge_duration": HSpurge_duration,
-#                 "DeltaDilute1_duration": DeltaDilute1_duration,
-#                 })
-# =============================================================================
 
     return epm.experiment_plan_list
 
