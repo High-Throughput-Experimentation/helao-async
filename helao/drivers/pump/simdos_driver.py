@@ -136,7 +136,7 @@ class SIMDOS:
                 await asyncio.sleep(0.1)
         except TimeoutError:
             if self.poll_signalq.full():
-                self.poll_signalq.get_nowait()
+                self.poll_signalq.get_nowait()  # unsure if we should set polling directly, do normal put, or put_nowait
             self.polling = True
             self.base.print_message("could not raise start signal, forcing polling loop to start")
 
