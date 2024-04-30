@@ -904,7 +904,11 @@ class Orch(Base):
                 self.print_message(
                     f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})"
                 )
-                if (
+                # check driver states
+                na_drivers = [k for k, (_, v) in self.status_summary.items() if v == "unknown"]
+                if na_drivers:
+                    await self.estop_loop(f"unknown driver states: {", ".join(na_drivers)}")
+                elif (
                     self.globalstatusmodel.loop_state == LoopStatus.estopped
                     or self.globalstatusmodel.loop_intent == LoopIntent.estop
                 ):
@@ -962,7 +966,6 @@ class Orch(Base):
                     self.print_message(
                         f"stopping orch with error code: {error_code}", error=True
                     )
-                    # await self.intend_stop()
                     await self.intend_estop()
                 await self.update_operator(True)
 
@@ -1548,6 +1551,8 @@ class Orch(Base):
                         else:
                             status_str = "idle"
                         status_summary[serv_key] = (status_str, driver_status)
+                    else:
+                        status_summary[serv_key] = ("unreachable", "unknown")
                 except aiohttp.client_exceptions.ClientConnectorError:
                     status_summary[serv_key] = ("unreachable", "unknown")
         return status_summary
