@@ -127,32 +127,32 @@ class SIMDOS:
         self.last_state = "unknown"
 
     async def start_polling(self):
-        self.base.print_message("got 'start_polling' request, raising signal")
+        self.base.print_message("got 'start_polling' request, raising signal", info=True)
         try:
             async with asyncio.timeout(2):
                 await self.poll_signalq.put(True)
             while not self.polling:
-                self.base.print_message("waiting for polling loop to start")
+                self.base.print_message("waiting for polling loop to start", warn=True)
                 await asyncio.sleep(0.1)
         except TimeoutError:
             if self.poll_signalq.full():
                 self.poll_signalq.get_nowait()  # unsure if we should set polling directly, do normal put, or put_nowait
             self.polling = True
-            self.base.print_message("could not raise start signal, forcing polling loop to start")
+            self.base.print_message("could not raise start signal, forcing polling loop to start", warn=True)
 
     async def stop_polling(self):
-        self.base.print_message("got 'stop_polling' request, raising signal")
+        self.base.print_message("got 'stop_polling' request, raising signal", info=True)
         try:
             async with asyncio.timeout(2):
                 await self.poll_signalq.put(False)
             while self.polling:
-                self.base.print_message("waiting for polling loop to stop")
+                self.base.print_message("waiting for polling loop to stop", warn=True)
                 await asyncio.sleep(0.1)
         except TimeoutError:
             if self.poll_signalq.full():
                 self.poll_signalq.get_nowait()
             self.polling = False
-            self.base.print_message("could not raise start signal, forcing polling loop to stop")
+            self.base.print_message("could not raise start signal, forcing polling loop to stop", warn=True)
 
 
     async def poll_signal_loop(self):
