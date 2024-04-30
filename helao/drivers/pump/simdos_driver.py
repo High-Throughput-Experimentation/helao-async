@@ -128,19 +128,32 @@ class SIMDOS:
 
     async def start_polling(self):
         self.base.print_message("got 'start_polling' request, raising signal")
-        async with self.base.aiolock:
-            await self.poll_signalq.put(True)
-        while not self.polling:
-            self.base.print_message("waiting for polling loop to start")
-            await asyncio.sleep(0.1)
+        try:
+            async with asyncio.timeout(2):
+                await self.poll_signalq.put(True)
+            while not self.polling:
+                self.base.print_message("waiting for polling loop to start")
+                await asyncio.sleep(0.1)
+        except TimeoutError:
+            if self.poll_signalq.full():
+                self.poll_signalq.get_nowait()
+            self.polling = True
+            self.base.print_message("could not raise start signal, forcing polling loop to start")
 
     async def stop_polling(self):
         self.base.print_message("got 'stop_polling' request, raising signal")
-        async with self.base.aiolock:
-            await self.poll_signalq.put(False)
-        while self.polling:
-            self.base.print_message("waiting for polling loop to stop")
-            await asyncio.sleep(0.1)
+        try:
+            async with asyncio.timeout(2):
+                await self.poll_signalq.put(False)
+            while self.polling:
+                self.base.print_message("waiting for polling loop to stop")
+                await asyncio.sleep(0.1)
+        except TimeoutError:
+            if self.poll_signalq.full():
+                self.poll_signalq.get_nowait()
+            self.polling = False
+            self.base.print_message("could not raise start signal, forcing polling loop to stop")
+
 
     async def poll_signal_loop(self):
         while True:
