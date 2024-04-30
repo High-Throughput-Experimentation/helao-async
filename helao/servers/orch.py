@@ -907,7 +907,7 @@ class Orch(Base):
                 # check driver states
                 na_drivers = [k for k, (_, v) in self.status_summary.items() if v == "unknown"]
                 if na_drivers:
-                    await self.estop_loop(f"unknown driver states: {", ".join(na_drivers)}")
+                    await self.estop_loop(f"unknown driver states: {', '.join(na_drivers)}")
                 elif (
                     self.globalstatusmodel.loop_state == LoopStatus.estopped
                     or self.globalstatusmodel.loop_intent == LoopIntent.estop
