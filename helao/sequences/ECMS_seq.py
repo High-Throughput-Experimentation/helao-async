@@ -269,7 +269,7 @@ def ECMS_repeat_CV_recirculation(
                 "volume_ul_cell_liquid": volume_ul_cell_liquid,
             },
         )
-
+        epm.add_experiment("ECMS_sub_electrolyte_recirculation_on", {})
 #achiving faster equilibrium time with faster CO2 flow rate
         epm.add_experiment(
             "ECMS_sub_headspace_purge_and_CO2baseline",
@@ -291,7 +291,7 @@ def ECMS_repeat_CV_recirculation(
             },
         )
         
-        epm.add_experiment("ECMS_sub_electrolyte_recirculation_on", {})
+        
             
         epm.add_experiment(
             "ECMS_sub_CV",
@@ -486,6 +486,7 @@ def ECMS_series_CA_recirculation(
                 "volume_ul_cell_liquid": volume_ul_cell_liquid,
             },
         )
+        epm.add_experiment("ECMS_sub_electrolyte_recirculation_on", {})
 #achiving faster equilibrium time with faster CO2 flow rate
         epm.add_experiment(
             "ECMS_sub_headspace_purge_and_CO2baseline",
@@ -507,7 +508,6 @@ def ECMS_series_CA_recirculation(
             },
         )
         
-        epm.add_experiment("ECMS_sub_electrolyte_recirculation_on", {})
             
         epm.add_experiment(
             "ECMS_sub_CA",
