@@ -14,9 +14,12 @@ __all__ = [
     "ECMS_sub_electrolyte_fill_cell",
     "ECMS_sub_prevacuum_cell",
     "ECMS_sub_headspace_purge_and_CO2baseline",
+    "ECMS_sub_electrolyte_recirculation_on",
+    "ECMS_sub_electrolyte_recirculation_off",
     "ECMS_sub_CA",
     "ECMS_sub_pulseCA",
     "ECMS_sub_CV",
+    "ECMS_sub_drain_recirculation",
     "ECMS_sub_drain",
     "ECMS_sub_final_clean_cell",
     "ECMS_sub_cali", 
@@ -457,6 +460,40 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.MS_baseline_duration})
     return apm.action_list
 
+def ECMS_sub_electrolyte_recirculation_on(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+    """Add electrolyte volume to cell position.
+
+    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    """
+
+    apm = ActionPlanMaker()
+
+    # Fill cell with liquid
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
+    return apm.action_list
+
+def ECMS_sub_electrolyte_recirculation_off(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+    """Add electrolyte volume to cell position.
+
+    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    """
+
+    apm = ActionPlanMaker()
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
+
+    return apm.action_list
+
 def ECMS_sub_CA(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -708,6 +745,28 @@ def ECMS_sub_CV(
 
     return apm.action_list
 
+def ECMS_sub_drain_recirculation(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    liquid_drain_time: float = 60,
+):
+    """Add electrolyte volume to cell position.
+
+    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    """
+
+    apm = ActionPlanMaker()
+
+    # Fill cell with liquid
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_drain_time})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
+    return apm.action_list
 
 def ECMS_sub_drain(
     experiment: Experiment,
@@ -755,6 +814,7 @@ def ECMS_sub_final_clean_cell(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_backward_time_2})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
 
