@@ -12,6 +12,7 @@ __all__ = [
     "ECMS_sub_normal_state",
     "ECMS_sub_alloff",
     "ECMS_sub_electrolyte_fill_cell",
+    "ECMS_sub_electrolyte_fill_cell_recirculation",
     "ECMS_sub_prevacuum_cell",
     "ECMS_sub_headspace_purge_and_CO2baseline",
     "ECMS_sub_electrolyte_recirculation_on",
@@ -379,7 +380,44 @@ def ECMS_sub_electrolyte_fill_cell(
 #     )
 #     return apm.action_list
 # =============================================================================
+def ECMS_sub_electrolyte_fill_cell_recirculation(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    #liquid_forward_time: float = 20,
+    liquid_backward_time: float = 10,
+    reservoir_liquid_sample_no: int = 1,
+    volume_ul_cell_liquid: int = 1
+):
+    """Add electrolyte volume to cell position.
 
+    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    """
+
+    apm = ActionPlanMaker()
+
+    # Fill cell with liquid
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_backward_time})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 0})
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid",
+        {
+            "custom": "cell1_we",
+            "source_liquid_in": LiquidSample(
+                sample_no=apm.pars.reservoir_liquid_sample_no, machine_name=ORCH_HOST
+            ).model_dump(),
+            "volume_ml": apm.pars.volume_ul_cell_liquid,
+            "combine_liquids": True,
+            "dilute_liquids": True,
+        },
+    )
+    return apm.action_list
 def ECMS_sub_prevacuum_cell(
     experiment: Experiment,
     experiment_version: int = 2,
