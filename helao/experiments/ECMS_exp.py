@@ -512,7 +512,7 @@ def ECMS_sub_electrolyte_recirculation_on(
     # Fill cell with liquid
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
     return apm.action_list
 
