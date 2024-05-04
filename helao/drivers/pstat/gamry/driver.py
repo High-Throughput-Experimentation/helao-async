@@ -73,7 +73,7 @@ class GamryDriver(HelaoDriver):
             )
             devices = client.CreateObject("GamryCOM.GamryDeviceList")
             self.device_name = devices.EnumSections()[self.device_id]
-            self.model = GAMRY_DEVICES[self.device_name.split("-")[0]]
+            self.model = GAMRY_DEVICES.get(self.device_name.split("-")[0], GAMRY_DEVICES["DEFAULT"])
             self.pstat = client.CreateObject(self.model.device)
             self.pstat.Init(self.device_name)
             self.pstat.Open()
