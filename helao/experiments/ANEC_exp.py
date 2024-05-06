@@ -15,6 +15,7 @@ __all__ = [
     "ANEC_sub_unload_cell",
     "ANEC_sub_unload_liquid",
     "ANEC_sub_normal_state",
+    "ANEC_sub_GC_headspacealiquot_nomixing",
     "ANEC_sub_GC_preparation",
     "ANEC_sub_cleanup",
     "ANEC_sub_CP",
@@ -23,6 +24,7 @@ __all__ = [
     "ANEC_sub_OCV",
     "ANEC_sub_liquidarchive",
     "ANEC_sub_aliquot",
+    "ANEC_sub_aliquot_nomixing",
     "ANEC_sub_alloff",
     "ANEC_sub_heatoff",
     "ANEC_sub_setheat",
@@ -427,6 +429,41 @@ def ANEC_sub_cleanup(
     apm.add_action_list(ANEC_sub_drain_cell(experiment))
     return apm.action_list
 
+def ANEC_sub_GC_headspacealiquot_nomixing(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    toolGC: str = "HS 2",
+    volume_ul_GC: int = 300,
+):
+    """Sample headspace in cell1_we and inject into GC
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+    """
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
+    apm.add(
+        PAL_server,
+        "PAL_ANEC_GC",
+        {
+            "toolGC": apm.pars.toolGC,
+            "source": "cell1_we",
+            "volume_ul_GC": apm.pars.volume_ul_GC,
+        },
+        process_finish=True,
+        technique_name=["headspace_GC_back_analysis", "headspace_GC_front_analysis"],
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    return apm.action_list
 
 def ANEC_sub_GC_preparation(
     experiment: Experiment,
@@ -598,6 +635,54 @@ def ANEC_sub_liquidarchive(
 
     return apm.action_list
 
+
+def ANEC_sub_aliquot_nomixing(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    toolGC: str = "HS 2",
+    toolarchive: str = "LS 3",
+    volume_ul_GC: int = 300,
+    volume_ul_archive: int = 500,
+    wash1: bool = True,
+    wash2: bool = True,
+    wash3: bool = True,
+    wash4: bool = False,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # first circulate the liquid back and forth
+    # e.g. mix it by reversing the flow a few times
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
+    apm.add(
+        PAL_server,
+        "PAL_ANEC_aliquot",
+        {
+            "toolGC": apm.pars.toolGC,
+            "toolarchive": apm.pars.toolarchive,
+            "source": "cell1_we",
+            "volume_ul_GC": apm.pars.volume_ul_GC,
+            "volume_ul_archive": apm.pars.volume_ul_archive,
+            "wash1": apm.pars.wash1,
+            "wash2": apm.pars.wash2,
+            "wash3": apm.pars.wash3,
+            "wash4": apm.pars.wash4,
+        },
+        process_finish=True,
+        technique_name=[
+            "headspace_GC_back_analysis",
+            "headspace_GC_front_analysis",
+            "liquid_product_archive",
+        ],
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
+
+    return apm.action_list
 
 def ANEC_sub_aliquot(
     experiment: Experiment,
