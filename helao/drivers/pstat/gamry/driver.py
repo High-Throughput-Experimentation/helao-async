@@ -93,7 +93,7 @@ class GamryDriver(HelaoDriver):
 
         return response
 
-    def get_status(self) -> DriverResponse:
+    def get_status(self, retries: int = 5) -> DriverResponse:
         """Return current driver status."""
         if self.pstat is not None:
             response = DriverResponse(
@@ -101,7 +101,16 @@ class GamryDriver(HelaoDriver):
             )
         else:
             try:
-                self.connect()
+                connect_attempts = 0
+                connect_error = True
+                while connect_error and connect_attempts < retries:
+                    connect_resp = self.connect()
+                    if connect_resp.status == DriverStatus.ok:
+                        connect_error = False
+                    time.sleep(0.5)
+                    connect_attempts += 1
+                if connect_error:
+                    raise COMError(f"Failed to connect after {retries} attempts.")
                 state = self.pstat.State()
                 state = dict([x.split("\t") for x in state.split("\r\n") if x])
                 response = DriverResponse(
