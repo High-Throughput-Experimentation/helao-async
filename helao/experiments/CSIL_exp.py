@@ -1412,20 +1412,20 @@ def CCSI_sub_co2maintainconcentration(
         ],  # save new liquid_sample_no of eche cell to globals
     )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(
-        MFC_server,
-        "acquire_flowrate",
-        {
-            "flowrate_sccm": None,
-            "duration": co2measure_duration,
-            "acquisition_rate": co2measure_acqrate,
-        },
-        to_globalexp_params=["total_scc"],
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-        ],
-    )
+    # apm.add(
+    #     MFC_server,
+    #     "acquire_flowrate",
+    #     {
+    #         "flowrate_sccm": None,
+    #         "duration": co2measure_duration,
+    #         "acquisition_rate": co2measure_acqrate,
+    #     },
+    #     to_globalexp_params=["total_scc"],
+    #     process_contrib=[
+    #         ProcessContrib.action_params,
+    #         ProcessContrib.files,
+    #     ],
+    # )
     apm.add(
         MFC_server,
         "maintain_concentration",
@@ -1440,6 +1440,7 @@ def CCSI_sub_co2maintainconcentration(
         asc.no_wait,
         nonblocking=True,
         technique_name="Adding_co2",
+        to_globalexp_params=["total_scc"],
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -1468,11 +1469,11 @@ def CCSI_sub_co2maintainconcentration(
         },
         asc.no_wait,
     )
-    apm.add(
-        MFC_server,
-        "cancel_acquire_flowrate",
-        {},
-    )
+    # apm.add(
+    #     MFC_server,
+    #     "cancel_acquire_flowrate",
+    #     {},
+    # )
     apm.add(ORCH_server, "wait", {"waittime": 3})
 
     apm.add(
