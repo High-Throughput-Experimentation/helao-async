@@ -76,7 +76,7 @@ MEASURED_6083 = [
 #     for s in MEASURED_6083
 # ]
 
-TEST_SMPS_608 = [
+TEST_SMPS_6083 = [
     {
         "sample_no": 766,
         "composition": {"Mn": 0.730724324204254, "Sb": 0.2692756757957459},
