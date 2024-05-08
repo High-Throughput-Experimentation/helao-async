@@ -86,7 +86,7 @@ servers:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8004
     group: action
-    fast: gamry_server2
+    fast: gamry_server
     params:
       allow_no_sample: true
       dev_id: 0
