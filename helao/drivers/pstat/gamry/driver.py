@@ -77,6 +77,7 @@ class GamryDriver(HelaoDriver):
             self.pstat = client.CreateObject(self.model.device)
             self.pstat.Init(self.device_name)
             self.pstat.Open()
+            self.pstat.SetCell(self.GamryCOM.CellOff)
             LOGGER.debug(
                 f"connected to {self.device_name} on device_id {self.device_id}"
             )
@@ -152,7 +153,7 @@ class GamryDriver(HelaoDriver):
                 )
 
             # apply initial configuration
-            self.pstat.SetCell(self.GamryCOM.CellOff)
+            # self.pstat.SetCell(self.GamryCOM.CellOff)
             self.pstat.SetPosFeedEnable(False)
             self.pstat.SetIEStability(self.GamryCOM.StabilityFast)
             self.pstat.SetSenseSpeedMode(self.model.set_sensemode)
