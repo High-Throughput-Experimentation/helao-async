@@ -86,11 +86,17 @@ class GamryDriver(HelaoDriver):
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
-        except Exception:
-            LOGGER.error("connection failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
+        except Exception as exc:
+            _, _, err_tup = exc.args
+            if "In use by another script" in err_tup[0]:
+                response = DriverResponse(
+                    response=DriverResponseType.success, status=DriverStatus.busy
+                )
+            else:
+                LOGGER.error("get_status connection", exc_info=True)
+                response = DriverResponse(
+                    response=DriverResponseType.failed, status=DriverStatus.error
+                )
 
         return response
 
@@ -106,29 +112,23 @@ class GamryDriver(HelaoDriver):
                 connect_error = True
                 while connect_error and connect_attempts < retries:
                     connect_resp = self.connect()
-                    if connect_resp.status == DriverStatus.ok:
+                    if connect_resp.status in [DriverStatus.ok, DriverStatus.busy]:
                         connect_error = False
                     time.sleep(0.5)
                     connect_attempts += 1
                 if connect_error:
-                    raise COMError(f"Failed to connect after {retries} attempts.")
-                state = self.pstat.State()
-                state = dict([x.split("\t") for x in state.split("\r\n") if x])
-                response = DriverResponse(
-                    response=DriverResponseType.success, data=state, status=DriverStatus.ok
-                )
-                self.disconnect()
-            except COMError as exc:
-                _, _, err_tup = exc.args
-                if "In use by another script" in err_tup[0]:
+                    raise Exception(f"Failed to connect after {retries} attempts.")
+                elif connect_resp.status == DriverStatus.busy:
                     response = DriverResponse(
                         response=DriverResponseType.success, status=DriverStatus.busy
                     )
                 else:
-                    LOGGER.error("get_status failed", exc_info=True)
+                    state = self.pstat.State()
+                    state = dict([x.split("\t") for x in state.split("\r\n") if x])
                     response = DriverResponse(
-                        response=DriverResponseType.failed, status=DriverStatus.error
+                        response=DriverResponseType.success, data=state, status=DriverStatus.ok
                     )
+                    self.disconnect()
             except Exception:
                 LOGGER.error("get_status failed", exc_info=True)
                 response = DriverResponse(
