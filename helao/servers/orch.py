@@ -858,6 +858,11 @@ class Orch(Base):
                         if k in result_action.action_params:
                             self.print_message(f"updating {k} in global vars")
                             self.global_params[k] = result_action.action_params[k]
+                        elif k in result_action.action_output:
+                            self.print_message(f"updating {k} in global vars")
+                            self.global_params[k] = result_action.action_output[k]
+                        else:
+                            self.print_message(f"key {k} not found in action output or params")
                 elif isinstance(result_action.to_globalexp_params, dict):
                     # self.print_message(
                     #     f"copying global vars {', '.join(result_action.to_globalexp_params.keys())} back to experiment"
@@ -866,6 +871,11 @@ class Orch(Base):
                         if k1 in result_action.action_params:
                             self.print_message(f"updating {k2} in global vars")
                             self.global_params[k2] = result_action.action_params[k1]
+                        elif k1 in result_action.action_output:
+                            self.print_message(f"updating {k2} in global vars")
+                            self.global_params[k2] = result_action.action_output[k1]
+                        else:
+                            self.print_message(f"key {k1} not found in action output or params")
 
             # # this will recursively call the next no_wait action in queue, and return its error
             # if self.action_dq and not self.step_thru_actions:
