@@ -106,6 +106,12 @@ def CCSI_sub_load_solid(
                 }
             ).model_dump(),
         },
+        process_finish= True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     return apm.action_list
@@ -139,6 +145,12 @@ def CCSI_sub_load_liquid(
             "combine_liquids": combine_True_False,
             "dilute_liquids": water_True_False,
         },
+        process_finish= True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
     return apm.action_list
 
@@ -162,6 +174,12 @@ def CCSI_sub_load_gas(
             ).model_dump(),
             "volume_ml": volume_ul_cell_gas / 1000,
         },
+        process_finish= True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
     return apm.action_list
 
