@@ -1221,7 +1221,7 @@ class Archive:
                     f"combining liquids '{source}' into new liquid reference",
                     info=True,
                 )
-
+                sample_dict.update({"parts": samples_in})
                 samples.append(LiquidSample(**sample_dict))
 
             else:
