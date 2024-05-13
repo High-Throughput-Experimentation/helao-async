@@ -485,13 +485,19 @@ class Orch(Base):
             self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
             if self.use_db:
-                meta_s3_key = f"sequence/{self.seq_model.sequence_uuid}.json"
-                self.print_message(
-                    f"uploading initial active sequence json to s3 ({meta_s3_key})"
-                )
-                await self.syncer.to_s3(
-                    self.seq_model.clean_dict(strip_private=True), meta_s3_key
-                )
+                try:
+                    meta_s3_key = f"sequence/{self.seq_model.sequence_uuid}.json"
+                    self.print_message(
+                        f"uploading initial active sequence json to s3 ({meta_s3_key})"
+                    )
+                    await self.syncer.to_s3(
+                        self.seq_model.clean_dict(strip_private=True), meta_s3_key
+                    )
+                except Exception as e:
+                    self.print_message(
+                        f"Error uploading initial active sequence json to s3: {e}",
+                        error=True,
+                    )
 
             self.aloop.create_task(self.seq_unpacker())
             await asyncio.sleep(1)
@@ -615,14 +621,19 @@ class Orch(Base):
         self.exp_model = self.active_experiment.get_exp()
         await self.write_active_experiment_exp()
         if self.use_db:
-            meta_s3_key = f"experiment/{self.exp_model.experiment_uuid}.json"
-            self.print_message(
-                f"uploading initial active experiment json to s3 ({meta_s3_key})"
-            )
-            await self.syncer.to_s3(
-                self.exp_model.clean_dict(strip_private=True), meta_s3_key
-            )
-
+            try:
+                meta_s3_key = f"experiment/{self.exp_model.experiment_uuid}.json"
+                self.print_message(
+                    f"uploading initial active experiment json to s3 ({meta_s3_key})"
+                )
+                await self.syncer.to_s3(
+                    self.exp_model.clean_dict(strip_private=True), meta_s3_key
+                )
+            except Exception as e:
+                self.print_message(
+                    f"Error uploading initial active experiment json to s3: {e}",
+                    error=True,
+                )
         return ErrorCodes.none
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
