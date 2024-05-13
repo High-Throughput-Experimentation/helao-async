@@ -111,7 +111,7 @@ class HTELegacyAPI:
             if plateid in self.els_cache.keys():
                 return self.els_cache[plateid]
         requiredkeysthere = (
-            lambda infofiled, print_key_or_keyword=print_key_or_keyword: (
+            lambda infofiled, print_key_or_keyword: (
                 "screening_print_id" in infofiled
             )
             if print_key_or_keyword == "screening_print_id"
