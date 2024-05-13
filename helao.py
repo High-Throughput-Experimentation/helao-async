@@ -211,7 +211,7 @@ class Pidd:
             print_message(
                 {}, "launcher", f"All actions terminated. Removing '{self.pidFilePath}'"
             )
-            os.remove(self.pidFilePath)
+        os.remove(self.pidFilePath)
 
 
 def validateConfig(PIDD, confDict, helao_root):
