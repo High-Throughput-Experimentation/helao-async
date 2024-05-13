@@ -1068,7 +1068,7 @@ class HelaoSyncer:
             try:
                 uploader(uploaded, self.bucket, target)
                 return True
-            except botocore.exceptions.ClientError as err:
+            except Exception as err:
                 _ = "".join(
                     traceback.format_exception(type(err), err, err.__traceback__)
                 )
