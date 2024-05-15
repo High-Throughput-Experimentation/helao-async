@@ -21,7 +21,7 @@ from helao.sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 from helao.sequences.ECHEUVIS_seq import ECHEUVIS_multiCA_led, ECHEUVIS_postseq
 from helaocore.models.orchstatus import LoopStatus
 
-TEST = True
+TEST = False
 
 MEASURED_6083 = [
     766,
@@ -315,7 +315,7 @@ ECHEUVIS_multiCA_led_defaults = {
     "solution_ph": 10,
     "measurement_area": 0.071,  # 3mm diameter droplet
     "liquid_volume_ml": 1.0,
-    "ref_vs_nhe": 0.21 + 0.082,
+    "ref_vs_nhe": 0.21 + 0.100,
     # "CA_potential_vsRHE": [
     #     0.4,
     #     1.0,
