@@ -10,6 +10,7 @@ from pprint import pprint
 
 from helao.servers.operator.helao_operator import HelaoOperator
 
+import httpx
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
 from data_request_client.models import Status
 from helao.helpers.premodels import Sequence
@@ -505,212 +506,219 @@ def main():
     resumed = False
 
     while True:
-        data_request = False
-
-        with CLIENT:
-            pending_requests = CLIENT.read_data_requests(status="pending")
-            acknowledged_requests = CLIENT.read_data_requests(status="acknowledged")
-
-        if RESUME_ID and not resumed:
-            matching_requests = [
-                req for req in acknowledged_requests if str(req.id) == RESUME_ID
-            ]
-            if matching_requests:
-                data_request = matching_requests[0]
-                resumed = True
-
-        elif pending_requests or TEST:
-            if TEST:
-                smpd = TEST_SMPS_6083[test_idx]
-                test_req = CreateDataRequestModel(
-                    composition=smpd["composition"],
-                    score=1.0,
-                    parameters=smpd["parameters"],
-                    sample_label=f"legacy__solid__6083_{smpd['sample_no']}",
-                )
-                with CLIENT:
-                    data_request = CLIENT.create_data_request(test_req)
-                test_idx += 1
-            elif pending_requests:
-                print(f"{gen_ts()} Pending data request count: {len(pending_requests)}")
-                data_request = pending_requests[0]
-            elif acknowledged_requests:
-                print(f"{gen_ts()} Restarting acknowledged data request from beginning")
-                data_request = acknowledged_requests[0]
-
-            sample_no = int(data_request.sample_label.split("_")[-1])
-
-            # INSITU params
-            z_start = data_request.parameters["z_start"]
-            scan_down = (
-                True if data_request.parameters["z_direction"] == "down" else False
-            )
-            ordered_vs = sorted(
-                ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"], reverse=scan_down
-            )
-            init_direction = ordered_vs[ordered_vs.index(z_start) :]
-            rev_direction = ordered_vs[: ordered_vs.index(z_start)][::-1]
-            potential_list = init_direction + rev_direction
-            insitu_params = {"CA_potential_vsRHE": potential_list}
-
-            # INSITU MEASUREMENT
-            insitu_seq = seq_constructor(
-                plate_id=PLATE_ID,
-                sample_no=sample_no,
-                data_request_id=data_request.id,
-                params=insitu_params,
-                seq_func=ECHEUVIS_multiCA_led,
-                seq_name="ECHEUVIS_multiCA_led",
-                seq_label="gcld-wetdryrun",
-                param_defaults=ECHEUVIS_multiCA_led_defaults,
-            )
-            print(f"{gen_ts()} Got measurement request {data_request.id}")
-            print(f"{gen_ts()} Plate {PLATE_ID} sample {sample_no} has composition:")
-            pprint(data_request.composition)
-            print(
-                f"{gen_ts()} Measurement parameters for sequence: {insitu_seq.sequence_uuid}:"
-            )
-            pprint(data_request.parameters)
-            operator.add_sequence(insitu_seq.get_seq())
-            print(
-                f"{gen_ts()} Dispatching measurement sequence: {insitu_seq.sequence_uuid}"
-            )
-            operator.start()
-            time.sleep(5)
-
-            # wait for sequence start (orch_state == "busy")
-            current_state, active_insitu_seq, last_seq = wait_for_orch(
-                operator, LoopStatus.started
-            )
-            print(
-                f"{gen_ts()} Measurement sequence {active_insitu_seq['sequence_uuid']} has started."
-            )
-            if current_state in [LoopStatus.error, LoopStatus.estopped]:
-                with CLIENT:
-                    output = CLIENT.set_status(
-                        "failed", data_request_id=data_request.id
-                    )
-                    input(
-                        "Press Enter to reset failed request to pending and exit operator..."
-                    )
-                    output = CLIENT.set_status(
-                        "pending", data_request_id=data_request.id
-                    )
-                    return -1
-            elif str(active_insitu_seq["sequence_uuid"]) == str(
-                insitu_seq.sequence_uuid
-            ):
-                # Acknowledge the data request
-                with CLIENT:
-                    output = CLIENT.acknowledge_data_request(data_request.id)
-                print(
-                    f"{gen_ts()} Data request {data_request.id} status: {output.status}"
-                )
-
-        if data_request:
-            # wait for sequence end (orch_state == "idle")
-            current_state, _, _ = wait_for_orch(operator, LoopStatus.stopped)
-            if current_state in [LoopStatus.error, LoopStatus.estopped]:
-                with CLIENT:
-                    output = CLIENT.set_status(
-                        "failed", data_request_id=data_request.id
-                    )
-                    input(
-                        "Press Enter to reset failed request to pending and exit operator..."
-                    )
-                    output = CLIENT.set_status(
-                        "pending", data_request_id=data_request.id
-                    )
-                    return -1
-
-            # with CLIENT:
-            #     output = CLIENT.set_status(
-            #         "process_finished", data_request_id=data_request.id
-            #     )
-            #     print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
-
-            print(
-                f"{gen_ts()} Unconditional 30 second wait for upload tasks to process."
-            )
-            time.sleep(30)
-
-            # when orchestrator has stopped, check DB server for upload state
-            num_sync_tasks = num_uploads(db_cfg)
-            while num_sync_tasks > 0:
-                print(
-                    f"{gen_ts()} Waiting for {num_sync_tasks} sequence uploads to finish."
-                )
-                time.sleep(10)
-                num_sync_tasks = num_uploads(db_cfg)
-
-            # INSITU ANALYSIS
-            ana_seq = ana_constructor(
-                plate_id=PLATE_ID,
-                sequence_uuid=str(active_insitu_seq["sequence_uuid"]),
-                data_request_id=data_request.id,
-                params={},
-                seq_func=ECHEUVIS_postseq,
-                seq_name="ECHEUVIS_postseq",
-                seq_label="gcld-wetdryrun-analysis",
-                param_defaults=ECHEUVIS_postseq_defaults,
-            )
-            operator.add_sequence(ana_seq.get_seq())
-            print(f"{gen_ts()} Dispatching analysis sequence: {ana_seq.sequence_uuid}")
-            operator.start()
-
-            time.sleep(5)
-
-            # wait for analysis start (orch_state == "busy")
-            current_state, active_seq, last_seq = wait_for_orch(
-                operator, LoopStatus.started
-            )
-            print(
-                f"{gen_ts()} Analysis sequence {active_seq['sequence_uuid']} has started."
-            )
-            if current_state in [LoopStatus.error, LoopStatus.estopped]:
-                with CLIENT:
-                    output = CLIENT.set_status(
-                        "failed", data_request_id=data_request.id
-                    )
-                    input(
-                        "Press Enter to reset failed request to pending and exit operator..."
-                    )
-                    output = CLIENT.set_status(
-                        "pending", data_request_id=data_request.id
-                    )
-                    return -1
-
-            # wait for analysis end (orch_state == "idle")
-            current_state, active_ana_seq, last_seq = wait_for_orch(
-                operator, LoopStatus.stopped
-            )
-            if current_state in [LoopStatus.error, LoopStatus.estopped]:
-                with CLIENT:
-                    output = CLIENT.set_status(
-                        "failed", data_request_id=data_request.id
-                    )
-                    input(
-                        "Press Enter to reset failed request to pending and exit operator..."
-                    )
-                    output = CLIENT.set_status(
-                        "pending", data_request_id=data_request.id
-                    )
-                    return -1
-            print(f"{gen_ts()} Analysis sequence complete.")
-
-            # with CLIENT:
-            #     output = CLIENT.set_status(
-            #         "analysis_finished", data_request_id=data_request.id
-            #     )
-            #     print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
-
-        else:
-            print(
-                f"{gen_ts()} Orchestrator is idle. Checking for data requests in 10 seconds."
-            )
-            time.sleep(10)
         if TEST & test_idx == len(TEST_SMPS_6083) - 1:
             return 0
+        
+        data_request = False
+
+        try:
+            with CLIENT:
+                pending_requests = CLIENT.read_data_requests(status="pending")
+                acknowledged_requests = CLIENT.read_data_requests(status="acknowledged")
+
+            if RESUME_ID and not resumed:
+                matching_requests = [
+                    req for req in acknowledged_requests if str(req.id) == RESUME_ID
+                ]
+                if matching_requests:
+                    data_request = matching_requests[0]
+                    resumed = True
+
+            elif pending_requests or TEST:
+                if TEST:
+                    smpd = TEST_SMPS_6083[test_idx]
+                    test_req = CreateDataRequestModel(
+                        composition=smpd["composition"],
+                        score=1.0,
+                        parameters=smpd["parameters"],
+                        sample_label=f"legacy__solid__6083_{smpd['sample_no']}",
+                    )
+                    with CLIENT:
+                        data_request = CLIENT.create_data_request(test_req)
+                    test_idx += 1
+                elif pending_requests:
+                    print(f"{gen_ts()} Pending data request count: {len(pending_requests)}")
+                    data_request = pending_requests[0]
+                elif acknowledged_requests:
+                    print(f"{gen_ts()} Restarting acknowledged data request from beginning")
+                    data_request = acknowledged_requests[0]
+
+                sample_no = int(data_request.sample_label.split("_")[-1])
+
+                # INSITU params
+                z_start = data_request.parameters["z_start"]
+                scan_down = (
+                    True if data_request.parameters["z_direction"] == "down" else False
+                )
+                ordered_vs = sorted(
+                    ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"], reverse=scan_down
+                )
+                init_direction = ordered_vs[ordered_vs.index(z_start) :]
+                rev_direction = ordered_vs[: ordered_vs.index(z_start)][::-1]
+                potential_list = init_direction + rev_direction
+                insitu_params = {"CA_potential_vsRHE": potential_list}
+
+                # INSITU MEASUREMENT
+                insitu_seq = seq_constructor(
+                    plate_id=PLATE_ID,
+                    sample_no=sample_no,
+                    data_request_id=data_request.id,
+                    params=insitu_params,
+                    seq_func=ECHEUVIS_multiCA_led,
+                    seq_name="ECHEUVIS_multiCA_led",
+                    seq_label="gcld-wetdryrun",
+                    param_defaults=ECHEUVIS_multiCA_led_defaults,
+                )
+                print(f"{gen_ts()} Got measurement request {data_request.id}")
+                print(f"{gen_ts()} Plate {PLATE_ID} sample {sample_no} has composition:")
+                pprint(data_request.composition)
+                print(
+                    f"{gen_ts()} Measurement parameters for sequence: {insitu_seq.sequence_uuid}:"
+                )
+                pprint(data_request.parameters)
+                operator.add_sequence(insitu_seq.get_seq())
+                print(
+                    f"{gen_ts()} Dispatching measurement sequence: {insitu_seq.sequence_uuid}"
+                )
+                operator.start()
+                time.sleep(5)
+
+                # wait for sequence start (orch_state == "busy")
+                current_state, active_insitu_seq, last_seq = wait_for_orch(
+                    operator, LoopStatus.started
+                )
+                print(
+                    f"{gen_ts()} Measurement sequence {active_insitu_seq['sequence_uuid']} has started."
+                )
+                if current_state in [LoopStatus.error, LoopStatus.estopped]:
+                    with CLIENT:
+                        output = CLIENT.set_status(
+                            "failed", data_request_id=data_request.id
+                        )
+                        input(
+                            "Press Enter to reset failed request to pending and exit operator..."
+                        )
+                        output = CLIENT.set_status(
+                            "pending", data_request_id=data_request.id
+                        )
+                        return -1
+                elif str(active_insitu_seq["sequence_uuid"]) == str(
+                    insitu_seq.sequence_uuid
+                ):
+                    # Acknowledge the data request
+                    with CLIENT:
+                        output = CLIENT.acknowledge_data_request(data_request.id)
+                    print(
+                        f"{gen_ts()} Data request {data_request.id} status: {output.status}"
+                    )
+
+            if data_request:
+                # wait for sequence end (orch_state == "idle")
+                current_state, _, _ = wait_for_orch(operator, LoopStatus.stopped)
+                if current_state in [LoopStatus.error, LoopStatus.estopped]:
+                    with CLIENT:
+                        output = CLIENT.set_status(
+                            "failed", data_request_id=data_request.id
+                        )
+                        input(
+                            "Press Enter to reset failed request to pending and exit operator..."
+                        )
+                        output = CLIENT.set_status(
+                            "pending", data_request_id=data_request.id
+                        )
+                        return -1
+
+                # with CLIENT:
+                #     output = CLIENT.set_status(
+                #         "process_finished", data_request_id=data_request.id
+                #     )
+                #     print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
+
+                print(
+                    f"{gen_ts()} Unconditional 30 second wait for upload tasks to process."
+                )
+                time.sleep(30)
+
+                # when orchestrator has stopped, check DB server for upload state
+                num_sync_tasks = num_uploads(db_cfg)
+                while num_sync_tasks > 0:
+                    print(
+                        f"{gen_ts()} Waiting for {num_sync_tasks} sequence uploads to finish."
+                    )
+                    time.sleep(10)
+                    num_sync_tasks = num_uploads(db_cfg)
+
+                # INSITU ANALYSIS
+                ana_seq = ana_constructor(
+                    plate_id=PLATE_ID,
+                    sequence_uuid=str(active_insitu_seq["sequence_uuid"]),
+                    data_request_id=data_request.id,
+                    params={},
+                    seq_func=ECHEUVIS_postseq,
+                    seq_name="ECHEUVIS_postseq",
+                    seq_label="gcld-wetdryrun-analysis",
+                    param_defaults=ECHEUVIS_postseq_defaults,
+                )
+                operator.add_sequence(ana_seq.get_seq())
+                print(f"{gen_ts()} Dispatching analysis sequence: {ana_seq.sequence_uuid}")
+                operator.start()
+
+                time.sleep(5)
+
+                # wait for analysis start (orch_state == "busy")
+                current_state, active_seq, last_seq = wait_for_orch(
+                    operator, LoopStatus.started
+                )
+                print(
+                    f"{gen_ts()} Analysis sequence {active_seq['sequence_uuid']} has started."
+                )
+                if current_state in [LoopStatus.error, LoopStatus.estopped]:
+                    with CLIENT:
+                        output = CLIENT.set_status(
+                            "failed", data_request_id=data_request.id
+                        )
+                        input(
+                            "Press Enter to reset failed request to pending and exit operator..."
+                        )
+                        output = CLIENT.set_status(
+                            "pending", data_request_id=data_request.id
+                        )
+                        return -1
+
+                # wait for analysis end (orch_state == "idle")
+                current_state, active_ana_seq, last_seq = wait_for_orch(
+                    operator, LoopStatus.stopped
+                )
+                if current_state in [LoopStatus.error, LoopStatus.estopped]:
+                    with CLIENT:
+                        output = CLIENT.set_status(
+                            "failed", data_request_id=data_request.id
+                        )
+                        input(
+                            "Press Enter to reset failed request to pending and exit operator..."
+                        )
+                        output = CLIENT.set_status(
+                            "pending", data_request_id=data_request.id
+                        )
+                        return -1
+                print(f"{gen_ts()} Analysis sequence complete.")
+
+                # with CLIENT:
+                #     output = CLIENT.set_status(
+                #         "analysis_finished", data_request_id=data_request.id
+                #     )
+                #     print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
+
+            else:
+                print(
+                    f"{gen_ts()} Orchestrator is idle. Checking for data requests in 10 seconds."
+                )
+
+        except httpx.ConnectError:
+                print(
+                    f"{gen_ts()} Could not connect to data requests service. Checking again in 10 seconds."
+                )
+        time.sleep(10)
         print("\n")
 
 
