@@ -1444,6 +1444,8 @@ def CCSI_sub_co2maintainconcentration(
     #         ProcessContrib.files,
     #     ],
     # )
+    # co2 upstream valve open
+    apm.add(NI_server, "gasvalve", {"gasvalve": "9-co2supply", "on": 1})
     apm.add(
         MFC_server,
         "maintain_concentration",
@@ -1513,6 +1515,16 @@ def CCSI_sub_co2maintainconcentration(
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
+    )
+    # co2 upstream valve close and pressure relief
+    apm.add(NI_server, "gasvalve", {"gasvalve": "9-co2supply", "on": 0})
+    apm.add(MFC_server,"acquire_flowrate",
+        {
+            "flowrate_sccm": 0.5,
+            "ramp_sccm_sec": 0.5,
+            "duration": 1.0,
+            "acquisition_rate": 0.5,
+        },
     )
 
     return apm.action_list
