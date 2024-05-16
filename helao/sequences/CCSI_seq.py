@@ -916,7 +916,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     flowramp_sccm: float = 0,
     target_co2_ppm: float = 1e5,
 #    headspace_scc: float = 10.5,
-    refill_freq_sec: float = 10.0,
+    maintain_fill_freq_s: float = 10.0,
     recirculation_rate_uL_min: int = 10000,
     clean_recirculation_rate_uL_min: int = 20000,
 
@@ -1012,7 +1012,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "flowramp_sccm": flowramp_sccm,
             "target_co2_ppm": target_co2_ppm,
             "headspace_scc": gas_volume/1000,
-            "refill_freq_sec": refill_freq_sec,
+            "refill_freq_sec": maintain_fill_freq_s,
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
         # epm.add_experiment("CCSI_sub_load_gas", {
