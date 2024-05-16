@@ -54,6 +54,7 @@ servers:
         1B: dev1/port0/line0
         7A: dev1/port1/line1
         7B: dev1/port1/line2
+        9-co2supply: dev1/port2/line0
       dev_multivalve:
         multi_CMD0: dev1/port1/line4
         multi_CMD1: dev1/port1/line5
