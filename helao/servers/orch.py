@@ -1267,6 +1267,16 @@ class Orch(Base):
             for i in range(min(len(self.experiment_dq), limit))
         ]
 
+    def list_all_experiments(self):
+        """Return all experiments in queue."""
+        return [(i, D.get_exp().experiment_name) for i,D in enumerate(self.experiment_dq)]
+
+    def drop_experiment_inds(self, inds: List[int]):
+        """Drop experiments by index."""
+        for i in sorted(inds, reverse=True):
+            del self.experiment_dq[i]
+        return self.list_all_experiments()
+
     def get_experiment(self, last=False) -> ExperimentModel:
         """Return the active or last experiment."""
         experiment = self.last_experiment if last else self.active_experiment
