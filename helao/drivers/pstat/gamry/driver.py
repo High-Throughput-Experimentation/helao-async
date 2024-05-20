@@ -310,10 +310,12 @@ class GamryDriver(HelaoDriver):
             self.pstat.SetCell(getattr(self.GamryCOM, self.technique.on_method.value))
             # run data acquisition
             self.events = client.GetEvents(self.dtaq, self.dtaqsink)
+            start_time = time.time()
             self.dtaq.Run(True)
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="measurement started",
+                data={"start_time": start_time},
                 status=DriverStatus.busy,
             )
         except comtypes.COMError:
