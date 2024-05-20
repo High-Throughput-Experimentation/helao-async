@@ -164,6 +164,8 @@ class Base:
         self.live_q = MultisubscriberQueue()
         self.live_buffer = {}
         self.status_clients = set()
+        # only executors register into local_action_task_queue, default executors ignore queue
+        self.local_action_task_queue = []
 
         self.status_publisher = WsPublisher(self.status_q)
         self.data_publisher = WsPublisher(self.data_q)
@@ -422,6 +424,7 @@ class Base:
         if len(self.last_10_active) == 10:
             _ = self.last_10_active.pop(0)
         self.last_10_active.append((l10.action.action_uuid, l10))
+        # register action_uuid in local action task queue
         return self.actives[activeparams.action.action_uuid]
 
     def get_active_info(self, action_uuid: UUID):
@@ -1047,6 +1050,9 @@ class Active:
             )
 
     def start_executor(self, executor: Executor):
+        # append action_uuid to local queue before running task if concurrency not allowed
+        if not executor.concurrent:
+            self.base.local_action_task_queue.append(executor.active.action.action_uuid)
         self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
         self.action_task.add_done_callback(self.executor_done_callback)
         self.base.print_message("Executor task started.")
@@ -1908,6 +1914,9 @@ class Active:
                     # send the last status
                     await self.add_status(action=action)
                     self.base.aloop.create_task(move_dir(action, base=self.base))
+                    # pop from local action task queue
+                    if action.action_uuid in self.base.local_action_task_queue:
+                        self.base.local_action_task_queue.remove(action.action_uuid)
 
                 # since all sub-actions of active are finished process endpoint queue
                 if self.base.endpoint_queues[action.action_name].qsize() > 0:
@@ -2022,6 +2031,9 @@ class Active:
 
     async def action_loop_task(self, executor: Executor):
         """Generic replacement for 'IOloop'."""
+        # stall action_loop task if concurrency is not allowed
+        while self.base.local_action_task_queue[0] != self.action.action_uuid and not executor.concurrent:
+            await asyncio.sleep(0.1)
 
         if self.action.nonblocking:
             await self.send_nonblocking_status()

@@ -57,6 +57,7 @@ class GamryExec(Executor):
         super().__init__(*args, **kwargs)
         try:
             self.poll_rate = 0.01  # pump events every 10 millisecond
+            self.concurrent = False
             self.start_time = time.time()
             self.data_buffer = defaultdict(lambda: deque(maxlen=1000))
 
