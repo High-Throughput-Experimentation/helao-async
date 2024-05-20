@@ -487,9 +487,15 @@ class OrchAPI(HelaoFastAPI):
             """Return the current list of experiments."""
             return self.orch.list_all_experiments()
 
-        @self.post("/drop_experiments", tags=["private"])
-        def drop_experiments(inds: List[int]):
-            """Return the current list of experiments."""
+        @self.post("/drop_experiment_inds", tags=["private"])
+        def drop_experiment_inds(inds: List[int]):
+            """Drop queued experiments by index."""
+            return self.orch.drop_experiment_inds(inds)
+
+        @self.post("/drop_experiment_range", tags=["private"])
+        def drop_experiment_range(lower: int, upper: int):
+            """Drop range of experiments by index, upper inclusive."""
+            inds = list(range(lower, upper + 1))
             return self.orch.drop_experiment_inds(inds)
 
         @self.post("/active_experiment", tags=["private"])
