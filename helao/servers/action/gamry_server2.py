@@ -6,6 +6,8 @@ the hardware driver class from the action server base class.
 
 """
 
+# TODO: test if we can set CellOff during a measurement to measure OCV
+
 __all__ = ["makeApp"]
 
 
