@@ -6,7 +6,7 @@ import asyncio
 from copy import copy
 from enum import Enum
 from socket import gethostname
-from typing import Union, Optional
+from typing import Union, Optional, List
 
 from fastapi import Body, WebSocket, Request
 from fastapi.routing import APIRoute
@@ -481,6 +481,16 @@ class OrchAPI(HelaoFastAPI):
         def list_experiments():
             """Return the current list of experiments."""
             return self.orch.list_experiments()
+
+        @self.post("/list_all_experiments", tags=["private"])
+        def list_all_experiments():
+            """Return the current list of experiments."""
+            return self.orch.list_all_experiments()
+
+        @self.post("/drop_experiments", tags=["private"])
+        def drop_experiments(inds: List[int]):
+            """Return the current list of experiments."""
+            return self.orch.drop_experiment_inds(inds)
 
         @self.post("/active_experiment", tags=["private"])
         def active_experiment():
