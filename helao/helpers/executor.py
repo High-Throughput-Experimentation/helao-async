@@ -25,6 +25,7 @@ class Executor:
         poll_rate: float = 0.2,
         oneoff: bool = True,
         exec_id: str = None,
+        concurrent: bool = True,
         **kwargs
     ):
         self.active = active
@@ -37,6 +38,8 @@ class Executor:
         self.active.action.exec_id = self.exec_id
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
+        # whether or not we can run multiple executors concurrently, regardless of executor type
+        self.concurrent = concurrent
 
     async def _pre_exec(self):
         "Setup methods, return error state."
