@@ -35,13 +35,24 @@ else:
     LOGGER = logging.LOGGER
 
 
-class AndorExec(Executor):
+class AndorCooling(Executor):
+    """Handle cooling and warmup of Andor camera."""
+    driver: AndorDriver
+
+
+class AndorAdjustND(Executor):
+    """Auto-select ND filter with maximum optimality."""
+    driver: AndorDriver
+
+
+class AndorExtTrig(Executor):
+    """Acquire data with external start trigger."""
     driver: AndorDriver
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         try:
-            self.poll_rate = 0.01  # pump events every 10 millisecond
+            self.poll_rate = 0.1  # pump events every 100 millisecond
             self.start_time = time.time()
 
             # link attrs for convenience
@@ -50,7 +61,13 @@ class AndorExec(Executor):
 
             # no external timer, event sink signals end of measurement
             self.duration = -1
-            self.technique = kwargs["technique"]
+            
+            self.frame_count = self.action_params["frame_count"]
+            self.timeout = self.action_params["timeout"]
+            self.buffer_count = self.action_params["buffer_count"]
+            
+            self.exp_time = self.action_params["exp_time"]
+            self.framerate = self.action_params["framerate"]
 
             LOGGER.info("AndorExec initialized.")
         except Exception:
@@ -58,7 +75,7 @@ class AndorExec(Executor):
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
-        resp = self.driver.setup()
+        resp = self.driver.setup_acquisition(exp_time=self.exp_time, framerate=self.framerate)
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         return {"error": error}
 
@@ -136,8 +153,8 @@ async def andor_dyn_endpoints(app=None):
         active = await app.base.setup_and_contain_action()
 
         # decide on abbreviated action name
-        active.action.action_abbr = "SPEC"
-        executor = AndorExec(active=active, oneoff=False)
+        active.action.action_abbr = "ANDORSPEC"
+        executor = AndorExtTrig(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
         #
         
