@@ -568,9 +568,16 @@ class Orch(Base):
             for k, v in self.active_experiment.experiment_params.items()
             if k in exp_func_args
         }
-        unpacked_acts = self.experiment_lib[self.active_experiment.experiment_name](
+        exp_return = exp_func(
             self.active_experiment, **supplied_params
         )
+        
+        if isinstance(exp_return, list):
+            unpacked_acts = exp_return
+        elif isinstance(exp_return, Experiment):
+            self.active_experiment = exp_return
+            unpacked_acts = self.active_experiment.action_plan
+        
         self.active_experiment.experiment_codehash = self.experiment_codehash_lib[
             self.active_experiment.experiment_name
         ]
@@ -583,6 +590,8 @@ class Orch(Base):
         process_count = 0
         init_process_uuids = [gen_uuid()]
         # self.print_message("setting action order")
+
+        ## actions are not instantiated until experiment is unpacked
         for i, act in enumerate(unpacked_acts):
             # init uuid now for tracking later
             act.action_uuid = gen_uuid()

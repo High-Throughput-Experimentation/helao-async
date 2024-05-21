@@ -40,6 +40,8 @@ class Sequence(SequenceModel):
 
     # not in SequenceModel:
     experimentmodel_list: List[ExperimentModel] = []  # running tally of completed experiments
+    # allow sequences to inherit parameters from global dict
+    from_globalexp_params: dict = {}
 
     def __repr__(self):
         return f"<sequence_name:{self.sequence_name}>"
@@ -90,8 +92,10 @@ class Sequence(SequenceModel):
 class Experiment(Sequence, ExperimentModel):
     "Sample-action grouping class."
 
-    # not in ExperimentModel:
+    # not in ExperimentModel, actionmodel_list is a list of completed ActionModels:
     actionmodel_list: List[ActionModel] = []
+    # not in ExperimentModel, action_plan is a list of Actions to be executed:
+    action_plan: list = []
     from_globalexp_params: dict = {}
 
     def __repr__(self):
@@ -404,6 +408,12 @@ class ActionPlanMaker:
         action_dict.update(kwargs)
         self.action_list.append(Action(**action_dict))
 
+    @property
+    def experiment(self):
+        exp = self._experiment
+        exp.action_plan = self.action_list
+        return exp
+        
 
 class ExperimentPlanMaker:
     def __init__(
