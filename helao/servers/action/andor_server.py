@@ -20,6 +20,7 @@ from fastapi import Body
 
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
+from helaocore.models.file import HloHeaderModel
 
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
@@ -37,16 +38,19 @@ else:
 
 class AndorCooling(Executor):
     """Handle cooling and warmup of Andor camera."""
+
     driver: AndorDriver
 
 
 class AndorAdjustND(Executor):
     """Auto-select ND filter with maximum optimality."""
+
     driver: AndorDriver
 
 
 class AndorExtTrig(Executor):
     """Acquire data with external start trigger."""
+
     driver: AndorDriver
 
     def __init__(self, *args, **kwargs):
@@ -61,13 +65,15 @@ class AndorExtTrig(Executor):
 
             # no external timer, event sink signals end of measurement
             self.duration = -1
-            
+
             self.frame_count = self.action_params["frame_count"]
             self.timeout = self.action_params["timeout"]
             self.buffer_count = self.action_params["buffer_count"]
-            
+
             self.exp_time = self.action_params["exp_time"]
             self.framerate = self.action_params["framerate"]
+
+            self.first_tick = None
 
             LOGGER.info("AndorExec initialized.")
         except Exception:
@@ -75,7 +81,9 @@ class AndorExtTrig(Executor):
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
-        resp = self.driver.setup_acquisition(exp_time=self.exp_time, framerate=self.framerate)
+        resp = self.driver.setup_acquisition(
+            exp_time=self.exp_time, framerate=self.framerate
+        )
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         return {"error": error}
 
@@ -100,7 +108,6 @@ class AndorExtTrig(Executor):
         resp = self.driver.cleanup()
         # may want to call disconnect if self.driver.connect() was used in setup or driver init
         self.driver.disconnect()
-
 
         # # _post_exec can send one last data message and/or make final calculations and store in action_params
         # # parse calculate outputs from data buffer:
@@ -150,14 +157,25 @@ async def andor_dyn_endpoints(app=None):
         action_version: int = 2,
         some_example_param: float = 0.0,
     ):
-        active = await app.base.setup_and_contain_action()
+        data_keys = ["elapsed_time_s"] + [
+            f"ch_{i:04}" for i in range(len(app.driver.wl_arr.shape[0]))
+        ]
+        active = await app.base.setup_and_contain_action(
+            json_data_keys=data_keys,
+            file_type="andor_helao__file",
+            hloheader=HloHeaderModel(
+                action_name=action.action_name,
+                column_headings=data_keys,
+                optional={"wl": list(app.driver.wl_arr)},
+            ),
+        )
 
         # decide on abbreviated action name
         active.action.action_abbr = "ANDORSPEC"
         executor = AndorExtTrig(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
         #
-        
+
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_acquire_external_trig", tags=["action"])
@@ -172,6 +190,7 @@ async def andor_dyn_endpoints(app=None):
                 executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()
+
 
 def makeApp(confPrefix, server_key, helao_root):
 

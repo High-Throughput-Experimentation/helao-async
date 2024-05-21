@@ -2,7 +2,6 @@
 """
 
 from pyAndorSDK3 import AndorSDK3
-from collections import deque
 import numpy as np
 import time as time
 import pandas as pd
@@ -35,7 +34,6 @@ class AndorDriver(HelaoDriver):
     stride: float
     clock_hz: float
     frame: int
-    acqs: deque
 
     def __init__(self, config: dict = {}):
         super().__init__(config=config)
@@ -511,8 +509,6 @@ class AndorDriver(HelaoDriver):
                 self.cam.queue(buf, imgsize)
 
             self.frame = None  # initialise frame to None
-            # initalise aquisition as a deque object so we can use the popleft() method
-            self.acqs = deque()  
 
             response = DriverResponse(
                 response=DriverResponseType.success,
@@ -551,14 +547,15 @@ class AndorDriver(HelaoDriver):
         """Retrieve data from device buffer."""
         try:
             acq = self.cam.wait_buffer(self.timeout)
-            self.acqs.append(acq)
             self.cam.queue(acq._np_data, self.cam.ImageSizeBytes) # requeue the buffer
-            # TODO: decide on dict format (key by timestamp, or wavelength...)
-            data_dict = {}
+            spectrum = acq.image[0]
+            tick_time = acq.metadata.timestamp / self.clock_hz
+            data_dict = {"tick_time": tick_time}
+            data_dict.update({f"ch_{i:04}": x  for i,x in enumerate(spectrum)})
             # status.busy will cause executor polling loop to continue
             status = DriverStatus.busy
-            # status.ok will cause executor polling loop to exit
-            status = DriverStatus.ok
+            # # status.ok will cause executor polling loop to exit
+            # status = DriverStatus.ok
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="",
@@ -577,6 +574,7 @@ class AndorDriver(HelaoDriver):
         """General stop method to abort all active methods e.g. motion, I/O, compute."""
         try:
             # call function to stop ongoing acquisition
+            self.cam.AcquisitionStop()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
