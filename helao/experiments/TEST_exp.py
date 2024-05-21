@@ -34,7 +34,9 @@ def TEST_sub_noblocking(
         ORCH_server, "wait", {"waittime": apm.pars.wait_time * 10}, nonblocking=True
     )
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time})
-    return apm.action_list
+    exp = apm.experiment
+    exp.experiment_params["test_additional_param"] = "test_additional_param_value"
+    return exp
 
 
 def TEST_sub_conditional_stop(
@@ -58,4 +60,4 @@ def TEST_sub_conditional_stop(
     apm.add(ORCH_server, "wait", {"waittime": 1})
     apm.add(ORCH_server, "wait", {"waittime": 1})
     apm.add(ORCH_server, "wait", {"waittime": 1})
-    return apm.action_list
+    return apm.experiment
