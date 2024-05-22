@@ -124,7 +124,7 @@ class AndorDriver(HelaoDriver):
         # LOGGER.info(sdkcamhandle.PixelWidth)
         return self.self.cam.PixelWidth
 
-    def image_and_check_dynamic_range(self, WL=[], exposure_time=0.0098):
+    def image_and_check_dynamic_range(self, exposure_time=0.0098):
         """This function collects a single image and checks that the maximum value is in the optimum dynamic range for the measurment.
         It returns the image, the maximum pixel value and a boolean that is true if the maximum value is in the optimum dynamic range
         defined by the range 65536-55536.
@@ -139,13 +139,18 @@ class AndorDriver(HelaoDriver):
         max = test.image.max()
         optimality = 1 + np.abs(63000 - max) / 63000
         range_bool = max < (2**16) and max > ((2**16) - 10000)
-        if len(WL) == 0:
-            plt.imshow(test.image, cmap="hot")
-        else:
-            # use imshow but set the x-axis to be the WL
-            LOGGER.info("using the WL array")
-            plt.figure(figsize=(8, 8))
-            plt.imshow(test.image, cmap="hot", extent=[WL[0], WL[-1], 0, 2160])
+        # #
+        # if len(self.wl_arr) == 0:
+        #     plt.imshow(test.image, cmap="hot")
+        # else:
+        #     # use imshow but set the x-axis to be the WL
+        #     LOGGER.info("using the WL array")
+        #     plt.figure(figsize=(8, 8))
+        #     plt.imshow(
+        #         test.image,
+        #         cmap="hot",
+        #         extent=[self.wl_arr[0], self.wl_arr[-1], 0, 2160],
+        #     )
 
         return test, max, range_bool, optimality
 
@@ -206,7 +211,7 @@ class AndorDriver(HelaoDriver):
         PixelWidth,
         centralWL=672.26,
         NumHorizPixels=2560,
-        ND_filer_num=1,
+        ND_filter_num=1,
         slit_width_um=10,
     ):
         """
@@ -215,10 +220,10 @@ class AndorDriver(HelaoDriver):
         """
         ## the return from GetWavelengthLimits looks weird to me :Wavelength Min: 0.0 Wavelength Max: 11127.045898
         # everything else looks fine and will get calibrated in the next block
-        if ND_filer_num > 6:
+        if ND_filter_num > 6:
             LOGGER.info("Filter number is too high")
             return
-        elif ND_filer_num < 1:
+        elif ND_filter_num < 1:
             LOGGER.info("Filter number is too low")
             return
         elif slit_width_um > 100:
@@ -287,7 +292,7 @@ class AndorDriver(HelaoDriver):
                     spc.SetSlitWidth(0, 1, 10)
                     LOGGER.info("slit set")
                 if spc.IsFilterPresent(0) == (20202, 1):
-                    spc.SetFilter(0, ND_filer_num)
+                    spc.SetFilter(0, ND_filter_num)
                     LOGGER.info("filter set")
 
             else:
@@ -305,23 +310,24 @@ class AndorDriver(HelaoDriver):
             shm = spc.Close()
             return WL_array
 
-    def adjust_ND(self, WL_arr):
+    def adjust_ND(self):
 
-        # Load libraries
-        spc = ATSpectrograph()
+        adjust_success = False
+        try:
+            # Load libraries
+            spc = ATSpectrograph()
 
-        # Initialize libraries
-        shm = spc.Initialize("")
+            # Initialize libraries
+            shm = spc.Initialize("")
 
-        LOGGER.info(
-            "Function Initialize returned {}".format(
-                spc.GetFunctionReturnDescription(shm, 64)[1]
+            LOGGER.info(
+                "Function Initialize returned {}".format(
+                    spc.GetFunctionReturnDescription(shm, 64)[1]
+                )
             )
-        )
 
-        LOGGER.info("Function Initialize returned {}".format(shm))
+            LOGGER.info("Function Initialize returned {}".format(shm))
 
-        if True:
             if ATSpectrograph.ATSPECTROGRAPH_SUCCESS == shm:
 
                 # Configure Spectrograph
@@ -378,34 +384,53 @@ class AndorDriver(HelaoDriver):
                     # create a for loop iterating from 1 to 6, setting each filter and getting the optimality value
                     for i in range(1, 7):
                         spc.SetFilter(0, i)
-                        _, max, _, optimality = self.image_and_check_dynamic_range(
-                            WL_arr
-                        )
+                        _, max, _, optimality = self.image_and_check_dynamic_range()
                         optimality_array[i - 1] = optimality
                         max_array[i - 1] = max
                     # find the filter with the maximum optimality value
-                    ND_filer_num = np.argmin(optimality_array)
-                    # if max_array[ND_filer_num] is above 54000, set optimality[ND_filer_num] to 999
+                    ND_filter_num = np.argmin(optimality_array)
+                    # if max_array[ND_filter_num] is above 54000, set optimality[ND_filter_num] to 999
                     for i in range(7):
-                        if max_array[ND_filer_num] > 54000:
-                            optimality_array[ND_filer_num] = 999
-                            ND_filer_num = np.argmin(optimality_array)
+                        if max_array[ND_filter_num] > 54000:
+                            optimality_array[ND_filter_num] = 999
+                            ND_filter_num = np.argmin(optimality_array)
                     else:
-                        ND_filer_num = np.argmin(optimality_array)
-                    spc.SetFilter(0, ND_filer_num)
+                        ND_filter_num = np.argmin(optimality_array)
+                    spc.SetFilter(0, ND_filter_num)
 
                     LOGGER.info(
                         "filter number set to ",
-                        ND_filer_num,
+                        ND_filter_num,
                         " with optimality value of ",
-                        optimality_array[ND_filer_num],
+                        optimality_array[ND_filter_num],
                         "and a max intensity of",
-                        max_array[ND_filer_num],
+                        max_array[ND_filter_num],
                     )
+                adjust_success = True
+                data = {
+                    "max_array": max_array,
+                    "optimality_array": optimality_array,
+                    "ND_filter_num": ND_filter_num,
+                }
             else:
                 LOGGER.info("Cannot continue, could not initialise Spectrograph")
-        shm = spc.Close()
-        return max_array, optimality_array, ND_filer_num
+                data = {}
+            shm = spc.Close()
+            response = DriverResponse(
+                response=(
+                    DriverResponseType.success
+                    if adjust_success
+                    else DriverResponseType.failed
+                ),
+                data=data,
+                status=DriverStatus.ok,
+            )
+        except Exception:
+            LOGGER.error("adjust_ND failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
 
     def warm_and_close(self, warmup: bool):
         """
@@ -480,7 +505,7 @@ class AndorDriver(HelaoDriver):
         """This function sets the camera up for a continous aquisition at the fastest rate using the complete AOI which is 10 ms exposure time"""
         try:
             # external start will start the camera upon 5V TTL signal. The camera will then aquire as fast as possible
-            self.cam.TriggerMode = "External Start"  
+            self.cam.TriggerMode = "External Start"
             self.cam.AOIVBin = 2160  # full verrtical binning over the  AOI
             self.cam.SimplePreAmpGainControl = (
                 "16-bit (low noise & high well capacity)"  # Single Pixel is 16 bit
@@ -529,7 +554,7 @@ class AndorDriver(HelaoDriver):
         """Apply signal and begin data acquisition."""
         try:
             # call function to activate External Trigger mode
-            self.cam.TriggerMode = "External Start"  
+            self.cam.TriggerMode = "External Start"
             self.cam.AcquisitionStart()
             response = DriverResponse(
                 response=DriverResponseType.success,
@@ -553,7 +578,9 @@ class AndorDriver(HelaoDriver):
             while True:
                 try:
                     acq = self.cam.wait_buffer(self.timeout)
-                    self.cam.queue(acq._np_data, self.cam.ImageSizeBytes) # requeue the buffer
+                    self.cam.queue(
+                        acq._np_data, self.cam.ImageSizeBytes
+                    )  # requeue the buffer
                     spectrum = acq.image[0]
                     tick_time = acq.metadata.timestamp / self.clock_hz
                     data_dict["tick_time"].append(tick_time)
@@ -561,7 +588,6 @@ class AndorDriver(HelaoDriver):
                         data_dict[f"ch_{i:04}"].append(x)
                 except CameraException:
                     break
-            # status.busy will signal action_loop_task to continue polling
             status = DriverStatus.busy
             response = DriverResponse(
                 response=DriverResponseType.success,
