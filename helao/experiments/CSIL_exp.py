@@ -724,7 +724,8 @@ def CCSI_sub_initialization_firstpart(
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 6,  # move co2 monitoring to separate exp, #3  n2 push, #4 change multivalve positions,5-syringepushwait, 6 co2afterpush
+    experiment_version: int = 7,  # move co2 monitoring to separate exp, #3  n2 push, #4 change multivalve positions,5-syringepushwait, 6 co2afterpush
+                                    #7 waterfill wait 
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
@@ -733,6 +734,7 @@ def CCSI_sub_cellfill(
     Syringe_rate_ulsec: float = 300,
     SyringePushWait_s: float = 6,
     LiquidFillWait_s: float = 15,
+    WaterFillWait_s: float = 15,
     previous_liquid: bool = False,
     n2_push: bool = False,
     co2_fill_after_n2push: bool = False,
@@ -799,6 +801,8 @@ def CCSI_sub_cellfill(
         apm.add(ORCH_server, "wait", {"waittime": SyringePushWait_s})
         if n2_push:
             # switch back to n2 source
+            apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 1})
+
             apm.add(
                 NI_server,
                 "multivalve",
@@ -817,6 +821,9 @@ def CCSI_sub_cellfill(
                 asc.no_wait,
             )
             apm.add(ORCH_server, "wait", {"waittime": LiquidFillWait_s})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 0})
+            apm.add(ORCH_server, "wait", {"waittime": 2})
+
             # switch back to co2 source
             apm.add(
                 NI_server,
@@ -916,6 +923,7 @@ def CCSI_sub_cellfill(
         apm.add(ORCH_server, "wait", {"waittime": 5.25})
         if n2_push:
             # switch back to n2 source
+            apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 1})
             apm.add(
                 NI_server,
                 "multivalve",
@@ -933,7 +941,9 @@ def CCSI_sub_cellfill(
                 {"multivalve": "multi_CMD0", "on": 1},
                 asc.no_wait,
             )
-            apm.add(ORCH_server, "wait", {"waittime": LiquidFillWait_s})
+            apm.add(ORCH_server, "wait", {"waittime": WaterFillWait_s})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 0})
+            apm.add(ORCH_server, "wait", {"waittime": 2})
             # switch back to co2 source
             apm.add(
                 NI_server,
