@@ -101,7 +101,8 @@ def ECMS_initiation_recirculation(
     flowrate_sccm: float = 3.0,
     flow_ramp_sccm: float = 0,
     MS_baseline_duration_1: float = 120, 
-    MS_baseline_duration_2: float = 90, 
+    MS_baseline_duration_2: float = 90,
+    tube_clear_time: float = 20,
     liquid_drain_time: float = 60.0,    
 ):
 
@@ -154,7 +155,7 @@ def ECMS_initiation_recirculation(
     )
 
     epm.add_experiment("ECMS_sub_normal_state",{})
-    epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})   
+    epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
     return epm.experiment_plan_list
 
 def ECMS_repeat_CV(
