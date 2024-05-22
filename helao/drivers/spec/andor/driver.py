@@ -1,7 +1,7 @@
 """ Andor Camera driver for Helao
 """
 
-from pyAndorSDK3 import AndorSDK3
+from pyAndorSDK3 import AndorSDK3, CameraException
 import numpy as np
 import time as time
 import pandas as pd
@@ -45,6 +45,8 @@ class AndorDriver(HelaoDriver):
         self.vert_pixels = None
         self.stride = None
         self.clock_hz = None
+
+        self.timeout = 9  # timeout for the wait_buffer function in milliseconds, we use 9 ms which is just below the frame time at 98 Hz, to trigger a CameraException when the buffer is empty
 
         self.sdk3 = AndorSDK3()
         self.device_id = self.config.get("dev_id", 0)
@@ -546,20 +548,25 @@ class AndorDriver(HelaoDriver):
     def get_data(self) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
-            acq = self.cam.wait_buffer(self.timeout)
-            self.cam.queue(acq._np_data, self.cam.ImageSizeBytes) # requeue the buffer
-            spectrum = acq.image[0]
-            tick_time = acq.metadata.timestamp / self.clock_hz
-            data_dict = {"tick_time": tick_time}
-            data_dict.update({f"ch_{i:04}": x  for i,x in enumerate(spectrum)})
-            # status.busy will cause executor polling loop to continue
+            data_dict = {"tick_time": []}
+            data_dict.update({f"ch_{i:04}": [] for i in range(self.wl_arr.size)})
+            while True:
+                try:
+                    acq = self.cam.wait_buffer(self.timeout)
+                    self.cam.queue(acq._np_data, self.cam.ImageSizeBytes) # requeue the buffer
+                    spectrum = acq.image[0]
+                    tick_time = acq.metadata.timestamp / self.clock_hz
+                    data_dict["tick_time"].append(tick_time)
+                    for i, x in enumerate(spectrum):
+                        data_dict[f"ch_{i:04}"].append(x)
+                except CameraException:
+                    break
+            # status.busy will signal action_loop_task to continue polling
             status = DriverStatus.busy
-            # # status.ok will cause executor polling loop to exit
-            # status = DriverStatus.ok
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="",
-                data=data_dict,
+                data=data_dict if data_dict["tick_time"] else {},
                 status=status,
             )
         except Exception:
@@ -606,6 +613,9 @@ class AndorDriver(HelaoDriver):
     def disconnect(self) -> DriverResponse:
         """Release connection to resource."""
         try:
+            if self.cam is not None:
+                self.cam.close()
+                self.cam = None
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -619,6 +629,10 @@ class AndorDriver(HelaoDriver):
     def reset(self) -> DriverResponse:
         """Reinitialize driver, force-close old connection if necessary."""
         try:
+            if self.cam is not None:
+                self.cleanup()
+                self.disconnect()
+                self.connect()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
