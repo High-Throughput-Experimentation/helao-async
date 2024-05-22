@@ -293,7 +293,6 @@ def ECMS_repeat_CV_recirculation(
     sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,   
-    liquid_fill_time: int =15,
     reservoir_liquid_sample_no: int = 2,
     volume_ul_cell_liquid: float = 600,
     #liquid_forward_time: float = 0,
@@ -320,6 +319,8 @@ def ECMS_repeat_CV_recirculation(
     ref_offset: float = 0.0,  
     MS_equilibrium_time: float = 120.0,
     
+    cleaning_times: int =1,
+    liquid_fill_time: float = 16,
     tube_clear_time: float = 20,
     liquid_drain_time: float = 80.0,
     #liquid_cleancell_time: float = 120,
@@ -417,7 +418,7 @@ def ECMS_repeat_CV_recirculation(
             
         epm.add_experiment("ECMS_sub_normal_state",{})
         epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
-        epm.add_experiment("ECMS_sub_clean_cell_recirculation", {"volume_ul_cell_liquid": volume_ul_cell_liquid, "liquid_backward_time":liquid_backward_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no, "tube_clear_time":tube_clear_time, "liquid_drain_time":liquid_drain_time})        
+        epm.add_experiment("ECMS_sub_clean_cell_recirculation", {"volume_ul_cell_liquid": volume_ul_cell_liquid, "liquid_backward_time":liquid_backward_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no, "tube_clear_time":tube_clear_time, "liquid_drain_time":liquid_drain_time, "liquid_fill_time":liquid_fill_time, "cleaning_times": cleaning_times})        
 
         #epm.add_experiment("ECMS_sub_electrolyte_clean_cell", {"liquid_backward_time": liquid_cleancell_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no})
     
@@ -743,7 +744,6 @@ def ECMS_series_CA_recirculation(
     sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
-    liquid_fill_time: int =15,    
     reservoir_liquid_sample_no: int = 2,
     volume_ul_cell_liquid: float = 600,
     #liquid_forward_time: float = 0,
@@ -763,6 +763,8 @@ def ECMS_series_CA_recirculation(
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
     MS_equilibrium_time: float = 120.0,
+    cleaning_times: int =1,
+    liquid_fill_time: float = 16,
     liquid_drain_time: float = 60.0,
     tube_clear_time: float = 20,
     #liquid_cleancell_time: float = 120,
@@ -838,7 +840,7 @@ def ECMS_series_CA_recirculation(
             
         epm.add_experiment("ECMS_sub_normal_state",{})
         epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
-        epm.add_experiment("ECMS_sub_clean_cell_recirculation", {"volume_ul_cell_liquid": volume_ul_cell_liquid, "liquid_backward_time":liquid_backward_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no, "tube_clear_time":tube_clear_time, "liquid_drain_time":liquid_drain_time})        
+        epm.add_experiment("ECMS_sub_clean_cell_recirculation", {"volume_ul_cell_liquid": volume_ul_cell_liquid, "liquid_backward_time":liquid_backward_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no, "tube_clear_time":tube_clear_time, "liquid_drain_time":liquid_drain_time, "liquid_fill_time": liquid_fill_time, "cleaning_times": cleaning_times})        
    
     return epm.experiment_plan_list
 def ECMS_series_pulseCA(
