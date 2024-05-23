@@ -1059,6 +1059,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
         epm.add_experiment("CCSI_sub_n2rinse", {
             "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
             "waterclean_volume_ul": drainclean_volume_ul,
+            "Syringe_rate_ulsec":Waterclean_syringe_rate_ulsec,
             "rinse_cycles": LiquidClean_full_rinses,
             "rinse_agitation": LiquidClean_rinse_agitation,
             "rinse_agitation_wait": LiquidClean_rinse_agitation_wait,
@@ -1096,7 +1097,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
         if watervolume != 0:
             epm.add_experiment("CCSI_sub_refill_clean", {
                 "Waterclean_volume_ul": watervolume,
-                "Syringe_rate_ulsec": 800, #syringe_rate_ulsec,
+                "Syringe_rate_ulsec": Waterclean_syringe_rate_ulsec, #syringe_rate_ulsec,
             })
 
         if perform_init:
