@@ -2373,6 +2373,7 @@ def CCSI_sub_n2rinse(
                 Solution_volume_ul=0,
                 Waterclean_reservoir_sample_no=Waterclean_reservoir_sample_no,
                 Waterclean_volume_ul=waterclean_volume_ul,
+                LiquidFillWait_s=LiquidFillWait_s,
                 Syringe_rate_ulsec=Syringe_rate_ulsec,
                 n2_push=n2_push,
             )
@@ -2396,7 +2397,7 @@ def CCSI_sub_n2rinse(
             CCSI_sub_refill_clean(
                 experiment=experiment,
                 Waterclean_volume_ul=waterclean_volume_ul,
-                Syringe_rate_ulsec=500,
+                Syringe_rate_ulsec=Syringe_rate_ulsec,
             )
         )
     return apm.action_list
