@@ -2305,7 +2305,7 @@ def CCSI_sub_n2clean(
         CCSI_sub_refill_clean(
             experiment=experiment,
             Waterclean_volume_ul=waterclean_volume_ul,
-            Syringe_rate_ulsec=500,
+            Syringe_rate_ulsec=Syringe_rate_ulsec,
         )
     )
 
