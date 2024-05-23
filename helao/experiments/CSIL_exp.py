@@ -822,7 +822,7 @@ def CCSI_sub_cellfill(
             )
             apm.add(ORCH_server, "wait", {"waittime": LiquidFillWait_s})
             apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 0})
-            apm.add(ORCH_server, "wait", {"waittime": 2})
+            apm.add(ORCH_server, "wait", {"waittime": 10})
 
             # switch back to co2 source
             apm.add(
@@ -943,7 +943,7 @@ def CCSI_sub_cellfill(
             )
             apm.add(ORCH_server, "wait", {"waittime": WaterFillWait_s})
             apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 0})
-            apm.add(ORCH_server, "wait", {"waittime": 2})
+            apm.add(ORCH_server, "wait", {"waittime": 10})
             # switch back to co2 source
             apm.add(
                 NI_server,
