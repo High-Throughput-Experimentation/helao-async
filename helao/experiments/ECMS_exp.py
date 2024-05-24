@@ -901,7 +901,7 @@ def ECMS_sub_clean_cell_recirculation(
     volume_ul_cell_liquid: int = 1,
     liquid_backward_time: float = 80,
     reservoir_liquid_sample_no: int = 2,
-    
+    tube_clear_delaytime: float = 40.0,
     tube_clear_time: float = 20,
     liquid_drain_time: float = 80,
 ):
@@ -928,14 +928,27 @@ def ECMS_sub_clean_cell_recirculation(
                 reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no
             )
         )
-        
-        apm.add_action_list(
-            ECMS_sub_drain_recirculation(
-                experiment=experiment,
-                tube_clear_time=apm.pars.tube_clear_time,
-                liquid_drain_time=apm.pars.liquid_drain_time
-            )
-        )
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.tube_clear_time+apm.pars.tube_clear_delaytime})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 1})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_drain_time-apm.pars.tube_clear_delaytime})
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
+# =============================================================================
+#         apm.add_action_list(
+#             ECMS_sub_drain_recirculation(
+#                 experiment=experiment,
+#                 tube_clear_time=apm.pars.tube_clear_time,
+#                 liquid_drain_time=apm.pars.liquid_drain_time
+#             )
+#         )
+# =============================================================================
     return apm.action_list
 
 def ECMS_sub_drain(
