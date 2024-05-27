@@ -68,6 +68,7 @@ servers:
         RecirculatingPeriPump1: dev1/port1/line2
         RecirculatingPeriPump2-dir: dev1/port1/line3
         RecirculatingPeriPump2: dev1/port1/line4
+        RecirculatingPeriPump2-maxspd: dev1/port2/line0
   PAL:
     host: hte-ecms-01.htejcap.caltech.edu
     port: 8007
