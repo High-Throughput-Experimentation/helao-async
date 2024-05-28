@@ -299,6 +299,8 @@ def ECMS_sub_alloff(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1-dir", "on": 0})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-maxspd", "on": 0})
+
     return apm.action_list
 
 def ECMS_sub_electrolyte_fill_recirculationreservoir(
@@ -858,11 +860,13 @@ def ECMS_sub_drain_recirculation(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-maxspd", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.tube_clear_time})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_drain_time})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-maxspd", "on": 0})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
