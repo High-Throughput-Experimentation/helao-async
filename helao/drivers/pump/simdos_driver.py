@@ -116,7 +116,7 @@ class SIMDOS:
             baudrate=9600,
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
-            timeout=0.1,
+            timeout=0.5,
         )
 
         self.aloop = asyncio.get_running_loop()
