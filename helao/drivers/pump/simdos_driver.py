@@ -297,7 +297,11 @@ class SIMDOS:
     def get_run_param(self, param: PumpParam):
         parcmd = param.value
         resp = self.send(f"?{parcmd}")
-        return int(resp)
+        if resp is not None:
+            return int(resp)
+        else:
+            self.base.print_message(f"could not validate {param.name}")
+            return -1
 
     def set_run_param(self, param: PumpParam, val: int):
         success = False
@@ -311,7 +315,7 @@ class SIMDOS:
             check = None
             if resp is not None:
                 check = self.send(f"?{parcmd}")
-            if int(check) == val:
+            if check is not None and int(check) == val:
                 success = True
                 self.base.print_message(f"successfully set {param.name} to {val}")
             else:
