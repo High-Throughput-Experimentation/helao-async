@@ -138,6 +138,7 @@ servers:
     params:
       port: COM7
       address: 0
+    verbose: true
   MFC:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8009
