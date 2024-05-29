@@ -208,6 +208,7 @@ class AndorDriver(HelaoDriver):
         )
 
     def setup_spectroscope(
+        self,
         PixelWidth,
         centralWL=672.26,
         NumHorizPixels=2560,
@@ -478,7 +479,7 @@ class AndorDriver(HelaoDriver):
         else:
             LOGGER.info("Warmup is set to False, so the camera will not warm up. ")
 
-    def generate_spectral_array(WL_arr, acqs, clockHz):
+    def generate_spectral_array(self, WL_arr, acqs, clockHz):
         """This function takes an aquisition object, the wavelength array and the camera clock speed and returns a dataframe of spectra
         args: WL_arr: wavelength array, acqs: aquisition object, clockHz: camera clock speed
         """
