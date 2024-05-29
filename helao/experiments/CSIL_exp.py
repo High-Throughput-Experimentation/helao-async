@@ -657,16 +657,16 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 1}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1}, asc.no_wait)
     apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait)
     apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait)
     apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": Manpurge1_duration})
 
     # line purge via v2 v5
 
     apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
-    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(ORCH_server, "wait", {"waittime": 5})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 1}, asc.no_wait)
@@ -724,8 +724,8 @@ def CCSI_sub_initialization_firstpart(
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 7,  # move co2 monitoring to separate exp, #3  n2 push, #4 change multivalve positions,5-syringepushwait, 6 co2afterpush
-                                    #7 waterfill wait 
+    experiment_version: int = 8,  # move co2 monitoring to separate exp, #3  n2 push, #4 change multivalve positions,5-syringepushwait, 6 co2afterpush
+                                    #7 waterfill wait 8 rearrange ordering
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
@@ -801,7 +801,6 @@ def CCSI_sub_cellfill(
         apm.add(ORCH_server, "wait", {"waittime": SyringePushWait_s})
         if n2_push:
             # switch back to n2 source
-            apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 1})
 
             apm.add(
                 NI_server,
@@ -820,31 +819,31 @@ def CCSI_sub_cellfill(
                 {"multivalve": "multi_CMD0", "on": 1},
                 asc.no_wait,
             )
+            apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 1})
             apm.add(ORCH_server, "wait", {"waittime": LiquidFillWait_s})
             apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 0})
-            apm.add(ORCH_server, "wait", {"waittime": 10})
+            apm.add(ORCH_server, "wait", {"waittime": 5})
 
-            # switch back to co2 source
-            apm.add(
-                NI_server,
-                "multivalve",
-                {"multivalve": "multi_CMD0", "on": 1},
-            )
-            apm.add(
-                NI_server,
-                "multivalve",
-                {"multivalve": "multi_CMD1", "on": 0},
-                asc.no_wait,
-            )
-            apm.add(
-                NI_server,
-                "multivalve",
-                {"multivalve": "multi_CMD2", "on": 1},
-                asc.no_wait,
-            )
+            # # switch back to co2 source
+            # apm.add(
+            #     NI_server,
+            #     "multivalve",
+            #     {"multivalve": "multi_CMD0", "on": 1},
+            # )
+            # apm.add(
+            #     NI_server,
+            #     "multivalve",
+            #     {"multivalve": "multi_CMD1", "on": 0},
+            #     asc.no_wait,
+            # )
+            # apm.add(
+            #     NI_server,
+            #     "multivalve",
+            #     {"multivalve": "multi_CMD2", "on": 1},
+            #     asc.no_wait,
+            # )
 
         else:
-            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
             apm.add(
                 NI_server,
                 "multivalve",
@@ -863,10 +862,11 @@ def CCSI_sub_cellfill(
                 {"multivalve": "multi_CMD2", "on": 1},
                 asc.no_wait,
             )
+            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
             apm.add(ORCH_server, "wait", {"waittime": LiquidFillWait_s})
             apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
 
-    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(ORCH_server, "wait", {"waittime": 5})
 
     if Waterclean_volume_ul == 0:
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -920,10 +920,9 @@ def CCSI_sub_cellfill(
             process_finish=True,
             process_contrib=proccontrib,
         )
-        apm.add(ORCH_server, "wait", {"waittime": 5.25})
+        apm.add(ORCH_server, "wait", {"waittime": 10})
         if n2_push:
             # switch back to n2 source
-            apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 1})
             apm.add(
                 NI_server,
                 "multivalve",
@@ -941,30 +940,30 @@ def CCSI_sub_cellfill(
                 {"multivalve": "multi_CMD0", "on": 1},
                 asc.no_wait,
             )
+            apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 1})
             apm.add(ORCH_server, "wait", {"waittime": WaterFillWait_s})
             apm.add(NI_server, "gasvalve", {"gasvalve": "10-n2push", "on": 0})
-            apm.add(ORCH_server, "wait", {"waittime": 10})
+            apm.add(ORCH_server, "wait", {"waittime": 5})
             # switch back to co2 source
-            apm.add(
-                NI_server,
-                "multivalve",
-                {"multivalve": "multi_CMD0", "on": 1},
-            )
-            apm.add(
-                NI_server,
-                "multivalve",
-                {"multivalve": "multi_CMD1", "on": 0},
-                asc.no_wait,
-            )
-            apm.add(
-                NI_server,
-                "multivalve",
-                {"multivalve": "multi_CMD2", "on": 1},
-                asc.no_wait,
-            )
+            # apm.add(
+            #     NI_server,
+            #     "multivalve",
+            #     {"multivalve": "multi_CMD0", "on": 1},
+            # )
+            # apm.add(
+            #     NI_server,
+            #     "multivalve",
+            #     {"multivalve": "multi_CMD1", "on": 0},
+            #     asc.no_wait,
+            # )
+            # apm.add(
+            #     NI_server,
+            #     "multivalve",
+            #     {"multivalve": "multi_CMD2", "on": 1},
+            #     asc.no_wait,
+            # )
 
         else:
-            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
             apm.add(
                 NI_server,
                 "multivalve",
@@ -983,12 +982,13 @@ def CCSI_sub_cellfill(
                 {"multivalve": "multi_CMD2", "on": 1},
                 asc.no_wait,
             )
+            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
             apm.add(ORCH_server, "wait", {"waittime": LiquidFillWait_s})
             apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
+            apm.add(ORCH_server, "wait", {"waittime": 5})
 
     if n2_push:
         if co2_fill_after_n2push:
-            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
             apm.add(
                 NI_server,
                 "multivalve",
@@ -1007,8 +1007,10 @@ def CCSI_sub_cellfill(
                 {"multivalve": "multi_CMD2", "on": 1},
                 asc.no_wait,
             )
+            apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
             apm.add(ORCH_server, "wait", {"waittime": co2_filltime_s})
             apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
+            apm.add(ORCH_server, "wait", {"waittime": 5})
 
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 1.75})
