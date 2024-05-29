@@ -87,6 +87,7 @@ class AndorDriver(HelaoDriver):
         The function will wait until the camera is at the target temperature before returning.
             args: cam: AndorSDK3 object
         """
+        self.cam.SensorCooling = True
         while self.cam.TemperatureStatus != "Stabilised":
             time.sleep(5)
             LOGGER.info("Temperature: {:.5f}C".format(self.cam.SensorTemperature))
