@@ -170,26 +170,26 @@ class AndorDriver(HelaoDriver):
         if self.cam.MetadataEnable:
             if self.cam.MetadataFrameInfo:
                 LOGGER.info("\n-----------\nFrame Info\n-----------")
-                LOGGER.info("Width:\t\t", acq.metadata.width)
-                LOGGER.info("Height:\t\t", acq.metadata.height)
-                LOGGER.info("Stride:\t\t", acq.metadata.stride)
-                LOGGER.info("Pixel Encoding:\t", acq.metadata.pixelencoding)
+                LOGGER.info(f"Width:\t\t {acq.metadata.width}")
+                LOGGER.info(f"Height:\t\t {acq.metadata.height}")
+                LOGGER.info(f"Stride:\t\t {acq.metadata.stride}")
+                LOGGER.info(f"Pixel Encoding:\t {acq.metadata.pixelencoding}")
 
             if self.cam.MetadataTimestamp:
                 LOGGER.info("\n-----------\nTime Stamp\n-----------")
-                LOGGER.info("TimeStamp (ticks):\t", acq.metadata.timestamp)
+                LOGGER.info(f"TimeStamp (ticks):\t {acq.metadata.timestamp}")
                 LOGGER.info(
                     "frequency (Hz):\t        ", self.cam.TimestampClockFrequency
                 )
 
             if irig_enabled:
                 LOGGER.info("\n----------\nIRIG Data\n----------")
-                LOGGER.info("Nanoseconds:\t", acq.metadata.irig_nanoseconds)
-                LOGGER.info("Seconds:\t", acq.metadata.irig_seconds)
-                LOGGER.info("Minutes:\t", acq.metadata.irig_minutes)
-                LOGGER.info("Hours:\t\t", acq.metadata.irig_hours)
-                LOGGER.info("Days:\t\t", acq.metadata.irig_days)
-                LOGGER.info("Years:\t\t", acq.metadata.irig_years)
+                LOGGER.info(f"Nanoseconds:\t {acq.metadata.irig_nanoseconds}")
+                LOGGER.info(f"Seconds:\t {acq.metadata.irig_seconds}")
+                LOGGER.info(f"Minutes:\t {acq.metadata.irig_minutes}")
+                LOGGER.info(f"Hours:\t\t {acq.metadata.irig_hours}")
+                LOGGER.info(f"Days:\t\t {acq.metadata.irig_days}")
+                LOGGER.info(f"Years:\t\t {acq.metadata.irig_years}")
         LOGGER.info("\n-----------\nCooler Info\n-----------")
         LOGGER.info("Temperature: {:.5f}C".format(self.cam.SensorTemperature))
         LOGGER.info("Status: '{}'".format(self.cam.TemperatureStatus))
