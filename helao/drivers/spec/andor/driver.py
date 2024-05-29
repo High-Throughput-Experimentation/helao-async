@@ -178,9 +178,7 @@ class AndorDriver(HelaoDriver):
             if self.cam.MetadataTimestamp:
                 LOGGER.info("\n-----------\nTime Stamp\n-----------")
                 LOGGER.info(f"TimeStamp (ticks):\t {acq.metadata.timestamp}")
-                LOGGER.info(
-                    "frequency (Hz):\t        ", self.cam.TimestampClockFrequency
-                )
+                LOGGER.info(f"frequency (Hz):\t        {self.cam.TimestampClockFrequency}")
 
             if irig_enabled:
                 LOGGER.info("\n----------\nIRIG Data\n----------")
@@ -417,14 +415,7 @@ class AndorDriver(HelaoDriver):
                         ND_filter_num = np.argmin(optimality_array)
                     spc.SetFilter(0, ND_filter_num)
 
-                    LOGGER.info(
-                        "filter number set to ",
-                        ND_filter_num,
-                        " with optimality value of ",
-                        optimality_array[ND_filter_num],
-                        "and a max intensity of",
-                        max_array[ND_filter_num],
-                    )
+                    LOGGER.info(f"filter number set to {ND_filter_num}, with optimality value of {optimality_array[ND_filter_num]} and a max intensity of {max_array[ND_filter_num]}")
                 adjust_success = True
                 data = {
                     "max_array": max_array,
