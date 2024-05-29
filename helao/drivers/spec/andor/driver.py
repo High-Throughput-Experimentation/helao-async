@@ -87,13 +87,13 @@ class AndorDriver(HelaoDriver):
         The function will wait until the camera is at the target temperature before returning.
             args: cam: AndorSDK3 object
         """
-        while self.self.cam.TemperatureStatus != "Stabilised":
+        while self.cam.TemperatureStatus != "Stabilised":
             time.sleep(5)
             LOGGER.info(
-                "Temperature: {:.5f}C".format(self.self.cam.SensorTemperature), end="  "
+                "Temperature: {:.5f}C".format(self.cam.SensorTemperature), end="  "
             )
-            LOGGER.info("Status: '{}'".format(self.self.cam.TemperatureStatus))
-            if self.self.cam.TemperatureStatus == "Fault":
+            LOGGER.info("Status: '{}'".format(self.cam.TemperatureStatus))
+            if self.cam.TemperatureStatus == "Fault":
                 err_str = "Camera faulted when cooling to target temperature"
                 raise RuntimeError(err_str)
 
@@ -102,27 +102,27 @@ class AndorDriver(HelaoDriver):
         Which is used to convert pixels to wavelengths in the spectrograph fucntions. Start with framerate is 100 Hz and exposure time is 9.8 ms.
         args: cam: camera object, framerate: desired framerate , exposure_time: desired exposure time defaults are max values for the camera
         """
-        self.self.cam.AOIVBin = 1  # readout on a single row
-        self.self.cam.SimplePreAmpGainControl = (
+        self.cam.AOIVBin = 1  # readout on a single row
+        self.cam.SimplePreAmpGainControl = (
             "16-bit (low noise & high well capacity)"
         )
-        self.self.cam.AOILayout = "Image"
-        self.self.cam.PixelEncoding = (
+        self.cam.AOILayout = "Image"
+        self.cam.PixelEncoding = (
             "Mono32"  # mono 32-bit encoding to get the full 32-bit range
         )
-        self.self.cam.CycleMode = "Fixed"  # fixed
-        self.self.cam.ElectronicShutteringMode = "Rolling"  # rolling shutter
-        self.self.cam.PixelReadoutRate = "280 MHz"  # 280 MHz readout rate
-        self.self.cam.ExposureTime = exposure_time  # 50ms exposure time
-        self.self.cam.MultitrackBinned = True
-        self.self.cam.VerticallyCentreAOI = True
+        self.cam.CycleMode = "Fixed"  # fixed
+        self.cam.ElectronicShutteringMode = "Rolling"  # rolling shutter
+        self.cam.PixelReadoutRate = "280 MHz"  # 280 MHz readout rate
+        self.cam.ExposureTime = exposure_time  # 50ms exposure time
+        self.cam.MultitrackBinned = True
+        self.cam.VerticallyCentreAOI = True
         # LOGGER.info('timestamp clock:')
         # LOGGER.info(sdkcamhandle.TimestampClock)
         # LOGGER.info('redout time:')
         # LOGGER.info(sdkcamhandle.ReadoutTime)
         # LOGGER.info('Pixel width:')
         # LOGGER.info(sdkcamhandle.PixelWidth)
-        return self.self.cam.PixelWidth
+        return self.cam.PixelWidth
 
     def image_and_check_dynamic_range(self, exposure_time=0.0098):
         """This function collects a single image and checks that the maximum value is in the optimum dynamic range for the measurment.
@@ -134,8 +134,8 @@ class AndorDriver(HelaoDriver):
         args: cam: AndorSDK3 object
         """
         _ = self.setup_image(exposure_time)
-        LOGGER.info(self.self.cam.SerialNumber)
-        test = self.self.cam.acquire()
+        LOGGER.info(self.cam.SerialNumber)
+        test = self.cam.acquire()
         max = test.image.max()
         optimality = 1 + np.abs(63000 - max) / 63000
         range_bool = max < (2**16) and max > ((2**16) - 10000)
@@ -159,31 +159,31 @@ class AndorDriver(HelaoDriver):
         It returns the width, height and stride of the image, this is used later to convert pixels to wavelengths in the spectrograph functions.
         The clock frequency is also returned, which is used to convert the timestamp ticks to seconds.
         """
-        self.self.cam.MetadataEnable = True  # Turn on Metadata
+        self.cam.MetadataEnable = True  # Turn on Metadata
         self.setup_image()
         # Turn IRIG on if implemented in camera
         irig_enabled = False
         try:
-            self.self.cam.MetadataIRIG = True
+            self.cam.MetadataIRIG = True
             irig_enabled = True
         except AttributeError:
             LOGGER.info("MetaDateIRIG not implemented")
 
         # Acquire an image
-        acq = self.self.cam.acquire()
-        if self.self.cam.MetadataEnable:
-            if self.self.cam.MetadataFrameInfo:
+        acq = self.cam.acquire()
+        if self.cam.MetadataEnable:
+            if self.cam.MetadataFrameInfo:
                 LOGGER.info("\n-----------\nFrame Info\n-----------")
                 LOGGER.info("Width:\t\t", acq.metadata.width)
                 LOGGER.info("Height:\t\t", acq.metadata.height)
                 LOGGER.info("Stride:\t\t", acq.metadata.stride)
                 LOGGER.info("Pixel Encoding:\t", acq.metadata.pixelencoding)
 
-            if self.self.cam.MetadataTimestamp:
+            if self.cam.MetadataTimestamp:
                 LOGGER.info("\n-----------\nTime Stamp\n-----------")
                 LOGGER.info("TimeStamp (ticks):\t", acq.metadata.timestamp)
                 LOGGER.info(
-                    "frequency (Hz):\t        ", self.self.cam.TimestampClockFrequency
+                    "frequency (Hz):\t        ", self.cam.TimestampClockFrequency
                 )
 
             if irig_enabled:
@@ -196,15 +196,15 @@ class AndorDriver(HelaoDriver):
                 LOGGER.info("Years:\t\t", acq.metadata.irig_years)
         LOGGER.info("\n-----------\nCooler Info\n-----------")
         LOGGER.info(
-            "Temperature: {:.5f}C".format(self.self.cam.SensorTemperature), end="  "
+            "Temperature: {:.5f}C".format(self.cam.SensorTemperature), end="  "
         )
-        LOGGER.info("Status: '{}'".format(self.self.cam.TemperatureStatus))
+        LOGGER.info("Status: '{}'".format(self.cam.TemperatureStatus))
 
         return (
             acq.metadata.width,
             acq.metadata.height,
             acq.metadata.stride,
-            self.self.cam.TimestampClockFrequency,
+            self.cam.TimestampClockFrequency,
         )
 
     def setup_spectroscope(
