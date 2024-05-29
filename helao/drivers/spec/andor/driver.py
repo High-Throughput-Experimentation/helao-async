@@ -89,9 +89,7 @@ class AndorDriver(HelaoDriver):
         """
         while self.cam.TemperatureStatus != "Stabilised":
             time.sleep(5)
-            LOGGER.info(
-                "Temperature: {:.5f}C".format(self.cam.SensorTemperature), end="  "
-            )
+            LOGGER.info("Temperature: {:.5f}C".format(self.cam.SensorTemperature))
             LOGGER.info("Status: '{}'".format(self.cam.TemperatureStatus))
             if self.cam.TemperatureStatus == "Fault":
                 err_str = "Camera faulted when cooling to target temperature"
@@ -103,9 +101,7 @@ class AndorDriver(HelaoDriver):
         args: cam: camera object, framerate: desired framerate , exposure_time: desired exposure time defaults are max values for the camera
         """
         self.cam.AOIVBin = 1  # readout on a single row
-        self.cam.SimplePreAmpGainControl = (
-            "16-bit (low noise & high well capacity)"
-        )
+        self.cam.SimplePreAmpGainControl = "16-bit (low noise & high well capacity)"
         self.cam.AOILayout = "Image"
         self.cam.PixelEncoding = (
             "Mono32"  # mono 32-bit encoding to get the full 32-bit range
@@ -195,9 +191,7 @@ class AndorDriver(HelaoDriver):
                 LOGGER.info("Days:\t\t", acq.metadata.irig_days)
                 LOGGER.info("Years:\t\t", acq.metadata.irig_years)
         LOGGER.info("\n-----------\nCooler Info\n-----------")
-        LOGGER.info(
-            "Temperature: {:.5f}C".format(self.cam.SensorTemperature), end="  "
-        )
+        LOGGER.info("Temperature: {:.5f}C".format(self.cam.SensorTemperature))
         LOGGER.info("Status: '{}'".format(self.cam.TemperatureStatus))
 
         return (
@@ -469,7 +463,7 @@ class AndorDriver(HelaoDriver):
             ):
                 time.sleep(5)
                 LOGGER.info(
-                    "Temperature: {:.5f}C".format(self.cam.SensorTemperature), end="  "
+                    "Temperature: {:.5f}C".format(self.cam.SensorTemperature)
                 )
                 LOGGER.info("Status: '{}'".format(self.cam.TemperatureStatus))
                 if self.cam.TemperatureStatus == "Fault":
