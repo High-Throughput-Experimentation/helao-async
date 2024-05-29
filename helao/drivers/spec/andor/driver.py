@@ -243,16 +243,9 @@ class AndorDriver(HelaoDriver):
             if ATSpectrograph.ATSPECTROGRAPH_SUCCESS == shm:
 
                 shm = spc.GetDetectorOffset(0, 0, 0)
-                LOGGER.info(
-                    "success code and detector offset is currently",
-                    spc.GetDetectorOffset(0, 0, 0),
-                )
+                LOGGER.info(f"success code and detector offset is currently {spc.GetDetectorOffset(0, 0, 0)}")
                 shm = spc.SetDetectorOffset(0, 0, 0, 170)
-                LOGGER.info(
-                    "success code was,  Offset was set to ",
-                    spc.GetDetectorOffset(0, 0, 0),
-                    "This is system specific and should be changed if the system changes",
-                )
+                LOGGER.info(f"Offset was set to {spc.GetDetectorOffset(0, 0, 0)} This is system specific and should be changed if the system changes")
 
                 # Configure Spectrograph
                 shm = spc.SetGrating(0, 1)
@@ -336,16 +329,9 @@ class AndorDriver(HelaoDriver):
             if ATSpectrograph.ATSPECTROGRAPH_SUCCESS == shm:
 
                 shm = spc.GetDetectorOffset(0, 0, 0)
-                print(
-                    "success code and detector offset is currently",
-                    spc.GetDetectorOffset(0, 0, 0),
-                )
+                LOGGER.info(f"success code and detector offset is currently {spc.GetDetectorOffset(0, 0, 0)}")
                 shm = spc.SetDetectorOffset(0, 0, 0, 170)
-                print(
-                    "success code was,  Offset was set to ",
-                    spc.GetDetectorOffset(0, 0, 0),
-                    "This is system specific and should be changed if the system changes",
-                )
+                LOGGER.info(f"Offset was set to {spc.GetDetectorOffset(0, 0, 0)} This is system specific and should be changed if the system changes")
 
                 # Configure Spectrograph
                 shm = spc.SetGrating(0, 1)
