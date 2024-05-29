@@ -112,18 +112,15 @@ class AndorExtTrig(Executor):
             self.action_params = self.active.action.action_params
             self.driver = self.active.base.fastapp.driver
 
-            # no external timer, event sink signals end of measurement
-            self.duration = -1
-
-            self.max_frame_count = self.action_params["frame_count"]
+            self.duration = self.action_params["duration"]
             self.timeout = self.action_params["timeout"]
+            self.frames_per_poll = self.action_params["frames_per_poll"]
             self.buffer_count = self.action_params["buffer_count"]
 
             self.exp_time = self.action_params["exp_time"]
             self.framerate = self.action_params["framerate"]
 
             self.first_tick = None
-            self.frames_acquired = 0
 
             LOGGER.info("AndorExtTrig initialized.")
         except Exception:
@@ -131,7 +128,7 @@ class AndorExtTrig(Executor):
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
-        resp = self.driver.setup_acquisition(
+        resp = self.driver.setup(
             exp_time=self.exp_time, framerate=self.framerate
         )
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
@@ -146,16 +143,16 @@ class AndorExtTrig(Executor):
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
-        resp = self.driver.get_data()
+        resp = self.driver.get_data(frames=self.frames_per_poll)
         if resp.data:
             if self.first_tick is None:
                 self.first_tick = resp.data["tick_time"][0]
-            self.frames_acquired += len(resp.data["tick_time"])
+        latest_tick = resp.data["tick_time"][-1]
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         status = (
             HloStatus.active
             if resp.status == DriverResponse.busy
-            and self.frames_acquired < self.max_frame_count
+            and latest_tick - self.first_tick < self.duration
             else HloStatus.finished
         )
         return {"error": error, "status": status, "data": resp.data}
@@ -167,12 +164,6 @@ class AndorExtTrig(Executor):
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": {}}
 
-    async def _manual_stop(self) -> dict:
-        """Interrupt acquisition."""
-        resp = self.driver.stop()
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.stop
-        return {"error": error}
-
 
 async def andor_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
@@ -181,7 +172,8 @@ async def andor_dyn_endpoints(app=None):
     async def acquire_external_trig(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        frame_count: int = 10,
+        duration: float = 10.0,
+        frames_per_poll: int = 100,
         buffer_count: int = 10,
         exp_time: float = 0.0098,
         framerate: float = 98,

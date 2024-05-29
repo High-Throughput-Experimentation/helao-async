@@ -46,7 +46,7 @@ class AndorDriver(HelaoDriver):
         self.stride = None
         self.clock_hz = None
 
-        self.timeout = 9  # timeout for the wait_buffer function in milliseconds, we use 9 ms which is just below the frame time at 98 Hz, to trigger a CameraException when the buffer is empty
+        self.timeout = 5000 
 
         self.sdk3 = AndorSDK3()
         self.device_id = self.config.get("dev_id", 0)
@@ -567,16 +567,16 @@ class AndorDriver(HelaoDriver):
             self.cleanup()
         return response
 
-    def get_data(self) -> DriverResponse:
+    def get_data(self, frames: int) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
             data_dict = {"tick_time": []}
             data_dict.update({f"ch_{i:04}": [] for i in range(self.wl_arr.size)})
-            while True:
+            for _ in range(frames):
                 try:
                     acq = self.cam.wait_buffer(self.timeout)
                     self.cam.queue(
-                        acq._np_data, self.cam.ImageSizeBytes
+                        np.zeros(acq._np_data.shape), self.cam.ImageSizeBytes
                     )  # requeue the buffer
                     spectrum = acq.image[0]
                     tick_time = acq.metadata.timestamp / self.clock_hz
