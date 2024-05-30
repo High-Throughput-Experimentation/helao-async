@@ -131,9 +131,9 @@ class AndorAcquire(Executor):
 
             self.first_tick = None
 
-            LOGGER.info("AndorExtTrig initialized.")
+            LOGGER.info("AndorAcquire initialized.")
         except Exception:
-            LOGGER.error("AndorExtTrig was not initialized.", exc_info=True)
+            LOGGER.error("AndorAcquire was not initialized.", exc_info=True)
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
@@ -193,6 +193,7 @@ async def andor_dyn_endpoints(app=None):
         buffer_count: int = 10,
         exp_time: float = 0.0098,
         framerate: float = 98,
+        timeout: float = 5000,
     ):
         data_keys = ["elapsed_time_s"] + [
             f"ch_{i:04}" for i in range(app.driver.wl_arr.shape[0])
