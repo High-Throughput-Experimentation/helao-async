@@ -233,7 +233,7 @@ async def andor_dyn_endpoints(app=None):
         timeout: int = 600,
     ):
         active = await app.base.setup_and_contain_action()
-        executor = AndorCooling(active=active, oneoff=True, cooldown=cooldown, timeout=timeout)
+        executor = AndorCooling(active=active, oneoff=False, cooldown=cooldown, timeout=timeout)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
     
@@ -243,7 +243,7 @@ async def andor_dyn_endpoints(app=None):
         action_version: int = 1,
     ):
         active = await app.base.setup_and_contain_action()
-        executor = AndorAdjustND(active=active, oneoff=False)
+        executor = AndorAdjustND(active=active, oneoff=True)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
