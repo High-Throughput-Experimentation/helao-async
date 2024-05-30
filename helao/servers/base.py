@@ -2056,7 +2056,11 @@ class Active:
 
         # action operations
         self.base.print_message("Running executor._exec() method")
-        result = await executor._exec()
+        try:
+            result = await executor._exec()
+        except Exception:
+            LOGGER.error("Executor._exec() failed", exc_info=True)
+            result = {}
         error = result.get("error", ErrorCodes.none)
         data = result.get("data", {})
         if data:
