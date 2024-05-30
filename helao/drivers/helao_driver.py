@@ -66,10 +66,9 @@ class DriverResponse:
     message: str = ""
     data: dict = field(default_factory=dict)
     status: DriverStatus = DriverStatus.unknown
-    timestamp: datetime
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    timestamp: datetime = field(init=False)
+
+    def __post_init__(self):
         self.timestamp = datetime.now()
 
     @property
