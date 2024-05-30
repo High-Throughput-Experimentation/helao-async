@@ -2032,7 +2032,7 @@ class Active:
     async def action_loop_task(self, executor: Executor):
         """Generic replacement for 'IOloop'."""
         # stall action_loop task if concurrency is not allowed
-        while self.base.local_action_task_queue[0] != self.action.action_uuid and not executor.concurrent:
+        while self.base.local_action_task_queue and self.base.local_action_task_queue[0] != self.action.action_uuid and not executor.concurrent:
             await asyncio.sleep(0.1)
 
         if self.action.nonblocking:
