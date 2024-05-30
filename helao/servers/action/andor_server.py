@@ -117,7 +117,6 @@ class AndorAcquire(Executor):
             self.timeout = self.action_params["timeout"]
             self.frames_per_poll = self.action_params["frames_per_poll"]
             self.buffer_count = self.action_params["buffer_count"]
-
             self.exp_time = self.action_params["exp_time"]
             self.framerate = self.action_params["framerate"]
 
@@ -175,10 +174,11 @@ class AndorAcquire(Executor):
 async def andor_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
 
-    @app.post(f"/{server_key}/acquire_external_trig", tags=["action"])
-    async def acquire_external_trig(
+    @app.post(f"/{server_key}/acquire", tags=["action"])
+    async def acquire(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
+        external_trigger: bool = True,
         duration: float = 10.0,
         frames_per_poll: int = 100,
         buffer_count: int = 10,
@@ -201,7 +201,7 @@ async def andor_dyn_endpoints(app=None):
 
         # decide on abbreviated action name
         active.action.action_abbr = "ANDORSPEC"
-        executor = AndorExtTrig(active=active, oneoff=False)
+        executor = AndorAcquire(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
 
         return active_action_dict
