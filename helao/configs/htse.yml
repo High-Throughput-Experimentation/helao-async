@@ -131,12 +131,9 @@ servers:
     host: 127.0.0.1
     port: 8011
     group: action
-    fast: spec_server
+    fast: andor_server
     params:
-      dev_num: 0
-      lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll
-      n_pixels: 1024
-      start_margin: 5
+      dev_id: 0
   # VIS:
   #   host: hte-eche-10.htejcap.caltech.edu
   #   port: 5001
