@@ -119,14 +119,14 @@ servers:
   #       # doric_led3: 6
   #       # ir_emitter: 7
   # PAL:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8007
-    group: action
-    fast: pal_server
-    params:
-      positions:
-        custom:
-          cell1_we: cell
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 8007
+  #   group: action
+  #   fast: pal_server
+  #   params:
+  #     positions:
+  #       custom:
+  #         cell1_we: cell
   ANDOR:
     host: 127.0.0.1
     port: 8011
