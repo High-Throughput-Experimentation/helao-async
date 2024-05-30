@@ -2075,7 +2075,11 @@ class Active:
         if not executor.oneoff:
             self.base.print_message("entering executor polling loop")
             while self.action_loop_running:
-                result = await executor._poll()
+                try:
+                    result = await executor._poll()
+                except Exception:
+                    LOGGER.error("Executor._poll() failed", exc_info=True)
+                    result = {}
                 # self.base.print_message(f"got result: {result}")
                 error = result.get("error", ErrorCodes.none)
                 status = result.get("status", HloStatus.finished)
