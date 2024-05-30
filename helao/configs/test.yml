@@ -16,3 +16,4 @@ servers:
       enable_op: true
       bokeh_port: 5011
       launch_browser: true
+    verbose: true
