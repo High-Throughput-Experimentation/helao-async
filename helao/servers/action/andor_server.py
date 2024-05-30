@@ -78,9 +78,7 @@ class AndorCooling(Executor):
 
         status = HloStatus.active
         if temp_status == "Stabilised":
-            if (sensor_temp < 20 and self.cooldown) or (
-                sensor_temp >= 20 and not self.cooldown
-            ):
+            if (sensor_temp < 20 and self.cooldown) or not self.cooldown:
                 status = HloStatus.finished
 
         error = ErrorCodes.none
