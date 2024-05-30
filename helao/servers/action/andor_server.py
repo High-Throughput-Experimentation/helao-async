@@ -97,7 +97,7 @@ class AndorAdjustND(Executor):
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": resp.data}
 
-class AndorExtTrig(Executor):
+class AndorAcquire(Executor):
     """Acquire data with external start trigger."""
 
     driver: AndorDriver
@@ -112,6 +112,7 @@ class AndorExtTrig(Executor):
             self.action_params = self.active.action.action_params
             self.driver = self.active.base.fastapp.driver
 
+            self.external_trigger = self.action_params["external_trigger"]
             self.duration = self.action_params["duration"]
             self.timeout = self.action_params["timeout"]
             self.frames_per_poll = self.action_params["frames_per_poll"]
@@ -135,14 +136,20 @@ class AndorExtTrig(Executor):
         return {"error": error}
 
     async def _exec(self) -> dict:
-        """Set external trigger to wait for measurement start."""
-        LOGGER.debug("setting external trigger")
-        resp = self.driver.set_external_trigger()
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+        """Set trigger to wait for measurement start."""
+        try:
+            LOGGER.debug("setting trigger")
+            resp = self.driver.set_trigger(self.external_trigger)
+            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+        except Exception:
+            error = ErrorCodes.critical
+            LOGGER.error("Error setting trigger", exc_info=True)
         return {"error": error}
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
+        if not self.external_trigger:
+            self.cam.SoftwareTrigger()
         resp = self.driver.get_data(frames=self.frames_per_poll)
         if resp.data:
             if self.first_tick is None:

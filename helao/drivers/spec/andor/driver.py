@@ -502,7 +502,6 @@ class AndorDriver(HelaoDriver):
         """This function sets the camera up for a continous aquisition at the fastest rate using the complete AOI which is 10 ms exposure time"""
         try:
             # external start will start the camera upon 5V TTL signal. The camera will then aquire as fast as possible
-            self.cam.TriggerMode = "External Start"
             self.cam.AOIVBin = 2160  # full verrtical binning over the  AOI
             self.cam.SimplePreAmpGainControl = (
                 "16-bit (low noise & high well capacity)"  # Single Pixel is 16 bit
@@ -547,11 +546,14 @@ class AndorDriver(HelaoDriver):
             self.cleanup()
         return response
 
-    def set_external_trigger(self) -> DriverResponse:
+    def set_trigger(self, external: bool = True) -> DriverResponse:
         """Apply signal and begin data acquisition."""
         try:
             # call function to activate External Trigger mode
-            self.cam.TriggerMode = "External Start"
+            if external:
+                self.cam.TriggerMode = "External Start"
+            else:
+                self.cam.TriggerMode = "Software"
             self.cam.AcquisitionStart()
             response = DriverResponse(
                 response=DriverResponseType.success,
@@ -559,7 +561,7 @@ class AndorDriver(HelaoDriver):
                 status=DriverStatus.busy,
             )
         except Exception:
-            LOGGER.error("set_external_trigger failed", exc_info=True)
+            LOGGER.error("set_trigger failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
