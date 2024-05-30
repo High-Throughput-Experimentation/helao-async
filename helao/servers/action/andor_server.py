@@ -156,8 +156,6 @@ class AndorAcquire(Executor):
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
-        if not self.external_trigger:
-            self.cam.SoftwareTrigger()
         resp = self.driver.get_data(frames=self.frames_per_poll)
         if resp.data:
             if self.first_tick is None:

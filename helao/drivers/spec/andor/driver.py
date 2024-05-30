@@ -598,13 +598,15 @@ class AndorDriver(HelaoDriver):
             self.cleanup()
         return response
 
-    def get_data(self, frames: int) -> DriverResponse:
+    def get_data(self, frames: int, external:bool = True) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
             data_dict = {"tick_time": []}
             data_dict.update({f"ch_{i:04}": [] for i in range(self.wl_arr.size)})
             for _ in range(frames):
                 try:
+                    if external:
+                        self.cam.SoftwareTrigger()
                     acq = self.cam.wait_buffer(self.timeout)
                     self.cam.queue(
                         np.zeros(acq._np_data.shape), self.cam.ImageSizeBytes
