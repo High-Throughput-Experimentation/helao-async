@@ -43,6 +43,7 @@ servers:
       bokeh_port: 5002
       # seqspec_parser_path: helao\specifications\last3months.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
+    verbose: true
   # MOTOR:
   #   host: hte-eche-10.htejcap.caltech.edu
   #   port: 8003
@@ -134,6 +135,7 @@ servers:
     fast: andor_server
     params:
       dev_id: 0
+    verbose: true
   # VIS:
   #   host: hte-eche-10.htejcap.caltech.edu
   #   port: 5001
