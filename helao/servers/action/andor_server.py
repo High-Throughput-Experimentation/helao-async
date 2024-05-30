@@ -62,16 +62,22 @@ class AndorCooling(Executor):
     async def _exec(self) -> dict:
         """Set SensorCooling flag and wait for stabilization."""
         LOGGER.debug(f"setting cam.SensorCooling = {self.cooldown}")
-        resp = self.cam.SensorCooling = self.cooldown
+        resp = self.driver.set_cooldown(self.cooldown)
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error}
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
-        sensor_temp = self.cam.SensorTemperature
+        resp = self.driver.check_temperature()
+        
+        if not resp.data:
+            return {"error": ErrorCodes.critical}
+        
+        sensor_temp = resp.data['temp']
+        temp_status = resp.data['status']
 
         status = HloStatus.active
-        if self.cam.TemperatureStatus == "Stabilised":
+        if temp_status == "Stabilised":
             if (sensor_temp < 20 and self.cooldown) or (
                 sensor_temp >= 20 and not self.cooldown
             ):

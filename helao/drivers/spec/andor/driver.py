@@ -95,6 +95,35 @@ class AndorDriver(HelaoDriver):
             if self.cam.TemperatureStatus == "Fault":
                 err_str = "Camera faulted when cooling to target temperature"
                 raise RuntimeError(err_str)
+    
+    def set_cooldown(self, cool: bool = True):
+        try:
+            self.cam.SensorCooling = cool
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("set_cooldown failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+    
+    def check_temperature(self):
+        try:
+            data = {"temp": self.cam.SensorTemperature,
+                    "status": self.cam.TemperatureStatus}
+            response = DriverResponse(
+                response=DriverResponseType.success, data=data, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("check_temperature failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+
 
     def setup_image(self, exposure_time=0.0098):
         """This function sets up the camera to take a single image with the desired framerate and exposure time. It returns the pixel width of the camera
