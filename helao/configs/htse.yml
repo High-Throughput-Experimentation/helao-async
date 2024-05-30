@@ -168,15 +168,15 @@ servers:
   #   params:
   #     axis_ip: 192.168.200.210
   # KMOTOR:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8015
-    group: action
-    fast: kinesis_server
-    params:
-      axes:
-        z:
-          serial_no: "49370234"
-          pos_scale: 1228800.0  # device to mm
-          vel_scale: 65970697.6  # device to mm/s
-          acc_scale: 13518.2  # device to mm/s2
-          move_limit_mm: 3.0
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 8015
+  #   group: action
+  #   fast: kinesis_server
+  #   params:
+  #     axes:
+  #       z:
+  #         serial_no: "49370234"
+  #         pos_scale: 1228800.0  # device to mm
+  #         vel_scale: 65970697.6  # device to mm/s
+  #         acc_scale: 13518.2  # device to mm/s2
+  #         move_limit_mm: 3.0
