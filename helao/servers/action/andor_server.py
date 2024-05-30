@@ -243,7 +243,7 @@ async def andor_dyn_endpoints(app=None):
         action_version: int = 1,
     ):
         active = await app.base.setup_and_contain_action()
-        executor = AndorAdjustND(active=active, oneoff=True)
+        executor = AndorAdjustND(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
