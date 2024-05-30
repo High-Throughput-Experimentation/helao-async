@@ -195,7 +195,7 @@ async def andor_dyn_endpoints(app=None):
         framerate: float = 98,
     ):
         data_keys = ["elapsed_time_s"] + [
-            f"ch_{i:04}" for i in range(len(app.driver.wl_arr.shape[0]))
+            f"ch_{i:04}" for i in range(app.driver.wl_arr.shape[0])
         ]
         active = await app.base.setup_and_contain_action(
             json_data_keys=data_keys,
