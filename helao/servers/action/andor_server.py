@@ -71,10 +71,15 @@ class AndorCooling(Executor):
         resp = self.driver.check_temperature()
         
         if not resp.data:
-            return {"error": ErrorCodes.critical}
+            return {"error": ErrorCodes.critical, "status": HloStatus.errored}
         
         sensor_temp = resp.data['temp']
         temp_status = resp.data['status']
+        LOGGER.info("Temperature: {:.5f}C".format(sensor_temp))
+        LOGGER.info("Status: '{}'".format(temp_status))
+
+        if temp_status == "Fault":
+            return {"error": ErrorCodes.critical, "status": HloStatus.errored}
 
         status = HloStatus.active
         if temp_status == "Stabilised":
