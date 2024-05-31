@@ -160,9 +160,11 @@ class AndorAcquire(Executor):
         resp = self.driver.get_data(
             frames=self.frames_per_poll, external=self.external_trigger
         )
-        if resp.data:
-            if self.first_tick is None:
-                self.first_tick = resp.data["tick_time"][0]
+        if not resp.data:
+            LOGGER.info("No data received.")
+            return {"error": ErrorCodes.none, "status": HloStatus.active}
+        if self.first_tick is None:
+            self.first_tick = resp.data["tick_time"][0]
         latest_tick = resp.data["tick_time"][-1]
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         status = (
