@@ -30,7 +30,7 @@ simulation: false
 #   toggle_is_shutter: false
 #   gamrychannelwait: -1
 #   gamrychannelsend: 0
-run_type: htse
+run_type: hispec
 root: C:\INST_hlo
 servers:
   ORCH:
