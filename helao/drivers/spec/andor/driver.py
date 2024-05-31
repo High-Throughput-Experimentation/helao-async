@@ -615,7 +615,7 @@ class AndorDriver(HelaoDriver):
             data_dict.update({f"ch_{i:04}": [] for i in range(self.wl_arr.size)})
             for _ in range(frames):
                 try:
-                    if external:
+                    if not external:
                         self.cam.SoftwareTrigger()
                     acq = self.cam.wait_buffer(self.timeout)
                     self.cam.queue(
