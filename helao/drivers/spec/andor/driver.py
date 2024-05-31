@@ -46,7 +46,7 @@ class AndorDriver(HelaoDriver):
         self.stride = None
         self.clock_hz = None
 
-        self.timeout = 5000 
+        self.timeout = 5000
 
         self.sdk3 = AndorSDK3()
         self.device_id = self.config.get("dev_id", 0)
@@ -95,7 +95,7 @@ class AndorDriver(HelaoDriver):
             if self.cam.TemperatureStatus == "Fault":
                 err_str = "Camera faulted when cooling to target temperature"
                 raise RuntimeError(err_str)
-    
+
     def set_cooldown(self, cool: bool = True):
         try:
             self.cam.SensorCooling = cool
@@ -108,11 +108,13 @@ class AndorDriver(HelaoDriver):
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
         return response
-    
+
     def check_temperature(self):
         try:
-            data = {"temp": self.cam.SensorTemperature,
-                    "status": self.cam.TemperatureStatus}
+            data = {
+                "temp": self.cam.SensorTemperature,
+                "status": self.cam.TemperatureStatus,
+            }
             response = DriverResponse(
                 response=DriverResponseType.success, data=data, status=DriverStatus.ok
             )
@@ -122,8 +124,6 @@ class AndorDriver(HelaoDriver):
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
         return response
-
-
 
     def setup_image(self, exposure_time=0.0098):
         """This function sets up the camera to take a single image with the desired framerate and exposure time. It returns the pixel width of the camera
@@ -208,7 +208,9 @@ class AndorDriver(HelaoDriver):
             if self.cam.MetadataTimestamp:
                 LOGGER.info("\n-----------\nTime Stamp\n-----------")
                 LOGGER.info(f"TimeStamp (ticks):\t {acq.metadata.timestamp}")
-                LOGGER.info(f"frequency (Hz):\t        {self.cam.TimestampClockFrequency}")
+                LOGGER.info(
+                    f"frequency (Hz):\t        {self.cam.TimestampClockFrequency}"
+                )
 
             if irig_enabled:
                 LOGGER.info("\n----------\nIRIG Data\n----------")
@@ -273,9 +275,13 @@ class AndorDriver(HelaoDriver):
             if ATSpectrograph.ATSPECTROGRAPH_SUCCESS == shm:
 
                 shm = spc.GetDetectorOffset(0, 0, 0)
-                LOGGER.info(f"success code and detector offset is currently {spc.GetDetectorOffset(0, 0, 0)}")
+                LOGGER.info(
+                    f"success code and detector offset is currently {spc.GetDetectorOffset(0, 0, 0)}"
+                )
                 shm = spc.SetDetectorOffset(0, 0, 0, 170)
-                LOGGER.info(f"Offset was set to {spc.GetDetectorOffset(0, 0, 0)} This is system specific and should be changed if the system changes")
+                LOGGER.info(
+                    f"Offset was set to {spc.GetDetectorOffset(0, 0, 0)} This is system specific and should be changed if the system changes"
+                )
 
                 # Configure Spectrograph
                 shm = spc.SetGrating(0, 1)
@@ -359,9 +365,13 @@ class AndorDriver(HelaoDriver):
             if ATSpectrograph.ATSPECTROGRAPH_SUCCESS == shm:
 
                 shm = spc.GetDetectorOffset(0, 0, 0)
-                LOGGER.info(f"success code and detector offset is currently {spc.GetDetectorOffset(0, 0, 0)}")
+                LOGGER.info(
+                    f"success code and detector offset is currently {spc.GetDetectorOffset(0, 0, 0)}"
+                )
                 shm = spc.SetDetectorOffset(0, 0, 0, 170)
-                LOGGER.info(f"Offset was set to {spc.GetDetectorOffset(0, 0, 0)} This is system specific and should be changed if the system changes")
+                LOGGER.info(
+                    f"Offset was set to {spc.GetDetectorOffset(0, 0, 0)} This is system specific and should be changed if the system changes"
+                )
 
                 # Configure Spectrograph
                 shm = spc.SetGrating(0, 1)
@@ -431,7 +441,9 @@ class AndorDriver(HelaoDriver):
                         ND_filter_num = np.argmin(optimality_array)
                     spc.SetFilter(0, ND_filter_num)
 
-                    LOGGER.info(f"filter number set to {ND_filter_num}, with optimality value of {optimality_array[ND_filter_num]} and a max intensity of {max_array[ND_filter_num]}")
+                    LOGGER.info(
+                        f"filter number set to {ND_filter_num}, with optimality value of {optimality_array[ND_filter_num]} and a max intensity of {max_array[ND_filter_num]}"
+                    )
                 adjust_success = True
                 data = {
                     "max_array": max_array,
@@ -469,9 +481,7 @@ class AndorDriver(HelaoDriver):
                 and self.cam.SensorTemperature < 20
             ):
                 time.sleep(5)
-                LOGGER.info(
-                    "Temperature: {:.5f}C".format(self.cam.SensorTemperature)
-                )
+                LOGGER.info("Temperature: {:.5f}C".format(self.cam.SensorTemperature))
                 LOGGER.info("Status: '{}'".format(self.cam.TemperatureStatus))
                 if self.cam.TemperatureStatus == "Fault":
                     err_str = "Camera faulted when cooling to target temperature"
@@ -598,7 +608,7 @@ class AndorDriver(HelaoDriver):
             self.cleanup()
         return response
 
-    def get_data(self, frames: int, external:bool = True) -> DriverResponse:
+    def get_data(self, frames: int, external: bool = True) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
             data_dict = {"tick_time": []}
