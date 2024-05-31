@@ -87,8 +87,7 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception as exc:
-            _, _, err_tup = exc.args
-            if "In use by another script" in err_tup[0]:
+            if "In use by another script" in exc.__str__():
                 response = DriverResponse(
                     response=DriverResponseType.success, status=DriverStatus.busy
                 )
