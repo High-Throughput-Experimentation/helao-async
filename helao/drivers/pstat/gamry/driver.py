@@ -61,12 +61,14 @@ class GamryDriver(HelaoDriver):
         self.device_id = self.config.get("dev_id", None)
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config.get("grounded", True))
+        self.connection_raised = False
         LOGGER.info(f"using device_id {self.device_id} from config")
         # self.connect()
 
     def connect(self) -> DriverResponse:
         """Open connection to resource."""
         try:
+            self.connection_raised = True
             comtypes.CoInitialize()
             self.GamryCOM = client.GetModule(
                 ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
@@ -101,7 +103,8 @@ class GamryDriver(HelaoDriver):
 
     def get_status(self, retries: int = 5) -> DriverResponse:
         """Return current driver status."""
-        if self.pstat is not None:
+        # if self.pstat is not None:
+        if self.connection_raised:
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.busy
             )
@@ -414,6 +417,7 @@ class GamryDriver(HelaoDriver):
                 self.pstat.Close()
                 self.pstat = None
                 comtypes.CoUninitialize()
+                self.connection_raised = False
             # self.ready = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
