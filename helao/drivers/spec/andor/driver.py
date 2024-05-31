@@ -5,7 +5,7 @@ from pyAndorSDK3 import AndorSDK3, CameraException
 import numpy as np
 import time as time
 import pandas as pd
-import matplotlib.pyplot as plt
+import json
 from pyAndorSpectrograph.spectrograph import ATSpectrograph
 
 # save a default log file system temp
@@ -631,7 +631,8 @@ class AndorDriver(HelaoDriver):
             print("spectrum shape is", spectrum.shape)
             if data_dict["tick_time"]:
                 for k,v in data_dict.items():
-                    print(k, type(v), v[0])
+                    print(k, type(v[0]), v[0])
+            print(json.dumps(data_dict))
             status = DriverStatus.busy
             response = DriverResponse(
                 response=DriverResponseType.success,
