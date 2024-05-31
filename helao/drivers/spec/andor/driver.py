@@ -628,6 +628,10 @@ class AndorDriver(HelaoDriver):
                         data_dict[f"ch_{i:04}"].append(x)
                 except CameraException:
                     break
+            print("spectrum shape is", spectrum.shape)
+            if data_dict["tick_time"]:
+                for k,v in data_dict.items():
+                    print(k, type(v), v[0])
             status = DriverStatus.busy
             response = DriverResponse(
                 response=DriverResponseType.success,
