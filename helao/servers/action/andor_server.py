@@ -69,12 +69,12 @@ class AndorCooling(Executor):
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
         resp = self.driver.check_temperature()
-        
+
         if not resp.data:
             return {"error": ErrorCodes.critical, "status": HloStatus.errored}
-        
-        sensor_temp = resp.data['temp']
-        temp_status = resp.data['status']
+
+        sensor_temp = resp.data["temp"]
+        temp_status = resp.data["status"]
         LOGGER.info("Temperature: {:.5f}C".format(sensor_temp))
         LOGGER.info("Status: '{}'".format(temp_status))
 
@@ -105,6 +105,7 @@ class AndorAdjustND(Executor):
         resp = self.driver.adjust_ND()
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": resp.data}
+
 
 class AndorAcquire(Executor):
     """Acquire data with external start trigger."""
@@ -137,9 +138,7 @@ class AndorAcquire(Executor):
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
-        resp = self.driver.setup(
-            exp_time=self.exp_time, framerate=self.framerate
-        )
+        resp = self.driver.setup(exp_time=self.exp_time, framerate=self.framerate)
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         return {"error": error}
 
@@ -148,7 +147,9 @@ class AndorAcquire(Executor):
         try:
             LOGGER.debug("setting trigger")
             resp = self.driver.set_trigger(self.external_trigger)
-            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            error = (
+                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            )
         except Exception:
             error = ErrorCodes.critical
             LOGGER.error("Error setting trigger", exc_info=True)
@@ -156,7 +157,9 @@ class AndorAcquire(Executor):
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
-        resp = self.driver.get_data(frames=self.frames_per_poll)
+        resp = self.driver.get_data(
+            frames=self.frames_per_poll, external=self.external_trigger
+        )
         if resp.data:
             if self.first_tick is None:
                 self.first_tick = resp.data["tick_time"][0]
@@ -235,10 +238,12 @@ async def andor_dyn_endpoints(app=None):
         timeout: int = 600,
     ):
         active = await app.base.setup_and_contain_action()
-        executor = AndorCooling(active=active, oneoff=False, cooldown=cooldown, timeout=timeout)
+        executor = AndorCooling(
+            active=active, oneoff=False, cooldown=cooldown, timeout=timeout
+        )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
-    
+
     @app.post(f"/{server_key}/adjust_nd", tags=["action"])
     async def adjust_nd(
         action: Action = Body({}, embed=True),
@@ -248,6 +253,7 @@ async def andor_dyn_endpoints(app=None):
         executor = AndorAdjustND(active=active, oneoff=True)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
+
 
 def makeApp(confPrefix, server_key, helao_root):
 
