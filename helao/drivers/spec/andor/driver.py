@@ -68,17 +68,11 @@ class AndorDriver(HelaoDriver):
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
-        except Exception as exc:
-            _, _, err_tup = exc.args
-            if "In use by another script" in err_tup[0]:
-                response = DriverResponse(
-                    response=DriverResponseType.success, status=DriverStatus.busy
-                )
-            else:
-                LOGGER.error("get_status connection", exc_info=True)
-                response = DriverResponse(
-                    response=DriverResponseType.failed, status=DriverStatus.error
-                )
+        except Exception:
+            LOGGER.error("get_status connection", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
 
         return response
 
