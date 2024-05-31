@@ -628,10 +628,6 @@ class AndorDriver(HelaoDriver):
                         data_dict[f"ch_{i:04}"].append(int(x))
                 except CameraException:
                     break
-            if data_dict["tick_time"]:
-                for k,v in data_dict.items():
-                    print(k, type(v[0]), v[0])
-            print(json.dumps(data_dict))
             status = DriverStatus.busy
             response = DriverResponse(
                 response=DriverResponseType.success,
