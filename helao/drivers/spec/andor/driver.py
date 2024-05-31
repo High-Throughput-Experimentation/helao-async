@@ -625,10 +625,9 @@ class AndorDriver(HelaoDriver):
                     tick_time = acq.metadata.timestamp / self.clock_hz
                     data_dict["tick_time"].append(tick_time)
                     for i, x in enumerate(spectrum):
-                        data_dict[f"ch_{i:04}"].append(x)
+                        data_dict[f"ch_{i:04}"].append(int(x))
                 except CameraException:
                     break
-            print("spectrum shape is", spectrum.shape)
             if data_dict["tick_time"]:
                 for k,v in data_dict.items():
                     print(k, type(v[0]), v[0])
