@@ -932,29 +932,29 @@ def ECMS_sub_clean_cell_recirculation(
                 reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no
             )
         )
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
-        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
-        #apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-maxspd", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.tube_clear_time+apm.pars.tube_clear_delaytime})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 1})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
-        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_drain_time-apm.pars.tube_clear_delaytime})
-        #apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-maxspd", "on": 0})
-        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
 # =============================================================================
-#         apm.add_action_list(
-#             ECMS_sub_drain_recirculation(
-#                 experiment=experiment,
-#                 tube_clear_time=apm.pars.tube_clear_time,
-#                 liquid_drain_time=apm.pars.liquid_drain_time
-#             )
-#         )
+#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
+#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
+#         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
+#         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
+#         #apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-maxspd", "on": 1})
+#         apm.add(ORCH_server, "wait", {"waittime": apm.pars.tube_clear_time+apm.pars.tube_clear_delaytime})
+#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 1})
+#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
+#         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
+#         apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_drain_time-apm.pars.tube_clear_delaytime})
+#         #apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-maxspd", "on": 0})
+#         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
+#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
+#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
 # =============================================================================
+        apm.add_action_list(
+            ECMS_sub_drain_recirculation(
+                experiment=experiment,
+                tube_clear_time=apm.pars.tube_clear_time,
+                liquid_drain_time=apm.pars.liquid_drain_time
+            )
+        )
     return apm.action_list
 
 def ECMS_sub_drain(
