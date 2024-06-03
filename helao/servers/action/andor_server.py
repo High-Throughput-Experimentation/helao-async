@@ -177,7 +177,6 @@ class AndorAcquire(Executor):
 
     async def _post_exec(self):
         resp = self.driver.cleanup()
-        self.driver.disconnect()
 
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": {}}

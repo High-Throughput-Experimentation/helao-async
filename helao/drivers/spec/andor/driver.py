@@ -705,5 +705,4 @@ class AndorDriver(HelaoDriver):
 
     def shutdown(self) -> None:
         """Pass-through shutdown events for BaseAPI."""
-        self.cleanup()
         self.disconnect()
