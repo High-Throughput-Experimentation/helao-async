@@ -7,8 +7,6 @@ dependencies:
     - aiodebug
     - aioshutil
     - plumbum
-    - pydantic-settings==2
-    - pydantic==2
     - pyft232
     - pylablib
     - sqlmodel
@@ -21,7 +19,7 @@ dependencies:
   - botocore
   - colorama
   - colorlog
-  - fastapi
+  - fastapi=0.110
   - filelock
   - git
   - httpx
@@ -39,6 +37,9 @@ dependencies:
   - psycopg2
   - pyaml
   - pybase64
+  - pydantic-core=2.16.3
+  - pydantic-settings=2.2.1
+  - pydantic=2.6.3
   - pyfiglet
   - pyftdi
   - pymodbus
