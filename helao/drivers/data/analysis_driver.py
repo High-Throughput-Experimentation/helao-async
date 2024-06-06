@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Union, Optional, Tuple
 from uuid import UUID
+import gzip
 
 import aiohttp
 import json
@@ -142,7 +143,9 @@ class HelaoAnalysisSyncer:
                 self.local_ana_root, year_week, analysis_day, f"{HMS}__{analysis_name}"
             )
             os.makedirs(local_ana_dir, exist_ok=True)
-            with open(os.path.join(local_ana_dir, f"{eua.analysis_uuid}.yml"), "w") as f:
+            with open(
+                os.path.join(local_ana_dir, f"{eua.analysis_uuid}.yml"), "w"
+            ) as f:
                 f.write(yml_dumps(model_dict))
 
             s3_model_target = f"analysis/{eua.analysis_uuid}.json"
@@ -152,7 +155,9 @@ class HelaoAnalysisSyncer:
                 try:
                     s3_model_success = await self.to_s3(model_dict, s3_model_target)
                 except Exception as e:
-                    tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                    tb = "".join(
+                        traceback.format_exception(type(e), e, e.__traceback__)
+                    )
                     print(tb)
             else:
                 s3_model_success = True
@@ -170,10 +175,10 @@ class HelaoAnalysisSyncer:
                 local_json_out = os.path.join(
                     local_ana_dir, os.path.basename(s3_output_target)
                 )
-                with open(local_json_out, "w") as f:
+                with gzip.open(local_json_out, 'wt', encoding='utf-8') as f:
                     json.dump(s3_dict, f)
                 if not self.config_dict.get("local_only", False):
-                    s3_success = await self.to_s3(s3_dict, s3_output_target)
+                    s3_success = await self.to_s3(s3_dict, s3_output_target, compress=True)
                 else:
                     s3_success = True
                 output_successes.append(s3_success)
@@ -186,14 +191,25 @@ class HelaoAnalysisSyncer:
                 self.base.print_message(f"Successfully synced {eua.analysis_uuid}")
                 return True
 
-        self.base.print_message(f"Analysis {eua.analysis_uuid} sync failed for process_uuid {process_uuid}.", warning=True)
+        self.base.print_message(
+            f"Analysis {eua.analysis_uuid} sync failed for process_uuid {process_uuid}.",
+            warning=True,
+        )
         self.running_tasks.pop(str(process_uuid))
         return False
 
-    async def to_s3(self, msg: Union[dict, Path], target: str, retries: int = 3):
+    async def to_s3(
+        self,
+        msg: Union[dict, Path],
+        target: str,
+        retries: int = 3,
+        compress: bool = False,
+    ):
         """Uploads to S3: dict sent as json, path sent as file."""
         if isinstance(msg, dict):
             uploaded = dict2json(msg)
+            if compress:
+                uploaded = gzip.compress(uploaded)
             uploader = self.s3.upload_fileobj
         else:
             uploaded = str(msg)
@@ -335,20 +351,21 @@ class HelaoAnalysisSyncer:
         """Generate list of DryUvisAnalysis from sequence or plate_id (latest seq)."""
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
         min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2023-04-26"
-        
+
         df = pgs3.LOADER.get_recent(
             query=DRYUVIS_QUERY, min_date=min_date, plate_id=plate_id
         )
 
         retry_counter = 0
         while df.shape[0] == 0 and retry_counter < 3:
-            self.base.print_message("query returned 0 rows, checking again in 5 seconds.")
+            self.base.print_message(
+                "query returned 0 rows, checking again in 5 seconds."
+            )
             time.sleep(5)
             df = pgs3.LOADER.get_recent(
                 query=DRYUVIS_QUERY, min_date=min_date, plate_id=plate_id
             )
             retry_counter += 1
-
 
         # all processes in sequence
         pdf = df.sort_values(

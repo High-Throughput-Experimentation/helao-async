@@ -2,7 +2,6 @@ from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel
 from helaocore.models.analysis import (
-    AnalysisDataModel,
     AnalysisOutputModel,
     AnalysisModel,
 )
@@ -50,7 +49,7 @@ class BaseAnalysis:
                 out_model = AnalysisOutputModel(
                     analysis_output_path=S3Locator(
                         bucket=bucket,
-                        key=f"analysis/{self.analysis_uuid}_output_{label}.json",
+                        key=f"analysis/{self.analysis_uuid}_output_{label}.json.gz",
                         region=region,
                     ),
                     content_type="application/json",
