@@ -15,6 +15,10 @@ class BaseAnalysis:
     analysis_uuid: UUID
     analysis_params: dict
     process_uuid: UUID
+    process_timestamp: datetime
+    process_name: str
+    run_type: str
+    technique_name: str
     inputs: object
     outputs: BaseModel
 

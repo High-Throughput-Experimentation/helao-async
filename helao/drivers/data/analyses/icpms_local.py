@@ -72,6 +72,10 @@ class IcpmsAnalysis(BaseAnalysis):
     analysis_uuid: UUID
     analysis_params: dict
     process_uuid: UUID
+    process_timestamp: datetime
+    process_name: str
+    run_type: str
+    technique_name: str
     inputs: IcpmsInputs
     outputs: IcpmsOutputs
     analysis_codehash: str
@@ -89,6 +93,13 @@ class IcpmsAnalysis(BaseAnalysis):
         self.analysis_params.update(analysis_params)
         self.inputs = IcpmsInputs(process_uuid, local_loader)
         self.process_uuid = self.inputs.icpms.process_uuid
+
+        # additional attrs
+        self.process_timestamp = self.inputs.icpms.process_timestamp
+        self.process_name = self.inputs.icpms.technique_name
+        self.run_type = self.inputs.icpms.meta_dict.get("run_type", "icpm")
+        self.technique_name = self.inputs.icpms.technique_name
+
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
         self.global_sample_label = self.inputs.global_sample_label
 
