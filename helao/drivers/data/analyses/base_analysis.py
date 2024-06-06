@@ -53,6 +53,7 @@ class BaseAnalysis:
                         region=region,
                     ),
                     content_type="application/json",
+                    content_encoding="gzip",
                     output_keys=output_keys,
                     output_name=label,
                     output={
