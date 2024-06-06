@@ -202,20 +202,24 @@ class Base:
         self.print_message(f"Got exception from coroutine: {context}", error=True)
         exc = context.get("exception")
         self.print_message(
-            f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}", error=True
+            f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}",
+            error=True,
         )
         self.print_message("setting E-STOP flag on active actions")
         for _, active in self.actives.items():
             active.set_estop()
-            
 
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
         # produce warnings on coroutines taking longer than interval
         aiodebug.log_slow_callbacks.enable(30.0)
         # dump coroutine stack traces when event loop hangs for longer than interval
-        self.dumper = aiodebug.hang_inspection.start(os.path.join(self.helaodirs.root, "FAULTS"), interval=5.0)
-        self.dumper_task = self.aloop.create_task(aiodebug.hang_inspection.stop_wait(self.dumper))
+        self.dumper = aiodebug.hang_inspection.start(
+            os.path.join(self.helaodirs.root, "FAULTS"), interval=5.0
+        )
+        self.dumper_task = self.aloop.create_task(
+            aiodebug.hang_inspection.stop_wait(self.dumper)
+        )
         self.aloop.set_exception_handler(self.exception_handler)
         if self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())
@@ -273,12 +277,16 @@ class Base:
                 flatParams = get_flat_params(route.dependant)
                 paramD = {
                     par.name: {
-                        "outer_type": str(par.field_info.annotation).split("'")[1]
-                        if len(str(par.field_info.annotation).split("'")) >= 2
-                        else str(par.field_info.annotation),
-                        "type": str(par.type_).split("'")[1]
-                        if len(str(par.type_).split("'")) >= 2
-                        else str(par.type_),
+                        "outer_type": (
+                            str(par.field_info.annotation).split("'")[1]
+                            if len(str(par.field_info.annotation).split("'")) >= 2
+                            else str(par.field_info.annotation)
+                        ),
+                        "type": (
+                            str(par.type_).split("'")[1]
+                            if len(str(par.type_).split("'")) >= 2
+                            else str(par.type_)
+                        ),
                         "required": par.required,
                         # "shape": par.shape,
                         "default": par.default if par.default is not ... else None,
@@ -674,9 +682,9 @@ class Base:
                 # in the "ActionServerModel"
                 if status_msg.action_name not in self.actionservermodel.endpoints:
                     # a new endpoints became available
-                    self.actionservermodel.endpoints[
-                        status_msg.action_name
-                    ] = EndpointModel(endpoint_name=status_msg.action_name)
+                    self.actionservermodel.endpoints[status_msg.action_name] = (
+                        EndpointModel(endpoint_name=status_msg.action_name)
+                    )
                 self.actionservermodel.endpoints[
                     status_msg.action_name
                 ].active_dict.update({status_msg.action_uuid: status_msg})
@@ -692,9 +700,11 @@ class Base:
                     f"{status_msg.action_server.disp_name()} "
                     f"to subscribers ({self.status_clients})."
                 )
-                if len(self.status_clients)==0 and self.orch_key is not None:
-                    await self.attach_client(self.orch_key, self.orch_host, self.orch_port)
-                    
+                if len(self.status_clients) == 0 and self.orch_key is not None:
+                    await self.attach_client(
+                        self.orch_key, self.orch_host, self.orch_port
+                    )
+
                 for combo_key in self.status_clients.copy():
                     client_servkey, client_host, client_port = combo_key
                     self.print_message(
@@ -1036,7 +1046,6 @@ class Active:
             info=True,
         )
 
-
         self.manual_stop = False
         self.action_loop_running = False
         self.action_task = None
@@ -1296,27 +1305,25 @@ class Active:
 
         # add some missing information to the hloheader
         if output_action.action_abbr is not None:
-            self.file_conn_dict[
-                file_conn_key
-            ].params.hloheader.action_name = output_action.action_abbr
+            self.file_conn_dict[file_conn_key].params.hloheader.action_name = (
+                output_action.action_abbr
+            )
         else:
-            self.file_conn_dict[
-                file_conn_key
-            ].params.hloheader.action_name = output_action.action_name
+            self.file_conn_dict[file_conn_key].params.hloheader.action_name = (
+                output_action.action_name
+            )
 
-        self.file_conn_dict[
-            file_conn_key
-        ].params.hloheader.column_headings = self.file_conn_dict[
-            file_conn_key
-        ].params.json_data_keys
+        self.file_conn_dict[file_conn_key].params.hloheader.column_headings = (
+            self.file_conn_dict[file_conn_key].params.json_data_keys
+        )
         # epoch_ns should have been set already
         # else we need to add it now because the header is now written
         # before data can be added to the file
         if self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns is None:
             self.base.print_message("realtime_ns was not set, adding it now.")
-            self.file_conn_dict[
-                file_conn_key
-            ].params.hloheader.epoch_ns = self.get_realtime_nowait()
+            self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = (
+                self.get_realtime_nowait()
+            )
 
         header, file_info = self.init_datafile(
             header=self.file_conn_dict[file_conn_key].params.hloheader.clean_dict(),
@@ -1377,10 +1384,7 @@ class Active:
 
                 self.action.data_stream_status = data_status
 
-                if data_status not in (
-                    None,
-                    HloStatus.active,
-                ):
+                if data_status not in (None, HloStatus.active):
                     self.base.print_message(
                         f"data_stream: skipping package for status: {data_status}",
                         info=True,
@@ -1428,9 +1432,9 @@ class Active:
                                 info=True,
                             )
 
-                            self.file_conn_dict[
-                                file_conn_key
-                            ].params.json_data_keys = jsonkeys
+                            self.file_conn_dict[file_conn_key].params.json_data_keys = (
+                                jsonkeys
+                            )
 
                         self.base.print_message(
                             f"creating output file for {file_conn_key}"
@@ -1443,9 +1447,9 @@ class Active:
                         # check if separator was already written
                         # else add it
                         if not self.file_conn_dict[file_conn_key].added_hlo_separator:
-                            self.file_conn_dict[
-                                file_conn_key
-                            ].added_hlo_separator = True
+                            self.file_conn_dict[file_conn_key].added_hlo_separator = (
+                                True
+                            )
                             await self.write_live_data(
                                 output_str="%%\n",
                                 file_conn_key=file_conn_key,
@@ -1474,7 +1478,9 @@ class Active:
                     self.num_data_written += 1
 
         except asyncio.CancelledError:
-            self.base.print_message("removing data_q subscription for active", info=True)
+            self.base.print_message(
+                "removing data_q subscription for active", info=True
+            )
             if dq_sub in self.base.data_q.subscribers:
                 self.base.data_q.remove(dq_sub)
         except Exception as e:
@@ -1726,10 +1732,11 @@ class Active:
                 # add the new one to active file conn dict
                 self.file_conn_dict[new_file_conn.params.file_conn_key] = new_file_conn
                 # and add the new file_conn_uuid to the new split action
-                self.action.file_conn_keys = [new_file_conn.params.file_conn_key] + self.action.file_conn_keys
+                self.action.file_conn_keys = [
+                    new_file_conn.params.file_conn_key
+                ] + self.action.file_conn_keys
                 self.num_data_queued = 0
                 self.num_data_written = 0
-
 
             # TODO:
             # update other action settings?
@@ -1763,7 +1770,7 @@ class Active:
 
     async def finish(
         self,
-        finish_uuid_list: List[UUID] = None
+        finish_uuid_list: List[UUID] = None,
         # end_state: HloStatus = HloStatus.finished
     ) -> Action:
         """Close file_conn, finish exp, copy aux,
@@ -1798,7 +1805,7 @@ class Active:
                     continue
                 if HloStatus.finished in action.action_status:
                     continue
-                
+
                 # set status to finish
                 # (replace active with finish)
                 self.base.replace_status(
@@ -1810,8 +1817,7 @@ class Active:
                 # send globalparams
                 if action.to_globalexp_params:
                     export_params = {
-                        k: action.action_params[k]
-                        for k in action.to_globalexp_params
+                        k: action.action_params[k] for k in action.to_globalexp_params
                     }
                     _, error_code = await async_private_dispatcher(
                         server_key=action.orch_key,
@@ -1821,8 +1827,9 @@ class Active:
                         json_dict=export_params,
                     )
                     if error_code == ErrorCodes.none:
-                        self.base.print_message("Successfully updated globalexp params.")
-
+                        self.base.print_message(
+                            "Successfully updated globalexp params."
+                        )
 
             # check if all actions are fininshed
             # if yes close dataLOGGER etc
@@ -1849,7 +1856,9 @@ class Active:
                     and retry_counter < 5
                 ):
                     await self.enqueue_data(
-                        datamodel=DataModel(data={}, errors=[], status=HloStatus.finished)
+                        datamodel=DataModel(
+                            data={}, errors=[], status=HloStatus.finished
+                        )
                     )
                     self.base.print_message(
                         f"Waiting for data_stream finished"
@@ -1863,8 +1872,13 @@ class Active:
                 self.base.print_message("checking if all queued data has written.")
                 write_retries = 5
                 write_iter = 0
-                while self.num_data_queued > self.num_data_written and write_iter < write_retries:
-                    self.base.print_message(f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 0.1 second.")
+                while (
+                    self.num_data_queued > self.num_data_written
+                    and write_iter < write_retries
+                ):
+                    self.base.print_message(
+                        f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 0.1 second."
+                    )
                     for action in self.action_list:
                         if action.data_stream_status != HloStatus.active:
                             await self.enqueue_data(
@@ -1923,7 +1937,9 @@ class Active:
 
                 # since all sub-actions of active are finished process endpoint queue
                 if self.base.endpoint_queues[action.action_name].qsize() > 0:
-                    self.base.print_message(f"{action.action_name} was previously queued")
+                    self.base.print_message(
+                        f"{action.action_name} was previously queued"
+                    )
                     qact, qpars = self.base.endpoint_queues[action.action_name].get()
                     self.base.print_message(f"running queued {action.action_name}")
                     qact.start_condition = ASC.no_wait
@@ -2035,7 +2051,11 @@ class Active:
     async def action_loop_task(self, executor: Executor):
         """Generic replacement for 'IOloop'."""
         # stall action_loop task if concurrency is not allowed
-        while self.base.local_action_task_queue and self.base.local_action_task_queue[0] != self.action.action_uuid and not executor.concurrent:
+        while (
+            self.base.local_action_task_queue
+            and self.base.local_action_task_queue[0] != self.action.action_uuid
+            and not executor.concurrent
+        ):
             await asyncio.sleep(0.1)
 
         if self.action.nonblocking:
