@@ -31,6 +31,7 @@ from copy import copy
 
 import botocore.exceptions
 import boto3
+import gzip
 
 # from filelock import FileLock
 
@@ -598,9 +599,7 @@ class HelaoSyncer:
         else:
             # self.task_set.add(yml_path.name)
             await self.task_queue.put((rank, yml_path))
-            LOGGER.info(
-                f"Added {str(yml_path)} to syncer queue with priority {rank}."
-            )
+            LOGGER.info(f"Added {str(yml_path)} to syncer queue with priority {rank}.")
 
     async def sync_yml(
         self,
@@ -685,11 +684,15 @@ class HelaoSyncer:
             while prog.dict.get("files_pending", []):
                 for sp in prog.dict["files_pending"]:
                     fp = Path(sp)
+                    compress = False
                     self.base.print_message(
                         f"Pushing {sp} to S3 for {prog.yml.target.name}"
                     )
                     if fp.suffix == ".hlo":
-                        file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
+                        compress = True
+                        file_s3_key = (
+                            f"raw_data/{meta['action_uuid']}/{fp.name}.json.gz"
+                        )
                         self.base.print_message("Parsing hlo dicts.")
                         try:
                             file_meta, file_data = read_hlo(sp)
@@ -707,7 +710,11 @@ class HelaoSyncer:
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}"
                         msg = fp
                     self.base.print_message(f"Destination: {file_s3_key}")
-                    file_success = await self.to_s3(msg, file_s3_key)
+                    file_success = await self.to_s3(
+                        msg=msg,
+                        target=file_s3_key,
+                        compress=compress,
+                    )
                     if file_success:
                         self.base.print_message("Removing file from pending list.")
                         prog.dict["files_pending"].remove(sp)
@@ -771,9 +778,7 @@ class HelaoSyncer:
                 f"Pushing prog.yml to API for {prog.yml.target.name}"
             )
             api_success = await self.to_api(prog.yml_model, prog.yml.type)
-            LOGGER.info(
-                f"API push returned {api_success} for {prog.yml.target.name}"
-            )
+            LOGGER.info(f"API push returned {api_success} for {prog.yml.target.name}")
             if api_success:
                 prog.dict["api"] = True
                 prog.write_dict()
@@ -835,7 +840,9 @@ class HelaoSyncer:
                 zip_target = prog.yml.target.parent.parent.joinpath(
                     f"{prog.yml.target.parent.name}.zip"
                 )
-                LOGGER.info(f"Full sequence has synced, creating zip: {str(zip_target)}")
+                LOGGER.info(
+                    f"Full sequence has synced, creating zip: {str(zip_target)}"
+                )
                 zip_dir(prog.yml.target.parent, zip_target)
                 self.cleanup_root()
                 # self.base.print_message(f"Removing sequence from progress.")
@@ -1047,7 +1054,13 @@ class HelaoSyncer:
                     exp_prog.write_dict()
         return exp_prog
 
-    async def to_s3(self, msg: Union[dict, Path], target: str, retries: int = 3):
+    async def to_s3(
+        self,
+        msg: Union[dict, Path],
+        target: str,
+        retries: int = 3,
+        compress: bool = False,
+    ):
         """Uploads to S3: dict sent as json, path sent as file."""
         if self.s3 is None:
             self.base.print_message("S3 is not configured. Skipping to S3 upload.")
@@ -1055,6 +1068,8 @@ class HelaoSyncer:
         if isinstance(msg, dict):
             self.base.print_message("Converting dict to json.")
             uploaded = dict2json(msg)
+            if compress:
+                uploaded = gzip.compress(uploaded)
             uploader = self.s3.upload_fileobj
         else:
             self.base.print_message("Converting path to str")
@@ -1073,7 +1088,7 @@ class HelaoSyncer:
                     traceback.format_exception(type(err), err, err.__traceback__)
                 )
                 self.base.print_message(err)
-                await asyncio.sleep(1)
+                await asyncio.sleep(5)
         self.base.print_message(f"Did not upload {target} after {retries} tries.")
         return False
 
@@ -1123,6 +1138,7 @@ class HelaoSyncer:
                         self.base.print_message(
                             f"[{i+1}/{retries}] an exception occurred: {e}"
                         )
+                        await asyncio.sleep(5)
                 else:
                     break
             if not api_success:
@@ -1160,6 +1176,7 @@ class HelaoSyncer:
                             self.base.print_message(
                                 f"unable to post failure model for {meta_type}: {meta_uuid}"
                             )
+                            await asyncio.sleep(5)
         return api_success
 
     def list_pending(self, omit_manual_exps: bool = True):
