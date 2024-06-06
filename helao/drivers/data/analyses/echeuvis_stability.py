@@ -291,6 +291,10 @@ class EcheUvisAnalysis(BaseAnalysis):
     sample_no: int
     ca_potential_vrhe: float
     process_uuid: UUID
+    process_timestamp: datetime
+    process_name: str
+    run_type: str
+    technique_name: str
     inputs: EcheUvisInputs
     outputs: EcheUvisOutputs
     analysis_codehash: str
@@ -309,6 +313,13 @@ class EcheUvisAnalysis(BaseAnalysis):
         # print("filtered data has shape:", pdf.shape)
         self.plate_id = int(pdf.iloc[0].plate_id)
         self.sample_no = int(pdf.iloc[0].sample_no)
+
+        # additional attrs
+        self.process_timestamp = pdf.iloc[0].process_timestamp
+        self.process_name = pdf.iloc[0].technique_name
+        self.run_type = pdf.iloc[0].run_type
+        self.technique_name = pdf.iloc[0].technique_name
+                
         # print("assembling inputs")
         self.inputs = EcheUvisInputs(
             process_uuid, self.plate_id, self.sample_no, query_df

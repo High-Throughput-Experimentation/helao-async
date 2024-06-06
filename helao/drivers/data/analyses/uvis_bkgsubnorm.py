@@ -197,6 +197,10 @@ class DryUvisAnalysis(BaseAnalysis):
     plate_id: int
     sample_no: int
     process_uuid: UUID
+    process_timestamp: datetime
+    process_name: str
+    run_type: str
+    technique_name: str
     inputs: DryUvisInputs
     outputs: DryUvisOutputs
     action_attr: str
@@ -216,6 +220,13 @@ class DryUvisAnalysis(BaseAnalysis):
         pdf = query_df.query("process_uuid==@process_uuid")
         self.plate_id = pdf.iloc[0].plate_id
         self.sample_no = pdf.iloc[0].sample_no
+
+        # additional attrs
+        self.process_timestamp = pdf.iloc[0].process_timestamp
+        self.process_name = pdf.iloc[0].technique_name
+        self.run_type = pdf.iloc[0].run_type
+        self.technique_name = pdf.iloc[0].technique_name
+        
         self.inputs = DryUvisInputs(
             process_uuid, self.plate_id, self.sample_no, query_df
         )
