@@ -84,16 +84,16 @@ servers:
   #       A: 127.8
   #       B: 76.7
   #     timeout: 600
-  # PSTAT:
-  #   host: hte-eche-10.htejcap.caltech.edu
-  #   port: 8004
-  #   group: action
-  #   fast: gamry_server2
-  #   params:
-  #     allow_no_sample: true
-  #     dev_id: 0
-  #     filterfreq_hz: 1000.0
-  #     grounded: true
+  PSTAT:
+    host: 127.0.0.1
+    port: 8004
+    group: action
+    fast: gamry_server2
+    params:
+      allow_no_sample: true
+      dev_id: 0
+      filterfreq_hz: 1000.0
+      grounded: true
   IO:
     host: 127.0.0.1
     port: 8005
@@ -137,13 +137,13 @@ servers:
     params:
       dev_id: 0
     verbose: true
-  # VIS:
-  #   host: hte-eche-10.htejcap.caltech.edu
-  #   port: 5001
-  #   group: visualizer
-  #   bokeh: action_visualizer
-  #   params:
-  #     doc_name: ECHE10 Visualizer
+  VIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: ECHE11 Visualizer
   # DB:
   #   host: hte-eche-10.htejcap.caltech.edu
   #   port: 8010
