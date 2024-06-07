@@ -3,12 +3,13 @@ simulation: false
 # builtin_ref_motorxy:
 #   - 44.850974338462315
 #   - -107.5622526817081
-# experiment_libraries:
-#   - samples_exp
-#   - ECHE_exp
-#   - ECHEUVIS_exp
-#   - UVIS_exp
-#   - TEST_exp
+experiment_libraries:
+  - samples_exp
+  - HISPEC_exp
+  # - ECHE_exp
+  # - ECHEUVIS_exp
+  # - UVIS_exp
+  # - TEST_exp
 # experiment_params:
 #   toggle_is_shutter: false
 #   gamrychannelwait: -1
@@ -93,32 +94,32 @@ servers:
   #     dev_id: 0
   #     filterfreq_hz: 1000.0
   #     grounded: true
-  # IO:
-  #   host: hte-eche-10.htejcap.caltech.edu
-  #   port: 8005
-  #   group: action
-  #   fast: galil_io
-  #   params:
-  #     galil_ip_str: 192.168.200.234
-  #     dev_di:
-  #       gamry_ttl0: 1
-  #     dev_do:
-  #       spec_trig: 5
-  #       ir_emitter: 8
-  #       doric_wled: 1
-  #       we_flow: 2
-  #       we_pump: 7
-  #       we_vent: 3
-  #       ce_pump: 6
-  #       ce_vent: 4
-  #       # gamry_aux: 1
-  #       # led: 8
-  #       # doric_led1: 4
-  #       # pump_ref_flush: 3
-  #       # pump_supply: 2
-  #       # doric_led2: 5
-  #       # doric_led3: 6
-  #       # ir_emitter: 7
+  IO:
+    host: 127.0.0.1
+    port: 8005
+    group: action
+    fast: galil_io
+    params:
+      galil_ip_str: 192.168.200.219
+      dev_di:
+        gamry_ttl0: 1
+      dev_do:
+        spec_trig: 5
+        ir_emitter: 8
+        doric_wled: 1
+        we_flow: 2
+        we_pump: 7
+        we_vent: 3
+        ce_pump: 6
+        ce_vent: 4
+        # gamry_aux: 1
+        # led: 8
+        # doric_led1: 4
+        # pump_ref_flush: 3
+        # pump_supply: 2
+        # doric_led2: 5
+        # doric_led3: 6
+        # ir_emitter: 7
   # PAL:
   #   host: hte-eche-10.htejcap.caltech.edu
   #   port: 8007
