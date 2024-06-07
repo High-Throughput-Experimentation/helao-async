@@ -17,12 +17,14 @@ __all__ = [
 ]
 
 from helao.helpers import logging
+
 if logging.LOGGER is None:
     logger = logging.make_logger(logger_name="gamry_driver_standalone")
 else:
     logger = logging.LOGGER
 
 from helao.helpers import config_loader
+
 if config_loader.CONFIG is None:
     rootcfg = {}
 else:
@@ -118,22 +120,11 @@ def ECHEUVIS_sub_CV_led(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    CV_duration_sec = (
-        abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
-    )
+    CV_duration_sec = abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
+    CV_duration_sec += abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
+    CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * cycles
     CV_duration_sec += (
-        abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
-    )
-    CV_duration_sec += (
-        abs(Vapex2_vsRHE - Vapex1_vsRHE)
-        / scanrate_voltsec
-        * cycles
-    )
-    CV_duration_sec += (
-        abs(Vapex2_vsRHE - Vapex1_vsRHE)
-        / scanrate_voltsec
-        * 2.0
-        * (cycles - 1)
+        abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * 2.0 * (cycles - 1)
     )
 
     if int(round(toggle_illum_time)) == -1:
@@ -183,7 +174,7 @@ def ECHEUVIS_sub_CV_led(
     )
 
     # apm.add(ORCH_server, "wait", {"waittime": 5})
-    
+
     # apm.add(
     #     IO_server,
     #     "set_digital_out",
@@ -243,18 +234,10 @@ def ECHEUVIS_sub_CV_led(
         PSTAT_server,
         "run_CV",
         {
-            "Vinit__V": Vinit_vsRHE
-            - 1.0 * ref_vs_nhe
-            - 0.059 * solution_ph,
-            "Vapex1__V": Vapex1_vsRHE
-            - 1.0 * ref_vs_nhe
-            - 0.059 * solution_ph,
-            "Vapex2__V": Vapex2_vsRHE
-            - 1.0 * ref_vs_nhe
-            - 0.059 * solution_ph,
-            "Vfinal__V": Vfinal_vsRHE
-            - 1.0 * ref_vs_nhe
-            - 0.059 * solution_ph,
+            "Vinit__V": Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vapex1__V": Vapex1_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vapex2__V": Vapex2_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vfinal__V": Vfinal_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
             "ScanRate__V_s": scanrate_voltsec,
             "AcqInterval__s": samplerate_sec,
             "Cycles": cycles,
@@ -427,11 +410,7 @@ def ECHEUVIS_sub_CA_led(
         # )
 
     # apply potential
-    potential = (
-        CA_potential_vsRHE
-        - 1.0 * ref_vs_nhe
-        - 0.059 * solution_ph
-    )
+    potential = CA_potential_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph
     print(f"ECHE_sub_CA potential: {potential}")
 
     apm.add(
@@ -554,7 +533,7 @@ def ECHEUVIS_sub_CP_led(
     )
 
     # apm.add(ORCH_server, "wait", {"waittime": 5})
-    
+
     # apm.add(
     #     IO_server,
     #     "set_digital_out",
@@ -571,7 +550,7 @@ def ECHEUVIS_sub_CP_led(
         start_condition=ActionStartCondition.no_wait,
         nonblocking=True,
     )
-    
+
     for ss in SPECSRV_MAP[spec_technique]:
         apm.add(
             ss,
@@ -608,7 +587,6 @@ def ECHEUVIS_sub_CP_led(
         #     start_condition=ActionStartCondition.no_wait,
         #     nonblocking=True,
         # )
-
 
     apm.add(
         PSTAT_server,
@@ -849,17 +827,17 @@ def ECHEUVIS_sub_disengage(
             )
     apm.add(ORCH_server, "wait", {"waittime": vent_wait})
     # lower z (disengage)
-    apm.add(
-        KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height}
-    )
+    apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
     for i, item in enumerate(["we_vent", "we_pump", "ce_vent", "ce_pump"]):
         apm.add(
             IO_server,
             "set_digital_out",
             {"do_item": item, "on": False},
-            ActionStartCondition.no_wait
-            if i > 0
-            else ActionStartCondition.wait_for_all,
+            (
+                ActionStartCondition.no_wait
+                if i > 0
+                else ActionStartCondition.wait_for_all
+            ),
         )
     return apm.action_list  # returns complete action list to orch
 
@@ -874,9 +852,7 @@ def ECHEUVIS_sub_engage(
 ):
     # raise z (engage)
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(
-        KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height}
-    )
+    apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
     # close vent valves
     for item in ("we_vent", "ce_vent"):
         apm.add(
@@ -907,9 +883,11 @@ def ECHEUVIS_sub_engage(
             IO_server,
             "set_digital_out",
             {"do_item": item, "on": flow_flag},
-            ActionStartCondition.no_wait
-            if i > 0
-            else ActionStartCondition.wait_for_all,
+            (
+                ActionStartCondition.no_wait
+                if i > 0
+                else ActionStartCondition.wait_for_all
+            ),
         )
     return apm.action_list  # returns complete action list to orch
 
