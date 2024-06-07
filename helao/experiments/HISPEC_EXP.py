@@ -134,13 +134,22 @@ def HISPEC_sub_CV_led(
         },
     )
 
+    apm.add(
+        ORCH_server,
+        "wait",
+        {
+            "waittime": 3,
+        },
+        start_condition=ActionStartCondition.no_wait,
+    )
+
     # setup toggle on galil_io
     apm.add(
         IO_server,
         "set_digital_cycle",
         {
             "trigger_name": "gamry_ttl0",
-            "triggertype": 1, # rising edge
+            "triggertype": 1,  # rising edge
             "out_name": [toggle1_source],
             "out_name_gamry": None,
             "toggle_init_delay": [toggle1_init_delay],
@@ -148,7 +157,7 @@ def HISPEC_sub_CV_led(
             "toggle_period": [toggle1_period],
             "toggle_duration": [toggle1_time],
         },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        start_condition=ActionStartCondition.wait_for_previous,  # orch is waiting for all action_dq to finish
         process_finish=False,
         process_contrib=[ProcessContrib.files, ProcessContrib.samples_out],
     )
@@ -170,7 +179,7 @@ def HISPEC_sub_CV_led(
             "IErange": gamry_i_range,
         },
         # from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_server,
+        start_condition=ActionStartCondition.wait_for_previous,
         technique_name="CV",
         process_finish=True,
         process_contrib=[
