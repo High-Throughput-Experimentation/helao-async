@@ -130,7 +130,7 @@ def HISPEC_sub_CV_led(
             "buffer_count": 10,
             "exp_time": 0.0098,
             "framerate": 98,
-            "timeout": 5000,
+            "timeout": 10000,
         },
     )
 
@@ -138,7 +138,7 @@ def HISPEC_sub_CV_led(
         ORCH_server,
         "wait",
         {
-            "waittime": 3,
+            "waittime": 2,
         },
         start_condition=ActionStartCondition.no_wait,
     )
