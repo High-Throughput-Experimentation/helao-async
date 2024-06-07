@@ -218,15 +218,15 @@ async def andor_dyn_endpoints(app=None):
 
         return active_action_dict
 
-    @app.post(f"/{server_key}/cancel_acquire_external_trig", tags=["action"])
-    async def cancel_acquire_external_trig(
+    @app.post(f"/{server_key}/cancel_acquire", tags=["action"])
+    async def cancel_acquire(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         """Stop sleep action."""
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():
-            if exec_id.split()[0] == "acquire_external_trig":
+            if exec_id.split()[0] == "acquire":
                 executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()
