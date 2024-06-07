@@ -35,7 +35,7 @@ run_type: hispec
 root: C:\INST_hlo
 servers:
   ORCH:
-    host: 127.0.0.1
+    host: hte-eche-11.htejcap.caltech.edu
     port: 8001
     group: orchestrator
     fast: async_orch2
@@ -46,7 +46,7 @@ servers:
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
     verbose: true
   # MOTOR:
-  #   host: hte-eche-10.htejcap.caltech.edu
+  #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8003
   #   group: action
   #   fast: galil_motion
@@ -85,17 +85,17 @@ servers:
   #       B: 76.7
   #     timeout: 600
   PSTAT:
-    host: 127.0.0.1
+    host: hte-eche-11.htejcap.caltech.edu
     port: 8004
     group: action
-    fast: gamry_server2
+    fast: gamry_server
     params:
       allow_no_sample: true
       dev_id: 0
       filterfreq_hz: 1000.0
       grounded: true
   IO:
-    host: 127.0.0.1
+    host: hte-eche-11.htejcap.caltech.edu
     port: 8005
     group: action
     fast: galil_io
@@ -121,7 +121,7 @@ servers:
         # doric_led3: 6
         # ir_emitter: 7
   # PAL:
-  #   host: hte-eche-10.htejcap.caltech.edu
+  #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8007
   #   group: action
   #   fast: pal_server
@@ -130,7 +130,7 @@ servers:
   #       custom:
   #         cell1_we: cell
   ANDOR:
-    host: 127.0.0.1
+    host: hte-eche-11.htejcap.caltech.edu
     port: 8011
     group: action
     fast: andor_server
@@ -138,14 +138,14 @@ servers:
       dev_id: 0
     verbose: true
   VIS:
-    host: 127.0.0.1
+    host: hte-eche-11.htejcap.caltech.edu
     port: 5001
     group: visualizer
     bokeh: action_visualizer
     params:
       doc_name: ECHE11 Visualizer
   # DB:
-  #   host: hte-eche-10.htejcap.caltech.edu
+  #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8010
   #   group: action
   #   fast: dbpack_server
@@ -156,7 +156,7 @@ servers:
   #     api_host: caltech-api.modelyst.com
   #     testing: false
   # ANA:
-  #   host: hte-eche-10.htejcap.caltech.edu
+  #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8014
   #   group: action
   #   fast: analysis_server
@@ -164,14 +164,14 @@ servers:
   #     env_file: k:/users/hte/.credentials/helao_data.env
   #     local_only: false
   # CAM:
-  #   host: hte-eche-10.htejcap.caltech.edu
+  #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8013
   #   group: action
   #   fast: cam_server
   #   params:
   #     axis_ip: 192.168.200.210
   # KMOTOR:
-  #   host: hte-eche-10.htejcap.caltech.edu
+  #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8015
   #   group: action
   #   fast: kinesis_server
