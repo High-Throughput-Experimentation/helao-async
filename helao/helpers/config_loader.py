@@ -14,7 +14,7 @@ CONFIG = None
 
 
 def config_loader(confArg, helao_root):
-    confPrefix = os.path.basename(confArg).replace(".py", "")
+    confPrefix = os.path.basename(confArg).replace(".py", "").replace(".yml", "")
     if confArg.endswith(".py") and os.path.exists(confArg):
         print_message({}, "launcher", f"Loading config from {confArg}", info=True)
         conf_spec = spec_from_file_location("configs", confArg)
