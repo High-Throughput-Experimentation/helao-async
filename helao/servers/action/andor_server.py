@@ -158,7 +158,7 @@ class AndorAcquire(Executor):
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
         resp = self.driver.get_data(
-            frames=self.frames_per_poll, external=self.external_trigger
+            frames=self.frames_per_poll, total_duration=self.duration, external=self.external_trigger, first_tick=self.first_tick
         )
         if not resp.data:
             LOGGER.info("No data received.")
@@ -167,12 +167,15 @@ class AndorAcquire(Executor):
             self.first_tick = resp.data["tick_time"][0]
         latest_tick = resp.data["tick_time"][-1]
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
-        status = (
-            HloStatus.active
-            if resp.status == DriverStatus.busy
-            and latest_tick - self.first_tick < self.duration
-            else HloStatus.finished
-        )
+        if resp.status == DriverStatus.ok:
+            status = HloStatus.finished
+        else:
+            status = (
+                HloStatus.active
+                if resp.status == DriverStatus.busy
+                and latest_tick - self.first_tick < self.duration
+                else HloStatus.finished
+            )
         return {"error": error, "status": status, "data": resp.data}
 
     async def _post_exec(self):
