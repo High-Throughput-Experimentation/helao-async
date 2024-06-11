@@ -8,7 +8,6 @@ dependencies:
     - aioshutil
     - plumbum
     - pyft232
-    - pylablib
     - sqlmodel
     - uuid7
     - git+https://github.com/spomjaksilp/pyMeCom
@@ -44,6 +43,7 @@ dependencies:
   - pybase64
   - pyfiglet
   - pyftdi
+  - pylablib
   - pymodbus
   - pyserial
   - python=3.11
