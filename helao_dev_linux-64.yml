@@ -8,7 +8,6 @@ dependencies:
     - aioshutil
     - plumbum
     - pyft232
-    - pylablib
     - sqlmodel
     - uuid7
     - git+https://github.com/spomjaksilp/pyMeCom
@@ -19,7 +18,7 @@ dependencies:
   - botocore
   - colorama
   - colorlog
-  - fastapi=0.110
+  - fastapi
   - filelock
   - git
   - httpx
@@ -37,11 +36,12 @@ dependencies:
   - psycopg2
   - pyaml
   - pybase64
-  - pydantic-core=2.16.3
-  - pydantic-settings=2.2.1
-  - pydantic=2.6.3
+  - pydantic-core
+  - pydantic-settings
+  - pydantic
   - pyfiglet
   - pyftdi
+  - pylablib
   - pymodbus
   - pyserial
   - python=3.11
