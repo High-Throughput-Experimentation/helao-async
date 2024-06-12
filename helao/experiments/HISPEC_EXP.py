@@ -295,7 +295,6 @@ def HISPEC_sub_CV_DOtrigger(
         {"do_item": "spec_trig", "on": False},
         start_condition=ActionStartCondition.wait_for_previous,
     )
-    apm.add()
 
     return apm.action_list  # returns complete action list to orch
 
