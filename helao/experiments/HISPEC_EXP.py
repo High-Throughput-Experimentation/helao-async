@@ -5,6 +5,7 @@ server_key must be a FastAPI action server defined in config
 
 __all__ = [
     "HISPEC_sub_CV_led",
+    "HISPEC_sub_CV_DOtrigger",
     # "HISPEC_sub_CA_led",
     # "HISPEC_sub_CP_led",
     # "HISPEC_sub_OCV_led",
@@ -188,6 +189,113 @@ def HISPEC_sub_CV_led(
             ProcessContrib.samples_out,
         ],
     )
+
+    return apm.action_list  # returns complete action list to orch
+
+
+def HISPEC_sub_CV_DOtrigger(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
+    Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
+    scanrate_voltsec: Optional[
+        float
+    ] = 0.02,  # scan rate in volts/second or amps/second.
+    samplerate_sec: float = 0.1,
+    cycles: int = 1,
+    gamry_i_range: str = "auto",
+    gamrychannelwait: int = 0,
+    gamrychannelsend: int = -1,
+    solution_ph: float = 0,
+    ref_vs_nhe: float = 0.21,
+    toggle1_source: str = "spec_trig",
+    toggle1_init_delay: float = 0.0,
+    toggle1_duty: float = 0.5,
+    toggle1_period: float = 2.0,
+    toggle1_time: float = -1,
+    # toggle2_source: str = "spec_trig",
+    # toggle2_init_delay: float = 0.0,
+    # toggle2_duty: float = 0.5,
+    # toggle2_period: float = 2.0,
+    # toggle2_time: float = -1,
+    comment: str = "",
+):
+    """last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    CV_duration_sec = abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
+    CV_duration_sec += abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
+    CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * cycles
+    CV_duration_sec += (
+        abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * 2.0 * (cycles - 1)
+    )
+
+    if int(round(toggle1_time)) == -1:
+        toggle1_time = CV_duration_sec
+    # if int(round(toggle2_time)) == -1:
+    #     toggle2_time = CV_duration_sec
+
+    # setup Andor camera external trigger acquisition
+    apm.add(
+        ANDOR_server,
+        "acquire",
+        {
+            "external_trigger": True,
+            "duration": CV_duration_sec * 1.05,
+            "frames_per_poll": 100,
+            "buffer_count": 10,
+            "exp_time": 0.0098,
+            "framerate": 98,
+            "timeout": 10000,
+        },
+    )
+
+    # apply potential
+    apm.add(
+        PSTAT_server,
+        "run_CV",
+        {
+            "Vinit__V": Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vapex1__V": Vapex1_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vapex2__V": Vapex2_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vfinal__V": Vfinal_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "ScanRate__V_s": scanrate_voltsec,
+            "AcqInterval__s": samplerate_sec,
+            "Cycles": cycles,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": gamry_i_range,
+        },
+        # from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.no_wait,
+        technique_name="CV",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    apm.add(ORCH_server, "wait", {"waittime": 5}, ActionStartCondition.no_wait)
+
+    apm.add(
+        IO_server,
+        "set_digital_out",
+        {"do_item": "spec_trig", "on": True},
+        start_condition=ActionStartCondition.wait_for_previous,
+    )
+    apm.add(ORCH_server, "wait", {"waittime": 5}, ActionStartCondition.no_wait)
+    apm.add(
+        IO_server,
+        "set_digital_out",
+        {"do_item": "spec_trig", "on": False},
+        start_condition=ActionStartCondition.wait_for_previous,
+    )
+    apm.add()
 
     return apm.action_list  # returns complete action list to orch
 
