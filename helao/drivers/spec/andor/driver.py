@@ -605,6 +605,7 @@ class AndorDriver(HelaoDriver):
     def get_data(self, frames: int, total_duration: float, external: bool = True, first_tick: float = None) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
+            status = DriverStatus.busy
             data_dict = {"tick_time": []}
             data_dict.update({f"ch_{i:04}": [] for i in range(self.wl_arr.size)})
             for _ in range(frames):
@@ -626,6 +627,7 @@ class AndorDriver(HelaoDriver):
                             break
                     status = DriverStatus.busy
                 except CameraException:
+                    status = DriverStatus.error
                     break
             response = DriverResponse(
                 response=DriverResponseType.success,
