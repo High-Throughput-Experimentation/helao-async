@@ -87,9 +87,7 @@ def parse_spechlo(hlod: dict):
             .to_numpy()
         )
     except Exception as err:
-        str_err = "".join(
-            traceback.format_exception(type(err), err, err.__traceback__)
-        )
+        str_err = "".join(traceback.format_exception(type(err), err, err.__traceback__))
         print(str_err)
         return False
     return wl, epochs, specarr
@@ -191,9 +189,7 @@ class EcheUvisInputs:
         self.baseline_spec_act = HelaoAction(
             bdf.query("action_name=='acquire_spec_extrig'")
             # bdf.query("action_name=='acquire_spec_adv'")
-            .sort_values("action_timestamp")
-            .iloc[0]
-            .action_uuid,
+            .sort_values("action_timestamp").iloc[0].action_uuid,
             query_df,
         )
         self.baseline_ocv_act = HelaoAction(
@@ -230,7 +226,9 @@ class EcheUvisInputs:
     def insitu_ca(self):
         return self.insitu_ca_act.hlo
 
-    def get_datamodels(self, global_sample_label: str, *args, **kwargs) -> List[AnalysisDataModel]:
+    def get_datamodels(
+        self, global_sample_label: str, *args, **kwargs
+    ) -> List[AnalysisDataModel]:
         action_keys = [k for k in vars(self).keys() if "spec_act" in k]
         inputs = []
         for ak in action_keys:
@@ -256,6 +254,7 @@ class EcheUvisInputs:
                 )
                 inputs.append(adm)
         return inputs
+
 
 class EcheUvisOutputs(BaseModel):
     wavelength: list
@@ -319,7 +318,7 @@ class EcheUvisAnalysis(BaseAnalysis):
         self.process_name = pdf.iloc[0].technique_name
         self.run_type = pdf.iloc[0].run_type
         self.technique_name = pdf.iloc[0].technique_name
-                
+
         # print("assembling inputs")
         self.inputs = EcheUvisInputs(
             process_uuid, self.plate_id, self.sample_no, query_df
@@ -363,7 +362,9 @@ class EcheUvisAnalysis(BaseAnalysis):
                 arr[
                     np.where(
                         (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
-                    )[0].min() :
+                    )[
+                        0
+                    ].min() :  # this gets the minimum index of the last t seconds
                 ]
                 for wl, ep, arr in rltups
             ]
@@ -371,29 +372,26 @@ class EcheUvisAnalysis(BaseAnalysis):
 
         # aggregate baseline insitu OCV spectra over final t seconds, omitting first n
         agg_baseline = aggfunc(
-            [
-                arr[
-                    np.where(
-                        (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
-                    )[0].min() :
-                ]
-                for wl, ep, arr in (btup,)
-            ][0],
+            btup[2][
+                np.where(
+                    (btup[1][ap["skip_first_n"] :] - btup[1].max())
+                    >= -ap["agg_last_secs"]
+                )[0].min() :
+            ],
             axis=0,
         )
 
         # aggregate insitu CA spectra over final t seconds, omitting first n
         agg_insitu = aggfunc(
-            [
-                arr[
-                    np.where(
-                        (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
-                    )[0].min() :
-                ]
-                for wl, ep, arr in (itup,)
-            ][0],
+            itup[2][
+                np.where(
+                    (itup[1][ap["skip_first_n"] :] - itup[1].max())
+                    >= -ap["agg_last_secs"]
+                )[0].min() :
+            ],
             axis=0,
         )
+
 
         inds = range(len(wl[wlindlo:wlindhi]))
         nbins = np.round(len(wl[wlindlo:wlindhi]) / ap["bin_width"]).astype(int)
@@ -427,6 +425,14 @@ class EcheUvisAnalysis(BaseAnalysis):
             ap["max_limit"],
         )
 
+        wls_insitu = itup[0][wlindlo:wlindhi]
+        eps_insitu = itup[1][ap["skip_first_n"] :]
+        arr_insitu = itup[2][ap["skip_first_n"] :, wlindlo:wlindhi]
+        refadj_arr_insitu = (arr_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+        omt_arr_insitu = 1 - refadj_arr_insitu
+        omt_refadj_baseline = 1 - refadj_baseline
+        arr_omt_ratio = omt_arr_insitu / omt_refadj_baseline
+        
         # create output model
         self.outputs = EcheUvisOutputs(
             wavelength=list(wl),
@@ -452,6 +458,10 @@ class EcheUvisAnalysis(BaseAnalysis):
                 np.abs(np.log10((1 - rscl_insitu) / (1 - rscl_baseline)))
             ),
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
+            noagg_wavelength=wls_insitu,
+            noagg_epoch=eps_insitu,
+            noagg_omt_baseline=omt_refadj_baseline,
+            noagg_omt_insitu=omt_arr_insitu,
+            noagg_omt_ratio=arr_omt_ratio,
         )
         return True
-
