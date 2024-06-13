@@ -979,9 +979,9 @@ class BokehOperator:
             liquid_list, solid_list, gas_list = unpack_samples_helper(
                 samples=act.samples_in
             )
-            self.vis.print_message(
-                f"solids_in: {[s.get_global_label() for s in solid_list]}", sample=True
-            )
+            # self.vis.print_message(
+            #     f"solids_in: {[s.get_global_label() for s in solid_list]}", sample=True
+            # )
             self.active_action_lists["action_name"].append(
                 actdict.get("action_name", None)
             )
