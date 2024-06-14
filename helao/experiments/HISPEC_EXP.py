@@ -215,7 +215,7 @@ def HISPEC_sub_CV_DOtrigger(
     toggle1_duty: float = 0.5,
     toggle1_period: float = 2.0,
     toggle1_time: float = -1,
-    # toggle2_source: str = "spec_trig",
+    toggle2_source: str = "doric_wled",
     # toggle2_init_delay: float = 0.0,
     # toggle2_duty: float = 0.5,
     # toggle2_period: float = 2.0,
@@ -288,12 +288,12 @@ def HISPEC_sub_CV_DOtrigger(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": 1,  # rising edge
-            "out_name": [toggle1_source],
+            "out_name": [toggle1_source, toggle2_source],
             "out_name_gamry": None,
-            "toggle_init_delay": [toggle1_init_delay],
-            "toggle_duty": [toggle1_duty],
-            "toggle_period": [toggle1_period],
-            "toggle_duration": [toggle1_time],
+            "toggle_init_delay": [toggle1_init_delay, toggle1_init_delay],
+            "toggle_duty": [toggle1_duty, toggle1_duty],
+            "toggle_period": [toggle1_period, toggle1_period],
+            "toggle_duration": [toggle1_time, toggle1_time],
         },
         start_condition=ActionStartCondition.wait_for_previous,  # orch is waiting for all action_dq to finish
         process_finish=False,
@@ -315,8 +315,6 @@ def HISPEC_sub_CV_DOtrigger(
         {"do_item": "ir_emitter", "on": False},
         start_condition=ActionStartCondition.wait_for_previous,
     )
-
-    apm.add(IO_server, "stop_digital_cycle", {}, start_condition=ActionStartCondition.wait_for_all)
 
     return apm.action_list  # returns complete action list to orch
 
