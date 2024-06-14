@@ -294,7 +294,6 @@ def HISPEC_sub_CV_DOtrigger(
             "toggle_duty": [toggle1_duty, toggle1_duty],
             "toggle_period": [toggle1_period, toggle1_period],
             "toggle_duration": [toggle1_time, toggle1_time],
-            "stop_via_ttl": False
         },
         start_condition=ActionStartCondition.wait_for_previous,  # orch is waiting for all action_dq to finish
         process_finish=False,
@@ -309,7 +308,7 @@ def HISPEC_sub_CV_DOtrigger(
         {"do_item": "ir_emitter", "on": True},
         start_condition=ActionStartCondition.wait_for_previous,
     )
-    # apm.add(ORCH_server, "wait", {"waittime": toggle1_time}, ActionStartCondition.wait_for_previous)
+    apm.add(ORCH_server, "wait", {"waittime": toggle1_time}, ActionStartCondition.wait_for_previous)
     apm.add(
         IO_server,
         "set_digital_out",
