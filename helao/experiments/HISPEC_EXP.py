@@ -244,7 +244,7 @@ def HISPEC_sub_CV_DOtrigger(
         "acquire",
         {
             "external_trigger": True,
-            "duration": CV_duration_sec * 1.05,
+            "duration": CV_duration_sec + 1,
             "frames_per_poll": 100,
             "buffer_count": 10,
             "exp_time": 0.0098,
