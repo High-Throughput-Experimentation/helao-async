@@ -308,8 +308,8 @@ def HISPEC_sub_CV_DOtrigger(
         {"do_item": "ir_emitter", "on": True},
         start_condition=ActionStartCondition.wait_for_previous,
     )
-    apm.add(ORCH_server, "wait", {"waittime": toggle1_time}, ActionStartCondition.wait_for_previous)
-    apm.add(ORCH_server, "wait", {"waittime": 5}, ActionStartCondition.wait_for_previous)
+    apm.add(ORCH_server, "wait", {"waittime": toggle1_time - 5}, ActionStartCondition.wait_for_previous)
+    apm.add(ORCH_server, "wait", {"waittime": 5}, ActionStartCondition.wait_for_all)
     apm.add(
         IO_server,
         "set_digital_out",
