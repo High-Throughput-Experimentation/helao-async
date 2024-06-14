@@ -301,7 +301,7 @@ def HISPEC_sub_CV_DOtrigger(
         process_contrib=[ProcessContrib.files, ProcessContrib.samples_out],
     )
 
-    apm.add(ORCH_server, "wait", {"waittime": 5}, ActionStartCondition.no_wait)
+    # apm.add(ORCH_server, "wait", {"waittime": 5}, ActionStartCondition.wait_for_previous)
 
     apm.add(
         IO_server,
