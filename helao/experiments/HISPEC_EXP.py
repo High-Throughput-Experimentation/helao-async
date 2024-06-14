@@ -317,7 +317,7 @@ def HISPEC_sub_CV_DOtrigger(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    # apm.add(IO_server, "stop_digital_cycle", {}, start_condition=ActionStartCondition.wait_for_all)
+    apm.add(IO_server, "stop_digital_cycle", {}, start_condition=ActionStartCondition.wait_for_all)
 
     return apm.action_list  # returns complete action list to orch
 
