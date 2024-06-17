@@ -17,6 +17,14 @@ TTL_OUTPUTS = {
 }
 
 
+TTL_OFF = {
+    0: (0, 1),
+    1: (0, 2),
+    2: (0, 4),
+    3: (0, 8),
+}
+
+
 @dataclass
 class GamryPstat:
     device: str

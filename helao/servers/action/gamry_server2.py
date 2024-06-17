@@ -151,7 +151,7 @@ class GamryExec(Executor):
         return {"error": error, "status": status, "data": resp.data}
 
     async def _post_exec(self):
-        resp = self.driver.cleanup()
+        resp = self.driver.cleanup(self.ttl_params)
         self.driver.disconnect()
 
         # parse calculate outputs from data buffer:
