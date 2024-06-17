@@ -32,7 +32,7 @@ from helao.drivers.helao_driver import (
     DriverResponseType,
 )
 
-from .device import GamryPstat, GAMRY_DEVICES, TTL_OUTPUTS
+from .device import GamryPstat, GAMRY_DEVICES, TTL_OUTPUTS, TTL_OFF
 from .sink import GamryDtaqSink, DummySink
 from .technique import GamryTechnique
 from .range import get_range, RANGES
@@ -387,17 +387,15 @@ class GamryDriver(HelaoDriver):
             )
         return response
 
-    def cleanup(self):
+    def cleanup(self, ttl_params: dict = {}):
         """Release state objects but don't close pstat."""
         try:
             if self.pstat is not None:
+                # disable TTL output
+                ttl_send = ttl_params.get("TTLsend", -1)
+                if ttl_send > -1:
+                    self.pstat.SetDigitalOut(*TTL_OFF[ttl_send])
                 self.pstat.SetCell(self.GamryCOM.CellOff)
-            self.events = None
-            self.dtaq = None
-            self.dtaqsink = DUMMY_SINK
-            self.technique = None
-            self.signal = None
-            self.counter = 0
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="measurement started",
@@ -409,6 +407,13 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
             )
+        finally:
+            self.events = None
+            self.dtaq = None
+            self.dtaqsink = DUMMY_SINK
+            self.technique = None
+            self.signal = None
+            self.counter = 0
         return response
 
     def disconnect(self) -> DriverResponse:
@@ -417,9 +422,6 @@ class GamryDriver(HelaoDriver):
             if self.pstat is not None:
                 self.pstat.SetCell(self.GamryCOM.CellOff)
                 self.pstat.Close()
-                self.pstat = None
-                comtypes.CoUninitialize()
-                self.connection_raised = False
             # self.ready = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
@@ -429,6 +431,10 @@ class GamryDriver(HelaoDriver):
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
+        finally:
+            self.pstat = None
+            comtypes.CoUninitialize()
+            self.connection_raised = False
         return response
 
     def reset(self) -> DriverResponse:
