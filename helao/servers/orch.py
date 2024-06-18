@@ -937,8 +937,17 @@ class Orch(Base):
                 # check driver states
                 na_drivers = [k for k, (_, v) in self.status_summary.items() if v == "unknown"]
                 if na_drivers:
-                    await self.estop_loop(f"unknown driver states: {', '.join(na_drivers)}")
-                elif (
+                    na_driver_retries = 0
+                    while na_driver_retries < 5 and na_drivers:
+                        self.print_message(f"unknown driver states: {', '.join(na_drivers)}, retrying in 5 seconds")
+                        await asyncio.sleep(5)
+                        na_drivers = [k for k, (_, v) in self.status_summary.items() if v == "unknown"]
+                        na_driver_retries += 1
+                    if na_drivers:
+                        self.current_stop_message = f"unknown driver states: {', '.join(na_drivers)}"
+                        await self.stop()
+                
+                if (
                     self.globalstatusmodel.loop_state == LoopStatus.estopped
                     or self.globalstatusmodel.loop_intent == LoopIntent.estop
                 ):
