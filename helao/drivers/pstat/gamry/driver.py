@@ -68,6 +68,9 @@ class GamryDriver(HelaoDriver):
     def connect(self) -> DriverResponse:
         """Open connection to resource."""
         try:
+            if self.connection_raised:
+                time.sleep(1)
+                raise ConnectionError("Connection already raised. In use by another script.")
             self.connection_raised = True
             comtypes.CoInitialize()
             self.GamryCOM = client.GetModule(
@@ -91,7 +94,7 @@ class GamryDriver(HelaoDriver):
         except Exception as exc:
             if "In use by another script" in exc.__str__():
                 response = DriverResponse(
-                    response=DriverResponseType.success, status=DriverStatus.busy
+                    response=DriverResponseType.failed, status=DriverStatus.busy
                 )
             else:
                 LOGGER.error("get_status connection", exc_info=True)
