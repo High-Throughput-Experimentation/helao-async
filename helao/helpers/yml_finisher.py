@@ -25,7 +25,7 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
         print_message({}, "yml_finisher", msg, info=True)
 
     if "host" not in db_config or "port" not in db_config:
-        print_msg(f"DB server not defined in config, {yml_path} will not sync.")
+        # print_msg(f"DB server not defined in config, {yml_path} will not sync.")
         return False
     else:
         dbp_port = db_config["port"]
