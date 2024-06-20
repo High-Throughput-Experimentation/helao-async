@@ -1,3 +1,5 @@
+# TODO: for NH3 synthesis experiment, add option run PAL commands locally instead of ssh
+
 __all__ = ["Spacingmethod", "PALtools", "PALposition", "PAL", "GCsampletype"]
 
 from helao.helpers import logging
