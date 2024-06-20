@@ -2,7 +2,7 @@
     CB {p_output};
     AI {p_trigger_on};
     XQ #tgl{subthread},{subthread};
-    AI {p_trigger_on};
+    AI 8;
     HX;
     CB {p_output};
 EN;
