@@ -5,25 +5,18 @@ exposed methods are intended to be blocking. Async should be handled in the serv
 All public methods must return a DriverResponse.
 
 """
+from typing import Optional
 
 # save a default log file system temp
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="gamry_driver_standalone")
+    LOGGER = logging.make_logger(logger_name="biologic_driver_standalone")
 else:
     LOGGER = logging.LOGGER
 
-import comtypes
-import comtypes.client as client
-import psutil
-import time
-from enum import Enum
-from copy import copy
-from _ctypes import COMError
-
-# import asyncio
-import numpy as np
+import easy_biologic as ebl
+import easy_biologic.base_programs as blp
 
 from helao.drivers.helao_driver import (
     HelaoDriver,
@@ -32,62 +25,31 @@ from helao.drivers.helao_driver import (
     DriverResponseType,
 )
 
-from .device import GamryPstat, GAMRY_DEVICES, TTL_OUTPUTS, TTL_OFF
-from .sink import GamryDtaqSink, DummySink
-from .technique import GamryTechnique
-from .range import get_range, RANGES
 
-DUMMY_SINK = DummySink()
-
-
-class GamryDriver(HelaoDriver):
-    dtaqsink: GamryDtaqSink
+class BiologicDriver(HelaoDriver):
     device_name: str
-    model: GamryPstat
+    connection_raised: bool
 
     def __init__(self, config: dict = {}):
         super().__init__(config=config)
         #
+        self.address = config.get(key="address", default="192.168.200.240")
+        self.num_channels = config.get(key="num_channels", default=12)
         self.device_name = "unknown"
-        self.dtaq = None
-        self.dtaqsink = DUMMY_SINK
-        self.events = None
-        self.technique = None
-        self.pstat = None
-        self.signal = None
-        self.ready = True
-        self.counter = 0
-        # get params from config or use defaults
-        self.device_id = self.config.get("dev_id", None)
-        self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
-        self.grounded = int(self.config.get("grounded", True))
         self.connection_raised = False
-        LOGGER.info(f"using device_id {self.device_id} from config")
-        # self.connect()
+        self.pstat = ebl.BiologicDevice(self.address)
+        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open connection to resource."""
         try:
             if self.connection_raised:
-                time.sleep(1)
                 raise ConnectionError("Connection already raised. In use by another script.")
+            self.pstat.connect()
             self.connection_raised = True
-            comtypes.CoInitialize()
-            self.GamryCOM = client.GetModule(
-                ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
-            )
-            devices = client.CreateObject("GamryCOM.GamryDeviceList")
-            self.device_name = devices.EnumSections()[self.device_id]
-            self.model = GAMRY_DEVICES.get(self.device_name.split("-")[0], GAMRY_DEVICES["DEFAULT"])
-            self.pstat = client.CreateObject(self.model.device)
-            self.pstat.Init(self.device_name)
-            self.pstat.Open()
-            self.pstat.SetCell(self.GamryCOM.CellOff)
             LOGGER.debug(
-                f"connected to {self.device_name} on device_id {self.device_id}"
+                f"connected to {self.device_name} on device_id {self.address}"
             )
-
-            # self.ready = True
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -101,44 +63,26 @@ class GamryDriver(HelaoDriver):
                 response = DriverResponse(
                     response=DriverResponseType.failed, status=DriverStatus.error
                 )
-
         return response
 
-    def get_status(self, retries: int = 5) -> DriverResponse:
+    def get_status(self, channel: Optional[int] = None) -> DriverResponse:
         """Return current driver status."""
-        # if self.pstat is not None:
-        if self.connection_raised:
+        try:
+            if channel is None:
+                infos = [self.pstat.channel_info(i) for i in range(self.num_channels)]
+                states = [x.State for x in infos]
+                status = DriverStatus.busy if any([x>0 for x in states]) else DriverStatus.ok
+            else:
+                info = self.pstat.channel_info(channel)
+                status = DriverStatus.busy if info.State > 0 else DriverStatus.ok
             response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.busy
+                response=DriverResponseType.success, status=status
             )
-        else:
-            try:
-                connect_attempts = 0
-                connect_error = True
-                while connect_error and connect_attempts < retries:
-                    connect_resp = self.connect()
-                    if connect_resp.status in [DriverStatus.ok, DriverStatus.busy]:
-                        connect_error = False
-                    time.sleep(0.5)
-                    connect_attempts += 1
-                if connect_error:
-                    raise Exception(f"Failed to connect after {retries} attempts.")
-                elif connect_resp.status == DriverStatus.busy:
-                    response = DriverResponse(
-                        response=DriverResponseType.success, status=DriverStatus.busy
-                    )
-                else:
-                    state = self.pstat.State()
-                    state = dict([x.split("\t") for x in state.split("\r\n") if x])
-                    response = DriverResponse(
-                        response=DriverResponseType.success, data=state, status=DriverStatus.ok
-                    )
-                    self.disconnect()
-            except Exception:
-                LOGGER.error("get_status failed", exc_info=True)
-                response = DriverResponse(
-                    response=DriverResponseType.failed, status=DriverStatus.error
-                )
+        except Exception:
+            LOGGER.error("get_status failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
         return response
 
     def setup(
