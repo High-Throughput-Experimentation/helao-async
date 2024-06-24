@@ -183,3 +183,11 @@ servers:
           vel_scale: 65970697.6  # device to mm/s
           acc_scale: 13518.2  # device to mm/s2
           move_limit_mm: 3.0
+  # BIOLOGIC:
+  #   host: hte-eche-04.htejcap.caltech.edu
+  #   port: 8016
+  #   group: action
+  #   fast: biologic_server
+  #   params:
+  #     xlx_path: C:\Program Files (x86)\EC-Lab\vmp_ii_0437_a6.xlx
+  #     bin_path:
