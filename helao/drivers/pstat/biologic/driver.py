@@ -1,10 +1,17 @@
-"""Gamry potentiostat driver using HelaoDriver abstract base class
+""" HelaoDriver wrapper around easy-biologic package for Biologic potentiostats
 
-This Gamry driver has zero dependencies on action server base object, and all
-exposed methods are intended to be blocking. Async should be handled in the server.
-All public methods must return a DriverResponse.
+https://github.com/bicarlsen/easy-biologic
+
+Notes:
+- import easy_biologic as ebl
+- import easy_biologic.base_programs as blp
+- establish connection using `ebl.BiologicDevice('ip_address')`
+- create technique using blp.OCV, blp.CP, etc. with set channels
+- run technique using retrieve_data=False
+- manually call _retrieve_data_segment to get single channel data
 
 """
+
 from typing import Optional
 
 # save a default log file system temp
@@ -16,7 +23,6 @@ else:
     LOGGER = logging.LOGGER
 
 import easy_biologic as ebl
-import easy_biologic.base_programs as blp
 
 from helao.drivers.helao_driver import (
     HelaoDriver,
@@ -24,6 +30,8 @@ from helao.drivers.helao_driver import (
     DriverStatus,
     DriverResponseType,
 )
+
+from .technique import BiologicTechnique
 
 
 class BiologicDriver(HelaoDriver):
@@ -44,12 +52,12 @@ class BiologicDriver(HelaoDriver):
         """Open connection to resource."""
         try:
             if self.connection_raised:
-                raise ConnectionError("Connection already raised. In use by another script.")
+                raise ConnectionError(
+                    "Connection already raised. In use by another script."
+                )
             self.pstat.connect()
             self.connection_raised = True
-            LOGGER.debug(
-                f"connected to {self.device_name} on device_id {self.address}"
-            )
+            LOGGER.debug(f"connected to {self.device_name} on device_id {self.address}")
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -71,7 +79,11 @@ class BiologicDriver(HelaoDriver):
             if channel is None:
                 infos = [self.pstat.channel_info(i) for i in range(self.num_channels)]
                 states = [x.State for x in infos]
-                status = DriverStatus.busy if any([x>0 for x in states]) else DriverStatus.ok
+                status = (
+                    DriverStatus.busy
+                    if any([x > 0 for x in states])
+                    else DriverStatus.ok
+                )
             else:
                 info = self.pstat.channel_info(channel)
                 status = DriverStatus.busy if info.State > 0 else DriverStatus.ok
@@ -87,157 +99,24 @@ class BiologicDriver(HelaoDriver):
 
     def setup(
         self,
-        technique: GamryTechnique,
-        signal_params: dict = {},
-        dtaq_params: dict = {},
+        technique: BiologicTechnique,
         action_params: dict = {},  # for mapping action keys to signal keys
-        ierange: Enum = "auto",
+        channel: int = 0,
     ) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
         try:
-            # check for ongoing measurement via dtaqsink
-            if not isinstance(self.dtaqsink, DummySink):
-                raise TypeError(
-                    "dtaqsink is not of type DummySink. Another technique may be running."
-                )
-
-            # apply initial configuration
-            # self.pstat.SetCell(self.GamryCOM.CellOff)
-            self.pstat.SetPosFeedEnable(False)
-            self.pstat.SetIEStability(self.GamryCOM.StabilityFast)
-            self.pstat.SetSenseSpeedMode(self.model.set_sensemode)
-            self.pstat.SetIConvention(self.GamryCOM.Anodic)
-            self.pstat.SetGround(self.config.get("grounded", True))
-
-            # maximum anticipated voltage (in Volts).
-            ichrangeval = self.pstat.TestIchRange(3.0)
-            self.pstat.SetIchRange(ichrangeval)
-            self.pstat.SetIchRangeMode(True)  # auto-set
-            self.pstat.SetIchOffsetEnable(False)
-
-            # call TestIchFilter before setting SetIchFilter
-            ichfilterval = self.pstat.TestIchFilter(
-                self.config.get("filterfreq_hz", 1000.0)
-            )
-            self.pstat.SetIchFilter(ichfilterval)
-
-            # voltage channel range.
-            vchrangeval = self.pstat.TestVchRange(12.0)
-            self.pstat.SetVchRange(vchrangeval)
-            self.pstat.SetVchRangeMode(True)
-            self.pstat.SetVchOffsetEnable(False)
-
-            # call TestVchFilter before setting SetVchFilter
-            vchfilterval = self.pstat.TestVchFilter(
-                self.config.get("filterfreq_hz", 1000.0)
-            )
-            self.pstat.SetVchFilter(vchfilterval)
-
-            # set the range of the Auxiliary A/D input.
-            self.pstat.SetAchRange(3.0)
-
-            # set the I/E Range of the potentiostat.
-            self.pstat.SetAnalogOut(0.0)
-            self.pstat.SetIruptMode(self.GamryCOM.IruptOff)
-
-            # set device-specific ranges
-            self.technique = technique
-            self.pstat.SetIERange(0.03)  # default range
-            range_enum = get_range(ierange, self.model.ierange)
-            if range_enum == self.model.ierange.auto:
-                self.pstat.SetIERangeMode(self.model.set_rangemode)
-            else:
-                self.pstat.SetIERange(RANGES[range_enum.name])
-
-            # override device-specific ranges with technique ranges if given
-            self.pstat.SetCtrlMode(getattr(self.GamryCOM, technique.signal.mode.value))
-            if technique.set_vchrangemode is not None:
-                self.pstat.SetVchRangeMode(technique.set_vchrangemode)
-            if technique.vchrange_keys is not None:
-                setpointv = np.max(
-                    [np.abs(signal_params[x]) for x in technique.vchrange_keys]
-                )
-                vchrangeval = self.pstat.TestVchRange(setpointv * 1.1)
-                self.pstat.SetVchRange(vchrangeval)
-            if technique.set_ierangemode is not None:
-                self.pstat.SetIERangeMode(technique.set_ierangemode)
-            if technique.ierange_keys is not None:
-                setpointie = np.max(
-                    [np.abs(signal_params[x]) for x in technique.ierange_keys]
-                )
-                ierangeval = self.pstat.TestIERange(setpointie)
-                self.pstat.SetIERange(ierangeval)
-
-            # initialize dtaq
-            self.dtaq = client.CreateObject(technique.dtaq.name)
-            dtaq_init_args = (signal_params[x] for x in technique.signal.init_keys)
-            if technique.dtaq.dtaq_type is not None:
-                self.dtaq.Init(
-                    self.pstat,
-                    getattr(self.GamryCOM, technique.dtaq.dtaq_type.value),
-                    *dtaq_init_args,
-                )
-            else:
-                self.dtaq.Init(self.pstat, *dtaq_init_args)
-            if technique.set_decimation is not None:
-                self.dtaq.SetDecimation(technique.set_decimation)
-
-            # apply dtaq limits
-            for dtaq_key, val in dtaq_params.items():
-                if val is None:
-                    continue
-                elif dtaq_key in technique.dtaq.int_param_keys:
-                    getattr(self.dtaq, dtaq_key)(val)
-                elif dtaq_key in technique.dtaq.bool_param_keys:
-                    getattr(self.dtaq, dtaq_key)(True, val)
-
-            # create event sink
-            self.dtaqsink = GamryDtaqSink(self.dtaq)
-
-            # map action params to signal params (e.g. OCV and CV cases)
-            mapped_signal_params = copy(signal_params)
-            for dest_key, val in technique.signal.map_keys.items():
-                if dest_key in signal_params:
-                    continue
-                elif isinstance(val, str) and val in action_params:
-                    mapped_signal_params[dest_key] = action_params[val]
-                elif (
-                    isinstance(val, float) or isinstance(val, int)
-                ) and dest_key not in signal_params:
-                    mapped_signal_params[dest_key] = val
-
-            # check for missing parameter keys
-            missing_keys = [
-                key
-                for key in technique.signal.param_keys + technique.signal.init_keys
-                if key not in mapped_signal_params
-            ]
-            if missing_keys:
-                raise KeyError(
-                    f"missing parameter keys {missing_keys} required by {technique.name}"
-                )
-            signal_paramlist = (
-                [self.pstat]
-                + [mapped_signal_params[key] for key in technique.signal.param_keys]
-                + [getattr(self.GamryCOM, self.technique.signal.mode.value)]
-            )
-            LOGGER.debug(signal_paramlist)
-            self.signal = client.CreateObject(technique.signal.name)
-            self.signal.Init(*signal_paramlist)
-            self.pstat.SetSignal(self.signal)
-            time.sleep(0.01)
+            # TODO: validate channel in use
+            parmap = technique.parameter_map
+            mapped_params = {
+                parmap[k]: v for k, v in action_params.items() if k in action_params
+            }
+            program = technique.easy_class(self.pstat, params=mapped_params)
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="setup complete",
                 status=DriverStatus.ok,
             )
-        except comtypes.COMError:
-            LOGGER.error("setup failed on COMError", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-            self.reset()
-            self.cleanup()
+            response.program = program
         except Exception:
             LOGGER.error("setup failed", exc_info=True)
             response = DriverResponse(
