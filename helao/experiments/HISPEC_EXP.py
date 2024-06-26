@@ -150,7 +150,7 @@ def HISPEC_sub_CV_led(
         "set_digital_cycle",
         {
             "trigger_name": "gamry_ttl0",
-            "triggertype": 1,  # rising edge
+            "triggertype": 0,  # rising edge
             "out_name": ["spec_trig", toggle1_source],
             "out_name_gamry": None,
             "toggle_init_delay": [toggle1_init_delay, toggle1_init_delay],
