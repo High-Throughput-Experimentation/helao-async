@@ -151,12 +151,12 @@ def HISPEC_sub_CV_led(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": 1,  # rising edge
-            "out_name": [toggle1_source],
+            "out_name": ["spec_trig", toggle1_source],
             "out_name_gamry": None,
-            "toggle_init_delay": [toggle1_init_delay],
-            "toggle_duty": [toggle1_duty],
-            "toggle_period": [toggle1_period],
-            "toggle_duration": [toggle1_time],
+            "toggle_init_delay": [toggle1_init_delay, toggle1_init_delay],
+            "toggle_duty": [toggle1_duty, toggle1_duty],
+            "toggle_period": [toggle1_period, toggle1_period],
+            "toggle_duration": [toggle1_time, toggle1_time],
         },
         start_condition=ActionStartCondition.wait_for_previous,  # orch is waiting for all action_dq to finish
         process_finish=False,
