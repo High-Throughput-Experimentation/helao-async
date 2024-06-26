@@ -12,6 +12,7 @@ Notes:
 
 """
 
+import time
 from typing import Optional
 
 # save a default log file system temp
@@ -46,6 +47,7 @@ class BiologicDriver(HelaoDriver):
         self.device_name = "unknown"
         self.connection_raised = False
         self.pstat = ebl.BiologicDevice(self.address)
+        self.channels = {i: None for i in range(self.num_channels)}
         self.connect()
 
     def connect(self) -> DriverResponse:
@@ -105,12 +107,14 @@ class BiologicDriver(HelaoDriver):
     ) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
         try:
-            # TODO: validate channel in use
+            # TODO: validate channel in use, self.channels[channel] must be None
             parmap = technique.parameter_map
             mapped_params = {
                 parmap[k]: v for k, v in action_params.items() if k in action_params
             }
-            program = technique.easy_class(self.pstat, params=mapped_params)
+            program = technique.easy_class(
+                device=self.pstat, params=mapped_params, channels=[channel]
+            )
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="setup complete",
@@ -128,14 +132,6 @@ class BiologicDriver(HelaoDriver):
     def measure(self, ttl_params: dict = {}) -> DriverResponse:
         """Apply signal and begin data acquisition."""
         try:
-            # emit TTL output
-            ttl_send = ttl_params.get("TTLsend", -1)
-            if ttl_send > -1:
-                self.pstat.SetDigitalOut(*TTL_OUTPUTS[ttl_send])
-            # energize cell
-            self.pstat.SetCell(getattr(self.GamryCOM, self.technique.on_method.value))
-            # run data acquisition
-            self.events = client.GetEvents(self.dtaq, self.dtaqsink)
             start_time = time.time()
             self.dtaq.Run(True)
             response = DriverResponse(
@@ -144,14 +140,6 @@ class BiologicDriver(HelaoDriver):
                 data={"start_time": start_time},
                 status=DriverStatus.busy,
             )
-        except comtypes.COMError:
-            LOGGER.error("measure failed on COMError", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed,
-                status=DriverStatus.error,
-            )
-            self.reset()
-            self.cleanup()
         except Exception:
             LOGGER.error("measure failed", exc_info=True)
             response = DriverResponse(
@@ -164,33 +152,7 @@ class BiologicDriver(HelaoDriver):
     def get_data(self, pump_rate: float) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
-            client.PumpEvents(pump_rate)
-            total_points = len(self.dtaqsink.acquired_points)
-            if self.counter < total_points:
-                new_data = self.dtaqsink.acquired_points[self.counter : total_points]
-                data_dict = {
-                    k: v
-                    for k, v in zip(
-                        self.technique.dtaq.output_keys, np.matrix(new_data).T.tolist()
-                    )
-                }
-            else:
-                data_dict = {}
-
-            sink_state = self.dtaqsink.status
-            if sink_state == "measuring" or self.counter < total_points:
-                status = DriverStatus.busy
-            elif sink_state == "done":
-                status = DriverStatus.ok
-            else:
-                status = DriverStatus.ok
-            self.counter = total_points
-            response = DriverResponse(
-                response=DriverResponseType.success,
-                message=sink_state,
-                data=data_dict,
-                status=status,
-            )
+            pass
         except Exception:
             LOGGER.error("get_data failed", exc_info=True)
             response = DriverResponse(
@@ -216,17 +178,7 @@ class BiologicDriver(HelaoDriver):
     def cleanup(self, ttl_params: dict = {}):
         """Release state objects but don't close pstat."""
         try:
-            if self.pstat is not None:
-                # disable TTL output
-                ttl_send = ttl_params.get("TTLsend", -1)
-                if ttl_send > -1:
-                    self.pstat.SetDigitalOut(*TTL_OFF[ttl_send])
-                self.pstat.SetCell(self.GamryCOM.CellOff)
-            response = DriverResponse(
-                response=DriverResponseType.success,
-                message="measurement started",
-                status=DriverStatus.ok,
-            )
+            pass
         except Exception:
             LOGGER.error("cleanup failed", exc_info=True)
             response = DriverResponse(
@@ -234,12 +186,7 @@ class BiologicDriver(HelaoDriver):
                 status=DriverStatus.error,
             )
         finally:
-            self.events = None
-            self.dtaq = None
-            self.dtaqsink = DUMMY_SINK
-            self.technique = None
-            self.signal = None
-            self.counter = 0
+            pass
         return response
 
     def disconnect(self) -> DriverResponse:
