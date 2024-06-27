@@ -23,6 +23,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
+import pandas as pd
 import easy_biologic as ebl
 
 from helao.drivers.helao_driver import (
@@ -32,7 +33,7 @@ from helao.drivers.helao_driver import (
     DriverResponseType,
 )
 
-from .technique import BiologicTechnique
+from .technique import BIOTECHS
 
 
 class BiologicDriver(HelaoDriver):
@@ -57,8 +58,8 @@ class BiologicDriver(HelaoDriver):
                 raise ConnectionError(
                     "Connection already raised. In use by another script."
                 )
-            self.pstat.connect()
             self.connection_raised = True
+            self.pstat.connect()
             LOGGER.debug(f"connected to {self.device_name} on device_id {self.address}")
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
@@ -86,11 +87,15 @@ class BiologicDriver(HelaoDriver):
                     if any([x > 0 for x in states])
                     else DriverStatus.ok
                 )
+            elif channel not in self.channels:
+                raise ValueError(f"Channel {channel} does not exist.")
             else:
                 info = self.pstat.channel_info(channel)
                 status = DriverStatus.busy if info.State > 0 else DriverStatus.ok
             response = DriverResponse(
-                response=DriverResponseType.success, status=status
+                response=DriverResponseType.success,
+                status=status,
+                data={i: s for i, s in enumerate(states)},
             )
         except Exception:
             LOGGER.error("get_status failed", exc_info=True)
@@ -101,26 +106,30 @@ class BiologicDriver(HelaoDriver):
 
     def setup(
         self,
-        technique: BiologicTechnique,
+        technique_name: str,
         action_params: dict = {},  # for mapping action keys to signal keys
         channel: int = 0,
     ) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
         try:
-            # TODO: validate channel in use, self.channels[channel] must be None
+            if channel not in self.channels:
+                raise ValueError(f"Channel {channel} does not exist.")
+            if self.channels[channel] is not None:
+                raise ValueError(f"Channel {channel} is in use.")
+            technique = BIOTECHS[technique_name]
             parmap = technique.parameter_map
             mapped_params = {
                 parmap[k]: v for k, v in action_params.items() if k in action_params
             }
-            program = technique.easy_class(
+            self.channels[channel] = technique.easy_class(
                 device=self.pstat, params=mapped_params, channels=[channel]
             )
+            self.channels[channel].field_remap = technique.field_map
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="setup complete",
                 status=DriverStatus.ok,
             )
-            response.program = program
         except Exception:
             LOGGER.error("setup failed", exc_info=True)
             response = DriverResponse(
@@ -129,11 +138,22 @@ class BiologicDriver(HelaoDriver):
             self.cleanup()
         return response
 
-    def measure(self, ttl_params: dict = {}) -> DriverResponse:
+    def start_channel(self, channel: int = 0) -> DriverResponse:
         """Apply signal and begin data acquisition."""
         try:
+            if channel not in self.channels:
+                raise ValueError(f"Channel {channel} does not exist.")
+            if self.channels[channel] is None:
+                raise ValueError(f"Channel {channel} has not been set up.")
+            channel_state = self.get_status(channel=channel).status
+            if channel_state == DriverStatus.busy:
+                raise ValueError(f"Channel {channel} is busy.")
+            if channel_state == DriverStatus.error:
+                raise ValueError(f"Channel {channel} encountered error.")
+
             start_time = time.time()
-            self.dtaq.Run(True)
+            self.channels[channel].run(retrieve_data=False)
+
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="measurement started",
@@ -141,7 +161,7 @@ class BiologicDriver(HelaoDriver):
                 status=DriverStatus.busy,
             )
         except Exception:
-            LOGGER.error("measure failed", exc_info=True)
+            LOGGER.error("start_channel failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
@@ -149,10 +169,22 @@ class BiologicDriver(HelaoDriver):
             self.cleanup()
         return response
 
-    def get_data(self, pump_rate: float) -> DriverResponse:
+    def get_data(self, channel: int = 0) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
-            pass
+            if channel not in self.channels:
+                raise ValueError(f"Channel {channel} does not exist.")
+            if self.channels[channel] is None:
+                raise ValueError(f"Channel {channel} has not been set up.")
+            program = self.channels[channel]
+            segment = program._retrieve_data_segment(channel)
+            parsed = [
+                program._fields(*program._field_values(datum, segment))
+                for datum in segment.data
+            ]
+            data = pd.DataFrame(parsed).to_dict(orient="list")
+            data = {program.field_remap[k]: v for k, v in data.items()}
+
         except Exception:
             LOGGER.error("get_data failed", exc_info=True)
             response = DriverResponse(
@@ -161,10 +193,19 @@ class BiologicDriver(HelaoDriver):
             )
         return response
 
-    def stop(self) -> DriverResponse:
+    def stop(self, channel: Optional[int] = None) -> DriverResponse:
         """General stop method to abort all active methods e.g. motion, I/O, compute."""
         try:
-            self.dtaq.Run(False)
+            running_channels = [k for k, c in self.channels.items() if c is not None]
+            if channel is None:
+                for ch in running_channels:
+                    self.pstat.stop_channel(ch)
+            elif channel in running_channels:
+                self.pstat.stop_channel(channel)
+            elif channel not in self.channels:
+                raise ValueError(f"Channel {channel} does not exist.")
+            else:
+                raise ValueError(f"Channel {channel} is not running.")
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -175,10 +216,19 @@ class BiologicDriver(HelaoDriver):
             )
         return response
 
-    def cleanup(self, ttl_params: dict = {}):
+    def cleanup(self, channel: int) -> DriverResponse:
         """Release state objects but don't close pstat."""
         try:
-            pass
+            if channel not in self.channels:
+                raise ValueError(f"Channel {channel} does not exist.")
+            channel_state = self.get_status(channel=channel).status
+            if channel_state == DriverStatus.busy:
+                raise ValueError(f"Channel {channel} is busy.")
+            self.channels[channel] = None
+            response = DriverResponse(
+                response=DriverResponseType.success,
+                status=DriverStatus.ok,
+            )
         except Exception:
             LOGGER.error("cleanup failed", exc_info=True)
             response = DriverResponse(
@@ -192,10 +242,7 @@ class BiologicDriver(HelaoDriver):
     def disconnect(self) -> DriverResponse:
         """Release connection to resource."""
         try:
-            if self.pstat is not None:
-                self.pstat.SetCell(self.GamryCOM.CellOff)
-                self.pstat.Close()
-            # self.ready = False
+            self.pstat.disconnect()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -206,38 +253,13 @@ class BiologicDriver(HelaoDriver):
             )
         finally:
             self.pstat = None
-            comtypes.CoUninitialize()
             self.connection_raised = False
         return response
 
     def reset(self) -> DriverResponse:
         """Reinitialize driver, force-close old connection if necessary."""
         try:
-            process_ids = {
-                p.pid: p
-                for p in psutil.process_iter(["name", "connections"])
-                if p.info["name"].startswith("GamryCom")
-            }
-
-            for pid in process_ids:
-                LOGGER.info(f"killing GamryCOM on PID: {pid}")
-                p = psutil.Process(pid)
-                for _ in range(3):
-                    p.terminate()
-                    time.sleep(0.5)
-                    if not psutil.pid_exists(p.pid):
-                        LOGGER.info("Successfully terminated GamryCom.")
-                if psutil.pid_exists(p.pid):
-                    LOGGER.warning(
-                        "Failed to terminate server GamryCom after 3 retries."
-                    )
-                    raise SystemError(f"GamryCOM on PID: {pid} is still running.")
-            self.GamryCOM = client.GetModule(
-                ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
-            )
-            self.pstat = None
-            # self.ready = False
-            # self.connect()
+            self.disconnect()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -246,9 +268,15 @@ class BiologicDriver(HelaoDriver):
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
+        finally:
+            self.connect()
         return response
 
     def shutdown(self) -> None:
         """Pass-through shutdown events for BaseAPI."""
-        self.cleanup()
+        state_dict = self.get_status().data
+        running_channels = [ch for ch, state in state_dict.items() if state > 0]
+        for ch in running_channels:
+            self.stop(channel=ch)
+            self.cleanup(channel=ch)
         self.disconnect()
