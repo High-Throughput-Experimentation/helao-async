@@ -1457,7 +1457,7 @@ def CCSI_sub_co2maintainconcentration(
         ],
     )
     # co2 upstream valve open
-    apm.add(NI_server, "gasvalve", {"gasvalve": "9-co2supply", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "9-co2supply", "on": 1},asc.no_wait)
     apm.add(
         MFC_server,
         "maintain_concentration",
