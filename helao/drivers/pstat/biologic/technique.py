@@ -11,6 +11,7 @@ class BiologicTechnique:
     technique_name: str
     easy_class: BiologicProgram
     parameter_map: Optional[Dict[str, str]] = None
+    field_map: Optional[Dict[str, str]] = None
 
 
 OCV = BiologicTechnique(
@@ -20,6 +21,10 @@ OCV = BiologicTechnique(
         "Tval__s": "time",
         "AcqInterval__s": "time_interval",
         "AcqInterval__V": "voltage_interval",
+    },
+    field_map={
+        "time": "t_s",
+        "voltage": "Ewe_V",
     },
 )
 CA = BiologicTechnique(
@@ -32,6 +37,13 @@ CA = BiologicTechnique(
         "AcqInterval__A": "current_interval",
         "IErange": "current_range",
     },
+    field_map={
+        "time": "t_s",
+        "voltage": "Ewe_V",
+        "current": "I_A",
+        "power": "P_W",
+        "cycle": "cycle",
+    },
 )
 CP = BiologicTechnique(
     technique_name="CP",
@@ -41,6 +53,13 @@ CP = BiologicTechnique(
         "Tval__s": "duration",
         "AcqInterval__s": "time_interval",
         "AcqInterval__V": "voltage_interval",
+    },
+    field_map={
+        "time": "t_s",
+        "voltage": "Ewe_V",
+        "current": "I_A",
+        "power": "P_W",
+        "cycle": "cycle",
     },
 )
 CV = BiologicTechnique(
@@ -55,4 +74,13 @@ CV = BiologicTechnique(
         "Cycles": "cycles",
         "AcqInterval__V": "step",
     },
+    field_map={
+        "time": "t_s",
+        "voltage": "Ewe_V",
+        "current": "I_A",
+        "power": "P_W",
+        "cycle": "cycle",
+    },
 )
+
+BIOTECHS = {x.technique_name: x for x in [OCV, CA, CP, CV]}
