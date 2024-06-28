@@ -14,7 +14,7 @@ class BiologicTechnique:
     field_map: Optional[Dict[str, str]] = None
 
 
-OCV = BiologicTechnique(
+TECH_OCV = BiologicTechnique(
     technique_name="OCV",
     easy_class=blp.OCV,
     parameter_map={
@@ -27,7 +27,7 @@ OCV = BiologicTechnique(
         "voltage": "Ewe_V",
     },
 )
-CA = BiologicTechnique(
+TECH_CA = BiologicTechnique(
     technique_name="CA",
     easy_class=blp.CA,
     parameter_map={
@@ -45,7 +45,7 @@ CA = BiologicTechnique(
         "cycle": "cycle",
     },
 )
-CP = BiologicTechnique(
+TECH_CP = BiologicTechnique(
     technique_name="CP",
     easy_class=blp.CP,
     parameter_map={
@@ -62,7 +62,7 @@ CP = BiologicTechnique(
         "cycle": "cycle",
     },
 )
-CV = BiologicTechnique(
+TECH_CV = BiologicTechnique(
     technique_name="CV",
     easy_class=blp.JV_Scan,
     parameter_map={
@@ -83,4 +83,4 @@ CV = BiologicTechnique(
     },
 )
 
-BIOTECHS = {x.technique_name: x for x in [OCV, CA, CP, CV]}
+BIOTECHS = {x.technique_name: x for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV]}
