@@ -6,7 +6,6 @@ the hardware driver class from the action server base class.
 
 """
 
-# TODO: test if we can set CellOff during a measurement to measure OCV
 
 __all__ = ["makeApp"]
 
@@ -30,7 +29,6 @@ from helao.helpers.config_loader import config_loader
 from helao.helpers.executor import Executor
 from helao.helpers import logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
-from helao.drivers.helao_driver import HelaoDriver
 from helao.drivers.pstat.gamry.driver import GamryDriver
 from helao.drivers.pstat.gamry.technique import (
     GamryTechnique,
@@ -88,9 +86,6 @@ class GamryExec(Executor):
                 k: self.action_params.get(k, -1) for k in ("TTLwait", "TTLsend")
             }
 
-            # hold cell off state if necessary
-            self.cell_off_time = self.action_params.get("cell_off_time", None)
-            self.cell_off = False
 
             LOGGER.info("GamryExec initialized.")
         except Exception:
@@ -139,9 +134,6 @@ class GamryExec(Executor):
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
-        # measure open circuit if cell_off_time is set
-        if self.cell_off_time is not None and time.time()-self.start_time > self.cell_off_time and not self.cell_off:
-                self.driver.pstat.SetCell(self.driver.GamryCOM.CellOff)
         resp = self.driver.get_data(self.poll_rate)
         # populate executor buffer for output calculation
         for k, v in resp.data.items():
@@ -222,7 +214,6 @@ async def gamry_dyn_endpoints(app=None):
         SetStopAtDelayDIMax: Optional[int] = None,
         SetStopAtDelayADIMin: Optional[int] = None,
         SetStopAtDelayADIMax: Optional[int] = None,
-        cell_off_time: Optional[float] = None,
     ):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)
         use 4bit bitmask for triggers
@@ -248,7 +239,6 @@ async def gamry_dyn_endpoints(app=None):
         SetStopXMax: Optional[float] = None,
         SetStopAtDelayXMin: Optional[int] = None,
         SetStopAtDelayXMax: Optional[int] = None,
-        cell_off_time: Optional[float] = None,
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -275,7 +265,6 @@ async def gamry_dyn_endpoints(app=None):
         SetStopXMax: Optional[float] = None,
         SetStopAtDelayXMin: Optional[int] = None,
         SetStopAtDelayXMax: Optional[int] = None,
-        cell_off_time: Optional[float] = None,
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -305,7 +294,6 @@ async def gamry_dyn_endpoints(app=None):
         SetStopIMax: Optional[float] = None,
         SetStopAtDelayIMin: Optional[int] = None,
         SetStopAtDelayIMax: Optional[int] = None,
-        cell_off_time: Optional[float] = None,
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
@@ -357,7 +345,6 @@ async def gamry_dyn_endpoints(app=None):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        cell_off_time: Optional[float] = None,
     ):
         """Measure pulsed voltammetry"""
         active = await app.base.setup_and_contain_action()
