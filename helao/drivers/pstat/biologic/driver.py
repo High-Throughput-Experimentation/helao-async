@@ -33,7 +33,7 @@ from helao.drivers.helao_driver import (
     DriverResponseType,
 )
 
-from .technique import BIOTECHS
+from .technique import BiologicTechnique
 
 
 class BiologicDriver(HelaoDriver):
@@ -106,20 +106,19 @@ class BiologicDriver(HelaoDriver):
 
     def setup(
         self,
-        technique_name: str,
+        technique: BiologicTechnique,
         action_params: dict = {},  # for mapping action keys to signal keys
-        channel: int = 0,
     ) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
         try:
+            channel = action_params.get("channel", -1)
             if channel not in self.channels:
                 raise ValueError(f"Channel {channel} does not exist.")
             if self.channels[channel] is not None:
                 raise ValueError(f"Channel {channel} is in use.")
-            technique = BIOTECHS[technique_name]
             parmap = technique.parameter_map
             mapped_params = {
-                parmap[k]: v for k, v in action_params.items() if k in action_params
+                parmap[k]: v for k, v in action_params.items() if k in parmap
             }
             self.channels[channel] = technique.easy_class(
                 device=self.pstat, params=mapped_params, channels=[channel]
