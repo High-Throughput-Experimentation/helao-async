@@ -178,13 +178,34 @@ class BiologicDriver(HelaoDriver):
                 raise ValueError(f"Channel {channel} has not been set up.")
             program = self.channels[channel]
             segment = program._retrieve_data_segment(channel)
+            if segment.values.State > 0:
+                status = DriverStatus.busy 
+                program_state = "measuring"
+            else:
+                status = DriverStatus.ok
+                program_state = "done"
+            segment_data = segment.data
+
+            # empty buffer if program_state is done
+            if program_state == "done":
+                latest_segment = program._retrieve_data_segment(channel)
+                while len(latest_segment.data) > 0:
+                    segment_data += latest_segment.data
+                    program._retrieve_data_segment(channel)
+                
             parsed = [
                 program._fields(*program._field_values(datum, segment))
-                for datum in segment.data
+                for datum in segment_data
             ]
             data = pd.DataFrame(parsed).to_dict(orient="list")
             data = {program.field_remap[k]: v for k, v in data.items()}
 
+            response = DriverResponse(
+                response=DriverResponseType.success,
+                message=program_state,
+                data=data,
+                status=status,
+            )
         except Exception:
             LOGGER.error("get_data failed", exc_info=True)
             response = DriverResponse(
