@@ -155,7 +155,7 @@ async def biologic_dyn_endpoints(app=None):
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
-        IErange: ecl.IRange = ecl.IRange.AUTO,
+        Irange: ecl.IRange = ecl.IRange.AUTO,
         channel: int = 0,
     ):
         """Chronoamperometry (current response on amplied potential)
@@ -164,6 +164,7 @@ async def biologic_dyn_endpoints(app=None):
         (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CA"
+        active.action.action_params["IRange"] = ecl.IRange(active.action.action_params["IRange"])
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CA)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
