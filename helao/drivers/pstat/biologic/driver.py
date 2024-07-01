@@ -81,6 +81,8 @@ class BiologicDriver(HelaoDriver):
     def get_status(self, channel: Optional[int] = None) -> DriverResponse:
         """Return current driver status."""
         try:
+            if not self.ready:
+                raise ConnectionError("Device not connected.")
             if channel is None:
                 infos = [self.pstat.channel_info(i) for i in range(self.num_channels)]
                 states = [x.State for x in infos]
