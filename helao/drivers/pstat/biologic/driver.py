@@ -43,8 +43,8 @@ class BiologicDriver(HelaoDriver):
     def __init__(self, config: dict = {}):
         super().__init__(config=config)
         #
-        self.address = config.get(key="address", default="192.168.200.240")
-        self.num_channels = config.get(key="num_channels", default=12)
+        self.address = config.get("address", "192.168.200.240")
+        self.num_channels = config.get("num_channels", 12)
         self.device_name = "unknown"
         self.connection_raised = False
         self.pstat = ebl.BiologicDevice(self.address)
