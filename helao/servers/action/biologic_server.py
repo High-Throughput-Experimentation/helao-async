@@ -146,8 +146,6 @@ async def biologic_dyn_endpoints(app=None):
         LOGGER.info("waiting for biologic init")
         await asyncio.sleep(1)
 
-    app.driver.connect()
-    app.driver.disconnect()
 
     @app.post(f"/{server_key}/run_CA", tags=["action"])
     async def run_CA(
