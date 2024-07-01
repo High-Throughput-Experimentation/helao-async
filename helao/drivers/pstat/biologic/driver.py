@@ -50,6 +50,7 @@ class BiologicDriver(HelaoDriver):
         self.connection_raised = False
         self.channels = {i: None for i in range(self.num_channels)}
         self.connect()
+        self.connection_ctx = None
 
     def connect(self) -> DriverResponse:
         """Open connection to resource."""
@@ -60,7 +61,7 @@ class BiologicDriver(HelaoDriver):
                 )
             self.connection_raised = True
             self.pstat = ebl.BiologicDevice(self.address)
-            self.pstat.connect()
+            self.connection_ctx = self.pstat.connect()
             self.ready = True
             LOGGER.info(f"connected to {self.device_name} on device_id {self.address}")
             response = DriverResponse(
@@ -268,6 +269,7 @@ class BiologicDriver(HelaoDriver):
         try:
             self.pstat.disconnect()
             self.pstat = None
+            self.connection_ctx = None
             self.ready = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
