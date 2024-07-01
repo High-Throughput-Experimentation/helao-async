@@ -187,7 +187,7 @@ class _VT_template(BaseModel, HelaoDict):
             return ret_sample
 
         if vial + 1 <= self.positions:
-            if self.samples[vial] == NoneSample() and not self.vials[vial]:
+            if isinstance(self.samples[vial], NoneSample) and not self.vials[vial]:
                 self.vials[vial] = True
                 self.samples[vial] = deepcopy(sample)
                 ret_sample = deepcopy(self.samples[vial])
