@@ -48,6 +48,7 @@ class BiologicDriver(HelaoDriver):
         self.device_name = "unknown"
         self.connection_raised = False
         self.pstat = ebl.BiologicDevice(self.address)
+        self.pstat.connect()
         self.channels = {i: None for i in range(self.num_channels)}
         self.connect()
 
@@ -59,7 +60,6 @@ class BiologicDriver(HelaoDriver):
                     "Connection already raised. In use by another script."
                 )
             self.connection_raised = True
-            self.pstat.connect()
             self.ready = True
             LOGGER.debug(f"connected to {self.device_name} on device_id {self.address}")
             response = DriverResponse(
