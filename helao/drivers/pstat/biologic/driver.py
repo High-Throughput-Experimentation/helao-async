@@ -60,6 +60,7 @@ class BiologicDriver(HelaoDriver):
                 )
             self.connection_raised = True
             self.pstat.connect()
+            self.ready = True
             LOGGER.debug(f"connected to {self.device_name} on device_id {self.address}")
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
@@ -178,7 +179,7 @@ class BiologicDriver(HelaoDriver):
             program = self.channels[channel]
             segment = program._retrieve_data_segment(channel)
             if segment.values.State > 0:
-                status = DriverStatus.busy 
+                status = DriverStatus.busy
                 program_state = "measuring"
             else:
                 status = DriverStatus.ok
@@ -191,7 +192,7 @@ class BiologicDriver(HelaoDriver):
                 while len(latest_segment.data) > 0:
                     segment_data += latest_segment.data
                     program._retrieve_data_segment(channel)
-                
+
             parsed = [
                 program._fields(*program._field_values(datum, segment))
                 for datum in segment_data
@@ -263,6 +264,7 @@ class BiologicDriver(HelaoDriver):
         """Release connection to resource."""
         try:
             self.pstat.disconnect()
+            self.ready = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
