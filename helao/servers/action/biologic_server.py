@@ -38,6 +38,8 @@ from helao.drivers.pstat.biologic.technique import (
     TECH_CV,
 )
 
+import easy_biologic.lib.ec_lib as ecl
+
 global LOGGER
 if logging.LOGGER is None:
     LOGGER = logging.make_LOGGER(LOGGER_name="biologic_server_standalone")
@@ -145,7 +147,6 @@ async def biologic_dyn_endpoints(app=None):
         await asyncio.sleep(1)
 
     app.driver.connect()
-    model_ierange = app.driver.model.ierange
     app.driver.disconnect()
 
     @app.post(f"/{server_key}/run_CA", tags=["action"])
@@ -156,7 +157,7 @@ async def biologic_dyn_endpoints(app=None):
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
-        IErange: model_ierange = "auto",
+        IErange: ecl.IRange = ecl.IRange.AUTO,
         channel: int = 0,
     ):
         """Chronoamperometry (current response on amplied potential)
