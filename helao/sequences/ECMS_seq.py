@@ -22,7 +22,7 @@ SEQUENCES = __all__
 
 
 def ECMS_initiation(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,    
     reservoir_liquid_sample_no: int = 2,
@@ -66,7 +66,7 @@ def ECMS_initiation(
         "ECMS_sub_headspace_purge_and_CO2baseline",
         {
             "CO2equilibrium_duration": CO2equilibrium_duration,
-            "flowrate_sccm": 20.0,
+            "flowrate_sccm": 10.0,
             "flow_ramp_sccm": flow_ramp_sccm,
             "MS_baseline_duration": MS_baseline_duration_1
         },
@@ -87,7 +87,7 @@ def ECMS_initiation(
     return epm.experiment_plan_list
 
 def ECMS_initiation_recirculation(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,    
     liquid_fill_time: float = 15,
@@ -138,7 +138,7 @@ def ECMS_initiation_recirculation(
         "ECMS_sub_headspace_purge_and_CO2baseline",
         {
             "CO2equilibrium_duration": CO2equilibrium_duration,
-            "flowrate_sccm": 20.0,
+            "flowrate_sccm": 10.0,
             "flow_ramp_sccm": flow_ramp_sccm,
             "MS_baseline_duration": MS_baseline_duration_1
         },
@@ -159,7 +159,7 @@ def ECMS_initiation_recirculation(
     return epm.experiment_plan_list
 
 def ECMS_repeat_CV(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,    
     reservoir_liquid_sample_no: int = 2,
@@ -219,7 +219,7 @@ def ECMS_repeat_CV(
             "ECMS_sub_headspace_purge_and_CO2baseline",
             {
                 "CO2equilibrium_duration": CO2equilibrium_duration,
-                "flowrate_sccm": 20.0,
+                "flowrate_sccm": 10.0,
                 "flow_ramp_sccm": flow_ramp_sccm,
                 "MS_baseline_duration": MS_baseline_duration_1
             },
@@ -290,7 +290,7 @@ def ECMS_repeat_CV(
 
 # =============================================================================
 def ECMS_repeat_CV_recirculation(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,   
     reservoir_liquid_sample_no: int = 2,
@@ -360,7 +360,7 @@ def ECMS_repeat_CV_recirculation(
             "ECMS_sub_headspace_purge_and_CO2baseline",
             {
                 "CO2equilibrium_duration": CO2equilibrium_duration,
-                "flowrate_sccm": 20.0,
+                "flowrate_sccm": 10.0,
                 "flow_ramp_sccm": flow_ramp_sccm,
                 "MS_baseline_duration": MS_baseline_duration_1
             },
@@ -550,7 +550,7 @@ def ECMS_repeat_CV_recirculation(
 # =============================================================================
 
 def ECMS_series_CA(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,    
     reservoir_liquid_sample_no: int = 2,
@@ -604,7 +604,7 @@ def ECMS_series_CA(
             "ECMS_sub_headspace_purge_and_CO2baseline",
             {
                 "CO2equilibrium_duration": CO2equilibrium_duration,
-                "flowrate_sccm": 20.0,
+                "flowrate_sccm": 10.0,
                 "flow_ramp_sccm": flow_ramp_sccm,
                 "MS_baseline_duration": MS_baseline_duration_1
             },
@@ -742,7 +742,7 @@ def ECMS_series_CA(
 #     return epm.experiment_plan_list
 # =============================================================================
 def ECMS_series_CA_recirculation(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 2,
@@ -806,7 +806,7 @@ def ECMS_series_CA_recirculation(
             "ECMS_sub_headspace_purge_and_CO2baseline",
             {
                 "CO2equilibrium_duration": CO2equilibrium_duration,
-                "flowrate_sccm": 20.0,
+                "flowrate_sccm": 10.0,
                 "flow_ramp_sccm": flow_ramp_sccm,
                 "MS_baseline_duration": MS_baseline_duration_1
             },
@@ -847,7 +847,7 @@ def ECMS_series_CA_recirculation(
     return epm.experiment_plan_list
 
 def ECMS_series_pulseCA(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,    
     reservoir_liquid_sample_no: int = 2,
@@ -903,7 +903,7 @@ def ECMS_series_pulseCA(
             "ECMS_sub_headspace_purge_and_CO2baseline",
             {
                 "CO2equilibrium_duration": CO2equilibrium_duration,
-                "flowrate_sccm": 20.0,
+                "flowrate_sccm": 10.0,
                 "flow_ramp_sccm": flow_ramp_sccm,
                 "MS_baseline_duration": MS_baseline_duration_1
             },
@@ -937,7 +937,7 @@ def ECMS_series_pulseCA(
     return epm.experiment_plan_list
 
 def ECMS_MS_calibration_recirculation(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     reservoir_liquid_sample_no: int = 2,
     liquid_fill_time: float = 15,
     volume_ul_cell_liquid: float = 600,
