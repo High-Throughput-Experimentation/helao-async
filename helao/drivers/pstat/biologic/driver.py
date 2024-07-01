@@ -62,7 +62,7 @@ class BiologicDriver(HelaoDriver):
             self.pstat = ebl.BiologicDevice(self.address)
             self.pstat.connect()
             self.ready = True
-            LOGGER.debug(f"connected to {self.device_name} on device_id {self.address}")
+            LOGGER.info(f"connected to {self.device_name} on device_id {self.address}")
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
