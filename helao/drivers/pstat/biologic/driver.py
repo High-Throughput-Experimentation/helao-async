@@ -46,9 +46,8 @@ class BiologicDriver(HelaoDriver):
         self.address = config.get("address", "192.168.200.240")
         self.num_channels = config.get("num_channels", 12)
         self.device_name = "unknown"
+        self.pstat = None
         self.connection_raised = False
-        self.pstat = ebl.BiologicDevice(self.address)
-        self.pstat.connect()
         self.channels = {i: None for i in range(self.num_channels)}
         self.connect()
 
@@ -60,6 +59,8 @@ class BiologicDriver(HelaoDriver):
                     "Connection already raised. In use by another script."
                 )
             self.connection_raised = True
+            self.pstat = ebl.BiologicDevice(self.address)
+            self.pstat.connect()
             self.ready = True
             LOGGER.debug(f"connected to {self.device_name} on device_id {self.address}")
             response = DriverResponse(
@@ -264,6 +265,7 @@ class BiologicDriver(HelaoDriver):
         """Release connection to resource."""
         try:
             self.pstat.disconnect()
+            self.pstat = None
             self.ready = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
@@ -274,7 +276,6 @@ class BiologicDriver(HelaoDriver):
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
         finally:
-            self.pstat = None
             self.connection_raised = False
         return response
 
