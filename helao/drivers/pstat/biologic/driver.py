@@ -43,6 +43,7 @@ class BiologicDriver(HelaoDriver):
     def __init__(self, config: dict = {}):
         super().__init__(config=config)
         #
+        self.ready = False
         self.address = config.get("address", "192.168.200.240")
         self.num_channels = config.get("num_channels", 12)
         self.device_name = "unknown"
@@ -268,6 +269,7 @@ class BiologicDriver(HelaoDriver):
         """Release connection to resource."""
         try:
             self.pstat.disconnect()
+            LOGGER.info(f"disconnected from {self.device_name} on device_id {self.address}")
             self.pstat = None
             self.connection_ctx = None
             self.ready = False
