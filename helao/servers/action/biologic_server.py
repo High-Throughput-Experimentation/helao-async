@@ -31,6 +31,7 @@ from helao.helpers import logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.drivers.pstat.biologic.driver import BiologicDriver
 from helao.drivers.pstat.biologic.technique import (
+    EC_IRange,
     BiologicTechnique,
     TECH_OCV,
     TECH_CA,
@@ -38,7 +39,7 @@ from helao.drivers.pstat.biologic.technique import (
     TECH_CV,
 )
 
-import easy_biologic.lib.ec_lib as ecl
+from easy_biologic.lib.ec_lib import IRange
 
 global LOGGER
 if logging.LOGGER is None:
@@ -126,8 +127,6 @@ class BiologicExec(Executor):
                 amplitude_thresh,
             )
             self.active.action.action_params["has_bubble"] = has_bubble
-        
-        
 
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": {}}
@@ -146,7 +145,6 @@ async def biologic_dyn_endpoints(app=None):
         LOGGER.info("waiting for biologic init")
         await asyncio.sleep(1)
 
-
     @app.post(f"/{server_key}/run_CA", tags=["action"])
     async def run_CA(
         action: Action = Body({}, embed=True),
@@ -155,7 +153,7 @@ async def biologic_dyn_endpoints(app=None):
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
-        Irange: ecl.IRange = ecl.IRange.AUTO,
+        Irange: EC_IRange = EC_IRange.IRange.AUTO,
         channel: int = 0,
     ):
         """Chronoamperometry (current response on amplied potential)
@@ -164,7 +162,9 @@ async def biologic_dyn_endpoints(app=None):
         (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CA"
-        active.action.action_params["IRange"] = ecl.IRange(active.action.action_params["IRange"])
+        active.action.action_params["IRange"] = getattr(
+            IRange, active.action.action_params["IRange"].value
+        )
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CA)
         active_action_dict = active.start_executor(executor)
         return active_action_dict

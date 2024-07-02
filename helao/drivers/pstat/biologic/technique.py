@@ -6,6 +6,25 @@ import easy_biologic.base_programs as blp
 from easy_biologic import BiologicProgram
 
 
+from enum import StrEnum
+
+class EC_IRange(StrEnum):
+    p100 = "p100"
+    n1   = "n1"  
+    n10  = "n10" 
+    n100 = "n100"
+    u1   = "u1"  
+    u10  = "u10" 
+    u100 = "u100"
+    m1   = "m1"  
+    m10  = "m10" 
+    m100 = "m100"
+    a1   = "a1"    # 1 amp
+
+    KEEP    = "KEEP"   
+    BOOSTER = "BOOSTER"
+    AUTO    = "AUTO"   
+
 @dataclass
 class BiologicTechnique:
     technique_name: str
