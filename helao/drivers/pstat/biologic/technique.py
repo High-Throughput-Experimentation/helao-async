@@ -54,7 +54,7 @@ TECH_CA = BiologicTechnique(
         "Tval__s": "duration",
         "AcqInterval__s": "time_interval",
         "AcqInterval__A": "current_interval",
-        "Irange": "current_range",
+        "IRange": "current_range",
     },
     field_map={
         "time": "t_s",
