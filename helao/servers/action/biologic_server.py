@@ -153,7 +153,7 @@ async def biologic_dyn_endpoints(app=None):
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
-        Irange: EC_IRange = EC_IRange.AUTO,
+        IRange: EC_IRange = EC_IRange.AUTO,
         channel: int = 0,
     ):
         """Chronoamperometry (current response on amplied potential)
