@@ -93,15 +93,19 @@ class BiologicDriver(HelaoDriver):
                     if any([x > 0 for x in states])
                     else DriverStatus.ok
                 )
+                data = {i: x for i, x in enumerate(states)}
             elif channel not in self.channels:
+                status = DriverStatus.uninitialized
+                data = {}
                 raise ValueError(f"Channel {channel} does not exist.")
             else:
                 info = self.pstat.channel_info(channel)
                 status = DriverStatus.busy if info.State > 0 else DriverStatus.ok
+                data = {channel: info.State}
             response = DriverResponse(
                 response=DriverResponseType.success,
                 status=status,
-                data={i: s for i, s in enumerate(states)},
+                data=data,
             )
         except Exception:
             LOGGER.error("get_status failed", exc_info=True)
@@ -171,7 +175,7 @@ class BiologicDriver(HelaoDriver):
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
             )
-            self.cleanup()
+            self.cleanup(channel)
         return response
 
     async def get_data(self, channel: int = 0) -> DriverResponse:
