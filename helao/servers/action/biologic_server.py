@@ -39,7 +39,7 @@ from helao.drivers.pstat.biologic.technique import (
     TECH_CV,
 )
 
-from easy_biologic.lib.ec_lib import IRange
+import easy_biologic.lib.ec_lib as ecl
 
 global LOGGER
 if logging.LOGGER is None:
@@ -163,7 +163,7 @@ async def biologic_dyn_endpoints(app=None):
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CA"
         active.action.action_params["IRange"] = getattr(
-            IRange, active.action.action_params["IRange"].value
+            ecl.IRange, active.action.action_params["IRange"].value
         )
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CA)
         active_action_dict = active.start_executor(executor)
