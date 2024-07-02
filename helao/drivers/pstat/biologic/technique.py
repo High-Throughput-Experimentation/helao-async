@@ -50,8 +50,8 @@ TECH_CA = BiologicTechnique(
     technique_name="CA",
     easy_class=blp.CA,
     parameter_map={
-        "Vval__V": "voltage",
-        "Tval__s": "duration",
+        "Vval__V": "voltages",
+        "Tval__s": "durations",
         "AcqInterval__s": "time_interval",
         "AcqInterval__A": "current_interval",
         "IRange": "current_range",
@@ -68,8 +68,8 @@ TECH_CP = BiologicTechnique(
     technique_name="CP",
     easy_class=blp.CP,
     parameter_map={
-        "Ival__A": "current",
-        "Tval__s": "duration",
+        "Ival__A": "currents",
+        "Tval__s": "durations",
         "AcqInterval__s": "time_interval",
         "AcqInterval__V": "voltage_interval",
     },
