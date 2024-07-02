@@ -130,8 +130,12 @@ class BiologicDriver(HelaoDriver):
             mapped_params = {
                 parmap[k]: v for k, v in action_params.items() if k in parmap
             }
+            listed = ["voltages", "currents", "durations"]
+            listed_params = {
+                k: [v] if k in listed else v for k, v in mapped_params.items()
+            }
             self.channels[channel] = technique.easy_class(
-                device=self.pstat, params=mapped_params, channels=[channel]
+                device=self.pstat, params=listed_params, channels=[channel]
             )
             self.channels[channel].field_remap = technique.field_map
             response = DriverResponse(
@@ -273,7 +277,9 @@ class BiologicDriver(HelaoDriver):
         """Release connection to resource."""
         try:
             self.pstat.disconnect()
-            LOGGER.info(f"disconnected from {self.device_name} on device_id {self.address}")
+            LOGGER.info(
+                f"disconnected from {self.device_name} on device_id {self.address}"
+            )
             self.pstat = None
             self.connection_ctx = None
             self.ready = False
