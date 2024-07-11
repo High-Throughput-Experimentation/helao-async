@@ -119,11 +119,12 @@ def CCSI_sub_load_solid(
 
 def CCSI_sub_load_liquid(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
     water_True_False: bool = False,
     combine_True_False: bool = False,
+    load_process_finish: bool = True,
 ):
     """Add liquid volume to cell position.
 
@@ -145,7 +146,7 @@ def CCSI_sub_load_liquid(
             "combine_liquids": combine_True_False,
             "dilute_liquids": water_True_False,
         },
-        process_finish= True,
+        process_finish= load_process_finish,
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.samples_in,
@@ -771,6 +772,7 @@ def CCSI_sub_cellfill(
                 volume_ul_cell_liquid=Solution_volume_ul,
                 water_True_False=previous_liquid,
                 combine_True_False=previous_liquid,
+                load_process_finish = procfinish,
             )
         )
         apm.add(
@@ -895,6 +897,7 @@ def CCSI_sub_cellfill(
                 volume_ul_cell_liquid=Waterclean_volume_ul,
                 water_True_False=True,
                 combine_True_False=True,
+                load_process_finish = False,
             )
         )
         apm.add(
