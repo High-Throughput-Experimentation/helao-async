@@ -5,7 +5,7 @@ server_key must be a FastAPI action server defined in config
 
 __all__ = [
     "HISPEC_sub_CV_led",
-    "HISPEC_sub_CV_DOtrigger",
+    # "HISPEC_sub_CV_DOtrigger",
     # "HISPEC_sub_CA_led",
     # "HISPEC_sub_CP_led",
     # "HISPEC_sub_OCV_led",
