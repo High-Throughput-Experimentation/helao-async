@@ -883,7 +883,7 @@ def CCSI_sub_cellfill(
         if Solution_volume_ul == 0:
             proccontrib = [
                 ProcessContrib.action_params,
-                ProcessContrib.samples_in,
+#                ProcessContrib.samples_in,
             ]
         else:
             proccontrib = [
@@ -897,7 +897,7 @@ def CCSI_sub_cellfill(
                 volume_ul_cell_liquid=Waterclean_volume_ul,
                 water_True_False=True,
                 combine_True_False=True,
-                load_process_finish = False,
+                load_process_finish = True,
             )
         )
         apm.add(
