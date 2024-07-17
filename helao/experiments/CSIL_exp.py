@@ -41,16 +41,13 @@ __all__ = [
 
 ###
 from socket import gethostname
-from typing import Optional, Union
+from typing import Union
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helaocore.models.action_start_condition import ActionStartCondition as asc
-from helao.drivers.robot.pal_driver import PALtools
 from helaocore.models.sample import SolidSample, LiquidSample, GasSample
 from helaocore.models.machine import MachineModel
 from helaocore.models.process_contrib import ProcessContrib
-from helao.helpers.ref_electrode import REF_TABLE
-from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.drivers.io.enum import TriggerType
 
 # list valid experiment functions
@@ -124,7 +121,6 @@ def CCSI_sub_load_liquid(
     volume_ul_cell_liquid: int = 1000,
     water_True_False: bool = False,
     combine_True_False: bool = False,
-    load_process_finish: bool = True,
 ):
     """Add liquid volume to cell position.
 
@@ -146,7 +142,7 @@ def CCSI_sub_load_liquid(
             "combine_liquids": combine_True_False,
             "dilute_liquids": water_True_False,
         },
-        process_finish= load_process_finish,
+        process_finish= True,
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.samples_in,
@@ -760,10 +756,6 @@ def CCSI_sub_cellfill(
         apm.add(
             NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait
         )
-        if Waterclean_volume_ul == 0:
-            procfinish = True
-        else:
-            procfinish = False
 
         apm.add_action_list(
             CCSI_sub_load_liquid(
@@ -772,7 +764,6 @@ def CCSI_sub_cellfill(
                 volume_ul_cell_liquid=Solution_volume_ul,
                 water_True_False=previous_liquid,
                 combine_True_False=previous_liquid,
-                load_process_finish = procfinish,
             )
         )
         apm.add(
@@ -794,10 +785,11 @@ def CCSI_sub_cellfill(
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             technique_name="syringe_inject",
-            process_finish=procfinish,
+            process_finish=True,
             process_contrib=[
                 ProcessContrib.action_params,
                 ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
             ],
         )
         apm.add(ORCH_server, "wait", {"waittime": SyringePushWait_s})
@@ -880,15 +872,6 @@ def CCSI_sub_cellfill(
         apm.add(
             NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait
         )
-        if Solution_volume_ul == 0:
-            proccontrib = [
-                ProcessContrib.action_params,
-#                ProcessContrib.samples_in,
-            ]
-        else:
-            proccontrib = [
-                ProcessContrib.action_params,
-            ]
 
         apm.add_action_list(
             CCSI_sub_load_liquid(
@@ -897,7 +880,6 @@ def CCSI_sub_cellfill(
                 volume_ul_cell_liquid=Waterclean_volume_ul,
                 water_True_False=True,
                 combine_True_False=True,
-                load_process_finish = True,
             )
         )
         apm.add(
@@ -921,7 +903,11 @@ def CCSI_sub_cellfill(
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             technique_name="syringe_inject",
             process_finish=True,
-            process_contrib=proccontrib,
+            process_contrib=[
+                ProcessContrib.action_params,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
         )
         apm.add(ORCH_server, "wait", {"waittime": 10})
         if n2_push:
