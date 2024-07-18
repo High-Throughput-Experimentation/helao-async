@@ -29,7 +29,7 @@ from helao.helpers.config_loader import config_loader
 from helao.helpers.executor import Executor
 from helao.helpers import logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
-from helao.drivers.pstat.gamry.driver_persist import GamryDriver
+from helao.drivers.pstat.gamry.driver import GamryDriver
 from helao.drivers.pstat.gamry.technique import (
     GamryTechnique,
     TECH_LSV,
