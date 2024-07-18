@@ -73,7 +73,6 @@ class GamryDriver(HelaoDriver):
     def connect(self) -> DriverResponse:
         try:
             self.connection_raised = True
-            comtypes.CoInitializeEx()
             LOGGER.info(f"using device_id {self.device_id} from config")
             self.GamryCOM = client.GetModule(
                 ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
@@ -86,7 +85,6 @@ class GamryDriver(HelaoDriver):
             self.pstat.Open()
             self.pstat.SetCell(self.GamryCOM.CellOff)
             self.state = self.pstat.State()
-            comtypes.CoUninitialize()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
