@@ -62,7 +62,6 @@ class GamryDriver(HelaoDriver):
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config.get("grounded", True))
         self.connection_raised = False
-        comtypes.CoInitializeEx()
         self.connect()
         LOGGER.debug(
             f"connected to {self.device_name} on device_id {self.device_id}"
