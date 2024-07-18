@@ -6,6 +6,9 @@ All public methods must return a DriverResponse.
 
 """
 
+import sys
+sys.coinit_flags = 0x0
+
 # save a default log file system temp
 from helao.helpers import logging
 
@@ -70,7 +73,7 @@ class GamryDriver(HelaoDriver):
     def connect(self) -> DriverResponse:
         try:
             self.connection_raised = True
-            comtypes.CoInitialize()
+            comtypes.CoInitializeEx()
             LOGGER.info(f"using device_id {self.device_id} from config")
             self.GamryCOM = client.GetModule(
                 ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
@@ -99,7 +102,7 @@ class GamryDriver(HelaoDriver):
         """Return current driver status."""
         if self.pstat is not None:
             try:
-                comtypes.CoInitialize()
+                comtypes.CoInitializeEx()
                 self.state = self.pstat.State()
                 comtypes.CoUninitialize()
                 state = dict([x.split("\t") for x in self.state.split("\r\n") if x])
