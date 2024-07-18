@@ -15,6 +15,7 @@ import time
 from typing import Optional, List
 from collections import defaultdict, deque
 
+import comtypes
 import numpy as np
 import pandas as pd
 from fastapi import Body, Query
@@ -46,6 +47,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
+comtypes.CoInitializeEx()
 
 class GamryExec(Executor):
     technique: GamryTechnique
