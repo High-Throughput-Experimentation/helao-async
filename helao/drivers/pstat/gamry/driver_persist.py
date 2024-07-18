@@ -76,6 +76,7 @@ class GamryDriver(HelaoDriver):
 
     def connect(self) -> DriverResponse:
         try:
+            comtypes.CoInitialize()
             self.pstat = client.CreateObject(self.model.device)
             self.pstat.Init(self.device_name)
             self.pstat.Open()
