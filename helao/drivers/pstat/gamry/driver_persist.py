@@ -82,6 +82,7 @@ class GamryDriver(HelaoDriver):
             self.pstat.Init(self.device_name)
             self.pstat.Open()
             self.pstat.SetCell(self.GamryCOM.CellOff)
+            comtypes.CoUninitialize()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -99,6 +100,7 @@ class GamryDriver(HelaoDriver):
             try:
                 comtypes.CoInitializeEx()
                 state = self.pstat.State()
+                comtypes.CoUninitialize()
                 state = dict([x.split("\t") for x in state.split("\r\n") if x])
                 response = DriverResponse(
                     response=DriverResponseType.success, data=state, status=DriverStatus.ok
@@ -398,7 +400,6 @@ class GamryDriver(HelaoDriver):
             if self.pstat is not None:
                 self.pstat.SetCell(self.GamryCOM.CellOff)
                 self.pstat.Close()
-                comtypes.CoUninitialize()
             # self.ready = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
