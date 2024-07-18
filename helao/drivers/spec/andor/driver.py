@@ -317,7 +317,7 @@ class AndorDriver(HelaoDriver):
                 LOGGER.info("::::::::::::::::::::::::")
                 LOGGER.info(spc.IsFilterPresent(shm))
                 if spc.IsSlitPresent(0, 1) == (20202, 1):
-                    spc.SetSlitWidth(0, 1, 10)
+                    spc.SetSlitWidth(0, 1, slit_width_um)
                     LOGGER.info("slit set")
                 if spc.IsFilterPresent(0) == (20202, 1):
                     spc.SetFilter(0, ND_filter_num)
