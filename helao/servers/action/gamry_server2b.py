@@ -15,7 +15,6 @@ import time
 from typing import Optional, List
 from collections import defaultdict, deque
 
-import comtypes
 import numpy as np
 import pandas as pd
 from fastapi import Body, Query
@@ -47,7 +46,6 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-comtypes.CoInitializeEx()
 
 class GamryExec(Executor):
     technique: GamryTechnique
@@ -422,6 +420,7 @@ def makeApp(confPrefix, server_key, helao_root):
     @app.post("/gamry_state", tags=["private"])
     def gamry_state():
         """Stops measurement."""
+        print(app.driver.pstat.TestIsOpen())
         state = app.driver.pstat.State()
         state = dict([x.split("\t") for x in state.split("\r\n") if x]) 
         return state
