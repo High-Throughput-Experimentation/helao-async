@@ -417,4 +417,11 @@ def makeApp(confPrefix, server_key, helao_root):
         """Stops measurement."""
         app.driver.stop()
 
+    @app.post("/gamry_state", tags=["private"])
+    def gamry_state():
+        """Stops measurement."""
+        state = app.driver.State()
+        state = dict([x.split("\t") for x in state.split("\r\n") if x]) 
+        return state
+
     return app
