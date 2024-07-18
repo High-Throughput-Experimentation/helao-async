@@ -61,14 +61,7 @@ class GamryDriver(HelaoDriver):
         self.device_id = self.config.get("dev_id", None)
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config.get("grounded", True))
-        self.connection_raised = True
-        LOGGER.info(f"using device_id {self.device_id} from config")
-        self.GamryCOM = client.GetModule(
-            ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
-        )
-        devices = client.CreateObject("GamryCOM.GamryDeviceList")
-        self.device_name = devices.EnumSections()[self.device_id]
-        self.model = GAMRY_DEVICES.get(self.device_name.split("-")[0], GAMRY_DEVICES["DEFAULT"])
+        self.connection_raised = False
         self.connect()
         LOGGER.debug(
             f"connected to {self.device_name} on device_id {self.device_id}"
@@ -76,7 +69,15 @@ class GamryDriver(HelaoDriver):
 
     def connect(self) -> DriverResponse:
         try:
-            comtypes.CoInitialize()
+            comtypes.CoInitializeEx()
+            self.connection_raised = True
+            LOGGER.info(f"using device_id {self.device_id} from config")
+            self.GamryCOM = client.GetModule(
+                ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
+            )
+            devices = client.CreateObject("GamryCOM.GamryDeviceList")
+            self.device_name = devices.EnumSections()[self.device_id]
+            self.model = GAMRY_DEVICES.get(self.device_name.split("-")[0], GAMRY_DEVICES["DEFAULT"])
             self.pstat = client.CreateObject(self.model.device)
             self.pstat.Init(self.device_name)
             self.pstat.Open()
@@ -96,7 +97,6 @@ class GamryDriver(HelaoDriver):
         """Return current driver status."""
         if self.pstat is not None:
             try:
-                comtypes.CoInitialize()
                 state = self.pstat.State()
                 state = dict([x.split("\t") for x in state.split("\r\n") if x])
                 response = DriverResponse(
@@ -397,6 +397,7 @@ class GamryDriver(HelaoDriver):
             if self.pstat is not None:
                 self.pstat.SetCell(self.GamryCOM.CellOff)
                 self.pstat.Close()
+                comtypes.CoUninitialize()
             # self.ready = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
