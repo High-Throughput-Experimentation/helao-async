@@ -62,6 +62,7 @@ class GamryDriver(HelaoDriver):
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config.get("grounded", True))
         self.connection_raised = False
+        comtypes.CoInitializeEx()
         self.connect()
         LOGGER.debug(
             f"connected to {self.device_name} on device_id {self.device_id}"
@@ -69,7 +70,6 @@ class GamryDriver(HelaoDriver):
 
     def connect(self) -> DriverResponse:
         try:
-            comtypes.CoInitializeEx()
             self.connection_raised = True
             LOGGER.info(f"using device_id {self.device_id} from config")
             self.GamryCOM = client.GetModule(
@@ -82,7 +82,7 @@ class GamryDriver(HelaoDriver):
             self.pstat.Init(self.device_name)
             self.pstat.Open()
             self.pstat.SetCell(self.GamryCOM.CellOff)
-            comtypes.CoUninitialize()
+            self.state = self.pstat.State()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -98,10 +98,7 @@ class GamryDriver(HelaoDriver):
         """Return current driver status."""
         if self.pstat is not None:
             try:
-                comtypes.CoInitializeEx()
-                state = self.pstat.State()
-                comtypes.CoUninitialize()
-                state = dict([x.split("\t") for x in state.split("\r\n") if x])
+                state = dict([x.split("\t") for x in self.state.split("\r\n") if x])
                 response = DriverResponse(
                     response=DriverResponseType.success, data=state, status=DriverStatus.ok
                 )
