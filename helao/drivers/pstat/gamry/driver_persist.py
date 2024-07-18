@@ -94,17 +94,21 @@ class GamryDriver(HelaoDriver):
 
     def get_status(self, retries: int = 5) -> DriverResponse:
         """Return current driver status."""
-        # if self.pstat is not None:
-        try:
-            state = self.pstat.State()
-            state = dict([x.split("\t") for x in state.split("\r\n") if x])
+        if self.pstat is not None:
+            try:
+                state = self.pstat.State()
+                state = dict([x.split("\t") for x in state.split("\r\n") if x])
+                response = DriverResponse(
+                    response=DriverResponseType.success, data=state, status=DriverStatus.ok
+                )
+            except Exception:
+                LOGGER.error("get_status failed", exc_info=True)
+                response = DriverResponse(
+                    response=DriverResponseType.failed, status=DriverStatus.error
+                )
+        else:
             response = DriverResponse(
-                response=DriverResponseType.success, data=state, status=DriverStatus.ok
-            )
-        except Exception:
-            LOGGER.error("get_status failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
+                response=DriverResponseType.success, status=DriverStatus.uninitialized
             )
         return response
 
