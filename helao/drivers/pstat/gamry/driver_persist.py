@@ -71,6 +71,7 @@ class GamryDriver(HelaoDriver):
         try:
             self.connection_raised = True
             LOGGER.info(f"using device_id {self.device_id} from config")
+            comtypes.CoInitializeEx(comtypes.COINIT_MULTITHREADED)
             self.GamryCOM = client.GetModule(
                 ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
             )
