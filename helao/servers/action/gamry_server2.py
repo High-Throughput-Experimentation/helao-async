@@ -29,7 +29,7 @@ from helao.helpers.config_loader import config_loader
 from helao.helpers.executor import Executor
 from helao.helpers import logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
-from helao.drivers.pstat.gamry.driver import GamryDriver
+from helao.drivers.pstat.gamry.driver_persist import GamryDriver
 from helao.drivers.pstat.gamry.technique import (
     GamryTechnique,
     TECH_LSV,
@@ -93,29 +93,14 @@ class GamryExec(Executor):
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
-        while self.driver.pstat is not None:
-            LOGGER.info("Waiting for pstat resource to be available.")
-            await asyncio.sleep(1)
-        retry_count = 0
-        connect_success = False
-        while not connect_success and retry_count < 5:
-            resp = self.driver.connect()
-            if resp.response == "success":
-                connect_success = True
-            retry_count += 1
-            await asyncio.sleep(1)
-        if not connect_success:
-            LOGGER.error("Failed to connect to device.", exc_info=True)
-            error = ErrorCodes.not_available
-        else:
-            resp = self.driver.setup(
-                self.technique,
-                self.signal_params,
-                self.dtaq_params,
-                self.action_params,
-                self.ierange,
-            )
-            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
+        resp = self.driver.setup(
+            self.technique,
+            self.signal_params,
+            self.dtaq_params,
+            self.action_params,
+            self.ierange,
+        )
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         return {"error": error}
 
     async def _exec(self) -> dict:
@@ -144,7 +129,6 @@ class GamryExec(Executor):
 
     async def _post_exec(self):
         resp = self.driver.cleanup(self.ttl_params)
-        self.driver.disconnect()
 
         # parse calculate outputs from data buffer:
         for k in ["t_s", "Ewe_V", "I_A"]:
@@ -186,9 +170,7 @@ async def gamry_dyn_endpoints(app=None):
         LOGGER.info("waiting for gamry init")
         await asyncio.sleep(1)
 
-    app.driver.connect()
     model_ierange = app.driver.model.ierange
-    app.driver.disconnect()
 
     @app.post(f"/{server_key}/run_LSV", tags=["action"])
     async def run_LSV(
@@ -435,4 +417,11 @@ def makeApp(confPrefix, server_key, helao_root):
         """Stops measurement."""
         app.driver.stop()
 
+    @app.post("/gamry_state", tags=["private"])
+    def gamry_state():
+        """Return pstat.State()."""
+        state = app.driver.pstat.State()
+        state = dict([x.split("\t") for x in state.split("\r\n") if x])
+        return state
+        
     return app
