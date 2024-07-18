@@ -69,13 +69,26 @@ class GamryDriver(HelaoDriver):
         devices = client.CreateObject("GamryCOM.GamryDeviceList")
         self.device_name = devices.EnumSections()[self.device_id]
         self.model = GAMRY_DEVICES.get(self.device_name.split("-")[0], GAMRY_DEVICES["DEFAULT"])
-        self.pstat = client.CreateObject(self.model.device)
-        self.pstat.Init(self.device_name)
-        self.pstat.Open()
-        self.pstat.SetCell(self.GamryCOM.CellOff)
+        self.connect()
         LOGGER.debug(
             f"connected to {self.device_name} on device_id {self.device_id}"
         )
+
+    def connect(self) -> DriverResponse:
+        try:
+            self.pstat = client.CreateObject(self.model.device)
+            self.pstat.Init(self.device_name)
+            self.pstat.Open()
+            self.pstat.SetCell(self.GamryCOM.CellOff)
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("connect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
 
 
     def get_status(self, retries: int = 5) -> DriverResponse:
@@ -419,13 +432,7 @@ class GamryDriver(HelaoDriver):
                         "Failed to terminate server GamryCom after 3 retries."
                     )
                     raise SystemError(f"GamryCOM on PID: {pid} is still running.")
-            self.GamryCOM = client.GetModule(
-                ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
-            )
-            self.pstat = client.CreateObject(self.model.device)
-            self.pstat.Init(self.device_name)
-            self.pstat.Open()
-            self.pstat.SetCell(self.GamryCOM.CellOff)
+            self.connect()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
