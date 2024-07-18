@@ -98,6 +98,7 @@ class GamryDriver(HelaoDriver):
         """Return current driver status."""
         if self.pstat is not None:
             try:
+                # self.state = self.pstat.State()
                 state = dict([x.split("\t") for x in self.state.split("\r\n") if x])
                 response = DriverResponse(
                     response=DriverResponseType.success, data=state, status=DriverStatus.ok
