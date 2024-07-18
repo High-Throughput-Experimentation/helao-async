@@ -6,6 +6,9 @@ All public methods must return a DriverResponse.
 
 """
 
+import sys
+sys.coinit_flags = 0x0
+
 # save a default log file system temp
 from helao.helpers import logging
 
@@ -62,17 +65,15 @@ class GamryDriver(HelaoDriver):
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config.get("grounded", True))
         self.connection_raised = False
-        LOGGER.info(f"using device_id {self.device_id} from config")
-        # self.connect()
+        self.connect()
+        LOGGER.debug(
+            f"connected to {self.device_name} on device_id {self.device_id}"
+        )
 
     def connect(self) -> DriverResponse:
-        """Open connection to resource."""
         try:
-            if self.connection_raised:
-                time.sleep(1)
-                raise ConnectionError("Connection already raised. In use by another script.")
             self.connection_raised = True
-            comtypes.CoInitialize()
+            LOGGER.info(f"using device_id {self.device_id} from config")
             self.GamryCOM = client.GetModule(
                 ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
             )
@@ -83,62 +84,36 @@ class GamryDriver(HelaoDriver):
             self.pstat.Init(self.device_name)
             self.pstat.Open()
             self.pstat.SetCell(self.GamryCOM.CellOff)
-            LOGGER.debug(
-                f"connected to {self.device_name} on device_id {self.device_id}"
-            )
-
-            # self.ready = True
+            self.state = self.pstat.State()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
-        except Exception as exc:
-            if "In use by another script" in exc.__str__():
-                response = DriverResponse(
-                    response=DriverResponseType.failed, status=DriverStatus.busy
-                )
-            else:
-                LOGGER.error("get_status connection", exc_info=True)
-                response = DriverResponse(
-                    response=DriverResponseType.failed, status=DriverStatus.error
-                )
-
+        except Exception:
+            LOGGER.error("connect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
         return response
+
 
     def get_status(self, retries: int = 5) -> DriverResponse:
         """Return current driver status."""
-        # if self.pstat is not None:
-        if self.connection_raised:
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.busy
-            )
-        else:
+        if self.pstat is not None:
             try:
-                connect_attempts = 0
-                connect_error = True
-                while connect_error and connect_attempts < retries:
-                    connect_resp = self.connect()
-                    if connect_resp.status in [DriverStatus.ok, DriverStatus.busy]:
-                        connect_error = False
-                    time.sleep(0.5)
-                    connect_attempts += 1
-                if connect_error:
-                    raise Exception(f"Failed to connect after {retries} attempts.")
-                elif connect_resp.status == DriverStatus.busy:
-                    response = DriverResponse(
-                        response=DriverResponseType.success, status=DriverStatus.busy
-                    )
-                else:
-                    state = self.pstat.State()
-                    state = dict([x.split("\t") for x in state.split("\r\n") if x])
-                    response = DriverResponse(
-                        response=DriverResponseType.success, data=state, status=DriverStatus.ok
-                    )
-                    self.disconnect()
+                self.state = self.pstat.State()
+                state = dict([x.split("\t") for x in self.state.split("\r\n") if x])
+                response = DriverResponse(
+                    response=DriverResponseType.success, data=state, status=DriverStatus.ok
+                )
             except Exception:
                 LOGGER.error("get_status failed", exc_info=True)
                 response = DriverResponse(
                     response=DriverResponseType.failed, status=DriverStatus.error
                 )
+        else:
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.uninitialized
+            )
         return response
 
     def setup(
@@ -436,12 +411,16 @@ class GamryDriver(HelaoDriver):
             )
         finally:
             self.pstat = None
-            comtypes.CoUninitialize()
             self.connection_raised = False
         return response
 
     def reset(self) -> DriverResponse:
         """Reinitialize driver, force-close old connection if necessary."""
+        try:
+            self.pstat.SetCell(self.GamryCOM.CellOff)
+            self.pstat.Close()
+        except Exception:
+            LOGGER.warn("Could not cleanly disconnect from pstat.", exc_info=True)
         try:
             process_ids = {
                 p.pid: p
@@ -462,12 +441,7 @@ class GamryDriver(HelaoDriver):
                         "Failed to terminate server GamryCom after 3 retries."
                     )
                     raise SystemError(f"GamryCOM on PID: {pid} is still running.")
-            self.GamryCOM = client.GetModule(
-                ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
-            )
-            self.pstat = None
-            # self.ready = False
-            # self.connect()
+            self.connect()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
