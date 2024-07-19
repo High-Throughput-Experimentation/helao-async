@@ -98,8 +98,12 @@ class BiologicExec(Executor):
         """Return data and status from dtaq event sink."""
         resp = await self.driver.get_data(self.channel)
         # populate executor buffer for output calculation
+        data_length = 0
         for k, v in resp.data.items():
             self.data_buffer[k].extend(v)
+            data_length = len(v)
+        if data_length:
+            self.data_buffer["channel"].extend(data_length * [self.channel])
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         status = HloStatus.active if resp.message != "done" else HloStatus.finished
         return {"error": error, "status": status, "data": resp.data}
