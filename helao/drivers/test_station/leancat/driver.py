@@ -1,5 +1,11 @@
 """ HelaoDriver for LeanCAT Fuel Cell Test Station
 
+TODO: 
+  1. Always disconnect from the station when the driver is shut down
+  2. Create_session should be an action so we can control OPC logging over the course of an experiment
+  3. Need to query postgresql database for latest job id
+
+
 """
 
 import json
