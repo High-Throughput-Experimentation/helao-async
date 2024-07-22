@@ -33,7 +33,7 @@ from helao.drivers.helao_driver import (
 
 
 
-class LeanCATDriver(HelaoDriver):
+class LeancatDriver(HelaoDriver):
     device_name: str
     connection_raised: bool
 
