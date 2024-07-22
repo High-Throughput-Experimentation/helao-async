@@ -9,11 +9,11 @@ from ..logger import main_log
 
 # arg_app_config_path = sys.argv[1]
 
-with open(arg_app_config_path, "r") as f:
-    app_config = json.loads(f.read())
-    db_config = app_config["app"]["db"]
-    # Delete property reconnectionInterval that is not recognized by psycopg2
-    del db_config["reconnectionInterval"]
+# with open(arg_app_config_path, "r") as f:
+#     app_config = json.loads(f.read())
+#     db_config = app_config["app"]["db"]
+#     # Delete property reconnectionInterval that is not recognized by psycopg2
+#     del db_config["reconnectionInterval"]
 
 
 def reconnect(f: Callable):
@@ -95,15 +95,15 @@ class Db:
             main_log.debug(f'Channel listener started: "{item}"')
 
 
-db = Db(db_config)
-try:
-    db.connect()
-    query = db.query
-    listen_channels = db.listen_channels
-    check_notifications = db.check_notifications
-    # Test db connection
-    query("SELECT NOW()")
-    main_log.info("Database connected")
-    listen_channels(["scripts-jobs-commands:new-row"])
-except Exception as e:
-    main_log.error(e)
+# db = Db(db_config)
+# try:
+#     db.connect()
+#     query = db.query
+#     listen_channels = db.listen_channels
+#     check_notifications = db.check_notifications
+#     # Test db connection
+#     query("SELECT NOW()")
+#     main_log.info("Database connected")
+#     listen_channels(["scripts-jobs-commands:new-row"])
+# except Exception as e:
+#     main_log.error(e)
