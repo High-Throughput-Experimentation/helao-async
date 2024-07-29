@@ -1069,7 +1069,7 @@ class HelaoSyncer:
             self.base.print_message("Converting dict to json.")
             uploaded = dict2json(msg)
             if compress:
-                uploaded = gzip.compress(uploaded)
+                uploaded = gzip.compress(uploaded.read())
             uploader = self.s3.upload_fileobj
         else:
             self.base.print_message("Converting path to str")
