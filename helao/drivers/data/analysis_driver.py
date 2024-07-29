@@ -178,7 +178,7 @@ class HelaoAnalysisSyncer:
                 with gzip.open(local_json_out, 'wt', encoding='utf-8') as f:
                     json.dump(s3_dict, f)
                 if not self.config_dict.get("local_only", False):
-                    s3_success = await self.to_s3(s3_dict, s3_output_target, compress=True)
+                    s3_success = await self.to_s3(s3_dict, s3_output_target, compress=False)
                 else:
                     s3_success = True
                 output_successes.append(s3_success)
