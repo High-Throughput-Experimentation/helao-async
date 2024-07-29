@@ -206,30 +206,35 @@ class HelaoAnalysisSyncer:
         compress: bool = False,
     ):
         """Uploads to S3: dict sent as json, path sent as file."""
-        if isinstance(msg, dict):
-            uploaded = dict2json(msg)
-            if compress:
-                uploaded = gzip.compress(uploaded.read())
-            uploader = self.s3.upload_fileobj
-        else:
-            uploaded = str(msg)
-            uploader = self.s3.upload_file
-        for i in range(retries + 1):
-            if i > 0:
-                self.base.print_message(
-                    f"S3 retry [{i}/{retries}]: {self.bucket}, {target}"
-                )
-            try:
-                uploader(uploaded, self.bucket, target)
-                return True
-            except botocore.exceptions.ClientError as err:
-                _ = "".join(
-                    traceback.format_exception(type(err), err, err.__traceback__)
-                )
-                self.base.print_message(err)
-                await asyncio.sleep(1)
-        self.base.print_message(f"Did not upload {target} after {retries} tries.")
-        return False
+        try:
+            if isinstance(msg, dict):
+                uploaded = dict2json(msg)
+                if compress:
+                    if not target.endswith(".gz"):
+                        target = f"{target}.gz"
+                    uploaded = gzip.compress(uploaded.read())
+                uploader = self.s3.upload_fileobj
+            else:
+                uploaded = str(msg)
+                uploader = self.s3.upload_file
+            for i in range(retries + 1):
+                if i > 0:
+                    self.base.print_message(
+                        f"S3 retry [{i}/{retries}]: {self.bucket}, {target}"
+                    )
+                try:
+                    uploader(uploaded, self.bucket, target)
+                    return True
+                except botocore.exceptions.ClientError as err:
+                    _ = "".join(
+                        traceback.format_exception(type(err), err, err.__traceback__)
+                    )
+                    self.base.print_message(err)
+                    await asyncio.sleep(1)
+            self.base.print_message(f"Did not upload {target} after {retries} tries.")
+            return False
+        except Exception:
+            LOGGER.error(f"Could not push {target}.", exc_info=True)
 
     async def to_api(self, req_model: dict, retries: int = 3):
         """POST/PATCH model via Modelyst API."""

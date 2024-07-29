@@ -1062,35 +1062,40 @@ class HelaoSyncer:
         compress: bool = False,
     ):
         """Uploads to S3: dict sent as json, path sent as file."""
-        if self.s3 is None:
-            self.base.print_message("S3 is not configured. Skipping to S3 upload.")
-            return True
-        if isinstance(msg, dict):
-            self.base.print_message("Converting dict to json.")
-            uploaded = dict2json(msg)
-            if compress:
-                uploaded = gzip.compress(uploaded.read())
-            uploader = self.s3.upload_fileobj
-        else:
-            self.base.print_message("Converting path to str")
-            uploaded = str(msg)
-            uploader = self.s3.upload_file
-        for i in range(retries + 1):
-            if i > 0:
-                self.base.print_message(
-                    f"S3 retry [{i}/{retries}]: {self.bucket}, {target}"
-                )
-            try:
-                uploader(uploaded, self.bucket, target)
+        try:
+            if self.s3 is None:
+                self.base.print_message("S3 is not configured. Skipping to S3 upload.")
                 return True
-            except Exception as err:
-                _ = "".join(
-                    traceback.format_exception(type(err), err, err.__traceback__)
-                )
-                self.base.print_message(err)
-                await asyncio.sleep(5)
-        self.base.print_message(f"Did not upload {target} after {retries} tries.")
-        return False
+            if isinstance(msg, dict):
+                self.base.print_message("Converting dict to json.")
+                uploaded = dict2json(msg)
+                if compress:
+                    if not target.endswith(".gz"):
+                        target = f"{target}.gz"
+                    uploaded = gzip.compress(uploaded.read())
+                uploader = self.s3.upload_fileobj
+            else:
+                self.base.print_message("Converting path to str")
+                uploaded = str(msg)
+                uploader = self.s3.upload_file
+            for i in range(retries + 1):
+                if i > 0:
+                    self.base.print_message(
+                        f"S3 retry [{i}/{retries}]: {self.bucket}, {target}"
+                    )
+                try:
+                    uploader(uploaded, self.bucket, target)
+                    return True
+                except Exception as err:
+                    _ = "".join(
+                        traceback.format_exception(type(err), err, err.__traceback__)
+                    )
+                    self.base.print_message(err)
+                    await asyncio.sleep(5)
+            self.base.print_message(f"Did not upload {target} after {retries} tries.")
+            return False
+        except Exception:
+            LOGGER.error(f"Could not push {target}.", exc_info=True)
 
     async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
         """POST/PATCH model via Modelyst API."""
