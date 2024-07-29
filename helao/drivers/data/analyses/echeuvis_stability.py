@@ -427,8 +427,8 @@ class EcheUvisAnalysis(BaseAnalysis):
 
         wls_insitu = itup[0][wlindlo:wlindhi]
         eps_insitu = itup[1][ap["skip_first_n"] :]
-        arr_insitu = itup[2][ap["skip_first_n"] :, wlindlo:wlindhi]
-        refadj_arr_insitu = (arr_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+        arr_insitu = itup[2][ap["skip_first_n"] :]
+        refadj_arr_insitu = ((arr_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark))[:, wlindlo:wlindhi]
         omt_arr_insitu = 1 - refadj_arr_insitu
         omt_refadj_baseline = 1 - refadj_baseline
         arr_omt_ratio = omt_arr_insitu / omt_refadj_baseline
