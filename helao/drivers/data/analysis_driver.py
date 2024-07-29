@@ -209,7 +209,7 @@ class HelaoAnalysisSyncer:
         if isinstance(msg, dict):
             uploaded = dict2json(msg)
             if compress:
-                uploaded = gzip.compress(uploaded)
+                uploaded = gzip.compress(uploaded.read())
             uploader = self.s3.upload_fileobj
         else:
             uploaded = str(msg)
