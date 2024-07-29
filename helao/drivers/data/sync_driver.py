@@ -689,9 +689,13 @@ class HelaoSyncer:
                         f"Pushing {sp} to S3 for {prog.yml.target.name}"
                     )
                     if fp.suffix == ".hlo":
-                        compress = True
+                        # compress = True
+                        # file_s3_key = (
+                        #     f"raw_data/{meta['action_uuid']}/{fp.name}.json.gz"
+                        # )
+                        compress = False
                         file_s3_key = (
-                            f"raw_data/{meta['action_uuid']}/{fp.name}.json.gz"
+                            f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                         )
                         self.base.print_message("Parsing hlo dicts.")
                         try:
