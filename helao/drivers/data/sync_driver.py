@@ -1284,7 +1284,7 @@ class HelaoSyncer:
                 self.unsync_dir(sync_path)
 
             else:
-                self.base.print_message(
+                LOGGER.warning(
                     f"Found {len(base_prgs)} .prg, .progress, or .lock files in subdirectories of {sync_path}"
                 )
                 # remove all .prg files and lock files
@@ -1338,4 +1338,4 @@ class HelaoSyncer:
                 tp = os.path.dirname(fp.replace("RUNS_SYNCED", "RUNS_FINISHED"))
                 os.makedirs(tp, exist_ok=True)
                 shutil.move(fp, tp)
-        self.base.print_message(f"Successfully reverted {sync_dir}")
+        LOGGER.warning(f"Successfully reverted {sync_dir}")
