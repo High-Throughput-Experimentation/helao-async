@@ -1022,6 +1022,7 @@ class HelaoSyncer:
                 if pidx not in exp_prog.dict["process_metas"]:
                     push_condition = False
                     sync_path = os.path.dirname(str(exp_prog.prg))
+                    LOGGER.warning(f"Cannot sync experiment because process index {pidx} is missing. See {str(exp_prog.yml.target)}")
                     self.reset_sync(sync_path)
                     await self.enqueue_yml(str(exp_prog.yml.target))
                     return exp_prog
