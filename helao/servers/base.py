@@ -177,6 +177,7 @@ class Base:
         self.ntp_last_sync = None
         self.aiolock = asyncio.Lock()
         self.endpoint_queues = {}
+        self.local_action_queue = Queue()
         self.fast_urls = []
 
         self.ntp_last_sync_file = None
@@ -1936,7 +1937,16 @@ class Active:
                         self.base.local_action_task_queue.remove(action.action_uuid)
 
                 # since all sub-actions of active are finished process endpoint queue
-                if self.base.endpoint_queues[action.action_name].qsize() > 0:
+                if not self.base.server_params.get("allow_concurrent_actions", True):
+                    if self.base.local_action_queue.qsize() > 0:
+                        qact, qpars = self.base.local_action_queue.get()
+                        self.base.print_message(
+                            f"{qact.action_name} was previously queued"
+                        )
+                        self.base.print_message(f"running queued {qact.action_name}")
+                        qact.start_condition = ASC.no_wait
+                        await async_action_dispatcher(self.base.world_cfg, qact, qpars)
+                elif self.base.endpoint_queues[action.action_name].qsize() > 0:
                     self.base.print_message(
                         f"{action.action_name} was previously queued"
                     )
