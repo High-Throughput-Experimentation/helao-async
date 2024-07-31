@@ -694,9 +694,7 @@ class HelaoSyncer:
                         #     f"raw_data/{meta['action_uuid']}/{fp.name}.json.gz"
                         # )
                         compress = False
-                        file_s3_key = (
-                            f"raw_data/{meta['action_uuid']}/{fp.name}.json"
-                        )
+                        file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                         self.base.print_message("Parsing hlo dicts.")
                         try:
                             file_meta, file_data = read_hlo(sp)
@@ -1022,7 +1020,9 @@ class HelaoSyncer:
                 if pidx not in exp_prog.dict["process_metas"]:
                     push_condition = False
                     sync_path = os.path.dirname(str(exp_prog.prg))
-                    LOGGER.warning(f"Cannot sync experiment because process index {pidx} is missing. See {str(exp_prog.yml.target)}")
+                    LOGGER.warning(
+                        f"Cannot sync experiment because process index {pidx} is missing. See {str(exp_prog.yml.target)}"
+                    )
                     self.reset_sync(sync_path)
                     await self.enqueue_yml(str(exp_prog.yml.target))
                     return exp_prog
@@ -1074,11 +1074,14 @@ class HelaoSyncer:
             if isinstance(msg, dict):
                 self.base.print_message("Converting dict to json.")
                 uploaded = dict2json(msg)
+                uploader = self.s3.upload_fileobj
                 if compress:
                     if not target.endswith(".gz"):
                         target = f"{target}.gz"
-                    uploaded = gzip.compress(uploaded.read())
-                uploader = self.s3.upload_fileobj
+                    uploaded = gzip.compress(uploaded)
+                    uploader = lambda byteobj, bucket, key: self.s3.put_object(
+                        bucket=bucket, body=byteobj, key=key
+                    )
             else:
                 self.base.print_message("Converting path to str")
                 uploaded = str(msg)
