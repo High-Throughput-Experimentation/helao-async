@@ -216,11 +216,14 @@ class HelaoAnalysisSyncer:
         try:
             if isinstance(msg, dict):
                 uploaded = dict2json(msg)
+                uploader = self.s3.upload_fileobj
                 if compress:
                     if not target.endswith(".gz"):
                         target = f"{target}.gz"
-                    uploaded = gzip.compress(uploaded.read())
-                uploader = self.s3.upload_fileobj
+                    uploaded = gzip.compress(uploaded)
+                    uploader = lambda byteobj, bucket, key: self.s3.put_object(
+                        bucket=bucket, body=byteobj, key=key
+                    )
             else:
                 uploaded = str(msg)
                 uploader = self.s3.upload_file
