@@ -107,6 +107,7 @@ class KDS100:
         self.sio = io.TextIOWrapper(io.BufferedRWPair(self.com, self.com))
 
         self.aloop = asyncio.get_running_loop()
+        self.com_lock = False
         self.polling = True
         self.poll_signalq = asyncio.Queue(1)
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
@@ -136,11 +137,14 @@ class KDS100:
             self.polling = await self.poll_signalq.get()
             self.base.print_message("polling signal received")
 
-    def send(self, pump_name: str, cmd: str):
+    async def send(self, pump_name: str, cmd: str):
         if not cmd.endswith("\r"):
             cmd = cmd + "\r"
         addr = self.config_dict["pumps"][pump_name]["address"]
         command_str = f"{addr:02}@{cmd}"
+        while self.com_lock:
+            await asyncio.sleep(0.1)
+        self.com_lock = True
         self.sio.write(command_str)
         self.sio.flush()
         resp = [x.strip() for x in self.sio.readlines() if x.strip()]
@@ -150,6 +154,7 @@ class KDS100:
                 time.sleep(0.1)  # wait 100 msec and re-read, response
                 newlines = [x.strip() for x in self.sio.readlines() if x.strip()]
                 resp += newlines
+        self.com_lock = False
         return resp
 
     async def poll_sensor_loop(self, frequency: int = 10):
@@ -164,7 +169,7 @@ class KDS100:
                         # self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     addr = pdict["address"]
-                    status_resp = self.send(plab, "status")
+                    status_resp = await self.send(plab, "status")
                     # self.base.print_message(f"received status: {status_resp}")
                     lastupdate = time.time()
                     status_prompt = status_resp[-1]
@@ -243,7 +248,7 @@ class KDS100:
         status_dict = {"status": state}
         self.base.live_buffer[pump_name][0].update(status_dict)
 
-    def start_pump(self, pump_name: str, direction: int):
+    async def start_pump(self, pump_name: str, direction: int):
         "Start motion in direction forward/infuse (1) or reverse/withdraw (-1)"
         if direction == 1:
             cmd = "irun"
@@ -251,18 +256,18 @@ class KDS100:
             cmd = "wrun"
         else:
             return False
-        resp = self.send(pump_name, cmd)
+        resp = await self.send(pump_name, cmd)
         self.update_status_from_response(resp)
         return resp
 
-    def set_force(self, pump_name: str, force_val: int):
+    async def set_force(self, pump_name: str, force_val: int):
         "Set infusion force value in percentage"
         cmd = f"forc {force_val}"
-        resp = self.send(pump_name, cmd)
+        resp = await self.send(pump_name, cmd)
         self.update_status_from_response(resp)
         return resp
 
-    def set_rate(self, pump_name: str, rate_val: int, direction: int):
+    async def set_rate(self, pump_name: str, rate_val: int, direction: int):
         "Set infusion|withdraw rate in uL/sec"
         if direction == 1:
             cmd = "irate"
@@ -270,19 +275,19 @@ class KDS100:
             cmd = "wrate"
         else:
             return False
-        resp = self.send(pump_name, f"{cmd} {rate_val} ul/sec")
+        resp = await self.send(pump_name, f"{cmd} {rate_val} ul/sec")
         self.update_status_from_response(resp)
         return resp
 
-    def set_target_volume(self, pump_name: str, vol_val: float):
+    async def set_target_volume(self, pump_name: str, vol_val: float):
         "Set infusion|withdraw volume in uL"
-        resp = self.send(pump_name, f"tvolume {vol_val} ul")
+        resp = await self.send(pump_name, f"tvolume {vol_val} ul")
         self.update_status_from_response(resp)
         return resp
 
-    def set_diameter(self, pump_name: str, diameter_mm: float):
+    async def set_diameter(self, pump_name: str, diameter_mm: float):
         "Set syringe diameter in mm"
-        resp = self.send(pump_name, f"diameter {diameter_mm:.4f}")
+        resp = await self.send(pump_name, f"diameter {diameter_mm:.4f}")
         self.update_status_from_response(resp)
         return resp
 
@@ -290,7 +295,7 @@ class KDS100:
     #     "Set infusion|withdraw ramp rate in units TODO"
     #     pass
 
-    def clear_time(self, pump_name: Optional[str] = None, direction: Optional[int] = 0):
+    async def clear_time(self, pump_name: Optional[str] = None, direction: Optional[int] = 0):
         if direction == 1:
             cmd = "citime"
         elif direction == -1:
@@ -299,15 +304,15 @@ class KDS100:
             cmd = "ctime"
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                resp = self.send(cpump_name, cmd)
+                resp = await self.send(cpump_name, cmd)
                 self.update_status_from_response(resp)
             return []
         else:
-            resp = self.send(pump_name, cmd)
+            resp = await self.send(pump_name, cmd)
             self.update_status_from_response(resp)
             return resp
 
-    def clear_volume(
+    async def clear_volume(
         self, pump_name: Optional[str] = None, direction: Optional[int] = 0
     ):
         if direction == 1:
@@ -318,72 +323,72 @@ class KDS100:
             cmd = "cvolume"
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                resp = self.send(cpump_name, cmd)
+                resp = await self.send(cpump_name, cmd)
                 self.update_status_from_response(resp)
             return []
         else:
             if direction != 0 and direction is not None:
-                vol_resp = self.send(pump_name, cmd[1:])[0].split(":")[-1]
+                vol_resp = await self.send(pump_name, cmd[1:])[0].split(":")[-1]
                 vol_val, vol_units = vol_resp.lower().split()
                 vol_val = float(vol_val)
                 direct_vol_ul = vol_val * ulmap[vol_units] * direction * -1
                 self.present_volume_ul += direct_vol_ul
-            resp = self.send(pump_name, cmd)
+            resp = await self.send(pump_name, cmd)
             self.update_status_from_response(resp)
             return resp
 
-    def clear_target_volume(self, pump_name: Optional[str] = None):
+    async def clear_target_volume(self, pump_name: Optional[str] = None):
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                resp = self.send(cpump_name, "ctvolume")
+                resp = await self.send(cpump_name, "ctvolume")
                 self.update_status_from_response(resp)
             return []
         else:
-            resp = self.send(pump_name, "ctvolume")
+            resp = await self.send(pump_name, "ctvolume")
             self.update_status_from_response(resp)
             return resp
 
-    def stop_pump(self, pump_name: Optional[str] = None):
+    async def stop_pump(self, pump_name: Optional[str] = None):
         cmd = "stp"
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                resp = self.send(cpump_name, cmd)
+                resp = await self.send(cpump_name, cmd)
                 self.update_status_from_response(resp)
             return []
         else:
-            resp = self.send(pump_name, cmd)
+            resp = await self.send(pump_name, cmd)
             self.update_status_from_response(resp)
             return resp
 
-    def safe_state(self):
+    async def safe_state(self):
         for plab, pdict in self.config_dict.get("pumps", {}).items():
             addr = pdict["address"]
             idle_resp = f"{addr:02}:\x11"
-            poll_resp = self.send(plab, "poll on")
+            poll_resp = await self.send(plab, "poll on")
             if poll_resp[-1] != idle_resp:
                 self.base.print_message(f"Error setting pump '{plab}' to 'POLL on'.")
                 self.base.print_message(f"Server returned: {poll_resp[0]}")
-            nvram_resp = self.send(plab, "nvram off")
+            nvram_resp = await self.send(plab, "nvram off")
             if nvram_resp[-1] != idle_resp:
                 self.base.print_message(f"Error setting pump '{plab}' to 'NVRAM off'.")
                 self.base.print_message(f"Server returned: {nvram_resp[0]}")
-            stop_resp = self.stop_pump(plab)
+            stop_resp = await self.stop_pump(plab)
             if stop_resp[-1] != idle_resp:
                 self.base.print_message(f"Error stopping pump '{plab}'.")
                 self.base.print_message(f"Server returned: {stop_resp[0]}")
-            cleartime_resp = self.clear_time(plab)
+            cleartime_resp = await self.clear_time(plab)
             if cleartime_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error clearing time params for pump '{plab}'."
                 )
                 self.base.print_message(f"Server returned: {cleartime_resp[0]}")
-            clearvol_resp = self.clear_target_volume(plab)
+            clearvol_resp = await self.clear_target_volume(plab)
             if clearvol_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error clearing volume params for pump '{plab}'."
                 )
                 self.base.print_message(f"Server returned: {clearvol_resp[0]}")
-            diameter_resp = self.set_diameter(plab, pdict["diameter"])
+            diameter_resp = await self.set_diameter(plab, pdict["diameter"])
             if diameter_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error setting syringe diameter on pump '{plab}'."
@@ -391,12 +396,12 @@ class KDS100:
                 self.base.print_message(f"Server returned: {diameter_resp[0]}")
             self.update_status_from_response(diameter_resp)
 
-    def shutdown(self):
+    async def shutdown(self):
         # this gets called when the server is shut down
         # or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
         self.base.print_message("shutting down syringe pump(s)")
-        self.safe_state()
+        await self.safe_state()
         self.com.close()
 
 
@@ -411,13 +416,13 @@ class PumpExec(Executor):
     async def _pre_exec(self):
         "Set rate and volume params, then run."
         self.active.base.print_message("PumpExec running setup methods.")
-        rate_resp = self.active.base.fastapp.driver.set_rate(
+        rate_resp = await self.active.base.fastapp.driver.set_rate(
             pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
             direction=self.direction,
         )
         self.active.base.print_message(f"set_rate returned: {rate_resp}")
-        vol_resp = self.active.base.fastapp.driver.set_target_volume(
+        vol_resp = await self.active.base.fastapp.driver.set_target_volume(
             pump_name=self.pump_name,
             vol_val=self.active.action.action_params["volume_uL"],
         )
@@ -425,7 +430,7 @@ class PumpExec(Executor):
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
-        start_resp = self.active.base.fastapp.driver.start_pump(
+        start_resp = await self.active.base.fastapp.driver.start_pump(
             pump_name=self.pump_name,
             direction=self.direction,
         )
@@ -445,18 +450,18 @@ class PumpExec(Executor):
             return {"error": ErrorCodes.none, "status": HloStatus.finished}
 
     async def _manual_stop(self):
-        stop_resp = self.active.base.fastapp.driver.stop_pump(self.pump_name)
+        stop_resp = await self.active.base.fastapp.driver.stop_pump(self.pump_name)
         self.active.base.print_message(f"stop_pump returned: {stop_resp}")
         return {"error": ErrorCodes.none}
 
     async def _post_exec(self):
         self.active.base.print_message("PumpExec running cleanup methods.")
-        clearvol_resp = self.active.base.fastapp.driver.clear_volume(
+        clearvol_resp = await self.active.base.fastapp.driver.clear_volume(
             pump_name=self.pump_name,
             direction=self.direction,
         )
         self.active.base.print_message(f"clear_volume returned: {clearvol_resp}")
-        cleartar_resp = self.active.base.fastapp.driver.clear_target_volume(
+        cleartar_resp = await self.active.base.fastapp.driver.clear_target_volume(
             pump_name=self.pump_name,
         )
         self.active.base.print_message(f"clear_target_volume returned: {cleartar_resp}")
