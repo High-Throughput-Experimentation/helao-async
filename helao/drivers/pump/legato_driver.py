@@ -132,7 +132,7 @@ class KDS100:
             await asyncio.sleep(0.1)
 
     async def poll_signal_loop(self):
-        self.safe_state()
+        await self.safe_state()
         while True:
             self.polling = await self.poll_signalq.get()
             self.base.print_message("polling signal received")
