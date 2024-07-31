@@ -1080,7 +1080,7 @@ class HelaoSyncer:
                         target = f"{target}.gz"
                     uploaded = gzip.compress(uploaded)
                     uploader = lambda byteobj, bucket, key: self.s3.put_object(
-                        bucket=bucket, body=byteobj, key=key
+                        Bucket=bucket, Body=byteobj, Key=key
                     )
             else:
                 self.base.print_message("Converting path to str")
