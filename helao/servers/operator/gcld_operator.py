@@ -294,7 +294,7 @@ UVIS_T_defaults = {
     "reference_mode": "builtin",
     "custom_position": "cell1_we",
     "spec_n_avg": 5,
-    "spec_int_time_ms": 60,
+    "spec_int_time_ms": 40,
     "duration_sec": 5,
     "specref_code": 1,
     "led_type": "front",
@@ -307,8 +307,6 @@ UVIS_T_defaults = {
 UVIS_T_postseq_defaults = {"recent": False}
 
 ECHEUVIS_multiCA_led_defaults = {
-    # "reservoir_electrolyte": "OER10",
-    # "reservoir_liquid_sample_no": 198,
     "reservoir_electrolyte": "OER1",
     "reservoir_liquid_sample_no": 448,
     "solution_bubble_gas": "O2",
@@ -316,15 +314,8 @@ ECHEUVIS_multiCA_led_defaults = {
     "measurement_area": 0.071,  # 3mm diameter droplet
     "liquid_volume_ml": 1.0,
     "ref_vs_nhe": 0.21 + 0.008,
-    # "CA_potential_vsRHE": [
-    #     0.4,
-    #     1.0,
-    #     1.6,
-    #     2.2,
-    # ],
     "CA_duration_sec": 85,
     "CA_potential_vsRHE": [
-        # -0.2,
         0,
         0.2,
         0.4,
@@ -336,8 +327,6 @@ ECHEUVIS_multiCA_led_defaults = {
         1.6,
         1.8,
         2.0,
-        # 2.2,
-        # 2.4,
     ],
     "CA_samplerate_sec": 0.05,
     "OCV_duration_sec": 5,
@@ -357,7 +346,7 @@ ECHEUVIS_multiCA_led_defaults = {
     "toggleSpec_init_delay": 0.0,
     "toggleSpec_time": -1,
     "spec_ref_duration": 5,
-    "spec_int_time_ms": 60,
+    "spec_int_time_ms": 40,
     "spec_n_avg": 5,
     "spec_technique": "T_UVVIS",
     "calc_ev_parts": [1.8, 2.2, 2.6, 3.0],
