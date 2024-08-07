@@ -6,6 +6,13 @@ Handles Helao analyses uploads to S3.
 
 __all__ = ["HelaoAnalysisSyncer"]
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="analysis_driver_standalone")
+else:
+    LOGGER = logging.LOGGER
+
 import time
 import asyncio
 import traceback
