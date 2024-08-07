@@ -328,7 +328,8 @@ class KDS100:
             return []
         else:
             if direction != 0 and direction is not None:
-                vol_resp = await self.send(pump_name, cmd[1:])[0].split(":")[-1]
+                resp = await self.send(pump_name, cmd[1:])
+                vol_resp = resp[0].split(":")[-1]
                 vol_val, vol_units = vol_resp.lower().split()
                 vol_val = float(vol_val)
                 direct_vol_ul = vol_val * ulmap[vol_units] * direction * -1
