@@ -266,6 +266,20 @@ def CCSI_sub_headspace_purge_and_measure(
     #
     # HEADSPACE EVALUATION
     apm.add(
+        MFC_server,
+        "acquire_flowrate",
+        {
+            "flowrate_sccm": None,
+            "duration": co2measure_duration,
+            "acquisition_rate": co2measure_acqrate,
+        },
+        technique_name="pressure_measurre",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+        ],
+    )
+    apm.add(
         CO2S_server,
         "acquire_co2",
         {
