@@ -3389,6 +3389,7 @@ def ADSS_PA_CV_TRI_new(
                                 "ref_type": ref_type,
                                 "ref_offset__V": ref_offset__V,
                                 "aliquot_insitu": False,
+                                "bubbler_gas": "N2",
                                 "run_use": "ref",
                                 "RSD_threshold": bubble_removal_RSD_threshold,
                                 "simple_threshold": bubble_removal_simple_threshold,
@@ -3408,6 +3409,7 @@ def ADSS_PA_CV_TRI_new(
                                "ref_type": ref_type,
                                "ref_offset__V": ref_offset__V,
                                "aliquot_insitu": False,
+                               "bubbler_gas": "N2",
                                "run_use": "ref"
                            })
 
@@ -3435,6 +3437,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "N2",
                     "run_use": "ref"
                 }
             )
@@ -3456,6 +3459,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "N2",
                     "run_use": "ref"
                 }
             )
@@ -3471,6 +3475,7 @@ def ADSS_PA_CV_TRI_new(
                         "ref_type": ref_type,
                         "ref_offset__V": ref_offset__V,
                         "aliquot_insitu": False,
+                        "bubbler_gas": "O2",
                         "run_use": "ref"
                     })
 #        epm.add_experiment(
@@ -3497,6 +3502,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "O2",
                     "run_use": "ref"
                 }
             )
@@ -3620,6 +3626,7 @@ def ADSS_PA_CV_TRI_new(
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 }
             )
+            previous_liquid_injected = ""
 
         #set initial gas to N2
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
@@ -3702,6 +3709,7 @@ def ADSS_PA_CV_TRI_new(
                                 "amplitude_threshold": bubble_removal_amplitude_threshold,
                                 "bubble_pump_reverse_time_s": bubble_removal_pump_reverse_t_s,
                                 "bubble_pump_forward_time_s": bubble_removal_pump_forward_t_s,
+                                "bubbler_gas": "N2",
                                 })
 
         #saturate electrolyte with N2
@@ -3713,7 +3721,8 @@ def ADSS_PA_CV_TRI_new(
                         "ph": ph,
                         "ref_type": ref_type,
                         "ref_offset__V": ref_offset__V,
-                        "aliquot_insitu": False,                        
+                        "aliquot_insitu": False,
+                        "bubbler_gas": "N2",                        
                     })
         
         # epm.add_experiment(
@@ -3740,6 +3749,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "N2",
                 }
             )
             if aliquot_after_cleaningCV[i] == 1:
@@ -3781,6 +3791,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "N2",
                 }
             )
             if aliquote_after_CV_init[i] == 1:
@@ -3817,6 +3828,7 @@ def ADSS_PA_CV_TRI_new(
                         "ref_type": ref_type,
                         "ref_offset__V": ref_offset__V,
                         "aliquot_insitu": False,
+                        "bubbler_gas": "O2",
                     })        
         
         # epm.add_experiment(
@@ -3844,6 +3856,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "O2",
                 }
             )
             if aliquote_CV_O2[i] == 1:
@@ -3870,6 +3883,7 @@ def ADSS_PA_CV_TRI_new(
 
         #inject phosphoric acid
         if Inject_PA:
+            previous_liquid_injected = "phosphoric"
             washmod += 1
             washone = washmod %4 %3 %2
             washtwo = (washmod + 1) %4 %3 %2
@@ -3902,6 +3916,8 @@ def ADSS_PA_CV_TRI_new(
                     "wait_time_s": inject_recirculate_wait_time_sec,
                 }
             )
+        else:
+            previous_liquid_injected = ""
 
         #start O2 cycles with PA
         for i, CV_cycle in enumerate(CV_O2_cycles):
@@ -3921,6 +3937,8 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "O2",
+                    "previous_liquid_injected": previous_liquid_injected,
                 },
             )
 
@@ -3958,6 +3976,8 @@ def ADSS_PA_CV_TRI_new(
                                "ref_type": ref_type,
                                "ref_offset__V": ref_offset__V,
                                "aliquot_insitu": False,
+                               "bubbler_gas": "N2",
+                               "previous_liquid_injected": previous_liquid_injected,
                            })
         
         # epm.add_experiment(
@@ -3984,6 +4004,8 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "N2",
+                    "previous_liquid_injected": previous_liquid_injected,
                 }
             )
             
@@ -4170,6 +4192,7 @@ def ADSS_PA_CV_TRI_new(
                                 "amplitude_threshold": bubble_removal_amplitude_threshold,
                                 "bubble_pump_reverse_time_s": bubble_removal_pump_reverse_t_s,
                                 "bubble_pump_forward_time_s": bubble_removal_pump_forward_t_s,
+                                "bubbler_gas": "N2",
                                 })
 
         #saturate electrolyte with N2
@@ -4182,7 +4205,9 @@ def ADSS_PA_CV_TRI_new(
                         "ref_type": ref_type,
                         "ref_offset__V": ref_offset__V,
                         "aliquot_insitu": False,
+                        "bubbler_gas": "N2",
                         "run_use": "ref"
+                        
                     })
         
         # epm.add_experiment(
@@ -4209,6 +4234,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "N2",
                     "run_use": "ref"
                 }
             )
@@ -4230,6 +4256,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "N2",
                     "run_use": "ref"
                 }
             )
@@ -4245,6 +4272,7 @@ def ADSS_PA_CV_TRI_new(
                                "ref_type": ref_type,
                                "ref_offset__V": ref_offset__V,
                                "aliquot_insitu": False,
+                               "bubbler_gas": "O2",
                                "run_use": "ref"
                            })        
 #        epm.add_experiment(
@@ -4271,6 +4299,7 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "bubbler_gas": "O2",
                     "run_use": "ref"
                 }
             )
