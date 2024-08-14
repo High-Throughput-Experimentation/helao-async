@@ -739,7 +739,7 @@ def ADSS_sub_fill(
 
 def ADSS_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 10,  # v10 insitu sub
+    experiment_version: int = 11,  # v10 insitu sub 11 bubbler/injected flags
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -748,10 +748,12 @@ def ADSS_sub_CA(
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
     CA_duration_sec: float = 1800,
-    insert_electrolyte: bool = False,  # rename this to insert_electrolyte_bool to avoid confusion
+    insert_electrolyte_bool: bool = False,  # rename this to insert_electrolyte_bool to avoid confusion
     insert_electrolyte_volume_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
+    bubbler_gas: str ="",
+    previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
     aliquot_insitu: bool = True,
@@ -828,13 +830,13 @@ def ADSS_sub_CA(
         before aliquot, and a -65- second wait to turn back on gas valve
         that occurs before full PAL action is completed
     """
-    if apm.pars.aliquot_insitu or apm.pars.insert_electrolyte:
+    if apm.pars.aliquot_insitu or apm.pars.insert_electrolyte_bool:
 
         apm.add_action_list(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=apm.pars.aliquot_insitu,
-                insert_electrolyte=apm.pars.insert_electrolyte,
+                insert_electrolyte_bool=apm.pars.insert_electrolyte,
                 insert_electrolyte_volume_ul=apm.pars.insert_electrolyte_volume_ul,
                 insert_electrolyte_time_sec=apm.pars.insert_electrolyte_time_sec,
                 electrolyte_sample_no=apm.pars.electrolyte_sample_no,
@@ -850,7 +852,7 @@ def ADSS_sub_CA(
 
 def ADSS_sub_CA_photo(
     experiment: Experiment,
-    experiment_version: int = 6,  # v4 add electrolyte add v6 insitu sub
+    experiment_version: int = 7,  # v4 add electrolyte add v6 insitu sub, 7 bubbler/injected flags
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -861,10 +863,12 @@ def ADSS_sub_CA_photo(
     CA_duration_sec: float = 1800,
     led_wavelength: str = "385",
     toggle_illum_duty: float = 1,
-    insert_electrolyte: bool = False,
+    insert_electrolyte_bool: bool = False,
     insert_electrolyte_volume_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
+    bubbler_gas: str ="",
+    previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
     aliquot_insitu: bool = True,
@@ -943,13 +947,13 @@ def ADSS_sub_CA_photo(
         before aliquot, and a -65- second wait to turn back on gas valve
         that occurs before full PAL action is completed
     """
-    if apm.pars.aliquot_insitu or apm.pars.insert_electrolyte:
+    if apm.pars.aliquot_insitu or apm.pars.insert_electrolyte_bool:
 
         apm.add_action_list(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=apm.pars.aliquot_insitu,
-                insert_electrolyte=apm.pars.insert_electrolyte,
+                insert_electrolyte_bool=apm.pars.insert_electrolyte,
                 insert_electrolyte_volume_ul=apm.pars.insert_electrolyte_volume_ul,
                 insert_electrolyte_time_sec=apm.pars.insert_electrolyte_time_sec,
                 electrolyte_sample_no=apm.pars.electrolyte_sample_no,
@@ -967,7 +971,7 @@ def ADSS_sub_CA_photo(
 
 def ADSS_sub_CV(
     experiment: Experiment,
-    experiment_version: int = 6,  # in situ actions replace
+    experiment_version: int = 7,  # 6 in situ actions replace, 7 bubbler/injected flags
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -981,13 +985,15 @@ def ADSS_sub_CV(
     ph: float = 9.53,
     ref_type: str = "inhouse",
     ref_offset__V: float = 0.0,
-    insert_electrolyte: bool = False,
+    insert_electrolyte_bool: bool = False,
     insert_electrolyte_volume_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
     aliquot_insitu: bool = True,
+    bubbler_gas: str ="",
+    previous_liquid_injected: str = "",
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here",
     run_use: RunUse = "data",
@@ -1046,13 +1052,13 @@ def ADSS_sub_CV(
             ProcessContrib.run_use,
         ],
     )
-    if apm.pars.aliquot_insitu or apm.pars.insert_electrolyte:
+    if apm.pars.aliquot_insitu or apm.pars.insert_electrolyte_bool:
 
         apm.add_action_list(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=apm.pars.aliquot_insitu,
-                insert_electrolyte=apm.pars.insert_electrolyte,
+                insert_electrolyte_bool=apm.pars.insert_electrolyte,
                 insert_electrolyte_volume_ul=apm.pars.insert_electrolyte_volume_ul,
                 insert_electrolyte_time_sec=apm.pars.insert_electrolyte_time_sec,
                 electrolyte_sample_no=apm.pars.electrolyte_sample_no,
@@ -1068,13 +1074,15 @@ def ADSS_sub_CV(
 
 def ADSS_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 6,  # in situ aliquot sub
+    experiment_version: int = 7,  # 6in situ aliquot sub 7, bubbler/injected flag
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
     ph: float = 9.53,
     ref_type: str = "inhouse",
     ref_offset__V: float = 0.0,
+    bubbler_gas: str ="",
+    previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
     aliquot_insitu: bool = False,
@@ -1182,7 +1190,7 @@ def ADSS_sub_OCV(
 
 def ADSS_sub_OCV_photo(
     experiment: Experiment,
-    experiment_version: int = 7,  # in situ aliquot sub
+    experiment_version: int = 8,  #7 in situ aliquot sub,8 bubbler/injected flags
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
@@ -1191,6 +1199,8 @@ def ADSS_sub_OCV_photo(
     ref_offset__V: float = 0.0,
     led_wavelength: str = "385",
     toggle_illum_duty: float = 1,
+    bubbler_gas: str ="",
+    previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
     aliquot_insitu: bool = False,
@@ -1259,7 +1269,7 @@ def ADSS_sub_OCV_photo(
 def ADSS_sub_insitu_actions(
     experiment: Experiment,
     experiment_version: int = 2,  # added washes
-    insert_electrolyte: bool = False,
+    insert_electrolyte_bool: bool = False,
     insert_electrolyte_volume_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
@@ -1287,7 +1297,7 @@ def ADSS_sub_insitu_actions(
 
     if apm.pars.aliquot_insitu:
 
-        if apm.pars.insert_electrolyte:
+        if apm.pars.insert_electrolyte_bool:
             eidx = [i for i, v in enumerate(atimes) if v < etime]
             mlist.insert(max(eidx) + 1, ("electrolyte", etime))
 
@@ -1362,7 +1372,7 @@ def ADSS_sub_insitu_actions(
                     ActionStartCondition.wait_for_orch,
                 )
             elif mtup[0] == "electrolyte":
-                #                if apm.pars.insert_electrolyte:
+                #                if apm.pars.insert_electrolyte_bool:
                 # apm.add_action_list(
                 #     ADSS_sub_load_liquid(
                 #         experiment=experiment,
@@ -1409,7 +1419,7 @@ def ADSS_sub_insitu_actions(
                     {"waittime": 0.1},
                     ActionStartCondition.wait_for_orch,
                 )
-    elif apm.pars.insert_electrolyte:
+    elif apm.pars.insert_electrolyte_bool:
         apm.add(ORCH_server, "wait", {"waittime": etime}, waitcond)
         apm.add(
             PAL_server,
