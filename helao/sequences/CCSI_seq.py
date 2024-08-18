@@ -1012,11 +1012,14 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "pureco2_sample_no": pureco2_sample_no,
             "flowrate_sccm": flowrate_sccm,
             "flowramp_sccm": flowramp_sccm,
-            "target_co2_ppm": target_co2_ppm,
+            # "target_co2_ppm": target_co2_ppm,
             "headspace_scc": gas_volume/1000,
             "refill_freq_sec": maintain_fill_freq_s,
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
-        })
+        },
+        from_globalexp_params={"mean_co2_ppm": "target_co2_ppm"},
+        
+        )
         # epm.add_experiment("CCSI_sub_load_gas", {
         #     "reservoir_gas_sample_no": pureco2_sample_no,
         #     "volume_ul_cell_gas": 1, #need calculated volume from mfc maintain concentration 
