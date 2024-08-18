@@ -286,11 +286,11 @@ def CCSI_sub_headspace_purge_and_measure(
             "duration": co2measure_duration,
             "acquisition_rate": co2measure_acqrate,
         },
+        asc.no_wait,
         technique_name="co2_measure",
         to_globalexp_params=["mean_co2_ppm"],
         process_finish=True,
         process_contrib=[ProcessContrib.files],
-        asc.no_wait,
 
     )
     apm.add(
