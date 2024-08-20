@@ -610,6 +610,7 @@ class HelaoSyncer:
         rank: int = 5,
         force_s3: bool = False,
         force_api: bool = False,
+        compress: bool = False,
     ):
         """Coroutine for syncing a single yml"""
         if not yml_path.exists():
@@ -686,17 +687,13 @@ class HelaoSyncer:
             while prog.dict.get("files_pending", []):
                 for sp in prog.dict["files_pending"]:
                     fp = Path(sp)
-                    compress = False
                     self.base.print_message(
                         f"Pushing {sp} to S3 for {prog.yml.target.name}"
                     )
                     if fp.suffix == ".hlo":
-                        # compress = True
-                        # file_s3_key = (
-                        #     f"raw_data/{meta['action_uuid']}/{fp.name}.json.gz"
-                        # )
-                        compress = False
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
+                        if compress:
+                            file_s3_key += ".gz"
                         self.base.print_message("Parsing hlo dicts.")
                         try:
                             file_meta, file_data = read_hlo(sp)

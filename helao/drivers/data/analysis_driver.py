@@ -81,11 +81,6 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self.running_tasks = {}
 
         self.syncer_loop = asyncio.create_task(self.syncer(), name="syncer_loop")
-        self.ana_funcs = {
-            "ECHEUVIS_InsituOpticalStability": EcheUvisAnalysis,
-            "UVIS_BkgSubNorm": DryUvisAnalysis,
-            "ICPMS_Concentration": IcpmsAnalysis,
-        }
 
     def sync_exit_callback(self, task: asyncio.Task):
         task_name = task.get_name()
@@ -128,18 +123,17 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         retries: int = 3,
         rank: int = 5,
     ):
-        process_uuid, process_df, analysis_params, analysis_name = calc_tup
+        process_uuid, process_df, analysis_params, ana_func = calc_tup
         # self.base.print_message(f"performing analysis {analysis_name}")
         # self.base.print_message(f"using params {analysis_params}")
         if analysis_params is None:
             analysis_params = {}
-        eua = self.ana_funcs[analysis_name](process_uuid, process_df, analysis_params)
+        eua = ana_func(process_uuid, process_df, analysis_params)
         # self.base.print_message("calculating analysis output")
         calc_result = eua.calc_output()
         if calc_result:
             # self.base.print_message("exporting analysis output")
             model_dict, output_dict = eua.export_analysis(
-                analysis_name=analysis_name,
                 bucket=self.bucket,
                 region=self.region,
                 dummy=self.world_config.get("dummy", True),
@@ -155,7 +149,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             year_week = ana_ts.strftime("%y.%U")
             analysis_day = ana_ts.strftime("%Y%m%d")
             local_ana_dir = os.path.join(
-                self.local_ana_root, year_week, analysis_day, f"{HMS}__{analysis_name}"
+                self.local_ana_root, year_week, analysis_day, f"{HMS}__{eua.analysis_name}"
             )
             os.makedirs(local_ana_dir, exist_ok=True)
             with open(
@@ -321,7 +315,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     puuid,
                     pdf,
                     params,
-                    "ECHEUVIS_InsituOpticalStability",
+                    EcheUvisAnalysis,
                 )
             )
 
@@ -371,7 +365,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     puuid,
                     pdf,
                     params,
-                    "UVIS_BkgSubNorm",
+                    DryUvisAnalysis,
                 )
             )
 
@@ -390,7 +384,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     puuid,
                     local_loader,
                     params,
-                    "ICPMS_Concentration",
+                    IcpmsAnalysis,
                 )
             )
 
