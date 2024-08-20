@@ -31,7 +31,7 @@ import pandas as pd
 from helao.servers.base import Base
 from helao.helpers.set_time import set_time
 from helao.helpers.yml_tools import yml_dumps
-from helao.drivers.data.sync_driver import dict2json
+from helao.drivers.data.sync_driver import dict2json, HelaoSyncer
 from helao.drivers.data.loaders import pgs3
 from helao.drivers.data.loaders.localfs import LocalLoader
 from helao.drivers.data.analyses.echeuvis_stability import (
@@ -41,8 +41,15 @@ from helao.drivers.data.analyses.echeuvis_stability import (
 from helao.drivers.data.analyses.uvis_bkgsubnorm import DryUvisAnalysis, DRYUVIS_QUERY
 from helao.drivers.data.analyses.icpms_local import IcpmsAnalysis
 
+from helao.helpers import logging
 
-class HelaoAnalysisSyncer:
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="sync_driver_standalone")
+else:
+    LOGGER = logging.LOGGER
+
+
+class HelaoAnalysisSyncer(HelaoSyncer):
     base: Base
     running_tasks: dict
 
@@ -61,6 +68,7 @@ class HelaoAnalysisSyncer:
             cache_sql=False,
         )
         self.s3 = pgs3.LOADER.cli
+        self.s3r = pgs3.LOADER.res
         # os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
         # self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
         # self.s3 = self.aws_session.client("s3")
@@ -182,10 +190,12 @@ class HelaoAnalysisSyncer:
                 local_json_out = os.path.join(
                     local_ana_dir, os.path.basename(s3_output_target)
                 )
-                with gzip.open(local_json_out, 'wt', encoding='utf-8') as f:
+                with gzip.open(local_json_out, "wt", encoding="utf-8") as f:
                     json.dump(s3_dict, f)
                 if not self.config_dict.get("local_only", False):
-                    s3_success = await self.to_s3(s3_dict, s3_output_target, compress=False)
+                    s3_success = await self.to_s3(
+                        s3_dict, s3_output_target, compress=False
+                    )
                 else:
                     s3_success = True
                 output_successes.append(s3_success)
@@ -204,47 +214,6 @@ class HelaoAnalysisSyncer:
         )
         self.running_tasks.pop(str(process_uuid))
         return False
-
-    async def to_s3(
-        self,
-        msg: Union[dict, Path],
-        target: str,
-        retries: int = 3,
-        compress: bool = False,
-    ):
-        """Uploads to S3: dict sent as json, path sent as file."""
-        try:
-            if isinstance(msg, dict):
-                uploaded = dict2json(msg)
-                uploader = self.s3.upload_fileobj
-                if compress:
-                    if not target.endswith(".gz"):
-                        target = f"{target}.gz"
-                    uploaded = gzip.compress(uploaded)
-                    uploader = lambda byteobj, bucket, key: self.s3.put_object(
-                        Bucket=bucket, Body=byteobj, Key=key
-                    )
-            else:
-                uploaded = str(msg)
-                uploader = self.s3.upload_file
-            for i in range(retries + 1):
-                if i > 0:
-                    self.base.print_message(
-                        f"S3 retry [{i}/{retries}]: {self.bucket}, {target}"
-                    )
-                try:
-                    uploader(uploaded, self.bucket, target)
-                    return True
-                except botocore.exceptions.ClientError as err:
-                    _ = "".join(
-                        traceback.format_exception(type(err), err, err.__traceback__)
-                    )
-                    self.base.print_message(err)
-                    await asyncio.sleep(1)
-            self.base.print_message(f"Did not upload {target} after {retries} tries.")
-            return False
-        except Exception:
-            LOGGER.error(f"Could not push {target}.", exc_info=True)
 
     async def to_api(self, req_model: dict, retries: int = 3):
         """POST/PATCH model via Modelyst API."""

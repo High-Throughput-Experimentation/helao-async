@@ -449,9 +449,11 @@ class HelaoSyncer:
                 profile_name=self.config_dict["aws_profile"]
             )
             self.s3 = self.aws_session.client("s3")
+            self.s3r = boto3.resource("s3")
         else:
             self.aws_session = None
             self.s3 = None
+            self.s3r = None
         self.bucket = self.config_dict["aws_bucket"]
         self.api_host = self.config_dict["api_host"]
 
@@ -1073,18 +1075,19 @@ class HelaoSyncer:
                 return True
             if isinstance(msg, dict):
                 self.base.print_message("Converting dict to json.")
-                uploaded = dict2json(msg)
+                uploadee = dict2json(msg)
                 uploader = self.s3.upload_fileobj
                 if compress:
                     if not target.endswith(".gz"):
                         target = f"{target}.gz"
-                    uploaded = gzip.compress(uploaded)
-                    uploader = lambda byteobj, bucket, key: self.s3.put_object(
-                        Bucket=bucket, Body=byteobj, Key=key
-                    )
+                    buffer = io.BytesIO()
+                    with gzip.GzipFile(fileobj=buffer, mode="wb") as f:
+                        f.write(uploadee.read())
+                    buffer.seek(0)
+                    uploadee = buffer
             else:
                 self.base.print_message("Converting path to str")
-                uploaded = str(msg)
+                uploadee = str(msg)
                 uploader = self.s3.upload_file
             for i in range(retries + 1):
                 if i > 0:
@@ -1092,7 +1095,7 @@ class HelaoSyncer:
                         f"S3 retry [{i}/{retries}]: {self.bucket}, {target}"
                     )
                 try:
-                    uploader(uploaded, self.bucket, target)
+                    uploader(uploadee, self.bucket, target)
                     return True
                 except Exception as err:
                     _ = "".join(
