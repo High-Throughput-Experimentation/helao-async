@@ -1,5 +1,3 @@
-import sys
-import json
 from typing import Any
 from opcua import ua, Client, Node
 from psycopg2 import sql
@@ -7,8 +5,8 @@ from ..database import query
 from ..logger import script_log
 
 
-with open(arg_app_config_path, "r") as f:
-    app_config = json.loads(f.read())
+# with open(arg_app_config_path, "r") as f:
+#     app_config = json.loads(f.read())
 
 
 class Variable:
@@ -75,7 +73,7 @@ class Variable:
         return res[0][0]
     
 class Station:
-    def __init__(self, station_name: str) -> None:
+    def __init__(self, station_name: str, app_config: dict) -> None:
         self._station_name = station_name
         self._connection_options = None
         self._client = None
@@ -86,7 +84,7 @@ class Station:
                 # If two configurations with the same station name are found, read only the first one
                 break
 
-        if self._connection_options == None:
+        if self._connection_options is None:
             raise Exception(f'Configuration for station with name "{station_name}" not found')
         else:
             script_log.debug(
