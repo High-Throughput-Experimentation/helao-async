@@ -1,4 +1,3 @@
-import json
 from psycopg2 import connect, sql
 from psycopg2 import OperationalError, ProgrammingError, Error
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
