@@ -42,6 +42,7 @@ from helaocore.models.experiment import ExperimentModel
 from helaocore.models.sequence import SequenceModel
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
+from helao.helpers.parquet import hlo_to_parquet
 from helao.helpers.yml_tools import yml_dumps, yml_load
 from helao.helpers.zip_dir import zip_dir
 
@@ -691,22 +692,44 @@ class HelaoSyncer:
                         f"Pushing {sp} to S3 for {prog.yml.target.name}"
                     )
                     if fp.suffix == ".hlo":
-                        file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
-                        if compress:
-                            file_s3_key += ".gz"
-                        self.base.print_message("Parsing hlo dicts.")
-                        try:
-                            file_meta, file_data = read_hlo(sp)
-                        except Exception as err:
-                            str_err = "".join(
-                                traceback.format_exception(
-                                    type(err), err, err.__traceback__
-                                )
+                        if fp.stat().st_size < 1024**3:  # 1GB
+                            file_s3_key = (
+                                f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                             )
-                            self.base.print_message(str_err)
-                            file_meta = {}
-                            file_data = {}
-                        msg = {"meta": file_meta, "data": file_data}
+                            if compress:
+                                file_s3_key += ".gz"
+                            self.base.print_message("Parsing hlo dicts.")
+                            try:
+                                file_meta, file_data = read_hlo(sp)
+                            except Exception as err:
+                                str_err = "".join(
+                                    traceback.format_exception(
+                                        type(err), err, err.__traceback__
+                                    )
+                                )
+                                self.base.print_message(str_err)
+                                file_meta = {}
+                                file_data = {}
+                            msg = {"meta": file_meta, "data": file_data}
+                        else:
+                            self.base.print_message(
+                                "hlo file larger than 1GB, converting to parquet."
+                            )
+                            file_s3_key = (
+                                f"raw_data/{meta['action_uuid']}/{fp.name}.parquet"
+                            )
+                            try:
+                                parquet_path = fp + ".parquet"
+                                hlo_to_parquet(fp, parquet_path)
+                                msg = Path(parquet_path)
+                            except Exception as err:
+                                str_err = "".join(
+                                    traceback.format_exception(
+                                        type(err), err, err.__traceback__
+                                    )
+                                )
+                                self.base.print_message(str_err)
+                                msg = None
                     else:
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}"
                         msg = fp
@@ -726,6 +749,10 @@ class HelaoSyncer:
                         self.base.print_message(f"Updating progress: {prog.dict}")
 
                         prog.write_dict()
+                        if isinstance(msg, Path) and msg.suffix==".parquet":
+                            self.base.print_message("cleaning up parquet file")
+                            msg.unlink()
+                            
 
         # if prog.yml is an experiment first check processes before pushing to API
         if prog.yml.type == "experiment":
@@ -1104,6 +1131,7 @@ class HelaoSyncer:
             return False
         except Exception:
             LOGGER.error(f"Could not push {target}.", exc_info=True)
+            return False
 
     async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
         """POST/PATCH model via Modelyst API."""
