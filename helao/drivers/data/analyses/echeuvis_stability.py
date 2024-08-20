@@ -282,7 +282,7 @@ class EcheUvisOutputs(BaseModel):
 
 class EcheUvisAnalysis(BaseAnalysis):
     """ECHEUVIS Optical Stability Analysis for GCLD demonstration."""
-
+    analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID
     analysis_params: dict
@@ -304,8 +304,8 @@ class EcheUvisAnalysis(BaseAnalysis):
         query_df: pd.DataFrame,
         analysis_params: dict,
     ):
+        self.analysis_name = "ECHEUVIS_InsituOpticalStability"
         self.analysis_timestamp = datetime.now()
-        self.analysis_uuid = gen_uuid()
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
         self.analysis_params.update(analysis_params)
         pdf = query_df.query("process_uuid==@process_uuid").reset_index(drop=True)
@@ -327,6 +327,7 @@ class EcheUvisAnalysis(BaseAnalysis):
         self.ca_potential_vrhe = self.inputs.insitu.process_params["CA_potential_vsRHE"]
         # print("getting code hash")
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
+        self.analysis_uuid = self.gen_uuid()
 
     def calc_output(self):
         """Calculate stability FOMs and intermediate vectors."""

@@ -67,7 +67,7 @@ class IcpmsOutputs(BaseModel):
 
 class IcpmsAnalysis(BaseAnalysis):
     """Dry UVIS Analysis for GCLD demonstration."""
-
+    analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID
     analysis_params: dict
@@ -87,8 +87,8 @@ class IcpmsAnalysis(BaseAnalysis):
         local_loader: LocalLoader,
         analysis_params: dict,
     ):
+        self.analysis_name = "ICPMS_Concentration"
         self.analysis_timestamp = datetime.now()
-        self.analysis_uuid = gen_uuid()
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
         self.analysis_params.update(analysis_params)
         self.inputs = IcpmsInputs(process_uuid, local_loader)
@@ -102,6 +102,7 @@ class IcpmsAnalysis(BaseAnalysis):
 
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
         self.global_sample_label = self.inputs.global_sample_label
+        self.analysis_uuid = self.gen_uuid(self.inputs.global_sample_label)
 
     def calc_output(self):
         """Calculate stability FOMs and intermediate vectors."""

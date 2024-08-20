@@ -8,9 +8,11 @@ from helaocore.models.analysis import (
 from helaocore.models.s3locator import S3Locator
 from helaocore.models.run_use import RunUse
 from helao.helpers.set_time import set_time
+from pydasher.serialization import hasher
 
 
 class BaseAnalysis:
+    analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID
     analysis_params: dict
@@ -21,6 +23,20 @@ class BaseAnalysis:
     technique_name: str
     inputs: object
     outputs: BaseModel
+    
+    def gen_uuid(self, global_sample_label: str = None):
+        input_data_models = self.inputs.get_datamodels(global_sample_label)
+        if global_sample_label is None:
+            ru_data = [x for x in input_data_models if x.run_use==RunUse.data]
+            if ru_data:
+                global_sample_label = ru_data[0].global_sample_label
+        hash_rep = {
+            "analysis_name": self.analysis_name,
+            "analysis_params": self.analysis_params,
+            "process_uuid": self.process_uuid,
+            "global_sample_label": global_sample_label,
+        }
+        return UUID(hasher(hash_rep))
 
     def export_analysis(
         self,

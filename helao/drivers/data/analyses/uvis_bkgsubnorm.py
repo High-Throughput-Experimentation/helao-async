@@ -190,7 +190,7 @@ class DryUvisOutputs(BaseModel):
 
 class DryUvisAnalysis(BaseAnalysis):
     """Dry UVIS Analysis for GCLD demonstration."""
-
+    analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID
     analysis_params: dict
@@ -212,9 +212,9 @@ class DryUvisAnalysis(BaseAnalysis):
         query_df: pd.DataFrame,
         analysis_params: dict,
     ):
+        self.analysis_name = "UVIS_BkgSubNorm"
         self.action_attr = "spec_act"
         self.analysis_timestamp = datetime.now()
-        self.analysis_uuid = gen_uuid()
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
         self.analysis_params.update(analysis_params)
         pdf = query_df.query("process_uuid==@process_uuid")
@@ -232,6 +232,7 @@ class DryUvisAnalysis(BaseAnalysis):
         )
         self.process_uuid = process_uuid
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
+        self.analysis_uuid = self.gen_uuid()
 
     def calc_output(self):
         """Calculate stability FOMs and intermediate vectors."""
