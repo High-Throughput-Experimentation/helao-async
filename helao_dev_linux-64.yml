@@ -37,6 +37,7 @@ dependencies:
   - psutil
   - psycopg2
   - pyaml
+  - pyarrow
   - pybase64
   - pydantic-core
   - pydantic-settings
