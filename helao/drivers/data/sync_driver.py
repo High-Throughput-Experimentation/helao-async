@@ -747,6 +747,7 @@ class HelaoSyncer:
                         )
                         prog.dict["files_s3"].update({fp.name: file_s3_key})
                         self.base.print_message(f"Updating progress: {prog.dict}")
+                        prog.write_dict()
 
                         # update files list with uploaded filename
                         if fp.name != os.path.basename(file_s3_key):
@@ -761,10 +762,6 @@ class HelaoSyncer:
                                 "file", f"{file_s3_key.split('.')[-1]}_file"
                             )
                             meta["files"].append(fileinfo)
-                            prog.yml_model = MOD_MAP[prog.yml.type](**meta).clean_dict(
-                                strip_private=True
-                            )
-                        prog.write_dict()
                         if isinstance(msg, Path) and msg.suffix == ".parquet":
                             self.base.print_message("cleaning up parquet file")
                             msg.unlink()
@@ -793,15 +790,15 @@ class HelaoSyncer:
 
         self.base.print_message(f"Patching model for {prog.yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
-        prog.yml_model = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(
+        meta = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(
             strip_private=True
         )
 
-        # patch technique lists in prog.yml_model
-        tech_name = prog.yml_model.get("technique_name", "NA")
+        # patch technique lists in meta
+        tech_name = meta.get("technique_name", "NA")
         if isinstance(tech_name, list):
-            split_technique = tech_name[prog.yml_model.get("action_split", 0)]
-            prog.yml_model["technique_name"] = split_technique
+            split_technique = tech_name[meta.get("action_split", 0)]
+            meta["technique_name"] = split_technique
 
         # next push prog.yml to S3
         if not prog.s3_done or force_s3:
@@ -810,7 +807,7 @@ class HelaoSyncer:
             )
             uuid_key = patched_meta[f"{prog.yml.type}_uuid"]
             meta_s3_key = f"{prog.yml.type}/{uuid_key}.json"
-            s3_success = await self.to_s3(prog.yml_model, meta_s3_key)
+            s3_success = await self.to_s3(meta, meta_s3_key)
             if s3_success:
                 prog.dict["s3"] = True
                 prog.write_dict()
@@ -820,7 +817,7 @@ class HelaoSyncer:
             self.base.print_message(
                 f"Pushing prog.yml to API for {prog.yml.target.name}"
             )
-            api_success = await self.to_api(prog.yml_model, prog.yml.type)
+            api_success = await self.to_api(meta, prog.yml.type)
             LOGGER.info(f"API push returned {api_success} for {prog.yml.target.name}")
             if api_success:
                 prog.dict["api"] = True
