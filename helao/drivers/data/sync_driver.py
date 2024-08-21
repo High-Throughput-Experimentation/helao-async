@@ -748,11 +748,26 @@ class HelaoSyncer:
                         prog.dict["files_s3"].update({fp.name: file_s3_key})
                         self.base.print_message(f"Updating progress: {prog.dict}")
 
+                        # update files list with uploaded filename
+                        if fp.name != os.path.basename(file_s3_key):
+                            file_idx = [
+                                i
+                                for i, x in enumerate(meta["files"])
+                                if x.file_name == fp.name
+                            ][0]
+                            fileinfo = meta["files"].pop(file_idx)
+                            fileinfo.file_name = os.path.basename(file_s3_key)
+                            fileinfo.file_type = fileinfo.file_type.replace(
+                                "file", f"{file_s3_key.split('.')[-1]}_file"
+                            )
+                            meta["files"].append(fileinfo)
+                            prog.yml_model = MOD_MAP[prog.yml.type](**meta).clean_dict(
+                                strip_private=True
+                            )
                         prog.write_dict()
-                        if isinstance(msg, Path) and msg.suffix==".parquet":
+                        if isinstance(msg, Path) and msg.suffix == ".parquet":
                             self.base.print_message("cleaning up parquet file")
                             msg.unlink()
-                            
 
         # if prog.yml is an experiment first check processes before pushing to API
         if prog.yml.type == "experiment":
