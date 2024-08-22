@@ -35,6 +35,7 @@ class BaseAnalysis:
             "analysis_params": self.analysis_params,
             "process_uuid": self.process_uuid,
             "global_sample_label": global_sample_label,
+            "analysis_codehash": self.analysis_codehash,
         }
         return UUID(hasher(hash_rep))
 
