@@ -23,7 +23,7 @@ ANALYSIS_DEFAULTS = {
     "bin_width": 3,
     "window_length": 45,
     "poly_order": 4,
-    "lower_wl": 370,
+    "lower_wl": 430,
     "upper_wl": 700,
     "max_mthd_allowed": 1.2,
     "max_limit": 0.99,
