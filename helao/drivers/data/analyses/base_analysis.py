@@ -40,7 +40,6 @@ class BaseAnalysis:
 
     def export_analysis(
         self,
-        analysis_name: str,
         bucket: str,
         region: str,
         dummy: bool = True,
@@ -91,7 +90,7 @@ class BaseAnalysis:
             print("!!! analysis does not contain any outputs")
 
         ana_model = AnalysisModel(
-            analysis_name=analysis_name,
+            analysis_name=self.analysis_name,
             analysis_timestamp=set_time(),
             analysis_params=self.analysis_params,
             analysis_codehash=self.analysis_codehash,
