@@ -278,6 +278,11 @@ class EcheUvisOutputs(BaseModel):
     insitu_max_rescaled: bool
     mean_abs_omT_ratio: float  # mean over wavelengths
     mean_abs_omT_diff: float  # mean over wavelengths
+    noagg_wavelength: list
+    noagg_epoch: list
+    noagg_omt_baseline: list
+    noagg_omt_insitu: list
+    noagg_omt_ratio: list
 
 
 class EcheUvisAnalysis(BaseAnalysis):
@@ -459,10 +464,10 @@ class EcheUvisAnalysis(BaseAnalysis):
                 np.abs(np.log10((1 - rscl_insitu) / (1 - rscl_baseline)))
             ),
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
-            noagg_wavelength=wls_insitu,
-            noagg_epoch=eps_insitu,
-            noagg_omt_baseline=omt_refadj_baseline,
-            noagg_omt_insitu=omt_arr_insitu,
-            noagg_omt_ratio=arr_omt_ratio,
+            noagg_wavelength=wls_insitu.tolist(),
+            noagg_epoch=eps_insitu.tolist(),
+            noagg_omt_baseline=omt_refadj_baseline.tolist(),
+            noagg_omt_insitu=omt_arr_insitu.tolist(),
+            noagg_omt_ratio=arr_omt_ratio.tolist(),
         )
         return True
