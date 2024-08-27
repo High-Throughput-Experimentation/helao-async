@@ -40,6 +40,7 @@ from helaocore.models.process import ProcessModel
 from helaocore.models.action import ShortActionModel, ActionModel
 from helaocore.models.experiment import ExperimentModel
 from helaocore.models.sequence import SequenceModel
+from helaocore.models.file import FileInfo
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
 from helao.helpers.parquet import hlo_to_parquet
@@ -754,9 +755,9 @@ class HelaoSyncer:
                             file_idx = [
                                 i
                                 for i, x in enumerate(meta["files"])
-                                if x.file_name == fp.name
+                                if x['file_name'] == fp.name
                             ][0]
-                            fileinfo = meta["files"].pop(file_idx)
+                            fileinfo = FileInfo(meta["files"].pop(file_idx))
                             fileinfo.file_name = os.path.basename(file_s3_key)
                             fileinfo.file_type = fileinfo.file_type.replace(
                                 "file", f"{file_s3_key.split('.')[-1]}_file"
