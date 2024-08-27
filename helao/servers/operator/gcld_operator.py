@@ -307,13 +307,13 @@ UVIS_T_defaults = {
 UVIS_T_postseq_defaults = {"recent": False}
 
 ECHEUVIS_multiCA_led_defaults = {
-    "reservoir_electrolyte": "OER1",
-    "reservoir_liquid_sample_no": 448,
+    "reservoir_electrolyte": "OER7",
+    "reservoir_liquid_sample_no": 374,
     "solution_bubble_gas": "O2",
-    "solution_ph": 1,
+    "solution_ph": 7,
     "measurement_area": 0.071,  # 3mm diameter droplet
     "liquid_volume_ml": 1.0,
-    "ref_vs_nhe": 0.21 + 0.053,
+    "ref_vs_nhe": 0.21 + 0.043,
     "CA_duration_sec": 85,
     "CA_potential_vsRHE": [
         0,
@@ -353,7 +353,7 @@ ECHEUVIS_multiCA_led_defaults = {
     "calc_bin_width": 3,
     "calc_window_length": 45,
     "calc_poly_order": 4,
-    "calc_lower_wl": 370.0,
+    "calc_lower_wl": 430.0,
     "calc_upper_wl": 700.0,
     "calc_skip_nspec": 4,
     "random_start_potential": False,
@@ -497,7 +497,7 @@ def main():
     while True:
         if TEST & test_idx == len(TEST_SMPS_6083) - 1:
             return 0
-        
+
         data_request = False
 
         try:
