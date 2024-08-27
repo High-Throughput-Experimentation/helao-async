@@ -232,7 +232,11 @@ class HelaoAction(HelaoModel):
         """Return primary .hlo filename for this action."""
         meta = self.json
         file_list = meta.get("files", [])
-        hlo_files = [x for x in file_list if x["file_name"].endswith(".hlo")]
+        hlo_files = [
+            x
+            for x in file_list
+            if x["file_name"].endswith(".hlo") or x["file_name"].endswith(".hlo.json")
+        ]
         if not hlo_files:
             return ""
         filename = hlo_files[0]["file_name"]
@@ -317,14 +321,14 @@ class EcheUvisLoader(HelaoLoader):
         print("!!! dataframe shape:", pdf.shape)
         print("!!! dataframe cols:", pdf.columns)
         pdf["plate_id"] = pdf.global_label.apply(
-            lambda x: int(x.split("_")[-2])
-            if "solid" in x and "None" not in x
-            else None
+            lambda x: (
+                int(x.split("_")[-2]) if "solid" in x and "None" not in x else None
+            )
         )
         pdf["sample_no"] = pdf.global_label.apply(
-            lambda x: int(x.split("_")[-1])
-            if "solid" in x and "None" not in x
-            else None
+            lambda x: (
+                int(x.split("_")[-1]) if "solid" in x and "None" not in x else None
+            )
         )
         # assign solid samples from sequence params
         for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
@@ -381,14 +385,14 @@ class EcheUvisLoader(HelaoLoader):
         print("!!! dataframe shape:", pdf.shape)
         print("!!! dataframe cols:", pdf.columns)
         pdf["plate_id"] = pdf.global_label.apply(
-            lambda x: int(x.split("_")[-2])
-            if "solid" in x and "None" not in x
-            else None
+            lambda x: (
+                int(x.split("_")[-2]) if "solid" in x and "None" not in x else None
+            )
         )
         pdf["sample_no"] = pdf.global_label.apply(
-            lambda x: int(x.split("_")[-1])
-            if "solid" in x and "None" not in x
-            else None
+            lambda x: (
+                int(x.split("_")[-1]) if "solid" in x and "None" not in x else None
+            )
         )
         # assign solid samples from sequence params
         for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
