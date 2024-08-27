@@ -116,7 +116,13 @@ class HelaoLoader:
         return jd
 
     def get_hlo(self, action_uuid: UUID, hlo_fn: str):
-        keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}.json"
+        if hlo_fn.endswith(".hlo"):
+            keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}.json"
+        elif hlo_fn.endswith(".hlo.json"):
+            keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}"
+        else:
+            print(f"{hlo_fn} is not a valid named hlo file.")
+            return {}
         if keystr in self.s3_cache:
             return self.s3_cache[keystr]
         obj = self.res.Object(bucket_name="helao.data", key=keystr)
@@ -340,7 +346,7 @@ class EcheUvisLoader(HelaoLoader):
                 ] = slab
 
             return pdf.sort_values("process_timestamp").reset_index(drop=True)
-    
+
     def get_recent(
         self,
         query: str,
