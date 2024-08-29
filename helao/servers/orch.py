@@ -470,6 +470,7 @@ class Orch(Base):
             if self.world_cfg.get("simulation", "False"):
                 self.active_sequence.simulation = True
             self.active_sequence.init_seq(time_offset=self.ntp_offset)
+            self.active_sequence.orchestrator = self.server
 
             # if experiment_plan_list is empty, unpack sequence,
             # otherwise operator already populated experiment_plan_list
