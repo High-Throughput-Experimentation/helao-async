@@ -153,7 +153,7 @@ class DryUvisInputs:
             if not isinstance(euis, list):
                 euis = [euis]
             for eui in euis:
-                raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
+                raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}"
                 if global_sample_label is not None:
                     global_sample = global_sample_label
                 elif ru in ["data", "baseline"]:
