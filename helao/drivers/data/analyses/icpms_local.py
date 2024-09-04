@@ -52,7 +52,7 @@ class IcpmsInputs:
         adm = AnalysisDataModel(
             action_uuid=self.icpms_act.action_uuid,
             run_use=self.icpms_act.json['run_use'],
-            raw_data_path=f"raw_data/{self.icpms_act.action_uuid}/{self.icpms_act.hlo_file}.json",
+            raw_data_path=f"raw_data/{self.icpms_act.action_uuid}/{self.icpms_act.hlo_file}",
             global_sample_label=self.global_sample_label,
         )
         return [adm]
