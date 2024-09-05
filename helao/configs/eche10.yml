@@ -43,107 +43,107 @@ servers:
       bokeh_port: 5002
       seqspec_parser_path: helao\specifications\last3months.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
-  MOTOR:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8003
-    group: action
-    fast: galil_motion
-    params:
-      enable_aligner: true
-      bokeh_port: 5003
-      M_instr:
-        -   - 1
-            - 0
-            - 0
-            - 0
-        -   - 0
-            - 1
-            - 0
-            - 0
-        -   - 0
-            - 0
-            - 1
-            - 0
-        -   - 0
-            - 0
-            - 0
-            - 1
-      count_to_mm:
-        A: 0.00015634502846261243
-        B: 0.00015624414084471834
-      galil_ip_str: 192.168.200.234
-      def_speed_count_sec: 10000
-      max_speed_count_sec: 25000
-      ipstr: 192.168.200.234
-      axis_id:
-        x: B
-        y: A
-      axis_zero:
-        A: 127.8
-        B: 76.7
-      timeout: 600
-  PSTAT:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8004
-    group: action
-    fast: gamry_server2
-    params:
-      allow_no_sample: true
-      dev_id: 0
-      filterfreq_hz: 1000.0
-      grounded: true
-  IO:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8005
-    group: action
-    fast: galil_io
-    params:
-      galil_ip_str: 192.168.200.234
-      dev_di:
-        gamry_ttl0: 1
-      dev_do:
-        spec_trig: 5
-        ir_emitter: 8
-        doric_wled: 1
-        we_flow: 2
-        we_pump: 7
-        we_vent: 3
-        ce_pump: 6
-        ce_vent: 4
-        # gamry_aux: 1
-        # led: 8
-        # doric_led1: 4
-        # pump_ref_flush: 3
-        # pump_supply: 2
-        # doric_led2: 5
-        # doric_led3: 6
-        # ir_emitter: 7
-  PAL:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8007
-    group: action
-    fast: pal_server
-    params:
-      positions:
-        custom:
-          cell1_we: cell
-  SPEC_T:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8011
-    group: action
-    fast: spec_server
-    params:
-      dev_num: 0
-      lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll
-      n_pixels: 1024
-      start_margin: 5
-  VIS:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: ECHE10 Visualizer
+  # MOTOR:
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 8003
+  #   group: action
+  #   fast: galil_motion
+  #   params:
+  #     enable_aligner: true
+  #     bokeh_port: 5003
+  #     M_instr:
+  #       -   - 1
+  #           - 0
+  #           - 0
+  #           - 0
+  #       -   - 0
+  #           - 1
+  #           - 0
+  #           - 0
+  #       -   - 0
+  #           - 0
+  #           - 1
+  #           - 0
+  #       -   - 0
+  #           - 0
+  #           - 0
+  #           - 1
+  #     count_to_mm:
+  #       A: 0.00015634502846261243
+  #       B: 0.00015624414084471834
+  #     galil_ip_str: 192.168.200.234
+  #     def_speed_count_sec: 10000
+  #     max_speed_count_sec: 25000
+  #     ipstr: 192.168.200.234
+  #     axis_id:
+  #       x: B
+  #       y: A
+  #     axis_zero:
+  #       A: 127.8
+  #       B: 76.7
+  #     timeout: 600
+  # PSTAT:
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 8004
+  #   group: action
+  #   fast: gamry_server2
+  #   params:
+  #     allow_no_sample: true
+  #     dev_id: 0
+  #     filterfreq_hz: 1000.0
+  #     grounded: true
+  # IO:
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 8005
+  #   group: action
+  #   fast: galil_io
+  #   params:
+  #     galil_ip_str: 192.168.200.234
+  #     dev_di:
+  #       gamry_ttl0: 1
+  #     dev_do:
+  #       spec_trig: 5
+  #       ir_emitter: 8
+  #       doric_wled: 1
+  #       we_flow: 2
+  #       we_pump: 7
+  #       we_vent: 3
+  #       ce_pump: 6
+  #       ce_vent: 4
+  #       # gamry_aux: 1
+  #       # led: 8
+  #       # doric_led1: 4
+  #       # pump_ref_flush: 3
+  #       # pump_supply: 2
+  #       # doric_led2: 5
+  #       # doric_led3: 6
+  #       # ir_emitter: 7
+  # PAL:
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 8007
+  #   group: action
+  #   fast: pal_server
+  #   params:
+  #     positions:
+  #       custom:
+  #         cell1_we: cell
+  # SPEC_T:
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 8011
+  #   group: action
+  #   fast: spec_server
+  #   params:
+  #     dev_num: 0
+  #     lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll
+  #     n_pixels: 1024
+  #     start_margin: 5
+  # VIS:
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 5001
+  #   group: visualizer
+  #   bokeh: action_visualizer
+  #   params:
+  #     doc_name: ECHE10 Visualizer
   DB:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8010
@@ -163,23 +163,23 @@ servers:
     params:
       env_file: k:/users/hte/.credentials/helao_data.env
       local_only: false
-  CAM:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8013
-    group: action
-    fast: cam_server
-    params:
-      axis_ip: 192.168.200.210
-  KMOTOR:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8015
-    group: action
-    fast: kinesis_server
-    params:
-      axes:
-        z:
-          serial_no: "49370234"
-          pos_scale: 1228800.0  # device to mm
-          vel_scale: 65970697.6  # device to mm/s
-          acc_scale: 13518.2  # device to mm/s2
-          move_limit_mm: 3.0
+  # CAM:
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 8013
+  #   group: action
+  #   fast: cam_server
+  #   params:
+  #     axis_ip: 192.168.200.210
+  # KMOTOR:
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 8015
+  #   group: action
+  #   fast: kinesis_server
+  #   params:
+  #     axes:
+  #       z:
+  #         serial_no: "49370234"
+  #         pos_scale: 1228800.0  # device to mm
+  #         vel_scale: 65970697.6  # device to mm/s
+  #         acc_scale: 13518.2  # device to mm/s2
+  #         move_limit_mm: 3.0
