@@ -157,8 +157,9 @@ class EcheUvisInputs:
             .action_uuid,
             query_df,
         )
+        keep_eche = ['run_OCV', 'run_CA']
         eche_acts = query_df.query(
-            "run_use=='data' & action_name.isin(@keep_names)"
+            "run_use=='data' & action_name.isin(@keep_eche)"
         ).sort_values("action_timestamp")
         presitu_ocv_idx = (
             list(eche_acts.action_uuid).index(self.insitu_ca_act.action_uuid) - 1
@@ -166,8 +167,9 @@ class EcheUvisInputs:
         self.presitu_ocv_act = HelaoAction(
             list(eche_acts.action_uuid)[presitu_ocv_idx], query_df
         )
+        keep_ocv = ['run_OCV', 'acquire_spec_extrig']
         ocv_specs = query_df.query(
-            "run_use=='data' & action_name.isin(@keep_names) & experiment_name=='ECHEUVIS_sub_OCV_led'"
+            "run_use=='data' & action_name.isin(@keep_ocv) & experiment_name=='ECHEUVIS_sub_OCV_led'"
         ).sort_values("action_timestamp")
         presitu_spec_idx = (
             list(ocv_specs.action_uuid).index(self.presitu_ocv_act.action_uuid) - 1
