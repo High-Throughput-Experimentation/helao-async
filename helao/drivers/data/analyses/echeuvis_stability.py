@@ -175,7 +175,7 @@ class EcheUvisInputs:
             list(ocv_specs.action_uuid).index(self.presitu_ocv_act.action_uuid) - 1
         )
         self.presitu_spec_act = HelaoAction(
-            list(ocv_specs.action_uuid)[presitu_spec_idx, query_df]
+            list(ocv_specs.action_uuid)[presitu_spec_idx], query_df
         )
 
         self.presitu = HelaoProcess(
