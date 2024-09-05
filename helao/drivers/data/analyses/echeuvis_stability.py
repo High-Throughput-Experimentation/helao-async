@@ -315,9 +315,9 @@ class EcheUvisOutputs(BaseModel):
     rscl_presitu: list
     baseline_min_rescaled: bool
     baseline_max_rescaled: bool
-    insitu_bin_rescaled: bool
+    insitu_min_rescaled: bool
     insitu_max_rescaled: bool
-    presitu_bin_rescaled: bool
+    presitu_min_rescaled: bool
     presitu_max_rescaled: bool
     mean_abs_omT_ratio: float  # mean over wavelengths
     mean_abs_omT_diff: float  # mean over wavelengths
@@ -531,11 +531,14 @@ class EcheUvisAnalysis(BaseAnalysis):
             agg_method=ap["agg_method"],
             agg_baseline=list(agg_baseline),
             agg_insitu=list(agg_insitu),
+            agg_presitu=list(agg_presitu),
             bin_wavelength=list(bin_wl),
             bin_baseline=list(bin_baseline),
             bin_insitu=list(bin_insitu),
+            bin_presitu=list(bin_presitu),
             smth_baseline=list(smth_baseline),
             smth_insitu=list(smth_insitu),
+            smth_presitu=list(smth_presitu),
             rscl_baseline=list(rscl_baseline),
             rscl_insitu=list(rscl_insitu),
             rscl_presitu=list(rscl_presitu),
