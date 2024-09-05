@@ -270,7 +270,7 @@ class EcheUvisInputs:
         inputs = []
         for ak in action_keys:
             euis = vars(self)[ak]
-            ru = ak.split("_spec")[0].replace("insitu", "data")
+            ru = ak.split("_spec")[0].replace("insitu", "data").replace("presitu", "data")
             if not isinstance(euis, list):
                 euis = [euis]
             for eui in euis:
