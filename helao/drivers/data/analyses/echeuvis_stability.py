@@ -125,6 +125,9 @@ class EcheUvisInputs:
     insitu: HelaoProcess
     insitu_spec_act: HelaoAction
     insitu_ca_act: HelaoAction
+    presitu: HelaoProcess
+    presitu_spec_act: HelaoAction
+    presitu_ocv_act: HelaoAction
     process_params: dict
     # solid_samples: list
 
@@ -154,7 +157,31 @@ class EcheUvisInputs:
             .action_uuid,
             query_df,
         )
+        eche_acts = query_df.query(
+            "run_use=='data' & action_name.isin(@keep_names)"
+        ).sort_values("action_timestamp")
+        presitu_ocv_idx = (
+            list(eche_acts.action_uuid).index(self.insitu_ca_act.action_uuid) - 1
+        )
+        self.presitu_ocv_act = HelaoAction(
+            list(eche_acts.action_uuid)[presitu_ocv_idx], query_df
+        )
+        ocv_specs = query_df.query(
+            "run_use=='data' & action_name.isin(@keep_names) & experiment_name=='ECHEUVIS_sub_OCV_led'"
+        ).sort_values("action_timestamp")
+        presitu_spec_idx = (
+            list(ocv_specs.action_uuid).index(self.presitu_ocv_act.action_uuid) - 1
+        )
+        self.presitu_spec_act = HelaoAction(
+            list(ocv_specs.action_uuid)[presitu_spec_idx, query_df]
+        )
 
+        self.presitu = HelaoProcess(
+            query_df.query("action_uuid==@self.presitu_ocv_act.action_uuid")
+            .iloc[0]
+            .process_uuid,
+            query_df,
+        )
         suuid = (
             query_df.query("process_uuid==@insitu_process_uuid").iloc[0].sequence_uuid
         )
@@ -226,6 +253,14 @@ class EcheUvisInputs:
     def insitu_ca(self):
         return self.insitu_ca_act.hlo
 
+    @property
+    def presitu_spec(self):
+        return self.presitu_spec_act.hlo
+
+    @property
+    def presitu_ocv(self):
+        return self.presitu_ocv_act.hlo
+    
     def get_datamodels(
         self, global_sample_label: str, *args, **kwargs
     ) -> List[AnalysisDataModel]:
@@ -265,28 +300,38 @@ class EcheUvisOutputs(BaseModel):
     agg_method: str
     agg_baseline: list  # mean over final t seconds of OCV
     agg_insitu: list  # mean over final t seconds of CA
+    agg_presitu: list  # mean over final t seconds of CA
     bin_wavelength: list
     bin_baseline: list
     bin_insitu: list
+    bin_presitu: list
     smth_baseline: list
     smth_insitu: list
+    smth_presitu: list
     rscl_baseline: list
     rscl_insitu: list
+    rscl_presitu: list
     baseline_min_rescaled: bool
     baseline_max_rescaled: bool
     insitu_bin_rescaled: bool
     insitu_max_rescaled: bool
+    presitu_bin_rescaled: bool
+    presitu_max_rescaled: bool
     mean_abs_omT_ratio: float  # mean over wavelengths
     mean_abs_omT_diff: float  # mean over wavelengths
     noagg_wavelength: list
     noagg_epoch: list
+    noagg_presitu_wavelength: list
+    noagg_presitu_epoch: list
     noagg_omt_baseline: list
     noagg_omt_insitu: list
+    noagg_omt_presitu: list
     noagg_omt_ratio: list
 
 
 class EcheUvisAnalysis(BaseAnalysis):
     """ECHEUVIS Optical Stability Analysis for GCLD demonstration."""
+
     analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID
@@ -340,6 +385,7 @@ class EcheUvisAnalysis(BaseAnalysis):
         rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
         btup = parse_spechlo(self.inputs.baseline_spec)
         itup = parse_spechlo(self.inputs.insitu_spec)
+        ptup = parse_spechlo(self.inputs.presitu_spec)
 
         if any([x is False for x in rdtups + rltups + [btup, itup]]):
             return False
@@ -398,6 +444,16 @@ class EcheUvisAnalysis(BaseAnalysis):
             axis=0,
         )
 
+        # aggregate presitu OCV spectra over final t seconds, omitting first n
+        agg_presitu = aggfunc(
+            ptup[2][
+                np.where(
+                    (ptup[1][ap["skip_first_n"] :] - ptup[1].max())
+                    >= -ap["agg_last_secs"]
+                )[0].min() :
+            ],
+            axis=0,
+        )
 
         inds = range(len(wl[wlindlo:wlindhi]))
         nbins = np.round(len(wl[wlindlo:wlindhi]) / ap["bin_width"]).astype(int)
@@ -407,14 +463,21 @@ class EcheUvisAnalysis(BaseAnalysis):
         refadj_insitu = (
             (agg_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
         )[wlindlo:wlindhi]
+        refadj_presitu = (
+            (agg_presitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+        )[wlindlo:wlindhi]
         bin_wl = binned_statistic(inds, wl[wlindlo:wlindhi], "mean", nbins).statistic
         bin_baseline = binned_statistic(inds, refadj_baseline, "mean", nbins).statistic
         bin_insitu = binned_statistic(inds, refadj_insitu, "mean", nbins).statistic
+        bin_presitu = binned_statistic(inds, refadj_presitu, "mean", nbins).statistic
         smth_baseline = savgol_filter(
             bin_baseline, ap["window_length"], ap["poly_order"], delta=ap["delta"]
         )
         smth_insitu = savgol_filter(
             bin_insitu, ap["window_length"], ap["poly_order"], delta=ap["delta"]
+        )
+        smth_presitu = savgol_filter(
+            bin_presitu, ap["window_length"], ap["poly_order"], delta=ap["delta"]
         )
         baseline_min_rscl, baseline_max_rscl, rscl_baseline = refadjust(
             smth_baseline,
@@ -430,15 +493,32 @@ class EcheUvisAnalysis(BaseAnalysis):
             ap["min_limit"],
             ap["max_limit"],
         )
+        presitu_min_rscl, presitu_max_rscl, rscl_presitu = refadjust(
+            smth_presitu,
+            ap["min_mthd_allowed"],
+            ap["max_mthd_allowed"],
+            ap["min_limit"],
+            ap["max_limit"],
+        )
 
         wls_insitu = itup[0][wlindlo:wlindhi]
         eps_insitu = itup[1][ap["skip_first_n"] :]
         arr_insitu = itup[2][ap["skip_first_n"] :]
-        refadj_arr_insitu = ((arr_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark))[:, wlindlo:wlindhi]
+        refadj_arr_insitu = (
+            (arr_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+        )[:, wlindlo:wlindhi]
         omt_arr_insitu = 1 - refadj_arr_insitu
         omt_refadj_baseline = 1 - refadj_baseline
         arr_omt_ratio = omt_arr_insitu / omt_refadj_baseline
-        
+
+        wls_presitu = itup[0][wlindlo:wlindhi]
+        eps_presitu = itup[1][ap["skip_first_n"] :]
+        arr_presitu = itup[2][ap["skip_first_n"] :]
+        refadj_arr_presitu = (
+            (arr_presitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+        )[:, wlindlo:wlindhi]
+        omt_arr_presitu = 1 - refadj_arr_presitu
+
         # create output model
         self.outputs = EcheUvisOutputs(
             wavelength=list(wl),
@@ -456,18 +536,24 @@ class EcheUvisAnalysis(BaseAnalysis):
             smth_insitu=list(smth_insitu),
             rscl_baseline=list(rscl_baseline),
             rscl_insitu=list(rscl_insitu),
+            rscl_presitu=list(rscl_presitu),
             baseline_min_rescaled=baseline_min_rscl,
             baseline_max_rescaled=baseline_max_rscl,
-            insitu_bin_rescaled=insitu_min_rscl,
+            insitu_min_rescaled=insitu_min_rscl,
             insitu_max_rescaled=insitu_max_rscl,
+            presitu_min_rescaled=presitu_min_rscl,
+            presitu_max_rescaled=presitu_max_rscl,
             mean_abs_omT_ratio=np.mean(
                 np.abs(np.log10((1 - rscl_insitu) / (1 - rscl_baseline)))
             ),
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
             noagg_wavelength=wls_insitu.tolist(),
             noagg_epoch=eps_insitu.tolist(),
+            noagg_presitu_wavelength=wls_presitu.tolist(),
+            noagg_presitu_epoch=eps_presitu.tolist(),
             noagg_omt_baseline=omt_refadj_baseline.tolist(),
             noagg_omt_insitu=omt_arr_insitu.tolist(),
+            noagg_omt_presitu=omt_arr_presitu.tolist(),
             noagg_omt_ratio=arr_omt_ratio.tolist(),
         )
         return True
