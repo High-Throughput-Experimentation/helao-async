@@ -16,6 +16,7 @@ from helao.helpers.gen_uuid import gen_uuid
 
 from .base_analysis import BaseAnalysis
 from helaocore.models.analysis import AnalysisDataModel
+from helacore.models.run_use import RunUse
 from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 
 ANALYSIS_DEFAULTS = {
@@ -270,14 +271,14 @@ class EcheUvisInputs:
         inputs = []
         for ak in action_keys:
             euis = vars(self)[ak]
-            ru = ak.split("_spec")[0].replace("insitu", "data").replace("presitu", "data")
+            ru = ak.split("_spec")[0].replace("insitu", "data").replace("presitu", "preca_baseline")
             if not isinstance(euis, list):
                 euis = [euis]
             for eui in euis:
                 raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}"
                 if global_sample_label is not None:
                     global_sample = global_sample_label
-                elif ru in ["data", "baseline"]:
+                elif ru in ["data", "baseline", "preca_baseline"]:
                     global_sample = (
                         f"legacy__solid__{int(self.plate_id):d}_{int(self.sample_no):d}"
                     )
@@ -285,7 +286,7 @@ class EcheUvisInputs:
                     global_sample = None
                 adm = AnalysisDataModel(
                     action_uuid=eui.action_uuid,
-                    run_use=ru,
+                    run_use=RunUse(ru),
                     raw_data_path=raw_data_path,
                     global_sample_label=global_sample,
                 )
