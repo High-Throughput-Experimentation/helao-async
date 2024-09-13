@@ -2406,7 +2406,7 @@ def ADSS_sub_transfer_liquid_in(
                     "machine_name": gethostname(),
                 }
             ).model_dump(),
-            "volume_ml": apm.pars.aliquot_volume_ul,
+            "volume_ml": apm.pars.aliquot_volume_ul / 1000,
             "combine_liquids": True,
             "dilute_liquids": False,
         },
