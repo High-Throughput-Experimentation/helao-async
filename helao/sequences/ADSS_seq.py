@@ -3153,7 +3153,7 @@ def ADSS_PA_CV_TRI(
 
 
 def ADSS_PA_CV_TRI_new(
-    sequence_version: int = 4, #bubble removal
+    sequence_version: int = 5, #5 shift aliquots to expts, bubble removal
     #note: str = "need as many samples as you expect combinations of UPL and LPL",
     
     #sample info
@@ -3672,24 +3672,8 @@ def ADSS_PA_CV_TRI_new(
         if aliquot_init: #stops gas purge, takes aliquote, starts gas purge again
             
             washmod += 1
-            washone = washmod %4 %3 %2
-            washtwo = (washmod + 1) %4 %3 %2
-            washthree = (washmod + 2) %4 %3 %2
-            washfour = (washmod + 3) %4 %3 %2
-
-            epm.add_experiment(
-                "ADSS_sub_sample_aliquot",
-                {
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "EquilibrationTime_s": 0,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": washone,
-                    "rinse_2": washtwo,
-                    "rinse_3": washthree,
-                    "rinse_4": washfour,
-                }
-            )
+            firstaliquot = True
+        else: firstaliquot = False
 
         #check for bubbles that could interfere with echem measurments with OCV
         if use_bubble_removal:
@@ -3722,6 +3706,9 @@ def ADSS_PA_CV_TRI_new(
                         "ref_type": ref_type,
                         "ref_offset__V": ref_offset__V,
                         "aliquot_insitu": False,
+                        "aliquot_pre": firstaliquot,
+                        "aliquot_volume_ul": aliquot_volume_ul,
+                        "washmod_in": washmod,
                         "bubbler_gas": "N2",                        
                     })
         
@@ -3734,6 +3721,12 @@ def ADSS_PA_CV_TRI_new(
         
         #start cleaning CVs in N2
         for i, CV_cycle in enumerate(cleaning_CV_cycles):
+
+            if aliquot_after_cleaningCV[i] == 1:
+                washmod += 1
+                postaliquot = True
+            else: postaliquot = False
+
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
@@ -3749,33 +3742,21 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "aliquot_post": postaliquot,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "washmod_in": washmod,
                     "bubbler_gas": "N2",
-                }
+                },
             )
-            if aliquot_after_cleaningCV[i] == 1:
-                
-                washmod += 1
-                washone = washmod %4 %3 %2
-                washtwo = (washmod + 1) %4 %3 %2
-                washthree = (washmod + 2) %4 %3 %2
-                washfour = (washmod + 3) %4 %3 %2
-
-                epm.add_experiment(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    }
-                )
 
         #start background CVs in N2
         for i, CV_cycle in enumerate(CV_N2_cycles):
+
+            if aliquote_after_CV_init[i] == 1:
+                washmod += 1
+                postaliquot = True
+            else: postaliquot = False
+
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
@@ -3791,31 +3772,12 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "aliquot_post": postaliquot,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "washmod_in": washmod,
                     "bubbler_gas": "N2",
                 }
             )
-            if aliquote_after_CV_init[i] == 1:
-                
-                washmod += 1
-                washone = washmod %4 %3 %2
-                washtwo = (washmod + 1) %4 %3 %2
-                washthree = (washmod + 2) %4 %3 %2
-                washfour = (washmod + 3) %4 %3 %2
-
-                epm.add_experiment(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    }
-                )
-
         
         #switch from N2 to O2 and saturate
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": False,})
@@ -3841,6 +3803,11 @@ def ADSS_PA_CV_TRI_new(
         #start O2 cycles
         for i, CV_cycle in enumerate(CV_O2_cycles):
 
+            if aliquote_CV_O2[i] == 1:
+                washmod += 1
+                postaliquot = True
+            else: postaliquot = False
+
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
@@ -3856,30 +3823,13 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "aliquot_post": postaliquot,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "washmod_in": washmod,
+           ####             "EquilibrationTime_s": 0,
                     "bubbler_gas": "O2",
                 }
             )
-            if aliquote_CV_O2[i] == 1:
-                
-                washmod += 1
-                washone = washmod %4 %3 %2
-                washtwo = (washmod + 1) %4 %3 %2
-                washthree = (washmod + 2) %4 %3 %2
-                washfour = (washmod + 3) %4 %3 %2
-
-                epm.add_experiment(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    }
-                )
 
         #inject phosphoric acid
         if Inject_PA:
@@ -3922,6 +3872,11 @@ def ADSS_PA_CV_TRI_new(
         #start O2 cycles with PA
         for i, CV_cycle in enumerate(CV_O2_cycles):
 
+            if aliquote_CV_O2[i] == 1:
+                washmod += 1
+                postaliquot = True
+            else: postaliquot = False
+
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
@@ -3937,32 +3892,15 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "aliquot_post": postaliquot,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "washmod_in": washmod,
+           ####             "EquilibrationTime_s": 0,
                     "bubbler_gas": "O2",
                     "previous_liquid_injected": previous_liquid_injected,
                 },
             )
 
-            if aliquote_CV_O2[i] == 1:
-                
-                washmod += 1
-                washone = washmod %4 %3 %2
-                washtwo = (washmod + 1) %4 %3 %2
-                washthree = (washmod + 2) %4 %3 %2
-                washfour = (washmod + 3) %4 %3 %2
-
-                epm.add_experiment(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    }
-                )
 
         #switch from O2 to N2 and saturate
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
@@ -3989,6 +3927,12 @@ def ADSS_PA_CV_TRI_new(
         
         #start background CVs in N2 with phosphoric acid
         for i, CV_cycle in enumerate(CV_N2_cycles):
+
+            if aliquote_CV_final[i] == 1:
+                washmod += 1
+                postaliquot = True
+            else: postaliquot = False
+
             epm.add_experiment(
                 "ADSS_sub_CV",
                 {
@@ -4004,32 +3948,14 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "aliquot_post": postaliquot,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "washmod_in": washmod,
+           ####             "EquilibrationTime_s": 0,
                     "bubbler_gas": "N2",
                     "previous_liquid_injected": previous_liquid_injected,
                 }
             )
-            
-            if aliquote_CV_final[i] == 1:
-                
-                washmod += 1
-                washone = washmod %4 %3 %2
-                washtwo = (washmod + 1) %4 %3 %2
-                washthree = (washmod + 2) %4 %3 %2
-                washfour = (washmod + 3) %4 %3 %2
-
-                epm.add_experiment(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    }
-                )
 
         if keep_electrolyte_at_end:
             epm.add_experiment("ADSS_sub_unload_solid",{})
