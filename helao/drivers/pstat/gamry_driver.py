@@ -217,7 +217,7 @@ class gamry:
         """script can be blocked or crash if GamryCom is still open and busy"""
         pyPids = {
             p.pid: p
-            for p in psutil.process_iter(["name", "connections"])
+            for p in psutil.process_iter(["name"])
             if p.info["name"].startswith("GamryCom")
         }
 
