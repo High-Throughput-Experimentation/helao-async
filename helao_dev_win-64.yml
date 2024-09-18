@@ -6,6 +6,7 @@ dependencies:
   - pip:
     - aiodebug
     - aioshutil
+    - nidaqmx
     - plumbum
     - pydasher
     - pyft232
@@ -29,7 +30,6 @@ dependencies:
   - jupyterlab
   - matplotlib
   - munch
-  - nidaqmx-python
   - ntplib
   - numpy
   - pandas
