@@ -774,7 +774,7 @@ def ADSS_sub_CA(
     PSTAT action (True) or after the PSTAT action (False)
 
     """
-    washmod = apm.pars.washmod_in
+    washmod = washmod_in
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -938,7 +938,7 @@ def ADSS_sub_CA_photo(
     PSTAT action (True) or after the PSTAT action (False)
 
     """
-    washmod = apm.pars.washmod_in
+    washmod = washmod_in
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1096,7 +1096,7 @@ def ADSS_sub_CV(
     run_use: RunUse = "data",
 ):
 
-    washmod = apm.pars.washmod_in
+    washmod = washmod_in
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1247,7 +1247,7 @@ def ADSS_sub_OCV(
     run_use: RunUse = "data",
 ):
     
-    washmod = apm.pars.washmod_in
+    washmod = washmod_in
    
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1405,7 +1405,7 @@ def ADSS_sub_OCV_photo(
     rinse_4: int = 0,
 ):
     
-    washmod = apm.pars.washmod_in
+    washmod = washmod_in
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
