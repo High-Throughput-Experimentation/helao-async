@@ -49,11 +49,15 @@ class IcpmsInputs:
         return self.icpms_act.hlo
 
     def get_datamodels(self, *args, **kwargs) -> List[AnalysisDataModel]:
+        filename, filetype, datakeys = self.icpms_act.hlo_file_tup
         adm = AnalysisDataModel(
             action_uuid=self.icpms_act.action_uuid,
             run_use=self.icpms_act.json['run_use'],
-            raw_data_path=f"raw_data/{self.icpms_act.action_uuid}/{self.icpms_act.hlo_file}",
+            raw_data_path=f"raw_data/{self.icpms_act.action_uuid}/{filename}",
             global_sample_label=self.global_sample_label,
+            file_name=filename,
+            file_type=filetype,
+            data_keys=datakeys,
         )
         return [adm]
 
