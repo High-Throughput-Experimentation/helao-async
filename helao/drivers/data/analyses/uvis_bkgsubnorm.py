@@ -153,7 +153,8 @@ class DryUvisInputs:
             if not isinstance(euis, list):
                 euis = [euis]
             for eui in euis:
-                raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}"
+                filename, filetype, datakeys = eui.hlo_file_tup
+                raw_data_path = f"raw_data/{eui.action_uuid}/{filename}"
                 if global_sample_label is not None:
                     global_sample = global_sample_label
                 elif ru in ["data", "baseline"]:
@@ -167,6 +168,9 @@ class DryUvisInputs:
                     run_use=ru,
                     raw_data_path=raw_data_path,
                     global_sample_label=global_sample,
+                    file_type=filetype,
+                    file_name=filename,
+                    data_keys=datakeys,
                 )
                 inputs.append(adm)
         return inputs
