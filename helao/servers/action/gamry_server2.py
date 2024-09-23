@@ -217,10 +217,10 @@ async def gamry_dyn_endpoints(app=None):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        SetStopXMin: Optional[float] = None,
-        SetStopXMax: Optional[float] = None,
-        SetStopAtDelayXMin: Optional[int] = None,
-        SetStopAtDelayXMax: Optional[int] = None,
+        SetStopXMin: Optional[float] = None,  # lower current threshold to trigger early stopping
+        SetStopXMax: Optional[float] = None,  # upper current threshold to trigger early stopping
+        SetStopAtDelayXMin: Optional[int] = None,  # number of consecutive points below SetStopXMin to trigger early stopping
+        SetStopAtDelayXMax: Optional[int] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -243,10 +243,10 @@ async def gamry_dyn_endpoints(app=None):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        SetStopXMin: Optional[float] = None,
-        SetStopXMax: Optional[float] = None,
-        SetStopAtDelayXMin: Optional[int] = None,
-        SetStopAtDelayXMax: Optional[int] = None,
+        SetStopXMin: Optional[float] = None,  # lower potential threshold to trigger early stopping
+        SetStopXMax: Optional[float] = None,  # upper potential threshold to trigger early stopping
+        SetStopAtDelayXMin: Optional[int] = None,  # number of consecutive points below SetStopXMin to trigger early stopping
+        SetStopAtDelayXMax: Optional[int] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -272,10 +272,10 @@ async def gamry_dyn_endpoints(app=None):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        SetStopIMin: Optional[float] = None,
-        SetStopIMax: Optional[float] = None,
-        SetStopAtDelayIMin: Optional[int] = None,
-        SetStopAtDelayIMax: Optional[int] = None,
+        SetStopIMin: Optional[float] = None,  # lower current threshold to trigger early stopping
+        SetStopIMax: Optional[float] = None,  # upper current threshold to trigger early stopping
+        SetStopAtDelayIMin: Optional[int] = None,  # number of consecutive points below SetStopIMin to trigger early stopping
+        SetStopAtDelayIMax: Optional[int] = None,  # number of consecutive points above SetStopIMax to trigger early stopping
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
