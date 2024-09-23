@@ -137,13 +137,13 @@ servers:
   #     lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll
   #     n_pixels: 1024
   #     start_margin: 5
-  # VIS:
-  #   host: hte-eche-10.htejcap.caltech.edu
-  #   port: 5001
-  #   group: visualizer
-  #   bokeh: action_visualizer
-  #   params:
-  #     doc_name: ECHE10 Visualizer
+  VIS:
+    host: hte-eche-10.htejcap.caltech.edu
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: ECHE10 Visualizer
   DB:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8010
