@@ -82,16 +82,16 @@ servers:
   #       A: 127.8
   #       B: 76.7
   #     timeout: 600
-  # PSTAT:
-  #   host: hte-eche-10.htejcap.caltech.edu
-  #   port: 8004
-  #   group: action
-  #   fast: gamry_server2
-  #   params:
-  #     allow_no_sample: true
-  #     dev_id: 0
-  #     filterfreq_hz: 1000.0
-  #     grounded: true
+  PSTAT:
+    host: hte-eche-10.htejcap.caltech.edu
+    port: 8004
+    group: action
+    fast: gamry_server2
+    params:
+      allow_no_sample: true
+      dev_id: 0
+      filterfreq_hz: 1000.0
+      grounded: true
   # IO:
   #   host: hte-eche-10.htejcap.caltech.edu
   #   port: 8005
