@@ -43,7 +43,7 @@ import easy_biologic.lib.ec_lib as ecl
 
 global LOGGER
 if logging.LOGGER is None:
-    LOGGER = logging.make_LOGGER(LOGGER_name="biologic_server_standalone")
+    LOGGER = logging.make_logger(logger_name="biologic_server_standalone")
 else:
     LOGGER = logging.LOGGER
 
