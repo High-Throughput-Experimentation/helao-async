@@ -22,279 +22,17 @@ from helao.sequences.ECHEUVIS_seq import ECHEUVIS_multiCA_led, ECHEUVIS_postseq
 from helaocore.models.orchstatus import LoopStatus
 
 TEST = False
-
-MEASURED_6083 = [
-    766,
-    802,
-    1872,
-    3096,
-    3113,
-    3131,
-    4479,
-    4550,
-    7571,
-    7633,
-    9012,
-    9056,
-    9065,
-    9083,
-    9109,
-    10739,
-    12439,
-    13989,
-    13989,
-    14069,
-    14087,
-    14122,
-    15654,
-    15760,
-    17319,
-    17319,
-    17346,
-    17461,
-    19028,
-    19117,
-    20461,
-    22035,
-    22044,
-    22079,
-    23579,
-    23606,
-    23641,
-    24980,
-    26230,
-    26283,
-    27300,
-    27362,
-]
-
-# TEST_SMPS_6083 = [
-#     {
-#         "sample_no": s,
-#         "composition": {"Mn": 0.5, "Sb": 0.5},
-#         "parameters": {"z_start": 1.2, "z_direction": "up"},
-#     }
-#     for s in MEASURED_6083
-# ]
-
-TEST_SMPS_6083 = [
-    {
-        "sample_no": 766,
-        "composition": {"Mn": 0.730724324204254, "Sb": 0.2692756757957459},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 802,
-        "composition": {"Mn": 0.5563284103323283, "Sb": 0.4436715896676717},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 1872,
-        "composition": {"Mn": 0.5851885328408131, "Sb": 0.4148114671591871},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 3096,
-        "composition": {"Mn": 0.7340208256425407, "Sb": 0.2659791743574593},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 3113,
-        "composition": {"Mn": 0.6507736413207856, "Sb": 0.3492263586792143},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 3131,
-        "composition": {"Mn": 0.5570478779827862, "Sb": 0.44295212201721373},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 4479,
-        "composition": {"Mn": 0.7935558421700739, "Sb": 0.20644415782992603},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 4550,
-        "composition": {"Mn": 0.4314344778657142, "Sb": 0.5685655221342858},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 7571,
-        "composition": {"Mn": 0.7216625888365149, "Sb": 0.2783374111634851},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 7633,
-        "composition": {"Mn": 0.409317247736705, "Sb": 0.5906827522632949},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 9012,
-        "composition": {"Mn": 0.8150660942470382, "Sb": 0.1849339057529617},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 9056,
-        "composition": {"Mn": 0.5972417128495429, "Sb": 0.4027582871504571},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 9065,
-        "composition": {"Mn": 0.5416354058899252, "Sb": 0.4583645941100748},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 9083,
-        "composition": {"Mn": 0.44377339031650664, "Sb": 0.5562266096834935},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 9109,
-        "composition": {"Mn": 0.3310238330802191, "Sb": 0.6689761669197809},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 10739,
-        "composition": {"Mn": 0.49463858674689504, "Sb": 0.505361413253105},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 12439,
-        "composition": {"Mn": 0.30645190507819575, "Sb": 0.6935480949218042},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 13989,
-        "composition": {"Mn": 0.8604921447308469, "Sb": 0.13950785526915319},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 13989,
-        "composition": {"Mn": 0.8604921447308469, "Sb": 0.13950785526915319},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 14069,
-        "composition": {"Mn": 0.4718580053279528, "Sb": 0.5281419946720471},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 14087,
-        "composition": {"Mn": 0.3692931609486959, "Sb": 0.6307068390513042},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 14122,
-        "composition": {"Mn": 0.21980562672479462, "Sb": 0.7801943732752054},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 15654,
-        "composition": {"Mn": 0.8654259187536348, "Sb": 0.13457408124636525},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 15760,
-        "composition": {"Mn": 0.32772795014225714, "Sb": 0.6722720498577428},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 17319,
-        "composition": {"Mn": 0.8735533794663827, "Sb": 0.1264466205336174},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 17319,
-        "composition": {"Mn": 0.8735533794663827, "Sb": 0.1264466205336174},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 17346,
-        "composition": {"Mn": 0.7738664754469314, "Sb": 0.22613352455306865},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 17461,
-        "composition": {"Mn": 0.17397206897272835, "Sb": 0.8260279310272717},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 19028,
-        "composition": {"Mn": 0.6798048076654397, "Sb": 0.32019519233456034},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 19117,
-        "composition": {"Mn": 0.19617412805896464, "Sb": 0.8038258719410354},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 20461,
-        "composition": {"Mn": 0.8068568481593802, "Sb": 0.19314315184061973},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 22035,
-        "composition": {"Mn": 0.8532437944210047, "Sb": 0.14675620557899524},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 22044,
-        "composition": {"Mn": 0.8056384914759117, "Sb": 0.19436150852408832},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 22079,
-        "composition": {"Mn": 0.6306049979589127, "Sb": 0.36939500204108733},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 23579,
-        "composition": {"Mn": 0.6253356399926024, "Sb": 0.3746643600073976},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 23606,
-        "composition": {"Mn": 0.4442777685324733, "Sb": 0.5557222314675268},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 23641,
-        "composition": {"Mn": 0.2491646874526252, "Sb": 0.7508353125473748},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 24980,
-        "composition": {"Mn": 0.5702077645990102, "Sb": 0.4297922354009899},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 26230,
-        "composition": {"Mn": 0.6318979323991896, "Sb": 0.36810206760081055},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 26283,
-        "composition": {"Mn": 0.28514730606859073, "Sb": 0.7148526939314093},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 27300,
-        "composition": {"Mn": 0.6934476679912756, "Sb": 0.30655233200872445},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-    {
-        "sample_no": 27362,
-        "composition": {"Mn": 0.28996638258663954, "Sb": 0.7100336174133605},
-        "parameters": {"z_start": 1.2, "z_direction": "up"},
-    },
-]
+SPEC_INT_MS = 35
+ELECTROLYTE_SHORT_NAME = "OER1"
+ELECTROLYTE_SAMPLE_NO =448
+ELECTROLYTE_PH = 1
+REF_OFFSET = 0.043
 
 UVIS_T_defaults = {
     "reference_mode": "builtin",
     "custom_position": "cell1_we",
     "spec_n_avg": 5,
-    "spec_int_time_ms": 40,
+    "spec_int_time_ms": SPEC_INT_MS,
     "duration_sec": 5,
     "specref_code": 1,
     "led_type": "front",
@@ -307,13 +45,13 @@ UVIS_T_defaults = {
 UVIS_T_postseq_defaults = {"recent": False}
 
 ECHEUVIS_multiCA_led_defaults = {
-    "reservoir_electrolyte": "OER1",
-    "reservoir_liquid_sample_no": 448,
+    "reservoir_electrolyte": ELECTROLYTE_SHORT_NAME,
+    "reservoir_liquid_sample_no": ELECTROLYTE_SAMPLE_NO,
     "solution_bubble_gas": "O2",
-    "solution_ph": 1,
+    "solution_ph": ELECTROLYTE_PH,
     "measurement_area": 0.071,  # 3mm diameter droplet
     "liquid_volume_ml": 1.0,
-    "ref_vs_nhe": 0.21 + 0.043,
+    "ref_vs_nhe": 0.21 + REF_OFFSET,
     "CA_duration_sec": 85,
     "CA_potential_vsRHE": [
         0,
@@ -346,7 +84,7 @@ ECHEUVIS_multiCA_led_defaults = {
     "toggleSpec_init_delay": 0.0,
     "toggleSpec_time": -1,
     "spec_ref_duration": 5,
-    "spec_int_time_ms": 40,
+    "spec_int_time_ms": SPEC_INT_MS,
     "spec_n_avg": 5,
     "spec_technique": "T_UVVIS",
     "calc_ev_parts": [1.8, 2.2, 2.6, 3.0],
