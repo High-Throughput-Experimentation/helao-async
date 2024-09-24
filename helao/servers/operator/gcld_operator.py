@@ -233,8 +233,8 @@ def main():
     resumed = False
 
     while True:
-        if TEST & test_idx == len(TEST_SMPS_6083) - 1:
-            return 0
+        # if TEST & test_idx == len(TEST_SMPS_6083) - 1:
+        #     return 0
 
         data_request = False
 
