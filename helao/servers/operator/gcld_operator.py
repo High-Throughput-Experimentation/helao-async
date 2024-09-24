@@ -307,10 +307,10 @@ UVIS_T_defaults = {
 UVIS_T_postseq_defaults = {"recent": False}
 
 ECHEUVIS_multiCA_led_defaults = {
-    "reservoir_electrolyte": "OER7",
-    "reservoir_liquid_sample_no": 374,
+    "reservoir_electrolyte": "OER1",
+    "reservoir_liquid_sample_no": 448,
     "solution_bubble_gas": "O2",
-    "solution_ph": 7,
+    "solution_ph": 1,
     "measurement_area": 0.071,  # 3mm diameter droplet
     "liquid_volume_ml": 1.0,
     "ref_vs_nhe": 0.21 + 0.043,
