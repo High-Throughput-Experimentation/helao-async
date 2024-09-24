@@ -6,7 +6,7 @@ from helao.helpers import logging  # get LOGGER from BaseAPI instance
 
 global LOGGER
 if logging.LOGGER is None:
-    LOGGER = logging.make_LOGGER(LOGGER_name="bubble_detection_standalone")
+    LOGGER = logging.make_logger(logger_name="bubble_detection_standalone")
 else:
     LOGGER = logging.LOGGER
 

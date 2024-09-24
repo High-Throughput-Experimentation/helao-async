@@ -29,6 +29,8 @@ global LOGGER
 
 
 class BaseAPI(HelaoFastAPI):
+    base: Base
+
     def __init__(
         self,
         config,

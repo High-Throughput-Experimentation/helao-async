@@ -42,7 +42,7 @@ from helao.drivers.pstat.gamry.technique import (
 
 global LOGGER
 if logging.LOGGER is None:
-    LOGGER = logging.make_LOGGER(LOGGER_name="gamry_server_standalone")
+    LOGGER = logging.make_logger(logger_name="gamry_server_standalone")
 else:
     LOGGER = logging.LOGGER
 
@@ -163,7 +163,7 @@ class GamryExec(Executor):
         return {"error": error}
 
 
-async def gamry_dyn_endpoints(app=None):
+async def gamry_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
 
     while not app.driver.ready:
