@@ -104,22 +104,13 @@ servers:
       dev_di:
         gamry_ttl0: 1
       dev_do:
-        spec_trig: 5
-        ir_emitter: 8
-        doric_wled: 1
+        we_vent: 5
+        ce_vent: 8
+        spec_trig: 1
         we_flow: 2
         we_pump: 7
-        we_vent: 3
         ce_pump: 6
-        ce_vent: 4
-        # gamry_aux: 1
-        # led: 8
-        # doric_led1: 4
-        # pump_ref_flush: 3
-        # pump_supply: 2
-        # doric_led2: 5
-        # doric_led3: 6
-        # ir_emitter: 7
+        ce_flow: 4
   # PAL:
   #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8007
