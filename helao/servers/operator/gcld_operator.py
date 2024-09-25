@@ -253,12 +253,11 @@ def main():
 
             elif pending_requests or TEST:
                 if TEST:
-                    smpd = TEST_SMPS_6083[test_idx]
                     test_req = CreateDataRequestModel(
-                        composition=smpd["composition"],
+                        composition={"Z": 1.0},
                         score=1.0,
-                        parameters=smpd["parameters"],
-                        sample_label=f"legacy__solid__6083_{smpd['sample_no']}",
+                        parameters={},
+                        sample_label=f"legacy__solid__0000_0",
                     )
                     with CLIENT:
                         data_request = CLIENT.create_data_request(test_req)
