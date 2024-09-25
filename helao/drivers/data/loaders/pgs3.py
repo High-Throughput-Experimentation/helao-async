@@ -319,10 +319,21 @@ class EcheUvisLoader(HelaoLoader):
         self,
         query: str,
         sequence_uuid: UUID,
+        sql_query_retries: int = 3,
     ):
         conditions = []
         conditions.append(f"    AND hp.sequence_uuid = '{str(sequence_uuid)}'")
-        data = self.run_raw_query(query + "\n".join(conditions))
+        tries = 0
+        data = None
+        while tries < sql_query_retries:
+            try:
+                data = self.run_raw_query(query + "\n".join(conditions))
+                break
+            except Exception as e:
+                print(f"!!! SQL query failed: {e}")
+                tries += 1
+        if data is None:
+            raise Exception("!!! SQL query failed after retries.")
         pdf = pd.DataFrame(data)
         print("!!! dataframe shape:", pdf.shape)
         print("!!! dataframe cols:", pdf.columns)
@@ -363,6 +374,7 @@ class EcheUvisLoader(HelaoLoader):
         min_date: str = "2024-01-01",
         plate_id: Optional[int] = None,
         sample_no: Optional[int] = None,
+        sql_query_retries: int = 3,
     ):
         conditions = []
         conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
@@ -386,7 +398,17 @@ class EcheUvisLoader(HelaoLoader):
         #     plate_id,
         #     sample_no,
         # ) not in self.recent_cache or not self.cache_sql:
-        data = self.run_raw_query(query + "\n".join(conditions))
+        tries = 0
+        data = None
+        while tries < sql_query_retries:
+            try:
+                data = self.run_raw_query(query + "\n".join(conditions))
+                break
+            except Exception as e:
+                print(f"!!! SQL query failed: {e}")
+                tries += 1
+        if data is None:
+            raise Exception("!!! SQL query failed after retries.")
         pdf = pd.DataFrame(data)
         print("!!! dataframe shape:", pdf.shape)
         print("!!! dataframe cols:", pdf.columns)
