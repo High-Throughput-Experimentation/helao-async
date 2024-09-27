@@ -1102,7 +1102,7 @@ class HelaoSyncer:
         self,
         msg: Union[dict, Path],
         target: str,
-        retries: int = 3,
+        retries: int = 5,
         compress: bool = False,
     ):
         """Uploads to S3: dict sent as json, path sent as file."""
@@ -1139,14 +1139,14 @@ class HelaoSyncer:
                         traceback.format_exception(type(err), err, err.__traceback__)
                     )
                     self.base.print_message(err)
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(30)
             self.base.print_message(f"Did not upload {target} after {retries} tries.")
             return False
         except Exception:
             LOGGER.error(f"Could not push {target}.", exc_info=True)
             return False
 
-    async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
+    async def to_api(self, req_model: dict, meta_type: str, retries: int = 5):
         """POST/PATCH model via Modelyst API."""
         if self.api_host is None:
             self.base.print_message(
@@ -1192,7 +1192,7 @@ class HelaoSyncer:
                         self.base.print_message(
                             f"[{i+1}/{retries}] an exception occurred: {e}"
                         )
-                        await asyncio.sleep(5)
+                        await asyncio.sleep(30)
                 else:
                     break
             if not api_success:
@@ -1230,7 +1230,7 @@ class HelaoSyncer:
                             self.base.print_message(
                                 f"unable to post failure model for {meta_type}: {meta_uuid}"
                             )
-                            await asyncio.sleep(5)
+                            await asyncio.sleep(30)
         return api_success
 
     def list_pending(self, omit_manual_exps: bool = True):
