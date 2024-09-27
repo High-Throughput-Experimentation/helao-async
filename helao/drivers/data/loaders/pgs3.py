@@ -1,5 +1,6 @@
 import io
 import json
+import time
 from uuid import UUID
 from typing import Optional
 from datetime import datetime
@@ -319,7 +320,7 @@ class EcheUvisLoader(HelaoLoader):
         self,
         query: str,
         sequence_uuid: UUID,
-        sql_query_retries: int = 3,
+        sql_query_retries: int = 5,
     ):
         conditions = []
         conditions.append(f"    AND hp.sequence_uuid = '{str(sequence_uuid)}'")
@@ -332,6 +333,7 @@ class EcheUvisLoader(HelaoLoader):
             except Exception as e:
                 print(f"!!! SQL query failed: {e}")
                 tries += 1
+                time.sleep(30)
         if data is None:
             raise Exception("!!! SQL query failed after retries.")
         pdf = pd.DataFrame(data)
@@ -407,6 +409,7 @@ class EcheUvisLoader(HelaoLoader):
             except Exception as e:
                 print(f"!!! SQL query failed: {e}")
                 tries += 1
+                time.sleep(30)
         if data is None:
             raise Exception("!!! SQL query failed after retries.")
         pdf = pd.DataFrame(data)
