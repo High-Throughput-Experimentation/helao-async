@@ -30,7 +30,7 @@ dependencies:
   - matplotlib
   - munch
   - ntplib
-  - numpy
+  - numpy=1
   - pandas
   - paramiko
   - picologging
