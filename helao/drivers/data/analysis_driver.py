@@ -61,6 +61,16 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self.local_ana_root = os.path.join(self.world_config["root"], "ANALYSES")
         self.max_tasks = self.config_dict.get("max_tasks", 4)
         # declare global loader for analysis models used by driver.batch_* methods
+        self.get_loader()
+        # self.api_host = self.config_dict["api_host"]
+
+        self.task_queue = asyncio.PriorityQueue()
+        self.task_set = set()
+        self.running_tasks = {}
+
+        self.syncer_loop = asyncio.create_task(self.syncer(), name="syncer_loop")
+
+    def get_loader(self):
         pgs3.LOADER = pgs3.EcheUvisLoader(
             self.config_dict["env_file"],
             cache_s3=False,
@@ -74,13 +84,6 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         # self.s3 = self.aws_session.client("s3")
         self.bucket = pgs3.LOADER.s3_bucket
         self.region = pgs3.LOADER.s3_region
-        # self.api_host = self.config_dict["api_host"]
-
-        self.task_queue = asyncio.PriorityQueue()
-        self.task_set = set()
-        self.running_tasks = {}
-
-        self.syncer_loop = asyncio.create_task(self.syncer(), name="syncer_loop")
 
     def sync_exit_callback(self, task: asyncio.Task):
         task_name = task.get_name()
