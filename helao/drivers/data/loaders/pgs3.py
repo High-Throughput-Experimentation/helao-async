@@ -25,7 +25,25 @@ class HelaoLoader:
         cache_json: bool = False,
         cache_sql: bool = False,
     ):
-        self.hcred = HelaoCredentials(_env_file=env_file)
+        self.env_file = env_file
+        self.cache_s3 = cache_s3
+        self.cache_json = cache_json
+        self.cache_sql = cache_sql
+        self.act_cache = {}  # {uuid: json_dict}
+        self.exp_cache = {}
+        self.seq_cache = {}
+        self.pro_cache = {}
+        self.s3_cache = {}  # {s3_path: hlo_dict}
+        self.sql_cache = {}  # {(uuid, type): json_dict}
+        self.last_seq_uuid = ""
+        self.connect()
+
+    def __del__(self):
+        self.cli.close()
+        self.tunnel.stop()
+
+    def connect(self):
+        self.hcred = HelaoCredentials(_env_file=self.env_file)
         self.tunnel = sshtunnel.SSHTunnelForwarder(
             self.hcred.JUMPBOX_HOST,
             ssh_username=self.hcred.JUMPBOX_USER,
@@ -42,21 +60,16 @@ class HelaoLoader:
         self.s3_region = self.hcred.AWS_REGION.get_secret_value()
         self.cli = self.sess.client("s3")
         self.res = self.sess.resource("s3")
-        self.cache_s3 = cache_s3
-        self.cache_json = cache_json
-        self.cache_sql = cache_sql
-        self.act_cache = {}  # {uuid: json_dict}
-        self.exp_cache = {}
-        self.seq_cache = {}
-        self.pro_cache = {}
-        self.s3_cache = {}  # {s3_path: hlo_dict}
-        self.sql_cache = {}  # {(uuid, type): json_dict}
-        self.last_seq_uuid = ""
         self.engine = create_engine(self.hcred.api_dsn)
 
-    def __del__(self):
-        self.cli.close()
-        self.tunnel.stop()
+    def reconnect(self):
+        try:
+            self.cli.close()
+            self.tunnel.stop()
+        except Exception as e:
+            print(f"!!! Error closing tunnel: {e}")
+        finally:
+            self.connect()
 
     def run_raw_query(self, query: str):
         with Session(self.engine) as session:
@@ -333,7 +346,8 @@ class EcheUvisLoader(HelaoLoader):
             except Exception as e:
                 print(f"!!! SQL query failed: {e}")
                 tries += 1
-                time.sleep(30)
+                time.sleep(30*tries)
+                self.reconnect()
         if data is None:
             raise Exception("!!! SQL query failed after retries.")
         pdf = pd.DataFrame(data)
@@ -409,7 +423,8 @@ class EcheUvisLoader(HelaoLoader):
             except Exception as e:
                 print(f"!!! SQL query failed: {e}")
                 tries += 1
-                time.sleep(30)
+                time.sleep(30*tries)
+                self.reconnect()
         if data is None:
             raise Exception("!!! SQL query failed after retries.")
         pdf = pd.DataFrame(data)
