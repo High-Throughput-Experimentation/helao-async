@@ -3302,6 +3302,37 @@ def ADSS_PA_CV_TRI_new(
 
     epm = ExperimentPlanMaker()
 
+
+    if rinse_with_electrolyte_bf_prefill:
+        epm.add_experiment(
+            "ADSS_sub_cellfill_prefilled_nosampleload",
+            {
+                "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_recirculate",
+            {
+                "direction_forward_or_reverse": "forward",
+                "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
+                "ReturnLineReverseWait_s": 5,
+            #    "ResidualWait_s": ResidualWait_s,
+            }
+        )
+        epm.add_experiment("ADSS_sub_refill_syringe", {
+            "syringe": "electrolyte",
+            "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+            "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            }
+        )  
+
 ###################################################################
 #REF MEASUREMENT AT BEGINNING OF SEQUENCE
 ###################################################################
@@ -4299,6 +4330,8 @@ def ADSS_PA_CV_TRI_new(
                     "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
                     }
-                )   
+                )  
+    epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": False,})
+ 
 
     return epm.experiment_plan_list  # returns complete experiment list
