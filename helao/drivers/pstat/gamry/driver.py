@@ -354,8 +354,9 @@ class GamryDriver(HelaoDriver):
     async def stop(self) -> DriverResponse:
         """General stop method to abort all active methods e.g. motion, I/O, compute."""
         try:
-            self.dtaq.Run(False)
-            self.dtaq.Stop()
+            self.dtaqsink.dtaq.Run(False)
+            self.dtaqsink.dtaq.Stop()
+            self.dtaqsink.status = "done"
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
