@@ -356,6 +356,7 @@ class GamryDriver(HelaoDriver):
         await asyncio.sleep(0.0001)
         try:
             self.dtaq.Run(False)
+            self.dtaq.Stop()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
