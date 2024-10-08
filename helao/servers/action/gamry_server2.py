@@ -158,7 +158,7 @@ class GamryExec(Executor):
 
     async def _manual_stop(self) -> dict:
         """Interrupt measurement and disconnect cell."""
-        resp = self.driver.stop()
+        resp = await self.driver.stop()
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.stop
         return {"error": error}
 
@@ -408,7 +408,7 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Stops measurement in a controlled way."""
         active = await app.base.setup_and_contain_action(action_abbr="stop")
-        app.driver.stop()
+        await app.driver.stop()
         finished_action = await active.finish()
         return finished_action.as_dict()
 
