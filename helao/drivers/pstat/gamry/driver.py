@@ -353,7 +353,6 @@ class GamryDriver(HelaoDriver):
 
     async def stop(self) -> DriverResponse:
         """General stop method to abort all active methods e.g. motion, I/O, compute."""
-        await asyncio.sleep(0.0001)
         try:
             self.dtaq.Run(False)
             self.dtaq.Stop()
