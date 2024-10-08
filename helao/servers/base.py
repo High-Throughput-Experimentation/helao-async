@@ -901,11 +901,11 @@ class Base:
             "experiment_uuid": str(exp.experiment_uuid),
             "experiment_name": exp.experiment_name,
             "experiment_output_dir": str(exp.experiment_output_dir),
+            "orch_key": str(exp.orch_key),
+            "orch_host": str(exp.orch_host),
+            "orch_port": int(exp.orch_port),
         }
-        append_str = (
-            "\n".join(["  " + x for x in yml_dumps([append_dict]).split("\n")][:-1])
-            + "\n"
-        )
+        append_str = yml_dumps([append_dict])
         sequence_dir = seq.get_sequence_dir()
         save_root = self.helaodirs.save_root
         output_path = os.path.join(save_root, sequence_dir)
