@@ -413,9 +413,10 @@ def makeApp(confPrefix, server_key, helao_root):
         return finished_action.as_dict()
 
     @app.post("/stop_private", tags=["private"])
-    def stop_private():
+    async def stop_private():
         """Stops measurement."""
-        app.driver.stop()
+        response = await app.driver.stop()
+        return response
 
     @app.post("/gamry_state", tags=["private"])
     def gamry_state():
