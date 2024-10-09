@@ -3304,6 +3304,7 @@ def ADSS_PA_CV_TRI_new(
 
 
     if rinse_with_electrolyte_bf_prefill:
+        epm.add_experiment("ADSS_sub_move_to_clean_cell", {})
         epm.add_experiment(
             "ADSS_sub_cellfill_prefilled_nosampleload",
             {
