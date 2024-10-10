@@ -707,6 +707,48 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
+        @self.post(f"/{server_key}/conditional_skip", tags=["action"])
+        async def conditional_skip(
+            action: Action = Body({}, embed=True),
+            action_version: int = 1,
+            skip_parameter: Optional[str] = "",
+            skip_condition: checkcond = checkcond.equals,
+            skip_value: Union[str, float, int, bool] = True,
+            skip_queued_actions: bool = True,
+            skip_queued_experiments: bool = False,
+            reason: str = "conditional skip",
+        ):
+            """Stop and clear all orch queues if condition is met."""
+            active = await self.orch.setup_and_contain_action()
+            cond = active.action.action_params["skip_condition"]
+            param = active.action.action_params.get(
+                active.action.action_params["skip_parameter"], None
+            )
+            thresh = active.action.action_params["skip_value"]
+            skip = False
+            if cond == checkcond.equals:
+                skip = param == thresh
+            elif cond == checkcond.above:
+                skip = param > thresh
+            elif cond == checkcond.below:
+                skip = param < thresh
+            elif cond == checkcond.isnot:
+                skip = param != thresh
+            elif cond == checkcond.uncond:
+                skip = True
+            elif cond is None:
+                skip = False
+
+            if skip:
+                if active.action.action_params["skip_queued_actions"]:
+                    await self.orch.clear_actions()
+                if active.action.action_params["skip_queued_experiments"]:
+                    await self.orch.clear_experiments()
+                await self.orch.update_operator(True)
+
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
         @self.post(f"/{server_key}/add_globalexp_param", tags=["action"])
         async def add_globalexp_param(
             action: Action = Body({}, embed=True),
