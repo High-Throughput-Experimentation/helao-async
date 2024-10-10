@@ -7,6 +7,7 @@ __all__ = [
     "ECMS_repeat_CV",
     "ECMS_repeat_CV_recirculation",
     "ECMS_repeat_CV_recirculation_mixedreactant",
+    "ECMS_CV_recirculation_mixedreactant",
     "ECMS_series_CA",
     "ECMS_series_CA_recirculation",
     "ECMS_series_CA_recirculation_mixedreactant",
@@ -746,6 +747,126 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
                 "WE_potential_apex2__V": WE_potential_apex2__V,
                 "WE_potential_final__V": WE_potential_final__V,
                 "ScanRate_V_s": ScanRate_V_s_2,
+                "Cycles": Cycles,
+                "SampleRate": SampleRate,
+                "IErange": IErange,
+                "MS_equilibrium_time": MS_equilibrium_time,
+            },
+        )
+        
+        epm.add_experiment("ECMS_sub_electrolyte_recirculation_off", {})
+            
+        epm.add_experiment("ECMS_sub_normal_state",{})
+        epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
+        epm.add_experiment("ECMS_sub_clean_cell_recirculation", {"volume_ul_cell_liquid": volume_ul_cell_liquid, "liquid_backward_time":liquid_backward_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no, "tube_clear_time":tube_clear_time, "liquid_drain_time":liquid_drain_time, "liquid_fill_time":liquid_fill_time +1.0, "cleaning_times": cleaning_times,  "tube_clear_delaytime": tube_clear_delaytime})        
+
+        #epm.add_experiment("ECMS_sub_electrolyte_clean_cell", {"liquid_backward_time": liquid_cleancell_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no})
+    
+    #epm.add_experiment("ECMS_sub_alloff", {})
+    return epm.experiment_plan_list
+
+def ECMS_CV_recirculation_mixedreactant(
+    sequence_version: int = 2,
+    plate_id: int = 4534,
+    solid_sample_no: int = 1,   
+    reservoir_liquid_sample_no: int = 2,
+    volume_ul_cell_liquid: float = 2090,
+    #liquid_forward_time: float = 0,
+    liquid_backward_time: float = 35,   
+    #vacuum_time: float = 10,   
+    CO2equilibrium_duration: float = 30,
+    CO2flowrate_sccm: float = 9.0,
+    Califlowrate_sccm: float = 1.0,
+    flow_ramp_sccm: float = 0,
+    MS_baseline_duration_1: float = 90, 
+    MS_baseline_duration_2: float = 180, 
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 7.8,
+    num_repeats: int = 1,
+    WE_potential_init__V: float = -1.0,
+    WE_potential_apex1__V: float = -2.0,
+    WE_potential_apex2__V: float = -1.0,
+    WE_potential_final__V: float = -1.0,
+    ScanRate_V_s_1: float = 0.02,
+    Cycles: int = 3,
+    SampleRate: float = 0.1,
+    IErange: str = "auto",
+    ref_offset: float = 0.0,  
+    MS_equilibrium_time: float = 120.0,
+    
+    cleaning_times: int =0,
+    liquid_fill_time: float = 9,
+    tube_clear_time: float = 15,
+    tube_clear_delaytime: float = 40.0,
+    liquid_drain_time: float = 70.0,
+    #liquid_cleancell_time: float = 120,
+):
+
+    epm = ExperimentPlanMaker()
+
+    # housekeeping
+    epm.add_experiment("ECMS_sub_unload_cell", {})
+    epm.add_experiment(
+        "ECMS_sub_load_solid",
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    )
+    
+    #epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
+
+    for _ in range(num_repeats):
+        epm.add_experiment(
+            "ECMS_sub_electrolyte_fill_recirculationreservoir",
+            {
+                "liquid_fill_time": liquid_fill_time,
+            },
+        )
+
+
+        epm.add_experiment(
+            "ECMS_sub_electrolyte_fill_cell_recirculation",
+            {
+                "liquid_backward_time": liquid_backward_time,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "volume_ul_cell_liquid": volume_ul_cell_liquid,
+            },
+        )
+#achiving faster equilibrium time with faster CO2 flow rate
+        epm.add_experiment(
+            "ECMS_sub_headspace_purge_and_CO2baseline",
+            {
+                "CO2equilibrium_duration": CO2equilibrium_duration,
+                "flowrate_sccm": 10.0,
+                "flow_ramp_sccm": flow_ramp_sccm,
+                "MS_baseline_duration": MS_baseline_duration_1
+            },
+        )
+        epm.add_experiment("ECMS_sub_electrolyte_recirculation_on", {})
+
+
+
+        epm.add_experiment(
+            "ECMS_sub_cali",
+            {
+                "CO2flowrate_sccm": CO2flowrate_sccm,
+                "Califlowrate_sccm": Califlowrate_sccm,
+                "MSsignal_quilibrium_time": MS_baseline_duration_2,
+            },
+        )
+        
+        
+            
+        epm.add_experiment(
+            "ECMS_sub_CV",
+            {
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "WE_potential_init__V": WE_potential_init__V,
+                "WE_potential_apex1__V": WE_potential_apex1__V,
+                "WE_potential_apex2__V": WE_potential_apex2__V,
+                "WE_potential_final__V": WE_potential_final__V,
+                "ScanRate_V_s": ScanRate_V_s_1,
                 "Cycles": Cycles,
                 "SampleRate": SampleRate,
                 "IErange": IErange,
