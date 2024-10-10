@@ -25,7 +25,7 @@ from enum import Enum
 from copy import copy
 from _ctypes import COMError
 
-# import asyncio
+import asyncio
 import numpy as np
 
 from helao.drivers.helao_driver import (
@@ -351,10 +351,12 @@ class GamryDriver(HelaoDriver):
             )
         return response
 
-    def stop(self) -> DriverResponse:
+    async def stop(self) -> DriverResponse:
         """General stop method to abort all active methods e.g. motion, I/O, compute."""
         try:
-            self.dtaq.Run(False)
+            self.dtaqsink.dtaq.Run(False)
+            self.dtaqsink.dtaq.Stop()
+            self.dtaqsink.status = "done"
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
