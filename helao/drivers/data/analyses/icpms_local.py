@@ -30,7 +30,7 @@ class IcpmsInputs:
         )
         self.process_params = self.icpms.process_params
         filed = [
-            d for d in self.icpms.json["files"] if d["file_type"] == "icpms_helao__file"
+            d for d in self.icpms.json["files"] if d["file_type"] in ["icpms_helao__file", "icpms_helao__json_file"]
         ][0]
         self.global_sample_label = [x for x in filed["sample"] if "__liquid__" in x][0]
         action_uuid = filed["action_uuid"]
