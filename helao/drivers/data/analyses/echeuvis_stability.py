@@ -116,10 +116,10 @@ def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit):
 
 
 class EcheUvisInputs:
-    ref_darks: List[HelaoProcess]
-    ref_dark_spec_acts: List[HelaoAction]
-    ref_lights: List[HelaoProcess]
-    ref_light_spec_acts: List[HelaoAction]
+    # ref_darks: List[HelaoProcess]
+    # ref_dark_spec_acts: List[HelaoAction]
+    # ref_lights: List[HelaoProcess]
+    # ref_light_spec_acts: List[HelaoAction]
     baseline: HelaoProcess
     baseline_spec_act: HelaoAction
     baseline_ocv_act: HelaoAction
@@ -189,22 +189,22 @@ class EcheUvisInputs:
             query_df.query("process_uuid==@insitu_process_uuid").iloc[0].sequence_uuid
         )
         sdf = query_df.query("sequence_uuid==@suuid")
-        self.ref_darks = [
-            HelaoProcess(x, query_df)
-            for x in sdf.query("run_use=='ref_dark'").process_uuid
-        ]
-        self.ref_dark_spec_acts = [
-            HelaoAction(x, query_df)
-            for x in sdf.query("run_use=='ref_dark'").action_uuid
-        ]
-        self.ref_lights = [
-            HelaoProcess(x, query_df)
-            for x in sdf.query("run_use=='ref_light'").process_uuid
-        ]
-        self.ref_light_spec_acts = [
-            HelaoAction(x, query_df)
-            for x in sdf.query("run_use=='ref_light'").action_uuid
-        ]
+        # self.ref_darks = [
+        #     HelaoProcess(x, query_df)
+        #     for x in sdf.query("run_use=='ref_dark'").process_uuid
+        # ]
+        # self.ref_dark_spec_acts = [
+        #     HelaoAction(x, query_df)
+        #     for x in sdf.query("run_use=='ref_dark'").action_uuid
+        # ]
+        # self.ref_lights = [
+        #     HelaoProcess(x, query_df)
+        #     for x in sdf.query("run_use=='ref_light'").process_uuid
+        # ]
+        # self.ref_light_spec_acts = [
+        #     HelaoAction(x, query_df)
+        #     for x in sdf.query("run_use=='ref_light'").action_uuid
+        # ]
 
         ddf = sdf.query("run_use=='data'")
         bdf = (
@@ -232,13 +232,13 @@ class EcheUvisInputs:
 
         # self.solid_samples = [f"legacy__solid__{plate_id}+{sample_no}"]
 
-    @property
-    def ref_dark_spec(self):
-        return [x.hlo for x in self.ref_dark_spec_acts]
+    # @property
+    # def ref_dark_spec(self):
+    #     return [x.hlo for x in self.ref_dark_spec_acts]
 
-    @property
-    def ref_light_spec(self):
-        return [x.hlo for x in self.ref_light_spec_acts]
+    # @property
+    # def ref_light_spec(self):
+    #     return [x.hlo for x in self.ref_light_spec_acts]
 
     @property
     def baseline_spec(self):
@@ -388,13 +388,14 @@ class EcheUvisAnalysis(BaseAnalysis):
 
     def calc_output(self):
         """Calculate stability FOMs and intermediate vectors."""
-        rdtups = [parse_spechlo(x) for x in self.inputs.ref_dark_spec]
-        rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
+        # rdtups = [parse_spechlo(x) for x in self.inputs.ref_dark_spec]
+        # rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
         btup = parse_spechlo(self.inputs.baseline_spec)
         itup = parse_spechlo(self.inputs.insitu_spec)
         ptup = parse_spechlo(self.inputs.presitu_spec)
 
-        if any([x is False for x in rdtups + rltups + [btup, itup]]):
+        # if any([x is False for x in rdtups + rltups + [btup, itup]]):
+        if any([x is False for x in [btup, itup]]):
             return False
 
         ap = self.analysis_params
@@ -403,31 +404,31 @@ class EcheUvisAnalysis(BaseAnalysis):
         wlindlo = np.where(wl > ap["lower_wl"])[0].min()
         wlindhi = np.where(wl < ap["upper_wl"])[0].max()
 
-        # mean aggregate initial and final reference dark spectra
-        mean_ref_dark = np.vstack(
-            [
-                arr[
-                    np.where(
-                        (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
-                    )[0].min() :
-                ]
-                for wl, ep, arr in rdtups
-            ]
-        ).mean(axis=0)
+        # # mean aggregate initial and final reference dark spectra
+        # mean_ref_dark = np.vstack(
+        #     [
+        #         arr[
+        #             np.where(
+        #                 (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
+        #             )[0].min() :
+        #         ]
+        #         for wl, ep, arr in rdtups
+        #     ]
+        # ).mean(axis=0)
 
-        # mean aggregate initial and final reference light spectra
-        mean_ref_light = np.vstack(
-            [
-                arr[
-                    np.where(
-                        (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
-                    )[
-                        0
-                    ].min() :  # this gets the minimum index of the last t seconds
-                ]
-                for wl, ep, arr in rltups
-            ]
-        ).mean(axis=0)
+        # # mean aggregate initial and final reference light spectra
+        # mean_ref_light = np.vstack(
+        #     [
+        #         arr[
+        #             np.where(
+        #                 (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
+        #             )[
+        #                 0
+        #             ].min() :  # this gets the minimum index of the last t seconds
+        #         ]
+        #         for wl, ep, arr in rltups
+        #     ]
+        # ).mean(axis=0)
 
         # aggregate baseline insitu OCV spectra over final t seconds, omitting first n
         agg_baseline = aggfunc(
@@ -465,13 +466,16 @@ class EcheUvisAnalysis(BaseAnalysis):
         inds = range(len(wl[wlindlo:wlindhi]))
         nbins = np.round(len(wl[wlindlo:wlindhi]) / ap["bin_width"]).astype(int)
         refadj_baseline = (
-            (agg_baseline - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+            # (agg_baseline - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+            agg_baseline
         )[wlindlo:wlindhi]
         refadj_insitu = (
-            (agg_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+            # (agg_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+            agg_insitu
         )[wlindlo:wlindhi]
         refadj_presitu = (
-            (agg_presitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+            # (agg_presitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+            agg_presitu
         )[wlindlo:wlindhi]
         bin_wl = binned_statistic(inds, wl[wlindlo:wlindhi], "mean", nbins).statistic
         bin_baseline = binned_statistic(inds, refadj_baseline, "mean", nbins).statistic
@@ -512,7 +516,8 @@ class EcheUvisAnalysis(BaseAnalysis):
         eps_insitu = itup[1][ap["skip_first_n"] :]
         arr_insitu = itup[2][ap["skip_first_n"] :]
         refadj_arr_insitu = (
-            (arr_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+            # (arr_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+            arr_insitu
         )[:, wlindlo:wlindhi]
         omt_arr_insitu = 1 - refadj_arr_insitu
         omt_refadj_baseline = 1 - refadj_baseline
@@ -522,7 +527,8 @@ class EcheUvisAnalysis(BaseAnalysis):
         eps_presitu = itup[1][ap["skip_first_n"] :]
         arr_presitu = itup[2][ap["skip_first_n"] :]
         refadj_arr_presitu = (
-            (arr_presitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+            # (arr_presitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+            arr_presitu
         )[:, wlindlo:wlindhi]
         omt_arr_presitu = 1 - refadj_arr_presitu
 
@@ -531,8 +537,10 @@ class EcheUvisAnalysis(BaseAnalysis):
             wavelength=list(wl),
             lower_wl_idx=wlindlo,
             upper_wl_idx=wlindhi,
-            mean_ref_dark=list(mean_ref_dark),
-            mean_ref_light=list(mean_ref_light),
+            # mean_ref_dark=list(mean_ref_dark),
+            # mean_ref_light=list(mean_ref_light),
+            mean_ref_dark=[],
+            mean_ref_light=[],
             agg_method=ap["agg_method"],
             agg_baseline=list(agg_baseline),
             agg_insitu=list(agg_insitu),
