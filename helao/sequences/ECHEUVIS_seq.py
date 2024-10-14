@@ -1091,87 +1091,87 @@ def ECHEUVIS_multiCA_led(
     epm = ExperimentPlanMaker()
 
     epm.add_experiment("ECHEUVIS_sub_startup", {})
-    if use_z_motor:
-        epm.add_experiment(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add_experiment(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to ref location."},
-        )
-    epm.add_experiment(
-        "UVIS_sub_setup_ref",
-        {
-            "reference_mode": "builtin",
-            "solid_custom_position": "cell1_we",
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[0],
-            "specref_code": 1,
-        },
-    )
-    if use_z_motor:
-        epm.add_experiment(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": True,
-                "flow_ce": True,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    else:
-        epm.add_experiment(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Restore flow and prepare for reference measurement."},
-        )
+    # if use_z_motor:
+    #     epm.add_experiment(
+    #         "ECHEUVIS_sub_disengage",
+    #         {
+    #             "clear_we": True,
+    #             "clear_ce": False,
+    #             "z_height": cell_disengaged_z,
+    #             "vent_wait": cell_vent_wait,
+    #         },
+    #     )
+    # else:
+    #     epm.add_experiment(
+    #         "ECHEUVIS_sub_interrupt",
+    #         {"reason": "Stop flow and prepare for xy motion to ref location."},
+    #     )
+    # epm.add_experiment(
+    #     "UVIS_sub_setup_ref",
+    #     {
+    #         "reference_mode": "builtin",
+    #         "solid_custom_position": "cell1_we",
+    #         "solid_plate_id": plate_id,
+    #         "solid_sample_no": plate_sample_no_list[0],
+    #         "specref_code": 1,
+    #     },
+    # )
+    # if use_z_motor:
+    #     epm.add_experiment(
+    #         "ECHEUVIS_sub_engage",
+    #         {
+    #             "flow_we": True,
+    #             "flow_ce": True,
+    #             "z_height": cell_engaged_z,
+    #             "fill_wait": cell_fill_wait,
+    #         },
+    #     )
+    # else:
+    #     epm.add_experiment(
+    #         "ECHEUVIS_sub_interrupt",
+    #         {"reason": "Restore flow and prepare for reference measurement."},
+    #     )
 
-    # dark ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add_experiment(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_dark",
-                "reference_mode": "builtin",
-            },
-        )
-    # light ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add_experiment(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_light",
-                "reference_mode": "builtin",
-            },
-        )
+    # # dark ref
+    # for st in SPEC_MAP[spec_technique]:
+    #     epm.add_experiment(
+    #         "UVIS_sub_measure",
+    #         {
+    #             "spec_type": st,
+    #             "spec_int_time_ms": spec_int_time_ms,
+    #             "spec_n_avg": spec_n_avg,
+    #             "duration_sec": spec_ref_duration,
+    #             "toggle_source": led_names[0],
+    #             "toggle_is_shutter": False,
+    #             "illumination_wavelength": led_wavelengths_nm[0],
+    #             "illumination_intensity": led_intensities_mw[0],
+    #             "illumination_intensity_date": led_date,
+    #             "illumination_side": led_type,
+    #             "technique_name": spec_technique,
+    #             "run_use": "ref_dark",
+    #             "reference_mode": "builtin",
+    #         },
+    #     )
+    # # light ref
+    # for st in SPEC_MAP[spec_technique]:
+    #     epm.add_experiment(
+    #         "UVIS_sub_measure",
+    #         {
+    #             "spec_type": st,
+    #             "spec_int_time_ms": spec_int_time_ms,
+    #             "spec_n_avg": spec_n_avg,
+    #             "duration_sec": spec_ref_duration,
+    #             "toggle_source": led_names[0],
+    #             "toggle_is_shutter": False,
+    #             "illumination_wavelength": led_wavelengths_nm[0],
+    #             "illumination_intensity": led_intensities_mw[0],
+    #             "illumination_intensity_date": led_date,
+    #             "illumination_side": led_type,
+    #             "technique_name": spec_technique,
+    #             "run_use": "ref_light",
+    #             "reference_mode": "builtin",
+    #         },
+    #     )
     if use_z_motor:
         epm.add_experiment(
             "ECHEUVIS_sub_disengage",
@@ -1314,86 +1314,86 @@ def ECHEUVIS_multiCA_led(
             )
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
-    if use_z_motor:
-        epm.add_experiment(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add_experiment(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to ref location."},
-        )
-    epm.add_experiment(
-        "UVIS_sub_setup_ref",
-        {
-            "reference_mode": "builtin",
-            "solid_custom_position": "cell1_we",
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[-1],
-            "specref_code": 1,
-        },
-    )
-    if use_z_motor:
-        epm.add_experiment(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": True,
-                "flow_ce": True,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    else:
-        epm.add_experiment(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Restore flow and prepare for reference measurement."},
-        )
-    # dark ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add_experiment(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_dark",
-                "reference_mode": "builtin",
-            },
-        )
-    # light ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add_experiment(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_light",
-                "reference_mode": "builtin",
-            },
-        )
+    # if use_z_motor:
+    #     epm.add_experiment(
+    #         "ECHEUVIS_sub_disengage",
+    #         {
+    #             "clear_we": True,
+    #             "clear_ce": False,
+    #             "z_height": cell_disengaged_z,
+    #             "vent_wait": cell_vent_wait,
+    #         },
+    #     )
+    # else:
+    #     epm.add_experiment(
+    #         "ECHEUVIS_sub_interrupt",
+    #         {"reason": "Stop flow and prepare for xy motion to ref location."},
+    #     )
+    # epm.add_experiment(
+    #     "UVIS_sub_setup_ref",
+    #     {
+    #         "reference_mode": "builtin",
+    #         "solid_custom_position": "cell1_we",
+    #         "solid_plate_id": plate_id,
+    #         "solid_sample_no": plate_sample_no_list[-1],
+    #         "specref_code": 1,
+    #     },
+    # )
+    # if use_z_motor:
+    #     epm.add_experiment(
+    #         "ECHEUVIS_sub_engage",
+    #         {
+    #             "flow_we": True,
+    #             "flow_ce": True,
+    #             "z_height": cell_engaged_z,
+    #             "fill_wait": cell_fill_wait,
+    #         },
+    #     )
+    # else:
+    #     epm.add_experiment(
+    #         "ECHEUVIS_sub_interrupt",
+    #         {"reason": "Restore flow and prepare for reference measurement."},
+    #     )
+    # # dark ref
+    # for st in SPEC_MAP[spec_technique]:
+    #     epm.add_experiment(
+    #         "UVIS_sub_measure",
+    #         {
+    #             "spec_type": st,
+    #             "spec_int_time_ms": spec_int_time_ms,
+    #             "spec_n_avg": spec_n_avg,
+    #             "duration_sec": spec_ref_duration,
+    #             "toggle_source": led_names[0],
+    #             "toggle_is_shutter": False,
+    #             "illumination_wavelength": led_wavelengths_nm[0],
+    #             "illumination_intensity": led_intensities_mw[0],
+    #             "illumination_intensity_date": led_date,
+    #             "illumination_side": led_type,
+    #             "technique_name": spec_technique,
+    #             "run_use": "ref_dark",
+    #             "reference_mode": "builtin",
+    #         },
+    #     )
+    # # light ref
+    # for st in SPEC_MAP[spec_technique]:
+    #     epm.add_experiment(
+    #         "UVIS_sub_measure",
+    #         {
+    #             "spec_type": st,
+    #             "spec_int_time_ms": spec_int_time_ms,
+    #             "spec_n_avg": spec_n_avg,
+    #             "duration_sec": spec_ref_duration,
+    #             "toggle_source": led_names[0],
+    #             "toggle_is_shutter": False,
+    #             "illumination_wavelength": led_wavelengths_nm[0],
+    #             "illumination_intensity": led_intensities_mw[0],
+    #             "illumination_intensity_date": led_date,
+    #             "illumination_side": led_type,
+    #             "technique_name": spec_technique,
+    #             "run_use": "ref_light",
+    #             "reference_mode": "builtin",
+    #         },
+    #     )
     if use_z_motor:
         # leave cell sealed w/solution for storage
         epm.add_experiment(
