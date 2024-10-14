@@ -1,9 +1,11 @@
+from typing import Optional
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel
 from helaocore.models.analysis import (
     AnalysisOutputModel,
     AnalysisModel,
+    AnalysisInput
 )
 from helaocore.models.s3locator import S3Locator
 from helaocore.models.run_use import RunUse
@@ -21,10 +23,11 @@ class BaseAnalysis:
     process_name: str
     run_type: str
     technique_name: str
-    inputs: object
+    inputs: AnalysisInput
     outputs: BaseModel
+    analysis_codehash: str
     
-    def gen_uuid(self, global_sample_label: str = None):
+    def gen_uuid(self, global_sample_label: Optional[str] = None):
         input_data_models = self.inputs.get_datamodels(global_sample_label)
         if global_sample_label is None:
             ru_data = [x for x in input_data_models if x.run_use==RunUse.data]
@@ -44,7 +47,7 @@ class BaseAnalysis:
         bucket: str,
         region: str,
         dummy: bool = True,
-        global_sample_label: str = None,
+        global_sample_label: Optional[str] = None,
     ):
         input_data_models = self.inputs.get_datamodels(global_sample_label)
         if global_sample_label is None:
