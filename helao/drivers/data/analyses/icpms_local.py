@@ -7,7 +7,7 @@ from typing import List
 from pydantic import BaseModel
 
 from helaocore.version import get_filehash
-from helaocore.models.analysis import AnalysisDataModel
+from helaocore.models.analysis import AnalysisDataModel, AnalysisInput
 
 from .base_analysis import BaseAnalysis
 from ...data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
@@ -18,7 +18,7 @@ ANALYSIS_DEFAULTS = {
 }
 
 
-class IcpmsInputs:
+class IcpmsInputs(AnalysisInput):
     icpms: HelaoProcess
     icpms_act: HelaoAction
     global_sample_label: str

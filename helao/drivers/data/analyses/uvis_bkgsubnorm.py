@@ -14,7 +14,7 @@ from helaocore.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 
 from .base_analysis import BaseAnalysis
-from helaocore.models.analysis import AnalysisDataModel
+from helaocore.models.analysis import AnalysisDataModel, AnalysisInput
 from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 from .echeuvis_stability import refadjust, parse_spechlo
 
@@ -74,7 +74,7 @@ WHERE
 """
 
 
-class DryUvisInputs:
+class DryUvisInputs(AnalysisInput):
     ref_darks: List[HelaoProcess]
     ref_dark_spec_acts: List[HelaoAction]
     ref_lights: List[HelaoProcess]
