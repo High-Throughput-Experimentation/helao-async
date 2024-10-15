@@ -427,13 +427,15 @@ def main():
                             "pending", data_request_id=data_request.id
                         )
                         return -1
-                print(f"{gen_ts()} Analysis sequence complete.")
 
-                # with CLIENT:
-                #     output = CLIENT.set_status(
-                #         "analysis_finished", data_request_id=data_request.id
-                #     )
-                #     print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
+                else:
+                    with CLIENT:
+                        output = CLIENT.set_status(
+                            "completed", data_request_id=data_request.id
+                        )
+                    print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
+
+                print(f"{gen_ts()} Analysis sequence complete.")
 
             else:
                 print(
