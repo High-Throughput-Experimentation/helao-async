@@ -68,7 +68,7 @@ ECHEUVIS_multiCA_led_defaults = {
     ],
     "CA_samplerate_sec": 0.05,
     "OCV_duration_sec": 5,
-    "gamry_i_range": "auto",
+    "gamry_i_range": "1mA",
     "led_type": "front",
     "led_date": "04/28/2023",
     "led_names": ["doric_wled"],
