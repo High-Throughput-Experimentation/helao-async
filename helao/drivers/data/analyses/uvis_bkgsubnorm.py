@@ -205,7 +205,7 @@ class DryUvisAnalysis(BaseAnalysis):
     process_name: str
     run_type: str
     technique_name: str
-    inputs: DryUvisInputs
+    inputs: AnalysisInput
     outputs: DryUvisOutputs
     action_attr: str
     analysis_codehash: str
@@ -230,7 +230,7 @@ class DryUvisAnalysis(BaseAnalysis):
         self.process_name = pdf.iloc[0].technique_name
         self.run_type = pdf.iloc[0].run_type
         self.technique_name = pdf.iloc[0].technique_name
-        
+
         self.inputs = DryUvisInputs(
             process_uuid, self.plate_id, self.sample_no, query_df
         )
