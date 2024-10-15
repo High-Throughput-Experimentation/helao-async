@@ -189,7 +189,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                 )
                 # with gzip.open(local_json_out, "wt", encoding="utf-8") as f:
                 os.makedirs(os.path.dirname(local_json_out), exist_ok=True)
-                with open(local_json_out) as f:
+                with open(local_json_out, "w") as f:
                     json.dump(s3_dict, f)
                 if not self.config_dict.get("local_only", False):
                     s3_success = await self.to_s3(
