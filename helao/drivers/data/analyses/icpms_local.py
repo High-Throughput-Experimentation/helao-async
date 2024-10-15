@@ -80,7 +80,7 @@ class IcpmsAnalysis(BaseAnalysis):
     process_name: str
     run_type: str
     technique_name: str
-    inputs: IcpmsInputs
+    inputs: AnalysisInput
     outputs: IcpmsOutputs
     analysis_codehash: str
     global_sample_label: str
