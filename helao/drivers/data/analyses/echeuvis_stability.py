@@ -263,7 +263,7 @@ class EcheUvisInputs(AnalysisInput):
     @property
     def presitu_ocv(self):
         return self.presitu_ocv_act.hlo
-    
+
     def get_datamodels(
         self, global_sample_label: str, *args, **kwargs
     ) -> List[AnalysisDataModel]:
@@ -351,7 +351,7 @@ class EcheUvisAnalysis(BaseAnalysis):
     process_name: str
     run_type: str
     technique_name: str
-    inputs: EcheUvisInputs
+    inputs: AnalysisInput
     outputs: EcheUvisOutputs
     analysis_codehash: str
 
