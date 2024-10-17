@@ -850,6 +850,7 @@ def ECHEUVIS_sub_engage(
     z_height: float = 1.5,
     fill_wait: float = 10.0,
     calibrate_intensity: bool = False,
+    max_integration_time: int = 150,
     illumination_source: str = "doric_wled",
 ):
     # raise z (engage)
@@ -905,7 +906,7 @@ def ECHEUVIS_sub_engage(
         apm.add(
             SPEC_T_server,
             "calibrate_intensity",
-            {},
+            {"max_integration_time": max_integration_time},
             to_globalexp_params=["calibrated_int_time_ms"],
         )
         apm.add(

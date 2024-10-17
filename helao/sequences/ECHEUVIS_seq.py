@@ -1371,6 +1371,7 @@ def ECHEUVIS_multiCA_led(
                     "z_height": cell_engaged_z,
                     "fill_wait": cell_fill_wait,
                     "calibrate_intensity": True,
+                    "max_integration_time": int(1000 * toggleSpec_period / spec_n_avg)
                 },
             )
         else:
