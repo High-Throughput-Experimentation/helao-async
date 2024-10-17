@@ -137,6 +137,7 @@ servers:
       lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll
       n_pixels: 1024
       start_margin: 5
+      allow_no_sample: true
   VIS:
     host: hte-eche-10.htejcap.caltech.edu
     port: 5001
