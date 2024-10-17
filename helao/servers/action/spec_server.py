@@ -134,9 +134,9 @@ def makeApp(confPrefix, server_key, helao_root):
             or peak_int > active.action.action_params["target_peak_max"]
         ):
             if peak_int < active.action.action_params["target_peak_min"]:
-                current_int_time *= int(target_avg / peak_int)
+                current_int_time = int(current_int_time * target_avg / peak_int)
             else:
-                current_int_time *= int(peak_int / target_avg)
+                current_int_time = int(current_int_time * peak_int / target_avg)
             app.base.print_message(
                 f"Adjusting integration time to: {current_int_time} ms", info=True
             )
