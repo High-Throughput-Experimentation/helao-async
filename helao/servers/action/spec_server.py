@@ -112,8 +112,8 @@ def makeApp(confPrefix, server_key, helao_root):
         n_avg: int = 10,
         peak_lower_wl: Optional[float] = 400,
         peak_upper_wl: Optional[float] = 750,
-        target_peak_max: Optional[float] = 40000,
-        target_peak_min: Optional[float] = 45000,
+        target_peak_min: Optional[float] = 40000,
+        target_peak_max: Optional[float] = 45000,
         max_iters: int = 5,
     ):
         """Acquire N spectra and average."""
@@ -150,8 +150,6 @@ def makeApp(confPrefix, server_key, helao_root):
             await active.enqueue_data_dflt(datadict=specdict)
             peak_int = specdict["peak_intensity"]
             app.base.print_message(f"Current peak intensity: {peak_int}", info=True)
-            app.base.print_message(f'min check: {peak_int < active.action.action_params["target_peak_min"]}', info=True)
-            app.base.print_message(f'max check: {peak_int > active.action.action_params["target_peak_max"]}', info=True)
             adjust_count += 1
 
         active.action.action_params["peak_intensity"] = peak_int
