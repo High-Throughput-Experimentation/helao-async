@@ -428,7 +428,7 @@ class Orch(Base):
 
     def unpack_sequence(
         self, sequence_name: str, sequence_params
-    ) -> List[ExperimentModel]:
+    ) -> List[Experiment]:
         if sequence_name in self.sequence_lib:
             return self.sequence_lib[sequence_name](**sequence_params)
         else:
