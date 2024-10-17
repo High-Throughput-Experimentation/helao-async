@@ -4,6 +4,7 @@ __all__ = [
     "ECHEUVIS_multiCA_led",
     "ECHEUVIS_CP_led",
     "ECHEUVIS_postseq",
+    "ECHEUVIS_diagnostic_CV"
 ]
 
 import random
