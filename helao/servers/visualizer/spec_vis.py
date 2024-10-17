@@ -32,6 +32,7 @@ VALID_ACTION_NAME = (
     "acquire_spec",
     "acquire_spec_adv",
     "acquire_spec_extrig",
+    "calibrate_intensity",
 )
 
 
