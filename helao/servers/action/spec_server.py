@@ -115,6 +115,7 @@ def makeApp(confPrefix, server_key, helao_root):
         target_peak_min: Optional[float] = 40000,
         target_peak_max: Optional[float] = 45000,
         max_iters: int = 5,
+        max_integration_time: int = 150
     ):
         """Calibrate integration time to achieve peak intensity window."""
         spec_header = {"wl": app.driver.pxwl}
@@ -140,7 +141,9 @@ def makeApp(confPrefix, server_key, helao_root):
                 current_int_time = int(current_int_time * target_avg / peak_int)
             else:
                 current_int_time = int(current_int_time * peak_int / target_avg)
-            
+            if current_int_time > active.action.action_params['max_integration_time']:
+                current_int_time = active.action.action_params['max_integration_time']
+                break
             app.base.print_message(
                 f"Adjusting integration time to: {current_int_time} ms", info=True
             )

@@ -56,7 +56,7 @@ CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
 ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
-toggle_triggertype = TriggerType.risingedge
+TOGGLE_TRIGGERTYPE = TriggerType.risingedge
 
 
 def ECHEUVIS_sub_startup(experiment: Experiment):
@@ -151,7 +151,7 @@ def ECHEUVIS_sub_CV_led(
         "set_digital_cycle",
         {
             "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
+            "triggertype": TOGGLE_TRIGGERTYPE,
             "out_name": [illumination_source, toggle2_source],
             "out_name_gamry": None,
             "toggle_init_delay": [
@@ -331,7 +331,7 @@ def ECHEUVIS_sub_CA_led(
         "set_digital_cycle",
         {
             "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
+            "triggertype": TOGGLE_TRIGGERTYPE,
             "out_name": [illumination_source, toggle2_source],
             "out_name_gamry": None,
             "toggle_init_delay": [
@@ -510,7 +510,7 @@ def ECHEUVIS_sub_CP_led(
         "set_digital_cycle",
         {
             "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
+            "triggertype": TOGGLE_TRIGGERTYPE,
             "out_name": [illumination_source, toggle2_source],
             "out_name_gamry": None,
             "toggle_init_delay": [
@@ -694,7 +694,7 @@ def ECHEUVIS_sub_OCV_led(
         "set_digital_cycle",
         {
             "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
+            "triggertype": TOGGLE_TRIGGERTYPE,
             "out_name": [illumination_source, toggle2_source],
             "out_name_gamry": None,
             "toggle_init_delay": [
