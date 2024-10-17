@@ -6,6 +6,8 @@ import ctypes
 import asyncio
 import traceback
 
+import numpy as np
+
 from helaocore.error import ErrorCodes
 from helaocore.models.data import DataModel
 from helaocore.models.file import FileConnParams, HloHeaderModel
@@ -243,6 +245,30 @@ class SM303:
                 retdict = {"epoch_s": time.time()}
                 retdict.update({f"ch_{i:04}": x for i, x in enumerate(self.data)})
                 retdict["error_code"] = ErrorCodes.none
+                arr_data = np.array(self.data)
+                lower_lim = (
+                    0
+                    if kwargs.get("peak_lower_wl") is None
+                    else min(
+                        [
+                            i
+                            for i, v in enumerate(self.pxwl)
+                            if v >= kwargs.get("peak_lower_wl")
+                        ]
+                    )
+                )
+                upper_lim = (
+                    len(self.pxwl) - 1
+                    if kwargs.get("peak_upper_wl") is None
+                    else max(
+                        [
+                            i
+                            for i, v in enumerate(self.pxwl)
+                            if v <= kwargs.get("peak_upper_wl")
+                        ]
+                    )
+                )
+                retdict["peak_intensity"] = arr_data[lower_lim:upper_lim].max()
                 return retdict
             else:
                 self.base.print_message("No data available.", info=True)
@@ -284,7 +310,8 @@ class SM303:
             samples_in = await self.unified_db.get_samples(A.samples_in)
             if not samples_in and not self.allow_no_sample:
                 self.base.print_message(
-                    "Spec server got no valid sample, cannot start measurement!", error=True
+                    "Spec server got no valid sample, cannot start measurement!",
+                    error=True,
                 )
                 A.samples_in = []
                 A.error_code = ErrorCodes.no_sample
