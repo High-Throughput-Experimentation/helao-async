@@ -114,6 +114,7 @@ def makeApp(confPrefix, server_key, helao_root):
         peak_upper_wl: Optional[float] = 750,
         target_peak_max: Optional[float] = 40000,
         target_peak_min: Optional[float] = 45000,
+        max_iters: int = 5,
     ):
         """Acquire N spectra and average."""
         spec_header = {"wl": app.driver.pxwl}
@@ -124,19 +125,22 @@ def makeApp(confPrefix, server_key, helao_root):
         specdict = app.driver.acquire_spec_adv(**active.action.action_params)
         await active.enqueue_data_dflt(datadict=specdict)
         peak_int = specdict["peak_intensity"]
-        app.base.print_message(f"Current peak intensity: {peak_int}", info=True)
+        app.base.print_message(f"Initial peak intensity: {peak_int}", info=True)
         target_avg = 0.5 * (
             active.action.action_params["target_peak_max"]
             + active.action.action_params["target_peak_min"]
         )
+        adjust_count = 0
         while (
-            peak_int < active.action.action_params["target_peak_min"]
-            or peak_int > active.action.action_params["target_peak_max"]
+            ((peak_int < active.action.action_params["target_peak_min"])
+            or (peak_int > active.action.action_params["target_peak_max"]))
+            and adjust_count < active.action.action_params["max_iters"]
         ):
             if peak_int < active.action.action_params["target_peak_min"]:
                 current_int_time = int(current_int_time * target_avg / peak_int)
             else:
                 current_int_time = int(current_int_time * peak_int / target_avg)
+            
             app.base.print_message(
                 f"Adjusting integration time to: {current_int_time} ms", info=True
             )
@@ -146,6 +150,7 @@ def makeApp(confPrefix, server_key, helao_root):
             await active.enqueue_data_dflt(datadict=specdict)
             peak_int = specdict["peak_intensity"]
             app.base.print_message(f"Current peak intensity: {peak_int}", info=True)
+            adjust_count += 1
 
         active.action.action_params["peak_intensity"] = peak_int
         active.action.action_params["calibrated_int_time_ms"] = current_int_time
