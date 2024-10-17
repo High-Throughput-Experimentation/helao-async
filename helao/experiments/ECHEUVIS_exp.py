@@ -145,33 +145,33 @@ def ECHEUVIS_sub_CV_led(
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    # setup toggle on galil_io
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
-            "out_name": [illumination_source, toggle2_source],
-            "out_name_gamry": None,
-            "toggle_init_delay": [
-                toggle_dark_time_init,
-                toggle2_init_delay,
-            ],
-            "toggle_duty": [toggle_illum_duty, toggle2_duty],
-            "toggle_period": [
-                toggle_illum_period,
-                toggle2_period,
-            ],
-            "toggle_duration": [toggle_illum_time, toggle2_time],
-        },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_out,
-        ],
-    )
+    # # setup toggle on galil_io
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_cycle",
+    #     {
+    #         "trigger_name": "gamry_ttl0",
+    #         "triggertype": toggle_triggertype,
+    #         "out_name": [illumination_source, toggle2_source],
+    #         "out_name_gamry": None,
+    #         "toggle_init_delay": [
+    #             toggle_dark_time_init,
+    #             toggle2_init_delay,
+    #         ],
+    #         "toggle_duty": [toggle_illum_duty, toggle2_duty],
+    #         "toggle_period": [
+    #             toggle_illum_period,
+    #             toggle2_period,
+    #         ],
+    #         "toggle_duration": [toggle_illum_time, toggle2_time],
+    #     },
+    #     start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    #     process_finish=False,
+    #     process_contrib=[
+    #         ProcessContrib.files,
+    #         ProcessContrib.samples_out,
+    #     ],
+    # )
 
     # apm.add(ORCH_server, "wait", {"waittime": 5})
 
@@ -246,7 +246,7 @@ def ECHEUVIS_sub_CV_led(
             "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_server,
+        start_condition=ActionStartCondition.no_wait,
         technique_name="CV",
         process_finish=True,
         process_contrib=[
