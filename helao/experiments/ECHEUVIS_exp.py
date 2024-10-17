@@ -850,6 +850,7 @@ def ECHEUVIS_sub_engage(
     z_height: float = 1.5,
     fill_wait: float = 10.0,
     calibrate_intensity: bool = False,
+    illumination_source: str = "doric_wled",
 ):
     # raise z (engage)
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -892,12 +893,28 @@ def ECHEUVIS_sub_engage(
         )
 
     if calibrate_intensity:
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {
+                "do_item": illumination_source,
+                "on": True,
+            },
+        )
         # run intensity calibration to store optimal integration time
         apm.add(
             SPEC_T_server,
             "calibrate_intensity",
             {},
             to_globalexp_params=["calibrated_int_time_ms"],
+        )
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {
+                "do_item": illumination_source,
+                "on": False,
+            },
         )
     return apm.action_list  # returns complete action list to orch
 
