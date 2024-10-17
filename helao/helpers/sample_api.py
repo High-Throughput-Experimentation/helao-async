@@ -570,7 +570,7 @@ class SolidSampleAPI(_BaseSampleAPI):
             if (sample.sample_no - 1) > len(pmdata) or (sample.sample_no - 1) < 0:
                 self._base.print_message(
                     f"get_xy: invalid sample no '{sample.sample_no}' on plate {sample.plate_id}",
-                    error=True,
+                    warning=True,
                 )
                 xylist.append((None, None))
             else:
@@ -609,7 +609,7 @@ class SolidSampleAPI(_BaseSampleAPI):
                 else:
                     self._base.print_message(
                         f"invalid legacy sample no '{sample.sample_no}' on plate {sample.plate_id}",
-                        error=True,
+                        warning=True,
                     )
             else:
                 self._base.print_message(
