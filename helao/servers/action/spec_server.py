@@ -150,8 +150,8 @@ def makeApp(confPrefix, server_key, helao_root):
             await active.enqueue_data_dflt(datadict=specdict)
             peak_int = specdict["peak_intensity"]
             app.base.print_message(f"Current peak intensity: {peak_int}", info=True)
-            app.base.print_message(f'min check: {peak_int < active.action.action_params["target_peak_min"]}')
-            app.base.print_message(f'max check: {peak_int > active.action.action_params["target_peak_max"]}')
+            app.base.print_message(f'min check: {peak_int < active.action.action_params["target_peak_min"]}', info=True)
+            app.base.print_message(f'max check: {peak_int > active.action.action_params["target_peak_max"]}', info=True)
             adjust_count += 1
 
         active.action.action_params["peak_intensity"] = peak_int
