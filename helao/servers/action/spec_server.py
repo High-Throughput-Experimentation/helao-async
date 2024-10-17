@@ -116,7 +116,7 @@ def makeApp(confPrefix, server_key, helao_root):
         target_peak_max: Optional[float] = 45000,
         max_iters: int = 5,
     ):
-        """Acquire N spectra and average."""
+        """Calibrate integration time to achieve peak intensity window."""
         spec_header = {"wl": app.driver.pxwl}
         active = await app.base.setup_and_contain_action(
             action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
