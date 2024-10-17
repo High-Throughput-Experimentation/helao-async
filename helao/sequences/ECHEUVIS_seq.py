@@ -1040,6 +1040,98 @@ def ECHEUVIS_CP_led(
     return epm.experiment_plan_list  # returns complete experiment list
 
 
+def ECHEUVIS_diagnostic_CV(
+    sequence_version: int = 1,
+    reservoir_electrolyte: Electrolyte = "OER10",
+    reservoir_liquid_sample_no: int = 1,
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    liquid_volume_ml: float = 1.0,
+    ref_vs_nhe: float = 0.21,
+    ref_offset__V: float = 0.0,
+    spec_ref_duration: float = 5,
+    spec_int_time_ms: float = 13,
+    spec_n_avg: int = 5,
+    cell_engaged_z: float = 2.5,
+    cell_disengaged_z: float = 0,
+    cell_vent_wait: float = 10.0,
+    cell_fill_wait: float = 30.0,
+):
+    epm = ExperimentPlanMaker()
+    epm.add_experiment("ECHEUVIS_sub_startup", {})
+    epm.add_experiment(
+        "ECHEUVIS_sub_disengage",
+        {
+            "clear_we": True,
+            "clear_ce": False,
+            "z_height": cell_disengaged_z,
+            "vent_wait": cell_vent_wait,
+        },
+    )
+    epm.add_experiment(
+        "UVIS_sub_setup_ref",
+        {
+            "reference_mode": "builtin",
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": 0,
+            "solid_sample_no": 0,
+            "specref_code": 1,
+        },
+    )
+    epm.add_experiment(
+        "ECHEUVIS_sub_engage",
+        {
+            "flow_we": True,
+            "flow_ce": True,
+            "z_height": cell_engaged_z,
+            "fill_wait": cell_fill_wait,
+        },
+    )
+    epm.add_experiment(
+        "ECHE_sub_preCV",
+        {
+            "CA_potential": 1.23 - ref_vs_nhe - ref_offset__V - 0.059 * solution_ph,
+            "samplerate_sec": 0.1,
+            "CA_duration_sec": 5.0,
+        },
+    )
+    # CV1
+    epm.add_experiment(
+        "ECHE_sub_CV",
+        {
+            "Vinit_vsRHE": 1.23,
+            "Vapex1_vsRHE": 1.98,
+            "Vapex2_vsRHE": 1.23,
+            "Vfinal_vsRHE": 1.23,
+            "scanrate_voltsec": 0.1,
+            "samplerate_sec": 0.1,
+            "cycles": 2,
+            "gamry_i_range": "1mA",
+            "solution_ph": solution_ph,
+            "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+            "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+            "solution_bubble_gas": solution_bubble_gas,
+            "measurement_area": measurement_area,
+            "ref_type": "leakless",
+            "ref_offset__V": ref_offset__V,
+        },
+    )
+    # leave cell sealed w/solution for storage
+    epm.add_experiment(
+        "ECHEUVIS_sub_engage",
+        {
+            "flow_we": False,
+            "flow_ce": False,
+            "z_height": cell_engaged_z,
+            "fill_wait": cell_fill_wait,
+        },
+    )
+    epm.add_experiment("ECHEUVIS_sub_shutdown", {})
+
+    return epm.experiment_plan_list  # returns complete experiment list
+
+
 def ECHEUVIS_multiCA_led(
     sequence_version: int = 5,
     plate_id: int = 1,
@@ -1074,13 +1166,6 @@ def ECHEUVIS_multiCA_led(
     spec_int_time_ms: float = 13,
     spec_n_avg: int = 5,
     spec_technique: str = "T_UVVIS",
-    calc_ev_parts: list = [1.8, 2.2, 2.6, 3.0],
-    calc_bin_width: int = 3,
-    calc_window_length: int = 45,
-    calc_poly_order: int = 4,
-    calc_lower_wl: float = 370.0,
-    calc_upper_wl: float = 700.0,
-    calc_skip_nspec: int = 4,
     random_start_potential: bool = True,
     use_z_motor: bool = False,
     cell_engaged_z: float = 2.5,
