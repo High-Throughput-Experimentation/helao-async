@@ -60,16 +60,16 @@ def create_liquid_sample(
                 LiquidSample(
                     **{
                         "machine_name": gethostname().lower(),
-                        "source": apm.pars.source,
-                        "volume_ml": apm.pars.volume_ml,
-                        "chemical": apm.pars.chemical,
-                        "partial_molarity": apm.pars.partial_molarity,
-                        "ph": apm.pars.ph,
-                        "supplier": apm.pars.supplier,
-                        "lot_number": apm.pars.lot_number,
-                        "electrolyte": apm.pars.electrolyte_name,
-                        "prep_date": apm.pars.prep_date,
-                        "comment": apm.pars.comment,
+                        "source": source,
+                        "volume_ml": volume_ml,
+                        "chemical": chemical,
+                        "partial_molarity": partial_molarity,
+                        "ph": ph,
+                        "supplier": supplier,
+                        "lot_number": lot_number,
+                        "electrolyte": electrolyte_name,
+                        "prep_date": prep_date,
+                        "comment": comment,
                     }
                 )
             ],
@@ -103,14 +103,14 @@ def create_gas_sample(
                 GasSample(
                     **{
                         "machine_name": gethostname().lower(),
-                        "source": apm.pars.source,
-                        "volume_ml": apm.pars.volume_ml,
-                        "chemical": apm.pars.chemical,
-                        "partial_molarity": apm.pars.partial_molarity,
-                        "supplier": apm.pars.supplier,
-                        "lot_number": apm.pars.lot_number,
-                        "prep_date": apm.pars.prep_date,
-                        "comment": apm.pars.comment,
+                        "source": source,
+                        "volume_ml": volume_ml,
+                        "chemical": chemical,
+                        "partial_molarity": partial_molarity,
+                        "supplier": supplier,
+                        "lot_number": lot_number,
+                        "prep_date": prep_date,
+                        "comment": comment,
                     }
                 )
             ],
@@ -146,25 +146,25 @@ def create_assembly_sample(
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # check first
-    if len(apm.pars.solid_plate_ids) != len(apm.pars.solid_sample_nos):
+    if len(solid_plate_ids) != len(solid_sample_nos):
         print(
             f"!!! ERROR: len(solid_plate_ids) != len(solid_sample_nos): "
-            f"{len(apm.pars.solid_plate_ids)} != {len(apm.pars.solid_sample_nos)}"
+            f"{len(solid_plate_ids)} != {len(solid_sample_nos)}"
         )
         return apm.action_list
 
     liquid_list = [
         LiquidSample(machine_name=gethostname().lower(), sample_no=sample_no)
-        for sample_no in apm.pars.liquid_sample_nos
+        for sample_no in liquid_sample_nos
     ]
     gas_list = [
         GasSample(machine_name=gethostname().lower(), sample_no=sample_no)
-        for sample_no in apm.pars.gas_sample_nos
+        for sample_no in gas_sample_nos
     ]
     solid_list = [
         SolidSample(machine_name="legacy", plate_id=plate_id, sample_no=sample_no)
         for plate_id, sample_no in zip(
-            apm.pars.solid_plate_ids, apm.pars.solid_sample_nos
+            solid_plate_ids, solid_sample_nos
         )
     ]
 
@@ -186,13 +186,13 @@ def create_assembly_sample(
                     **{
                         "machine_name": gethostname().lower(),
                         "parts": parts,
-                        # "source": apm.pars.source,
-                        "volume_ml": apm.pars.volume_ml,
-                        # "chemical": apm.pars.chemical,
-                        # "partial_molarity": apm.pars.partial_molarity,
-                        # "supplier": apm.pars.supplier,
-                        # "lot_number": apm.pars.lot_number,
-                        "comment": apm.pars.comment,
+                        # "source": source,
+                        "volume_ml": volume_ml,
+                        # "chemical": chemical,
+                        # "partial_molarity": partial_molarity,
+                        # "supplier": supplier,
+                        # "lot_number": lot_number,
+                        "comment": comment,
                     }
                 )
             ],
@@ -235,14 +235,14 @@ def generate_sample_no_list(
         PAL_server,
         "generate_plate_sample_no_list",
         {
-            "plate_id": apm.pars.plate_id,
-            "sample_code": apm.pars.sample_code,
-            "skip_n_samples": apm.pars.skip_n_samples,
-            # "direction":apm.pars.direction,
-            # "sample_nos":apm.pars.sample_nos,
-            # "sample_nos_operator":apm.pars.sample_nos_operator,
-            # "platemap_xys":apm.pars.platemap_xys,
-            # "platemap_xys_operator":apm.pars.platemap_xys_operator,
+            "plate_id": plate_id,
+            "sample_code": sample_code,
+            "skip_n_samples": skip_n_samples,
+            # "direction":direction,
+            # "sample_nos":sample_nos,
+            # "sample_nos_operator":sample_nos_operator,
+            # "platemap_xys":platemap_xys,
+            # "platemap_xys_operator":platemap_xys_operator,
         },
     )
 
@@ -259,7 +259,7 @@ def load_liquid_sample(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     liquid = LiquidSample(
-        sample_no=apm.pars.liquid_sample_no, machine_name=apm.pars.machine_name
+        sample_no=liquid_sample_no, machine_name=machine_name
     )
 
     apm.add(
@@ -267,9 +267,9 @@ def load_liquid_sample(
         "archive_tray_load",
         {
             "load_sample_in": liquid,
-            "tray": apm.pars.tray,
-            "slot": apm.pars.slot,
-            "vial": apm.pars.vial
+            "tray": tray,
+            "slot": slot,
+            "vial": vial
         },
     )
 
@@ -304,16 +304,16 @@ def create_and_load_liquid_sample(
                 LiquidSample(
                     **{
                         "machine_name": gethostname().lower(),
-                        "source": apm.pars.source,
-                        "volume_ml": apm.pars.volume_ml,
-                        "chemical": apm.pars.chemical,
-                        "partial_molarity": apm.pars.partial_molarity,
-                        "ph": apm.pars.ph,
-                        "supplier": apm.pars.supplier,
-                        "lot_number": apm.pars.lot_number,
-                        "electrolyte": apm.pars.electrolyte_name,
-                        "prep_date": apm.pars.prep_date,
-                        "comment": apm.pars.comment,
+                        "source": source,
+                        "volume_ml": volume_ml,
+                        "chemical": chemical,
+                        "partial_molarity": partial_molarity,
+                        "ph": ph,
+                        "supplier": supplier,
+                        "lot_number": lot_number,
+                        "electrolyte": electrolyte_name,
+                        "prep_date": prep_date,
+                        "comment": comment,
                     }
                 )
             ],
@@ -326,9 +326,9 @@ def create_and_load_liquid_sample(
         PAL_server,
         "archive_tray_load",
         {
-            "tray": apm.pars.tray,
-            "slot": apm.pars.slot,
-            "vial": apm.pars.vial
+            "tray": tray,
+            "slot": slot,
+            "vial": vial
         },
         from_globalexp_params={"_fast_sample_out": "load_sample_in"}
     )
@@ -342,5 +342,5 @@ def orch_sub_wait(
 ):
     apm = ActionPlanMaker()
        
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time_s})
+    apm.add(ORCH_server, "wait", {"waittime": wait_time_s})
     return apm.action_list  # returns complete action list to orch

@@ -66,10 +66,10 @@ def UVIS_sub_load_solid(
         PAL_server,
         "archive_custom_load",
         {
-            "custom": apm.pars.solid_custom_position,
+            "custom": solid_custom_position,
             "load_sample_in": SolidSample(
-                sample_no=apm.pars.solid_sample_no,
-                plate_id=apm.pars.solid_plate_id,
+                sample_no=solid_sample_no,
+                plate_id=solid_plate_id,
                 machine_name="legacy",
             ),
         },
@@ -92,10 +92,10 @@ def UVIS_sub_startup(
         PAL_server,
         "archive_custom_load",
         {
-            "custom": apm.pars.solid_custom_position,
+            "custom": solid_custom_position,
             "load_sample_in": SolidSample(
-                sample_no=apm.pars.solid_sample_no,
-                plate_id=apm.pars.solid_plate_id,
+                sample_no=solid_sample_no,
+                plate_id=solid_plate_id,
                 machine_name="legacy",
             ),
         },
@@ -105,8 +105,8 @@ def UVIS_sub_startup(
         MOTOR_server,
         "solid_get_samples_xy",
         {
-            "plate_id": apm.pars.solid_plate_id,
-            "sample_no": apm.pars.solid_sample_no,
+            "plate_id": solid_plate_id,
+            "sample_no": solid_sample_no,
         },
         to_globalexp_params=[
             "_platexy"
@@ -144,8 +144,8 @@ def UVIS_sub_movetosample(
         MOTOR_server,
         "solid_get_samples_xy",
         {
-            "plate_id": apm.pars.solid_plate_id,
-            "sample_no": apm.pars.solid_sample_no,
+            "plate_id": solid_plate_id,
+            "sample_no": solid_sample_no,
         },
         to_globalexp_params=[
             "_platexy"
@@ -176,7 +176,7 @@ def UVIS_sub_relmove(
         MOTOR_server,
         "move",
         {
-            "d_mm": [apm.pars.offset_x_mm, apm.pars.offset_y_mm],
+            "d_mm": [offset_x_mm, offset_y_mm],
             "axis": ["x", "y"],
             "mode": MoveModes.relative,
             "transformation": TransformationModes.platexy,
@@ -218,27 +218,27 @@ def UVIS_sub_measure(
         IO_server,
         "set_digital_out",
         {
-            "do_item": apm.pars.toggle_source,
-            "on": False if apm.pars.run_use == "ref_dark" else True,
+            "do_item": toggle_source,
+            "on": False if run_use == "ref_dark" else True,
         },
     )
 
     # wait for 1 second for shutter to actuate
-    if apm.pars.toggle_is_shutter:
+    if toggle_is_shutter:
         apm.add(ORCH_server, "wait", {"waittime": 1})
 
     # setup spectrometer data collection
     apm.add(
-        SPEC_T_server if apm.pars.spec_type == SpecType.T else SPEC_R_server,
+        SPEC_T_server if spec_type == SpecType.T else SPEC_R_server,
         "acquire_spec_adv",
         {
-            "int_time_ms": apm.pars.spec_int_time_ms,
-            "n_avg": apm.pars.spec_n_avg,
-            "duration_sec": apm.pars.duration_sec,
+            "int_time_ms": spec_int_time_ms,
+            "n_avg": spec_n_avg,
+            "duration_sec": duration_sec,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        run_use=apm.pars.run_use,
-        technique_name=apm.pars.technique_name,
+        run_use=run_use,
+        technique_name=technique_name,
         process_finish=True,
         process_contrib=[
             ProcessContrib.files,
@@ -253,12 +253,12 @@ def UVIS_sub_measure(
         IO_server,
         "set_digital_out",
         {
-            "do_item": apm.pars.toggle_source,
-            "on": True if apm.pars.toggle_is_shutter else False,
+            "do_item": toggle_source,
+            "on": True if toggle_is_shutter else False,
         },
     )
 
-    if apm.pars.reference_mode == "blank" and apm.pars.run_use == "ref_light":
+    if reference_mode == "blank" and run_use == "ref_light":
         apm.add(
             ORCH_server,
             "interrupt",
@@ -280,14 +280,14 @@ def UVIS_sub_setup_ref(
 ):
     """Determine initial and final reference measurements and move to position."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    if apm.pars.reference_mode == "internal":
+    if reference_mode == "internal":
         apm.add(
             MOTOR_server,
             "solid_get_nearest_specref",
             {
-                "plate_id": apm.pars.solid_plate_id,
-                "sample_no": apm.pars.solid_sample_no,
-                "specref_code": apm.pars.specref_code,
+                "plate_id": solid_plate_id,
+                "sample_no": solid_sample_no,
+                "specref_code": specref_code,
             },
             to_globalexp_params=["_refno", "_refxy"],
         )
@@ -295,12 +295,12 @@ def UVIS_sub_setup_ref(
             PAL_server,
             "archive_custom_load_solid",
             {
-                "custom": apm.pars.solid_custom_position,
-                "plate_id": apm.pars.solid_plate_id,
+                "custom": solid_custom_position,
+                "plate_id": solid_plate_id,
             },
             from_globalexp_params={"_refno": "sample_no"},
         )
-    elif apm.pars.reference_mode == "builtin":
+    elif reference_mode == "builtin":
         apm.add(
             MOTOR_server,
             "solid_get_builtin_specref",
@@ -311,12 +311,12 @@ def UVIS_sub_setup_ref(
             PAL_server,
             "archive_custom_load_solid",
             {
-                "custom": apm.pars.solid_custom_position,
-                "sample_no": apm.pars.solid_sample_no,
-                "plate_id": apm.pars.solid_plate_id,
+                "custom": solid_custom_position,
+                "sample_no": solid_sample_no,
+                "plate_id": solid_plate_id,
             },
         )
-    elif apm.pars.reference_mode == "blank":
+    elif reference_mode == "blank":
         apm.add(
             ORCH_server,
             "interrupt",
@@ -326,10 +326,10 @@ def UVIS_sub_setup_ref(
             PAL_server,
             "archive_custom_load",
             {
-                "custom": apm.pars.solid_custom_position,
+                "custom": solid_custom_position,
                 "load_sample_in": SolidSample(
-                    sample_no=apm.pars.solid_sample_no,
-                    plate_id=apm.pars.solid_plate_id,
+                    sample_no=solid_sample_no,
+                    plate_id=solid_plate_id,
                     machine_name="legacy",
                 ),
             },
@@ -338,8 +338,8 @@ def UVIS_sub_setup_ref(
             MOTOR_server,
             "solid_get_samples_xy",
             {
-                "plate_id": apm.pars.solid_plate_id,
-                "sample_no": apm.pars.solid_sample_no,
+                "plate_id": solid_plate_id,
+                "sample_no": solid_sample_no,
             },
             to_globalexp_params={"_platexy": "_refxy"},
         )
@@ -351,7 +351,7 @@ def UVIS_sub_setup_ref(
             "axis": ["x", "y"],
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy
-            if apm.pars.reference_mode != "builtin"
+            if reference_mode != "builtin"
             else TransformationModes.motorxy,
         },
         from_globalexp_params={"_refxy": "d_mm"},
@@ -379,16 +379,16 @@ def UVIS_calc_abs(
         CALC_server,
         "calc_uvis_abs",
         {
-            "ev_parts": apm.pars.ev_parts,
-            "bin_width": apm.pars.bin_width,
-            "window_length": apm.pars.window_length,
-            "poly_order": apm.pars.poly_order,
-            "lower_wl": apm.pars.lower_wl,
-            "upper_wl": apm.pars.upper_wl,
-            "max_mthd_allowed": apm.pars.max_mthd_allowed,
-            "max_limit": apm.pars.max_limit,
-            "min_mthd_allowed": apm.pars.min_mthd_allowed,
-            "min_limit": apm.pars.min_limit,
+            "ev_parts": ev_parts,
+            "bin_width": bin_width,
+            "window_length": window_length,
+            "poly_order": poly_order,
+            "lower_wl": lower_wl,
+            "upper_wl": upper_wl,
+            "max_mthd_allowed": max_mthd_allowed,
+            "max_limit": max_limit,
+            "min_mthd_allowed": min_mthd_allowed,
+            "min_limit": min_limit,
         },
     )
     return apm.action_list  # returns complete action list to orch
@@ -407,10 +407,10 @@ def UVIS_analysis_dry(
         ANA_server,
         "analyze_dryuvis",
         {
-            "sequence_uuid": apm.pars.sequence_uuid,
-            "plate_id": apm.pars.plate_id,
-            "recent": apm.pars.recent,
-            "params": apm.pars.params,
+            "sequence_uuid": sequence_uuid,
+            "plate_id": plate_id,
+            "recent": recent,
+            "params": params,
         },
     )
     return apm.action_list

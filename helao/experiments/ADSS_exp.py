@@ -149,8 +149,8 @@ def debug(
         {
             "Tval": 10.0,
             "AcqInterval__s": 1.0,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": "auto",
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
@@ -249,11 +249,11 @@ def ADSS_sub_load_solid(
         PAL_server,
         "archive_custom_load",
         {
-            "custom": apm.pars.solid_custom_position,
+            "custom": solid_custom_position,
             "load_sample_in": SolidSample(
                 **{
-                    "sample_no": apm.pars.solid_sample_no,
-                    "plate_id": apm.pars.solid_plate_id,
+                    "sample_no": solid_sample_no,
+                    "plate_id": solid_plate_id,
                     "machine_name": "legacy",
                 }
             ).model_dump(),
@@ -286,16 +286,16 @@ def ADSS_sub_load_liquid(
         PAL_server,
         "archive_custom_add_liquid",
         {
-            "custom": apm.pars.liquid_custom_position,
+            "custom": liquid_custom_position,
             "source_liquid_in": LiquidSample(
                 **{
-                    "sample_no": apm.pars.liquid_sample_no,
+                    "sample_no": liquid_sample_no,
                     "machine_name": gethostname(),
                 }
             ).model_dump(),
-            "volume_ml": apm.pars.volume_ul_cell_liquid / 1000,
-            "combine_liquids": apm.pars.combine_liquids,
-            "dilute_liquids": apm.pars.dilute_liquids,
+            "volume_ml": volume_ul_cell_liquid / 1000,
+            "combine_liquids": combine_liquids,
+            "dilute_liquids": dilute_liquids,
         },
         start_condition=ActionStartCondition.wait_for_orch,  #
     )
@@ -328,11 +328,11 @@ def ADSS_sub_load(
         PAL_server,
         "archive_custom_load",
         {
-            "custom": apm.pars.solid_custom_position,
+            "custom": solid_custom_position,
             "load_sample_in": SolidSample(
                 **{
-                    "sample_no": apm.pars.solid_sample_no,
-                    "plate_id": apm.pars.solid_plate_id,
+                    "sample_no": solid_sample_no,
+                    "plate_id": solid_plate_id,
                     "machine_name": "legacy",
                 }
             ).model_dump(),
@@ -340,12 +340,12 @@ def ADSS_sub_load(
         start_condition=ActionStartCondition.wait_for_orch,
     )
     # add liquid to cell position
-    if apm.pars.previous_liquid:
+    if previous_liquid:
         apm.add(
             PAL_server,
             "archive_custom_add_liquid",
             {
-                "custom": apm.pars.liquid_custom_position,
+                "custom": liquid_custom_position,
                 "combine_liquids": False,
                 "dilute_liquids": False,
             },
@@ -360,14 +360,14 @@ def ADSS_sub_load(
             PAL_server,
             "archive_custom_add_liquid",
             {
-                "custom": apm.pars.liquid_custom_position,
+                "custom": liquid_custom_position,
                 "source_liquid_in": LiquidSample(
                     **{
-                        "sample_no": apm.pars.liquid_sample_no,
+                        "sample_no": liquid_sample_no,
                         "machine_name": gethostname(),
                     }
                 ).model_dump(),
-                "volume_ml": apm.pars.liquid_sample_volume_ul / 1000,
+                "volume_ml": liquid_sample_volume_ul / 1000,
                 "combine_liquids": False,
                 "dilute_liquids": False,
             },
@@ -418,8 +418,8 @@ def ADSS_sub_move_to_sample(
         MOTOR_server,
         "solid_get_samples_xy",
         {
-            "plate_id": apm.pars.solid_plate_id,
-            "sample_no": apm.pars.solid_sample_no,
+            "plate_id": solid_plate_id,
+            "sample_no": solid_sample_no,
         },
         to_globalexp_params=[
             "_platexy"
@@ -474,13 +474,13 @@ def ADSS_sub_sample_start(
     apm.add_action_list(
         ADSS_sub_load(
             experiment=experiment,
-            solid_custom_position=apm.pars.solid_custom_position,
-            solid_plate_id=apm.pars.solid_plate_id,
-            solid_sample_no=apm.pars.solid_sample_no,
-            previous_liquid=apm.pars.previous_liquid,
-            liquid_custom_position=apm.pars.liquid_custom_position,
-            liquid_sample_no=apm.pars.liquid_sample_no,
-            liquid_sample_volume_ul=apm.pars.liquid_sample_volume_ul,
+            solid_custom_position=solid_custom_position,
+            solid_plate_id=solid_plate_id,
+            solid_sample_no=solid_sample_no,
+            previous_liquid=previous_liquid,
+            liquid_custom_position=liquid_custom_position,
+            liquid_sample_no=liquid_sample_no,
+            liquid_sample_volume_ul=liquid_sample_volume_ul,
         )
     )
 
@@ -514,8 +514,8 @@ def ADSS_sub_sample_start(
         MOTOR_server,
         "solid_get_samples_xy",
         {
-            "plate_id": apm.pars.solid_plate_id,
-            "sample_no": apm.pars.solid_sample_no,
+            "plate_id": solid_plate_id,
+            "sample_no": solid_sample_no,
         },
         to_globalexp_params=[
             "_platexy"
@@ -639,8 +639,8 @@ def ADSS_sub_clean_PALtool(
         PAL_server,
         "PAL_deepclean",
         {
-            "tool": apm.pars.clean_tool,
-            "volume_ul": apm.pars.clean_volume_ul,
+            "tool": clean_tool,
+            "volume_ul": clean_volume_ul,
         },
         start_condition=ActionStartCondition.wait_for_all,
     )
@@ -662,10 +662,10 @@ def ADSS_sub_fillfixed(
         PAL_server,
         "PAL_fillfixed",
         {
-            "tool": apm.pars.PAL_Injector,
+            "tool": PAL_Injector,
             "source": "elec_res1",
             "dest": "cell1_we",
-            "volume_ul": apm.pars.fill_vol_ul,
+            "volume_ul": fill_vol_ul,
             "wash1": 0,
             "wash2": 0,
             "wash3": 0,
@@ -701,7 +701,7 @@ def ADSS_sub_fillfixed(
         ORCH_server,
         "wait",
         {
-            "waittime": apm.pars.filltime_sec,
+            "waittime": filltime_sec,
         },
         start_condition=ActionStartCondition.wait_for_all,
     )
@@ -722,10 +722,10 @@ def ADSS_sub_fill(
         PAL_server,
         "PAL_fill",
         {
-            "tool": apm.pars.PAL_Injector,
+            "tool": PAL_Injector,
             "source": "elec_res1",
             "dest": "cell1_we",
-            "volume_ul": apm.pars.fill_vol_ul,
+            "volume_ul": fill_vol_ul,
             "wash1": 0,
             "wash2": 0,
             "wash3": 0,
@@ -793,21 +793,21 @@ def ADSS_sub_CA(
 
     # calculate potential
     versus = 0  # for vs rhe
-    if apm.pars.potential_versus == "oer":
+    if potential_versus == "oer":
         versus = 1.23
-    if apm.pars.ref_type == "rhe":
-        potential = apm.pars.CA_potential - apm.pars.ref_offset__V + versus
+    if ref_type == "rhe":
+        potential = CA_potential - ref_offset__V + versus
     else:
         potential = (
-            apm.pars.CA_potential
-            - 1.0 * apm.pars.ref_offset__V
+            CA_potential
+            - 1.0 * ref_offset__V
             + versus
-            - 0.059 * apm.pars.ph
-            - REF_TABLE[apm.pars.ref_type]
+            - 0.059 * ph
+            - REF_TABLE[ref_type]
         )
     print(f"ADSS_sub_CA potential: {potential}")
 
-    if apm.pars.aliquot_pre:
+    if aliquot_pre:
         washmod += 1
         washone = washmod %4 %3 %2
         washtwo = (washmod + 1) %4 %3 %2
@@ -817,10 +817,10 @@ def ADSS_sub_CA(
         apm.add_action_list(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
+                aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s= 0,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
                 rinse_1 = washone,
                 rinse_2= washtwo,
                 rinse_3= washthree,
@@ -835,9 +835,9 @@ def ADSS_sub_CA(
         "run_CA",
         {
             "Vval__V": potential,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "IErange": apm.pars.gamry_i_range,
+            "Tval__s": CA_duration_sec,
+            "AcqInterval__s": samplerate_sec,
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -856,25 +856,25 @@ def ADSS_sub_CA(
         before aliquot, and a -65- second wait to turn back on gas valve
         that occurs before full PAL action is completed
     """
-    if apm.pars.aliquot_insitu or apm.pars.insert_electrolyte_bool:
+    if aliquot_insitu or insert_electrolyte_bool:
 
         apm.add_action_list(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
-                aliquot_insitu=apm.pars.aliquot_insitu,
-                insert_electrolyte_bool=apm.pars.insert_electrolyte,
-                insert_electrolyte_volume_ul=apm.pars.insert_electrolyte_volume_ul,
-                insert_electrolyte_time_sec=apm.pars.insert_electrolyte_time_sec,
-                electrolyte_sample_no=apm.pars.electrolyte_sample_no,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
-                aliquot_times_sec=apm.pars.aliquot_times_sec,
+                aliquot_insitu=aliquot_insitu,
+                insert_electrolyte_bool=insert_electrolyte,
+                insert_electrolyte_volume_ul=insert_electrolyte_volume_ul,
+                insert_electrolyte_time_sec=insert_electrolyte_time_sec,
+                electrolyte_sample_no=electrolyte_sample_no,
+                aliquot_volume_ul=aliquot_volume_ul,
+                aliquot_times_sec=aliquot_times_sec,
                 washmod_in=washmod,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
             )
         )
 
-    if apm.pars.aliquot_post:
+    if aliquot_post:
         washmod += 1
         washone = washmod %4 %3 %2
         washtwo = (washmod + 1) %4 %3 %2
@@ -884,10 +884,10 @@ def ADSS_sub_CA(
         apm.add_action_list(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
+                aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s= 0,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
                 rinse_1 = washone,
                 rinse_2= washtwo,
                 rinse_3= washthree,
@@ -955,7 +955,7 @@ def ADSS_sub_CA_photo(
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    if apm.pars.aliquot_pre:
+    if aliquot_pre:
         washmod += 1
         washone = washmod %4 %3 %2
         washtwo = (washmod + 1) %4 %3 %2
@@ -965,10 +965,10 @@ def ADSS_sub_CA_photo(
         apm.add_action_list(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
+                aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s= 0,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
                 rinse_1 = washone,
                 rinse_2= washtwo,
                 rinse_3= washthree,
@@ -980,17 +980,17 @@ def ADSS_sub_CA_photo(
 
     # calculate potential
     versus = 0  # for vs rhe
-    if apm.pars.potential_versus == "oer":
+    if potential_versus == "oer":
         versus = 1.23
-    if apm.pars.ref_type == "rhe":
-        potential = apm.pars.CA_potential - apm.pars.ref_offset__V + versus
+    if ref_type == "rhe":
+        potential = CA_potential - ref_offset__V + versus
     else:
         potential = (
-            apm.pars.CA_potential
-            - 1.0 * apm.pars.ref_offset__V
+            CA_potential
+            - 1.0 * ref_offset__V
             + versus
-            - 0.059 * apm.pars.ph
-            - REF_TABLE[apm.pars.ref_type]
+            - 0.059 * ph
+            - REF_TABLE[ref_type]
         )
     print(f"ADSS_sub_CA potential: {potential}")
 
@@ -1000,9 +1000,9 @@ def ADSS_sub_CA_photo(
         "run_CA",
         {
             "Vval__V": potential,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "IErange": apm.pars.gamry_i_range,
+            "Tval__s": CA_duration_sec,
+            "AcqInterval__s": samplerate_sec,
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1021,27 +1021,27 @@ def ADSS_sub_CA_photo(
         before aliquot, and a -65- second wait to turn back on gas valve
         that occurs before full PAL action is completed
     """
-    if apm.pars.aliquot_insitu or apm.pars.insert_electrolyte_bool:
+    if aliquot_insitu or insert_electrolyte_bool:
 
         apm.add_action_list(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
-                aliquot_insitu=apm.pars.aliquot_insitu,
-                insert_electrolyte_bool=apm.pars.insert_electrolyte,
-                insert_electrolyte_volume_ul=apm.pars.insert_electrolyte_volume_ul,
-                insert_electrolyte_time_sec=apm.pars.insert_electrolyte_time_sec,
-                electrolyte_sample_no=apm.pars.electrolyte_sample_no,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
-                aliquot_times_sec=apm.pars.aliquot_times_sec,
+                aliquot_insitu=aliquot_insitu,
+                insert_electrolyte_bool=insert_electrolyte,
+                insert_electrolyte_volume_ul=insert_electrolyte_volume_ul,
+                insert_electrolyte_time_sec=insert_electrolyte_time_sec,
+                electrolyte_sample_no=electrolyte_sample_no,
+                aliquot_volume_ul=aliquot_volume_ul,
+                aliquot_times_sec=aliquot_times_sec,
                 washmod_in=washmod,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
             )
         )
 
     apm.add(NI_server, "led", {"led": "led", "on": 0})
 
-    if apm.pars.aliquot_post:
+    if aliquot_post:
         washmod += 1
         washone = washmod %4 %3 %2
         washtwo = (washmod + 1) %4 %3 %2
@@ -1051,10 +1051,10 @@ def ADSS_sub_CA_photo(
         apm.add_action_list(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
+                aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s= 0,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
                 rinse_1 = washone,
                 rinse_2= washtwo,
                 rinse_3= washthree,
@@ -1113,7 +1113,7 @@ def ADSS_sub_CV(
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    if apm.pars.aliquot_pre:
+    if aliquot_pre:
         washmod += 1
         washone = washmod %4 %3 %2
         washtwo = (washmod + 1) %4 %3 %2
@@ -1123,10 +1123,10 @@ def ADSS_sub_CV(
         apm.add_action_list(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
+                aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s= 0,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
                 rinse_1 = washone,
                 rinse_2= washtwo,
                 rinse_3= washthree,
@@ -1139,29 +1139,29 @@ def ADSS_sub_CV(
         PSTAT_server,
         "run_CV",
         {
-            "Vinit__V": apm.pars.Vinit_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.ph,
-            "Vapex1__V": apm.pars.Vapex1_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.ph,
-            "Vapex2__V": apm.pars.Vapex2_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.ph,
-            "Vfinal__V": apm.pars.Vfinal_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.ph,
-            "ScanRate__V_s": apm.pars.scanrate_voltsec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "Cycles": apm.pars.cycles,
-            "IErange": apm.pars.gamry_i_range,
+            "Vinit__V": Vinit_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * ph,
+            "Vapex1__V": Vapex1_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * ph,
+            "Vapex2__V": Vapex2_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * ph,
+            "Vfinal__V": Vfinal_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * ph,
+            "ScanRate__V_s": scanrate_voltsec,
+            "AcqInterval__s": samplerate_sec,
+            "Cycles": cycles,
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        run_use=apm.pars.run_use,
+        run_use=run_use,
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CV",
         process_finish=True,
@@ -1173,25 +1173,25 @@ def ADSS_sub_CV(
             ProcessContrib.run_use,
         ],
     )
-    if apm.pars.aliquot_insitu or apm.pars.insert_electrolyte_bool:
+    if aliquot_insitu or insert_electrolyte_bool:
 
         apm.add_action_list(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
-                aliquot_insitu=apm.pars.aliquot_insitu,
-                insert_electrolyte_bool=apm.pars.insert_electrolyte,
-                insert_electrolyte_volume_ul=apm.pars.insert_electrolyte_volume_ul,
-                insert_electrolyte_time_sec=apm.pars.insert_electrolyte_time_sec,
-                electrolyte_sample_no=apm.pars.electrolyte_sample_no,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
-                aliquot_times_sec=apm.pars.aliquot_times_sec,
+                aliquot_insitu=aliquot_insitu,
+                insert_electrolyte_bool=insert_electrolyte,
+                insert_electrolyte_volume_ul=insert_electrolyte_volume_ul,
+                insert_electrolyte_time_sec=insert_electrolyte_time_sec,
+                electrolyte_sample_no=electrolyte_sample_no,
+                aliquot_volume_ul=aliquot_volume_ul,
+                aliquot_times_sec=aliquot_times_sec,
                 washmod_in=washmod,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
             )
         )
 
-    if apm.pars.aliquot_post:
+    if aliquot_post:
         washmod += 1
         washone = washmod %4 %3 %2
         washtwo = (washmod + 1) %4 %3 %2
@@ -1201,10 +1201,10 @@ def ADSS_sub_CV(
         apm.add_action_list(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
+                aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s= 0,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
                 rinse_1 = washone,
                 rinse_2= washtwo,
                 rinse_3= washthree,
@@ -1264,7 +1264,7 @@ def ADSS_sub_OCV(
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    if apm.pars.aliquot_pre:
+    if aliquot_pre:
         washmod += 1
         washone = washmod %4 %3 %2
         washtwo = (washmod + 1) %4 %3 %2
@@ -1274,10 +1274,10 @@ def ADSS_sub_OCV(
         apm.add_action_list(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
+                aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s= 0,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
                 rinse_1 = washone,
                 rinse_2= washtwo,
                 rinse_3= washthree,
@@ -1290,18 +1290,18 @@ def ADSS_sub_OCV(
         PSTAT_server,
         "run_OCV",
         {
-            "Tval__s": apm.pars.Tval__s,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "IErange": apm.pars.gamry_i_range,
-            "RSD_threshold": apm.pars.RSD_threshold,
-            "simple_threshold": apm.pars.simple_threshold,
-            "signal_change_threshold": apm.pars.signal_change_threshold,
-            "amplitude_threshold": apm.pars.amplitude_threshold,
+            "Tval__s": Tval__s,
+            "AcqInterval__s": samplerate_sec,
+            "IErange": gamry_i_range,
+            "RSD_threshold": RSD_threshold,
+            "simple_threshold": simple_threshold,
+            "signal_change_threshold": signal_change_threshold,
+            "amplitude_threshold": amplitude_threshold,
 
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         to_globalexp_params=["has_bubble"],
-        run_use=apm.pars.run_use,
+        run_use=run_use,
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="OCV",
         process_finish=True,
@@ -1313,21 +1313,21 @@ def ADSS_sub_OCV(
             ProcessContrib.run_use,
         ],
     )
-    if apm.pars.aliquot_insitu:
+    if aliquot_insitu:
 
         apm.add_action_list(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
-                aliquot_insitu=apm.pars.aliquot_insitu,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
-                aliquot_times_sec=apm.pars.aliquot_times_sec,
+                aliquot_insitu=aliquot_insitu,
+                aliquot_volume_ul=aliquot_volume_ul,
+                aliquot_times_sec=aliquot_times_sec,
                 washmod_in=washmod,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
             )
         )
 
-    if apm.pars.check_bubble:
+    if check_bubble:
         apm.add(
             ORCH_server,
             "conditional_exp",
@@ -1337,26 +1337,26 @@ def ADSS_sub_OCV(
                 "check_value": True,
                 "conditional_experiment_name": "ADSS_sub_remove_bubble",
                 "conditional_experiment_params": {  
-                    "Tval__s": apm.pars.Tval__s,
-                    "gamry_i_range": apm.pars.gamry_i_range,
-                    "samplerate_sec": apm.pars.samplerate_sec,
-                    "ph": apm.pars.ph,
-                    "ref_type": apm.pars.ref_type,
-                    "ref_offset__V": apm.pars.ref_offset__V,                    
-                    "pump_reverse_time_s": apm.pars.bubble_pump_reverse_time_s,
-                    "pump_forward_time_s": apm.pars.bubble_pump_forward_time_s,
-                    "RSD_threshold": apm.pars.RSD_threshold,
-                    "simple_threshold": apm.pars.simple_threshold,
-                    "signal_change_threshold": apm.pars.signal_change_threshold,
-                    "amplitude_threshold": apm.pars.amplitude_threshold,
-                    "run_use": apm.pars.run_use,
+                    "Tval__s": Tval__s,
+                    "gamry_i_range": gamry_i_range,
+                    "samplerate_sec": samplerate_sec,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,                    
+                    "pump_reverse_time_s": bubble_pump_reverse_time_s,
+                    "pump_forward_time_s": bubble_pump_forward_time_s,
+                    "RSD_threshold": RSD_threshold,
+                    "simple_threshold": simple_threshold,
+                    "signal_change_threshold": signal_change_threshold,
+                    "amplitude_threshold": amplitude_threshold,
+                    "run_use": run_use,
                     }
                     
             },
             from_globalexp_params={"has_bubble": "has_bubble"},
         )
 
-    if apm.pars.aliquot_post:
+    if aliquot_post:
         washmod += 1
         washone = washmod %4 %3 %2
         washtwo = (washmod + 1) %4 %3 %2
@@ -1366,10 +1366,10 @@ def ADSS_sub_OCV(
         apm.add_action_list(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
+                aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s= 0,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
                 rinse_1 = washone,
                 rinse_2= washtwo,
                 rinse_3= washthree,
@@ -1422,7 +1422,7 @@ def ADSS_sub_OCV_photo(
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    if apm.pars.aliquot_pre:
+    if aliquot_pre:
         washmod += 1
         washone = washmod %4 %3 %2
         washtwo = (washmod + 1) %4 %3 %2
@@ -1432,10 +1432,10 @@ def ADSS_sub_OCV_photo(
         apm.add_action_list(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
+                aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s= 0,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
                 rinse_1 = washone,
                 rinse_2= washtwo,
                 rinse_3= washthree,
@@ -1450,9 +1450,9 @@ def ADSS_sub_OCV_photo(
         PSTAT_server,
         "run_OCV",
         {
-            "Tval__s": apm.pars.Tval__s,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "IErange": apm.pars.gamry_i_range,
+            "Tval__s": Tval__s,
+            "AcqInterval__s": samplerate_sec,
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1466,23 +1466,23 @@ def ADSS_sub_OCV_photo(
             ProcessContrib.run_use,
         ],
     )
-    if apm.pars.aliquot_insitu:
+    if aliquot_insitu:
 
         apm.add_action_list(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
-                aliquot_insitu=apm.pars.aliquot_insitu,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
-                aliquot_times_sec=apm.pars.aliquot_times_sec,
+                aliquot_insitu=aliquot_insitu,
+                aliquot_volume_ul=aliquot_volume_ul,
+                aliquot_times_sec=aliquot_times_sec,
                 washmod_in=washmod,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
             )
         )
 
         apm.add(NI_server, "led", {"led": "led", "on": 0})
 
-    if apm.pars.aliquot_post:
+    if aliquot_post:
         washmod += 1
         washone = washmod %4 %3 %2
         washtwo = (washmod + 1) %4 %3 %2
@@ -1492,10 +1492,10 @@ def ADSS_sub_OCV_photo(
         apm.add_action_list(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
-                aliquot_volume_ul=apm.pars.aliquot_volume_ul,
+                aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s= 0,
-                PAL_Injector=apm.pars.PAL_Injector,
-                PAL_Injector_id=apm.pars.PAL_Injector_id,
+                PAL_Injector=PAL_Injector,
+                PAL_Injector_id=PAL_Injector_id,
                 rinse_1 = washone,
                 rinse_2= washtwo,
                 rinse_3= washthree,
@@ -1530,15 +1530,15 @@ def ADSS_sub_insitu_actions(
         that occurs before full PAL action is completed
     """
 
-    atimes = apm.pars.aliquot_times_sec
-    etime = apm.pars.insert_electrolyte_time_sec
+    atimes = aliquot_times_sec
+    etime = insert_electrolyte_time_sec
     mlist = [("aliquot", t) for t in atimes]
     waitcond = ActionStartCondition.no_wait
     intervals = []
 
-    if apm.pars.aliquot_insitu:
+    if aliquot_insitu:
 
-        if apm.pars.insert_electrolyte_bool:
+        if insert_electrolyte_bool:
             eidx = [i for i, v in enumerate(atimes) if v < etime]
             mlist.insert(max(eidx) + 1, ("electrolyte", etime))
 
@@ -1553,7 +1553,7 @@ def ADSS_sub_insitu_actions(
             print(intervals)
 
         washmod = washmod_in
-        if apm.pars.injector_wash_one:
+        if injector_wash_one:
             washone = 1
             washtwo = 0
             washthree = 0
@@ -1580,9 +1580,9 @@ def ADSS_sub_insitu_actions(
                     PAL_server,
                     "PAL_archive",
                     {
-                        "tool": apm.pars.PAL_Injector,
+                        "tool": PAL_Injector,
                         "source": "cell1_we",
-                        "volume_ul": apm.pars.aliquot_volume_ul,
+                        "volume_ul": aliquot_volume_ul,
                         "sampleperiod": [0.0],
                         "spacingmethod": Spacingmethod.linear,
                         "spacingfactor": 1.0,
@@ -1604,7 +1604,7 @@ def ADSS_sub_insitu_actions(
                     ],
                 )
                 vwait = 61  # orig 65
-                if not apm.pars.injector_wash_one:
+                if not injector_wash_one:
                     washmod += 1
                     washone = washmod %4 %3 %2
                     washtwo = (washmod + 1) %4 %3 %2
@@ -1619,13 +1619,13 @@ def ADSS_sub_insitu_actions(
                     ActionStartCondition.wait_for_orch,
                 )
             elif mtup[0] == "electrolyte":
-                #                if apm.pars.insert_electrolyte_bool:
+                #                if insert_electrolyte_bool:
                 # apm.add_action_list(
                 #     ADSS_sub_load_liquid(
                 #         experiment=experiment,
                 #         liquid_custom_position="cell1_we",
-                #         liquid_sample_no=apm.pars.electrolyte_sample_no,
-                #         volume_ul_cell_liquid=apm.pars.insert_electrolyte_ul,
+                #         liquid_sample_no=electrolyte_sample_no,
+                #         volume_ul_cell_liquid=insert_electrolyte_ul,
                 #     )
                 # )
 
@@ -1642,11 +1642,11 @@ def ADSS_sub_insitu_actions(
                         "custom": "cell1_we",
                         "source_liquid_in": LiquidSample(
                             **{
-                                "sample_no": apm.pars.electrolyte_sample_no,
+                                "sample_no": electrolyte_sample_no,
                                 "machine_name": gethostname(),
                             }
                         ).model_dump(),
-                        "volume_ml": apm.pars.insert_electrolyte_volume_ul / 1000,
+                        "volume_ml": insert_electrolyte_volume_ul / 1000,
                         "combine_liquids": True,
                         "dilute_liquids": False,
                     },
@@ -1655,7 +1655,7 @@ def ADSS_sub_insitu_actions(
                 apm.add_action_list(
                     ADSS_sub_cellfill_prefilled(
                         experiment=experiment,
-                        Solution_volume_ul=apm.pars.insert_electrolyte_volume_ul,
+                        Solution_volume_ul=insert_electrolyte_volume_ul,
                         Syringe_rate_ulsec=300,
                     )
                 )
@@ -1666,7 +1666,7 @@ def ADSS_sub_insitu_actions(
                     {"waittime": 0.1},
                     ActionStartCondition.wait_for_orch,
                 )
-    elif apm.pars.insert_electrolyte_bool:
+    elif insert_electrolyte_bool:
         apm.add(ORCH_server, "wait", {"waittime": etime}, waitcond)
         apm.add(
             PAL_server,
@@ -1675,11 +1675,11 @@ def ADSS_sub_insitu_actions(
                 "custom": "cell1_we",
                 "source_liquid_in": LiquidSample(
                     **{
-                        "sample_no": apm.pars.electrolyte_sample_no,
+                        "sample_no": electrolyte_sample_no,
                         "machine_name": gethostname(),
                     }
                 ).model_dump(),
-                "volume_ml": apm.pars.insert_electrolyte_volume_ul / 1000,
+                "volume_ml": insert_electrolyte_volume_ul / 1000,
                 "combine_liquids": True,
                 "dilute_liquids": False,
             },
@@ -1688,7 +1688,7 @@ def ADSS_sub_insitu_actions(
         apm.add_action_list(
             ADSS_sub_cellfill_prefilled(
                 experiment=experiment,
-                Solution_volume_ul=apm.pars.insert_electrolyte_volume_ul,
+                Solution_volume_ul=insert_electrolyte_volume_ul,
                 Syringe_rate_ulsec=300,
             )
         )
@@ -1720,21 +1720,21 @@ def ADSS_sub_add_liquid(
             "custom": "cell1_we",
             "source_liquid_in": LiquidSample(
                 **{
-                    "sample_no": apm.pars.liquid_sample_no,
+                    "sample_no": liquid_sample_no,
                     "machine_name": gethostname(),
                 }
             ).model_dump(),
-            "volume_ml": apm.pars.added_liquid_volume_ul / 1000,
+            "volume_ml": added_liquid_volume_ul / 1000,
             "combine_liquids": True,
             "dilute_liquids": False,
         },
         ActionStartCondition.wait_for_orch,
     )
-    if not apm.pars.virtual_add:
+    if not virtual_add:
         apm.add_action_list(
             ADSS_sub_cellfill_prefilled(
                 experiment=experiment,
-                Solution_volume_ul=apm.pars.added_liquid_volume_ul,
+                Solution_volume_ul=added_liquid_volume_ul,
                 Syringe_rate_ulsec=300,
             )
         )
@@ -1769,8 +1769,8 @@ def ADSS_sub_tray_unload(
         PAL_server,
         "archive_tray_export_json",
         {
-            "tray": apm.pars.tray,
-            "slot": apm.pars.slot,
+            "tray": tray,
+            "slot": slot,
         },
         start_condition=ActionStartCondition.wait_for_all,
     )
@@ -1779,8 +1779,8 @@ def ADSS_sub_tray_unload(
         PAL_server,
         "archive_tray_export_csv",
         {
-            "tray": apm.pars.tray,
-            "slot": apm.pars.slot,
+            "tray": tray,
+            "slot": slot,
         },
         start_condition=ActionStartCondition.wait_for_all,
     )
@@ -1789,11 +1789,11 @@ def ADSS_sub_tray_unload(
         PAL_server,
         "archive_tray_export_icpms",
         {
-            "tray": apm.pars.tray,
-            "slot": apm.pars.slot,
-            "survey_runs": apm.pars.survey_runs,
-            "main_runs": apm.pars.main_runs,
-            "rack": apm.pars.rack,
+            "tray": tray,
+            "slot": slot,
+            "survey_runs": survey_runs,
+            "main_runs": main_runs,
+            "rack": rack,
         },
         start_condition=ActionStartCondition.wait_for_all,
     )
@@ -1802,8 +1802,8 @@ def ADSS_sub_tray_unload(
         PAL_server,
         "archive_tray_unload",
         {
-            "tray": apm.pars.tray,
-            "slot": apm.pars.slot,
+            "tray": tray,
+            "slot": slot,
         },
         start_condition=ActionStartCondition.wait_for_all,
     )
@@ -1828,12 +1828,12 @@ def ADSS_sub_tray_icpms_export(
         PAL_server,
         "archive_tray_export_icpms",
         {
-            "tray": apm.pars.tray,
-            "slot": apm.pars.slot,
-            "survey_runs": apm.pars.survey_runs,
-            "main_runs": apm.pars.main_runs,
-            "rack": apm.pars.rack,
-            "dilution_factor": apm.pars.dilution_factor,
+            "tray": tray,
+            "slot": slot,
+            "survey_runs": survey_runs,
+            "main_runs": main_runs,
+            "rack": rack,
+            "dilution_factor": dilution_factor,
         },
     )
 
@@ -1855,7 +1855,7 @@ def ADSS_sub_z_move(
         MOTOR_server,
         "move",
         {
-            "d_mm": [0, 0, apm.pars.offset_z_mm],
+            "d_mm": [0, 0, offset_z_mm],
             "axis": ["x", "y", "z"],
             "mode": MoveModes.relative,
             "transformation": TransformationModes.platexy,
@@ -1884,7 +1884,7 @@ def ADSS_sub_rel_move(
         MOTOR_server,
         "move",
         {
-            "d_mm": [apm.pars.offset_x_mm, apm.pars.offset_y_mm, apm.pars.offset_z_mm],
+            "d_mm": [offset_x_mm, offset_y_mm, offset_z_mm],
             "axis": ["x", "y", "z"],
             "mode": MoveModes.relative,
             "transformation": TransformationModes.platexy,
@@ -1914,7 +1914,7 @@ def ADSS_sub_abs_move(
         MOTOR_server,
         "move",
         {
-            "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+            "d_mm": [x_mm, y_mm],
             "axis": ["x", "y"],
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
@@ -1946,11 +1946,11 @@ def ADSS_sub_heat(
         NI_server,
         "heatloop",
         {
-            "duration_hrs": apm.pars.duration_hrs,
-            "celltemp_min_C": apm.pars.celltemp_min_C,
-            "celltemp_max_C": apm.pars.celltemp_max_C,
-            "reservoir2_min_C": apm.pars.reservoir2_min_C,
-            "reservoir2_max_C": apm.pars.reservoir2_max_C,
+            "duration_hrs": duration_hrs,
+            "celltemp_min_C": celltemp_min_C,
+            "celltemp_max_C": celltemp_max_C,
+            "reservoir2_min_C": reservoir2_min_C,
+            "reservoir2_max_C": reservoir2_max_C,
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         process_finish=False,
@@ -2002,8 +2002,8 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
     #     SOLUTIONPUMP_server,
     #     "withdraw",
     #     {
-    #         "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-    #         "volume_uL": apm.pars.Solution_volume_ul,
+    #         "rate_uL_sec": Syringe_rate_ulsec,
+    #         "volume_uL": Solution_volume_ul,
     #     },
     # )
     # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
@@ -2011,8 +2011,8 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
         SOLUTIONPUMP_server,
         "infuse",
         {
-            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Solution_volume_ul,
+            "rate_uL_sec": Syringe_rate_ulsec,
+            "volume_uL": Solution_volume_ul,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="cell_fill",
@@ -2023,7 +2023,7 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
         ],
         start_condition=ActionStartCondition.wait_for_orch,
     )
-    if apm.pars.ReturnLineWait_s != 0:
+    if ReturnLineWait_s != 0:
         apm.add(
             NI_server,
             "pump",
@@ -2039,7 +2039,7 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
         apm.add(
             ORCH_server,
             "wait",
-            {"waittime": apm.pars.ReturnLineWait_s},
+            {"waittime": ReturnLineWait_s},
             start_condition=ActionStartCondition.wait_for_previous,
         )
         apm.add(
@@ -2085,8 +2085,8 @@ def ADSS_sub_cellfill_prefilled(
     #     SOLUTIONPUMP_server,
     #     "withdraw",
     #     {
-    #         "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-    #         "volume_uL": apm.pars.Solution_volume_ul,
+    #         "rate_uL_sec": Syringe_rate_ulsec,
+    #         "volume_uL": Solution_volume_ul,
     #     },
     # )
     # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
@@ -2094,8 +2094,8 @@ def ADSS_sub_cellfill_prefilled(
         SOLUTIONPUMP_server,
         "infuse",
         {
-            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Solution_volume_ul,
+            "rate_uL_sec": Syringe_rate_ulsec,
+            "volume_uL": Solution_volume_ul,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="cell_fill",
@@ -2106,7 +2106,7 @@ def ADSS_sub_cellfill_prefilled(
         ],
         start_condition=ActionStartCondition.wait_for_orch,
     )
-    if apm.pars.ReturnLineWait_s != 0:
+    if ReturnLineWait_s != 0:
         apm.add(
             NI_server,
             "pump",
@@ -2122,7 +2122,7 @@ def ADSS_sub_cellfill_prefilled(
         apm.add(
             ORCH_server,
             "wait",
-            {"waittime": apm.pars.ReturnLineWait_s},
+            {"waittime": ReturnLineWait_s},
             start_condition=ActionStartCondition.wait_for_previous,
         )
         apm.add(
@@ -2153,8 +2153,8 @@ def ADSS_sub_cellfill_flush(
     #     SOLUTIONPUMP_server,
     #     "withdraw",
     #     {
-    #         "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-    #         "volume_uL": apm.pars.Solution_volume_ul,
+    #         "rate_uL_sec": Syringe_rate_ulsec,
+    #         "volume_uL": Solution_volume_ul,
     #     },
     # )
     # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
@@ -2162,14 +2162,14 @@ def ADSS_sub_cellfill_flush(
         SOLUTIONPUMP_server,
         "infuse",
         {
-            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Solution_volume_ul,
+            "rate_uL_sec": Syringe_rate_ulsec,
+            "volume_uL": Solution_volume_ul,
         },
     )
-    if apm.pars.ReturnLineWait_s != 0:
+    if ReturnLineWait_s != 0:
         apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
         apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
+        apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
         apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
@@ -2189,19 +2189,19 @@ def ADSS_sub_drain_cell(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # clearing return line
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineReverseWait_s})
+    apm.add(ORCH_server, "wait", {"waittime": ReturnLineReverseWait_s})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "V4", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining reservoir
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.DrainWait_s / 2})
+    apm.add(ORCH_server, "wait", {"waittime": DrainWait_s / 2})
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.DrainWait_s / 2})
+    apm.add(ORCH_server, "wait", {"waittime": DrainWait_s / 2})
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 1})
     #    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining cell
-    #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.ResidualWait_s})
+    #    apm.add(ORCH_server, "wait", {"waittime": ResidualWait_s})
     #    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "V4", "on": 0})
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 0})
@@ -2220,7 +2220,7 @@ def ADSS_sub_keep_electrolyte(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # clearing return line
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineReverseWait_s})
+    apm.add(ORCH_server, "wait", {"waittime": ReturnLineReverseWait_s})
     apm.add(ORCH_server, "interrupt", {"reason": "Save electrolyte in reservoir."})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
@@ -2239,7 +2239,7 @@ def ADSS_sub_keep_electrolyte(
 #     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 #     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
 #     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-#     apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReversePurgeWait_s})
+#     apm.add(ORCH_server, "wait", {"waittime": ReversePurgeWait_s})
 #     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
 #     return apm.action_list
@@ -2261,31 +2261,31 @@ def ADSS_sub_clean_cell(
     apm = ActionPlanMaker()
 
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
-    if apm.pars.Clean_volume_ul > 10000:
+    if Clean_volume_ul > 10000:
         apm.add(
             WATERCLEANPUMP_server,
             "infuse",
             {
-                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+                "rate_uL_sec": Syringe_rate_ulsec,
                 "volume_uL": 6000,
             },
         )
         apm.add(ORCH_server, "wait", {"waittime": 10})
         apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.PurgeWait_s})
+        apm.add(ORCH_server, "wait", {"waittime": PurgeWait_s})
         apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
 
         apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
         apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
+        apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
         apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
         apm.add_action_list(
             ADSS_sub_drain_cell(
                 experiment=experiment,
                 DrainWait_s=40,
-                ReturnLineReverseWait_s=apm.pars.ReturnLineReverseWait_s,
-                # ResidualWait_s=apm.pars.ResidualWait_s,
+                ReturnLineReverseWait_s=ReturnLineReverseWait_s,
+                # ResidualWait_s=ResidualWait_s,
             )
         )
 
@@ -2293,27 +2293,27 @@ def ADSS_sub_clean_cell(
         WATERCLEANPUMP_server,
         "infuse",
         {
-            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Clean_volume_ul,
+            "rate_uL_sec": Syringe_rate_ulsec,
+            "volume_uL": Clean_volume_ul,
         },
     )
     apm.add(ORCH_server, "wait", {"waittime": 10})
-    if apm.pars.Clean_volume_ul < 7000:
+    if Clean_volume_ul < 7000:
         apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.PurgeWait_s})
+        apm.add(ORCH_server, "wait", {"waittime": PurgeWait_s})
         apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
 
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
+    apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
     apm.add_action_list(
         ADSS_sub_drain_cell(
             experiment=experiment,
-            DrainWait_s=apm.pars.DrainWait_s,
-            ReturnLineReverseWait_s=apm.pars.ReturnLineReverseWait_s,
-            # ResidualWait_s=apm.pars.ResidualWait_s,
+            DrainWait_s=DrainWait_s,
+            ReturnLineReverseWait_s=ReturnLineReverseWait_s,
+            # ResidualWait_s=ResidualWait_s,
         )
     )
     if lift:
@@ -2360,11 +2360,11 @@ def ADSS_sub_move_to_ref_measurement(
     apm.add(
         MOTOR_server,
         "solid_get_builtin_specref",
-        {"ref_position_name": apm.pars.reference_position_name},
+        {"ref_position_name": reference_position_name},
         to_globalexp_params=["_refxy"],
     )
     if (
-        apm.pars.reference_position_name == "builtin_ref_motorxy"
+        reference_position_name == "builtin_ref_motorxy"
     ):  # if using clean cell position with this experiment, then use platexy. otherwise motorxy
         apm.add(
             MOTOR_server,
@@ -2400,40 +2400,40 @@ def ADSS_sub_move_to_ref_measurement(
 #     Syringe_rate_ulsec: float = 300,
 # ):
 #     apm = ActionPlanMaker()
-#     if apm.pars.Solution_volume_ul != 0:
+#     if Solution_volume_ul != 0:
 #         apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
 #         apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #         apm.add(
 #             SOLUTIONPUMP_server,
 #             "withdraw",
 #             {
-#                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-#                 "volume_uL": apm.pars.Solution_volume_ul + 25,
+#                 "rate_uL_sec": Syringe_rate_ulsec,
+#                 "volume_uL": Solution_volume_ul + 25,
 #             },
 #         )
 #         apm.add(
 #             SOLUTIONPUMP_server,
 #             "infuse",
-#             {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25},
+#             {"rate_uL_sec": Syringe_rate_ulsec, "volume_uL": 25},
 #         )
 #         apm.add(ORCH_server, "wait", {"waittime": 40})
 #         apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
 
-#     if apm.pars.Waterclean_volume_ul != 0:
+#     if Waterclean_volume_ul != 0:
 #         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
 #         apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #         apm.add(
 #             WATERCLEANPUMP_server,
 #             "withdraw",
 #             {
-#                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-#                 "volume_uL": apm.pars.Waterclean_volume_ul + 25,
+#                 "rate_uL_sec": Syringe_rate_ulsec,
+#                 "volume_uL": Waterclean_volume_ul + 25,
 #             },
 #         )
 #         apm.add(
 #             WATERCLEANPUMP_server,
 #             "infuse",
-#             {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25},
+#             {"rate_uL_sec": Syringe_rate_ulsec, "volume_uL": 25},
 #         )
 #         apm.add(ORCH_server, "wait", {"waittime": 10})
 #         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
@@ -2467,22 +2467,22 @@ def ADSS_sub_sample_aliquot(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.EquilibrationTime_s})
+    apm.add(ORCH_server, "wait", {"waittime": EquilibrationTime_s})
     apm.add(
         PAL_server,
         "PAL_archive",
         {
-            "tool": apm.pars.PAL_Injector,
+            "tool": PAL_Injector,
             "source": "cell1_we",
-            "volume_ul": apm.pars.aliquot_volume_ul,
+            "volume_ul": aliquot_volume_ul,
             "sampleperiod": [0.0],
             "spacingmethod": Spacingmethod.custom,
             "spacingfactor": 1.0,
             "timeoffset": 0.0,
-            "wash1": apm.pars.rinse_1,
-            "wash2": apm.pars.rinse_2,
-            "wash3": apm.pars.rinse_3,
-            "wash4": apm.pars.rinse_4,
+            "wash1": rinse_1,
+            "wash2": rinse_2,
+            "wash3": rinse_3,
+            "wash4": rinse_4,
         },
         start_condition=ActionStartCondition.wait_for_orch,
         technique_name="liquid_product_archive",
@@ -2507,14 +2507,14 @@ def ADSS_sub_recirculate(
     wait_time_s: float = 10,
 ):
     apm = ActionPlanMaker()
-    if apm.pars.direction_forward_or_reverse == "forward":
+    if direction_forward_or_reverse == "forward":
         dir = 0
     else:
         dir = 1
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": dir})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time_s})
+    apm.add(ORCH_server, "wait", {"waittime": wait_time_s})
     return apm.action_list  # returns complete action list to orch
 
 
@@ -2525,7 +2525,7 @@ def ADSS_sub_cell_illumination(
     illumination_on: bool = False,
 ):
     apm = ActionPlanMaker()
-    if apm.pars.illumination_on:
+    if illumination_on:
         apm.add(
             NI_server,
             "led",
@@ -2557,7 +2557,7 @@ def ADSS_sub_interrupt(
     reason: str = "wait",
 ):
     apm = ActionPlanMaker()
-    apm.add(ORCH_server, "interrupt", {"reason": apm.pars.reason})
+    apm.add(ORCH_server, "interrupt", {"reason": reason})
     return apm.action_list
 
 
@@ -2569,21 +2569,21 @@ def ADSS_sub_refill_syringe(
     Syringe_rate_ulsec: float = 1000,
 ):
     apm = ActionPlanMaker()
-    if apm.pars.syringe == "waterclean":
+    if syringe == "waterclean":
         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
             WATERCLEANPUMP_server,
             "withdraw",
             {
-                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": apm.pars.fill_volume_ul,
+                "rate_uL_sec": Syringe_rate_ulsec,
+                "volume_uL": fill_volume_ul,
             },
         )
         apm.add(ORCH_server, "wait", {"waittime": 10})
         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
 
-    if apm.pars.syringe == "electrolyte":
+    if syringe == "electrolyte":
         # need valve for this soln
         apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -2591,8 +2591,8 @@ def ADSS_sub_refill_syringe(
             SOLUTIONPUMP_server,
             "withdraw",
             {
-                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": apm.pars.fill_volume_ul,
+                "rate_uL_sec": Syringe_rate_ulsec,
+                "volume_uL": fill_volume_ul,
             },
         )
         apm.add(ORCH_server, "wait", {"waittime": 10})
@@ -2608,7 +2608,7 @@ def ADSS_sub_gasvalve_toggle(
 ):
     # true for N2 flow
     apm = ActionPlanMaker()
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": apm.pars.open})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": open})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -2620,7 +2620,7 @@ def ADSS_sub_gasvalve_N2flow(
 ):
     # true for N2 flow
     apm = ActionPlanMaker()
-    apm.add(NI_server, "gasvalve", {"gasvalve": "O2N2toggle", "on": apm.pars.open})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "O2N2toggle", "on": open})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -2646,14 +2646,14 @@ def ADSS_sub_transfer_liquid_in(
         PAL_server,
         "archive_custom_add_liquid",
         {
-            "custom": apm.pars.destination,
+            "custom": destination,
             "source_liquid_in": LiquidSample(
                 **{
-                    "sample_no": apm.pars.liquid_sample_no,
+                    "sample_no": liquid_sample_no,
                     "machine_name": gethostname(),
                 }
             ).model_dump(),
-            "volume_ml": apm.pars.aliquot_volume_ul / 1000,
+            "volume_ml": aliquot_volume_ul / 1000,
             "combine_liquids": True,
             "dilute_liquids": False,
         },
@@ -2670,16 +2670,16 @@ def ADSS_sub_transfer_liquid_in(
         PAL_server,
         "PAL_transfer_tray_custom",
         {
-            "volume_ul": apm.pars.aliquot_volume_ul,
-            "source_tray": apm.pars.source_tray,
-            "source_slot": apm.pars.source_slot,
-            "source_vial": apm.pars.source_vial,
-            "dest": apm.pars.destination,
-            "tool": apm.pars.PAL_Injector,
-            "wash1": apm.pars.rinse_1,
-            "wash2": apm.pars.rinse_2,
-            "wash3": apm.pars.rinse_3,
-            "wash4": apm.pars.rinse_4,
+            "volume_ul": aliquot_volume_ul,
+            "source_tray": source_tray,
+            "source_slot": source_slot,
+            "source_vial": source_vial,
+            "dest": destination,
+            "tool": PAL_Injector,
+            "wash1": rinse_1,
+            "wash2": rinse_2,
+            "wash3": rinse_3,
+            "wash4": rinse_4,
         },
     )
 
@@ -2708,26 +2708,26 @@ def ADSS_sub_remove_bubble(
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.pump_reverse_time_s})
+    apm.add(ORCH_server, "wait", {"waittime": pump_reverse_time_s})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.pump_forward_time_s})
+    apm.add(ORCH_server, "wait", {"waittime": pump_forward_time_s})
     apm.add_action_list(
         ADSS_sub_OCV(
             experiment=experiment,
-            Tval__s=apm.pars.Tval__s,
-            gamry_i_range=apm.pars.gamry_i_range,
-            samplerate_sec=apm.pars.samplerate_sec,
-            ph=apm.pars.ph,
-            ref_type=apm.pars.ref_type,
-            ref_offset__V=apm.pars.ref_offset__V,
-            check_bubble=apm.pars.check_bubble,
-            RSD_threshold=apm.pars.RSD_threshold,
-            simple_threshold=apm.pars.simple_threshold,
-            signal_change_threshold=apm.pars.signal_change_threshold,
-            amplitude_threshold=apm.pars.amplitude_threshold,
-            bubble_pump_forward_time_s=apm.pars.bubble_pump_forward_time_s,
-            bubble_pump_reverse_time_s=apm.pars.bubble_pump_reverse_time_s,
-            run_use=apm.pars.run_use,
+            Tval__s=Tval__s,
+            gamry_i_range=gamry_i_range,
+            samplerate_sec=samplerate_sec,
+            ph=ph,
+            ref_type=ref_type,
+            ref_offset__V=ref_offset__V,
+            check_bubble=check_bubble,
+            RSD_threshold=RSD_threshold,
+            simple_threshold=simple_threshold,
+            signal_change_threshold=signal_change_threshold,
+            amplitude_threshold=amplitude_threshold,
+            bubble_pump_forward_time_s=bubble_pump_forward_time_s,
+            bubble_pump_reverse_time_s=bubble_pump_reverse_time_s,
+            run_use=run_use,
 
         )
     )

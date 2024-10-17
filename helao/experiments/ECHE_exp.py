@@ -82,15 +82,15 @@ def ECHE_sub_add_liquid(
         PAL_server,
         "archive_custom_add_liquid",
         {
-            "custom": apm.pars.solid_custom_position,
+            "custom": solid_custom_position,
             "source_liquid_in": LiquidSample(
                 **{
-                    "sample_no": apm.pars.reservoir_liquid_sample_no,
+                    "sample_no": reservoir_liquid_sample_no,
                     "machine_name": gethostname().lower(),
                 }
             ).model_dump(),
-            "volume_ml": apm.pars.liquid_volume_ml,
-            "reservoir_bubbler_gas": apm.pars.solution_bubble_gas,
+            "volume_ml": liquid_volume_ml,
+            "reservoir_bubbler_gas": solution_bubble_gas,
             "combine_liquids": True,
             "dilute_liquids": True,
         },
@@ -115,11 +115,11 @@ def ECHE_sub_load_solid(
         PAL_server,
         "archive_custom_load",
         {
-            "custom": apm.pars.solid_custom_position,
+            "custom": solid_custom_position,
             "load_sample_in": SolidSample(
                 **{
-                    "sample_no": apm.pars.solid_sample_no,
-                    "plate_id": apm.pars.solid_plate_id,
+                    "sample_no": solid_sample_no,
+                    "plate_id": solid_plate_id,
                     "machine_name": "legacy",
                 }
             ).model_dump(),
@@ -152,9 +152,9 @@ def ECHE_sub_startup(
     apm.add_action_list(
         ECHE_sub_load_solid(
             experiment=experiment,
-            solid_custom_position=apm.pars.solid_custom_position,
-            solid_plate_id=apm.pars.solid_plate_id,
-            solid_sample_no=apm.pars.solid_sample_no,
+            solid_custom_position=solid_custom_position,
+            solid_plate_id=solid_plate_id,
+            solid_sample_no=solid_sample_no,
         )
     )
 
@@ -162,10 +162,10 @@ def ECHE_sub_startup(
     apm.add_action_list(
         ECHE_sub_add_liquid(
             experiment=experiment,
-            solid_custom_position=apm.pars.solid_custom_position,
-            reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
-            solution_bubble_gas=apm.pars.solution_bubble_gas,
-            liquid_volume_ml=apm.pars.liquid_volume_ml,
+            solid_custom_position=solid_custom_position,
+            reservoir_liquid_sample_no=reservoir_liquid_sample_no,
+            solution_bubble_gas=solution_bubble_gas,
+            liquid_volume_ml=liquid_volume_ml,
         )
     )
 
@@ -174,8 +174,8 @@ def ECHE_sub_startup(
         MOTOR_server,
         "solid_get_samples_xy",
         {
-            "plate_id": apm.pars.solid_plate_id,
-            "sample_no": apm.pars.solid_sample_no,
+            "plate_id": solid_plate_id,
+            "sample_no": solid_sample_no,
         },
         to_globalexp_params=[
             "_platexy"
@@ -188,7 +188,7 @@ def ECHE_sub_startup(
         MOTOR_server,
         "move",
         {
-            # "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+            # "d_mm": [x_mm, y_mm],
             "axis": ["x", "y"],
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
@@ -245,8 +245,8 @@ def ECHE_sub_CA_led(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.CA_duration_sec
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CA_duration_sec
 
     # get sample for gamry
     apm.add(
@@ -268,12 +268,12 @@ def ECHE_sub_CA_led(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": apm.pars.illumination_source,
+            "out_name": illumination_source,
             "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": apm.pars.toggle_dark_time_init,
-            "toggle_duty": apm.pars.toggle_illum_duty,
-            "toggle_period": apm.pars.toggle_illum_period,
-            "toggle_duration": apm.pars.toggle_illum_time,
+            "toggle_init_delay": toggle_dark_time_init,
+            "toggle_duty": toggle_illum_duty,
+            "toggle_period": toggle_illum_period,
+            "toggle_duration": toggle_illum_time,
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         process_finish=False,
@@ -284,17 +284,17 @@ def ECHE_sub_CA_led(
 
     # # calculate potential
     versus = 0  # for vs rhe
-    if apm.pars.potential_versus == "oer":
+    if potential_versus == "oer":
         versus = 1.23
-    if apm.pars.ref_type == "rhe":
-        potential = apm.pars.CA_potential - apm.pars.ref_offset__V + versus
+    if ref_type == "rhe":
+        potential = CA_potential - ref_offset__V + versus
     else:
         potential = (
-            apm.pars.CA_potential
-            - 1.0 * apm.pars.ref_offset__V
+            CA_potential
+            - 1.0 * ref_offset__V
             + versus
-            - 0.059 * apm.pars.solution_ph
-            - REF_TABLE[apm.pars.ref_type]
+            - 0.059 * solution_ph
+            - REF_TABLE[ref_type]
         )
     print(f"ECHE_sub_CA potential: {potential}")
     apm.add(
@@ -302,11 +302,11 @@ def ECHE_sub_CA_led(
         "run_CA",
         {
             "Vval__V": potential,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.gamry_i_range,
+            "Tval__s": CA_duration_sec,
+            "AcqInterval__s": samplerate_sec,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -391,9 +391,9 @@ def ECHE_sub_preCV(
         PSTAT_server,
         "run_CA",
         {
-            "Vval": apm.pars.CA_potential,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "SampleRate": apm.pars.samplerate_sec,
+            "Vval": CA_potential,
+            "Tval__s": CA_duration_sec,
+            "SampleRate": samplerate_sec,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             "IErange": "auto",
@@ -448,22 +448,22 @@ def ECHE_sub_CA(
 
     # apply potential
     # potential = (
-    #     apm.pars.CA_potential_vsRHE
-    #     - 1.0 * apm.pars.ref_vs_nhe
-    #     - 0.059 * apm.pars.solution_ph
+    #     CA_potential_vsRHE
+    #     - 1.0 * ref_vs_nhe
+    #     - 0.059 * solution_ph
     # # calculate potential
     versus = 0  # for vs rhe
-    if apm.pars.potential_versus == "oer":
+    if potential_versus == "oer":
         versus = 1.23
-    if apm.pars.ref_type == "rhe":
-        potential = apm.pars.CA_potential - apm.pars.ref_offset__V + versus
+    if ref_type == "rhe":
+        potential = CA_potential - ref_offset__V + versus
     else:
         potential = (
-            apm.pars.CA_potential
-            - 1.0 * apm.pars.ref_offset__V
+            CA_potential
+            - 1.0 * ref_offset__V
             + versus
-            - 0.059 * apm.pars.solution_ph
-            - REF_TABLE[apm.pars.ref_type]
+            - 0.059 * solution_ph
+            - REF_TABLE[ref_type]
         )
     print(f"ECHE_sub_CA potential: {potential}")
     apm.add(
@@ -471,9 +471,9 @@ def ECHE_sub_CA(
         "run_CA",
         {
             "Vval__V": potential,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "IErange": apm.pars.gamry_i_range,
+            "Tval__s": CA_duration_sec,
+            "AcqInterval__s": samplerate_sec,
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -527,25 +527,25 @@ def ECHE_sub_CV_led(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     CV_duration_sec = (
-        abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.scanrate_voltsec
+        abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
     )
     CV_duration_sec += (
-        abs(apm.pars.Vfinal_vsRHE - apm.pars.Vapex2_vsRHE) / apm.pars.scanrate_voltsec
+        abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
     )
     CV_duration_sec += (
-        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
-        / apm.pars.scanrate_voltsec
-       # * apm.pars.cycles
+        abs(Vapex2_vsRHE - Vapex1_vsRHE)
+        / scanrate_voltsec
+       # * cycles
     )
     CV_duration_sec += (
-        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
-        / apm.pars.scanrate_voltsec
+        abs(Vapex2_vsRHE - Vapex1_vsRHE)
+        / scanrate_voltsec
         * 2.0
-        * (apm.pars.cycles - 1)
+        * (cycles - 1)
     )
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = CV_duration_sec
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CV_duration_sec
 
     # get sample for gamry
     apm.add(
@@ -567,12 +567,12 @@ def ECHE_sub_CV_led(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": apm.pars.illumination_source,
+            "out_name": illumination_source,
             "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": apm.pars.toggle_dark_time_init,
-            "toggle_duty": apm.pars.toggle_illum_duty,
-            "toggle_period": apm.pars.toggle_illum_period,
-            "toggle_duration": apm.pars.toggle_illum_time,
+            "toggle_init_delay": toggle_dark_time_init,
+            "toggle_duty": toggle_illum_duty,
+            "toggle_period": toggle_illum_period,
+            "toggle_duration": toggle_illum_time,
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         process_finish=False,
@@ -588,28 +588,28 @@ def ECHE_sub_CV_led(
         PSTAT_server,
         "run_CV",
         {
-            "Vinit__V": apm.pars.Vinit_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.solution_ph,
-            "Vapex1__V": apm.pars.Vapex1_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.solution_ph,
-            "Vapex2__V": apm.pars.Vapex2_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.solution_ph,
-            "Vfinal__V": apm.pars.Vfinal_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.solution_ph,
-            "ScanRate__V_s": apm.pars.scanrate_voltsec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "Cycles": apm.pars.cycles,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.gamry_i_range,
+            "Vinit__V": Vinit_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * solution_ph,
+            "Vapex1__V": Vapex1_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * solution_ph,
+            "Vapex2__V": Vapex2_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * solution_ph,
+            "Vfinal__V": Vfinal_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * solution_ph,
+            "ScanRate__V_s": scanrate_voltsec,
+            "AcqInterval__s": samplerate_sec,
+            "Cycles": cycles,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -670,26 +670,26 @@ def ECHE_sub_CV(
         PSTAT_server,
         "run_CV",
         {
-            "Vinit__V": apm.pars.Vinit_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.solution_ph,
-            "Vapex1__V": apm.pars.Vapex1_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.solution_ph,
-            "Vapex2__V": apm.pars.Vapex2_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.solution_ph,
-            "Vfinal__V": apm.pars.Vfinal_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.solution_ph,
-            "ScanRate__V_s": apm.pars.scanrate_voltsec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "Cycles": apm.pars.cycles,
-            "IErange": apm.pars.gamry_i_range,
+            "Vinit__V": Vinit_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * solution_ph,
+            "Vapex1__V": Vapex1_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * solution_ph,
+            "Vapex2__V": Vapex2_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * solution_ph,
+            "Vfinal__V": Vfinal_vsRHE
+            - 1.0 * ref_offset__V
+            - REF_TABLE[ref_type]
+            - 0.059 * solution_ph,
+            "ScanRate__V_s": scanrate_voltsec,
+            "AcqInterval__s": samplerate_sec,
+            "Cycles": cycles,
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -740,7 +740,7 @@ def ECHE_sub_CP(
 
     #    # apply potential
     #   potential = (
-    #        apm.pars.CA_potential_vsRHE - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.solution_ph
+    #        CA_potential_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph
     #    )
     #    print(f"ECHE_sub_CA potential: {potential}")
     apm.add(
@@ -748,9 +748,9 @@ def ECHE_sub_CP(
         "run_CP",
         {
             "Ival__A": CP_current,
-            "Tval__s": apm.pars.CP_duration_sec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "IErange": apm.pars.gamry_i_range,
+            "Tval__s": CP_duration_sec,
+            "AcqInterval__s": samplerate_sec,
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -797,8 +797,8 @@ def ECHE_sub_CP_led(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.CP_duration_sec
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CP_duration_sec
 
     # get sample for gamry
     apm.add(
@@ -820,12 +820,12 @@ def ECHE_sub_CP_led(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": apm.pars.illumination_source,
+            "out_name": illumination_source,
             "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": apm.pars.toggle_dark_time_init,
-            "toggle_duty": apm.pars.toggle_illum_duty,
-            "toggle_period": apm.pars.toggle_illum_period,
-            "toggle_duration": apm.pars.toggle_illum_time,
+            "toggle_init_delay": toggle_dark_time_init,
+            "toggle_duty": toggle_illum_duty,
+            "toggle_period": toggle_illum_period,
+            "toggle_duration": toggle_illum_time,
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         process_finish=False,
@@ -840,12 +840,12 @@ def ECHE_sub_CP_led(
         PSTAT_server,
         "run_CP",
         {
-            "Ival__A": apm.pars.CP_current,
-            "Tval__s": apm.pars.CP_duration_sec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.gamry_i_range,
+            "Ival__A": CP_current,
+            "Tval__s": CP_duration_sec,
+            "AcqInterval__s": samplerate_sec,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -878,8 +878,8 @@ def ECHE_sub_movetosample(
         MOTOR_server,
         "solid_get_samples_xy",
         {
-            "plate_id": apm.pars.solid_plate_id,
-            "sample_no": apm.pars.solid_sample_no,
+            "plate_id": solid_plate_id,
+            "sample_no": solid_sample_no,
         },
         to_globalexp_params=[
             "_platexy"
@@ -892,7 +892,7 @@ def ECHE_sub_movetosample(
         MOTOR_server,
         "move",
         {
-            # "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+            # "d_mm": [x_mm, y_mm],
             "axis": ["x", "y"],
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
@@ -920,7 +920,7 @@ def ECHE_sub_rel_move(
         MOTOR_server,
         "move",
         {
-            "d_mm": [apm.pars.offset_x_mm, apm.pars.offset_y_mm],
+            "d_mm": [offset_x_mm, offset_y_mm],
             "axis": ["x", "y"],
             "mode": MoveModes.relative,
             "transformation": TransformationModes.platexy,

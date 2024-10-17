@@ -53,7 +53,7 @@ def SIM_measure_CP(
     apm.add(
         PAL_server,
         "query_plate",
-        {"elements": apm.pars.elements, "ph": apm.pars.solution_ph},
+        {"elements": elements, "ph": solution_ph},
         to_globalexp_params=["_plate_id"],
     )
     # load plate
@@ -68,7 +68,7 @@ def SIM_measure_CP(
     apm.add(
         PAL_server,
         "acquire",
-        {"element_fracs": apm.pars.element_fracs},
+        {"element_fracs": element_fracs},
         to_globalexp_params=["_acq_sample_no"],
     )
     # find plate x,y coordinates from sample_no
@@ -87,7 +87,7 @@ def SIM_measure_CP(
     apm.add(
         ANA_server,
         "calc_cpfom",
-        {"ph": apm.pars.solution_ph, "jmacm2": 3},
+        {"ph": solution_ph, "jmacm2": 3},
         from_globalexp_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
     )
     # measure CP at 10mA/cm2 for 15 seconds
@@ -96,7 +96,7 @@ def SIM_measure_CP(
     apm.add(
         ANA_server,
         "calc_cpfom",
-        {"ph": apm.pars.solution_ph, "jmacm2": 10},
+        {"ph": solution_ph, "jmacm2": 10},
         from_globalexp_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
     )
 

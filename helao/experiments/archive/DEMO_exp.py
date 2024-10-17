@@ -40,17 +40,17 @@ def DEMO_sub_CP(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.CP_duration_sec
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CP_duration_sec
 
     apm.add(
         PSTAT_server,
         "run_CP",
         {
-            "Ival": apm.pars.CP_current,
-            "Tval__s": apm.pars.CP_duration_sec,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "IErange": apm.pars.IErange,
+            "Ival": CP_current,
+            "Tval__s": CP_duration_sec,
+            "AcqInterval__s": SampleRate,
+            "IErange": IErange,
         },
     )
 
@@ -71,15 +71,15 @@ def DEMO_sub_CA(
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    if apm.pars.WE_versus == "ref":
-        potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V
+    if WE_versus == "ref":
+        potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
 
-    elif apm.pars.WE_versus == "rhe":
+    elif WE_versus == "rhe":
         potential_vsRef = (
-            apm.pars.WE_potential__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
-            - REF_TABLE[apm.pars.ref_type]
+            WE_potential__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
+            - REF_TABLE[ref_type]
         )
 
     apm.add(
@@ -87,9 +87,9 @@ def DEMO_sub_CA(
         "run_CA",
         {
             "Vval__V": potential_vsRef,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "IErange": apm.pars.IErange,
+            "Tval__s": CA_duration_sec,
+            "AcqInterval__s": SampleRate,
+            "IErange": IErange,
         },
     )
 
@@ -109,9 +109,9 @@ def DEMO_sub_OCV(
         PSTAT_server,
         "run_OCV",
         {
-            "Tval__s": apm.pars.Tval__s,
+            "Tval__s": Tval__s,
             "SampleRate": 0.05,
-            "IErange": apm.pars.IErange,
+            "IErange": IErange,
         },
     )
 
