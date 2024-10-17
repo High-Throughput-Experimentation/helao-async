@@ -472,6 +472,12 @@ class Orch(Base):
             self.active_sequence.init_seq(time_offset=self.ntp_offset)
             self.active_sequence.orchestrator = self.server
 
+            # from global params
+            for k, v in self.active_sequence.from_globalexp_params.items():
+                self.print_message(f"{k}:{v}")
+                if k in self.global_params:
+                    self.active_sequence.sequence_params[v] = self.global_params[k]
+
             # if experiment_plan_list is empty, unpack sequence,
             # otherwise operator already populated experiment_plan_list
             if not self.active_sequence.experiment_plan_list:
@@ -569,16 +575,14 @@ class Orch(Base):
             for k, v in self.active_experiment.experiment_params.items()
             if k in exp_func_args
         }
-        exp_return = exp_func(
-            self.active_experiment, **supplied_params
-        )
-        
+        exp_return = exp_func(self.active_experiment, **supplied_params)
+
         if isinstance(exp_return, list):
             unpacked_acts = exp_return
         elif isinstance(exp_return, Experiment):
             self.active_experiment = exp_return
             unpacked_acts = self.active_experiment.action_plan
-        
+
         self.active_experiment.experiment_codehash = self.experiment_codehash_lib[
             self.active_experiment.experiment_name
         ]
@@ -883,7 +887,9 @@ class Orch(Base):
                             self.print_message(f"updating {k} in global vars")
                             self.global_params[k] = result_action.action_output[k]
                         else:
-                            self.print_message(f"key {k} not found in action output or params")
+                            self.print_message(
+                                f"key {k} not found in action output or params"
+                            )
                 elif isinstance(result_action.to_globalexp_params, dict):
                     # self.print_message(
                     #     f"copying global vars {', '.join(result_action.to_globalexp_params.keys())} back to experiment"
@@ -896,7 +902,9 @@ class Orch(Base):
                             self.print_message(f"updating {k2} in global vars")
                             self.global_params[k2] = result_action.action_output[k1]
                         else:
-                            self.print_message(f"key {k1} not found in action output or params")
+                            self.print_message(
+                                f"key {k1} not found in action output or params"
+                            )
 
             # # this will recursively call the next no_wait action in queue, and return its error
             # if self.action_dq and not self.step_thru_actions:
@@ -936,18 +944,28 @@ class Orch(Base):
                     f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})"
                 )
                 # check driver states
-                na_drivers = [k for k, (_, v) in self.status_summary.items() if v == "unknown"]
+                na_drivers = [
+                    k for k, (_, v) in self.status_summary.items() if v == "unknown"
+                ]
                 if na_drivers:
                     na_driver_retries = 0
                     while na_driver_retries < 5 and na_drivers:
-                        self.print_message(f"unknown driver states: {', '.join(na_drivers)}, retrying in 5 seconds")
+                        self.print_message(
+                            f"unknown driver states: {', '.join(na_drivers)}, retrying in 5 seconds"
+                        )
                         await asyncio.sleep(5)
-                        na_drivers = [k for k, (_, v) in self.status_summary.items() if v == "unknown"]
+                        na_drivers = [
+                            k
+                            for k, (_, v) in self.status_summary.items()
+                            if v == "unknown"
+                        ]
                         na_driver_retries += 1
                     if na_drivers:
-                        self.current_stop_message = f"unknown driver states: {', '.join(na_drivers)}"
+                        self.current_stop_message = (
+                            f"unknown driver states: {', '.join(na_drivers)}"
+                        )
                         await self.stop()
-                
+
                 if (
                     self.globalstatusmodel.loop_state == LoopStatus.estopped
                     or self.globalstatusmodel.loop_intent == LoopIntent.estop
@@ -1288,7 +1306,9 @@ class Orch(Base):
 
     def list_all_experiments(self):
         """Return all experiments in queue."""
-        return [(i, D.get_exp().experiment_name) for i,D in enumerate(self.experiment_dq)]
+        return [
+            (i, D.get_exp().experiment_name) for i, D in enumerate(self.experiment_dq)
+        ]
 
     def drop_experiment_inds(self, inds: List[int]):
         """Drop experiments by index."""
