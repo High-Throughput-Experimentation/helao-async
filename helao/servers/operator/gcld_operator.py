@@ -18,15 +18,20 @@ from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.config_loader import config_loader
 from helao.helpers.gen_uuid import gen_uuid
 from helao.sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
-from helao.sequences.ECHEUVIS_seq import ECHEUVIS_multiCA_led, ECHEUVIS_postseq
+from helao.sequences.ECHEUVIS_seq import (
+    ECHEUVIS_multiCA_led,
+    ECHEUVIS_postseq,
+    ECHEUVIS_diagnostic_CV,
+)
 from helaocore.models.orchstatus import LoopStatus
 
 TEST = False
 SPEC_INT_MS = 35
 ELECTROLYTE_SHORT_NAME = "OER7"
-ELECTROLYTE_SAMPLE_NO =374
+ELECTROLYTE_SAMPLE_NO = 374
 ELECTROLYTE_PH = 7
 REF_OFFSET = 0.090
+QC_EVERY = 20
 
 UVIS_T_defaults = {
     "reference_mode": "builtin",
@@ -104,6 +109,21 @@ ECHEUVIS_multiCA_led_defaults = {
 
 ECHEUVIS_postseq_defaults = {"recent": False}
 
+ECHEUVIS_diagnostic_CV_defaults = {
+    "reservoir_electrolyte": ELECTROLYTE_SHORT_NAME,
+    "reservoir_liquid_sample_no": ELECTROLYTE_SAMPLE_NO,
+    "solution_bubble_gas": "O2",
+    "solution_ph": ELECTROLYTE_PH,
+    "measurement_area": 0.071,  # 3mm diameter droplet
+    "liquid_volume_ml": 1.0,
+    "ref_vs_nhe": 0.21,
+    "ref_offset__V": REF_OFFSET,
+    "cell_engaged_z": 1.5,
+    "cell_disengaged_z": 0,
+    "cell_vent_wait": 10.0,
+    "cell_fill_wait": 35.0,
+}
+
 
 def seq_constructor(
     plate_id,
@@ -177,6 +197,42 @@ def ana_constructor(
     return seq
 
 
+def qc_constructor(
+    plate_id,
+    sample_no,
+    data_request_id,
+    params={},
+    seq_func=UVIS_T,
+    seq_name="UVIS_T",
+    seq_label="gcld-mvp-demo",
+    param_defaults={},
+):
+    argspec = inspect.getfullargspec(seq_func)
+    seq_args = list(argspec.args)
+    seq_defaults = list(argspec.defaults)
+    seq_uuid = gen_uuid()
+    seq_params = copy(param_defaults)
+    seq_params.update(params)
+    seq_params["plate_id"] = plate_id
+    seq_params["solid_sample_no"] = sample_no
+    seq_params.update(
+        {k: v for k, v in zip(seq_args, seq_defaults) if k not in seq_params}
+    )
+    experiment_list = seq_func(**seq_params)
+    seq = Sequence(
+        sequence_name=seq_name,
+        sequence_label=seq_label,
+        sequence_params=seq_params,
+        sequence_uuid=seq_uuid,
+        data_request_id=data_request_id,
+        experiment_list=[],
+        experiment_plan_list=experiment_list,
+        experimentmodel_list=[],
+        dummy=TEST,
+    )
+    return seq
+
+
 def gen_ts():
     return f"[{time.strftime('%H:%M:%S')}]"
 
@@ -231,6 +287,7 @@ def main():
     db_cfg = world_cfg["servers"]["DB"]
     test_idx = 0
     resumed = False
+    request_count = 0
 
     while True:
         # if TEST & test_idx == len(TEST_SMPS_6083) - 1:
@@ -263,10 +320,14 @@ def main():
                         data_request = CLIENT.create_data_request(test_req)
                     test_idx += 1
                 elif pending_requests:
-                    print(f"{gen_ts()} Pending data request count: {len(pending_requests)}")
+                    print(
+                        f"{gen_ts()} Pending data request count: {len(pending_requests)}"
+                    )
                     data_request = pending_requests[0]
                 elif acknowledged_requests:
-                    print(f"{gen_ts()} Restarting acknowledged data request from beginning")
+                    print(
+                        f"{gen_ts()} Restarting acknowledged data request from beginning"
+                    )
                     data_request = acknowledged_requests[0]
 
                 sample_no = int(data_request.sample_label.split("_")[-1])
@@ -277,7 +338,8 @@ def main():
                     True if data_request.parameters["z_direction"] == "down" else False
                 )
                 ordered_vs = sorted(
-                    ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"], reverse=scan_down
+                    ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"],
+                    reverse=scan_down,
                 )
                 init_direction = ordered_vs[ordered_vs.index(z_start) :]
                 rev_direction = ordered_vs[: ordered_vs.index(z_start)][::-1]
@@ -296,7 +358,9 @@ def main():
                     param_defaults=ECHEUVIS_multiCA_led_defaults,
                 )
                 print(f"{gen_ts()} Got measurement request {data_request.id}")
-                print(f"{gen_ts()} Plate {PLATE_ID} sample {sample_no} has composition:")
+                print(
+                    f"{gen_ts()} Plate {PLATE_ID} sample {sample_no} has composition:"
+                )
                 pprint(data_request.composition)
                 print(
                     f"{gen_ts()} Measurement parameters for sequence: {insitu_seq.sequence_uuid}:"
@@ -386,17 +450,19 @@ def main():
                     param_defaults=ECHEUVIS_postseq_defaults,
                 )
                 operator.add_sequence(ana_seq.get_seq())
-                print(f"{gen_ts()} Dispatching analysis sequence: {ana_seq.sequence_uuid}")
+                print(
+                    f"{gen_ts()} Dispatching analysis sequence: {ana_seq.sequence_uuid}"
+                )
                 operator.start()
 
                 time.sleep(5)
 
                 # wait for analysis start (orch_state == "busy")
-                current_state, active_seq, last_seq = wait_for_orch(
+                current_state, active_ana_seq, last_seq = wait_for_orch(
                     operator, LoopStatus.started
                 )
                 print(
-                    f"{gen_ts()} Analysis sequence {active_seq['sequence_uuid']} has started."
+                    f"{gen_ts()} Analysis sequence {active_ana_seq['sequence_uuid']} has started."
                 )
                 if current_state in [LoopStatus.error, LoopStatus.estopped]:
                     with CLIENT:
@@ -433,9 +499,59 @@ def main():
                         output = CLIENT.set_status(
                             "completed", data_request_id=data_request.id
                         )
-                    print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
+                    print(
+                        f"{gen_ts()} Data request {data_request.id} status: {output.status}"
+                    )
 
                 print(f"{gen_ts()} Analysis sequence complete.")
+                request_count += 1
+
+                if request_count % QC_EVERY == 0:
+                    print(
+                        f"{gen_ts()} Running diagnostic CV every {QC_EVERY} iterations."
+                    )
+
+                    # QC CV on reference
+                    qc_seq = qc_constructor(
+                        plate_id=0,
+                        sample_no=0,
+                        data_request_id=data_request.id,
+                        params={},
+                        seq_func=ECHEUVIS_diagnostic_CV,
+                        seq_name="ECHEUVIS_diagnostic_CV",
+                        seq_label="gcld-diagnostic-cv",
+                        param_defaults=ECHEUVIS_diagnostic_CV_defaults,
+                    )
+                    operator.add_sequence(qc_seq.get_seq())
+                    print(f"{gen_ts()} Dispatching QC sequence: {qc_seq.sequence_uuid}")
+                    operator.start()
+
+                    time.sleep(5)
+
+                    # wait for QC start (orch_state == "busy")
+                    current_state, active_qc_seq, last_seq = wait_for_orch(
+                        operator, LoopStatus.started
+                    )
+                    print(
+                        f"{gen_ts()} QC sequence {active_qc_seq['sequence_uuid']} has started."
+                    )
+                    if current_state in [LoopStatus.error, LoopStatus.estopped]:
+                        with CLIENT:
+                            output = CLIENT.set_status(
+                                "failed", data_request_id=data_request.id
+                            )
+                            input(
+                                "Press Enter to reset failed request to pending and exit operator..."
+                            )
+                            output = CLIENT.set_status(
+                                "pending", data_request_id=data_request.id
+                            )
+                            return -1
+
+                    # wait for QC end (orch_state == "idle")
+                    current_state, active_qc_seq, last_seq = wait_for_orch(
+                        operator, LoopStatus.stopped
+                    )
 
             else:
                 print(
@@ -443,9 +559,9 @@ def main():
                 )
 
         except httpx.ConnectError:
-                print(
-                    f"{gen_ts()} Could not connect to data requests service. Checking again in 10 seconds."
-                )
+            print(
+                f"{gen_ts()} Could not connect to data requests service. Checking again in 10 seconds."
+            )
         time.sleep(10)
         print("\n")
 

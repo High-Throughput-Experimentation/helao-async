@@ -1043,6 +1043,8 @@ def ECHEUVIS_CP_led(
 
 def ECHEUVIS_diagnostic_CV(
     sequence_version: int = 1,
+    plate_id: int = 0,
+    solid_sample_no: int = 0,
     reservoir_electrolyte: Electrolyte = "OER10",
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "O2",
@@ -1072,8 +1074,8 @@ def ECHEUVIS_diagnostic_CV(
         {
             "reference_mode": "builtin",
             "solid_custom_position": "cell1_we",
-            "solid_plate_id": 0,
-            "solid_sample_no": 0,
+            "solid_plate_id": plate_id,
+            "solid_sample_no": solid_sample_no,
             "specref_code": 1,
         },
     )
@@ -1122,7 +1124,7 @@ def ECHEUVIS_diagnostic_CV(
             "flow_we": False,
             "flow_ce": False,
             "z_height": cell_engaged_z,
-            "fill_wait": cell_fill_wait,
+            "fill_wait": 5.0,
         },
     )
     epm.add_experiment("ECHEUVIS_sub_shutdown", {})

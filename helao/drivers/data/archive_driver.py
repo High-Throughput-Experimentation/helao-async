@@ -358,7 +358,7 @@ class Archive:
         )
 
         if not load_samples_in:
-            print_message({}, "archive", "Sample does not exist in DB.", error=True)
+            print_message({}, "archive", "Sample does not exist in DB.", warning=True)
             return error, sample
 
         position_found = False
@@ -1058,7 +1058,7 @@ class Archive:
         )
 
         if not load_samples_in:
-            print_message({}, "archive", "Sample does not exist in DB.", error=True)
+            print_message({}, "archive", "Sample does not exist in DB.", warning=True)
             return False, NoneSample(), {}
 
         if custom in self.positions.customs_dict:
