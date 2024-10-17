@@ -24,8 +24,8 @@ def ICPMS_analysis_concentration(
         ANA_server,
         "analyze_icpms_local",
         {
-            "sequence_zip_path": apm.pars.sequence_zip_path,
-            "params": apm.pars.params,
+            "sequence_zip_path": sequence_zip_path,
+            "params": params,
         },
     )
     return apm.action_list

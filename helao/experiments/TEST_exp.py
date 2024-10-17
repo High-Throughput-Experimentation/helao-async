@@ -31,9 +31,9 @@ def TEST_sub_noblocking(
 ):
     apm = ActionPlanMaker()
     apm.add(
-        ORCH_server, "wait", {"waittime": apm.pars.wait_time * 10}, nonblocking=True
+        ORCH_server, "wait", {"waittime": wait_time * 10}, nonblocking=True
     )
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time})
+    apm.add(ORCH_server, "wait", {"waittime": wait_time})
     exp = apm.experiment
     exp.experiment_params["test_additional_param"] = "test_additional_param_value"
     return exp

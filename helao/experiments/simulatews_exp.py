@@ -34,26 +34,26 @@ def SIM_websocket_data(
     apm.add(
         ORCH_server,
         "wait",
-        {"waittime": apm.pars.wait_time},
+        {"waittime": wait_time},
         process_contrib=[ProcessContrib.action_params],
     )
     apm.add(
         SIM_server,
         "acquire_data",
-        {"duration": apm.pars.data_duration},
+        {"duration": data_duration},
         process_contrib=[ProcessContrib.files, ProcessContrib.run_use],
         process_finish=True,
     )
     apm.add(
         ORCH_server,
         "wait",
-        {"waittime": apm.pars.wait_time},
+        {"waittime": wait_time},
         process_contrib=[ProcessContrib.action_params],
     )
     apm.add(
         SIM_server,
         "acquire_data",
-        {"duration": apm.pars.data_duration},
+        {"duration": data_duration},
         process_contrib=[ProcessContrib.files, ProcessContrib.run_use],
         process_finish=True,
     )

@@ -105,8 +105,8 @@ def ANEC_sub_startup(
         MOTOR_server,
         "solid_get_samples_xy",
         {
-            "plate_id": apm.pars.solid_plate_id,
-            "sample_no": apm.pars.solid_sample_no,
+            "plate_id": solid_plate_id,
+            "sample_no": solid_sample_no,
         },
         to_globalexp_params=[
             "_platexy"
@@ -119,7 +119,7 @@ def ANEC_sub_startup(
         MOTOR_server,
         "move",
         {
-            # "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+            # "d_mm": [x_mm, y_mm],
             "axis": ["x", "y"],
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
@@ -133,7 +133,7 @@ def ANEC_sub_startup(
         MOTOR_server,
         "move",
         {
-            "d_mm": [apm.pars.z_move_mm],
+            "d_mm": [z_move_mm],
             "axis": ["z"],
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.motorxy,
@@ -181,8 +181,8 @@ def ANEC_sub_load_solid(
             "custom": "cell1_we",
             "load_sample_in": SolidSample(
                 **{
-                    "sample_no": apm.pars.solid_sample_no,
-                    "plate_id": apm.pars.solid_plate_id,
+                    "sample_no": solid_sample_no,
+                    "plate_id": solid_plate_id,
                     "machine_name": "legacy",
                 }
             ).model_dump(),
@@ -258,7 +258,7 @@ def ANEC_sub_setheat(
     apm.add(
         TEC_server,
         "set_temperature",
-        {"target_temperature_degc": apm.pars.target_temperature_degc},
+        {"target_temperature_degc": target_temperature_degc},
     )
     apm.add(
         TEC_server,
@@ -328,17 +328,17 @@ def ANEC_sub_flush_fill_cell(
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_flush_time})
+    apm.add(ORCH_server, "wait", {"waittime": liquid_flush_time})
     # Stop flow and start CO2 purge
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2_purge_time})
+    apm.add(ORCH_server, "wait", {"waittime": co2_purge_time})
     # Open headspace flow-through, stop purge
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
     apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 0})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.equilibration_time})
+    apm.add(ORCH_server, "wait", {"waittime": equilibration_time})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
     # (3) Create liquid sample and add to assembly
     apm.add(
@@ -347,9 +347,9 @@ def ANEC_sub_flush_fill_cell(
         {
             "custom": "cell1_we",
             "source_liquid_in": LiquidSample(
-                sample_no=apm.pars.reservoir_liquid_sample_no, machine_name=ORCH_HOST
+                sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
             ).model_dump(),
-            "volume_ml": apm.pars.volume_ul_cell_liquid,
+            "volume_ml": volume_ul_cell_liquid,
             "combine_liquids": True,
             "dilute_liquids": True,
         },
@@ -397,7 +397,7 @@ def ANEC_sub_drain_cell(
     apm = ActionPlanMaker()
     apm.add_action_list(ANEC_sub_normal_state(experiment))
     apm.add_action_list(ANEC_sub_unload_liquid(experiment))
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.drain_time})
+    apm.add(ORCH_server, "wait", {"waittime": drain_time})
 
     return apm.action_list
 
@@ -423,7 +423,7 @@ def ANEC_sub_cleanup(
     apm.add_action_list(
         ANEC_sub_flush_fill_cell(
             experiment=experiment,
-            reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
+            reservoir_liquid_sample_no=reservoir_liquid_sample_no,
         )
     )
     apm.add_action_list(ANEC_sub_drain_cell(experiment))
@@ -450,9 +450,9 @@ def ANEC_sub_GC_headspacealiquot_nomixing(
         PAL_server,
         "PAL_ANEC_GC",
         {
-            "toolGC": apm.pars.toolGC,
+            "toolGC": toolGC,
             "source": "cell1_we",
-            "volume_ul_GC": apm.pars.volume_ul_GC,
+            "volume_ul_GC": volume_ul_GC,
         },
         process_finish=True,
         technique_name=["headspace_GC_back_analysis", "headspace_GC_front_analysis"],
@@ -494,9 +494,9 @@ def ANEC_sub_GC_preparation(
         PAL_server,
         "PAL_ANEC_GC",
         {
-            "toolGC": apm.pars.toolGC,
+            "toolGC": toolGC,
             "source": "cell1_we",
-            "volume_ul_GC": apm.pars.volume_ul_GC,
+            "volume_ul_GC": volume_ul_GC,
         },
         process_finish=True,
         technique_name=["headspace_GC_back_analysis", "headspace_GC_front_analysis"],
@@ -526,8 +526,8 @@ def ANEC_sub_load_solid_only(
         {
             "custom": "cell1_we",
             "load_sample_in": SolidSample(
-                sample_no=apm.pars.solid_sample_no,
-                plate_id=apm.pars.solid_plate_id,
+                sample_no=solid_sample_no,
+                plate_id=solid_plate_id,
                 machine_name="legacy",
             ).model_dump(),
         },
@@ -555,8 +555,8 @@ def ANEC_sub_load_solid_and_clean_cell(
         {
             "custom": "cell1_we",
             "load_sample_in": SolidSample(
-                sample_no=apm.pars.solid_sample_no,
-                plate_id=apm.pars.solid_plate_id,
+                sample_no=solid_sample_no,
+                plate_id=solid_plate_id,
                 machine_name="legacy",
             ).model_dump(),
         },
@@ -565,18 +565,18 @@ def ANEC_sub_load_solid_and_clean_cell(
     apm.add_action_list(
         ANEC_sub_flush_fill_cell(
             experiment=experiment,
-            reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
+            reservoir_liquid_sample_no=reservoir_liquid_sample_no,
         )
     )
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.recirculation_time})
+    apm.add(ORCH_server, "wait", {"waittime": recirculation_time})
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
     apm.add(
         PAL_server,
         "PAL_ANEC_GC",
         {
-            "toolGC": PALtools(apm.pars.toolGC),
+            "toolGC": PALtools(toolGC),
             "source": "cell1_we",
-            "volume_ul_GC": apm.pars.volume_ul_GC,
+            "volume_ul_GC": volume_ul_GC,
         },
         process_finish=True,
         technique_name=["headspace_GC_back_analysis", "headspace_GC_front_analysis"],
@@ -612,13 +612,13 @@ def ANEC_sub_liquidarchive(
         PAL_server,
         "PAL_archive",
         {
-            "tool": apm.pars.toolarchive,
+            "tool": toolarchive,
             "source": "cell1_we",
-            "volume_ul": apm.pars.volume_ul_archive,
-            "wash1": apm.pars.wash1,
-            "wash2": apm.pars.wash2,
-            "wash3": apm.pars.wash3,
-            "wash4": apm.pars.wash4,
+            "volume_ul": volume_ul_archive,
+            "wash1": wash1,
+            "wash2": wash2,
+            "wash3": wash3,
+            "wash4": wash4,
         },
         process_finish=True,
         technique_name=[
@@ -657,15 +657,15 @@ def ANEC_sub_aliquot_nomixing(
         PAL_server,
         "PAL_ANEC_aliquot",
         {
-            "toolGC": apm.pars.toolGC,
-            "toolarchive": apm.pars.toolarchive,
+            "toolGC": toolGC,
+            "toolarchive": toolarchive,
             "source": "cell1_we",
-            "volume_ul_GC": apm.pars.volume_ul_GC,
-            "volume_ul_archive": apm.pars.volume_ul_archive,
-            "wash1": apm.pars.wash1,
-            "wash2": apm.pars.wash2,
-            "wash3": apm.pars.wash3,
-            "wash4": apm.pars.wash4,
+            "volume_ul_GC": volume_ul_GC,
+            "volume_ul_archive": volume_ul_archive,
+            "wash1": wash1,
+            "wash2": wash2,
+            "wash3": wash3,
+            "wash4": wash4,
         },
         process_finish=True,
         technique_name=[
@@ -713,15 +713,15 @@ def ANEC_sub_aliquot(
         PAL_server,
         "PAL_ANEC_aliquot",
         {
-            "toolGC": apm.pars.toolGC,
-            "toolarchive": apm.pars.toolarchive,
+            "toolGC": toolGC,
+            "toolarchive": toolarchive,
             "source": "cell1_we",
-            "volume_ul_GC": apm.pars.volume_ul_GC,
-            "volume_ul_archive": apm.pars.volume_ul_archive,
-            "wash1": apm.pars.wash1,
-            "wash2": apm.pars.wash2,
-            "wash3": apm.pars.wash3,
-            "wash4": apm.pars.wash4,
+            "volume_ul_GC": volume_ul_GC,
+            "volume_ul_archive": volume_ul_archive,
+            "wash1": wash1,
+            "wash2": wash2,
+            "wash3": wash3,
+            "wash4": wash4,
         },
         process_finish=True,
         technique_name=[
@@ -756,8 +756,8 @@ def ANEC_sub_CP(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.CP_duration_sec
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CP_duration_sec
 
     # get sample for gamry
     apm.add(
@@ -771,10 +771,10 @@ def ANEC_sub_CP(
         PSTAT_server,
         "run_CP",
         {
-            "Ival": apm.pars.CP_current,
-            "Tval__s": apm.pars.CP_duration_sec,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "IErange": apm.pars.IErange,
+            "Ival": CP_current,
+            "Tval__s": CP_duration_sec,
+            "AcqInterval__s": SampleRate,
+            "IErange": IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="CP",
@@ -803,13 +803,13 @@ def ANEC_sub_CA(
     pH: float = 6.8,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    if apm.pars.WE_versus == "ref":
-        potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V
-    elif apm.pars.WE_versus == "rhe":
+    if WE_versus == "ref":
+        potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
+    elif WE_versus == "rhe":
         potential_vsRef = (
-            apm.pars.WE_potential__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
     apm.add(
@@ -823,9 +823,9 @@ def ANEC_sub_CA(
         "run_CA",
         {
             "Vval__V": potential_vsRef,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "IErange": apm.pars.IErange,
+            "Tval__s": CA_duration_sec,
+            "AcqInterval__s": SampleRate,
+            "IErange": IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
@@ -857,13 +857,13 @@ def ANEC_sub_HeatCA(
     target_temperature_degc: float = 25.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    if apm.pars.WE_versus == "ref":
-        potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V
-    elif apm.pars.WE_versus == "rhe":
+    if WE_versus == "ref":
+        potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
+    elif WE_versus == "rhe":
         potential_vsRef = (
-            apm.pars.WE_potential__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
     apm.add(
@@ -875,7 +875,7 @@ def ANEC_sub_HeatCA(
     apm.add(
         TEC_server,
         "set_temperature",
-        {"target_temperature_degc": apm.pars.target_temperature_degc},
+        {"target_temperature_degc": target_temperature_degc},
     )
     apm.add(
         TEC_server,
@@ -890,9 +890,9 @@ def ANEC_sub_HeatCA(
         "run_CA",
         {
             "Vval__V": potential_vsRef,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "IErange": apm.pars.IErange,
+            "Tval__s": CA_duration_sec,
+            "AcqInterval__s": SampleRate,
+            "IErange": IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
@@ -936,9 +936,9 @@ def ANEC_sub_OCV(
         PSTAT_server,
         "run_OCV",
         {
-            "Tval__s": apm.pars.Tval__s,
+            "Tval__s": Tval__s,
             "SampleRate": 0.05,
-            "IErange": apm.pars.IErange,
+            "IErange": IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="CP",
@@ -977,15 +977,15 @@ def ANEC_sub_photo_CA(
     toggle_illum_time: float = -1,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.CA_duration_sec
-    if apm.pars.WE_versus == "ref":
-        potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V
-    elif apm.pars.WE_versus == "rhe":
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CA_duration_sec
+    if WE_versus == "ref":
+        potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
+    elif WE_versus == "rhe":
         potential_vsRef = (
-            apm.pars.WE_potential__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
     apm.add(
@@ -1002,12 +1002,12 @@ def ANEC_sub_photo_CA(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": apm.pars.illumination_source,
+            "out_name": illumination_source,
             "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": apm.pars.toggle_dark_time_init,
-            "toggle_duty": apm.pars.toggle_illum_duty,
-            "toggle_period": apm.pars.toggle_illum_period,
-            "toggle_duration": apm.pars.toggle_illum_time,
+            "toggle_init_delay": toggle_dark_time_init,
+            "toggle_duty": toggle_illum_duty,
+            "toggle_period": toggle_illum_period,
+            "toggle_duration": toggle_illum_time,
         },
         process_finish=False,
         process_contrib=[
@@ -1020,11 +1020,11 @@ def ANEC_sub_photo_CA(
         "run_CA",
         {
             "Vval__V": potential_vsRef,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.IErange,
+            "Tval__s": CA_duration_sec,
+            "AcqInterval__s": SampleRate,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
@@ -1064,42 +1064,42 @@ def ANEC_sub_CV(
     ref_offset__V: float = 0.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    if apm.pars.WE_versus == "ref":
+    if WE_versus == "ref":
         potential_init_vsRef = (
-            apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_init__V - 1.0 * ref_offset__V
         )
         potential_apex1_vsRef = (
-            apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_apex1__V - 1.0 * ref_offset__V
         )
         potential_apex2_vsRef = (
-            apm.pars.WE_potential_apex2__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_apex2__V - 1.0 * ref_offset__V
         )
         potential_final_vsRef = (
-            apm.pars.WE_potential_final__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_final__V - 1.0 * ref_offset__V
         )
-    elif apm.pars.WE_versus == "rhe":
+    elif WE_versus == "rhe":
         potential_init_vsRef = (
-            apm.pars.WE_potential_init__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_init__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
         potential_apex1_vsRef = (
-            apm.pars.WE_potential_apex1__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_apex1__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
         potential_apex2_vsRef = (
-            apm.pars.WE_potential_apex2__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_apex2__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
         potential_final_vsRef = (
-            apm.pars.WE_potential_final__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_final__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
 
@@ -1118,10 +1118,10 @@ def ANEC_sub_CV(
             "Vapex1__V": potential_apex1_vsRef,
             "Vapex2__V": potential_apex2_vsRef,
             "Vfinal__V": potential_final_vsRef,
-            "ScanRate__V_s": apm.pars.ScanRate_V_s,
-            "Cycles": apm.pars.Cycles,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "IErange": apm.pars.IErange,
+            "ScanRate__V_s": ScanRate_V_s,
+            "Cycles": Cycles,
+            "AcqInterval__s": SampleRate,
+            "IErange": IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
@@ -1157,42 +1157,42 @@ def ANEC_sub_HeatCV(
     target_temperature_degc: float = 25.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    if apm.pars.WE_versus == "ref":
+    if WE_versus == "ref":
         potential_init_vsRef = (
-            apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_init__V - 1.0 * ref_offset__V
         )
         potential_apex1_vsRef = (
-            apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_apex1__V - 1.0 * ref_offset__V
         )
         potential_apex2_vsRef = (
-            apm.pars.WE_potential_apex2__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_apex2__V - 1.0 * ref_offset__V
         )
         potential_final_vsRef = (
-            apm.pars.WE_potential_final__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_final__V - 1.0 * ref_offset__V
         )
-    elif apm.pars.WE_versus == "rhe":
+    elif WE_versus == "rhe":
         potential_init_vsRef = (
-            apm.pars.WE_potential_init__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_init__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
         potential_apex1_vsRef = (
-            apm.pars.WE_potential_apex1__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_apex1__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
         potential_apex2_vsRef = (
-            apm.pars.WE_potential_apex2__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_apex2__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
         potential_final_vsRef = (
-            apm.pars.WE_potential_final__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_final__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
 
@@ -1206,7 +1206,7 @@ def ANEC_sub_HeatCV(
     apm.add(
         TEC_server,
         "set_temperature",
-        {"target_temperature_degc": apm.pars.target_temperature_degc},
+        {"target_temperature_degc": target_temperature_degc},
     )
     apm.add(
         TEC_server,
@@ -1226,10 +1226,10 @@ def ANEC_sub_HeatCV(
             "Vapex1__V": potential_apex1_vsRef,
             "Vapex2__V": potential_apex2_vsRef,
             "Vfinal__V": potential_final_vsRef,
-            "ScanRate__V_s": apm.pars.ScanRate_V_s,
-            "Cycles": apm.pars.Cycles,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "IErange": apm.pars.IErange,
+            "ScanRate__V_s": ScanRate_V_s,
+            "Cycles": Cycles,
+            "AcqInterval__s": SampleRate,
+            "IErange": IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
@@ -1277,63 +1277,63 @@ def ANEC_sub_photo_CV(
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     CV_duration_sec = (
-        abs(apm.pars.WE_potential_apex1__V - apm.pars.WE_potential_init__V)
-        / apm.pars.ScanRate_V_s
+        abs(WE_potential_apex1__V - WE_potential_init__V)
+        / ScanRate_V_s
     )
     CV_duration_sec += (
-        abs(apm.pars.WE_potential_final__V - apm.pars.WE_potential_apex2__V)
-        / apm.pars.ScanRate_V_s
+        abs(WE_potential_final__V - WE_potential_apex2__V)
+        / ScanRate_V_s
     )
     CV_duration_sec += (
-        abs(apm.pars.WE_potential_apex2__V - apm.pars.WE_potential_apex1__V)
-        / apm.pars.ScanRate_V_s
-#        * apm.pars.Cycles
+        abs(WE_potential_apex2__V - WE_potential_apex1__V)
+        / ScanRate_V_s
+#        * Cycles
     )
     CV_duration_sec += (
-        abs(apm.pars.WE_potential_apex2__V - apm.pars.WE_potential_apex1__V)
-        / apm.pars.ScanRate_V_s
+        abs(WE_potential_apex2__V - WE_potential_apex1__V)
+        / ScanRate_V_s
         * 2.0
-        * (apm.pars.Cycles - 1)
+        * (Cycles - 1)
     )
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = CV_duration_sec
-    if apm.pars.WE_versus == "ref":
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CV_duration_sec
+    if WE_versus == "ref":
         potential_init_vsRef = (
-            apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_init__V - 1.0 * ref_offset__V
         )
         potential_apex1_vsRef = (
-            apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_apex1__V - 1.0 * ref_offset__V
         )
         potential_apex2_vsRef = (
-            apm.pars.WE_potential_apex2__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_apex2__V - 1.0 * ref_offset__V
         )
         potential_final_vsRef = (
-            apm.pars.WE_potential_final__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_final__V - 1.0 * ref_offset__V
         )
-    elif apm.pars.WE_versus == "rhe":
+    elif WE_versus == "rhe":
         potential_init_vsRef = (
-            apm.pars.WE_potential_init__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_init__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
         potential_apex1_vsRef = (
-            apm.pars.WE_potential_apex1__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_apex1__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
         potential_apex2_vsRef = (
-            apm.pars.WE_potential_apex2__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_apex2__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
         potential_final_vsRef = (
-            apm.pars.WE_potential_final__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_final__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
 
@@ -1352,12 +1352,12 @@ def ANEC_sub_photo_CV(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": apm.pars.illumination_source,
+            "out_name": illumination_source,
             "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": apm.pars.toggle_dark_time_init,
-            "toggle_duty": apm.pars.toggle_illum_duty,
-            "toggle_period": apm.pars.toggle_illum_period,
-            "toggle_duration": apm.pars.toggle_illum_time,
+            "toggle_init_delay": toggle_dark_time_init,
+            "toggle_duty": toggle_illum_duty,
+            "toggle_period": toggle_illum_period,
+            "toggle_duration": toggle_illum_time,
             #                "stop_via_ttl": False,
         },
         process_finish=False,
@@ -1374,12 +1374,12 @@ def ANEC_sub_photo_CV(
             "Vapex1__V": potential_apex1_vsRef,
             "Vapex2__V": potential_apex2_vsRef,
             "Vfinal__V": potential_final_vsRef,
-            "ScanRate__V_s": apm.pars.ScanRate_V_s,
-            "Cycles": apm.pars.Cycles,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.IErange,
+            "ScanRate__V_s": ScanRate_V_s,
+            "Cycles": Cycles,
+            "AcqInterval__s": SampleRate,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
@@ -1432,16 +1432,16 @@ def ANEC_sub_GCLiquid_analysis(
         PAL_server,
         "PAL_injection_tray_GC",
         {
-            "tool": apm.pars.tool,
-            "source_tray": apm.pars.source_tray,
-            "source_slot": apm.pars.source_slot,
-            "source_vial": apm.pars.source_vial,
-            "dest": apm.pars.dest,
-            "volume_ul": apm.pars.volume_ul,
-            "wash1": apm.pars.wash1,
-            "wash2": apm.pars.wash2,
-            "wash3": apm.pars.wash3,
-            "wash4": apm.pars.wash4,
+            "tool": tool,
+            "source_tray": source_tray,
+            "source_slot": source_slot,
+            "source_vial": source_vial,
+            "dest": dest,
+            "volume_ul": volume_ul,
+            "wash1": wash1,
+            "wash2": wash2,
+            "wash3": wash3,
+            "wash4": wash4,
         },
         process_finish=True,
         technique_name=["liquid_GC_front_analysis"],
@@ -1452,7 +1452,7 @@ def ANEC_sub_GCLiquid_analysis(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.GC_analysis_time})
+    apm.add(ORCH_server, "wait", {"waittime": GC_analysis_time})
     return apm.action_list
 
 
@@ -1487,16 +1487,16 @@ def ANEC_sub_HPLCLiquid_analysis(
         PAL_server,
         "PAL_injection_tray_HPLC",
         {
-            "tool": apm.pars.tool,
-            "source_tray": apm.pars.source_tray,
-            "source_slot": apm.pars.source_slot,
-            "source_vial": apm.pars.source_vial,
-            "dest": apm.pars.dest,
-            "volume_ul": apm.pars.volume_ul,
-            "wash1": apm.pars.wash1,
-            "wash2": apm.pars.wash2,
-            "wash3": apm.pars.wash3,
-            "wash4": apm.pars.wash4,
+            "tool": tool,
+            "source_tray": source_tray,
+            "source_slot": source_slot,
+            "source_vial": source_vial,
+            "dest": dest,
+            "volume_ul": volume_ul,
+            "wash1": wash1,
+            "wash2": wash2,
+            "wash3": wash3,
+            "wash4": wash4,
         },
         process_finish=True,
         technique_name=["liquid_HPLC_analysis"],
@@ -1507,7 +1507,7 @@ def ANEC_sub_HPLCLiquid_analysis(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.HPLC_analysis_time})
+    apm.add(ORCH_server, "wait", {"waittime": HPLC_analysis_time})
     return apm.action_list
 
 
@@ -1537,30 +1537,30 @@ def ANEC_sub_photo_LSV(
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     CV_duration_sec = (
-        abs(apm.pars.WE_potential_apex1__V - apm.pars.WE_potential_init__V)
-        / apm.pars.ScanRate_V_s
+        abs(WE_potential_apex1__V - WE_potential_init__V)
+        / ScanRate_V_s
     )
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = CV_duration_sec
-    if apm.pars.WE_versus == "ref":
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CV_duration_sec
+    if WE_versus == "ref":
         potential_init_vsRef = (
-            apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_init__V - 1.0 * ref_offset__V
         )
         potential_apex1_vsRef = (
-            apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V
+            WE_potential_apex1__V - 1.0 * ref_offset__V
         )
-    elif apm.pars.WE_versus == "rhe":
+    elif WE_versus == "rhe":
         potential_init_vsRef = (
-            apm.pars.WE_potential_init__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_init__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
         potential_apex1_vsRef = (
-            apm.pars.WE_potential_apex1__V
-            - 1.0 * apm.pars.ref_offset__V
-            - 0.059 * apm.pars.pH
+            WE_potential_apex1__V
+            - 1.0 * ref_offset__V
+            - 0.059 * pH
             - REF_TABLE[ref_type]
         )
 
@@ -1579,12 +1579,12 @@ def ANEC_sub_photo_LSV(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": apm.pars.illumination_source,
+            "out_name": illumination_source,
             "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": apm.pars.toggle_dark_time_init,
-            "toggle_duty": apm.pars.toggle_illum_duty,
-            "toggle_period": apm.pars.toggle_illum_period,
-            "toggle_duration": apm.pars.toggle_illum_time,
+            "toggle_init_delay": toggle_dark_time_init,
+            "toggle_duty": toggle_illum_duty,
+            "toggle_period": toggle_illum_period,
+            "toggle_duration": toggle_illum_time,
         },
         process_finish=False,
         process_contrib=[
@@ -1598,11 +1598,11 @@ def ANEC_sub_photo_LSV(
         {
             "Vinit__V": potential_init_vsRef,
             "Vfinal__V": potential_apex1_vsRef,
-            "ScanRate__V_s": apm.pars.ScanRate_V_s,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.IErange,
+            "ScanRate__V_s": ScanRate_V_s,
+            "AcqInterval__s": SampleRate,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
@@ -1651,8 +1651,8 @@ def ANEC_sub_photo_CP(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.CP_duration_sec
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = CP_duration_sec
 
     # get sample for gamry
     apm.add(
@@ -1668,12 +1668,12 @@ def ANEC_sub_photo_CP(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": toggle_triggertype,
-            "out_name": apm.pars.illumination_source,
+            "out_name": illumination_source,
             "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": apm.pars.toggle_dark_time_init,
-            "toggle_duty": apm.pars.toggle_illum_duty,
-            "toggle_period": apm.pars.toggle_illum_period,
-            "toggle_duration": apm.pars.toggle_illum_time,
+            "toggle_init_delay": toggle_dark_time_init,
+            "toggle_duty": toggle_illum_duty,
+            "toggle_period": toggle_illum_period,
+            "toggle_duration": toggle_illum_time,
         },
         process_finish=False,
         process_contrib=[
@@ -1685,12 +1685,12 @@ def ANEC_sub_photo_CP(
         PSTAT_server,
         "run_CP",
         {
-            "Ival": apm.pars.CP_current,
-            "Tval__s": apm.pars.CP_duration_sec,
-            "AcqInterval__s": apm.pars.SampleRate,
-            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": apm.pars.IErange,
+            "Ival": CP_current,
+            "Tval__s": CP_duration_sec,
+            "AcqInterval__s": SampleRate,
+            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="CP",
