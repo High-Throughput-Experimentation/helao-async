@@ -377,11 +377,11 @@ def ECHEUVIS_sub_CA_led(
             ss,
             "acquire_spec_extrig",
             {
-                "int_time": spec_int_time_ms,
+                # "int_time": spec_int_time_ms,
                 "n_avg": spec_n_avg,
                 "duration": toggle2_time,
             },
-            from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+            from_globalexp_params={"_fast_samples_in": "fast_samples_in", "calibrated_int_time_ms": "int_time"},
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=spec_technique,
             process_contrib=[
@@ -740,11 +740,11 @@ def ECHEUVIS_sub_OCV_led(
             ss,
             "acquire_spec_extrig",
             {
-                "int_time": spec_int_time_ms,
+                # "int_time": spec_int_time_ms,
                 "n_avg": spec_n_avg,
                 "duration": toggle2_time,
             },
-            from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+            from_globalexp_params={"_fast_samples_in": "fast_samples_in", "calibrated_int_time_ms": "int_time"},
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=spec_technique,
             process_contrib=[
