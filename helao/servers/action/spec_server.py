@@ -36,7 +36,7 @@ def makeApp(confPrefix, server_key, helao_root):
     @app.post("/get_wl", tags=["private"])
     def get_wl():
         """Return spectrometer wavelength array; shape = (num_pixels)"""
-        return app.driver.pxwl
+        return app.driver.pxwl # type: ignore
 
     @app.post(f"/{server_key}/acquire_spec", tags=["action"])
     async def acquire_spec(
@@ -50,14 +50,14 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Acquire one or more spectrum if duration is positive."""
         # app.base.print_message("!!! Starting acquire_spec action.")
-        spec_header = {"wl": app.driver.pxwl}
+        spec_header = {"wl": app.driver.pxwl} # type: ignore
         active = await app.base.setup_and_contain_action(
             action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
         )
         # app.base.print_message("!!! acquire_spec action is active.")
         starttime = time.time()
         # acquire at least 1 spectrum
-        specdict = app.driver.acquire_spec_adv(**active.action.action_params)
+        specdict = app.driver.acquire_spec_adv(**active.action.action_params) # type: ignore
         await active.enqueue_data_dflt(datadict=specdict)
         # duration loop
         while time.time() - starttime < active.action.action_params["duration_sec"]:
@@ -79,6 +79,8 @@ def makeApp(confPrefix, server_key, helao_root):
         ] = -1,  # measurements longer than HTTP timeout should use acquire_spec_extrig
         n_avg: int = 1,
         fft: int = 0,
+        peak_lower_wl: Optional[float] = None,
+        peak_upper_wl: Optional[float] = None,
     ):
         """Acquire N spectra and average."""
         spec_header = {"wl": app.driver.pxwl}
@@ -93,8 +95,62 @@ def makeApp(confPrefix, server_key, helao_root):
         while time.time() - starttime < active.action.action_params["duration_sec"]:
             specdict = app.driver.acquire_spec_adv(**active.action.action_params)
             await active.enqueue_data_dflt(datadict=specdict)
-        # wait 1 second to capture dangling data messages
-        await asyncio.sleep(1)
+
+        active.action.action_params["peak_intensity"] = specdict.get(
+            "peak_intensity", None
+        )
+        # wait 0.1 second to capture dangling data messages
+        await asyncio.sleep(0.1)
+        finished_act = await active.finish()
+        return finished_act.as_dict()
+
+    @app.post(f"/{server_key}/calibrate_intensity", tags=["action"])
+    async def calibrate_intensity(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        int_time_ms: int = 35,
+        n_avg: int = 10,
+        peak_lower_wl: Optional[float] = 400,
+        peak_upper_wl: Optional[float] = 750,
+        target_peak_max: Optional[float] = 40000,
+        target_peak_min: Optional[float] = 45000,
+    ):
+        """Acquire N spectra and average."""
+        spec_header = {"wl": app.driver.pxwl}
+        active = await app.base.setup_and_contain_action(
+            action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
+        )
+        current_int_time = active.action.action_params["int_time_ms"]
+        specdict = app.driver.acquire_spec_adv(**active.action.action_params)
+        await active.enqueue_data_dflt(datadict=specdict)
+        peak_int = specdict["peak_intensity"]
+        app.base.print_message(f"Current peak intensity: {peak_int}", info=True)
+        target_avg = 0.5 * (
+            active.action.action_params["target_peak_max"]
+            + active.action.action_params["target_peak_min"]
+        )
+        while (
+            peak_int < active.action.action_params["target_peak_min"]
+            or peak_int > active.action.action_params["target_peak_max"]
+        ):
+            if peak_int < active.action.action_params["target_peak_min"]:
+                current_int_time *= int(target_avg / peak_int)
+            else:
+                current_int_time *= int(peak_int / target_avg)
+            app.base.print_message(
+                f"Adjusting integration time to: {current_int_time} ms", info=True
+            )
+            spec_params = active.action.action_params
+            spec_params.update({"int_time_ms": current_int_time})
+            specdict = app.driver.acquire_spec_adv(**spec_params)
+            await active.enqueue_data_dflt(datadict=specdict)
+            peak_int = specdict["peak_intensity"]
+            app.base.print_message(f"Current peak intensity: {peak_int}", info=True)
+
+        active.action.action_params["peak_intensity"] = peak_int
+        active.action.action_params["calibrated_int_time_ms"] = current_int_time
+        # wait 0.1 second to capture dangling data messages
+        await asyncio.sleep(0.1)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -110,7 +166,7 @@ def makeApp(confPrefix, server_key, helao_root):
         duration: float = -1,
     ):
         """Acquire spectra based on external trigger."""
-        A =  app.base.setup_action()
+        A = app.base.setup_action()
         A.action_abbr = "OPT"
         # app.base.print_message("Setting up external trigger.", info=True)
         active_dict = await app.driver.acquire_spec_extrig(A)
@@ -125,8 +181,8 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Acquire spectra based on external trigger."""
         active = await app.base.setup_and_contain_action()
-        await app.driver.stop(delay=active.action.action_params["delay"])
-        finished_action = await active.finish()
+        await app.driver.stop(delay=active.action.action_params["delay"]) # type: ignore
+        finished_action = await active.finish() # type: ignore
         return finished_action.as_dict()
 
     return app
