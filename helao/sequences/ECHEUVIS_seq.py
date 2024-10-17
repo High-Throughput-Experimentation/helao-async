@@ -4,7 +4,7 @@ __all__ = [
     "ECHEUVIS_multiCA_led",
     "ECHEUVIS_CP_led",
     "ECHEUVIS_postseq",
-    "ECHEUVIS_diagnostic_CV"
+    "ECHEUVIS_diagnostic_CV",
 ]
 
 import random
@@ -1305,6 +1305,7 @@ def ECHEUVIS_multiCA_led(
                     "flow_ce": True,
                     "z_height": cell_engaged_z,
                     "fill_wait": cell_fill_wait,
+                    "calibrate_intensity": True,
                 },
             )
         else:
@@ -1355,10 +1356,11 @@ def ECHEUVIS_multiCA_led(
                     "toggle2_period": toggleSpec_period,
                     "toggle2_init_delay": toggleSpec_init_delay,
                     "toggle2_time": toggleSpec_time,
-                    "spec_int_time_ms": spec_int_time_ms,
+                    # "spec_int_time_ms": spec_int_time_ms,
                     "spec_n_avg": spec_n_avg,
                     "spec_technique": spec_technique,
                 },
+                from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
             )
             # CA1
             epm.add_experiment(
@@ -1392,10 +1394,11 @@ def ECHEUVIS_multiCA_led(
                     "toggle2_period": toggleSpec_period,
                     "toggle2_init_delay": toggleSpec_init_delay,
                     "toggle2_time": toggleSpec_time,
-                    "spec_int_time_ms": spec_int_time_ms,
+                    # "spec_int_time_ms": spec_int_time_ms,
                     "spec_n_avg": spec_n_avg,
                     "spec_technique": spec_technique,
                 },
+                from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
             )
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
