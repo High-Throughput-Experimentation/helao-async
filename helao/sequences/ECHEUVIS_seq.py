@@ -1052,7 +1052,21 @@ def ECHEUVIS_diagnostic_CV(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
-    ref_offset__V: float = 0.0,
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_names: list = ["doric_wled"],
+    led_wavelengths_nm: list = [-1],
+    led_intensities_mw: list = [0.432],
+    led_name_CA: str = "doric_wled",
+    toggleCA_illum_duty: float = 1.0,
+    toggleCA_illum_period: float = 1.0,
+    toggleCA_dark_time_init: float = 0,
+    toggleCA_illum_time: float = -1,
+    toggleSpec_duty: float = 0.5,
+    toggleSpec_period: float = 0.25,
+    toggleSpec_init_delay: float = 0.0,
+    toggleSpec_time: float = -1,
+    spec_n_avg: int = 1,
     cell_engaged_z: float = 2.5,
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
@@ -1086,19 +1100,49 @@ def ECHEUVIS_diagnostic_CV(
             "flow_ce": True,
             "z_height": cell_engaged_z,
             "fill_wait": cell_fill_wait,
+            "calibrate_intensity": True,
         },
     )
     epm.add_experiment(
-        "ECHE_sub_preCV",
+        "ECHEUVIS_sub_CA_led",
         {
-            "CA_potential": 1.23 - ref_vs_nhe - ref_offset__V - 0.059 * solution_ph,
+            "CA_potential_vsRHE": 1.23,
+            "solution_ph": solution_ph,
+            "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+            "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+            "solution_bubble_gas": solution_bubble_gas,
+            "measurement_area": measurement_area,
+            "reference_electrode_type": "NHE",
+            "ref_vs_nhe": ref_vs_nhe,
             "samplerate_sec": 0.1,
-            "CA_duration_sec": 5.0,
+            "CA_duration_sec": 10,
+            "gamry_i_range": "1mA",
+            "illumination_source": led_name_CA,
+            "illumination_wavelength": led_wavelengths_nm[
+                led_names.index(led_name_CA)
+            ],
+            "illumination_intensity": led_intensities_mw[
+                led_names.index(led_name_CA)
+            ],
+            "illumination_intensity_date": led_date,
+            "illumination_side": led_type,
+            "toggle_illum_duty": toggleCA_illum_duty,
+            "toggle_illum_period": toggleCA_illum_period,
+            "toggle_illum_time": toggleCA_illum_time,
+            "toggle_dark_time_init": toggleCA_dark_time_init,
+            "toggle2_duty": toggleSpec_duty,
+            "toggle2_period": toggleSpec_period,
+            "toggle2_init_delay": toggleSpec_init_delay,
+            "toggle2_time": toggleSpec_time,
+            # "spec_int_time_ms": spec_int_time_ms,
+            "spec_n_avg": 3,
+            "spec_technique": "T_UVVIS",
         },
+        from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
     )
     # CV1
     epm.add_experiment(
-        "ECHE_sub_CV",
+        "ECHEUVIS_sub_CV_led",
         {
             "Vinit_vsRHE": 1.23,
             "Vapex1_vsRHE": 1.98,
@@ -1113,9 +1157,30 @@ def ECHEUVIS_diagnostic_CV(
             "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
             "solution_bubble_gas": solution_bubble_gas,
             "measurement_area": measurement_area,
-            "ref_type": "leakless",
-            "ref_offset__V": ref_offset__V,
+            "reference_electrode_type": "NHE",
+            "ref_vs_nhe": ref_vs_nhe,
+            "illumination_source": led_name_CA,
+            "illumination_wavelength": led_wavelengths_nm[
+                led_names.index(led_name_CA)
+            ],
+            "illumination_intensity": led_intensities_mw[
+                led_names.index(led_name_CA)
+            ],
+            "illumination_intensity_date": led_date,
+            "illumination_side": led_type,
+            "toggle_illum_duty": 1.0,
+            "toggle_illum_period": 1.0,
+            "toggle_illum_time": -1,
+            "toggle_dark_time_init": 0,
+            "toggle2_duty": toggleSpec_duty,
+            "toggle2_period": toggleSpec_period,
+            "toggle2_init_delay": toggleSpec_init_delay,
+            "toggle2_time": toggleSpec_time,
+            # "spec_int_time_ms": spec_int_time_ms,
+            "spec_n_avg": spec_n_avg,
+            "spec_technique": "T_UVVIS",
         },
+        from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
     )
     # leave cell sealed w/solution for storage
     epm.add_experiment(
