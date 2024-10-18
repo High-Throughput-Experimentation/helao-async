@@ -505,14 +505,14 @@ def main():
                         )
                         return -1
 
-                else:
-                    with CLIENT:
-                        output = CLIENT.set_status(
-                            "completed", data_request_id=data_request.id
-                        )
-                    print(
-                        f"{gen_ts()} Data request {data_request.id} status: {output.status}"
-                    )
+                # else:
+                #     with CLIENT:
+                #         output = CLIENT.set_status(
+                #             "completed", data_request_id=data_request.id
+                #         )
+                #     print(
+                #         f"{gen_ts()} Data request {data_request.id} status: {output.status}"
+                #     )
 
                 print(f"{gen_ts()} Analysis sequence complete.")
                 request_count += 1
