@@ -405,6 +405,10 @@ def main():
                     # Acknowledge the data request
                     with CLIENT:
                         output = CLIENT.acknowledge_data_request(data_request.id)
+                        expected = CLIENT.set_expected_number_of_analyses(
+                            len(ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"]),
+                            data_request.id,
+                        )
                     print(
                         f"{gen_ts()} Data request {data_request.id} status: {output.status}"
                     )
