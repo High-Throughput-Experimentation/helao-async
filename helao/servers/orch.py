@@ -29,9 +29,6 @@ from fastapi import WebSocket
 from bokeh.server.server import Server
 
 from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.sequence import SequenceModel
-from helaocore.models.experiment import ExperimentModel
-from helaocore.models.action import ActionModel
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.server import ActionServerModel, GlobalStatusModel
 from helaocore.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
@@ -319,7 +316,7 @@ class Orch(Base):
             )
 
     async def update_nonblocking(
-        self, actionmodel: ActionModel, server_host: str, server_port: int
+        self, actionmodel: Action, server_host: str, server_port: int
     ):
         """Update method for action server to push non-blocking action ids."""
         # print(actionmodel.clean_dict())
@@ -481,13 +478,10 @@ class Orch(Base):
             # if experiment_plan_list is empty, unpack sequence,
             # otherwise operator already populated experiment_plan_list
             if not self.active_sequence.experiment_plan_list:
-                unpacked_exps = self.unpack_sequence(
+                self.active_sequence.experiment_plan_list = self.unpack_sequence(
                     self.active_sequence.sequence_name,
                     self.active_sequence.sequence_params,
                 )
-                self.active_sequence.experiment_plan_list = [
-                    Experiment(**exp.as_dict()) for exp in unpacked_exps
-                ]
 
             self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
@@ -812,7 +806,7 @@ class Orch(Base):
 
                 if not A.nonblocking:
                     # orch gets back an active action dict, we can self-register the dispatched action in global status
-                    resmod = ActionModel(**result_actiondict)
+                    resmod = Action(**result_actiondict)
                     srvname = resmod.action_server.server_name
                     actname = resmod.action_name
                     resuuid = resmod.action_uuid
@@ -1263,14 +1257,15 @@ class Orch(Base):
 
     async def add_experiment(
         self,
-        seq: SequenceModel,
-        experimentmodel: ExperimentModel,
+        seq: Sequence,
+        experimentmodel: Experiment,
         prepend: bool = False,
         at_index: int = None,
     ):
-        Ddict = experimentmodel.model_dump()
-        Ddict.update(seq.model_dump())
-        D = Experiment(**Ddict)
+        seq_dict = seq.model_dump()
+        D = experimentmodel
+        for k, v in seq_dict.items():
+            setattr(D, k, v)
 
         # init uuid now for tracking later
         D.experiment_uuid = gen_uuid()
@@ -1316,14 +1311,14 @@ class Orch(Base):
             del self.experiment_dq[i]
         return self.list_all_experiments()
 
-    def get_experiment(self, last=False) -> ExperimentModel:
+    def get_experiment(self, last=False) -> Experiment:
         """Return the active or last experiment."""
         experiment = self.last_experiment if last else self.active_experiment
         if experiment is not None:
             return experiment.get_exp()
         return {}
 
-    def get_sequence(self, last=False) -> SequenceModel:
+    def get_sequence(self, last=False) -> Sequence:
         """Return the active or last experiment."""
         sequence = self.last_sequence if last else self.active_sequence
         if sequence is not None:
