@@ -1264,8 +1264,8 @@ class Orch(Base):
     ):
         seq_dict = seq.model_dump()
         D = experimentmodel
-        for k, v in seq_dict.items():
-            setattr(D, k, v)
+        for k in seq_dict.keys():
+            setattr(D, k, getattr(seq, k))
 
         # init uuid now for tracking later
         D.experiment_uuid = gen_uuid()
