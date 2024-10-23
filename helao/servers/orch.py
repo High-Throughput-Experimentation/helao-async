@@ -477,11 +477,29 @@ class Orch(Base):
 
             # if experiment_plan_list is empty, unpack sequence,
             # otherwise operator already populated experiment_plan_list
-            if True:
-                self.active_sequence.experiment_plan_list = self.unpack_sequence(
+            if self.active_sequence.sequence_name in self.sequence_lib:
+                experiment_plan_list = self.unpack_sequence(
                     self.active_sequence.sequence_name,
                     self.active_sequence.sequence_params,
                 )
+                if not self.active_sequence_experiment_plan_list:
+                    self.active_sequence.experiment_plan_list = experiment_plan_list
+                elif len(self.active_sequence.experiment_plan_list) >= len(experiment_plan_list):
+                    new_experiment_plan_list = []
+                    for exp_model in self.active_sequence.experiment_plan_list:
+                        if not experiment_plan_list:
+                            new_experiment_plan_list.append(exp_model)
+                        else:
+                            exp = experiment_plan_list.pop(0)
+                            if exp.experiment_name == exp_model.experiment_name:
+                                for k, v in vars(exp_model).items():
+                                    setattr(exp, k, v)
+                                new_experiment_plan_list.append(exp)
+                            else:
+                                break
+                    if len(self.active_sequence.experiment_plan_list) == len(new_experiment_plan_list):
+                        self.active_sequence.experiment_plan_list = new_experiment_plan_list
+
 
             self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
