@@ -477,7 +477,7 @@ class Orch(Base):
 
             # if experiment_plan_list is empty, unpack sequence,
             # otherwise operator already populated experiment_plan_list
-            if not self.active_sequence.experiment_plan_list:
+            if True:
                 self.active_sequence.experiment_plan_list = self.unpack_sequence(
                     self.active_sequence.sequence_name,
                     self.active_sequence.sequence_params,
