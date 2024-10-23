@@ -143,7 +143,7 @@ class OrchAPI(HelaoFastAPI):
             experiment queue for testing.
             """
             self.orch = Orch(fastapp=self)
-            
+
             self.orch.myinit()
             if driver_class is not None:
                 if issubclass(driver_class, HelaoDriver):
@@ -330,7 +330,7 @@ class OrchAPI(HelaoFastAPI):
                             endpointmodel[HloStatus.skipped] = {}
                         endpointmodel.nonactive_dict[HloStatus.skipped].update({uuid: statusmodel})
                 await self.orch.update_status(actionservermodel=updatemodel)
-            return cleared_actives 
+            return cleared_actives
 
         @self.post("/update_nonblocking", tags=["private"])
         async def update_nonblocking(
@@ -781,8 +781,8 @@ class OrchAPI(HelaoFastAPI):
             loop.create_task(sleep_then_error())
             return True
 
-        @self.post("/clear_global_params", tags=["private"])
-        def clear_global_params():
+        @self.post("/clear_global_params_private", tags=["private"])
+        def clear_global_params_private():
             current_params = list(self.orch.global_params.keys())
             self.orch.global_params = {}
             if current_params:
@@ -793,6 +793,21 @@ class OrchAPI(HelaoFastAPI):
         @self.post("/get_global_params", tags=["private"])
         def get_global_params():
             return self.orch.global_params
+
+        @self.post(f"/{server_key}/clear_global_params", tags=["action"])
+        async def clear_global_params(
+            action: Action = Body({}, embed=True),
+        ):
+            active = await self.orch.setup_and_contain_action()
+            current_params = list(self.orch.global_params.keys())
+            self.orch.global_params = {}
+            if current_params:
+                self.orch.print_message("\n".join(["removed:"] + current_params), info=True)
+            else:
+                self.orch.print_message("global_params was empty", info=True)
+            active.action.action_params.update({"cleared": current_params))
+            finished_action = await active.finish()
+            return finished_action.as_dict()
 
 class WaitExec(Executor):
     def __init__(self, *args, **kwargs):
