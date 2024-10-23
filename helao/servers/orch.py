@@ -1281,7 +1281,10 @@ class Orch(Base):
         at_index: int = None,
     ):
         seq_dict = seq.model_dump()
-        D = experimentmodel
+        if not isinstance(experimentmodel, Experiment):
+            D = Experiment(experimentmodel.model_dict()**)
+        else:
+            D = experimentmodel
         for k in seq_dict.keys():
             setattr(D, k, getattr(seq, k))
 
