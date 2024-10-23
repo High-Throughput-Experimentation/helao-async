@@ -27,10 +27,10 @@ from helaocore.models.orchstatus import LoopStatus
 
 TEST = False
 SPEC_INT_MS = 35
-ELECTROLYTE_SHORT_NAME = "OER7"
-ELECTROLYTE_SAMPLE_NO = 374
-ELECTROLYTE_PH = 7
-REF_OFFSET = 0.110
+ELECTROLYTE_SHORT_NAME = "OER1"
+ELECTROLYTE_SAMPLE_NO = 448
+ELECTROLYTE_PH = 1.8
+REF_OFFSET = 0.118
 QC_EVERY = 20
 
 UVIS_T_defaults = {
@@ -124,7 +124,7 @@ ECHEUVIS_diagnostic_CV_defaults = {
     "toggleSpec_period": 0.5,
     "toggleSpec_init_delay": 0.0,
     "toggleSpec_time": -1,
-    "spec_n_avg": 3,
+    "spec_n_avg": 2,
     "cell_engaged_z": 1.5,
     "cell_disengaged_z": 0,
     "cell_vent_wait": 10.0,
