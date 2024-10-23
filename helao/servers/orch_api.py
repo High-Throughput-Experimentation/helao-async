@@ -805,7 +805,7 @@ class OrchAPI(HelaoFastAPI):
                 self.orch.print_message("\n".join(["removed:"] + current_params), info=True)
             else:
                 self.orch.print_message("global_params was empty", info=True)
-            active.action.action_params.update({"cleared": current_params))
+            active.action.action_params.update({"cleared": current_params})
             finished_action = await active.finish()
             return finished_action.as_dict()
 
