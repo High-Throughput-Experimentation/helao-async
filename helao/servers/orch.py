@@ -1283,7 +1283,7 @@ class Orch(Base):
         seq_dict = seq.model_dump()
         if not isinstance(experimentmodel, Experiment):
             experimentmodel_dict = experimentmodel.model_dump()
-            D = Experiment(experimentmodel_dict**)
+            D = Experiment(**experimentmodel_dict)
         else:
             D = experimentmodel
         for k in seq_dict.keys():
