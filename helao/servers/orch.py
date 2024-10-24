@@ -482,7 +482,7 @@ class Orch(Base):
                     self.active_sequence.sequence_name,
                     self.active_sequence.sequence_params,
                 )
-                if not self.active_sequence_experiment_plan_list:
+                if not self.active_sequence.experiment_plan_list:
                     self.active_sequence.experiment_plan_list = experiment_plan_list
                 elif len(self.active_sequence.experiment_plan_list) >= len(experiment_plan_list):
                     new_experiment_plan_list = []
