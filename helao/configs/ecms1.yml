@@ -15,7 +15,7 @@ run_type: ecms
 root: C:\INST_hlo
 servers:
   ORCH:
-    host: hte-ecms-01.htejcap.caltech.edu
+    host: hte-ecms-03.htejcap.caltech.edu
     port: 8001
     group: orchestrator
     fast: async_orch2
@@ -44,7 +44,7 @@ servers:
   #     monitor_ai:
   #       cell_pressure_psi: 5.0
   NI:
-    host: hte-ecms-01.htejcap.caltech.edu
+    host: hte-ecms-03.htejcap.caltech.edu
     port: 8006
     group: action
     fast: nidaqmx_server
@@ -70,7 +70,7 @@ servers:
         RecirculatingPeriPump2: dev1/port1/line4
         RecirculatingPeriPump2-maxspd: dev1/port2/line0
   PAL:
-    host: hte-ecms-01.htejcap.caltech.edu
+    host: hte-ecms-03.htejcap.caltech.edu
     port: 8007
     group: action
     fast: pal_server
@@ -79,14 +79,14 @@ servers:
         custom:
           cell1_we: cell
   VIS:
-    host: hte-ecms-01.htejcap.caltech.edu
+    host: hte-ecms-03.htejcap.caltech.edu
     port: 5001
     group: visualizer
     bokeh: action_visualizer
     params:
       doc_name: ECMS Visualizer
   LIVE:
-    host: hte-ecms-01.htejcap.caltech.edu
+    host: hte-ecms-03.htejcap.caltech.edu
     port: 5004
     group: visualizer
     bokeh: live_visualizer
@@ -94,7 +94,7 @@ servers:
       doc_name: Sensor Visualizer
     verbose: false
   MFC:
-    host: hte-ecms-01.htejcap.caltech.edu
+    host: hte-ecms-03.htejcap.caltech.edu
     port: 8009
     group: action
     fast: mfc_server
@@ -107,7 +107,7 @@ servers:
 
 
   CALIBRATIONMFC:
-    host: hte-ecms-01.htejcap.caltech.edu
+    host: hte-ecms-03.htejcap.caltech.edu
     port: 8012 
     group: action
     fast: mfc_server
@@ -118,7 +118,7 @@ servers:
           unit_id: A
 
   PSTAT:
-    host: hte-ecms-01.htejcap.caltech.edu
+    host: hte-ecms-03.htejcap.caltech.edu
     port: 8004
     group: action
     fast: gamry_server
@@ -128,14 +128,14 @@ servers:
       grounded: true
       allow_no_sample: true # would need to remove this later so all samples can be tracked
   CALC:
-    host: hte-ecms-01.htejcap.caltech.edu
+    host: hte-ecms-03.htejcap.caltech.edu
     port: 8011
     group: action
     fast: calc_server
     params: {}
     verbose: false
   DB:
-    host: hte-ecms-01.htejcap.caltech.edu
+    host: hte-ecms-03.htejcap.caltech.edu
     port: 8010
     group: action
     fast: dbpack_server
