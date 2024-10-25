@@ -101,7 +101,7 @@ servers:
     params:
       devices:
         CO2:
-          port: COM5
+          port: COM3
           unit_id: A
     verbose: false
 
@@ -114,7 +114,7 @@ servers:
     params:
       devices:
         Caligas:
-          port: COM6 # needs to update
+          port: COM4 # needs to update
           unit_id: A
 
   PSTAT:
