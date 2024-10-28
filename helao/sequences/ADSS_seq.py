@@ -3153,7 +3153,7 @@ def ADSS_PA_CV_TRI(
 
 
 def ADSS_PA_CV_TRI_new(
-    sequence_version: int = 5, #5 shift aliquots to expts, bubble removal
+    sequence_version: int = 6, #6 new transfer syringe#5 shift aliquots to expts, bubble removal
     #note: str = "need as many samples as you expect combinations of UPL and LPL",
     
     #sample info
@@ -3210,6 +3210,8 @@ def ADSS_PA_CV_TRI_new(
     phosphoric_quantity_ul: int = 90,
     inject_recirculate_wait_time_sec: float = 60,
     #liquid_custom_position: str = "elec_res1",
+    phos_PAL_Injector: str = "LS 5",
+    phos_PAL_Injector_id: str = "LS5_peek",
 
     #Ref Pt measurement CVs
     ref_CV_cycles: List[int] = [8],
@@ -3881,8 +3883,8 @@ def ADSS_PA_CV_TRI_new(
                 "source_vial": phosphoric_location[2],            
                 "liquid_sample_no": phosphoric_sample_no,
                 "aliquot_volume_ul": phosphoric_quantity_ul,
-                "PAL_Injector": PAL_Injector,
-                "PAL_Injector_id": PAL_Injector_id,
+                "PAL_Injector": phos_PAL_Injector,
+                "PAL_Injector_id": phos_PAL_Injector_id,
                 "rinse_1": washone,
                 "rinse_2": washtwo,
                 "rinse_3": washthree,
