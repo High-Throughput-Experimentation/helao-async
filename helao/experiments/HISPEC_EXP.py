@@ -4,7 +4,7 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
-    "HISPEC_sub_CV_led",
+    "HISPEC_sub_SpEC",
     # "HISPEC_sub_CV_DOtrigger",
     # "HISPEC_sub_CA_led",
     # "HISPEC_sub_CP_led",
@@ -20,7 +20,7 @@ __all__ = [
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="gamry_driver_standalone")
+    logger = logging.make_logger(logger_name="hispec_exp_standalone")
 else:
     logger = logging.LOGGER
 
@@ -47,35 +47,43 @@ from helaocore.models.electrolyte import Electrolyte
 EXPERIMENTS = __all__
 
 PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname().lower()).as_dict()
-# MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname().lower()).as_dict()
+MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname().lower()).as_dict()
 IO_server = MM(server_name="IO", machine_name=gethostname().lower()).as_dict()
 ANDOR_server = MM(server_name="ANDOR", machine_name=gethostname().lower()).as_dict()
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 # PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 # CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
-# KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
+KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
 # ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.risingedge
 
 
-# def HISPEC_sub_startup(experiment: Experiment):
-#     """Unload custom position and enable IR emitter."""
-#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-#     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
-#     apm.add(IO_server, "set_digital_out", {"do_item": "ir_emitter", "on": True})
-#     return apm.action_list  # returns complete action list to orch
+def HISPEC_sub_startup(experiment: Experiment):
+    """Unload custom position."""
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
+    return apm.action_list  # returns complete action list to orch
 
 
-# def HISPEC_sub_shutdown(experiment: Experiment):
-#     """Unload custom position and disable IR emitter."""
-#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-#     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
-#     apm.add(IO_server, "set_digital_out", {"do_item": "ir_emitter", "on": False})
-#     return apm.action_list  # returns complete action list to orch
+def HISPEC_sub_shutdown(experiment: Experiment):
+    """Unload custom position and disable IR emitter."""
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
+    return apm.action_list  # returns complete action list to orch
 
 
-def HISPEC_sub_CV_led(
+# implement Biologic trigger actions
+#  use easy_biologic's BiologicDevice.load_techniques() method
+
+# HISPEC_sub_OCVtoCAtoCV -- use OCV potential for conditioning CA and starting CV; CV needs to locally queue after CA
+# HISPEC_sub_EIS
+
+# HISPEC_sub_LoSpEC -- CA to SpEC, conditional SpEC
+# HISPEC_sub_PD_LoSpEC
+
+# spectral electrochemistry experiment
+def HISPEC_sub_SpEC(
     experiment: Experiment,
     experiment_version: int = 1,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
@@ -151,7 +159,7 @@ def HISPEC_sub_CV_led(
         {
             "trigger_name": "gamry_ttl0",
             "triggertype": 1,  # rising edge
-            "out_name": ["spec_trig", toggle1_source],
+            "out_name": ["spec_trig", toggle1_source],  # TODO: parameterize outs
             "out_name_gamry": None,
             "toggle_init_delay": [toggle1_init_delay, toggle1_init_delay],
             "toggle_duty": [toggle1_duty, toggle1_duty],
