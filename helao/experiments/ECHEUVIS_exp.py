@@ -19,7 +19,7 @@ __all__ = [
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="gamry_driver_standalone")
+    logger = logging.make_logger(logger_name="echeuvis_exp_standalone")
 else:
     logger = logging.LOGGER
 
@@ -58,6 +58,10 @@ ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
 TOGGLE_TRIGGERTYPE = TriggerType.risingedge
 
+# main HiSpEC sequence: OCV -> SpEC -> EIS -- top priority
+# lowspec PD -- 2
+# lowspec conditional -- 3
+# lowspec sequence: no XYZ; no pump
 
 def ECHEUVIS_sub_startup(experiment: Experiment):
     """Unload custom position and enable IR emitter."""
