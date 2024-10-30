@@ -228,10 +228,10 @@ class AndorDriver(HelaoDriver):
     def setup_spectroscope(
         self,
         PixelWidth,
-        centralWL=672.26,
+        centralWL=697.26,
         NumHorizPixels=2560,
         ND_filter_num=1,
-        slit_width_um=150,
+        slit_width_um=200,
     ):
         """
         This functionsets up the spectrograph with standard parameters as default.
