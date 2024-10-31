@@ -83,14 +83,14 @@ TECH_CP = BiologicTechnique(
 )
 TECH_CV = BiologicTechnique(
     technique_name="CV",
-    easy_class=blp.JV_Scan,
+    easy_class=blp.CV,
     parameter_map={
         "Vinit__V": "start",
-        "Vapex1__V": "v1",
-        "Vapex2__V": "v2",
-        "Vfinal__V": "end",
+        "Vapex1__V": "end",
+        "Vapex2__V": "E2",
+        "Vfinal__V": "Ef",
         "ScanRate__V_s": "rate",
-        "Cycles": "cycles",
+        "Cycles": "N_Cycles",
         "AcqInterval__V": "step",
     },
     field_map={
