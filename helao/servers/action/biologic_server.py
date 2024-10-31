@@ -61,7 +61,16 @@ class BiologicExec(Executor):
             self.data_buffer = defaultdict(lambda: deque(maxlen=1000))
 
             # link attrs for convenience
-            self.action_params = self.active.action.action_params
+            self.action_params = {
+                k: v
+                for k, v in self.active.action.action_params.items()
+                if not k.startswith("ttl_")
+            }
+            self.ttl_params = {
+                k: v
+                for k, v in self.active.action.action_params.itemsss()
+                if k.startswith("ttl_")
+            }
             self.driver = self.active.base.fastapp.driver
             self.channel = self.action_params["channel"]
 
@@ -89,7 +98,7 @@ class BiologicExec(Executor):
     async def _exec(self) -> dict:
         """Begin measurement or wait for TTL trigger if specified."""
         LOGGER.debug("starting measurement")
-        resp = self.driver.start_channel(self.channel)
+        resp = self.driver.start_channel(self.channel, self.ttl_params)
         self.start_time = resp.data.get("start_time", time.time())
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error}
@@ -159,6 +168,9 @@ async def biologic_dyn_endpoints(app=None):
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
         IRange: EC_IRange = EC_IRange.AUTO,
         channel: int = 0,
+        ttl: str = 'none',
+        ttl_logic: int = 1,
+        ttl_duration: float = 1.0,
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -182,6 +194,9 @@ async def biologic_dyn_endpoints(app=None):
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         channel: int = 0,
+        ttl: str = 'none',
+        ttl_logic: int = 1,
+        ttl_duration: float = 1.0,
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -205,6 +220,9 @@ async def biologic_dyn_endpoints(app=None):
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         Cycles: int = 1,
         channel: int = 0,
+        ttl: str = 'none',
+        ttl_logic: int = 1,
+        ttl_duration: float = 1.0,
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
@@ -228,6 +246,9 @@ async def biologic_dyn_endpoints(app=None):
         simple_threshold: float = 0.3,
         signal_change_threshold: float = 0.01,
         amplitude_threshold: float = 0.05,
+        ttl: str = 'none',
+        ttl_logic: int = 1,
+        ttl_duration: float = 1.0,
     ):
         """mesasures open circuit potential
         use 4bit bitmask for triggers
