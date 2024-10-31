@@ -151,7 +151,7 @@ class BiologicDriver(HelaoDriver):
             self.cleanup()
         return response
 
-    def start_channel(self, channel: int = 0) -> DriverResponse:
+    def start_channel(self, channel: int = 0, ttl_params: dict = {}) -> DriverResponse:
         """Apply signal and begin data acquisition."""
         try:
             if channel not in self.channels:
@@ -165,7 +165,7 @@ class BiologicDriver(HelaoDriver):
                 raise ValueError(f"Channel {channel} encountered error.")
 
             start_time = time.time()
-            self.channels[channel].run(retrieve_data=False)
+            self.channels[channel].run(retrieve_data=False, **ttl_params)
 
             response = DriverResponse(
                 response=DriverResponseType.success,

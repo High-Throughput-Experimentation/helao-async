@@ -102,4 +102,18 @@ TECH_CV = BiologicTechnique(
     },
 )
 
+TECH_GEIS = BiologicTechnique(
+    technique_name="GEIS",
+    easy_class=blp.GEIS,
+    parameter_map={},
+    field_map={},
+)
+
+TECH_PEIS = BiologicTechnique(
+    technique_name="PEIS",
+    easy_class=blp.PEIS,
+    parameter_map={},
+    field_map={},
+)
+
 BIOTECHS = {x.technique_name: x for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV]}
