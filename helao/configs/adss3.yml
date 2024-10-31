@@ -202,7 +202,7 @@ servers:
     group: action
     fast: syringe_server
     params:
-      port: COM7
+      port: COM3
       pumps:
         zero:
           address: 0
