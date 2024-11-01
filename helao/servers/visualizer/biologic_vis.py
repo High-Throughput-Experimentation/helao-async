@@ -165,7 +165,8 @@ class C_biovis:
         self.IOtask.cancel()
 
     def callback_selector_change(self, attr, old, new):
-        self.reset_plot()
+        for ch in self.channel_action_uuid:
+            self.reset_plot(ch)
 
     def callback_input_max_points(self, attr, old, new, sender):
         """callback for input_max_points"""
