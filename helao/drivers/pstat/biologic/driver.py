@@ -165,7 +165,7 @@ class BiologicDriver(HelaoDriver):
                 raise ValueError(f"Channel {channel} encountered error.")
 
             start_time = time.time()
-            self.channels[channel].run(retrieve_data=False, **ttl_params)
+            self.channels[channel].run(retrieve_data=False, ttl_params)
 
             response = DriverResponse(
                 response=DriverResponseType.success,
