@@ -68,7 +68,7 @@ class BiologicExec(Executor):
             }
             self.ttl_params = {
                 k: v
-                for k, v in self.active.action.action_params.itemsss()
+                for k, v in self.active.action.action_params.items()
                 if k.startswith("ttl_")
             }
             self.driver = self.active.base.fastapp.driver
