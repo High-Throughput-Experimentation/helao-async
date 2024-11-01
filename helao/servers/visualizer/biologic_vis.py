@@ -62,7 +62,7 @@ class C_biovis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "channel"]
+        self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "P_W", "cycle", "channel"]
 
         # separate data sources for each channel
         self.channel_datasources = {
@@ -218,24 +218,26 @@ class C_biovis:
                 data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
             ):
-                pstat_channel = data_dict['channel'][0]
-                # only resets if axis selector or action_uuid changes
-                self.reset_plot(channel=pstat_channel, new_action_uuid=str(data_package.action_uuid))
-                for _, uuid_dict in data_package.datamodel.data.items():
-                    for data_label, data_val in uuid_dict.items():
-                        if data_label in self.data_dict_keys:
-                            if isinstance(data_val, list):
-                                data_dict[data_label] += data_val
-                            else:
-                                data_dict[data_label].append(data_val)
+                channels = data_package.datamodel.data.get("channel", [])
+                if channels:
+                    pstat_channel = channels[0]
+                    # only resets if axis selector or action_uuid changes
+                    self.reset_plot(channel=pstat_channel, new_action_uuid=str(data_package.action_uuid))
+                    for _, uuid_dict in data_package.datamodel.data.items():
+                        for data_label, data_val in uuid_dict.items():
+                            if data_label in self.data_dict_keys:
+                                if isinstance(data_val, list):
+                                    data_dict[data_label] += data_val
+                                else:
+                                    data_dict[data_label].append(data_val)
 
-                # check for missing I_A in OCV
-                max_len = max([len(v) for v in data_dict.values()])
-                for k, v in data_dict.items():
-                    if len(v) < max_len:
-                        pad_len = max_len - len(v)
-                        data_dict[k] += ["NaN"] * pad_len
-                self.channel_datasources[pstat_channel].stream(data_dict, rollover=self.max_points)
+                    # check for missing I_A in OCV
+                    max_len = max([len(v) for v in data_dict.values()])
+                    for k, v in data_dict.items():
+                        if len(v) < max_len:
+                            pad_len = max_len - len(v)
+                            data_dict[k] += ["NaN"] * pad_len
+                    self.channel_datasources[pstat_channel].stream(data_dict, rollover=self.max_points)
 
     def _add_plots(self, channel):
         # clear legend
