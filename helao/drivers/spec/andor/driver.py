@@ -245,7 +245,7 @@ class AndorDriver(HelaoDriver):
         elif ND_filter_num < 1:
             LOGGER.info("Filter number is too low")
             return
-        elif slit_width_um > 150:
+        elif slit_width_um > 200:
             LOGGER.info("Slit width is too high")
             return
         elif slit_width_um < 10:
