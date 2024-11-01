@@ -216,5 +216,6 @@ class PALtools(str, Enum):
     LS2 = "LS 2"
     LS3 = "LS 3"
     LS4 = "LS 4"
+    LS5 = "LS 5"
     HS1 = "HS 1"
     HS2 = "HS 2"
