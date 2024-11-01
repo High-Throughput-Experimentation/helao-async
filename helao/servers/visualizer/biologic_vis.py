@@ -119,7 +119,7 @@ class C_biovis:
         self.plot_divs = [
             vert_item
             for vert_group in zip(
-                self.vert_groups, Spacer(height=10) * len(self.vert_groups)
+                self.vert_groups, [Spacer(height=10)] * len(self.vert_groups)
             )
             for vert_item in vert_group
         ][:-1]
