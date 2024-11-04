@@ -238,8 +238,6 @@ class C_biovis:
                                 pad_len = max_len - len(v)
                                 data_dict[k] += ["NaN"] * pad_len
                         self.channel_datasources[pstat_channel].stream(data_dict, rollover=self.max_points)
-                        print(data_dict)
-                        print(self.channel_datasources[pstat_channel].data)
 
     def _add_plots(self, channel):
         # clear legend
