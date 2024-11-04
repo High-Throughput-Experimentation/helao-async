@@ -31,6 +31,21 @@ class HelaoFastAPI(FastAPI):
     """
 
     def __init__(self, helao_cfg: dict, helao_srv: str, *args, **kwargs):
+        """
+        Initializes the server API with the given configuration.
+
+        Args:
+            helao_cfg (dict): Configuration dictionary for helao.
+            helao_srv (str): Server name.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Attributes:
+            helao_cfg (dict): Stores the helao configuration.
+            helao_srv (str): Stores the server name.
+            server_cfg (dict): Configuration for the specific server.
+            server_params (dict): Parameters for the server configuration.
+        """
         super().__init__(*args, **kwargs, openapi_tags=TAGS)
         self.helao_cfg = helao_cfg
         self.helao_srv = helao_srv
