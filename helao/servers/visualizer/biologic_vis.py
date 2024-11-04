@@ -62,7 +62,7 @@ class C_biovis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "P_W", "cycle", "channel"]
+        self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "P_W", "cycle"]
 
         # separate data sources for each channel
         self.channel_datasources = {
@@ -218,6 +218,7 @@ class C_biovis:
                 data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
             ):
+                print(data_package.datamodel.data)
                 channels = data_package.datamodel.data.get("channel", [])
                 if channels:
                     pstat_channel = channels[0]
