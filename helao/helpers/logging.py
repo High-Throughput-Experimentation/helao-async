@@ -24,7 +24,6 @@ LOGGER = None
 
 
 def make_logger(
-    log_level: int = 20,
     logger_name: Optional[str] = None,
     log_dir: Optional[str] = None,
     log_level: int = 20,  # 10 (DEBUG), 20 (INFO), 30 (WARNING), 40 (ERROR), 50 (CRITICAL)
