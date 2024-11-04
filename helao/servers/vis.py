@@ -10,20 +10,70 @@ from helaocore.models.machine import MachineModel
 
 # TODO: HelaoVis will return doc to replace makeBokehApp func
 class HelaoVis(HelaoBokehAPI):
+    """
+    HelaoVis is a server class that extends the HelaoBokehAPI to provide visualization capabilities.
+
+    Attributes:
+        vis (Vis): An instance of the Vis class for handling visualization tasks.
+
+    Methods:
+        __init__(config, server_key, doc):
+            Initialize the Vis server with the given configuration, server key, and documentation object.
+    """
+
     def __init__(
         self,
         config,
         server_key,
         doc,
     ):
+        """
+        Initialize the Vis server.
+
+        Args:
+            config (dict): Configuration dictionary for the server.
+            server_key (str): Unique key identifying the server.
+            doc (object): Documentation object for the server.
+        """
         super().__init__(config, server_key, doc)
         self.vis = Vis(self)
 
 
 class Vis:
-    """Base class for all HELAO bokeh servers."""
+    """
+    A class to represent the visualization server.
+
+    Attributes
+    ----------
+    server : MachineModel
+        An instance of MachineModel representing the server.
+    server_cfg : dict
+        Configuration dictionary for the server.
+    world_cfg : dict
+        Global configuration dictionary.
+    doc : Document
+        Bokeh document instance.
+    helaodirs : HelaoDirs
+        Directories used by the Helao system.
+
+    Methods
+    -------
+    __init__(bokehapp: HelaoBokehAPI)
+        Initializes the Vis instance with the given Bokeh application.
+    print_message(*args, **kwargs)
+        Prints a message using the server configuration and log directory.
+    """
 
     def __init__(self, bokehapp: HelaoBokehAPI):
+        """
+        Initializes the visualization server.
+
+        Args:
+            bokehapp (HelaoBokehAPI): An instance of the HelaoBokehAPI class.
+
+        Raises:
+            ValueError: If the root directory is not defined in the configuration.
+        """
         self.server = MachineModel(
             server_name=bokehapp.helao_srv, machine_name=gethostname().lower()
         )
@@ -40,6 +90,16 @@ class Vis:
             )
 
     def print_message(self, *args, **kwargs):
+        """
+        Prints a message with the server configuration and server name.
+
+        Parameters:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+        None
+        """
         print_message(
             self.server_cfg,
             self.server.server_name,
