@@ -69,7 +69,12 @@ class C_biovis:
             ch: ColumnDataSource(data={key: [] for key in self.data_dict_keys})
             for ch in range(self.num_channels)
         }
+        self.channel_datasources_prev = {
+            ch: ColumnDataSource(data={key: [] for key in self.data_dict_keys})
+            for ch in range(self.num_channels)
+        }
         self.channel_action_uuid = {ch: "" for ch in range(self.num_channels)}
+        self.channel_action_uuid_prev = {ch: "" for ch in range(self.num_channels)}
 
         # create visual elements
         self.layout = []
@@ -104,12 +109,21 @@ class C_biovis:
             for ch in range(self.num_channels)
         ]
 
+        self.channel_plots_prev = [
+            figure(title=f"channel {ch}", height=300, width=500)
+            for ch in range(self.num_channels)
+        ]
+
         # generate 2-column layout for potentiostat channels
         self.vert_groups = [
             [
                 item
                 for horiz_group in [
-                    (plot, Spacer(width=20)) for plot in self.channel_plots[i : i + 2]
+                    (plot, Spacer(width=20), plot_prev)
+                    for plot, plot_prev in zip(
+                        self.channel_plots[i : i + 2],
+                        self.channel_plots_prev[i : i + 2],
+                    )
                 ]
                 for item in horiz_group
             ][:-1]
@@ -133,14 +147,14 @@ class C_biovis:
         self.layout = layout(
             [
                 [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
-                [ self.input_max_points],
+                [self.input_max_points],
                 [
                     Paragraph(text="""x-axis:""", width=500, height=15),
                     Paragraph(text="""y-axis:""", width=500, height=15),
                 ],
                 [self.xaxis_selector_group, self.yaxis_selector_group],
                 Spacer(height=10),
-                *self.plot_divs
+                *self.plot_divs,
             ],
             background="#D6DBDF",
             width=1024,
@@ -223,7 +237,10 @@ class C_biovis:
                     if channels:
                         pstat_channel = channels[0]
                         # only resets if axis selector or action_uuid changes
-                        self.reset_plot(channel=pstat_channel, new_action_uuid=str(data_package.action_uuid))
+                        self.reset_plot(
+                            channel=pstat_channel,
+                            new_action_uuid=str(data_package.action_uuid),
+                        )
                         for data_label, data_val in uuid_dict.items():
                             if data_label in self.data_dict_keys:
                                 if isinstance(data_val, list):
@@ -237,17 +254,27 @@ class C_biovis:
                             if len(v) < max_len:
                                 pad_len = max_len - len(v)
                                 data_dict[k] += ["NaN"] * pad_len
-                        self.channel_datasources[pstat_channel].stream(data_dict, rollover=self.max_points)
+                        self.channel_datasources[pstat_channel].stream(
+                            data_dict, rollover=self.max_points
+                        )
 
     def _add_plots(self, channel):
         # clear legend
         if self.channel_plots[channel].renderers:
             self.channel_plots[channel].legend.items = []
+        if self.channel_plots_prev[channel].renderers:
+            self.channel_plots_prev[channel].legend.items = []
 
         # remove all old lines
         self.channel_plots[channel].renderers = []
+        self.channel_plots_prev[channel].renderers = []
 
-        self.channel_plots[channel].title.text = f"active action_uuid: {self.channel_action_uuid[channel]}"
+        self.channel_plots[channel].title.text = (
+            f"active action_uuid: {self.channel_action_uuid[channel]}"
+        )
+        self.channel_plots_prev[channel].title.text = (
+            f"last action_uuid: {self.channel_action_uuid_prev[channel]}"
+        )
         xstr = self.data_dict_keys[self.xselect]
         ystr = self.data_dict_keys[self.yselect]
         self.vis.print_message(f"{xstr}, {ystr}")
@@ -260,13 +287,26 @@ class C_biovis:
             name=self.channel_action_uuid[channel],
             legend_label=ystr,
         )
+        self.channel_plots_prev[channel].line(
+            x=xstr,
+            y=ystr,
+            line_color=colors[0],
+            source=self.channel_datasources_prev[channel],
+            name=self.channel_action_uuid_prev[channel],
+            legend_label=ystr,
+        )
 
     def reset_plot(self, channel, new_action_uuid=None, forceupdate: bool = False):
         if self.channel_action_uuid[channel] != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
                 self.vis.print_message(f" ... reseting channel {channel} graph")
+                if self.channel_action_uuid_prev[channel] != "":
+                    self.channel_action_uuid_prev[channel] = self.channel_action_uuid[channel]
+                    self.channel_datasources_prev[channel] = ColumnDataSource(data=deepcopy(self.channel_datasources[channel].data))
                 self.channel_action_uuid[channel] = new_action_uuid
-                self.channel_datasources[channel].data = {key: [] for key in self.data_dict_keys}
+                self.channel_datasources[channel].data = {
+                    key: [] for key in self.data_dict_keys
+                }
             self._add_plots(channel)
         if (self.xselect != self.xaxis_selector_group.active) or (
             self.yselect != self.yaxis_selector_group.active
