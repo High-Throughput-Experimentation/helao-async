@@ -98,10 +98,14 @@ class BiologicExec(Executor):
     async def _exec(self) -> dict:
         """Begin measurement or wait for TTL trigger if specified."""
         LOGGER.debug("starting measurement")
-        resp = self.driver.start_channel(self.channel, self.ttl_params)
-        self.start_time = resp.data.get("start_time", time.time())
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
-        return {"error": error}
+        try:
+            resp = self.driver.start_channel(self.channel, self.ttl_params)
+            self.start_time = resp.data.get("start_time", time.time())
+            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            return {"error": error}
+        except Exception:
+            LOGGER.error("BiologicExec exec error", exc_info=True)
+            return {"error": ErrorCodes.critical}
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
