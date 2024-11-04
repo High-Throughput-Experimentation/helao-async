@@ -218,7 +218,6 @@ class C_biovis:
                 data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
             ):
-                print(data_package.datamodel.data)
                 channels = data_package.datamodel.data.get("channel", [])
                 if channels:
                     pstat_channel = channels[0]
@@ -239,6 +238,8 @@ class C_biovis:
                             pad_len = max_len - len(v)
                             data_dict[k] += ["NaN"] * pad_len
                     self.channel_datasources[pstat_channel].stream(data_dict, rollover=self.max_points)
+                    print(data_dict)
+                    print(self.channel_datasources[pstat_channel].data)
 
     def _add_plots(self, channel):
         # clear legend
