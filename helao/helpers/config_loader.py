@@ -14,6 +14,21 @@ CONFIG = None
 
 
 def config_loader(confArg, helao_root):
+    """
+    Loads a configuration file in either Python (.py) or YAML (.yml) format.
+
+    Args:
+        confArg (str): The path to the configuration file or a prefix for the configuration file.
+        helao_root (str): The root directory for the helao project.
+
+    Returns:
+        dict: The loaded configuration dictionary with an additional key 'loaded_config_path' 
+              indicating the absolute path of the loaded configuration file.
+
+    Raises:
+        FileNotFoundError: If the specified configuration file does not exist or if the prefix 
+                           does not correspond to an existing .py or .yml file.
+    """
     confPrefix = os.path.basename(confArg).replace(".py", "").replace(".yml", "")
     if confArg.endswith(".py") and os.path.exists(confArg):
         print_message({}, "launcher", f"Loading config from {confArg}", info=True)
