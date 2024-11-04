@@ -15,7 +15,20 @@ TAGS = [
 
 
 class HelaoFastAPI(FastAPI):
-    """Standard FastAPI class with HELAO config attached for simpler import."""
+    """
+    HelaoFastAPI is a subclass of FastAPI that initializes with specific configuration
+    parameters for the Helao server.
+
+    Attributes:
+        helao_cfg (dict): Configuration dictionary for Helao.
+        helao_srv (str): Name of the Helao server.
+        server_cfg (dict): Configuration dictionary for the specific server.
+        server_params (dict): Additional parameters for the server.
+
+    Methods:
+        __init__(helao_cfg: dict, helao_srv: str, *args, **kwargs):
+            Initializes the HelaoFastAPI instance with the given configuration and server name.
+    """
 
     def __init__(self, helao_cfg: dict, helao_srv: str, *args, **kwargs):
         super().__init__(*args, **kwargs, openapi_tags=TAGS)
@@ -30,7 +43,23 @@ class HelaoFastAPI(FastAPI):
 
 
 class HelaoBokehAPI:
-    """Standard Bokeh class with HELAO config attached for simpler import."""
+    """
+    A class to represent the Helao Bokeh API.
+
+    Attributes:
+    -----------
+    helao_cfg : dict
+        Configuration dictionary for Helao.
+    helao_srv : str
+        Name of the Helao server.
+    doc : Document
+        Bokeh document object.
+
+    Methods:
+    --------
+    __init__(self, helao_cfg: dict, helao_srv: str, doc):
+        Initializes the HelaoBokehAPI with the given configuration, server name, and Bokeh document.
+    """
 
     def __init__(self, helao_cfg: dict, helao_srv: str, doc):
         self.helao_srv = helao_srv

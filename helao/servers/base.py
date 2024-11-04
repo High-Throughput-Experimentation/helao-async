@@ -78,35 +78,109 @@ colorama.init(strip=not sys.stdout.isatty())
 
 
 class Base:
-    """Base class for all HELAO servers.
+    """
+    Base class for managing server configurations, endpoints, and actions.
 
-    Base is a general class which implements message passing,
-    status update, data writing, and data streaming via async tasks.
-    Every instrument and action server should import this class
-    for efficient integration into an orchestrated environment.
+    Attributes:
+        server (MachineModel): The server machine model.
+        fastapp (FastAPI): The FastAPI application instance.
+        dyn_endpoints (callable, optional): Dynamic endpoints initializer.
+        server_cfg (dict): Server configuration.
+        server_params (dict): Server parameters.
+        world_cfg (dict): Global configuration.
+        orch_key (str, optional): Orchestrator key.
+        orch_host (str, optional): Orchestrator host.
+        orch_port (int, optional): Orchestrator port.
+        run_type (str, optional): Run type.
+        helaodirs (HelaoDirs): Directory paths for Helao.
+        actives (Dict[UUID, object]): Active actions.
+        last_10_active (list): Last 10 active actions.
+        executors (dict): Running executors.
+        actionservermodel (ActionServerModel): Action server model.
+        status_q (MultisubscriberQueue): Status queue.
+        data_q (MultisubscriberQueue): Data queue.
+        live_q (MultisubscriberQueue): Live queue.
+        live_buffer (dict): Live buffer.
+        status_clients (set): Status clients.
+        local_action_task_queue (list): Local action task queue.
+        status_publisher (WsPublisher): Status WebSocket publisher.
+        data_publisher (WsPublisher): Data WebSocket publisher.
+        live_publisher (WsPublisher): Live WebSocket publisher.
+        ntp_server (str): NTP server.
+        ntp_response (NTPResponse, optional): NTP response.
+        ntp_offset (float, optional): NTP offset.
+        ntp_last_sync (float, optional): Last NTP sync time.
+        aiolock (asyncio.Lock): Asyncio lock.
+        endpoint_queues (dict): Endpoint queues.
+        local_action_queue (Queue): Local action queue.
+        fast_urls (list): FastAPI URLs.
+        ntp_last_sync_file (str, optional): NTP last sync file path.
+        ntplockpath (str, optional): NTP lock file path.
+        ntplock (FileLock, optional): NTP file lock.
+        aloop (asyncio.AbstractEventLoop, optional): Asyncio event loop.
+        dumper (aiodebug.hang_inspection.HangInspector, optional): Hang inspector.
+        dumper_task (asyncio.Task, optional): Hang inspector task.
+        sync_ntp_task_run (bool): NTP sync task running flag.
+        ntp_syncer (asyncio.Task, optional): NTP sync task.
+        bufferer (asyncio.Task, optional): Live buffer task.
+        status_LOGGER (asyncio.Task, optional): Status logger task.
 
-    A Base initialized within a FastAPI startup event
-    will launch three async tasks to the server's event loop for handling:
-    (1) broadcasting status updates via websocket and
-        http POST requests to an attached
-        orchestrator's status updater if available,
-    (2) data streaming via websocket,
-    (3) data writing to local disk.
-
-    Websocket connections are broadcast from a multisubscriber queue
-    in order to handle consumption from multiple clients
-    awaiting a single queue. Self-subscriber tasks are
-    also created as initial subscribers
-    to log all events and prevent queue overflow.
-
-    The data writing method will update a class attribute
-    with the currently open file.
-    For a given root directory, files
-    and folders will be written as follows: TBD
+    Methods:
+        __init__(self, fastapp, dyn_endpoints=None): Initialize the Base class.
+        exception_handler(self, loop, context): Handle exceptions in the event loop.
+        myinit(self): Initialize the event loop and tasks.
+        dyn_endpoints_init(self): Initialize dynamic endpoints.
+        endpoint_queues_init(self): Initialize endpoint queues.
+        print_message(self, *args, **kwargs): Print a message with server context.
+        init_endpoint_status(self, dyn_endpoints=None): Initialize endpoint status.
+        get_endpoint_urls(self): Get a list of all endpoints on this server.
+        _get_action(self, frame) -> Action: Get the action from the current frame.
+        setup_action(self) -> Action: Setup an action.
+        setup_and_contain_action(self, json_data_keys: List[str], action_abbr: str, file_type: str, hloheader: HloHeaderModel): Setup and contain an action.
+        contain_action(self, activeparams: ActiveParams): Contain an action.
+        get_active_info(self, action_uuid: UUID): Get active action information.
+        get_ntp_time(self): Get the current time from the NTP server.
+        send_statuspackage(self, client_servkey: str, client_host: str, client_port: int, action_name: str = None): Send a status package to a client.
+        send_nbstatuspackage(self, client_servkey: str, client_host: str, client_port: int, actionmodel: ActionModel): Send a non-blocking status package to a client.
+        attach_client(self, client_servkey: str, client_host: str, client_port: int, retry_limit=5): Attach a client for status updates.
+        detach_client(self, client_servkey: str, client_host: str, client_port: int): Detach a client from status updates.
+        ws_status(self, websocket: WebSocket): Handle WebSocket status subscriptions.
+        ws_data(self, websocket: WebSocket): Handle WebSocket data subscriptions.
+        ws_live(self, websocket: WebSocket): Handle WebSocket live subscriptions.
+        live_buffer_task(self): Task to update the live buffer.
+        put_lbuf(self, live_dict): Put data into the live buffer.
+        put_lbuf_nowait(self, live_dict): Put data into the live buffer without waiting.
+        get_lbuf(self, live_key): Get data from the live buffer.
+        log_status_task(self, retry_limit: int = 5): Task to log status changes and send updates to clients.
+        detach_subscribers(self): Detach all subscribers.
+        get_realtime(self, epoch_ns: float = None, offset: float = None) -> float: Get the current real-time.
+        get_realtime_nowait(self, epoch_ns: float = None, offset: float = None) -> float: Get the current real-time without waiting.
+        sync_ntp_task(self, resync_time: int = 1800): Task to regularly sync with the NTP server.
+        shutdown(self): Shutdown the server and tasks.
+        write_act(self, action): Write action metadata to a file.
+        write_exp(self, experiment, manual=False): Write experiment metadata to a file.
+        write_seq(self, sequence, manual=False): Write sequence metadata to a file.
+        append_exp_to_seq(self, exp, seq): Append experiment metadata to a sequence file.
+        new_file_conn_key(self, key: str) -> UUID: Generate a new file connection key.
+        dflt_file_conn_key(self): Get the default file connection key.
+        replace_status(self, status_list: List[HloStatus], old_status: HloStatus, new_status: HloStatus): Replace a status in the status list.
+        get_main_error(self, errors) -> ErrorCodes: Get the main error from a list of errors.
+        stop_executor(self, executor_id: str): Stop an executor.
+        stop_all_executor_prefix(self, action_name: str, match_vars: dict = {}): Stop all executors with a given prefix.
     """
 
     # TODO: add world_cfg: dict parameter for BaseAPI to pass config instead of fastapp
     def __init__(self, fastapp, dyn_endpoints=None):
+        """
+        Initialize the server object.
+
+        Args:
+            fastapp: The FastAPI application instance.
+            dyn_endpoints (optional): Dynamic endpoints for the server.
+
+        Raises:
+            ValueError: If the root directory is not defined or 'run_type' is missing in the configuration.
+        """
         self.server = MachineModel(
             server_name=fastapp.helao_srv, machine_name=gethostname().lower()
         )
@@ -200,6 +274,22 @@ class Base:
                             self.ntp_offset = float(self.ntp_offset)
 
     def exception_handler(self, loop, context):
+        """
+        Handles exceptions raised by coroutines in the event loop.
+
+        This method is intended to be used as an exception handler for asyncio event loops.
+        It logs the exception details and sets an emergency stop (E-STOP) flag on all active actions.
+
+        Args:
+            loop (asyncio.AbstractEventLoop): The event loop where the exception occurred.
+            context (dict): A dictionary containing information about the exception, including
+                            the exception object itself under the key "exception".
+
+        Logs:
+            - The context of the exception.
+            - The formatted exception traceback.
+            - A message indicating that the E-STOP flag is being set on active actions.
+        """
         self.print_message(f"Got exception from coroutine: {context}", error=True)
         exc = context.get("exception")
         self.print_message(
@@ -211,6 +301,27 @@ class Base:
             active.set_estop()
 
     def myinit(self):
+        """
+        Initializes the asynchronous event loop and various tasks for the server.
+
+        This method performs the following actions:
+        - Retrieves the current running event loop.
+        - Enables logging of slow callbacks that take longer than a specified interval.
+        - Starts the hang inspection to dump coroutine stack traces when the event loop hangs.
+        - Creates a task to stop the hang inspection.
+        - Sets a custom exception handler for the event loop.
+        - Gathers NTP time if it has not been synced yet.
+        - Initializes and starts tasks for NTP synchronization, live buffering, and status logging.
+
+        Attributes:
+            aloop (asyncio.AbstractEventLoop): The current running event loop.
+            dumper (aiodebug.hang_inspection.HangInspector): The hang inspection instance.
+            dumper_task (asyncio.Task): The task to stop the hang inspection.
+            sync_ntp_task_run (bool): Flag indicating if the NTP sync task has run.
+            ntp_syncer (asyncio.Task): The task for NTP synchronization.
+            bufferer (asyncio.Task): The task for live buffering.
+            status_LOGGER (asyncio.Task): The task for logging status.
+        """
         self.aloop = asyncio.get_running_loop()
         # produce warnings on coroutines taking longer than interval
         aiodebug.log_slow_callbacks.enable(30.0)
@@ -232,15 +343,45 @@ class Base:
         self.status_LOGGER = self.aloop.create_task(self.log_status_task())
 
     def dyn_endpoints_init(self):
+        """
+        Initializes dynamic endpoints by gathering asynchronous tasks.
+
+        This method uses `asyncio.gather` to concurrently initialize the status
+        of dynamic endpoints.
+
+        Returns:
+            None
+        """
         asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
 
     def endpoint_queues_init(self):
+        """
+        Initializes endpoint queues for the server.
+
+        This method iterates over the URLs in `self.fast_urls` and checks if the
+        path of each URL starts with the server's name. If it does, it extracts
+        the endpoint name from the URL path and initializes a queue for that
+        endpoint, storing it in `self.endpoint_queues`.
+
+        Returns:
+            None
+        """
         for urld in self.fast_urls:
             if urld.get("path", "").strip("/").startswith(self.server.server_name):
                 endpoint_name = urld["path"].strip("/").split("/")[-1]
                 self.endpoint_queues[endpoint_name] = Queue()
 
     def print_message(self, *args, **kwargs):
+        """
+        Print a message with the server configuration and server name.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Keyword Args:
+            log_dir (str): Directory where logs are stored.
+        """
         print_message(
             self.server_cfg,
             self.server.server_name,
@@ -251,8 +392,23 @@ class Base:
 
     # TODO: add app: FastAPI parameter for BaseAPI to pass app
     async def init_endpoint_status(self, dyn_endpoints=None):
-        """Populate status dict
-        with FastAPI server endpoints for monitoring."""
+        """
+        Initializes the endpoint status for the server.
+
+        This method performs the following tasks:
+        1. If `dyn_endpoints` is a callable, it invokes it with the `fastapp` instance.
+        2. Iterates through the routes of the `fastapp` instance and updates the
+           `actionservermodel.endpoints` dictionary with the endpoint names that
+           start with the server's name.
+        3. Sorts the status of each endpoint.
+        4. Prints a message indicating the number of endpoints found for status monitoring.
+        5. Retrieves and stores the URLs of the endpoints.
+        6. Initializes the endpoint queues.
+
+        Args:
+            dyn_endpoints (Optional[Callable]): A callable that takes the `fastapp`
+                                                instance as an argument. Default is None.
+        """
         if callable(dyn_endpoints):
             await dyn_endpoints(app=self.fastapp)
         for route in self.fastapp.routes:
@@ -270,7 +426,26 @@ class Base:
         self.endpoint_queues_init()
 
     def get_endpoint_urls(self):
-        """Return a list of all endpoints on this server."""
+        """
+        Return a list of all endpoints on this server.
+
+        This method iterates over all routes in the FastAPI application (`self.fastapp.routes`)
+        and constructs a list of dictionaries, each representing an endpoint. Each dictionary
+        contains the following keys:
+
+        - "path": The path of the route.
+        - "name": The name of the route.
+        - "params": A dictionary of parameters for the route, where each key is the parameter
+          name and the value is another dictionary with the following keys:
+            - "outer_type": The outer type of the parameter.
+            - "type": The type of the parameter.
+            - "required": A boolean indicating if the parameter is required.
+            - "default": The default value of the parameter, or `None` if there is no default.
+
+        Returns:
+            list: A list of dictionaries, each representing an endpoint with its path, name,
+                  and parameters.
+        """
         url_list = []
         for route in self.fastapp.routes:
             routeD = {"path": route.path, "name": route.name}
@@ -301,6 +476,21 @@ class Base:
         return url_list
 
     def _get_action(self, frame) -> Action:
+        """
+        Extracts and constructs an Action object from the given frame.
+
+        This method inspects the local variables of the provided frame to find an
+        instance of the Action class. It also collects other parameters and updates
+        the action's parameters accordingly. If no Action instance is found, a blank
+        Action is created. The method also sets various attributes of the Action
+        object, such as action name, server key, and action parameters.
+
+        Args:
+            frame: The frame object from which to extract the Action.
+
+        Returns:
+            Action: The constructed or updated Action object.
+        """
         _args, _varargs, _keywords, _locals = inspect.getargvalues(frame)
         action = None
         paramdict = {}
@@ -386,6 +576,15 @@ class Base:
         return action
 
     def setup_action(self) -> Action:
+        """
+        Sets up and returns an Action object.
+
+        This method retrieves the current frame's caller frame and uses it to
+        initialize and return an Action object.
+
+        Returns:
+            Action: The initialized Action object.
+        """
         return self._get_action(frame=inspect.currentframe().f_back)
 
     async def setup_and_contain_action(
@@ -395,8 +594,21 @@ class Base:
         file_type: str = "helao__file",
         hloheader: HloHeaderModel = HloHeaderModel(),
     ):
-        """This is a simple shortcut for very basic endpoints
-        which just want to return some simple data"""
+        """
+        Asynchronously sets up and contains an action.
+
+        This method initializes an action with the provided parameters and then
+        contains it using the `contain_action` method.
+
+        Args:
+            json_data_keys (List[str], optional): A list of JSON data keys. Defaults to an empty list.
+            action_abbr (str, optional): An abbreviation for the action. Defaults to None.
+            file_type (str, optional): The type of file. Defaults to "helao__file".
+            hloheader (HloHeaderModel, optional): The header model for HLO. Defaults to an instance of HloHeaderModel.
+
+        Returns:
+            ActiveParams: The active parameters after containing the action.
+        """
         action = self._get_action(frame=inspect.currentframe().f_back)
         if action_abbr is not None:
             action.action_abbr = action_abbr
@@ -416,12 +628,15 @@ class Base:
         return active
 
     async def contain_action(self, activeparams: ActiveParams):
-        """return an active Action:
-        file_type: type of output data file
-        json_data_keys: data keys for json encoded data (dict)
-        file_sample_label: list of sample labels
-        file_conn_keys:
-        header: header for data file
+        """
+        Handles the containment of an action by either substituting an existing action
+        or creating a new one, and maintains a record of the last 10 active actions.
+
+        Args:
+            activeparams (ActiveParams): The parameters of the action to be contained.
+
+        Returns:
+            Active: The active action instance that has been contained.
         """
         if activeparams.action.action_uuid in self.actives:
             await self.actives[activeparams.action.action_uuid].substitute()
@@ -437,6 +652,16 @@ class Base:
         return self.actives[activeparams.action.action_uuid]
 
     def get_active_info(self, action_uuid: UUID):
+        """
+        Retrieve the active action information for a given action UUID.
+
+        Args:
+            action_uuid (UUID): The unique identifier of the action to retrieve.
+
+        Returns:
+            dict: A dictionary containing the action information if the action UUID is found.
+            None: If the action UUID is not found, returns None and logs an error message.
+        """
         if action_uuid in self.actives:
             action_dict = self.actives[action_uuid].action.as_dict()
             return action_dict
@@ -447,7 +672,30 @@ class Base:
             return None
 
     async def get_ntp_time(self):
-        """Check system clock against NIST clock for trigger operations."""
+        """
+        Asynchronously retrieves the current time from an NTP server and updates the
+        instance variables with the response.
+
+        This method acquires a lock to ensure thread safety while accessing the NTP
+        server. It sends a request to the specified NTP server and updates the
+        following instance variables based on the response:
+        - ntp_response: The full response from the NTP server.
+        - ntp_last_sync: The original time from the NTP response.
+        - ntp_offset: The offset time from the NTP response.
+
+        If the request to the NTP server fails, it logs a timeout message and sets
+        ntp_last_sync to the current time and ntp_offset to 0.0.
+
+        Additionally, it logs the ntp_offset and ntp_last_sync values. If a file path
+        for ntp_last_sync_file is provided, it waits until the file is not in use,
+        then writes the ntp_last_sync and ntp_offset values to the file.
+
+        Raises:
+            ntplib.NTPException: If there is an error in the NTP request.
+
+        Returns:
+            None
+        """
         with self.ntplock:
             c = ntplib.NTPClient()
             try:
@@ -482,6 +730,18 @@ class Base:
         client_port: int,
         action_name: str = None,
     ):
+        """
+        Asynchronously sends a status package to a specified client.
+
+        Args:
+            client_servkey (str): The service key of the client.
+            client_host (str): The host address of the client.
+            client_port (int): The port number of the client.
+            action_name (str, optional): The name of the action to include in the status package. Defaults to None.
+
+        Returns:
+            tuple: A tuple containing the response and error code from the private dispatcher.
+        """
         # needs private dispatcher
         json_dict = {
             "actionservermodel": self.actionservermodel.get_fastapi_json(
@@ -505,6 +765,19 @@ class Base:
         client_port: int,
         actionmodel: ActionModel,
     ):
+        """
+        Sends a non-blocking status package to a specified client.
+
+        Args:
+            client_servkey (str): The server key of the client.
+            client_host (str): The host address of the client.
+            client_port (int): The port number of the client.
+            actionmodel (ActionModel): The action model to be sent.
+
+        Returns:
+            tuple: A tuple containing the response and error code from the dispatcher.
+
+        """
         # needs private dispatcher
         json_dict = {
             "actionmodel": actionmodel.as_dict(),
@@ -528,7 +801,21 @@ class Base:
     async def attach_client(
         self, client_servkey: str, client_host: str, client_port: int, retry_limit=5
     ):
-        """Add client for pushing status updates via HTTP POST."""
+        """
+        Attach a client to the status subscriber list.
+
+        This method attempts to attach a client to the server's status subscriber list.
+        It retries the attachment process up to `retry_limit` times if it fails.
+
+        Args:
+            client_servkey (str): The service key of the client.
+            client_host (str): The host address of the client.
+            client_port (int): The port number of the client.
+            retry_limit (int, optional): The number of times to retry the attachment process. Defaults to 5.
+
+        Returns:
+            bool: True if the client was successfully attached, False otherwise.
+        """
         success = False
         combo_key = (
             client_servkey,
@@ -581,7 +868,19 @@ class Base:
         return success
 
     def detach_client(self, client_servkey: str, client_host: str, client_port: int):
-        """Remove client from receiving status updates via HTTP POST"""
+        """
+        Detaches a client from receiving status updates.
+
+        Parameters:
+        client_servkey (str): The service key of the client.
+        client_host (str): The host address of the client.
+        client_port (int): The port number of the client.
+
+        Removes the client identified by the combination of service key, host,
+        and port from the list of clients receiving status updates. If the client
+        is not found in the list, a message indicating that the client is not
+        subscribed will be printed.
+        """
         combo_key = (
             client_servkey,
             client_host,
@@ -596,7 +895,20 @@ class Base:
             self.print_message(f"Client {combo_key} is not subscribed.")
 
     async def ws_status(self, websocket: WebSocket):
-        "Subscribe to status queue and send message to websocket client."
+        """
+        Handle WebSocket connections for status updates.
+
+        This asynchronous method accepts a WebSocket connection, subscribes to
+        status updates, and sends compressed status messages to the client. If an
+        exception occurs, it logs the error and removes the subscriber from the
+        status queue.
+
+        Args:
+            websocket (WebSocket): The WebSocket connection instance.
+
+        Raises:
+            Exception: If an error occurs during the WebSocket communication.
+        """
         self.print_message("got new status subscriber")
         await websocket.accept()
         status_sub = self.status_q.subscribe()
@@ -616,7 +928,19 @@ class Base:
                 self.status_q.remove(status_sub)
 
     async def ws_data(self, websocket: WebSocket):
-        """Subscribe to data queue and send messages to websocket client."""
+        """
+        Handle WebSocket connections for data subscribers.
+
+        This asynchronous method accepts a WebSocket connection, subscribes to a data queue,
+        and sends compressed data messages to the WebSocket client. If an exception occurs,
+        it logs the error and removes the subscriber from the data queue.
+
+        Args:
+            websocket (WebSocket): The WebSocket connection instance.
+
+        Raises:
+            Exception: If any exception occurs during the WebSocket communication.
+        """
         self.print_message("got new data subscriber")
         await websocket.accept()
         data_sub = self.data_q.subscribe()
@@ -636,7 +960,19 @@ class Base:
                 self.data_q.remove(data_sub)
 
     async def ws_live(self, websocket: WebSocket):
-        """Subscribe to data queue and send messages to websocket client."""
+        """
+        Handle a new WebSocket connection for live data streaming.
+
+        This coroutine accepts a WebSocket connection, subscribes to the live data queue,
+        and sends compressed live data messages to the client. If an exception occurs,
+        it logs the error and removes the subscriber from the live data queue.
+
+        Args:
+            websocket (WebSocket): The WebSocket connection instance.
+
+        Raises:
+            Exception: If an error occurs during the WebSocket communication or data processing.
+        """
         self.print_message("got new live_buffer subscriber")
         await websocket.accept()
         live_sub = self.live_q.subscribe()
@@ -654,26 +990,71 @@ class Base:
                 self.live_q.remove(live_sub)
 
     async def live_buffer_task(self):
-        """Self-subscribe to live_q, update live_buffer dict."""
+        """
+        Asynchronous task that processes messages from a live queue and updates the live buffer.
+
+        This method subscribes to the live queue and iterates over incoming messages.
+        Each message is used to update the live buffer.
+
+        The method logs a message indicating that the live buffer task has been created.
+
+        Returns:
+            None
+        """
         self.print_message(f"{self.server.server_name} live buffer task created.")
         async for live_msg in self.live_q.subscribe():
             self.live_buffer.update(live_msg)
 
     async def put_lbuf(self, live_dict):
-        """Convert dict values to tuples of (val, timestamp), enqueue to live_q."""
+        """
+        Asynchronously puts a dictionary with updated timestamps into the live queue.
+
+        Args:
+            live_dict (dict): A dictionary where each key-value pair will be updated with the current time.
+
+        Returns:
+            None
+        """
         new_dict = {k: (v, time()) for k, v in live_dict.items()}
         await self.live_q.put(new_dict)
 
     def put_lbuf_nowait(self, live_dict):
-        """Convert dict values to tuples of (val, timestamp), enqueue to live_q."""
+        """
+        Puts a dictionary with current timestamps into the live queue without waiting.
+
+        Args:
+            live_dict (dict): A dictionary where each key-value pair will be updated
+                              with the current time and then put into the live queue.
+        """
         new_dict = {k: (v, time()) for k, v in live_dict.items()}
         self.live_q.put_nowait(new_dict)
 
     def get_lbuf(self, live_key):
+        """
+        Retrieve the live buffer associated with the given key.
+
+        Args:
+            live_key (str): The key to identify the live buffer.
+
+        Returns:
+            object: The live buffer associated with the given key.
+        """
         return self.live_buffer[live_key]
 
     async def log_status_task(self, retry_limit: int = 5):
-        """Self-subscribe to status queue, log status changes, POST to clients."""
+        """
+        Asynchronous task to log and send status updates to clients.
+
+        This task subscribes to a status queue and processes incoming status messages.
+        It updates the internal action server model with the new status, sends the status
+        to subscribed clients, and handles retries in case of failures.
+
+        Args:
+            retry_limit (int): The number of retry attempts for sending status updates to clients. Default is 5.
+
+        Raises:
+            Exception: If an error occurs during the execution of the task, it logs the error and traceback.
+        """
         self.print_message(f"{self.server.server_name} status log task created.")
 
         try:
@@ -754,18 +1135,48 @@ class Base:
             )
 
     async def detach_subscribers(self):
+        """
+        Asynchronously detaches subscribers by signaling the termination of
+        status and data queues and then waits for a short period.
+
+        This method performs the following actions:
+        1. Puts a `StopAsyncIteration` exception into the `status_q` queue.
+        2. Puts a `StopAsyncIteration` exception into the `data_q` queue.
+        3. Waits for 1 second to allow the queues to process the termination signal.
+
+        Returns:
+            None
+        """
         await self.status_q.put(StopAsyncIteration)
         await self.data_q.put(StopAsyncIteration)
         await asyncio.sleep(1)
 
     async def get_realtime(self, epoch_ns: float = None, offset: float = None) -> float:
-        """returns epoch in ns"""
+        """
+        Asynchronously retrieves the real-time value.
+
+        Args:
+            epoch_ns (float, optional): The epoch time in nanoseconds. Defaults to None.
+            offset (float, optional): The offset to be applied to the epoch time. Defaults to None.
+
+        Returns:
+            float: The real-time value.
+        """
         return self.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
         self, epoch_ns: float = None, offset: float = None
     ) -> float:
-        """returns epoch in ns"""
+        """
+        Calculate the real-time in nanoseconds, optionally adjusted by an offset.
+
+        Parameters:
+        epoch_ns (float, optional): The epoch time in nanoseconds. If None, the current time is used.
+        offset (float, optional): The offset in seconds to adjust the time. If None, the instance's NTP offset is used.
+
+        Returns:
+        float: The calculated real-time in nanoseconds.
+        """
         if offset is None:
             if self.ntp_offset is not None:
                 offset_ns = int(np.floor(self.ntp_offset * 1e9))
@@ -780,7 +1191,22 @@ class Base:
         return real_time
 
     async def sync_ntp_task(self, resync_time: int = 1800):
-        "Regularly sync with NTP server."
+        """
+        Periodically synchronizes the system time with an NTP server.
+
+        This asynchronous task runs in a loop, checking the last synchronization
+        time from a file and determining if a resynchronization is needed based
+        on the provided `resync_time` interval. If the time since the last
+        synchronization exceeds `resync_time`, it triggers an NTP time sync.
+        The task can be cancelled gracefully.
+
+        Args:
+            resync_time (int): The interval in seconds to wait before
+                               resynchronizing the time. Default is 1800 seconds (30 minutes).
+
+        Raises:
+            asyncio.CancelledError: If the task is cancelled during execution.
+        """
         self.sync_ntp_task_run = True
         try:
             while self.sync_ntp_task_run:
@@ -813,13 +1239,39 @@ class Base:
             self.print_message("ntp sync task was cancelled", info=True)
 
     async def shutdown(self):
+        """
+        Asynchronously shuts down the server.
+
+        This method performs the following actions:
+        1. Sets the `sync_ntp_task_run` flag to False to stop NTP synchronization.
+        2. Detaches all subscribers by calling `detach_subscribers`.
+        3. Cancels the `status_LOGGER` task.
+        4. Cancels the `ntp_syncer` task.
+
+        Returns:
+            None
+        """
         self.sync_ntp_task_run = False
         await self.detach_subscribers()
         self.status_LOGGER.cancel()
         self.ntp_syncer.cancel()
 
     async def write_act(self, action):
-        "Create new exp if it doesn't exist."
+        """
+        Asynchronously writes action metadata to a YAML file if saving is enabled.
+
+        Args:
+            action (Action): The action object containing metadata to be saved.
+
+        The function constructs the output file path and name based on the action's
+        timestamp and other attributes. If the directory does not exist, it creates
+        it. The metadata is then written to a YAML file in the specified directory.
+
+        If saving is disabled for the action, a message indicating this is printed.
+
+        Raises:
+            OSError: If there is an issue creating the directory or writing the file.
+        """
         if action.save_act:
             act_dict = action.get_actmodel().clean_dict()
             output_path = os.path.join(
@@ -846,6 +1298,16 @@ class Base:
             )
 
     async def write_exp(self, experiment, manual=False):
+        """
+        Asynchronously writes the experiment data to a YAML file.
+
+        Args:
+            experiment (Experiment): The experiment object containing the data to be written.
+            manual (bool, optional): If True, saves the file in the DIAG directory. Defaults to False.
+
+        Writes:
+            A YAML file containing the experiment data to the specified directory.
+        """
         exp_dict = experiment.get_exp().clean_dict()
         if manual:
             save_root = str(self.helaodirs.save_root).replace("ACTIVE", "DIAG")
@@ -871,6 +1333,18 @@ class Base:
             await f.write(output_str)
 
     async def write_seq(self, sequence, manual=False):
+        """
+        Asynchronously writes a sequence to a YAML file.
+
+        Args:
+            sequence (Sequence): The sequence object to be written.
+            manual (bool, optional): If True, the sequence will be saved in the "DIAG" directory.
+                                     If False, it will be saved in the default save_root directory.
+                                     Defaults to False.
+
+        Writes:
+            A YAML file containing the sequence data to the specified directory.
+        """
         seq_dict = sequence.get_seq().clean_dict()
         sequence_dir = sequence.get_sequence_dir()
         if manual:
@@ -897,6 +1371,20 @@ class Base:
             await f.write(output_str)
 
     async def append_exp_to_seq(self, exp, seq):
+        """
+        Appends experiment details to a sequence file in YAML format.
+
+        Args:
+            exp: An object containing experiment details such as experiment_uuid,
+                 experiment_name, experiment_output_dir, orch_key, orch_host, and orch_port.
+            seq: An object representing the sequence to which the experiment details
+                 will be appended. It should have methods get_sequence_dir() and
+                 sequence_timestamp.
+
+        Writes:
+            A YAML formatted string containing the experiment details to a file named
+            with the sequence timestamp in the sequence directory.
+        """
         append_dict = {
             "experiment_uuid": str(exp.experiment_uuid),
             "experiment_name": exp.experiment_name,
@@ -917,6 +1405,15 @@ class Base:
             await f.write(append_str)
 
     def new_file_conn_key(self, key: str) -> UUID:
+        """
+        Generates a UUID based on the MD5 hash of the provided key string.
+
+        Args:
+            key (str): The input string to be hashed and converted to a UUID.
+
+        Returns:
+            UUID: A UUID object generated from the MD5 hash of the input string.
+        """
         # return shortuuid.decode(key)
         # Instansiate new md5_hash
         md5_hash = hashlib.md5()
@@ -928,12 +1425,32 @@ class Base:
         return UUID(the_md5_hex_str)
 
     def dflt_file_conn_key(self):
-        """simply return a default None"""
+        """
+        Generates a default file connection key.
+
+        This method returns a new file connection key using the string representation
+        of `None`.
+
+        Returns:
+            str: A new file connection key.
+        """
         return self.new_file_conn_key(str(None))
 
     def replace_status(
         self, status_list: List[HloStatus], old_status: HloStatus, new_status: HloStatus
     ):
+        """
+        Replaces an old status with a new status in the given status list. If the old status
+        is not found in the list, the new status is appended to the list.
+
+        Args:
+            status_list (List[HloStatus]): The list of statuses to be modified.
+            old_status (HloStatus): The status to be replaced.
+            new_status (HloStatus): The status to replace with.
+
+        Returns:
+            None
+        """
         if old_status in status_list:
             idx = status_list.index(old_status)
             status_list[idx] = new_status
@@ -941,8 +1458,15 @@ class Base:
             status_list.append(new_status)
 
     def get_main_error(self, errors) -> ErrorCodes:
-        """select the main error from a list of errors
-        currently return the first noty none error"""
+        """
+        Determines the main error from a list of errors or a single error.
+
+        Args:
+            errors (Union[List[ErrorCodes], ErrorCodes]): A list of error codes or a single error code.
+
+        Returns:
+            ErrorCodes: The first non-none error code found in the list, or the single error code if not a list.
+        """
         ret_error = ErrorCodes.none
         if isinstance(errors, list):
             for error in errors:
@@ -955,6 +1479,21 @@ class Base:
         return ret_error
 
     def stop_executor(self, executor_id: str):
+        """
+        Stops the executor task associated with the given executor ID.
+
+        This method attempts to stop the action task of the specified executor by signaling it to end its polling loop.
+        If the executor ID is not found among the active executors, an error message is printed.
+
+        Args:
+            executor_id (str): The ID of the executor to stop.
+
+        Returns:
+            dict: A dictionary indicating whether the stop signal was successfully sent.
+                  The dictionary contains a single key "signal_stop" with a boolean value:
+                  - True if the stop signal was successfully sent.
+                  - False if the executor ID was not found.
+        """
         try:
             self.executors[executor_id].stop_action_task()
             self.print_message(
@@ -967,6 +1506,17 @@ class Base:
             return {"signal_stop": False}
 
     def stop_all_executor_prefix(self, action_name: str, match_vars: dict = {}):
+        """
+        Stops all executors whose keys start with the given action name prefix.
+
+        Args:
+            action_name (str): The prefix of the executor keys to match.
+            match_vars (dict, optional): A dictionary of variable names and values to further filter the executors.
+                Only executors whose variables match the provided values will be stopped. Defaults to an empty dictionary.
+
+        Returns:
+            None
+        """
         matching_execs = [k for k in self.executors if k.startswith(action_name)]
         if match_vars:
             matching_execs = [
@@ -980,9 +1530,170 @@ class Base:
 
 
 class Active:
-    """Active action holder which wraps data queing and exp writing."""
+    """
+    The Active class represents an active action within a server. It manages the lifecycle of an action, including initialization, execution, data logging, and finalization. The class provides methods to handle various aspects of an action, such as starting executors, logging data, handling errors, and managing file connections.
+
+    Attributes:
+        base: The base server instance.
+        active_uuid: The unique identifier for the active action.
+        action: The current action being managed.
+        action_list: A list of all actions associated with this active instance.
+        listen_uuids: A list of UUIDs to listen for data logging.
+        num_data_queued: The number of data items queued for logging.
+        num_data_written: The number of data items written to files.
+        file_conn_dict: A dictionary mapping file connection keys to FileConn instances.
+        manual_stop: A flag indicating if the action should be manually stopped.
+        action_loop_running: A flag indicating if the action loop is currently running.
+        action_task: The asyncio task for the action loop.
+
+    Methods:
+        __init__(self, base, activeparams: ActiveParams):
+            Initializes the Active instance with the given base server and active parameters.
+
+        executor_done_callback(self, futr):
+            Callback function to handle the completion of an executor.
+
+        start_executor(self, executor: Executor):
+            Starts the executor for the action.
+
+        oneoff_executor(self, executor: Executor):
+            Executes a one-off action using the executor.
+
+        update_act_file(self):
+            Updates the action file with the current action state.
+
+        myinit(self):
+            Initializes the data logger and action file.
+
+        init_datafile(self, header, file_type, json_data_keys, file_sample_label, filename, file_group: HloFileGroup, file_conn_key: str = None, action: Action = None):
+            Initializes a data file with the given parameters.
+
+        finish_hlo_header(self, file_conn_keys: List[UUID] = None, realtime: float = None):
+            Adds a timestamp to the data file header.
+
+        add_status(self, action=None):
+            Sends the status of the most recent active action.
+
+        set_estop(self, action: Action = None):
+            Sets the emergency stop status for the action.
+
+        set_error(self, error_code: ErrorCodes = None, action: Action = None):
+            Sets the error status for the action.
+
+        get_realtime(self, epoch_ns: float = None, offset: float = None) -> float:
+            Gets the current real-time with optional epoch and offset.
+
+        get_realtime_nowait(self, epoch_ns: float = None, offset: float = None) -> float:
+            Gets the current real-time without waiting.
+
+        write_live_data(self, output_str: str, file_conn_key: UUID):
+            Appends lines to the file connection.
+
+        enqueue_data_dflt(self, datadict: dict):
+            Enqueues data to a default file connection key.
+
+        enqueue_data(self, datamodel: DataModel, action: Action = None):
+            Enqueues data to the data queue.
+
+        enqueue_data_nowait(self, datamodel: DataModel, action: Action = None):
+            Enqueues data to the data queue without waiting.
+
+        assemble_data_msg(self, datamodel: DataModel, action: Action = None) -> DataPackageModel:
+            Assembles a data message for the given data model and action.
+
+        add_new_listen_uuid(self, new_uuid: UUID):
+            Adds a new UUID to the data logger UUID list.
+
+        _get_action_for_file_conn_key(self, file_conn_key: UUID):
+            Gets the action associated with the given file connection key.
+
+        log_data_set_output_file(self, file_conn_key: UUID):
+            Sets the output file for logging data.
+
+        log_data_task(self):
+            Subscribes to the data queue and writes data to the file.
+
+        write_file(self, output_str: str, file_type: str, filename: str = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: str = None, sample_str: str = None, file_sample_label: str = None, json_data_keys: str = None, action: Action = None):
+            Writes a complete file with the given parameters.
+
+        write_file_nowait(self, output_str: str, file_type: str, filename: str = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: str = None, sample_str: str = None, file_sample_label: str = None, json_data_keys: str = None, action: Action = None):
+            Writes a complete file with the given parameters without waiting.
+
+        set_sample_action_uuid(self, sample: SampleUnion, action_uuid: UUID):
+            Sets the action UUID for the given sample.
+
+        append_sample(self, samples: List[SampleUnion], IO: str, action: Action = None):
+            Adds samples to the input or output sample list.
+
+        split_and_keep_active(self):
+            Splits the current action and keeps it active.
+
+        split_and_finish_prev_uuids(self):
+            Splits the current action and finishes previous UUIDs.
+
+        finish_all(self):
+            Finishes all actions.
+
+        split(self, uuid_list: Optional[List[UUID]] = None, new_fileconnparams: Optional[FileConnParams] = None) -> List[UUID]:
+            Splits the current action and finishes previous actions in the UUID list.
+
+        substitute(self):
+            Closes all file connections.
+
+        finish(self, finish_uuid_list: List[UUID] = None) -> Action:
+            Finishes the actions in the UUID list and performs cleanup.
+
+        track_file(self, file_type: str, file_path: str, samples: List[SampleUnion], action: Action = None):
+            Adds auxiliary files to the file dictionary.
+
+        relocate_files(self):
+            Copies auxiliary files to the experiment directory.
+
+        finish_manual_action(self):
+            Finishes a manual action and writes the sequence and experiment meta files.
+
+        send_nonblocking_status(self, retry_limit: int = 3):
+            Sends the non-blocking status to clients.
+
+        action_loop_task(self, executor: Executor):
+            The main loop for executing an action.
+
+        stop_action_task(self):
+            Stops the action loop task.
+    """
 
     def __init__(self, base, activeparams: ActiveParams):  # outer instance
+        """
+        Initializes an instance of the class.
+
+        Args:
+            base: The base instance.
+            activeparams (ActiveParams): The active parameters.
+
+        Attributes:
+            base: The base instance.
+            active_uuid: The UUID of the active action.
+            action: The active action.
+            action_list: A list of all actions for this active instance, with the most recent one at position 0.
+            listen_uuids: A list of UUIDs to listen to.
+            num_data_queued: The number of data items queued.
+            num_data_written: The number of data items written.
+            file_conn_dict (Dict[str, FileConn]): A dictionary mapping file connection keys to FileConn instances.
+            manual_stop: A flag indicating whether the action has been manually stopped.
+            action_loop_running: A flag indicating whether the action loop is running.
+            action_task: The task associated with the action.
+
+        Notes:
+            - Updates the timestamp and UUID of the action if they are None.
+            - Sets the action to dummy or simulation mode based on the world configuration.
+            - Initializes the action with a time offset.
+            - Adds the action UUID to the list of listen UUIDs.
+            - Prints a message if the action is a manual action.
+            - Checks if the root save directory is specified and sets the save flags accordingly.
+            - Adds auxiliary listen UUIDs from the active parameters.
+            - Initializes file connections from the active parameters and updates the action's file connection keys.
+            - Prints messages indicating the save flags for the action.
+        """
         self.base = base
         self.active_uuid = activeparams.action.action_uuid
         self.action = activeparams.action
@@ -1052,6 +1763,16 @@ class Active:
         self.action_task = None
 
     def executor_done_callback(self, futr):
+        """
+        Callback function to handle the completion of a future.
+
+        This function is called when a future is done. It attempts to retrieve the
+        result of the future. If an exception occurred during the execution of the
+        future, it catches the exception and prints the traceback.
+
+        Args:
+            futr (concurrent.futures.Future): The future object that has completed.
+        """
         try:
             _ = futr.result()
         except Exception as exc:
@@ -1060,6 +1781,21 @@ class Active:
             )
 
     def start_executor(self, executor: Executor):
+        """
+        Starts the executor task and manages its execution.
+
+        Args:
+            executor (Executor): The executor instance to be started.
+
+        Returns:
+            dict: A dictionary representation of the action associated with the executor.
+
+        Notes:
+            - If the executor does not allow concurrency, the action UUID is appended to the local queue before running the task.
+            - The executor task is created and started using the event loop.
+            - A callback is added to handle the completion of the executor task.
+            - A message indicating the start of the executor task is printed.
+        """
         # append action_uuid to local queue before running task if concurrency not allowed
         if not executor.concurrent:
             self.base.local_action_task_queue.append(executor.active.action.action_uuid)
@@ -1069,12 +1805,43 @@ class Active:
         return self.action.as_dict()
 
     async def oneoff_executor(self, executor: Executor):
+        """
+        Executes a one-off task using the provided executor.
+
+        Args:
+            executor (Executor): The executor instance to run the task.
+
+        Returns:
+            The result of the action loop task executed by the provided executor.
+        """
         return await self.action_loop_task(executor)
 
     async def update_act_file(self):
+        """
+        Asynchronously updates the action file by writing the current action.
+
+        This method calls the `write_act` method of the `base` object, passing the
+        current action as an argument. It ensures that the action file is updated
+        with the latest action data.
+
+        Returns:
+            None
+        """
         await self.base.write_act(self.action)
 
     async def myinit(self):
+        """
+        Asynchronous initialization method for setting up logging and directories.
+
+        This method performs the following tasks:
+        1. Creates a task for logging data.
+        2. If the action requires saving, it creates necessary directories and updates the action file.
+        3. Prints a message indicating the initialization status.
+        4. Adds the current status.
+
+        Returns:
+            None
+        """
         self.data_LOGGER = self.base.aloop.create_task(self.log_data_task())
         if self.action.save_act:
             os.makedirs(
@@ -1108,6 +1875,22 @@ class Active:
         file_conn_key: str = None,
         action: Action = None,
     ):
+        """
+        Initializes a data file with the provided parameters and generates the necessary file information.
+
+        Args:
+            header (Union[dict, list, str, None]): The header information for the file. Can be a dictionary, list, string, or None.
+            file_type (str): The type of the file.
+            json_data_keys (list): List of keys for JSON data.
+            file_sample_label (Union[list, str, None]): Labels for the file samples. Can be a list, string, or None.
+            filename (str): The name of the file. If None, a filename will be generated.
+            file_group (HloFileGroup): The group to which the file belongs (e.g., heloa_files or aux_files).
+            file_conn_key (str, optional): The connection key for the file. Defaults to None.
+            action (Action, optional): The action associated with the file. Defaults to None.
+
+        Returns:
+            tuple: A tuple containing the header (str) and file information (FileInfo).
+        """
         filenum = 0
         if action is None:
             action = self.action
@@ -1165,7 +1948,22 @@ class Active:
         file_conn_keys: List[UUID] = None,
         realtime: float = None,
     ):
-        """this just adds a timestamp for the data"""
+        """
+        Finalizes the HLO header for the given file connection keys.
+
+        This method updates the `epoch_ns` field in the HLO header of each file
+        connection specified by `file_conn_keys` with the provided `realtime` value.
+        If `realtime` is not provided, the current real-time value is used. If
+        `file_conn_keys` is not provided, the method will update the HLO header for
+        all file connections associated with the actions in `self.action_list`.
+
+        Args:
+            file_conn_keys (List[UUID], optional): A list of file connection keys
+                to update. If None, all file connection keys from `self.action_list`
+                will be used. Defaults to None.
+            realtime (float, optional): The real-time value to set in the HLO header.
+                If None, the current real-time value will be used. Defaults to None.
+        """
         # needs to be a sync function
         if realtime is None:
             realtime = self.get_realtime_nowait()
@@ -1181,7 +1979,21 @@ class Active:
             self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = realtime
 
     async def add_status(self, action=None):
-        """by default send the status of the most recent active action"""
+        """
+        Adds the given action to the status list and logs the action.
+
+        If the action is not provided, it defaults to `self.action`.
+
+        Args:
+            action (Optional[Action]): The action to be added to the status list. If None, defaults to `self.action`.
+
+        Returns:
+            None
+
+        Side Effects:
+            - Logs a message indicating the action being added to the status list.
+            - If the action is blocking, it waits until the action is added to the status queue.
+        """
         if action is None:
             action = self.action
 
@@ -1193,6 +2005,16 @@ class Active:
             await self.base.status_q.put(action.get_actmodel())
 
     def set_estop(self, action: Action = None):
+        """
+        Sets the emergency stop (E-STOP) status for the given action.
+
+        Parameters:
+        action (Action, optional): The action to set the E-STOP status for.
+                                   If None, the current action is used.
+
+        Returns:
+        None
+        """
         if action is None:
             action = self.action
         action.action_status.append(HloStatus.estopped)
@@ -1201,11 +2023,20 @@ class Active:
             error=True,
         )
 
-    async def set_error(
-        self,
-        error_code: ErrorCodes = None,
-        action: Action = None,
-    ):
+    async def set_error(self, error_code: ErrorCodes = None, action: Action = None):
+        """
+        Sets the error status and error code for the given action.
+
+        Args:
+            error_code (ErrorCodes, optional): The error code to set. Defaults to None.
+            action (Action, optional): The action to update. Defaults to None, in which case self.action is used.
+
+        Side Effects:
+            - Appends HloStatus.errored to the experiment_status of the action.
+            - Sets the error_code of the action to the provided error_code or ErrorCodes.unspecified if not provided.
+            - Prints an error message with the action's UUID and name.
+
+        """
         if action is None:
             action = self.action
         action.experiment_status.append(HloStatus.errored)
@@ -1221,15 +2052,46 @@ class Active:
         )
 
     async def get_realtime(self, epoch_ns: float = None, offset: float = None) -> float:
+        """
+        Asynchronously retrieves the real-time value.
+
+        Args:
+            epoch_ns (float, optional): The epoch time in nanoseconds. Defaults to None.
+            offset (float, optional): The offset to be applied to the real-time value. Defaults to None.
+
+        Returns:
+            float: The real-time value with the applied offset.
+        """
         return self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
         self, epoch_ns: float = None, offset: float = None
     ) -> float:
+        """
+        Retrieve the current real-time value without waiting.
+
+        Args:
+            epoch_ns (float, optional): The epoch time in nanoseconds. Defaults to None.
+            offset (float, optional): The offset to be applied to the epoch time. Defaults to None.
+
+        Returns:
+            float: The current real-time value.
+        """
         return self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     async def write_live_data(self, output_str: str, file_conn_key: UUID):
-        """Appends lines to file_conn."""
+        """
+        Asynchronously writes a string to a live data file connection.
+
+        Args:
+            output_str (str): The string to be written to the file. A newline character
+                              will be appended if it is not already present.
+            file_conn_key (UUID): The unique identifier for the file connection in the
+                                  file connection dictionary.
+
+        Returns:
+            None
+        """
         if file_conn_key in self.file_conn_dict:
             if self.file_conn_dict[file_conn_key].file:
                 if not output_str.endswith("\n"):
@@ -1237,8 +2099,14 @@ class Active:
                 await self.file_conn_dict[file_conn_key].file.write(output_str)
 
     async def enqueue_data_dflt(self, datadict: dict):
-        """This is a simple wrapper for simple endpoints which just
-        push data to a single file using a default data conn key
+        """
+        Asynchronously enqueues data using the default file connection key.
+
+        Args:
+            datadict (dict): The data dictionary to be enqueued.
+
+        Returns:
+            None
         """
         await self.enqueue_data(
             datamodel=DataModel(
@@ -1249,6 +2117,17 @@ class Active:
         )
 
     async def enqueue_data(self, datamodel: DataModel, action: Action = None):
+        """
+        Asynchronously enqueues data into the data queue.
+
+        Args:
+            datamodel (DataModel): The data model instance containing the data to be enqueued.
+            action (Action, optional): The action associated with the data. If not provided,
+                                       the default action will be used.
+
+        Returns:
+            None
+        """
         if action is None:
             action = self.action
         await self.base.data_q.put(
@@ -1258,6 +2137,20 @@ class Active:
             self.num_data_queued += 1
 
     def enqueue_data_nowait(self, datamodel: DataModel, action: Action = None):
+        """
+        Enqueues a data message into the queue without waiting.
+
+        Args:
+            datamodel (DataModel): The data model to be enqueued.
+            action (Action, optional): The action associated with the data. Defaults to None.
+
+        Raises:
+            queue.Full: If the queue is full and the data cannot be enqueued.
+
+        Notes:
+            If `action` is not provided, the method uses the instance's `self.action`.
+            Increments `self.num_data_queued` if `datamodel.data` is not empty.
+        """
         if action is None:
             action = self.action
         self.base.data_q.put_nowait(
@@ -1269,6 +2162,18 @@ class Active:
     def assemble_data_msg(
         self, datamodel: DataModel, action: Action = None
     ) -> DataPackageModel:
+        """
+        Assembles a data message package from the given data model and action.
+
+        Args:
+            datamodel (DataModel): The data model containing the data to be packaged.
+            action (Action, optional): The action associated with the data. If not provided,
+                                       the default action of the instance will be used.
+
+        Returns:
+            DataPackageModel: A data package model containing the action UUID, action name,
+                              data model, and any errors from the data model.
+        """
         if action is None:
             action = self.action
         return DataPackageModel(
@@ -1279,10 +2184,25 @@ class Active:
         )
 
     def add_new_listen_uuid(self, new_uuid: UUID):
-        """adds a new uuid to the current data LOGGER UUID list"""
+        """
+        Adds a new UUID to the listen_uuids list.
+
+        Args:
+            new_uuid (UUID): The new UUID to be added to the list.
+        """
         self.listen_uuids.append(new_uuid)
 
     def _get_action_for_file_conn_key(self, file_conn_key: UUID):
+        """
+        Retrieve the action associated with a given file connection key.
+
+        Args:
+            file_conn_key (UUID): The unique identifier for the file connection key.
+
+        Returns:
+            Action or None: The action associated with the given file connection key,
+                            or None if no matching action is found.
+        """
         output_action = None
         for action in self.action_list:
             if file_conn_key in action.file_conn_keys:
@@ -1291,7 +2211,23 @@ class Active:
         return output_action
 
     async def log_data_set_output_file(self, file_conn_key: UUID):
-        "Set active save_path, write header if supplied."
+        """
+        Asynchronously logs data and sets up an output file for a given file connection key.
+
+        Args:
+            file_conn_key (UUID): The unique identifier for the file connection.
+
+        Returns:
+            None
+
+        This method performs the following steps:
+        1. Logs the creation of a file for the given file connection key.
+        2. Retrieves the action associated with the file connection key.
+        3. Adds missing information to the header if necessary.
+        4. Initializes the data file with the appropriate header and metadata.
+        5. Creates the output file and sets up the file connection.
+        6. Writes the header to the new file if it exists.
+        """
 
         self.base.print_message(f"creating file for file conn: {file_conn_key}")
 
@@ -1362,7 +2298,29 @@ class Active:
             await self.file_conn_dict[file_conn_key].file.write(header)
 
     async def log_data_task(self):
-        """Self-subscribe to data queue, write to present file path."""
+        """
+        Asynchronous task to log data messages from a data queue.
+
+        This method subscribes to a data queue and processes incoming data messages.
+        It checks if data logging is enabled, verifies the status of the data, and
+        writes the data to the appropriate output files.
+
+        The method handles the following:
+        - Subscribes to the data queue.
+        - Filters data messages based on action UUIDs.
+        - Checks the status of the data and skips messages with certain statuses.
+        - Retrieves the appropriate action for each data message.
+        - Creates output files if they do not exist.
+        - Writes data to the output files in JSON format or as raw data.
+        - Handles errors and exceptions during the logging process.
+
+        Exceptions:
+            asyncio.CancelledError: Raised when the task is cancelled.
+            Exception: Catches all other exceptions and logs the error message and traceback.
+
+        Returns:
+            None
+        """
         if not self.action.save_data:
             self.base.print_message("data writing disabled")
             return
@@ -1503,7 +2461,43 @@ class Active:
         json_data_keys: str = None,
         action: Action = None,
     ):
-        """Write complete file, not used with queue streaming."""
+        """
+        Asynchronously writes a string to a file with specified parameters.
+
+        Parameters:
+        -----------
+        output_str : str
+            The string content to be written to the file.
+        file_type : str
+            The type of the file to be written.
+        filename : str, optional
+            The name of the file. If not provided, a default name will be used.
+        file_group : HloFileGroup, optional
+            The group to which the file belongs. Default is HloFileGroup.aux_files.
+        header : str, optional
+            The header content to be written at the beginning of the file.
+        sample_str : str, optional
+            A sample string related to the file content.
+        file_sample_label : str, optional
+            A label for the file sample.
+        json_data_keys : str, optional
+            JSON data keys related to the file content.
+        action : Action, optional
+            The action context in which the file is being written. If not provided, 
+            the current action context will be used.
+
+        Returns:
+        --------
+        str or None
+            The path to the written file if the action's save_data attribute is True,
+            otherwise None.
+
+        Notes:
+        ------
+        - The method ensures the output directory exists before writing the file.
+        - Handles different OS path conventions (Windows and POSIX).
+        - Writes the header and output string to the file, separated by '%%\n'.
+        """
         if action is None:
             action = self.action
         if action.save_data:
@@ -1556,7 +2550,23 @@ class Active:
         json_data_keys: str = None,
         action: Action = None,
     ):
-        """Write complete file, not used with queue streaming."""
+        """
+        Writes a file asynchronously without waiting for the operation to complete.
+
+        Args:
+            output_str (str): The string content to be written to the file.
+            file_type (str): The type of the file to be written.
+            filename (str, optional): The name of the file. Defaults to None.
+            file_group (HloFileGroup, optional): The group to which the file belongs. Defaults to HloFileGroup.aux_files.
+            header (str, optional): The header content to be written at the beginning of the file. Defaults to None.
+            sample_str (str, optional): The sample string associated with the file. Defaults to None.
+            file_sample_label (str, optional): The label for the file sample. Defaults to None.
+            json_data_keys (str, optional): The JSON data keys associated with the file. Defaults to None.
+            action (Action, optional): The action associated with the file writing operation. Defaults to None.
+
+        Returns:
+            str: The path to the written file if the action's save_data attribute is True, otherwise None.
+        """
         if action is None:
             action = self.action
 
@@ -1598,6 +2608,16 @@ class Active:
             return None
 
     def set_sample_action_uuid(self, sample: SampleUnion, action_uuid: UUID):
+        """
+        Sets the action UUID for a given sample and its parts if the sample is of type 'assembly'.
+
+        Args:
+            sample (SampleUnion): The sample object for which the action UUID is to be set.
+            action_uuid (UUID): The action UUID to be assigned to the sample.
+
+        Returns:
+            None
+        """
         sample.action_uuid = [action_uuid]
         if sample.sample_type == SampleType.assembly:
             for part in sample.parts:
@@ -1606,7 +2626,25 @@ class Active:
     async def append_sample(
         self, samples: List[SampleUnion], IO: str, action: Action = None
     ):
-        """Add sample to samples_out and samples_in dict"""
+        """
+        Append samples to the specified action's input or output list.
+
+        Args:
+            samples (List[SampleUnion]): A list of samples to be appended.
+            IO (str): Specifies whether the samples are to be appended to the input ('in') or output ('out') list.
+            action (Action, optional): The action to which the samples will be appended. If not provided, the current action is used.
+
+        Returns:
+            None
+
+        Notes:
+            - If the `samples` list is empty, the function returns immediately.
+            - Samples of type `NoneSample` are skipped.
+            - The `action_uuid` of each sample is updated to the current action's UUID.
+            - If a sample's inheritance is `None`, it is set to `SampleInheritance.allow_both`.
+            - If a sample's status is `None`, it is set to `[SampleStatus.preserved]`.
+            - The function broadcasts the status when a sample is added for operator table updates.
+        """
         if action is None:
             action = self.action
         # check if samples is empty
@@ -1645,9 +2683,26 @@ class Active:
         await self.add_status(action=action)
 
     async def split_and_keep_active(self):
+        """
+        Asynchronously splits and keeps active.
+
+        This method calls the `split` method with an empty `uuid_list`.
+
+        Returns:
+            None
+        """
         await self.split(uuid_list=[])
 
     async def split_and_finish_prev_uuids(self):
+        """
+        Asynchronously splits and finishes previous UUIDs.
+
+        This method calls the `split` method with `uuid_list` set to None,
+        which processes and finalizes any previous UUIDs.
+
+        Returns:
+            None
+        """
         await self.split(uuid_list=None)
 
     async def finish_all(self):
@@ -1658,11 +2713,19 @@ class Active:
         uuid_list: Optional[List[UUID]] = None,
         new_fileconnparams: Optional[FileConnParams] = None,
     ) -> List[UUID]:
-        """splits the current action and
-        finishes all previous action in uuid_list
-        default uuid_list = None finishes all previous
+        """
+        Splits the current action into a new action, creating new file connections
+        and updating the action status accordingly.
 
-        returns new file_conn_key
+        Args:
+            uuid_list (Optional[List[UUID]]): List of UUIDs to finish. If None, all actions except the current one will be finished.
+            new_fileconnparams (Optional[FileConnParams]): Parameters for the new file connection. If None, the previous file connection parameters will be used.
+
+        Returns:
+            List[UUID]: List of new file connection keys.
+
+        Raises:
+            Exception: If the split operation fails.
         """
 
         try:
@@ -1774,10 +2837,21 @@ class Active:
         finish_uuid_list: List[UUID] = None,
         # end_state: HloStatus = HloStatus.finished
     ) -> Action:
-        """Close file_conn, finish exp, copy aux,
-        set endpoint status, and move active dict to past.
-        for action uuids of active defined in finish_uuid_list.
-        default None finishes all
+        """
+        Finish the actions specified by the given UUIDs or finish all actions if no UUIDs are provided.
+
+        This method updates the status of the specified actions to `finished`, sends global parameters if required,
+        and ensures that all actions are properly finalized. It also handles the closing of data streams and files,
+        updates the database, and processes any queued actions.
+
+        Args:
+            finish_uuid_list (List[UUID], optional): A list of UUIDs of the actions to be finished. If None, all actions will be finished.
+
+        Returns:
+            Action: The most recent action of the active.
+
+        Raises:
+            Exception: If any error occurs during the finishing process.
         """
         try:
 
@@ -1969,7 +3043,19 @@ class Active:
         samples: List[SampleUnion],
         action: Action = None,
     ) -> None:
-        "Add auxiliary files to file dictionary."
+        """
+        Tracks a file by adding its information to the associated action.
+
+        Args:
+            file_type (str): The type of the file being tracked.
+            file_path (str): The path to the file being tracked.
+            samples (List[SampleUnion]): A list of samples associated with the file.
+            action (Action, optional): The action associated with the file. If not provided, 
+                                       the current action will be used.
+
+        Returns:
+            None
+        """
         if action is None:
             action = self.action
         if os.path.dirname(file_path) != os.path.join(
@@ -1992,7 +3078,17 @@ class Active:
         )
 
     async def relocate_files(self):
-        "Copy auxiliary files from folder path to exp directory."
+        """
+        Asynchronously relocates files from their current locations to new paths.
+
+        This method iterates over the file paths listed in `self.action.AUX_file_paths`
+        and moves each file to a new directory specified by combining `self.base.helaodirs.save_root`
+        and `self.action.action_output_dir`. If the source path and the new path are different,
+        the file is copied to the new location using `async_copy`.
+
+        Returns:
+            None
+        """
         for x in self.action.AUX_file_paths:
             new_path = os.path.join(
                 self.base.helaodirs.save_root,
@@ -2003,6 +3099,20 @@ class Active:
                 await async_copy(x, new_path)
 
     async def finish_manual_action(self):
+        """
+        Finalizes the most recent manual action in the action list.
+
+        This method checks if the most recent action in the action list is a manual action.
+        If it is, it creates a deep copy of the action and updates its status to finished.
+        It then clears the samples and files associated with the action.
+
+        The method proceeds to add all actions in the action list to the experiment model
+        and adds the experiment to the sequence model. Finally, it writes the experiment
+        and sequence metadata files for the manual operation.
+
+        Returns:
+            None
+        """
         # self.action_list[-1] is the very first action
         if self.action_list[-1].manual_action:
             exp = deepcopy(self.action_list[-1])
@@ -2028,6 +3138,20 @@ class Active:
             await self.base.write_seq(exp, manual=True)
 
     async def send_nonblocking_status(self, retry_limit: int = 3):
+        """
+        Sends a non-blocking status update to all clients in `self.base.status_clients`.
+
+        This method attempts to send a status update to each client up to `retry_limit` times.
+        If the update is successful, a success message is printed. If the update fails after
+        the specified number of retries, an error message is printed.
+
+        Args:
+            retry_limit (int): The maximum number of retry attempts for sending the status update.
+                               Defaults to 3.
+
+        Returns:
+            None
+        """
         for combo_key in self.base.status_clients:
             client_servkey, client_host, client_port = combo_key
             self.base.print_message(
@@ -2059,7 +3183,23 @@ class Active:
                 )
 
     async def action_loop_task(self, executor: Executor):
-        """Generic replacement for 'IOloop'."""
+        """
+        Asynchronous task that manages the execution of an action loop.
+
+        This method handles the lifecycle of an action, including pre-execution setup,
+        execution, polling for ongoing actions, manual stopping, and post-execution cleanup.
+        It also manages the registration and deregistration of executors, and handles
+        non-blocking actions.
+
+        Args:
+            executor (Executor): The executor responsible for running the action.
+
+        Returns:
+            The result of the action's finish method.
+
+        Raises:
+            Exception: If any exception occurs during the execution or polling of the action.
+        """
         # stall action_loop task if concurrency is not allowed
         while (
             self.base.local_action_task_queue
@@ -2164,14 +3304,40 @@ class Active:
         return retval
 
     def stop_action_task(self):
-        "External method for stopping action_loop_task."
+        """
+        Stops the current action task.
+
+        This method sets the `manual_stop` flag to True and stops the action loop
+        by setting `action_loop_running` to False. It also logs a message indicating
+        that a stop action request has been received.
+        """
         self.base.print_message("Stop action request received. Stopping poll.")
         self.manual_stop = True
         self.action_loop_running = False
 
 
 class DummyBase:
+    """
+    A dummy base class for demonstration purposes.
+
+    Attributes:
+        live_buffer (dict): A dictionary to store live buffer data.
+        actionservermodel (ActionServerModel): An instance of ActionServerModel.
+
+    Methods:
+        __init__(): Initializes the DummyBase instance.
+        print_message(message: str): Prints a message with a dummy server name.
+        async put_lbuf(message: dict): Asynchronously updates the live buffer with the given message.
+        get_lbuf(buf_key: str): Retrieves the value and timestamp from the live buffer for the given key.
+    """
     def __init__(self) -> None:
+        """
+        Initializes the base server with default settings.
+
+        Attributes:
+            live_buffer (dict): A dictionary to store live data.
+            actionservermodel (ActionServerModel): An instance of ActionServerModel initialized with a dummy server and machine name, and a unique action UUID.
+        """
         self.live_buffer = {}
         self.actionservermodel = ActionServerModel(
             action_server=MachineModel(server_name="DUMMY", machine_name="dummyhost"),
@@ -2179,13 +3345,34 @@ class DummyBase:
         )
 
     def print_message(self, message: str) -> None:
+        """
+        Prints a message to the console.
+
+        Args:
+            message (str): The message to be printed.
+        """
         print_message({}, "DUMMY", message)
 
     async def put_lbuf(self, message: dict) -> None:
+        """
+        Updates the live buffer with the provided message.
+
+        Args:
+            message (dict): A dictionary containing key-value pairs to be added to the live buffer.
+        """
         now = time.time()
         for k, v in message:
             self.live_buffer[k] = (v, now)
 
     def get_lbuf(self, buf_key: str) -> tuple:
+        """
+        Retrieve the value and timestamp from the live buffer for a given key.
+
+        Args:
+            buf_key (str): The key to look up in the live buffer.
+
+        Returns:
+            tuple: A tuple containing the value and timestamp associated with the given key.
+        """
         buf_val, buf_ts = self.live_buffer[buf_key]
         return buf_val, buf_ts
