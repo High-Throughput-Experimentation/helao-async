@@ -69,7 +69,7 @@ class BiologicExec(Executor):
             self.ttl_params = {
                 k: v
                 for k, v in self.active.action.action_params.items()
-                if (k.startswith("ttl_") or k == "ttl")
+                if k not in self.action_params
             }
             self.driver = self.active.base.fastapp.driver
             self.channel = self.action_params["channel"]
@@ -177,7 +177,6 @@ async def biologic_dyn_endpoints(app=None):
         channel: int = 0,
         ttl: str = 'none',
         ttl_logic: int = 1,
-        ttl_duration: float = 1.0,
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -203,7 +202,6 @@ async def biologic_dyn_endpoints(app=None):
         channel: int = 0,
         ttl: str = 'none',
         ttl_logic: int = 1,
-        ttl_duration: float = 1.0,
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -229,7 +227,6 @@ async def biologic_dyn_endpoints(app=None):
         channel: int = 0,
         ttl: str = 'none',
         ttl_logic: int = 1,
-        ttl_duration: float = 1.0,
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
@@ -255,7 +252,6 @@ async def biologic_dyn_endpoints(app=None):
         amplitude_threshold: float = 0.05,
         ttl: str = 'none',
         ttl_logic: int = 1,
-        ttl_duration: float = 1.0,
     ):
         """mesasures open circuit potential
         use 4bit bitmask for triggers
