@@ -118,8 +118,6 @@ class BiologicExec(Executor):
         if data_length:
             self.data_buffer["channel"].extend(data_length * [self.channel])
             resp.data.update({"channel": data_length * [self.channel]})
-        else:
-            resp.data.update({"channel": []})
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         status = HloStatus.active if resp.message != "done" else HloStatus.finished
         return {"error": error, "status": status, "data": resp.data}
