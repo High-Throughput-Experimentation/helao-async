@@ -212,7 +212,6 @@ class BiologicDriver(HelaoDriver):
             ]
             data = pd.DataFrame(parsed).to_dict(orient="list")
             data = {program.field_remap[k]: v for k, v in data.items()}
-            print(data)
 
             response = DriverResponse(
                 response=DriverResponseType.success,
