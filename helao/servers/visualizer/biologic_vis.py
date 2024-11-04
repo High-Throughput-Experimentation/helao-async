@@ -213,17 +213,17 @@ class C_biovis:
 
     def add_points(self, datapackage_list: list):
         for data_package in datapackage_list:
-            data_dict = {k: [] for k in self.data_dict_keys}
             if (
                 data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
             ):
-                channels = data_package.datamodel.data.get("channel", [])
-                if channels:
-                    pstat_channel = channels[0]
-                    # only resets if axis selector or action_uuid changes
-                    self.reset_plot(channel=pstat_channel, new_action_uuid=str(data_package.action_uuid))
-                    for _, uuid_dict in data_package.datamodel.data.items():
+                for _, uuid_dict in data_package.datamodel.data.items():
+                    data_dict = {k: [] for k in self.data_dict_keys}
+                    channels = uuid_dict.get("channel", [])
+                    if channels:
+                        pstat_channel = channels[0]
+                        # only resets if axis selector or action_uuid changes
+                        self.reset_plot(channel=pstat_channel, new_action_uuid=str(data_package.action_uuid))
                         for data_label, data_val in uuid_dict.items():
                             if data_label in self.data_dict_keys:
                                 if isinstance(data_val, list):
@@ -231,15 +231,15 @@ class C_biovis:
                                 else:
                                     data_dict[data_label].append(data_val)
 
-                    # check for missing I_A in OCV
-                    max_len = max([len(v) for v in data_dict.values()])
-                    for k, v in data_dict.items():
-                        if len(v) < max_len:
-                            pad_len = max_len - len(v)
-                            data_dict[k] += ["NaN"] * pad_len
-                    self.channel_datasources[pstat_channel].stream(data_dict, rollover=self.max_points)
-                    print(data_dict)
-                    print(self.channel_datasources[pstat_channel].data)
+                        # check for missing I_A in OCV
+                        max_len = max([len(v) for v in data_dict.values()])
+                        for k, v in data_dict.items():
+                            if len(v) < max_len:
+                                pad_len = max_len - len(v)
+                                data_dict[k] += ["NaN"] * pad_len
+                        self.channel_datasources[pstat_channel].stream(data_dict, rollover=self.max_points)
+                        print(data_dict)
+                        print(self.channel_datasources[pstat_channel].data)
 
     def _add_plots(self, channel):
         # clear legend
