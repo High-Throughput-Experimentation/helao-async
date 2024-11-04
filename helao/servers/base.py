@@ -3360,7 +3360,7 @@ class DummyBase:
         Args:
             message (dict): A dictionary containing key-value pairs to be added to the live buffer.
         """
-        now = time.time()
+        now = time()
         for k, v in message:
             self.live_buffer[k] = (v, now)
 
