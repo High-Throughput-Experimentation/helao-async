@@ -64,12 +64,12 @@ class BiologicExec(Executor):
             self.action_params = {
                 k: v
                 for k, v in self.active.action.action_params.items()
-                if not k.startswith("ttl_")
+                if not (k.startswith("ttl_") or k == "ttl")
             }
             self.ttl_params = {
                 k: v
                 for k, v in self.active.action.action_params.items()
-                if k.startswith("ttl_")
+                if (k.startswith("ttl_") or k == "ttl")
             }
             self.driver = self.active.base.fastapp.driver
             self.channel = self.action_params["channel"]
