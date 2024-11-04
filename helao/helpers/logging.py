@@ -24,11 +24,22 @@ LOGGER = None
 
 
 def make_logger(
+    log_level: int = 20,
     logger_name: Optional[str] = None,
     log_dir: Optional[str] = None,
     log_level: int = 20,  # 10 (DEBUG), 20 (INFO), 30 (WARNING), 40 (ERROR), 50 (CRITICAL)
 ):
-    """Creates a logger (use once per process)."""
+    """
+    Creates and configures a logger instance with both console and file handlers.
+
+    Args:
+        logger_name (Optional[str]): The name of the logger. If None, the root logger is used.
+        log_dir (Optional[str]): The directory where the log file will be stored. If None, the system's temporary directory is used.
+        log_level (int): The logging level. Default is 20 (INFO). Other levels are 10 (DEBUG), 30 (WARNING), 40 (ERROR), 50 (CRITICAL).
+
+    Returns:
+        logging.Logger: Configured logger instance.
+    """
     log_dir = tempfile.gettempdir() if log_dir is None else log_dir
     log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
