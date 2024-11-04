@@ -114,7 +114,6 @@ class BiologicExec(Executor):
         if data_length:
             self.data_buffer["channel"].extend(data_length * [self.channel])
             resp.data.update({"channel": data_length * [self.channel]})
-            print(resp.data)
         else:
             resp.data.update({"channel": []})
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
