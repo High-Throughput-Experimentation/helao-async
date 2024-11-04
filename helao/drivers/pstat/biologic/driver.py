@@ -120,8 +120,8 @@ class BiologicDriver(HelaoDriver):
         action_params: dict = {},  # for mapping action keys to signal keys
     ) -> DriverResponse:
         """Set measurement conditions on potentiostat."""
+        channel = action_params.get("channel", -1)
         try:
-            channel = action_params.get("channel", -1)
             if channel not in self.channels:
                 raise ValueError(f"Channel {channel} does not exist.")
             if self.channels[channel] is not None:
@@ -148,7 +148,7 @@ class BiologicDriver(HelaoDriver):
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
-            self.cleanup()
+            self.cleanup(channel)
         return response
 
     def start_channel(self, channel: int = 0, ttl_params: dict = {}) -> DriverResponse:
