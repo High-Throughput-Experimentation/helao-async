@@ -4,15 +4,49 @@ import os
 import zipfile
 
 
-def rcp_to_dict(rcppath: str):  # read common info/rcp/exp/ana structure into dict
+def rcp_to_dict(rcppath: str):
+    """
+    Convert a structured text file or a file within a zip archive into a nested dictionary.
+
+    The function reads a file with a specific structure where each line contains a key-value pair
+    separated by a colon and indented with tabs to indicate hierarchy levels. It supports reading
+    from both plain text files and zip archives containing the file. The resulting dictionary
+    reflects the hierarchical structure of the input file.
+
+    Args:
+        rcppath (str): The path to the input file. It can be a plain text file or a zip archive
+                       containing the file.
+
+    Returns:
+        dict: A nested dictionary representing the hierarchical structure of the input file.
+    """
 
     dlist = []
 
     def _tab_level(astr):
-        """Count number of leading tabs in a string"""
+        """
+        Calculate the tab level of a given string.
+
+        Args:
+            astr (str): The input string to evaluate.
+
+        Returns:
+            float: The tab level, calculated as the number of leading spaces divided by 4.
+        """
         return (len(astr) - len(astr.lstrip("    "))) / 4
 
     def _ttree_to_json(ttree, level=0):
+        """
+        Converts a tree structure (list of dictionaries) into a nested JSON-like dictionary.
+
+        Args:
+            ttree (list): A list of dictionaries representing the tree structure. Each dictionary
+                          should have at least 'level', 'name', and 'value' keys.
+            level (int, optional): The current level of the tree being processed. Defaults to 0.
+
+        Returns:
+            dict: A nested dictionary representing the JSON structure of the input tree.
+        """
         result = {}
         for i in range(0, len(ttree)):
             cn = ttree[i]
