@@ -14,6 +14,27 @@ from pydasher.serialization import hasher
 
 
 class BaseAnalysis:
+    """
+    BaseAnalysis class for handling analysis data and exporting results.
+    Attributes:
+        analysis_name (str): Name of the analysis.
+        analysis_timestamp (datetime): Timestamp of the analysis.
+        analysis_uuid (UUID): Unique identifier for the analysis.
+        analysis_params (dict): Parameters for the analysis.
+        process_uuid (UUID): Unique identifier for the process.
+        process_timestamp (datetime): Timestamp of the process.
+        process_name (str): Name of the process.
+        run_type (str): Type of the run.
+        technique_name (str): Name of the technique used.
+        inputs (AnalysisInput): Input data for the analysis.
+        outputs (BaseModel): Output data from the analysis.
+        analysis_codehash (str): Hash of the analysis code.
+    Methods:
+        gen_uuid(global_sample_label: Optional[str] = None) -> UUID:
+            Generates a unique identifier for the analysis based on input data models and parameters.
+        export_analysis(bucket: str, region: str, dummy: bool = True, global_sample_label: Optional[str] = None) -> Tuple[dict, dict]:
+            Exports the analysis results to a specified S3 bucket and returns the analysis model and outputs.
+    """
     analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID
@@ -28,6 +49,23 @@ class BaseAnalysis:
     analysis_codehash: str
     
     def gen_uuid(self, global_sample_label: Optional[str] = None):
+        """
+        Generates a UUID for the analysis based on various attributes.
+
+        Parameters:
+        global_sample_label (Optional[str]): A label for the global sample. If not provided,
+                             it will be derived from the input data models.
+
+        Returns:
+        UUID: A unique identifier generated from the hash representation of the analysis attributes.
+
+        The UUID is generated using a hash representation that includes:
+        - analysis_name: The name of the analysis.
+        - analysis_params: The parameters of the analysis.
+        - process_uuid: The UUID of the process.
+        - global_sample_label: The global sample label.
+        - analysis_codehash: The hash of the analysis code.
+        """
         input_data_models = self.inputs.get_datamodels(global_sample_label)
         if global_sample_label is None:
             ru_data = [x for x in input_data_models if x.run_use==RunUse.data]
@@ -49,6 +87,28 @@ class BaseAnalysis:
         dummy: bool = True,
         global_sample_label: Optional[str] = None,
     ):
+        """
+        Export the analysis results to a structured format.
+
+        Args:
+            bucket (str): The S3 bucket where the analysis output will be stored.
+            region (str): The AWS region where the S3 bucket is located.
+            dummy (bool, optional): A flag indicating whether this is a dummy run. Defaults to True.
+            global_sample_label (Optional[str], optional): A label for the global sample. Defaults to None.
+
+        Returns:
+            Tuple[Dict, Dict]: A tuple containing the cleaned analysis model dictionary and the outputs model dump.
+
+        Raises:
+            ValueError: If the analysis does not contain any outputs.
+
+        Notes:
+            - The function retrieves input data models based on the global sample label.
+            - It categorizes the outputs into scalar and array outputs.
+            - It constructs output data models for each category and appends them to the output data models list.
+            - If no output data models are found, a message is printed indicating the absence of outputs.
+            - An AnalysisModel instance is created with the relevant details and returned as a cleaned dictionary along with the outputs model dump.
+        """
         input_data_models = self.inputs.get_datamodels(global_sample_label)
         if global_sample_label is None:
             ru_data = [x for x in input_data_models if x.run_use==RunUse.data]

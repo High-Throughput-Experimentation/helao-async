@@ -7,7 +7,54 @@ from helao.helpers.read_hlo import read_hlo
 
 
 class FileMapper:
+    """
+    FileMapper is a class that helps in mapping and locating files within a specified directory structure.
+    It provides methods to locate, read, and process files based on their paths and states.
+
+    Attributes:
+        inputfile (Path or None): The absolute path of the input file if it exists, otherwise None.
+        inputdir (Path): The absolute path of the input directory.
+        inputparts (list): A list of parts of the input directory path.
+        runpos (int): The position of the "RUNS_*" or "PROCESSES" directory in the path.
+        prestr (str): The path string up to the "RUNS_*" or "PROCESSES" directory.
+        states (list): A list of states used to identify different run directories.
+        relstrs (list): A list of relative paths of files within the "RUNS_*" or "PROCESSES" directories.
+
+    Methods:
+        __init__(save_path: Union[str, Path]):
+            Initializes the FileMapper with the given save path.
+        
+        locate(p: str) -> Union[str, None]:
+            Locates the file path based on the given relative path and returns the absolute path if found.
+        
+        read_hlo(p: str, retries: int = 3) -> Union[tuple, None]:
+            Reads an HLO file from the given relative path with a specified number of retries.
+        
+        read_yml(p: str) -> dict:
+            Reads a YAML file from the given relative path and returns its contents as a dictionary.
+        
+        read_lines(p: str) -> list:
+            Reads a text file from the given relative path and returns its contents as a list of lines.
+        
+        read_bytes(p: str) -> bytes:
+            Reads a binary file from the given relative path and returns its contents as bytes.
+    """
     def __init__(self, save_path: Union[str, Path]):
+        """
+        Initializes the FileMapper object with the given save path.
+
+        Args:
+            save_path (Union[str, Path]): The path where files are saved. It can be a string or a Path object.
+
+        Attributes:
+            inputfile (Path or None): The absolute path of the input file if save_path is a file, otherwise None.
+            inputdir (Path): The absolute path of the directory containing the input file or the save_path directory.
+            inputparts (list): A list of parts of the input directory path.
+            runpos (int): The position of the "RUNS_*" or "PROCESSES" directory in the input directory path.
+            prestr (str): The path string up to the "RUNS_*" or "PROCESSES" directory.
+            states (list): A list of states used to identify different run states.
+            relstrs (list): A list of relative paths of all files at the save_path level and deeper, relative to "RUNS_*" or "PROCESSES".
+        """
         if isinstance(save_path, str):
             save_path = Path(save_path)
         if save_path.is_file():
@@ -42,6 +89,21 @@ class FileMapper:
                 self.relstrs.append(os.path.join(*p.parts[self.runpos + 1 :]))
 
     def locate(self, p: str):
+        """
+        Locate the file path based on the given string `p`.
+
+        This method checks if the string `p` contains the substring "PROCESSES".
+        If it does, the method returns `p` as is. Otherwise, it iterates through
+        the `states` attribute, constructs a potential file path by joining
+        `prestr`, "RUNS_" followed by the current state, and `p`. If the constructed
+        path exists, it returns this path. If no valid path is found, it returns None.
+
+        Args:
+            p (str): The file path or partial file path to locate.
+
+        Returns:
+            str or None: The located file path if found, otherwise None.
+        """
         if "PROCESSES" in p:
             return p
         for state in self.states:
@@ -51,6 +113,20 @@ class FileMapper:
         return None
 
     def read_hlo(self, p: str, retries: int = 3):
+        """
+        Reads an HLO file from the specified path with retry logic.
+
+        Args:
+            p (str): The path to the HLO file.
+            retries (int, optional): The number of times to retry reading the file in case of a ValueError. Defaults to 3.
+
+        Returns:
+            tuple: The contents of the HLO file if read successfully.
+
+        Raises:
+            FileNotFoundError: If the file cannot be located.
+            ValueError: If the file cannot be read after the specified number of retries.
+        """
         lp = self.locate(p)
         if lp is None:
             raise FileNotFoundError
@@ -67,6 +143,18 @@ class FileMapper:
             return None
 
     def read_yml(self, p: str):
+        """
+        Reads a YAML file from the specified path and returns its contents as a dictionary.
+
+        Args:
+            p (str): The path to the YAML file.
+
+        Returns:
+            dict: The contents of the YAML file as a dictionary.
+
+        Raises:
+            FileNotFoundError: If the file cannot be located.
+        """
         lp = self.locate(p)
         if lp is None:
             raise FileNotFoundError
@@ -75,6 +163,18 @@ class FileMapper:
             return dict(yml_load(Path(lp)))
 
     def read_lines(self, p: str):
+        """
+        Reads the contents of a file and returns them as a list of lines.
+
+        Args:
+            p (str): The path to the file.
+
+        Returns:
+            list: A list of strings, each representing a line in the file.
+
+        Raises:
+            FileNotFoundError: If the file cannot be located.
+        """
         lp = self.locate(p)
         if lp is None:
             raise FileNotFoundError
@@ -83,6 +183,18 @@ class FileMapper:
             return lines
 
     def read_bytes(self, p: str):
+        """
+        Reads the content of a file as bytes.
+
+        Args:
+            p (str): The path to the file.
+
+        Returns:
+            bytes: The content of the file.
+
+        Raises:
+            FileNotFoundError: If the file cannot be located.
+        """
         lp = self.locate(p)
         if lp is None:
             raise FileNotFoundError

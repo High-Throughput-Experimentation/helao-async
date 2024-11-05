@@ -4,6 +4,20 @@ import json
 
 
 def fix_numerics(val):
+    """
+    Recursively converts numeric strings in the input to their appropriate numeric types.
+    
+    Args:
+        val (str, list, dict): The input value which can be a string, list, or dictionary.
+        
+    Returns:
+        The input value with numeric strings converted to their respective numeric types.
+        - If the input is a string that represents a boolean ('True' or 'False'), it is converted to a boolean.
+        - If the input is a string that represents a number, it is converted to a float.
+        - If the input is a list, the function is applied recursively to each element.
+        - If the input is a dictionary, the function is applied recursively to each value.
+        - If the input does not match any of the above conditions, it is returned unchanged.
+    """
     if isinstance(val, str):
         stripped = val.strip()
         if stripped in ['True', 'False']:
@@ -23,6 +37,19 @@ def fix_numerics(val):
 
 
 def parse_bokeh_input(v):
+    """
+    Parses a given input string, attempting to convert it from a JSON-like format
+    with single quotes to a proper JSON format with double quotes. If the conversion
+    fails, the original input is returned. The resulting value is then processed to
+    fix any numeric types.
+
+    Args:
+        v (str): The input string to be parsed.
+
+    Returns:
+        Any: The parsed and processed value, which could be of any type depending on
+        the input and the result of the numeric fixing process.
+    """
     try:
         val = json.loads(v.replace("'", '"'))
     except ValueError:

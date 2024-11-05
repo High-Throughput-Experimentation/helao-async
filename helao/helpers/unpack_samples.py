@@ -8,6 +8,23 @@ from helaocore.models.sample import (
                            )
 
 def unpack_samples_helper(samples: List[SampleUnion] = []) -> Tuple[List[SampleUnion],List[SampleUnion]]:
+    """
+    Unpacks a list of samples into separate lists based on their sample type.
+
+    This function takes a list of samples, which can include nested assembly samples,
+    and recursively unpacks them into separate lists for liquid, solid, and gas samples.
+
+    Args:
+        samples (List[SampleUnion]): A list of samples to be unpacked. Each sample can be of type
+                                        liquid, solid, gas, or assembly. Assembly samples can contain
+                                        other samples, including nested assemblies.
+
+    Returns:
+        Tuple[List[SampleUnion], List[SampleUnion], List[SampleUnion]]: A tuple containing three lists:
+            - liquid_list: List of liquid samples.
+            - solid_list: List of solid samples.
+            - gas_list: List of gas samples.
+    """
     liquid_list = []
     solid_list = []
     gas_list = []
