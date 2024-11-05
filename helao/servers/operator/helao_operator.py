@@ -7,7 +7,61 @@ from helao.helpers.config_loader import config_loader
 
 
 class HelaoOperator:
+    """
+    HelaoOperator class to interact with the orchestrator server.
+
+    Attributes:
+        helao_config (dict): Configuration loaded for Helao.
+        orch_key (str): Key for the orchestrator server.
+        orch_host (str): Host address of the orchestrator server.
+        orch_port (int): Port number of the orchestrator server.
+
+    Methods:
+        __init__(config_arg, orch_key):
+            Initializes the HelaoOperator with the given configuration and orchestrator key.
+        
+        request(endpoint: str, path_params: dict = {}, json_params: dict = {}):
+            Sends a request to the orchestrator server and returns the response.
+        
+        start():
+            Dispatches a start request to the orchestrator server.
+        
+        stop():
+            Dispatches a stop request to the orchestrator server.
+        
+        orch_state():
+            Retrieves the current state of the orchestrator.
+        
+        get_active_experiment():
+            Retrieves the currently active experiment.
+        
+        get_active_sequence():
+            Retrieves the currently active sequence.
+        
+        add_experiment(experiment: Experiment, index: int = -1):
+            Adds an experiment to the active sequence or creates a new sequence.
+        
+        add_sequence(sequence: Sequence):
+            Adds a sequence to the orchestrator queue.
+    """
     def __init__(self, config_arg, orch_key):
+        """
+        Initializes the HelaoOperator instance.
+
+        Args:
+            config_arg (str): The configuration argument to load the configuration.
+            orch_key (str): The key to identify the orchestrator server in the configuration.
+
+        Raises:
+            Exception: If the orchestrator server is not found in the configuration.
+            Exception: If the orchestrator host or port is not fully specified.
+
+        Attributes:
+            helao_config (dict): The loaded configuration for Helao.
+            orch_key (str): The key for the orchestrator server.
+            orch_host (str): The host address of the orchestrator server.
+            orch_port (int): The port number of the orchestrator server.
+        """
         helao_root = os.path.dirname(os.path.realpath(__file__))
         while "helao.py" not in os.listdir(helao_root):
             helao_root = os.path.dirname(helao_root)
@@ -27,6 +81,18 @@ class HelaoOperator:
         )
 
     def request(self, endpoint: str, path_params: dict = {}, json_params: dict = {}):
+        """
+        Sends a request to the specified endpoint with given path and JSON parameters.
+
+        Args:
+            endpoint (str): The endpoint to send the request to.
+            path_params (dict, optional): The path parameters to include in the request. Defaults to {}.
+            json_params (dict, optional): The JSON parameters to include in the request. Defaults to {}.
+
+        Returns:
+            dict: The response from the request. If an exception occurs, returns a dictionary with 
+                  "orch_state", "loop_state", and "loop_intent" set to "unreachable".
+        """
         try:
             resp, error_code = private_dispatcher(
                 self.orch_key,
@@ -46,27 +112,71 @@ class HelaoOperator:
         return resp
 
     def start(self):
-        """Dispatch start request on orch"""
+        """
+        Initiates the 'start' request to the operator server.
+
+        Returns:
+            Response from the 'start' request.
+        """
         return self.request("start")
 
     def stop(self):
-        """Dispatch stop request on orch"""
+        """
+        Sends a request to stop the current operation.
+
+        Returns:
+            Response from the "stop" request.
+        """
         return self.request("stop")
 
     def orch_state(self):
-        """Dispatch stop request on orch"""
+        """
+        Retrieve the current state of the orchestrator.
+
+        This method sends a request to get the current state of the orchestrator
+        and returns the response.
+
+        Returns:
+            The current state of the orchestrator.
+        """
         return self.request("get_orch_state")
 
     def get_active_experiment(self):
-        """Retrieve active experiment"""
+        """
+        Retrieve the currently active experiment.
+
+        This method sends a request to obtain the active experiment.
+
+        Returns:
+            The active experiment data.
+        """
         return self.request("get_active_experiment")
 
     def get_active_sequence(self):
-        """Retrieve active sequence"""
+        """
+        Retrieve the currently active sequence.
+
+        This method sends a request to obtain the active sequence.
+
+        Returns:
+            The active sequence.
+        """
         return self.request("get_active_sequence")
 
     def add_experiment(self, experiment: Experiment, index: int = -1):
-        """add experiment to active sequence or creates new sequence"""
+        """
+        Adds an experiment to the operator's experiment list.
+
+        If the index is -1, the experiment is appended to the end of the list.
+        Otherwise, the experiment is inserted at the specified index.
+
+        Args:
+            experiment (Experiment): The experiment to be added.
+            index (int, optional): The position at which to insert the experiment. Defaults to -1.
+
+        Returns:
+            Response: The response from the request to add the experiment.
+        """
         if index == -1:
             return self.request(
                 "append_experiment", json_params={"experiment": experiment.as_dict()}
@@ -78,7 +188,16 @@ class HelaoOperator:
         )
 
     def add_sequence(self, sequence: Sequence):
-        """add sequence to orch queue"""
+        """
+        Adds a sequence to the operator.
+
+        Args:
+            sequence (Sequence): The sequence object to be added. It should have a method `as_dict` 
+                                  that converts the sequence to a dictionary format.
+
+        Returns:
+            Response: The response from the request to append the sequence.
+        """
         return self.request(
             "append_sequence", json_params={"sequence": sequence.as_dict()}
         )
