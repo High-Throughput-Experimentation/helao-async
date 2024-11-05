@@ -34,7 +34,6 @@ dependencies:
   - numpy=1
   - pandas
   - paramiko
-  - pdoc
   - picologging
   - pip
   - psutil
