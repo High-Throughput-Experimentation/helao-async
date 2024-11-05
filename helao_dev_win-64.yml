@@ -61,6 +61,8 @@ dependencies:
   - scikit-learn
   - scipy
   - shortuuid
+  - sphinx-autodoc-typehints
+  - sphinx-markdown-builder
   - sqlalchemy
   - sshtunnel
   - starlette
