@@ -1,3 +1,18 @@
+"""
+This module provides helper functions to read HLO files, process their data, and convert them to Parquet format.
+
+Functions:
+    read_hlo_header(file_path):
+
+    read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
+        Reads the data chunks from a HLO file starting from a given index.
+
+    hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100):
+        Converts a HLO file to a Parquet file.
+
+    read_helao_metadata(parquet_file_path):
+        Reads the custom metadata from a Parquet file.
+"""
 import json
 from ruamel.yaml import YAML
 from collections import defaultdict
@@ -10,6 +25,17 @@ yaml = YAML()
 
 
 def read_hlo_header(file_path):
+    """
+    Reads the header of a HLO file and returns the parsed YAML content and the index where the data starts.
+
+    Args:
+        file_path (str): The path to the HLO file.
+
+    Returns:
+        tuple: A tuple containing:
+            - dict: Parsed YAML content from the header.
+            - int: The index where the data starts in the file.
+    """
     yml_lines = []
     data_start_index = -1
     with open(file_path) as f:
@@ -24,6 +50,19 @@ def read_hlo_header(file_path):
 
 
 def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
+    """
+    Reads data from a file in chunks and yields the data as dictionaries.
+
+    Args:
+        file_path (str): The path to the file to read.
+        data_start_index (int): The line index to start reading data from.
+        chunk_size (int, optional): The number of lines to read in each chunk. Defaults to 100.
+
+    Yields:
+        tuple: A tuple containing:
+            - dict: A dictionary where keys are the JSON keys from the file and values are lists of the corresponding values.
+            - int: The maximum length of the lists in the dictionary.
+    """
     with open(file_path) as f:
         chunkd = defaultdict(list)
         for i, line in enumerate(f):
@@ -44,6 +83,17 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
 
 
 def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100):
+    """
+    Converts HLO (custom format) data to Parquet format.
+
+    Parameters:
+    input_hlo_path (str): Path to the input HLO file.
+    output_parquet_path (str): Path to the output Parquet file.
+    chunk_size (int, optional): Number of rows to process at a time. Default is 100.
+
+    Returns:
+    None
+    """
     writer = None
     schema = None
     metadata = None
@@ -75,6 +125,15 @@ def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100):
 
 
 def read_helao_metadata(parquet_file_path):
+    """
+    Reads Helao metadata from a Parquet file.
+
+    Args:
+        parquet_file_path (str): The file path to the Parquet file.
+
+    Returns:
+        dict: A dictionary containing the Helao metadata.
+    """
     meta = pq.read_metadata(parquet_file_path)
     metadict = json.loads(meta.metadata.get(b"helao_metadata", b"{}").decode())
     return metadict

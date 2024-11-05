@@ -1,3 +1,23 @@
+"""
+This module contains the implementation of the HelaoVis and Vis classes for the Helao visualization server.
+
+Classes:
+    HelaoVis(HelaoBokehAPI): A server class that extends the HelaoBokehAPI to provide visualization capabilities.
+    Vis: A class to represent the visualization server.
+
+HelaoVis:
+
+
+Vis:
+        server (MachineModel): An instance of MachineModel representing the server.
+        server_cfg (dict): Configuration dictionary for the server.
+        world_cfg (dict): Global configuration dictionary.
+        doc (Document): Bokeh document instance.
+        helaodirs (HelaoDirs): Directories used by the Helao system.
+
+        __init__(bokehapp: HelaoBokehAPI):
+        print_message(*args, **kwargs):
+"""
 __all__ = ["Vis", "HelaoVis"]
 
 from socket import gethostname
