@@ -269,10 +269,10 @@ class C_biovis:
         self.channel_plots_prev[channel].renderers = []
 
         self.channel_plots[channel].title.text = (
-            f"active action_uuid: {self.channel_action_uuid[channel]}"
+            f"[ch:{channel:0d}] active action_uuid: {self.channel_action_uuid[channel]}"
         )
         self.channel_plots_prev[channel].title.text = (
-            f"last action_uuid: {self.channel_action_uuid_prev[channel]}"
+            f"[ch:{channel:0d}] last action_uuid: {self.channel_action_uuid_prev[channel]}"
         )
         xstr = self.data_dict_keys[self.xselect]
         ystr = self.data_dict_keys[self.yselect]
@@ -299,8 +299,8 @@ class C_biovis:
         if self.channel_action_uuid[channel] != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
                 self.vis.print_message(f" ... reseting channel {channel} graph")
+                self.channel_action_uuid_prev[channel] = self.channel_action_uuid[channel]
                 if self.channel_action_uuid_prev[channel] != "":
-                    self.channel_action_uuid_prev[channel] = self.channel_action_uuid[channel]
                     self.channel_datasources_prev[channel] = ColumnDataSource(data=deepcopy(self.channel_datasources[channel].data))
                 self.channel_action_uuid[channel] = new_action_uuid
                 self.channel_datasources[channel].data = {
