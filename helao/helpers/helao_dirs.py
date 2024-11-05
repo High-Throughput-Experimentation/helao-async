@@ -10,6 +10,19 @@ from helaocore.models.helaodirs import HelaoDirs
 
 
 def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
+    """
+    Initializes and verifies the directory structure for the Helao application based on the provided configuration.
+
+    Args:
+        world_cfg (dict): Configuration dictionary containing the root directory and other settings.
+        server_name (str, optional): Name of the server. If provided, old log files will be compressed.
+
+    Returns:
+        HelaoDirs: An instance of the HelaoDirs class containing paths to various directories.
+
+    Raises:
+        Exception: If there is an error compressing old log files.
+    """
     def check_dir(path):
         if not os.path.isdir(path):
             print_message(
