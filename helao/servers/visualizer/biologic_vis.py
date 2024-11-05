@@ -121,14 +121,13 @@ class C_biovis:
                 for horiz_group in [
                     (plot, Spacer(width=20), plot_prev)
                     for plot, plot_prev in zip(
-                        self.channel_plots[i : i + 2],
-                        self.channel_plots_prev[i : i + 2],
+                        self.channel_plots,
+                        self.channel_plots_prev,
                     )
                 ]
                 for item in horiz_group
-            ][:-1]
+            ]
             for i in range(self.num_channels)
-            if i % 2 == 0
         ]
         self.plot_divs = [
             vert_item
@@ -136,7 +135,7 @@ class C_biovis:
                 self.vert_groups, [Spacer(height=10)] * len(self.vert_groups)
             )
             for vert_item in vert_group
-        ][:-1]
+        ]
 
         # combine all sublayouts into a single one
         docs_url = f"http://{self.potserv_host}:{self.potserv_port}/docs#/"
