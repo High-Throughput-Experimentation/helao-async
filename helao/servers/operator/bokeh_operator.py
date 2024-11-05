@@ -1,3 +1,23 @@
+"""
+This module defines the BokehOperator class, which is responsible for managing
+the Bokeh-based user interface for the HTE (High Throughput Experimentation) 
+orchestrator. The BokehOperator class provides methods for interacting with 
+the orchestrator, including adding sequences and experiments, updating tables, 
+and handling user input.
+
+Classes:
+    return_sequence_lib: A Pydantic BaseModel class representing a sequence 
+        object with attributes such as index, sequence_name, doc, args, 
+        defaults, and argtypes.
+    return_experiment_lib: A Pydantic BaseModel class representing an 
+        experiment object with attributes such as index, experiment_name, 
+        doc, args, defaults, and argtypes.
+    BokehOperator: A class that manages the Bokeh-based user interface for 
+        the HTE orchestrator. It provides methods for interacting with the 
+        orchestrator, updating tables, handling user input, and managing 
+        sequences and experiments.
+
+"""
 import traceback
 import asyncio
 import io
@@ -5,7 +25,6 @@ import json
 import os
 import sys
 import importlib
-import glob
 from typing import List
 from pybase64 import b64decode
 from socket import gethostname

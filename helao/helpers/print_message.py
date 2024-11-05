@@ -9,6 +9,24 @@ from pyfiglet import figlet_format
 
 
 def print_message(server_cfg={}, server_name=None, *args, **kwargs):
+    """
+    Prints and logs messages with different styles based on the server configuration and message type.
+
+    Args:
+        server_cfg (dict, optional): Configuration dictionary for the server. Defaults to {}.
+        server_name (str, optional): Name of the server. Defaults to None.
+        *args: Variable length argument list for the message content.
+        **kwargs: Arbitrary keyword arguments for additional options.
+            - error (bool, optional): If present, the message is treated as an error.
+            - warning (bool, optional): If present, the message is treated as a warning.
+            - warn (bool, optional): Alias for warning.
+            - info (bool, optional): If present, the message is treated as an informational message.
+            - sample (bool, optional): If present, the message is treated as a sample message.
+            - log_dir (str, optional): Directory path where the log files will be saved.
+
+    Returns:
+        None
+    """
     def write_log_file(
         server_name=None, output_path=None, msg_part1=None, msg_part2=None
     ):

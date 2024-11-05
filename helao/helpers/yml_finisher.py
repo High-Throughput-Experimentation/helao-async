@@ -16,6 +16,17 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 
 
 async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
+    """
+    Asynchronously attempts to finish processing a YAML file by sending a request to a specified database server.
+
+    Args:
+        yml_path (str): The file path to the YAML file.
+        db_config (dict, optional): A dictionary containing the database configuration with keys "host" and "port". Defaults to an empty dictionary.
+        retry (int, optional): The number of retry attempts if the request fails. Defaults to 3.
+
+    Returns:
+        bool: True if the YAML file was successfully processed, False otherwise.
+    """
     yp = Path(yml_path)
 
     def print_msg(msg):
@@ -59,7 +70,20 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
 async def move_dir(
     hobj: Union[Sequence, Experiment, Action], base: object = None, retry_delay: int = 5
 ):
-    """Move directory from RUNS_ACTIVE to RUNS_FINISHED."""
+    """
+    Move directory from RUNS_ACTIVE to RUNS_FINISHED or RUNS_DIAG based on the type and attributes of the provided object.
+
+    Parameters:
+    hobj (Union[Sequence, Experiment, Action]): The object whose directory is to be moved. Can be of type Sequence, Experiment, or Action.
+    base (object, optional): The base object that provides the print_message method. Defaults to None.
+    retry_delay (int, optional): The delay in seconds between retries for copying and removing files. Defaults to 5.
+
+    Returns:
+    dict: An empty dictionary if an invalid object type is provided.
+
+    Raises:
+    Exception: If there are issues with directory creation, file copying, or file removal.
+    """
 
     if base is not None:
 
@@ -143,7 +167,10 @@ async def move_dir(
                     )
                     yml_path = os.path.join(new_dir, f"{timestamp}-{obj_type[:3]}.yml")
                     if not is_manual:
-                        await yml_finisher(yml_path, db_config=base.world_cfg.get("servers", {}).get("DB", {}))
+                        await yml_finisher(
+                            yml_path,
+                            db_config=base.world_cfg.get("servers", {}).get("DB", {}),
+                        )
                 if rm_success and obj_type == "action" and is_manual:
                     # remove active sequence and experiment dirs
                     exp_dir = os.path.dirname(yml_dir)
