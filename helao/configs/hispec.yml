@@ -88,11 +88,11 @@ servers:
     host: hte-eche-11.htejcap.caltech.edu
     port: 8004
     group: action
-    fast: gamry_server
+    fast: biologic_server
     params:
       allow_no_sample: true
-      dev_id: 0
-      filterfreq_hz: 1000.0
+      address: 192.168.200.100
+      num_channels: 1
       grounded: true
   IO:
     host: hte-eche-11.htejcap.caltech.edu
