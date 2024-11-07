@@ -11,12 +11,12 @@ from pydantic import BaseModel
 from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
 
-from helaocore.version import get_filehash
+from helao.core.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 
 from .base_analysis import BaseAnalysis
-from helaocore.models.analysis import AnalysisDataModel, AnalysisInput
-from helaocore.models.run_use import RunUse
+from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
+from helao.core.models.run_use import RunUse
 from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 
 ANALYSIS_DEFAULTS = {

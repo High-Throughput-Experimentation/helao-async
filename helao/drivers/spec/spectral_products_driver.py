@@ -8,11 +8,11 @@ import traceback
 
 import numpy as np
 
-from helaocore.error import ErrorCodes
-from helaocore.models.data import DataModel
-from helaocore.models.file import FileConnParams, HloHeaderModel
-from helaocore.models.sample import SampleInheritance, SampleStatus
-from helaocore.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
+from helao.core.models.data import DataModel
+from helao.core.models.file import FileConnParams, HloHeaderModel
+from helao.core.models.sample import SampleInheritance, SampleStatus
+from helao.core.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI

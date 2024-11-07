@@ -5,8 +5,8 @@ from fastapi import Body, Query
 from helao.servers.base_api import BaseAPI
 from helao.drivers.io.galil_io_driver import Galil, TriggerType, AiMonExec
 from helao.helpers.premodels import Action
-from helaocore.models.sample import LiquidSample, SampleUnion
-from helaocore.error import ErrorCodes
+from helao.core.models.sample import LiquidSample, SampleUnion
+from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
 

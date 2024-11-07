@@ -37,8 +37,8 @@ from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 
-from helaocore.models.experiment import ExperimentModel
-from helaocore.models.orchstatus import LoopStatus
+from helao.core.models.experiment import ExperimentModel
+from helao.core.models.orchstatus import LoopStatus
 from helao.helpers.premodels import Sequence, Experiment
 
 from bokeh.layouts import column

@@ -13,7 +13,7 @@ from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import HloStatus
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 

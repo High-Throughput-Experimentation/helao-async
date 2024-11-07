@@ -23,7 +23,7 @@ from helao.sequences.ECHEUVIS_seq import (
     ECHEUVIS_postseq,
     ECHEUVIS_diagnostic_CV,
 )
-from helaocore.models.orchstatus import LoopStatus
+from helao.core.models.orchstatus import LoopStatus
 
 TEST = False
 SPEC_INT_MS = 35

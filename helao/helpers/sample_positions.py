@@ -20,13 +20,13 @@ from typing import (
 from enum import Enum
 from pydantic import BaseModel, Field, root_validator
 
-from helaocore.models.sample import (
+from helao.core.models.sample import (
     SampleUnion,
     NoneSample,
     object_to_sample,
 )
 from helao.helpers.print_message import print_message
-from helaocore.helaodict import HelaoDict
+from helao.core.helaodict import HelaoDict
 
 from helao.helpers import logging
 

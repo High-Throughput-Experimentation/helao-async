@@ -20,7 +20,7 @@ from helao.drivers.robot.pal_driver import (
 )
 from helao.drivers.data.archive_driver import ScanDirection, ScanOperator
 
-from helaocore.models.sample import (
+from helao.core.models.sample import (
     SampleType,
     LiquidSample,
     GasSample,
@@ -28,7 +28,7 @@ from helaocore.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helaocore.models.data import DataModel
+from helao.core.models.data import DataModel
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader

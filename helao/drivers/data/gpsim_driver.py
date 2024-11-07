@@ -2,8 +2,8 @@ import os
 import asyncio
 import time
 
-from helaocore.error import ErrorCodes
-from helaocore.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 from helao.helpers.zstd_io import unzpickle
 from helao.servers.base import Base, Active
 from helao.helpers.executor import Executor

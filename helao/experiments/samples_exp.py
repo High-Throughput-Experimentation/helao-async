@@ -15,14 +15,14 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 
-# from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.sample import (
+# from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.sample import (
     LiquidSample,
     GasSample,
     AssemblySample,
     SolidSample,
 )
-from helaocore.models.machine import MachineModel
+from helao.core.models.machine import MachineModel
 
 
 EXPERIMENTS = __all__

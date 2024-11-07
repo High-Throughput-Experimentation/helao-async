@@ -22,10 +22,10 @@ from typing import Union, Optional
 
 import numpy as np
 
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import HloStatus
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.helpers.ws_subscriber import WsSyncClient as WSC

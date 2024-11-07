@@ -38,11 +38,11 @@ import gzip
 # from filelock import FileLock
 
 from helao.servers.base import Base
-from helaocore.models.process import ProcessModel
-from helaocore.models.action import ShortActionModel, ActionModel
-from helaocore.models.experiment import ExperimentModel
-from helaocore.models.sequence import SequenceModel
-from helaocore.models.file import FileInfo
+from helao.core.models.process import ProcessModel
+from helao.core.models.action import ShortActionModel, ActionModel
+from helao.core.models.experiment import ExperimentModel
+from helao.core.models.sequence import SequenceModel
+from helao.core.models.file import FileInfo
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
 from helao.helpers.parquet import hlo_to_parquet

@@ -29,13 +29,13 @@ import traceback
 from bokeh.server.server import Server
 
 from helao.servers.base import Base
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.premodels import Action
 from helao.servers.vis import HelaoVis
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.helpers.active_params import ActiveParams
-from helaocore.models.file import FileConnParams
-from helaocore.models.sample import SolidSample
+from helao.core.models.file import FileConnParams
+from helao.core.models.sample import SolidSample
 
 from helao.layouts.aligner import Aligner
 from helao.drivers.motion.enum import MoveModes, TransformationModes

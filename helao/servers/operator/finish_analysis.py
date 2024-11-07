@@ -19,7 +19,7 @@ from helao.helpers.config_loader import config_loader
 from helao.helpers.gen_uuid import gen_uuid
 from helao.sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 from helao.sequences.ECHEUVIS_seq import ECHEUVIS_multiCA_led, ECHEUVIS_postseq
-from helaocore.models.orchstatus import LoopStatus
+from helao.core.models.orchstatus import LoopStatus
 
 inst_config = sys.argv[1]
 PLATE_ID = 6083

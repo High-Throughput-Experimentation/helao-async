@@ -15,9 +15,9 @@ from typing import Optional, List
 
 from fastapi import Body
 
-from helaocore.error import ErrorCodes
-from helaocore.models.hlostatus import HloStatus
-from helaocore.models.file import HloHeaderModel
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.file import HloHeaderModel
 
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action

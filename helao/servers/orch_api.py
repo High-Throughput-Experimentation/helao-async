@@ -17,16 +17,16 @@ from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
 from helao.servers.orch import Orch
-from helaocore.models.server import ActionServerModel
-from helaocore.models.action import ActionModel
-from helaocore.models.machine import MachineModel
-from helaocore.models.orchstatus import LoopStatus
-from helaocore.models.action_start_condition import ActionStartCondition as ASC
+from helao.core.models.server import ActionServerModel
+from helao.core.models.action import ActionModel
+from helao.core.models.machine import MachineModel
+from helao.core.models.orchstatus import LoopStatus
+from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
-from helaocore.error import ErrorCodes
-from helaocore.models.experiment import ExperimentModel
-from helaocore.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
+from helao.core.models.experiment import ExperimentModel
+from helao.core.models.hlostatus import HloStatus
 from starlette.types import Message
 from starlette.responses import JSONResponse, Response
 

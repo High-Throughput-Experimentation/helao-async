@@ -1,7 +1,7 @@
 import time
 from types import MethodType
-from helaocore.error import ErrorCodes
-from helaocore.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 
 
 class Executor:

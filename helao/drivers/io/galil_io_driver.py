@@ -28,9 +28,9 @@ from typing import Union, Optional, List
 
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.make_str_enum import make_str_enum
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import HloStatus
 
 from helao.drivers.io.enum import TriggerType
 

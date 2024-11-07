@@ -12,9 +12,9 @@ from typing import Optional, List, Union
 from fastapi import Body
 import numpy as np
 
-from helaocore.error import ErrorCodes
-from helaocore.models.hlostatus import HloStatus
-from helaocore.models.sample import SampleUnion
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.sample import SampleUnion
 
 from helao.servers.base import Base, Executor
 from helao.servers.base_api import BaseAPI

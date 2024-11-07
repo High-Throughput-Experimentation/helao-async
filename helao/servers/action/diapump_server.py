@@ -12,8 +12,8 @@ from fastapi import Body
 from helao.drivers.pump.simdos_driver import SIMDOS, RunExec
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
-from helaocore.models.data import DataModel
-from helaocore.error import ErrorCodes
+from helao.core.models.data import DataModel
+from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
 

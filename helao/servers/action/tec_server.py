@@ -9,7 +9,7 @@ from typing import Optional, List
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
-from helaocore.models.sample import SampleUnion
+from helao.core.models.sample import SampleUnion
 from helao.drivers.temperature_control.mecom_driver import MeerstetterTEC, TECMonExec, TECWaitExec
 from helao.helpers.config_loader import config_loader
 

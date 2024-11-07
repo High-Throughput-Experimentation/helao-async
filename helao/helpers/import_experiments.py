@@ -4,7 +4,7 @@ import os
 import time
 from importlib.machinery import SourceFileLoader
 from helao.helpers.print_message import print_message
-from helaocore.version import get_filehash
+from helao.core.version import get_filehash
 
 from helao.helpers import logging
 

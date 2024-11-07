@@ -44,10 +44,10 @@ from typing import Optional
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.drivers.robot.pal_driver import PALtools
-from helaocore.models.sample import SolidSample, LiquidSample
-from helaocore.models.machine import MachineModel
-from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.process_contrib import ProcessContrib
+from helao.core.models.sample import SolidSample, LiquidSample
+from helao.core.models.machine import MachineModel
+from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
 from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.drivers.io.enum import TriggerType

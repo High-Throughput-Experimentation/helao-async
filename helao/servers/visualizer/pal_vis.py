@@ -13,11 +13,11 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 from bokeh.models import DataTable, TableColumn
 
-from helaocore.models.hlostatus import HloStatus
-from helaocore.models.data import DataPackageModel
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.data import DataPackageModel
 from helao.servers.vis import Vis
 from helao.helpers.dispatcher import async_private_dispatcher
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 
 
 valid_data_status = (

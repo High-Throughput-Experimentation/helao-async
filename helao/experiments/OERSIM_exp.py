@@ -15,7 +15,7 @@ from typing import Optional, Union
 from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helaocore.models.machine import MachineModel as MM
+from helao.core.models.machine import MachineModel as MM
 
 
 EXPERIMENTS = __all__

@@ -8,8 +8,8 @@ __all__ = ["SIM_websocket_data"]
 
 from socket import gethostname
 
-from helaocore.models.machine import MachineModel
-from helaocore.models.process_contrib import ProcessContrib
+from helao.core.models.machine import MachineModel
+from helao.core.models.process_contrib import ProcessContrib
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 

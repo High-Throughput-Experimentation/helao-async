@@ -1,6 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel
-from helaocore.models.sample import SampleType
+from helao.core.models.sample import SampleType
 
 
 class _cam(BaseModel):

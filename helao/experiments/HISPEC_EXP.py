@@ -38,10 +38,10 @@ from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.helpers.spec_map import SPECSRV_MAP
 from helao.drivers.io.enum import TriggerType
 
-from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.machine import MachineModel as MM
-from helaocore.models.process_contrib import ProcessContrib
-from helaocore.models.electrolyte import Electrolyte
+from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.machine import MachineModel as MM
+from helao.core.models.process_contrib import ProcessContrib
+from helao.core.models.electrolyte import Electrolyte
 
 
 EXPERIMENTS = __all__

@@ -10,10 +10,10 @@ import asyncio
 import requests
 import aiofiles
 
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import HloStatus
 
 
 class AxisCam:

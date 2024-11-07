@@ -11,10 +11,10 @@ from socket import gethostname
 # from typing import Optional
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helaocore.models.machine import MachineModel as MM
+from helao.core.models.machine import MachineModel as MM
 
-# from helaocore.models.action_start_condition import ActionStartCondition
-# from helaocore.models.process_contrib import ProcessContrib
+# from helao.core.models.action_start_condition import ActionStartCondition
+# from helao.core.models.process_contrib import ProcessContrib
 
 
 EXPERIMENTS = __all__

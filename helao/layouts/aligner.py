@@ -29,8 +29,8 @@ from bokeh.models.widgets import FileInput
 
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
-from helaocore.models.data import DataModel
-from helaocore.error import ErrorCodes
+from helao.core.models.data import DataModel
+from helao.core.error import ErrorCodes
 
 from helao.drivers.motion.enum import MoveModes, TransformationModes
 
