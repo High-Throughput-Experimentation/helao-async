@@ -37,6 +37,9 @@ from helao.drivers.pstat.biologic.technique import (
     TECH_CA,
     TECH_CP,
     TECH_CV,
+    TECH_GEIS,
+    TECH_PEIS,
+    SweepMode,
 )
 
 import easy_biologic.lib.ec_lib as ecl
@@ -272,6 +275,53 @@ async def biologic_dyn_endpoints(app=None):
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "OCV"
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_OCV)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+
+    @app.post(f"/{server_key}/run_PEIS", tags=["action"])
+    async def run_PEIS(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        Vinit__V: float = 0.01,  # Initial value in volts or amps.
+        Vamp__V: float = 0.1,  # Amplitude value in volts
+        Finit__Hz: float = 1,  # Initial frequency in Hz.
+        Ffinal__Hz: float = 10000,  # Final frequency in Hz.
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        vs_initial: bool = False,  # True if vs initial, False if vs previous.
+        channel: int = 0,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+        TTLduration: float = 1.0,
+    ):
+        """run Potentiostatic EIS"""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "PEIS"
+        executor = BiologicExec(active=active, oneoff=False, technique=TECH_GEIS)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    @app.post(f"/{server_key}/run_GEIS", tags=["action"])
+    async def run_GEIS(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        Iinit__A: float = 0.01,  # Initial value in volts or amps.
+        Iamp__A: float = 0.1,  # Final value in volts or amps.
+        Finit__Hz: float = 1,  # Initial frequency in Hz.
+        Ffinal__Hz: float = 10000,  # Final frequency in Hz.
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        vs_initial: bool = False,  # True if vs initial, False if vs previous.
+        channel: int = 0,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+        TTLduration: float = 1.0,
+    ):
+        """run Galvanostataic EIS"""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "GEIS"
+        executor = BiologicExec(active=active, oneoff=False, technique=TECH_GEIS)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
