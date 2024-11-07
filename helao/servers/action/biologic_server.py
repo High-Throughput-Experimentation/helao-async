@@ -115,7 +115,9 @@ class BiologicExec(Executor):
         try:
             resp = self.driver.start_channel(self.channel, self.ttl_params)
             self.start_time = resp.data.get("start_time", time.time())
-            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            error = (
+                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            )
             return {"error": error}
         except Exception:
             LOGGER.error("BiologicExec exec error", exc_info=True)
@@ -248,6 +250,9 @@ async def biologic_dyn_endpoints(app=None):
         use 4bit bitmask for triggers
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
+        active.action.action_params[
+            "Cycles"
+        ] -= 1  # 0-indexed for biologic, i.e. additional cycles
         active.action.action_abbr = "CV"
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CV)
         active_action_dict = active.start_executor(executor)
@@ -277,7 +282,6 @@ async def biologic_dyn_endpoints(app=None):
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_OCV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
-
 
     @app.post(f"/{server_key}/run_PEIS", tags=["action"])
     async def run_PEIS(
@@ -353,10 +357,11 @@ def makeApp(confPrefix, server_key, helao_root):
     async def stop(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
+        channel: Optional[int] = None,
     ):
         """Stops measurement in a controlled way."""
         active = await app.base.setup_and_contain_action(action_abbr="stop")
-        app.driver.stop()
+        app.driver.stop(active.action.action_params["channel"])
         finished_action = await active.finish()
         return finished_action.as_dict()
 
