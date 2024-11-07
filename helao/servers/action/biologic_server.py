@@ -250,9 +250,7 @@ async def biologic_dyn_endpoints(app=None):
         use 4bit bitmask for triggers
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
-        active.action.action_params[
-            "Cycles"
-        ] -= 1  # 0-indexed for biologic, i.e. additional cycles
+        active.action.action_params["Cycles"] -= 1  # i.e. additional cycles
         active.action.action_abbr = "CV"
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CV)
         active_action_dict = active.start_executor(executor)
