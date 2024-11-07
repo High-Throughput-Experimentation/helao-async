@@ -19,7 +19,7 @@ __all__ = [
 
 
 from helao.helpers.premodels import ExperimentPlanMaker
-from helaocore.models.electrolyte import Electrolyte
+from helao.core.models.electrolyte import Electrolyte
 from helao.helpers.ref_electrode import REF_TABLE
 
 

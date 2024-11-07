@@ -1,6 +1,6 @@
 import os
 
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.premodels import Sequence, Experiment
 from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.config_loader import config_loader

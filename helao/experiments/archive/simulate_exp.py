@@ -25,7 +25,7 @@ from socket import gethostname
 from typing import Optional, List
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helaocore.models.machine import MachineModel
+from helao.core.models.machine import MachineModel
 
 
 # list valid experiment functions

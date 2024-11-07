@@ -19,11 +19,11 @@ import colorama
 from fastapi import WebSocket
 from bokeh.server.server import Server
 
-from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.hlostatus import HloStatus
-from helaocore.models.server import ActionServerModel, GlobalStatusModel
-from helaocore.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
-from helaocore.error import ErrorCodes
+from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.server import ActionServerModel, GlobalStatusModel
+from helao.core.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
+from helao.core.error import ErrorCodes
 
 from helao.servers.operator.bokeh_operator import BokehOperator
 from helao.servers.vis import HelaoVis

@@ -15,7 +15,7 @@ from bokeh.models import ColumnDataSource
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import HloStatus
 
 from helao.servers.vis import Vis
 from helao.helpers.dispatcher import private_dispatcher

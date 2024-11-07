@@ -9,7 +9,7 @@ from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
-from helaocore.models.sample import SampleUnion
+from helao.core.models.sample import SampleUnion
 from helao.drivers.mfc.alicat_driver import (
     AliCatMFC,
     MfcExec,

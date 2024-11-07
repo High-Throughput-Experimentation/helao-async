@@ -19,9 +19,9 @@ import numpy as np
 import pandas as pd
 from fastapi import Body, Query
 
-from helaocore.error import ErrorCodes
-from helaocore.models.sample import SampleUnion
-from helaocore.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
+from helao.core.models.sample import SampleUnion
+from helao.core.models.hlostatus import HloStatus
 
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action

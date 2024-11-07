@@ -14,7 +14,7 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 from bokeh.models import Button
 from bokeh.events import ButtonClick
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss

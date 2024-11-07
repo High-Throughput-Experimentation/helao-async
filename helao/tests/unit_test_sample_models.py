@@ -6,7 +6,7 @@ import sys
 import traceback
 
 
-from helaocore.models.sample import (
+from helao.core.models.sample import (
     LiquidSample,
     GasSample,
     SolidSample,
