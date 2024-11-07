@@ -298,7 +298,7 @@ async def biologic_dyn_endpoints(app=None):
         """run Potentiostatic EIS"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "PEIS"
-        executor = BiologicExec(active=active, oneoff=False, technique=TECH_GEIS)
+        executor = BiologicExec(active=active, oneoff=False, technique=TECH_PEIS)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
