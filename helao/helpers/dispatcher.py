@@ -6,7 +6,7 @@ import aiohttp
 import requests
 
 from helao.helpers.premodels import Action
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 
 from helao.helpers.print_message import print_message
 

@@ -1,4 +1,4 @@
-from helaocore.models.sample import _BaseSample
+from helao.core.models.sample import _BaseSample
 from helao.helpers.print_message import print_message
 
 from helao.helpers import logging

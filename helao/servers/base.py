@@ -45,10 +45,10 @@ from helao.helpers import async_copy
 from helao.helpers.yml_tools import yml_dumps
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Action
-from helaocore.models.action_start_condition import ActionStartCondition as ASC
+from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.ws_publisher import WsPublisher
-from helaocore.models.hlostatus import HloStatus
-from helaocore.models.sample import (
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.sample import (
     SampleType,
     SampleUnion,
     NoneSample,
@@ -56,13 +56,13 @@ from helaocore.models.sample import (
     SampleStatus,
     object_to_sample,
 )
-from helaocore.models.data import DataModel, DataPackageModel
-from helaocore.models.machine import MachineModel
-from helaocore.models.server import ActionServerModel, EndpointModel
-from helaocore.models.action import ActionModel
-from helaocore.version import get_filehash
+from helao.core.models.data import DataModel, DataPackageModel
+from helao.core.models.machine import MachineModel
+from helao.core.models.server import ActionServerModel, EndpointModel
+from helao.core.models.action import ActionModel
+from helao.core.version import get_filehash
 from helao.helpers.active_params import ActiveParams
-from helaocore.models.file import (
+from helao.core.models.file import (
     FileConn,
     FileConnParams,
     HloFileGroup,
@@ -70,7 +70,7 @@ from helaocore.models.file import (
     HloHeaderModel,
 )
 from helao.helpers.file_in_use import file_in_use
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected

@@ -13,8 +13,8 @@ from typing import Optional, List
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
-from helaocore.models.sample import SampleUnion
-from helaocore.models.file import HloHeaderModel
+from helao.core.models.sample import SampleUnion
+from helao.core.models.file import HloHeaderModel
 from helao.drivers.spec.spectral_products_driver import SM303
 from helao.helpers.config_loader import config_loader
 

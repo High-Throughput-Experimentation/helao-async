@@ -30,7 +30,7 @@ LOGGER = logging.LOGGER
 from helao.helpers.server_api import HelaoBokehAPI
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.print_message import print_message
-from helaocore.models.machine import MachineModel
+from helao.core.models.machine import MachineModel
 
 
 # TODO: HelaoVis will return doc to replace makeBokehApp func

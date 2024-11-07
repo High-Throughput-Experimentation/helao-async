@@ -40,7 +40,7 @@ from termcolor import cprint
 from pyfiglet import figlet_format
 import colorama
 
-from helaocore.version import get_hlo_version
+from helao.core.version import get_hlo_version
 from helao.helpers.print_message import print_message
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.config_loader import config_loader

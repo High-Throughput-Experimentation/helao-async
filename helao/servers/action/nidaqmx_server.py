@@ -23,10 +23,10 @@ from socket import gethostname
 
 from helao.servers.base_api import BaseAPI
 from helao.drivers.io.nidaqmx_driver import cNIMAX, DevMonExec
-from helaocore.models.sample import LiquidSample, SampleUnion
+from helao.core.models.sample import LiquidSample, SampleUnion
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
 

@@ -19,9 +19,9 @@ import numpy as np
 import pandas as pd
 from fastapi import Body, Query
 
-from helaocore.error import ErrorCodes
-from helaocore.models.sample import SampleUnion
-from helaocore.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
+from helao.core.models.sample import SampleUnion
+from helao.core.models.hlostatus import HloStatus
 
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
@@ -64,13 +64,24 @@ class BiologicExec(Executor):
             self.action_params = {
                 k: v
                 for k, v in self.active.action.action_params.items()
-                if not (k.startswith("ttl_") or k == "ttl")
+                if not (k.startswith("TTL"))
             }
-            self.ttl_params = {
+
+            # parse gamry-style TTL params
+            gttl_params = {
                 k: v
                 for k, v in self.active.action.action_params.items()
                 if k not in self.action_params
             }
+            self.ttl_params = {}
+            self.ttl_params["ttl"] = "none"
+            self.ttl_params["ttl_logic"] = 1
+            self.ttl_params["ttl_duration"] = gttl_params.get("TTLduration", 1.0)
+            if gttl_params.get("TTLsend", -1) >= 0:
+                self.ttl_params["ttl"] = "out"
+            elif gttl_params.get("TTLwait", -1) >= 0:
+                self.ttl_params["ttl"] = "in"
+
             self.driver = self.active.base.fastapp.driver
             self.channel = self.action_params["channel"]
 
@@ -173,9 +184,9 @@ async def biologic_dyn_endpoints(app=None):
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
         IRange: EC_IRange = EC_IRange.AUTO,
         channel: int = 0,
-        ttl: str = 'none',
-        ttl_logic: int = 1,
-        ttl_duration: float = 1.0,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+        TTLduration: float = 1.0,
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -199,9 +210,9 @@ async def biologic_dyn_endpoints(app=None):
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         channel: int = 0,
-        ttl: str = 'none',
-        ttl_logic: int = 1,
-        ttl_duration: float = 1.0,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+        TTLduration: float = 1.0,
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -225,9 +236,9 @@ async def biologic_dyn_endpoints(app=None):
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         Cycles: int = 1,
         channel: int = 0,
-        ttl: str = 'none',
-        ttl_logic: int = 1,
-        ttl_duration: float = 1.0,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+        TTLduration: float = 1.0,
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
@@ -251,9 +262,9 @@ async def biologic_dyn_endpoints(app=None):
         simple_threshold: float = 0.3,
         signal_change_threshold: float = 0.01,
         amplitude_threshold: float = 0.05,
-        ttl: str = 'none',
-        ttl_logic: int = 1,
-        ttl_duration: float = 1.0,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+        TTLduration: float = 1.0,
     ):
         """mesasures open circuit potential
         use 4bit bitmask for triggers

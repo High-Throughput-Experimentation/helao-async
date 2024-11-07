@@ -23,10 +23,10 @@ import psutil
 
 from helao.helpers.premodels import Action
 from helao.servers.base import Base
-from helaocore.error import ErrorCodes
-from helaocore.helaodict import HelaoDict
+from helao.core.error import ErrorCodes
+from helao.core.helaodict import HelaoDict
 
-from helaocore.models.sample import (
+from helao.core.models.sample import (
     SampleUnion,
     NoneSample,
     AssemblySample,
@@ -34,10 +34,10 @@ from helaocore.models.sample import (
     SampleInheritance,
     SampleType,
 )
-from helaocore.models.file import FileConnParams
+from helao.core.models.file import FileConnParams
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.update_sample_vol import update_vol
-from helaocore.models.data import DataModel
+from helao.core.models.data import DataModel
 from helao.drivers.data.archive_driver import Archive
 from helao.drivers.robot.enum import (
     PALtools,

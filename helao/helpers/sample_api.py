@@ -19,7 +19,7 @@ from uuid import UUID
 
 
 from helao.helpers.legacy_api import HTELegacyAPI
-from helaocore.models.sample import (
+from helao.core.models.sample import (
     AssemblySample,
     LiquidSample,
     SampleUnion,

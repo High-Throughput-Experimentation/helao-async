@@ -12,7 +12,7 @@ from data_request_client.client import DataRequestsClient, CreateDataRequestMode
 from data_request_client.models import Status
 from helao.helpers.config_loader import config_loader
 from helao.sequences.TEST_seq import TEST_consecutive_noblocking
-from helaocore.models.orchstatus import LoopStatus
+from helao.core.models.orchstatus import LoopStatus
 
 inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])

@@ -26,9 +26,9 @@ import json
 
 
 from helao.servers.base import Base, Active
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 
-from helaocore.models.sample import (
+from helao.core.models.sample import (
     SampleType,
     SampleUnion,
     LiquidSample,

@@ -2,7 +2,7 @@ __all__ = ["unpack_samples_helper"]
 
 from typing import List, Tuple
 
-from helaocore.models.sample import (
+from helao.core.models.sample import (
                             SampleUnion,
                             SampleType
                            )

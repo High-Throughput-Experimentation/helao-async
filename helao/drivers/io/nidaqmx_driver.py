@@ -20,14 +20,14 @@ from nidaqmx.constants import TriggerType
 from helao.helpers.premodels import Action
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helaocore.models.sample import SampleInheritance, SampleStatus
-from helaocore.models.file import FileConnParams, HloHeaderModel
+from helao.core.models.sample import SampleInheritance, SampleStatus
+from helao.core.models.file import FileConnParams, HloHeaderModel
 from helao.helpers.active_params import ActiveParams
-from helaocore.models.data import DataModel
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.data import DataModel
+from helao.core.models.hlostatus import HloStatus
 
 
 class cNIMAX:

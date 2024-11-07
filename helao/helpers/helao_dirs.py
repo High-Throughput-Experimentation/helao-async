@@ -6,7 +6,7 @@ import re
 from glob import glob
 
 from helao.helpers.print_message import print_message
-from helaocore.models.helaodirs import HelaoDirs
+from helao.core.models.helaodirs import HelaoDirs
 
 from helao.helpers import logging
 

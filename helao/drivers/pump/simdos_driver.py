@@ -13,8 +13,8 @@ from enum import IntEnum, Enum
 
 # import traceback
 
-from helaocore.models.hlostatus import HloStatus
-from helaocore.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
 

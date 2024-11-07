@@ -5,8 +5,8 @@ import asyncio
 import serial
 import minimalmodbus
 
-from helaocore.error import ErrorCodes
-from helaocore.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
 
