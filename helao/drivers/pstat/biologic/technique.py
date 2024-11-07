@@ -25,6 +25,10 @@ class EC_IRange(StrEnum):
     BOOSTER = "BOOSTER"
     AUTO    = "AUTO"   
 
+class SweepMode(StrEnum):
+    LINEAR = "lin"
+    LOG    = "log"
+
 @dataclass
 class BiologicTechnique:
     technique_name: str
@@ -102,18 +106,74 @@ TECH_CV = BiologicTechnique(
     },
 )
 
-TECH_GEIS = BiologicTechnique(
-    technique_name="GEIS",
-    easy_class=blp.GEIS,
-    parameter_map={},
-    field_map={},
-)
-
 TECH_PEIS = BiologicTechnique(
     technique_name="PEIS",
     easy_class=blp.PEIS,
-    parameter_map={},
-    field_map={},
+    parameter_map={
+        "Vinit__V": "voltage",
+        "Vamp__V": "amplitude_voltage",
+        "Finit__Hz": "initial_frequency",
+        "Ffinal__Hz": "final_frequency",
+        "Duration__s": "duration",
+        "AcqInterval__s": "time_interval",
+        "vs_initial": "vs_initial",
+        # "AcqInterval__I": "current_interval",
+        # "SweepMode": "sweep",
+        # "Repeats": "repeat",
+        # "DriftCorrection": "correction",
+        # "DelayFraction": "wait",
+        },
+    field_map={
+        "process": "process",
+        "time": "t_s",
+        "voltage": "Ewe_V",
+        "current": "I_A",
+        "abs_voltage": "AbsEwe_V",
+        "abs_current": "AbsI_A",
+        "impedance_phase": "phase",
+        "impedance_modulus": "modulus",
+        "voltage_ce": "Ece_V",
+        "abs_voltage_ce": "AbsEce_V",
+        "abs_current_ce": "AbsIce_A",
+        "impedance_ce_phase": "phase_ce",
+        "impedance_ce_modulus": "modulus_ce",
+        "frequency": "f_Hz",
+        },
 )
 
-BIOTECHS = {x.technique_name: x for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV]}
+TECH_GEIS = BiologicTechnique(
+    technique_name="GEIS",
+    easy_class=blp.GEIS,
+    parameter_map={
+        "Iinit__A": "current",
+        "Iamp__A": "amplitude_current",
+        "Finit__Hz": "initial_frequency",
+        "Ffinal__Hz": "final_frequency",
+        "Duration__s": "duration",
+        "AcqInterval__s": "time_interval",
+        "vs_initial": "vs_initial",
+        # "AcqInterval__V": "voltage_interval",
+        # "SweepMode": "sweep",
+        # "Repeats": "repeat",
+        # "DriftCorrection": "correction",
+        # "DelayFraction": "wait",
+        },
+    field_map={
+        "process": "process",
+        "time": "t_s",
+        "voltage": "Ewe_V",
+        "current": "I_A",
+        "abs_voltage": "AbsEwe_V",
+        "abs_current": "AbsI_A",
+        "impedance_phase": "phase",
+        "impedance_modulus": "modulus",
+        "voltage_ce": "Ece_V",
+        "abs_voltage_ce": "AbsEce_V",
+        "abs_current_ce": "AbsIce_A",
+        "impedance_ce_phase": "phase_ce",
+        "impedance_ce_modulus": "modulus_ce",
+        "frequency": "f_Hz",
+        },
+)
+
+BIOTECHS = {x.technique_name: x for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV, TECH_GEIS, TECH_PEIS]}
