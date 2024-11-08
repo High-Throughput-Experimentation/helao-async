@@ -127,18 +127,22 @@ class BiologicExec(Executor):
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
-        resp = await self.driver.get_data(self.channel)
-        # populate executor buffer for output calculation
-        data_length = 0
-        for k, v in resp.data.items():
-            self.data_buffer[k].extend(v)
-            data_length = len(v)
-        if data_length:
-            self.data_buffer["channel"].extend(data_length * [self.channel])
-            resp.data.update({"channel": data_length * [self.channel]})
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
-        status = HloStatus.active if resp.message != "done" else HloStatus.finished
-        return {"error": error, "status": status, "data": resp.data}
+        try:
+            resp = await self.driver.get_data(self.channel)
+            # populate executor buffer for output calculation
+            data_length = 0
+            for k, v in resp.data.items():
+                self.data_buffer[k].extend(v)
+                data_length = len(v)
+            if data_length:
+                self.data_buffer["channel"].extend(data_length * [self.channel])
+                resp.data.update({"channel": data_length * [self.channel]})
+            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            status = HloStatus.active if resp.message != "done" else HloStatus.finished
+            return {"error": error, "status": status, "data": resp.data}
+        except Exception:
+            LOGGER.error("BiologicExec poll error", exc_info=True)
+            return {"error": ErrorCodes.critical, "status": HloStatus.errored}
 
     async def _post_exec(self):
         LOGGER.info("BiologicExec running post_exec.")

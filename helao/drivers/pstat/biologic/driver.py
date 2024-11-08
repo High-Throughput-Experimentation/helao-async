@@ -190,6 +190,7 @@ class BiologicDriver(HelaoDriver):
             if self.channels[channel] is None:
                 raise ValueError(f"Channel {channel} has not been set up.")
             program = self.channels[channel]
+            print("!!! retrieving data")
             segment = await program._retrieve_data_segment(channel)
             if segment.values.State > 0:
                 status = DriverStatus.busy
@@ -206,6 +207,7 @@ class BiologicDriver(HelaoDriver):
                     segment_data += latest_segment.data
                     await program._retrieve_data_segment(channel)
 
+            print("!!! parsing data")
             parsed = [
                 program._fields(*program._field_values(datum, segment))
                 for datum in segment_data
