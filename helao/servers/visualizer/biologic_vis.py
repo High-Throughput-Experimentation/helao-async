@@ -119,7 +119,7 @@ class C_biovis:
                 label=f"Stop channel {ch}",
                 button_type="danger",
                 width=70,
-                align="end",
+                align="start",
             )
             for ch in range(self.num_channels)
         ]
