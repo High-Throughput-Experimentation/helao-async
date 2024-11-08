@@ -137,7 +137,9 @@ class BiologicExec(Executor):
             if data_length:
                 self.data_buffer["channel"].extend(data_length * [self.channel])
                 resp.data.update({"channel": data_length * [self.channel]})
-            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            error = (
+                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            )
             status = HloStatus.active if resp.message != "done" else HloStatus.finished
             return {"error": error, "status": status, "data": resp.data}
         except Exception:
@@ -258,6 +260,11 @@ async def biologic_dyn_endpoints(app=None):
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_params["Cycles"] -= 1  # i.e. additional cycles
+        active.action.action_params["AcqInterval__V"] = (
+            active.action.action_params["AcqInterval__s"]
+            * active.action.action_params["ScanRate__V_s"]
+        )
+
         active.action.action_abbr = "CV"
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CV)
         active_action_dict = active.start_executor(executor)
