@@ -116,11 +116,11 @@ def HISPEC_sub_SpEC(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    CV_duration_sec = abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
-    CV_duration_sec += abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
-    CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * cycles
+    CV_duration_sec = abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec # time from initial to Vertex 1
+    CV_duration_sec += abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec # time from vertex 1 to vertex 2 (imagine for now num scans =1)
+    CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec # time from vertex to to final
     CV_duration_sec += (
-        abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * 2.0 * (cycles - 1)
+        abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * 2.0 * (cycles - 1) # now, if C>1 we have c-1 triangular waveforms inserted after the first vertex 1.
     )
 
     if int(round(toggle1_time)) == -1:
