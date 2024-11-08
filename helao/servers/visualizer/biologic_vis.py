@@ -114,6 +114,19 @@ class C_biovis:
             for ch in range(self.num_channels)
         ]
 
+        self.stop_buttons = [
+            Button(
+                label=f"Stop channel {ch}",
+                button_type="danger",
+                width=70,
+                align="end",
+            )
+            for ch in range(self.num_channels)
+        ]
+
+        for i,x in enumerate(self.stop_buttons):
+            x.on_event(ButtonClick, partial(self.callback_stop_measure, channel=i))
+
         # generate 2-column layout for potentiostat channels
         self.vert_groups = [
             [
@@ -132,7 +145,7 @@ class C_biovis:
         self.plot_divs = [
             vert_item
             for vert_group in zip(
-                self.vert_groups, [Spacer(height=10)] * len(self.vert_groups)
+                self.stop_buttons, self.vert_groups, [Spacer(height=10)] * len(self.vert_groups)
             )
             for vert_item in vert_group
         ]
@@ -299,9 +312,13 @@ class C_biovis:
         if self.channel_action_uuid[channel] != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
                 self.vis.print_message(f" ... reseting channel {channel} graph")
-                self.channel_action_uuid_prev[channel] = self.channel_action_uuid[channel]
+                self.channel_action_uuid_prev[channel] = self.channel_action_uuid[
+                    channel
+                ]
                 if self.channel_action_uuid_prev[channel] != "":
-                    self.channel_datasources_prev[channel] = ColumnDataSource(data=deepcopy(self.channel_datasources[channel].data))
+                    self.channel_datasources_prev[channel] = ColumnDataSource(
+                        data=deepcopy(self.channel_datasources[channel].data)
+                    )
                 self.channel_action_uuid[channel] = new_action_uuid
                 self.channel_datasources[channel].data = {
                     key: [] for key in self.data_dict_keys
@@ -313,3 +330,17 @@ class C_biovis:
             self.xselect = self.xaxis_selector_group.active
             self.yselect = self.yaxis_selector_group.active
             self._add_plots(channel)
+
+    def callback_stop_measure(self, event, channel):
+        self.vis.print_message("stopping gamry measurement")
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                async_private_dispatcher,
+                server_key=self.potentiostat_key,
+                host=self.potserv_host,
+                port=self.potserv_port,
+                private_action="stop_private",
+                params_dict={"channel": channel},
+                json_dict={},
+            )
+        )

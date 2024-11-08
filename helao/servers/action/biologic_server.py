@@ -104,6 +104,7 @@ class BiologicExec(Executor):
                 action_params=self.action_params,
             )
             error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
+            LOGGER.info("BiologicExec setup successful.")
         except Exception:
             error = ErrorCodes.critical
             LOGGER.error("BiologicExec pre-exec error", exc_info=True)
@@ -118,6 +119,7 @@ class BiologicExec(Executor):
             error = (
                 ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
             )
+            LOGGER.info("BiologicExec measurement started.")
             return {"error": error}
         except Exception:
             LOGGER.error("BiologicExec exec error", exc_info=True)
@@ -139,6 +141,7 @@ class BiologicExec(Executor):
         return {"error": error, "status": status, "data": resp.data}
 
     async def _post_exec(self):
+        LOGGER.info("BiologicExec running post_exec.")
         resp = self.driver.cleanup(self.channel)
 
         # parse calculate outputs from data buffer:
@@ -364,8 +367,8 @@ def makeApp(confPrefix, server_key, helao_root):
         return finished_action.as_dict()
 
     @app.post("/stop_private", tags=["private"])
-    def stop_private():
+    def stop_private(channel: Optional[int] = None):
         """Stops measurement."""
-        app.driver.stop()
+        app.driver.stop(channel)
 
     return app
