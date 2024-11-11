@@ -25,7 +25,8 @@ __all__ = [
     "ECMS_sub_clean_cell_recirculation",
     "ECMS_sub_drain",
     "ECMS_sub_final_clean_cell",
-    "ECMS_sub_cali", 
+    "ECMS_sub_cali",
+    "ECMS_sub_threegascali",
     "ECMS_sub_pulsecali",
 ]
 
@@ -1078,6 +1079,83 @@ def ECMS_sub_cali(
 
     return apm.action_list
 
+def ECMS_sub_threegascali(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    CO2flowrate_sccm: float = 5.0,   
+    Califlowrate_sccm: float = 5.0,   #O2
+    Califlowrate_two_sccm: float = 0.0, #Ar
+    flow_ramp_sccm: float = 0,
+    MSsignal_quilibrium_time: float = 300,
+):
+    """prevacuum the cell gas phase side to make the electrolyte contact with GDE
+    """
+
+    apm = ActionPlanMaker()
+
+    # set CO2 flow rate
+    apm.add(
+        MFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": CO2flowrate_sccm,
+            "ramp_sccm_sec": flow_ramp_sccm,
+            "device_name": "CO2",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        MFC_server,
+        "cancel_hold_valve_action",
+        {
+            "device_name": "CO2"
+        },
+        asc.no_wait,
+    )
+    # set Calibration gas flow rate
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
+    #cali gas one
+    apm.add(
+        CALIBRATIONMFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": Califlowrate_sccm,
+            "ramp_sccm_sec": flow_ramp_sccm,
+            "device_name": "Caligas",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        CALIBRATIONMFC_server,
+        "cancel_hold_valve_action",
+        {
+            "device_name": "Caligas"
+        },
+        asc.no_wait,
+    )
+    
+    # cali gas two
+    apm.add(
+        CALIBRATIONMFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": Califlowrate_two_sccm,
+            "ramp_sccm_sec": flow_ramp_sccm,
+            "device_name": "Caligas2",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        CALIBRATIONMFC_server,
+        "cancel_hold_valve_action",
+        {
+            "device_name": "Caligas2"
+        },
+        asc.no_wait,
+    )
+    apm.add(ORCH_server, "wait", {"waittime": MSsignal_quilibrium_time})
+
+    return apm.action_list
 
 def ECMS_sub_pulsecali(
     experiment: Experiment,
