@@ -117,6 +117,17 @@ servers:
           port: COM4 # needs to update
           unit_id: A
 
+  CALIBRATIONMFC2:
+    host: hte-ecms-03.htejcap.caltech.edu
+    port: 8013 
+    group: action
+    fast: mfc_server
+    params:
+      devices:
+        Caligas2:
+          port: COM6 # needs to update
+          unit_id: A
+
   PSTAT:
     host: hte-ecms-03.htejcap.caltech.edu
     port: 8004
