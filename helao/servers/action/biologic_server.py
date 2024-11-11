@@ -30,8 +30,8 @@ from helao.helpers.executor import Executor
 from helao.helpers import logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.drivers.pstat.biologic.driver import BiologicDriver
+from easy_biologic.lib.ec_lib import IRange, ERange
 from helao.drivers.pstat.biologic.technique import (
-    EC_IRange,
     BiologicTechnique,
     TECH_OCV,
     TECH_CA,
@@ -196,7 +196,7 @@ async def biologic_dyn_endpoints(app=None):
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
-        IRange: EC_IRange = EC_IRange.AUTO,
+        IRange: IRange = IRange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -223,6 +223,7 @@ async def biologic_dyn_endpoints(app=None):
         Ival__A: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        ERange: ERange = ERange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -249,6 +250,7 @@ async def biologic_dyn_endpoints(app=None):
         ScanRate__V_s: float = 1.0,  # Scan rate in volts/sec or amps/sec.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         Cycles: int = 1,
+        IRange: IRange = IRange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -277,6 +279,7 @@ async def biologic_dyn_endpoints(app=None):
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        ERange: ERange = ERange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -302,6 +305,7 @@ async def biologic_dyn_endpoints(app=None):
         Ffinal__Hz: float = 10000,  # Final frequency in Hz.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         vs_initial: bool = False,  # True if vs initial, False if vs previous.
+        IRange: IRange = IRange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -325,6 +329,7 @@ async def biologic_dyn_endpoints(app=None):
         Ffinal__Hz: float = 10000,  # Final frequency in Hz.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         vs_initial: bool = False,  # True if vs initial, False if vs previous.
+        ERange: ERange = ERange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,

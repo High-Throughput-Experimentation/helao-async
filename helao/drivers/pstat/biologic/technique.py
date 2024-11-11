@@ -8,22 +8,28 @@ from easy_biologic import BiologicProgram
 
 from enum import StrEnum
 
-class EC_IRange(StrEnum):
-    p100 = "p100"
-    n1   = "n1"  
-    n10  = "n10" 
-    n100 = "n100"
-    u1   = "u1"  
-    u10  = "u10" 
-    u100 = "u100"
-    m1   = "m1"  
-    m10  = "m10" 
-    m100 = "m100"
-    a1   = "a1"    # 1 amp
+# class IRange(StrEnum):
+#     p100 = "p100"
+#     n1   = "n1"  
+#     n10  = "n10" 
+#     n100 = "n100"
+#     u1   = "u1"  
+#     u10  = "u10" 
+#     u100 = "u100"
+#     m1   = "m1"  
+#     m10  = "m10" 
+#     m100 = "m100"
+#     a1   = "a1"    # 1 amp
 
-    KEEP    = "KEEP"   
-    BOOSTER = "BOOSTER"
-    AUTO    = "AUTO"   
+#     KEEP    = "KEEP"   
+#     BOOSTER = "BOOSTER"
+#     AUTO    = "AUTO"   
+
+# class ERange(StrEnum):
+#     v2_5 = "v2_5"
+#     v5 = "v5"
+#     v10 = "v10"
+#     AUTO = "AUTO"
 
 class SweepMode(StrEnum):
     LINEAR = "lin"
@@ -44,6 +50,7 @@ TECH_OCV = BiologicTechnique(
         "Tval__s": "time",
         "AcqInterval__s": "time_interval",
         "AcqInterval__V": "voltage_interval",
+        "ERange": "voltage_range",
     },
     field_map={
         "time": "t_s",
@@ -59,6 +66,7 @@ TECH_CA = BiologicTechnique(
         "AcqInterval__s": "time_interval",
         "AcqInterval__A": "current_interval",
         "IRange": "current_range",
+        "ERange": "voltage_range",
     },
     field_map={
         "time": "t_s",
@@ -76,6 +84,7 @@ TECH_CP = BiologicTechnique(
         "Tval__s": "durations",
         "AcqInterval__s": "time_interval",
         "AcqInterval__V": "voltage_interval",
+        "ERange": "voltage_range",
     },
     field_map={
         "time": "t_s",
@@ -96,6 +105,7 @@ TECH_CV = BiologicTechnique(
         "ScanRate__V_s": "rate",
         "Cycles": "N_Cycles",
         "AcqInterval__V": "step",
+        "IRange": "current_range",
     },
     field_map={
         "time": "t_s",
