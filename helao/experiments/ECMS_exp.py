@@ -58,6 +58,7 @@ CALC_server = MachineModel(server_name="CALC", machine_name=ORCH_HOST).as_dict()
 #CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
 MFC_server = MachineModel(server_name="MFC", machine_name=ORCH_HOST).as_dict()
 CALIBRATIONMFC_server = MachineModel(server_name="CALIBRATIONMFC", machine_name=ORCH_HOST).as_dict()
+CALIBRATIONMFCSECOND_server = MachineModel(server_name="CALIBRATIONMFCSECOND", machine_name=ORCH_HOST).as_dict()
 
 # SOLUTIONPUMP_server = MachineModel(
 #     server_name="SYRINGE0", machine_name=ORCH_HOST
@@ -212,7 +213,24 @@ def ECMS_sub_normal_state(
         },
         asc.no_wait,
     )
-    
+    apm.add(
+        CALIBRATIONMFCSECOND_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": 0.0,
+            "ramp_sccm_sec": 0.0,
+            "device_name": "Caligassecond",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        CALIBRATIONMFCSECOND_server,
+        "hold_valve_closed_action",
+        {
+            "device_name": "Caligassecond"
+        },
+        asc.no_wait,
+    )    
     apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 0})
@@ -1136,20 +1154,20 @@ def ECMS_sub_threegascali(
     
     # cali gas two
     apm.add(
-        CALIBRATIONMFC_server,
+        CALIBRATIONMFCSECOND_server,
         "set_flowrate",
         {
             "flowrate_sccm": Califlowrate_two_sccm,
             "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "Caligas2",
+            "device_name": "Caligassecond",
         },
         asc.no_wait,
     )
     apm.add(
-        CALIBRATIONMFC_server,
+        CALIBRATIONMFCSECOND_server,
         "cancel_hold_valve_action",
         {
-            "device_name": "Caligas2"
+            "device_name": "Caligassecond"
         },
         asc.no_wait,
     )
