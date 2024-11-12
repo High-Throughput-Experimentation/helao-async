@@ -34,25 +34,25 @@ class EC_ERange( StrEnum ):
 
 
 EC_IRange_map = {
-    EC_IRange.p100: IRange.p100,
-    EC_IRange.n1: IRange.n1,
-    EC_IRange.n10: IRange.n10,
-    EC_IRange.n100: IRange.n100,
-    EC_IRange.u1: IRange.u1,
-    EC_IRange.u10: IRange.u10,
-    EC_IRange.u100: IRange.u100,
-    EC_IRange.m1: IRange.m1,
-    EC_IRange.m10: IRange.m10,
-    EC_IRange.m100: IRange.m100,
-    EC_IRange.a1: IRange.a1,
-    EC_IRange.KEEP: IRange.KEEP,
-    EC_IRange.BOOSTER: IRange.BOOSTER,
-    EC_IRange.AUTO: IRange.AUTO,
+    EC_IRange.p100: IRange.p100.value,
+    EC_IRange.n1: IRange.n1.value,
+    EC_IRange.n10: IRange.n10.value,
+    EC_IRange.n100: IRange.n100.value,
+    EC_IRange.u1: IRange.u1.value,
+    EC_IRange.u10: IRange.u10.value,
+    EC_IRange.u100: IRange.u100.value,
+    EC_IRange.m1: IRange.m1.value,
+    EC_IRange.m10: IRange.m10.value,
+    EC_IRange.m100: IRange.m100.value,
+    EC_IRange.a1: IRange.a1.value,
+    EC_IRange.KEEP: IRange.KEEP.value,
+    EC_IRange.BOOSTER: IRange.BOOSTER.value,
+    EC_IRange.AUTO: IRange.AUTO.value,
 }
 
 EC_ERange_map = {
-    EC_ERange.v2_5: ERange.v2_5,
-    EC_ERange.v5: ERange.v5,    
-    EC_ERange.v10: ERange.v10,  
-    EC_ERange.AUTO: ERange.AUTO,
+    EC_ERange.v2_5: ERange.v2_5.value,
+    EC_ERange.v5: ERange.v5.value,    
+    EC_ERange.v10: ERange.v10.value,  
+    EC_ERange.AUTO: ERange.AUTO.value,
 }
