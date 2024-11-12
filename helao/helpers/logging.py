@@ -12,7 +12,7 @@ Usage:
 # import picologging as logging
 # from picologging.handlers import TimedRotatingFileHandler
 import logging
-from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler, SMTPHandler
 from colorlog import ColoredFormatter
 import tempfile
 import os
@@ -27,6 +27,9 @@ def make_logger(
     logger_name: Optional[str] = None,
     log_dir: Optional[str] = None,
     log_level: int = 20,  # 10 (DEBUG), 20 (INFO), 30 (WARNING), 40 (ERROR), 50 (CRITICAL)
+    email_creds: Optional[dict] = None,
+    email_recipients: Optional[list] = None,
+    email_subject: str = "Error from Helao",
 ):
     """
     Creates and configures a logger instance with both console and file handlers.
@@ -69,11 +72,27 @@ def make_logger(
     )
     timed_rotation.setFormatter(formatter)
 
-    # set log level and attach handlers
+    # set log level and attach default handlers
     handlers = [console, timed_rotation]
     for handler in handlers:
         handler.setLevel(log_level)
         logger_instance.addHandler(handler)
+
+    if log_level > 20:
+        if email_creds is not None and email_recipients is not None:
+            email_handler = SMTPHandler(
+                mailhost=email_creds["mailhost"],
+                fromaddr=email_creds["fromaddr"],
+                toaddrs=email_recipients,
+                subject=email_subject,
+                credentials=(email_creds["username"], email_creds["password"]),
+                secure=(),
+            )
+            email_handler.setLevel(log_level)
+            email_handler.setFormatter(formatter)
+            logger_instance.addHandler(email_handler)
+        
+        
 
     logger_instance.info(f"writing log events to {log_path}")
     return logger_instance
