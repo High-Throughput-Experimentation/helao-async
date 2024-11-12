@@ -30,7 +30,7 @@ from helao.helpers.executor import Executor
 from helao.helpers import logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.drivers.pstat.biologic.driver import BiologicDriver
-from easy_biologic.lib.ec_lib import IRange, ERange
+from helao.drivers.pstat.biologic.enum import EC_IRange, EC_ERange, EC_IRange_map, EC_ERange_map
 from helao.drivers.pstat.biologic.technique import (
     BiologicTechnique,
     TECH_OCV,
@@ -196,7 +196,7 @@ async def biologic_dyn_endpoints(app=None):
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
-        IRange: IRange = IRange.AUTO,
+        IRange: EC_IRange = EC_IRange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -208,9 +208,7 @@ async def biologic_dyn_endpoints(app=None):
         (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CA"
-        active.action.action_params["IRange"] = getattr(
-            ecl.IRange, active.action.action_params["IRange"].value
-        )
+        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CA)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -223,7 +221,7 @@ async def biologic_dyn_endpoints(app=None):
         Ival__A: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        ERange: ERange = ERange.AUTO,
+        ERange: EC_ERange = EC_ERange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -234,6 +232,7 @@ async def biologic_dyn_endpoints(app=None):
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CP"
+        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CP)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -250,7 +249,7 @@ async def biologic_dyn_endpoints(app=None):
         ScanRate__V_s: float = 1.0,  # Scan rate in volts/sec or amps/sec.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         Cycles: int = 1,
-        IRange: IRange = IRange.AUTO,
+        IRange: EC_IRange = EC_IRange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -266,8 +265,8 @@ async def biologic_dyn_endpoints(app=None):
             active.action.action_params["AcqInterval__s"]
             * active.action.action_params["ScanRate__V_s"]
         )
-
         active.action.action_abbr = "CV"
+        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -279,7 +278,7 @@ async def biologic_dyn_endpoints(app=None):
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        ERange: ERange = ERange.AUTO,
+        ERange: EC_ERange = EC_ERange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -290,6 +289,7 @@ async def biologic_dyn_endpoints(app=None):
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "OCV"
+        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_OCV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -305,7 +305,7 @@ async def biologic_dyn_endpoints(app=None):
         Ffinal__Hz: float = 10000,  # Final frequency in Hz.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         vs_initial: bool = False,  # True if vs initial, False if vs previous.
-        IRange: IRange = IRange.AUTO,
+        IRange: EC_IRange = EC_IRange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -314,6 +314,7 @@ async def biologic_dyn_endpoints(app=None):
         """run Potentiostatic EIS"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "PEIS"
+        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_PEIS)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -329,7 +330,7 @@ async def biologic_dyn_endpoints(app=None):
         Ffinal__Hz: float = 10000,  # Final frequency in Hz.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         vs_initial: bool = False,  # True if vs initial, False if vs previous.
-        ERange: ERange = ERange.AUTO,
+        ERange: EC_ERange = EC_ERange.AUTO,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -338,6 +339,7 @@ async def biologic_dyn_endpoints(app=None):
         """run Galvanostataic EIS"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "GEIS"
+        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_GEIS)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
