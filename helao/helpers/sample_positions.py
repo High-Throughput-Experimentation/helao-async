@@ -28,6 +28,13 @@ from helaocore.models.sample import (
 from helao.helpers.print_message import print_message
 from helaocore.helaodict import HelaoDict
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="sample_positions_standalone")
+else:
+    LOGGER = logging.LOGGER
+
 VTUnion = ForwardRef("VTUnion")
 
 
@@ -57,7 +64,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            print_message(LOGGER, server_name="archive", f"invalid 'custom_type': {self.custom_type}", error=True)
             return False
 
     def dilution_allowed(self) -> bool:
@@ -66,7 +73,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            print_message(LOGGER, server_name="archive", f"invalid 'custom_type': {self.custom_type}", error=True)
             return False
 
     def is_destroyed(self) -> bool:
@@ -85,7 +92,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            print_message(LOGGER, server_name="archive", f"invalid 'custom_type': {self.custom_type}", error=True)
             return False
 
     def unload(self) -> SampleUnion:
@@ -104,7 +111,7 @@ class Custom(BaseModel, HelaoDict):
 
         self.sample = deepcopy(sample_in)
         self.blocked = False
-        print_message({}, "archive", f"loaded sample {sample_in.global_label}", info=True)
+        print_message(LOGGER, server_name="archive", f"loaded sample {sample_in.global_label}", info=True)
         return True, deepcopy(sample_in)
 
 

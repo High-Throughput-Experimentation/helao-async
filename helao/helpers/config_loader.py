@@ -9,6 +9,12 @@ from importlib.machinery import SourceFileLoader
 from .print_message import print_message
 from .yml_tools import yml_load
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="config_loader_standalone")
+else:
+    LOGGER = logging.LOGGER
 
 CONFIG = None 
 
@@ -31,18 +37,18 @@ def config_loader(confArg, helao_root):
     """
     confPrefix = os.path.basename(confArg).replace(".py", "").replace(".yml", "")
     if confArg.endswith(".py") and os.path.exists(confArg):
-        print_message({}, "launcher", f"Loading config from {confArg}", info=True)
+        print_message(LOGGER, server_name="launcher", f"Loading config from {confArg}", info=True)
         conf_spec = spec_from_file_location("configs", confArg)
         conf_mod = module_from_spec(conf_spec)
         conf_spec.loader.exec_module(conf_mod)
         config = conf_mod.config
         full_path = os.path.abspath(confArg)
     elif confArg.endswith(".yml") and os.path.exists(confArg):
-        print_message({}, "launcher", f"Loading config from {confArg}", info=True)
+        print_message(LOGGER, server_name="launcher", f"Loading config from {confArg}", info=True)
         config = yml_load(Path(confArg))
         full_path = os.path.abspath(confArg)
     elif (confArg.endswith(".py") or confArg.endswith(".yml")) and not os.path.exists(confArg):
-        print_message({}, "launcher", f"Config not found at {os.path.abspath(confArg)}", error=True)
+        print_message(LOGGER, server_name="launcher", f"Config not found at {os.path.abspath(confArg)}", error=True)
         raise FileNotFoundError("Config argument ends with .py or .yml but expected path not found.")
     else:
         yml_path = os.path.join(helao_root, "helao", "configs", f"{confPrefix}.yml")

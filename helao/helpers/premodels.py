@@ -212,8 +212,8 @@ class Experiment(Sequence, ExperimentModel):
         #         "\n----------------------------------",
         #         error=True,
         #     )
-        #     print_message({}, "experiment", f"samples_in labels: {in_labels}", error=True)
-        #     print_message({}, "experiment", f"samples_out labels: {out_labels}", error=True)
+        #     print_message(LOGGER, server_name="experiment", f"samples_in labels: {in_labels}", error=True)
+        #     print_message(LOGGER, server_name="experiment", f"samples_out labels: {out_labels}", error=True)
 
 
 class Action(Experiment, ActionModel):

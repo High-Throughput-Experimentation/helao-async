@@ -56,6 +56,12 @@ from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.helpers.premodels import Action
 from helao.helpers.update_sample_vol import update_vol
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="archive_driver_standalone")
+else:
+    LOGGER = logging.LOGGER
 
 class ScanDirection(str, Enum):
     raster_rows = "raster_rows"
@@ -113,7 +119,7 @@ class Archive:
             )
             self.write_config()
         # except Exception:
-        # print_message({}, "launcher", f"Error loading '{pidFile}', writing empty global dict.", error = True)
+        # print_message(LOGGER, server_name="launcher", f"Error loading '{pidFile}', writing empty global dict.", error = True)
         # self.write_config()
 
         # check trays
@@ -358,7 +364,7 @@ class Archive:
         )
 
         if not load_samples_in:
-            print_message({}, "archive", "Sample does not exist in DB.", warning=True)
+            print_message(LOGGER, server_name="archive", "Sample does not exist in DB.", warning=True)
             return error, sample
 
         position_found = False
@@ -376,7 +382,7 @@ class Archive:
                             )
                             position_found = True
         if not position_found:
-            print_message({}, "archive", f"could not find tray {tray}, slot {slot}, vial {vial} in defined positions or set position is already occupied.")   
+            print_message(LOGGER, server_name="archive", f"could not find tray {tray}, slot {slot}, vial {vial} in defined positions or set position is already occupied.")   
         
         # update with information from db
         sample = await self._update_samples(sample)
@@ -1058,7 +1064,7 @@ class Archive:
         )
 
         if not load_samples_in:
-            print_message({}, "archive", "Sample does not exist in DB.", warning=True)
+            print_message(LOGGER, server_name="archive", "Sample does not exist in DB.", warning=True)
             return False, NoneSample(), {}
 
         if custom in self.positions.customs_dict:
