@@ -27,4 +27,4 @@ def print_message(logger, server_name, *args, **kwargs):
     else:
         logger_method = logger.info
 
-    logger_method(" ".join(args))
+    logger_method(" ".join([str(x) for x in args]))
