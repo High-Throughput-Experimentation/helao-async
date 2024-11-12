@@ -1,5 +1,13 @@
 __all__ = ["Orch"]
 
+
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="orch_standalone")
+else:
+    LOGGER = logging.LOGGER
+
 import asyncio
 import sys
 from copy import deepcopy

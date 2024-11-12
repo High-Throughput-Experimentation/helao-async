@@ -47,6 +47,12 @@ from helao.helpers.config_loader import config_loader
 
 import helao.tests.unit_test_sample_models
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="launcher")
+else:
+    LOGGER = logging.LOGGER
 # from helao.tests.unit_test_sample_models import sample_model_unit_test
 
 
@@ -139,7 +145,7 @@ class Pidd:
         """
         with open(self.pidFilePath, "rb") as f:
             self.d = pickle.load(f)
-            # print_message({}, "launcher", f"Succesfully loaded '{self.pidFilePath}'.")
+            # print_message(LOGGER, server_name="launcher", f"Succesfully loaded '{self.pidFilePath}'.")
 
     def write_global(self):
         """
@@ -193,7 +199,7 @@ class Pidd:
                   information about a process, such as its PID, port, and host.
         """
         helaoPids = self.list_pids()
-        # print_message({}, "launcher", helaoPids)
+        # print_message(LOGGER, server_name="launcher", helaoPids)
         running = [tup for tup in helaoPids if psutil.pid_exists(tup[3])]
         # active = []
         # for tup in running:
@@ -232,7 +238,7 @@ class Pidd:
             for p in psutil.process_iter(["name", "connections"])
             if p.info["name"].startswith("python")
         }
-        # print_message({}, "launcher", pyPids)
+        # print_message(LOGGER, server_name="launcher", pyPids)
         match = {pid: connections for pid, connections in pyPids.items() if connections}
         for pid, connections in match.items():
             if (host, port) in [(c.laddr.ip, c.laddr.port) for c in connections]:
@@ -259,7 +265,7 @@ class Pidd:
         """
         self.load_global()  # reload in case any servers were appended
         if k not in self.d:
-            print_message({}, "launcher", f"Server '{k}' not found in pid dict.")
+            print_message(LOGGER, server_name="launcher", f"Server '{k}' not found in pid dict.")
             return True
         else:
             active = self.list_active()
@@ -298,7 +304,7 @@ class Pidd:
                     print_message(
                         {}, "launcher", f"Error terminating server '{k}'", error=True
                     )
-                    print_message({}, "launcher", repr(e), tb, error=True)
+                    print_message(LOGGER, server_name="launcher", repr(e), tb, error=True)
                     return False
 
     def close(self):
@@ -320,12 +326,12 @@ class Pidd:
             OSError: If there is an issue removing the PID file.
         """
         active = self.list_active()
-        print_message({}, "launcher", f"active pidds: {active}")
+        print_message(LOGGER, server_name="launcher", f"active pidds: {active}")
 
         activeserver = [k for k, _, _, _ in active]
         KILL_ORDER = ["operator", "visualizer", "action", "orchestrator"]
         for group in KILL_ORDER:
-            print_message({}, "launcher", f"Killing {group} group.")
+            print_message(LOGGER, server_name="launcher", f"Killing {group} group.")
             if group in self.servers.keys():
                 G = self.servers[group]
                 for server in G:
@@ -336,7 +342,7 @@ class Pidd:
                         f"waiting {twait} seconds before killing server {server}",
                     )
                     time.sleep(twait)
-                    print_message({}, "launcher", f"Killing {server}.")
+                    print_message(LOGGER, server_name="launcher", f"Killing {server}.")
                     if server in activeserver:
                         self.kill_server(server)
 
@@ -350,7 +356,7 @@ class Pidd:
                 {}, "launcher", "Following actions failed to terminate:", error=True
             )
             for x in active:
-                print_message({}, "launcher", x)
+                print_message(LOGGER, server_name="launcher", x)
         else:
             print_message(
                 {}, "launcher", f"All actions terminated. Removing '{self.pidFilePath}'"
@@ -385,10 +391,10 @@ def validateConfig(PIDD, confDict, helao_root):
     If any of these checks fail, an appropriate error message is printed and the function returns False.
     """
     if len(confDict["servers"]) != len(set(confDict["servers"])):
-        print_message({}, "launcher", "Server keys are not unique.")
+        print_message(LOGGER, server_name="launcher", "Server keys are not unique.")
         return False
     if "servers" not in confDict:
-        print_message({}, "launcher", "'servers' key not defined in config dictionary.")
+        print_message(LOGGER, server_name="launcher", "'servers' key not defined in config dictionary.")
         return False
     for server in confDict["servers"]:
         serverDict = confDict["servers"][server]
@@ -449,7 +455,7 @@ def validateConfig(PIDD, confDict, helao_root):
                 return False
     serverAddrs = [f"{d['host']}:{d['port']}" for d in confDict["servers"].values()]
     if len(serverAddrs) != len(set(serverAddrs)):
-        print_message({}, "launcher", "Server host:port locations are not unique.")
+        print_message(LOGGER, server_name="launcher", "Server host:port locations are not unique.")
         return False
     return True
 
@@ -507,7 +513,7 @@ def launcher(confArg, confDict, helao_root, extraopt=""):
         )
         raise Exception(f"Configuration for '{confPrefix}' is invalid.")
     else:
-        print_message({}, "launcher", f"Configuration for '{confPrefix}' is valid.")
+        print_message(LOGGER, server_name="launcher", f"Configuration for '{confPrefix}' is valid.")
     # get running pids
     active = pidd.list_active()
     activeKHP = [(k, h, p) for k, h, p, _ in active]
@@ -519,7 +525,7 @@ def launcher(confArg, confDict, helao_root, extraopt=""):
     pidd.servers = allGroup
     pidd.orchServs = []
     for group in LAUNCH_ORDER:
-        print_message({}, "launcher", f"Launching {group} group.")
+        print_message(LOGGER, server_name="launcher", f"Launching {group} group.")
         if group in pidd.servers.keys():
             G = pidd.servers[group]
             for server in G.keys():
@@ -635,7 +641,7 @@ def main():
         )
     python_path = os.environ.get("PYTHONPATH")
     if python_path is None:
-        print_message({}, "launcher", "", "PYTHONPATH environment var not defined.")
+        print_message(LOGGER, server_name="launcher", "", "PYTHONPATH environment var not defined.")
         quit()
     else:
         python_paths = (
@@ -706,7 +712,7 @@ def main():
         old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
         nots_counter = 0
         for old_log in old_log_txts:
-            print_message({}, "launcher", f"Compressing: {old_log}")
+            print_message(LOGGER, server_name="launcher", f"Compressing: {old_log}")
             try:
                 timestamp_found = False
                 timestamp = ""
@@ -737,7 +743,7 @@ def main():
                     zf.write(old_log, arcname)
                 os.remove(old_log)
             except:
-                print_message({}, "launcher", f"Error compressing log: {old_log}")
+                print_message(LOGGER, server_name="launcher", f"Error compressing log: {old_log}")
 
     pidd = launcher(
         confArg=confArg, confDict=config, helao_root=helao_root, extraopt=extraopt
@@ -770,7 +776,7 @@ def main():
         Returns:
             dict: The server details including host and port.
         """
-        print_message({}, "launcher", f"Unsubscribing {servername} websockets.")
+        print_message(LOGGER, server_name="launcher", f"Unsubscribing {servername} websockets.")
         S = pidd.servers[groupname][servername]
         requests.post(f"http://{S['host']}:{S['port']}/shutdown")
         return S
@@ -869,7 +875,7 @@ def main():
                             )
                         break
                     elif sind == "":
-                        print_message({}, "launcher", f"Cancelling restart.")
+                        print_message(LOGGER, server_name="launcher", f"Cancelling restart.")
                         break
                     else:
                         print_message(
@@ -897,12 +903,12 @@ def main():
             # no /shutdown in visualizers
             KILL_ORDER = ["action"]  # orch are killed above
             for group in KILL_ORDER:
-                print_message({}, "launcher", f"Shutting down {group} group.")
+                print_message(LOGGER, server_name="launcher", f"Shutting down {group} group.")
                 if group in pidd.servers.keys():
                     G = pidd.servers[group]
                     for server in G.keys():
                         try:
-                            print_message({}, "launcher", f"Shutting down {server}.")
+                            print_message(LOGGER, server_name="launcher", f"Shutting down {server}.")
                             S = G[server]
                             # will produce a 404 if not found
                             requests.post(f"http://{S['host']}:{S['port']}/shutdown")

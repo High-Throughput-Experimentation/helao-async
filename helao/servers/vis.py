@@ -22,6 +22,11 @@ __all__ = ["Vis", "HelaoVis"]
 
 from socket import gethostname
 
+from helao.helpers import logging
+
+global LOGGER
+LOGGER = logging.LOGGER
+
 from helao.helpers.server_api import HelaoBokehAPI
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.print_message import print_message
@@ -121,7 +126,7 @@ class Vis:
         None
         """
         print_message(
-            self.server_cfg,
+            LOGGER,
             self.server.server_name,
             log_dir=self.helaodirs.log_root,
             *args,

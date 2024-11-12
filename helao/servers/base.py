@@ -383,7 +383,7 @@ class Base:
             log_dir (str): Directory where logs are stored.
         """
         print_message(
-            self.server_cfg,
+            LOGGER,
             self.server.server_name,
             log_dir=self.helaodirs.log_root,
             *args,
@@ -3351,7 +3351,7 @@ class DummyBase:
         Args:
             message (str): The message to be printed.
         """
-        print_message({}, "DUMMY", message)
+        print_message(LOGGER, server_name="DUMMY", message)
 
     async def put_lbuf(self, message: dict) -> None:
         """
