@@ -7,6 +7,12 @@ from importlib.machinery import SourceFileLoader
 from helao.helpers.print_message import print_message
 from helaocore.version import get_filehash
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="import_sequences_standalone")
+else:
+    LOGGER = logging.LOGGER
 
 def import_sequences(
     world_config_dict: dict,
@@ -21,7 +27,7 @@ def import_sequences(
 
     def get_seqs(seq_path, seq_file):
         print_message(
-            world_config_dict,
+            LOGGER,
             server_name,
             f"importing sequences from '{seq_file}' from '{seq_path}'",
         )
@@ -36,13 +42,13 @@ def import_sequences(
                 sequence_lib.update({func: tempd[func]})
                 sequence_codehash_lib.update({func: sequence_file_hash})
                 print_message(
-                    world_config_dict,
+                    LOGGER,
                     server_name,
                     f"added seq '{func}' to sequence library",
                 )
             else:
                 print_message(
-                    world_config_dict,
+                    LOGGER,
                     server_name,
                     f"!!! Could not find sequence function '{func}' in '{seq_file}'",
                     error=True,
@@ -54,7 +60,7 @@ def import_sequences(
         )
     if not os.path.isdir(sequence_path):
         print_message(
-            world_config_dict,
+            LOGGER,
             server_name,
             f"sequence path {sequence_path} was specified but is not a valid directory",
         )
@@ -73,14 +79,14 @@ def import_sequences(
         for userfile in userfiles:
             get_seqs(seq_path=user_sequence_path, seq_file=userfile)
             print_message(
-                world_config_dict,
+                LOGGER,
                 server_name,
                 f"Pausing for 3 seconds to notify: custom sequences were imported from {os.path.join(user_sequence_path, userfile)}",
             )
             time.sleep(3)
 
     print_message(
-        world_config_dict,
+        LOGGER,
         server_name,
         f"imported {len(seqlibs)} sequences specified by config.",
     )

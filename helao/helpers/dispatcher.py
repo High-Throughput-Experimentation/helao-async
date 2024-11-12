@@ -10,6 +10,13 @@ from helaocore.error import ErrorCodes
 
 from helao.helpers.print_message import print_message
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="dispatcher_standalone")
+else:
+    LOGGER = logging.LOGGER
+
 
 async def async_action_dispatcher(world_config_dict: dict, A: Action, params={}):
     """
@@ -42,7 +49,7 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={})
                 if resp.status != 200:
                     error_code = ErrorCodes.http
                     print_message(
-                        actd,
+                        LOGGER,
                         "orchestrator",
                         f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}",
                         error=True,
@@ -50,7 +57,7 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={})
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 print_message(
-                    actd,
+                    LOGGER,
                     "orchestrator",
                     f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{resp}', error={repr(e), tb,}",
                     error=True,
@@ -95,7 +102,7 @@ async def async_private_dispatcher(
                 if resp.status != 200:
                     error_code = ErrorCodes.http
                     print_message(
-                        {},
+                        LOGGER,
                         "orchestrator",
                         f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
                         error=True,
@@ -103,7 +110,7 @@ async def async_private_dispatcher(
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 print_message(
-                    {},
+                    LOGGER,
                     "orchestrator",
                     f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
                     error=True,
@@ -151,7 +158,7 @@ def private_dispatcher(
                 if resp.status_code != 200:
                     error_code = ErrorCodes.http
                     print_message(
-                        {},
+                        LOGGER,
                         "orchestrator",
                         f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}', error={repr(error_code)}",
                         error=True,
@@ -159,7 +166,7 @@ def private_dispatcher(
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 print_message(
-                    {},
+                    LOGGER,
                     "orchestrator",
                     f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
                     error=True,
@@ -236,7 +243,7 @@ async def endpoints_available(req_list: list):
         badinds = [i for i,v in enumerate(responses) if not v]
         unavailable = [(req_list[i], [states[i]]) for i in badinds]
         print_message(
-            {},
+            LOGGER,
             "orchestrator",
             f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}",
         )

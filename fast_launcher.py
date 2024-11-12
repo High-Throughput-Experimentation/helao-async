@@ -82,7 +82,7 @@ if __name__ == "__main__":
     LOGGING_CONFIG["formatters"]["access"]["use_colors"] = False
 
     print_message(
-        {},
+        LOGGER,
         "fast_launcher",
         f" ---- starting  {server_key} ----",
         log_dir=log_root,

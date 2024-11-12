@@ -333,7 +333,7 @@ class ExpYml(HelaoYml):
                     self.progress.write()
             else:
                 print_message(
-                    {},
+                    LOGGER,
                     "DB",
                     f"Cannot create process {group_idx} with actions still pending.",
                 )
@@ -387,11 +387,11 @@ class ExpYml(HelaoYml):
             ]
         # if base_process["run_type"] == "MISSING":
         #     print_message(
-        #         {}, "DB", f"Process terminating action has no type. Using DB config."
+        #         LOGGER, "DB", f"Process terminating action has no type. Using DB config."
         #     )
         # if base_process["technique_name"] == "MISSING":
         #     print_message(
-        #         {},
+        #         LOGGER,
         #         "DB",
         #         f"Process terminating action has no technique_name. Using action_name.",
         #     )
@@ -473,7 +473,7 @@ class ExpYml(HelaoYml):
                 file_dict["file_name"] = f"{file_dict['file_name']}.json"
         self.progress[group_idx]["meta"] = meta_json
         # print_message(
-        #     {}, "DB", f"Writing process {group_idx} meta dict to progress file."
+        #     LOGGER, "DB", f"Writing process {group_idx} meta dict to progress file."
         # )
         self.progress.write()
 

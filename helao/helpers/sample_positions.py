@@ -105,7 +105,7 @@ class Custom(BaseModel, HelaoDict):
     def load(self, sample_in: SampleUnion) -> Tuple[bool, SampleUnion]:
         if self.sample != NoneSample():
             print_message(
-                {}, "archive", "sample already loaded. Unload first to load new one.", error=True
+                LOGGER, "archive", "sample already loaded. Unload first to load new one.", error=True
             )
             return False, NoneSample()
 

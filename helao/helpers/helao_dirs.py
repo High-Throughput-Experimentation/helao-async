@@ -32,7 +32,7 @@ def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
     def check_dir(path):
         if not os.path.isdir(path):
             print_message(
-                {},
+                LOGGER,
                 "DIR",
                 f"Warning: directory '{path}' does not exist. Creating it.",
                 warning=True,
@@ -50,7 +50,7 @@ def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
         ana_root = os.path.join(root, "ANALYSES")
         process_root = os.path.join(root, "PROCESSES")
         print_message(
-            {},
+            LOGGER,
             "DIR",
             f"Found root directory in config: {world_cfg['root']}",
         )
