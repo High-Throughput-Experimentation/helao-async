@@ -140,7 +140,13 @@ class BiologicExec(Executor):
             error = (
                 ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
             )
-            status = HloStatus.active if resp.message != "done" else HloStatus.finished
+            status = HloStatus.active
+            
+            if resp.message == "done":
+                status = HloStatus.finished
+            if resp.response == "failed":
+                status = HloStatus.errored
+                
             return {"error": error, "status": status, "data": resp.data}
         except Exception:
             LOGGER.error("BiologicExec poll error", exc_info=True)
