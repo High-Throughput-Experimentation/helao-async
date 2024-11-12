@@ -1,4 +1,4 @@
-from Enum import StrEnum
+from enum import StrEnum
 from easy_biologic.lib.ec_lib import IRange, ERange
 
 
