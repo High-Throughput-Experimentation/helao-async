@@ -214,7 +214,7 @@ async def biologic_dyn_endpoints(app=None):
         (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CA"
-        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
+        # active.action.action_params["IRange"] = EC_IRange_map[# active.action.action_params["IRange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CA)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -238,7 +238,7 @@ async def biologic_dyn_endpoints(app=None):
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CP"
-        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
+        # active.action.action_params["ERange"] = EC_ERange_map[# active.action.action_params["ERange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CP)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -272,7 +272,7 @@ async def biologic_dyn_endpoints(app=None):
             * active.action.action_params["ScanRate__V_s"]
         )
         active.action.action_abbr = "CV"
-        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
+        # active.action.action_params["IRange"] = EC_IRange_map[# active.action.action_params["IRange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -295,7 +295,7 @@ async def biologic_dyn_endpoints(app=None):
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "OCV"
-        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
+        # active.action.action_params["ERange"] = EC_ERange_map[# active.action.action_params["ERange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_OCV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -320,7 +320,7 @@ async def biologic_dyn_endpoints(app=None):
         """run Potentiostatic EIS"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "PEIS"
-        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
+        # active.action.action_params["IRange"] = EC_IRange_map[# active.action.action_params["IRange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_PEIS)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -345,7 +345,7 @@ async def biologic_dyn_endpoints(app=None):
         """run Galvanostataic EIS"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "GEIS"
-        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
+        # active.action.action_params["ERange"] = EC_ERange_map[# active.action.action_params["ERange"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_GEIS)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
