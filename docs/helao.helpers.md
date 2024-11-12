@@ -875,7 +875,7 @@ This replaces Model._\_fields_\_ from Pydantic V1.
 
 ## helao.helpers.print_message module
 
-### helao.helpers.print_message.print_message(server_cfg={}, server_name=None, \*args, \*\*kwargs)
+### helao.helpers.print_message.print_message(logger_instance, server_name, \*args, \*\*kwargs)
 
 Prints and logs messages with different styles based on the server configuration and message type.
 

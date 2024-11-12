@@ -77,7 +77,7 @@ if __name__ == "__main__":
     else:
         log_root = None
     print_message(
-        {},
+        LOGGER,
         "bokeh_launcher",
         f" ---- starting  {server_key} ----",
         log_dir=log_root,
@@ -98,7 +98,7 @@ if __name__ == "__main__":
         allow_websocket_origin=[f"{servHost}:{servPort}"],
     )
     print_message(
-        {},
+        LOGGER,
         "bokeh_launcher",
         f"started {server_key} {bokehapp}",
         log_dir=log_root,

@@ -143,7 +143,7 @@ class Experiment(Sequence, ExperimentModel):
 
         for actm in self.actionmodel_list:
             print_message(
-                {},
+                LOGGER,
                 "experiment",
                 f"updating exp with act {actm.action_name} on "
                 f"{actm.action_server.disp_name()}, uuid:{actm.action_uuid}",
@@ -204,7 +204,7 @@ class Experiment(Sequence, ExperimentModel):
 
         # if not isunique:
         #     print_message(
-        #         {},
+        #         LOGGER,
         #         "experiment",
         #         "\n----------------------------------"
         #         "\nDuplicate but 'unique' samples."
@@ -302,7 +302,7 @@ class ActionPlanMaker:
             if isinstance(argparam, Experiment):
                 if self._experiment is None:
                     print_message(
-                        {},
+                        LOGGER,
                         "actionplanmaker",
                         f"{self.expname}: found Experiment BaseModel under "
                         f"parameter '{arg}'",
@@ -311,7 +311,7 @@ class ActionPlanMaker:
                     self._experiment = deepcopy(argparam)
                 else:
                     print_message(
-                        {},
+                        LOGGER,
                         "actionplanmaker",
                         f"{self.expname}: critical error: "
                         f"found another Experiment BaseModel"
@@ -326,7 +326,7 @@ class ActionPlanMaker:
         # check if an Experiment was detected
         if self._experiment is None:
             print_message(
-                {},
+                LOGGER,
                 "actionplanmaker",
                 f"{self.expname}: warning: "
                 f"no Experiment BaseModel was found "
@@ -354,7 +354,7 @@ class ActionPlanMaker:
         for key, val in exp_paramdict.items():
             if key not in self._experiment.experiment_params.keys():
                 print_message(
-                    {},
+                    LOGGER,
                     "ActionPlanMaker",
                     f"{self.expname}: local var '{key}'"
                     f" not found in Experiment, "
@@ -369,7 +369,7 @@ class ActionPlanMaker:
                 setattr(self.pars, key, val)
 
         print_message(
-            {},
+            LOGGER,
             "ActionPlanMaker",
             f"{self.expname}: params in self.pars are:" f" {vars(self.pars)}",
             info=True,

@@ -69,7 +69,7 @@ def config_loader(confArg, helao_root):
         else:
             raise FileNotFoundError("Config argument was a prefix but .py or .yml could not be found.")
         print_message(
-            {},
+            LOGGER,
             "launcher",
             f"Loading config from {full_path}",
             info=True,

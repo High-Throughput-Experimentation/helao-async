@@ -6,6 +6,12 @@ from importlib.machinery import SourceFileLoader
 from helao.helpers.print_message import print_message
 from helaocore.version import get_filehash
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="import_experiments_standalone")
+else:
+    LOGGER = logging.LOGGER
 
 def import_experiments(
     world_config_dict: dict,
@@ -20,7 +26,7 @@ def import_experiments(
 
     def get_exps(exp_path, exp_file):
         print_message(
-            world_config_dict,
+            LOGGER,
             server_name,
             f"importing exeriments from '{exp_file}' from '{exp_path}'",
         )
@@ -35,13 +41,13 @@ def import_experiments(
                 experiment_lib.update({func: tempd[func]})
                 experiment_codehash_lib.update({func: experiment_file_hash})
                 print_message(
-                    world_config_dict,
+                    LOGGER,
                     server_name,
                     f"added exp '{func}' to experiment library",
                 )
             else:
                 print_message(
-                    world_config_dict,
+                    LOGGER,
                     server_name,
                     f"!!! Could not find experiment function '{func}' in '{exp_file}'",
                     error=True,
@@ -53,7 +59,7 @@ def import_experiments(
         )
     if not os.path.isdir(experiment_path):
         print_message(
-            world_config_dict,
+            LOGGER,
             server_name,
             f"experiment path {experiment_path} was specified but is not a valid directory",
         )
@@ -72,14 +78,14 @@ def import_experiments(
         for userfile in userfiles:
             get_exps(exp_path=user_experiment_path, exp_file=userfile)
             print_message(
-                world_config_dict,
+                LOGGER,
                 server_name,
                 f"Pausing for 3 seconds to notify: custom experiments were imported from {os.path.join(user_experiment_path, userfile)}",
             )
             time.sleep(3)
 
     print_message(
-        world_config_dict,
+        LOGGER,
         server_name,
         f"imported {len(explibs)} experiments specified by config.",
     )
