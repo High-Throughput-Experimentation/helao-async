@@ -262,7 +262,7 @@ class ExpYml(HelaoYml):
         self.get_actions()
         if self.grouped_actions:
             self.max_group = max(self.grouped_actions.keys())
-            # print_message(LOGGER, server_name="DB", f"There are {self.max_group + 1} process groups.")
+            # print_message(LOGGER, "DB", f"There are {self.max_group + 1} process groups.")
         else:
             self.max_group = 0
 
@@ -320,7 +320,7 @@ class ExpYml(HelaoYml):
                 self.progress[act.pkey]["ready"] or self.progress[act.pkey]["done"]
                 for act in group_acts
             ]
-            # print_message(LOGGER, server_name="DB", f"Group {group_idx} action states: {act_states}")
+            # print_message(LOGGER, "DB", f"Group {group_idx} action states: {act_states}")
             if all(act_states):
                 # print_message(
                 #     {}, "DB", f"Process {group_idx} is ready, all actions finished."
@@ -328,7 +328,7 @@ class ExpYml(HelaoYml):
                 self.progress[group_idx]["ready"] = True
                 self.progress.write()
                 if self.progress[group_idx]["meta"] == {}:
-                    # print_message(LOGGER, server_name="DB", f"Creating process {group_idx} meta dict.")
+                    # print_message(LOGGER, "DB", f"Creating process {group_idx} meta dict.")
                     self.create_process(group_idx)
                     self.progress.write()
             else:

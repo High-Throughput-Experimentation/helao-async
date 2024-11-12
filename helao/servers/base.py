@@ -3351,7 +3351,7 @@ class DummyBase:
         Args:
             message (str): The message to be printed.
         """
-        print_message(LOGGER, server_name="DUMMY", message)
+        print_message(LOGGER, "DUMMY", message)
 
     async def put_lbuf(self, message: dict) -> None:
         """

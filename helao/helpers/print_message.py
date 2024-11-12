@@ -1,7 +1,7 @@
 __all__ = ["print_message"]
 
 
-def print_message(logger, server_name=None, *args, **kwargs):
+def print_message(LOGGER, None, *args, **kwargs):
     """
     Logs a message using the specified logger.
 
