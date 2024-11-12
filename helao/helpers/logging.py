@@ -12,6 +12,20 @@ Usage:
 # import picologging as logging
 # from picologging.handlers import TimedRotatingFileHandler
 import logging
+
+ALERT_LEVEL = 60
+logging.addLevelName(ALERT_LEVEL, "ALERT")
+
+
+def alert(self, message, *args, **kws):
+    if self.isEnabledFor(ALERT_LEVEL):
+        # Yes, logger takes its '*args' as 'args'.
+        self._log(ALERT_LEVEL, message, args, **kws)
+
+
+logging.Logger.alert = alert
+
+
 from logging.handlers import TimedRotatingFileHandler, SMTPHandler
 from colorlog import ColoredFormatter
 import tempfile
@@ -27,9 +41,7 @@ def make_logger(
     logger_name: Optional[str] = None,
     log_dir: Optional[str] = None,
     log_level: int = 20,  # 10 (DEBUG), 20 (INFO), 30 (WARNING), 40 (ERROR), 50 (CRITICAL)
-    email_creds: Optional[dict] = None,
-    email_recipients: Optional[list] = None,
-    email_subject: str = "Error from Helao",
+    email_config: dict = {},
 ):
     """
     Creates and configures a logger instance with both console and file handlers.
@@ -56,9 +68,10 @@ def make_logger(
             "WARNING": "yellow",
             "ERROR": "light_red",
             "CRITICAL": "red,bg_white",
+            "ALERT": "magenta",
         },
         secondary_log_colors={},
-        style='%'
+        style="%",
     )
 
     logger_instance = logging.getLogger(logger_name)
@@ -78,21 +91,30 @@ def make_logger(
         handler.setLevel(log_level)
         logger_instance.addHandler(handler)
 
-    if log_level > 20:
-        if email_creds is not None and email_recipients is not None:
+    if log_level == 60:
+        mailhost = email_config.get("mailhost", None)
+        fromaddr = email_config.get("fromaddr", None)
+        username = email_config.get("username", None)
+        password = email_config.get("password", None)
+        recipients = email_config.get("recipients", None)
+        subject = email_config.get("subject", "Error in Helao")
+        if all(
+            [
+                x is not None
+                for x in [mailhost, fromaddr, username, password, recipients]
+            ]
+        ):
             email_handler = SMTPHandler(
-                mailhost=email_creds["mailhost"],
-                fromaddr=email_creds["fromaddr"],
-                toaddrs=email_recipients,
-                subject=email_subject,
-                credentials=(email_creds["username"], email_creds["password"]),
+                mailhost=mailhost,
+                fromaddr=fromaddr,
+                toaddrs=recipients,
+                subject=subject,
+                credentials=(username, password),
                 secure=(),
             )
             email_handler.setLevel(log_level)
             email_handler.setFormatter(formatter)
             logger_instance.addHandler(email_handler)
-        
-        
 
     logger_instance.info(f"writing log events to {log_path}")
     return logger_instance
