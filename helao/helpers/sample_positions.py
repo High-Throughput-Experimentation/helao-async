@@ -64,7 +64,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message(LOGGER, server_name="archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            print_message(LOGGER, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
             return False
 
     def dilution_allowed(self) -> bool:
@@ -73,7 +73,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message(LOGGER, server_name="archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            print_message(LOGGER, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
             return False
 
     def is_destroyed(self) -> bool:
@@ -92,7 +92,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message(LOGGER, server_name="archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            print_message(LOGGER, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
             return False
 
     def unload(self) -> SampleUnion:
@@ -111,7 +111,7 @@ class Custom(BaseModel, HelaoDict):
 
         self.sample = deepcopy(sample_in)
         self.blocked = False
-        print_message(LOGGER, server_name="archive", f"loaded sample {sample_in.global_label}", info=True)
+        print_message(LOGGER, "archive", f"loaded sample {sample_in.global_label}", info=True)
         return True, deepcopy(sample_in)
 
 

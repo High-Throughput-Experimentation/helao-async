@@ -39,7 +39,7 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
         # if base is not None:
         #     base.print_message(msg, info=True)
         # else:
-        print_message(LOGGER, server_name="yml_finisher", msg, info=True)
+        print_message(LOGGER, "yml_finisher", msg, info=True)
 
     if "host" not in db_config or "port" not in db_config:
         # print_msg(f"DB server not defined in config, {yml_path} will not sync.")
@@ -99,7 +99,7 @@ async def move_dir(
     else:
 
         def print_msg(msg):
-            print_message(LOGGER, server_name="yml_finisher", msg, info=True)
+            print_message(LOGGER, "yml_finisher", msg, info=True)
 
     obj_type = hobj.__class__.__name__.lower()
     dest_dir = "RUNS_FINISHED"
