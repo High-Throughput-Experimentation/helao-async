@@ -1,106 +1,30 @@
 __all__ = ["print_message"]
 
-import os
-from time import strftime
 
-from colorama import Fore, Back, Style, colorama_text
-from termcolor import cprint
-from pyfiglet import figlet_format
-
-
-def print_message(server_cfg={}, server_name=None, *args, **kwargs):
+def print_message(logger, server_name=None, *args, **kwargs):
     """
-    Prints and logs messages with different styles based on the server configuration and message type.
+    Logs a message using the specified logger.
 
-    Args:
-        server_cfg (dict, optional): Configuration dictionary for the server. Defaults to {}.
-        server_name (str, optional): Name of the server. Defaults to None.
-        *args: Variable length argument list for the message content.
-        **kwargs: Arbitrary keyword arguments for additional options.
-            - error (bool, optional): If present, the message is treated as an error.
-            - warning (bool, optional): If present, the message is treated as a warning.
-            - warn (bool, optional): Alias for warning.
-            - info (bool, optional): If present, the message is treated as an informational message.
-            - sample (bool, optional): If present, the message is treated as a sample message.
-            - log_dir (str, optional): Directory path where the log files will be saved.
+    Parameters:
+    logger (logging.Logger): The logger instance to use for logging the message.
+    server_name (str, optional): The name of the server. Defaults to None.
+    *args: Variable length argument list to be joined into the log message.
+    **kwargs: Arbitrary keyword arguments to determine the log level. 
+              Recognized keys are "error", "warning", "warn", and "info".
 
-    Returns:
-        None
+    The log level is determined based on the presence of specific keys in kwargs:
+    - If "error" is present, the message is logged as an error.
+    - If "warning" or "warn" is present, the message is logged as a warning.
+    - If "info" is present or no recognized keys are present, the message is logged as info.
     """
-    def write_log_file(
-        server_name=None, output_path=None, msg_part1=None, msg_part2=None
-    ):
-        output_path = os.path.join(output_path, server_name)
-        output_file = os.path.join(
-            output_path, f"{server_name}_log_{strftime('%Y%m%d')}.txt"
-        )
-        if not os.path.exists(output_path):
-            os.makedirs(output_path, exist_ok=True)
-        with open(output_file, "a+") as f:
-            for arg in msg_part2:
-                f.write(f"{msg_type}{msg_part1}: {arg}\n")
 
-    precolor = ""
-    msg_type = ""
     if "error" in kwargs:
-        precolor = f"{Style.BRIGHT}{Fore.WHITE}{Back.RED}"
-        msg_type = "error_"
+        logger_method = logger.error
     elif "warning" in kwargs or "warn" in kwargs:
-        precolor = f"{Fore.BLACK}{Back.YELLOW}"
-        msg_type = "warning_"
+        logger_method = logger.warning
     elif "info" in kwargs:
-        precolor = f"{Fore.BLACK}{Back.GREEN}"
-        msg_type = "info_"
-    elif "sample" in kwargs:
-        precolor = f"{Fore.BLUE}{Style.BRIGHT}{Back.CYAN}"
-        msg_type = "sample_"
+        logger_method = logger.info
     else:
-        precolor = f"{Style.RESET_ALL}"
+        logger_method = logger.info
 
-    srv_type = server_cfg.get("group", "")
-    cmd_print = server_cfg.get("cmd_print", False)
-    style = ""
-    if srv_type == "orchestrator":
-        style = f"{Style.BRIGHT}{Fore.GREEN}"
-    elif srv_type == "action":
-        style = f"{Style.BRIGHT}{Fore.YELLOW}"
-    elif srv_type == "operator":
-        style = f"{Style.BRIGHT}{Fore.CYAN}"
-    elif srv_type == "visualizer":
-        style = f"{Style.BRIGHT}{Fore.CYAN}"
-    else:
-        style = ""
-
-    msg_part1 = f"[{strftime('%H:%M:%S')}_{server_name}]:"
-
-    if cmd_print or server_cfg.get("verbose", False) or any([k in kwargs for k in ["error", "warn", "warning", "info"]]):
-        with colorama_text():
-            if "error" in kwargs:
-                cprint(
-                    figlet_format("ERROR", font="starwars"),
-                    "yellow",
-                    "on_red",
-                    attrs=["bold"],
-                )
-
-            for arg in args:
-                print(
-                    f"\n{precolor}{msg_part1}{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}\r"
-                )
-
-    output_path = kwargs.get("log_dir", None)
-    if output_path is not None and (
-        any([k in kwargs for k in ["error", "warn", "warning"]]) or server_cfg.get("verbose", False)
-    ):
-        write_log_file(
-            server_name=server_name,
-            output_path=output_path,
-            msg_part1=msg_part1,
-            msg_part2=args,
-        )
-        write_log_file(
-            server_name="_MASTER_",
-            output_path=output_path,
-            msg_part1=msg_part1,
-            msg_part2=args,
-        )
+    logger_method(" ".join(args))
