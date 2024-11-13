@@ -109,11 +109,11 @@ def makeApp(confPrefix, server_key, helao_root):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
         int_time_ms: int = 35,
-        n_avg: int = 10,
+        n_avg: int = 3,
         peak_lower_wl: Optional[float] = 400,
         peak_upper_wl: Optional[float] = 750,
-        target_peak_min: Optional[float] = 40000,
-        target_peak_max: Optional[float] = 45000,
+        target_peak_min: Optional[float] = 30000,
+        target_peak_max: Optional[float] = 32000,
         max_iters: int = 5,
         max_integration_time: int = 150
     ):
