@@ -85,7 +85,16 @@ class GamryExec(Executor):
             self.ttl_params = {
                 k: self.action_params.get(k, -1) for k in ("TTLwait", "TTLsend")
             }
-
+            self.alert_params = {
+                k: self.action_params.get(k, False)
+                for k in (
+                    "alertThreshEwe_V",
+                    "alertThreshI_A",
+                    "alert_above",
+                    "alert_duration__s",
+                    "alert_sleep__s",
+                )
+            }
 
             LOGGER.info("GamryExec initialized.")
         except Exception:
@@ -123,6 +132,24 @@ class GamryExec(Executor):
         # populate executor buffer for output calculation
         for k, v in resp.data.items():
             self.data_buffer[k].extend(v)
+        # check for alert thresholds at this point in data_buffer
+        min_duration = self.alert_params["alert_duration__s"]
+        if min_duration > 0 and self.data_buffer.get("t_s", [-1])[-1] > min_duration:
+            time_buffer = self.data_buffer["t_s"]
+            idx = 1
+            latest_t = time_buffer[-1]
+            slice_duration = latest_t - time_buffer[-idx]
+            while (len(time_buffer) > idx) and (slice_duration < min_duration):
+                idx += 1
+            if slice_duration >= min_duration:
+                for thresh_key in ("Ewe_V", "I_A"):
+                    thresh_val = self.alert_params.get(f"alertThresh{thresh_key}", None)
+                    slice_val = self.data_buffer[thresh_key][-idx]
+                    if thresh_val is not None:
+                        if all([x > thresh_val for x in slice_val]) and self.alert_params["alert_above"]:
+                            LOGGER.alert(f"{thresh_key} went above {thresh_val} for {min_duration}")
+                        if all([x < thresh_val for x in slice_val]) and not self.alert_params["alert_above"]:
+                            LOGGER.alert(f"{thresh_key} went below {thresh_val} for {min_duration}")
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         status = HloStatus.active if resp.message != "done" else HloStatus.finished
         return {"error": error, "status": status, "data": resp.data}
@@ -150,8 +177,6 @@ class GamryExec(Executor):
                 amplitude_thresh,
             )
             self.active.action.action_params["has_bubble"] = has_bubble
-        
-        
 
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": {}}
@@ -196,6 +221,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         SetStopAtDelayDIMax: Optional[int] = None,
         SetStopAtDelayADIMin: Optional[int] = None,
         SetStopAtDelayADIMax: Optional[int] = None,
+        alertThreshI_A: float = 0,
+        alert_duration__s: float = -1,
+        alert_sleep__s: float = -1,
     ):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)
         use 4bit bitmask for triggers
@@ -217,10 +245,21 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        SetStopXMin: Optional[float] = None,  # lower current threshold to trigger early stopping
-        SetStopXMax: Optional[float] = None,  # upper current threshold to trigger early stopping
-        SetStopAtDelayXMin: Optional[int] = None,  # number of consecutive points below SetStopXMin to trigger early stopping
-        SetStopAtDelayXMax: Optional[int] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
+        SetStopXMin: Optional[
+            float
+        ] = None,  # lower current threshold to trigger early stopping
+        SetStopXMax: Optional[
+            float
+        ] = None,  # upper current threshold to trigger early stopping
+        SetStopAtDelayXMin: Optional[
+            int
+        ] = None,  # number of consecutive points below SetStopXMin to trigger early stopping
+        SetStopAtDelayXMax: Optional[
+            int
+        ] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
+        alertThreshI_A: float = 0,
+        alert_duration__s: float = -1,
+        alert_sleep__s: float = -1,
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -243,10 +282,21 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        SetStopXMin: Optional[float] = None,  # lower potential threshold to trigger early stopping
-        SetStopXMax: Optional[float] = None,  # upper potential threshold to trigger early stopping
-        SetStopAtDelayXMin: Optional[int] = None,  # number of consecutive points below SetStopXMin to trigger early stopping
-        SetStopAtDelayXMax: Optional[int] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
+        SetStopXMin: Optional[
+            float
+        ] = None,  # lower potential threshold to trigger early stopping
+        SetStopXMax: Optional[
+            float
+        ] = None,  # upper potential threshold to trigger early stopping
+        SetStopAtDelayXMin: Optional[
+            int
+        ] = None,  # number of consecutive points below SetStopXMin to trigger early stopping
+        SetStopAtDelayXMax: Optional[
+            int
+        ] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
+        alertThreshEwe_V: float = 0,
+        alert_duration__s: float = -1,
+        alert_sleep__s: float = -1,
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -272,10 +322,21 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        SetStopIMin: Optional[float] = None,  # lower current threshold to trigger early stopping
-        SetStopIMax: Optional[float] = None,  # upper current threshold to trigger early stopping
-        SetStopAtDelayIMin: Optional[int] = None,  # number of consecutive points below SetStopIMin to trigger early stopping
-        SetStopAtDelayIMax: Optional[int] = None,  # number of consecutive points above SetStopIMax to trigger early stopping
+        SetStopIMin: Optional[
+            float
+        ] = None,  # lower current threshold to trigger early stopping
+        SetStopIMax: Optional[
+            float
+        ] = None,  # upper current threshold to trigger early stopping
+        SetStopAtDelayIMin: Optional[
+            int
+        ] = None,  # number of consecutive points below SetStopIMin to trigger early stopping
+        SetStopAtDelayIMax: Optional[
+            int
+        ] = None,  # number of consecutive points above SetStopIMax to trigger early stopping
+        alertThreshI_A: float = 0,
+        alert_duration__s: float = -1,
+        alert_sleep__s: float = -1,
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
@@ -303,6 +364,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         IErange: model_ierange = "auto",
         SetStopADVMin: Optional[float] = None,
         SetStopADVMax: Optional[float] = None,
+        alertThreshEwe_V: float = 0,
+        alert_duration__s: float = -1,
+        alert_sleep__s: float = -1,
     ):
         """mesasures open circuit potential
         use 4bit bitmask for triggers
@@ -327,6 +391,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
+        alertThreshI_A: float = 0,
+        alert_duration__s: float = -1,
+        alert_sleep__s: float = -1,
     ):
         """Measure pulsed voltammetry"""
         active = await app.base.setup_and_contain_action()
@@ -424,5 +491,5 @@ def makeApp(confPrefix, server_key, helao_root):
         state = app.driver.pstat.State()
         state = dict([x.split("\t") for x in state.split("\r\n") if x])
         return state
-        
+
     return app
