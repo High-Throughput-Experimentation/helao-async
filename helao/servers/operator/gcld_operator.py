@@ -90,7 +90,7 @@ ECHEUVIS_multiCA_led_defaults = {
     "toggleSpec_time": -1,
     "spec_ref_duration": 5,
     "spec_int_time_ms": SPEC_INT_MS,
-    "spec_n_avg": 2,
+    "spec_n_avg": 1,
     "spec_technique": "T_UVVIS",
     "random_start_potential": False,
     "use_z_motor": True,
