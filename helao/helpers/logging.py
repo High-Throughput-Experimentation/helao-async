@@ -91,30 +91,29 @@ def make_logger(
         handler.setLevel(log_level)
         logger_instance.addHandler(handler)
 
-    if log_level == 60:
-        mailhost = email_config.get("mailhost", None)
-        fromaddr = email_config.get("fromaddr", None)
-        username = email_config.get("username", None)
-        password = email_config.get("password", None)
-        recipients = email_config.get("recipients", None)
-        subject = email_config.get("subject", "Error in Helao")
-        if all(
-            [
-                x is not None
-                for x in [mailhost, fromaddr, username, password, recipients]
-            ]
-        ):
-            email_handler = SMTPHandler(
-                mailhost=mailhost,
-                fromaddr=fromaddr,
-                toaddrs=recipients,
-                subject=subject,
-                credentials=(username, password),
-                secure=(),
-            )
-            email_handler.setLevel(log_level)
-            email_handler.setFormatter(formatter)
-            logger_instance.addHandler(email_handler)
+    mailhost = email_config.get("mailhost", None)
+    fromaddr = email_config.get("fromaddr", None)
+    username = email_config.get("username", None)
+    password = email_config.get("password", None)
+    recipients = email_config.get("recipients", None)
+    subject = email_config.get("subject", "Error in Helao")
+    if all(
+        [
+            x is not None
+            for x in [mailhost, fromaddr, username, password, recipients]
+        ]
+    ):
+        email_handler = SMTPHandler(
+            mailhost=mailhost,
+            fromaddr=fromaddr,
+            toaddrs=recipients,
+            subject=subject,
+            credentials=(username, password),
+            secure=(),
+        )
+        email_handler.setLevel(ALERT_LEVEL)
+        email_handler.setFormatter(formatter)
+        logger_instance.addHandler(email_handler)
 
     logger_instance.info(f"writing log events to {log_path}")
     return logger_instance
