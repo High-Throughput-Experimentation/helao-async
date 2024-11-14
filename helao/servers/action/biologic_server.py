@@ -30,7 +30,7 @@ from helao.helpers.executor import Executor
 from helao.helpers import logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.drivers.pstat.biologic.driver import BiologicDriver
-from helao.drivers.pstat.biologic.enum import EC_IRange, EC_ERange, EC_IRange_map, EC_ERange_map
+from helao.drivers.pstat.biologic.enum import EC_IRange, EC_ERange, EC_Bandwidth, EC_IRange_map, EC_ERange_map, EC_Bandwidth_map
 from helao.drivers.pstat.biologic.technique import (
     BiologicTechnique,
     TECH_OCV,
@@ -255,7 +255,9 @@ async def biologic_dyn_endpoints(app=None):
         ScanRate__V_s: float = 1.0,  # Scan rate in volts/sec or amps/sec.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         Cycles: int = 1,
-        # IRange: EC_IRange = EC_IRange.AUTO,
+        IRange: EC_IRange = EC_IRange.AUTO,
+        ERange: EC_ERange = EC_ERange.AUTO,
+        Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -272,7 +274,9 @@ async def biologic_dyn_endpoints(app=None):
             * active.action.action_params["ScanRate__V_s"]
         )
         active.action.action_abbr = "CV"
-        # active.action.action_params["IRange"] = EC_IRange_map[# active.action.action_params["IRange"]]
+        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
+        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
+        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[active.action.action_params["Bandwidth"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
