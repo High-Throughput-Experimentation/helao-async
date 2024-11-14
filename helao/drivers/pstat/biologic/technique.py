@@ -106,6 +106,8 @@ TECH_CV = BiologicTechnique(
         "Cycles": "N_Cycles",
         "AcqInterval__V": "step",
         "IRange": "current_range",
+        "ERange": "voltage_range",
+        "Bandwidth": "bandwidth",
     },
     field_map={
         "time": "t_s",
