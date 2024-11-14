@@ -208,7 +208,7 @@ class BiologicDriver(HelaoDriver):
             segment_values = getdict(segment.values)
             values_list = []
             if segment_data:
-                _sval = list(segment_data.values())[0]
+                _sval = list(getdict(segment_data).values())[0]
                 if len(_sval)>1:
                     segment_values = {k: [v]*len(_sval) for k, v in segment_values.items()}
                 values_list.append(segment_values)
@@ -220,7 +220,7 @@ class BiologicDriver(HelaoDriver):
                 while len(latest_segment.data) > 0:
                     segment_data += latest_segment.data
                     segment_values = getdict(latest_segment.values)
-                    _sval = list(segment_data.values())[0]
+                    _sval = list(getdict(segment_data).values())[0]
                     if len(_sval)>1:
                         segment_values = {k: [v]*len(_sval) for k, v in segment_values.items()}
                     values_list.append(segment_values)
