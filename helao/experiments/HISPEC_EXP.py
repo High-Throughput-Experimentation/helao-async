@@ -95,9 +95,12 @@ def HISPEC_sub_SpEC(
     ] = 0.02,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
     cycles: int = 1,
-    gamry_i_range: str = "auto",
+    # gamry_i_range: str = "auto",
     gamrychannelwait: int = -1,
     gamrychannelsend: int = 0,
+    IRange: str = "AUTO",
+    ERange: str = "AUTO",
+    Bandwidth: str = "BW4",
     solution_ph: float = 0,
     ref_vs_nhe: float = 0.21,
     toggle1_source: str = "spec_trig",
@@ -185,7 +188,9 @@ def HISPEC_sub_SpEC(
             "Cycles": cycles,
             "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": gamry_i_range,
+            "IRange": IRange,
+            "ERange": ERange,
+            "Bandwidth": Bandwidth, 
         },
         # from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_previous,
