@@ -11,7 +11,7 @@ from helao.core.error import ErrorCodes
 from helao.helpers.print_message import print_message
 
 
-async def async_action_dispatcher(world_config_dict: dict, A: Action, params={}):
+async def async_action_dispatcher(world_config_dict: dict, A: Action, params={}, timeout=60):
     """
     Asynchronously dispatches an action to the specified server and handles the response.
 
@@ -30,7 +30,8 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={})
     act_addr = actd["host"]
     act_port = actd["port"]
     url = f"http://{act_addr}:{act_port}/{A.action_server.server_name}/{A.action_name}"
-    async with aiohttp.ClientSession() as session:
+    client_timeout = aiohttp.ClientTimeout(total=timeout)
+    async with aiohttp.ClientSession(timeout=client_timeout) as session:
         async with session.post(
             url,
             params=params,
@@ -66,6 +67,7 @@ async def async_private_dispatcher(
     private_action: str,
     params_dict: dict = {},
     json_dict: dict = {},
+    timeout: int = 60,
 ):
     """
     Asynchronously dispatches a private action to a specified server.
@@ -83,7 +85,8 @@ async def async_private_dispatcher(
     """
     url = f"http://{host}:{port}/{private_action}"
 
-    async with aiohttp.ClientSession() as session:
+    client_timeout = aiohttp.ClientTimeout(total=timeout)
+    async with aiohttp.ClientSession(timeout=client_timeout) as session:
         async with session.post(
             url,
             params=params_dict,
