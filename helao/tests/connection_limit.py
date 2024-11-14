@@ -17,7 +17,7 @@ async def main():
     ) for _ in range(NUM_JOBS)]
 
     re_tups = await asyncio.gather(*tasks)
-    print(re_tups)
+    print([err for resp, err in re_tups])
     print('main done')
     sys.exit(0)
 
