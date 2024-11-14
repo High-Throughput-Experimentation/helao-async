@@ -61,7 +61,10 @@ if __name__ == "__main__":
         email_config = {}
     if logging.LOGGER is None:
         logging.LOGGER = logging.make_logger(
-            logger_name=server_key, log_dir=log_root, email_config=email_config
+            logger_name=server_key,
+            log_dir=log_root,
+            email_config=email_config,
+            log_level=CONFIG.get("log_level", 20),
         )
     LOGGER = logging.LOGGER
     if config_loader.CONFIG is None:
