@@ -211,10 +211,10 @@ class BiologicDriver(HelaoDriver):
 
 
             # empty buffer if program_state is done
+            values_list = []
             if program_state == "done":
                 print("!!! retrieving last segment")
                 latest_segment = await program._retrieve_data_segment(channel)
-                values_list = []
                 while len(latest_segment.data) > 0:
                     segment_data += latest_segment.data
                     values_list.append(getdict(latest_segment.values))
