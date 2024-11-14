@@ -50,9 +50,6 @@ TECH_OCV = BiologicTechnique(
         "Tval__s": "time",
         "AcqInterval__s": "time_interval",
         "AcqInterval__V": "voltage_interval",
-        # "IRange": "current_range",
-        # "ERange": "voltage_range",
-        "Bandwidth": "bandwidth",
     },
     field_map={
         "time": "t_s",
