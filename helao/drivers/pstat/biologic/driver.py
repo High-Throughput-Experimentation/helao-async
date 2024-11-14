@@ -36,6 +36,11 @@ from helao.drivers.helao_driver import (
 from .technique import BiologicTechnique
 
 
+# ctypes struct to dict (won't work with arrays, nested structs)
+def getdict(struct):
+    return dict((field, getattr(struct, field)) for field, _ in struct._fields_)
+
+
 class BiologicDriver(HelaoDriver):
     device_name: str
     connection_raised: bool
@@ -200,21 +205,33 @@ class BiologicDriver(HelaoDriver):
                 status = DriverStatus.ok
                 program_state = "done"
             segment_data = segment.data
+            values_dict = getdict(segment.values)
+            print("polled values", values_dict)
+            print("polled_data", segment_data)
+
 
             # empty buffer if program_state is done
             if program_state == "done":
                 print("!!! retrieving last segment")
                 latest_segment = await program._retrieve_data_segment(channel)
+                values_list = []
                 while len(latest_segment.data) > 0:
                     segment_data += latest_segment.data
+                    values_list.append(getdict(latest_segment.values))
                     latest_segment = await program._retrieve_data_segment(channel)
+            
+            print("final values", values_list)
+            print("final data", segment_data)
 
             parsed = [
                 program._fields(*program._field_values(datum, segment))
                 for datum in segment_data
             ]
+            
             data = pd.DataFrame(parsed).to_dict(orient="list")
             data = {program.field_remap[k]: v for k, v in data.items()}
+
+            print("parsed data", data)
 
             response = DriverResponse(
                 response=DriverResponseType.success,
