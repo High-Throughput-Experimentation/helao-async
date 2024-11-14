@@ -205,9 +205,13 @@ class BiologicDriver(HelaoDriver):
                 status = DriverStatus.ok
                 program_state = "done"
             segment_data = segment.data
+            segment_values = getdict(segment.values)
             values_list = []
             if segment_data:
-                values_list.append(getdict(segment.values))
+                _sval = list(segment_data.values())[0]
+                if len(_sval)>1:
+                    segment_values = {k: [v]*len(_sval) for k, v in segment_values.items()}
+                values_list.append(segment_values)
 
             # empty buffer if program_state is done
             if program_state == "done":
@@ -215,7 +219,11 @@ class BiologicDriver(HelaoDriver):
                 latest_segment = await program._retrieve_data_segment(channel)
                 while len(latest_segment.data) > 0:
                     segment_data += latest_segment.data
-                    values_list.append(getdict(latest_segment.values))
+                    segment_values = getdict(latest_segment.values)
+                    _sval = list(segment_data.values())[0]
+                    if len(_sval)>1:
+                        segment_values = {k: [v]*len(_sval) for k, v in segment_values.items()}
+                    values_list.append(segment_values)
                     latest_segment = await program._retrieve_data_segment(channel)
             
             parsed = [
