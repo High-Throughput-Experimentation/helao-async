@@ -45,6 +45,7 @@ import colorama
 from helao.helpers.print_message import print_message
 from helao.helpers import logging
 from helao.helpers import config_loader
+from helao.helpers.yml_tools import yml_load
 
 global LOGGER
 global CONFIG
@@ -58,8 +59,14 @@ if __name__ == "__main__":
     confArg = sys.argv[1]
     CONFIG = config_loader.config_loader(confArg, helao_root)
     log_root = os.path.join(CONFIG["root"], "LOGS") if "root" in CONFIG else None
+    if CONFIG.get("alert_config_path", False):
+        email_config = yml_load(CONFIG["alert_config_path"])
+    else:
+        email_config = {}
     if logging.LOGGER is None:
-        logging.LOGGER = logging.make_logger(logger_name=server_key, log_dir=log_root)
+        logging.LOGGER = logging.make_logger(
+            logger_name=server_key, log_dir=log_root, email_config=email_config
+        )
     LOGGER = logging.LOGGER
     if config_loader.CONFIG is None:
         config_loader.CONFIG = CONFIG
