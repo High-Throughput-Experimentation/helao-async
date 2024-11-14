@@ -296,8 +296,6 @@ async def biologic_dyn_endpoints(app=None):
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        # IRange: EC_IRange = EC_IRange.AUTO,
-        # ERange: EC_ERange = EC_ERange.AUTO,
         Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
         channel: int = 0,
         TTLwait: int = -1,
@@ -309,8 +307,6 @@ async def biologic_dyn_endpoints(app=None):
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "OCV"
-        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
-        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
         active.action.action_params["Bandwidth"] = EC_Bandwidth_map[active.action.action_params["Bandwidth"]]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_OCV)
         active_action_dict = active.start_executor(executor)
