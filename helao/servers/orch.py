@@ -37,9 +37,8 @@ from helao.servers.operator.bokeh_operator import BokehOperator
 from helao.servers.vis import HelaoVis
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
+from helao.helpers import dispatcher
 from helao.helpers.dispatcher import (
-    async_private_dispatcher,
-    async_action_dispatcher,
     endpoints_available,
 )
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
@@ -53,6 +52,14 @@ from helao.drivers.data.sync_driver import HelaoSyncer
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
+
+
+global DISPATCHER
+
+if dispatcher.DISPATCHER is None:
+    DISPATCHER = dispatcher.Dispatcher()
+else:
+    DISPATCHER = dispatcher.DISPATCHER
 
 
 class Orch(Base):
@@ -489,7 +496,7 @@ class Orch(Base):
                 serv_port = serv_dict["port"]
                 for _ in range(retry_limit):
                     try:
-                        response, error_code = await async_private_dispatcher(
+                        response, error_code = await DISPATCHER.async_private_dispatcher(
                             server_key=serv_key,
                             host=serv_addr,
                             port=serv_port,
@@ -580,7 +587,7 @@ class Orch(Base):
                 f"Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}"
             )
             # print(server_key, exec_id, server_host, server_port)
-            response, error_code = await async_private_dispatcher(
+            response, error_code = await DISPATCHER.async_private_dispatcher(
                 server_key=server_key,
                 host=server_host,
                 port=server_port,
@@ -1081,7 +1088,7 @@ class Orch(Base):
             # check Action requirements
             A = self.action_dq.popleft()
 
-            # see async_action_dispatcher for unpacking
+            # see DISPATCHER.async_action_dispatcher for unpacking
             if A.start_condition == ActionStartCondition.no_wait:
                 self.print_message("orch is dispatching an unconditional action")
             else:
@@ -1166,7 +1173,7 @@ class Orch(Base):
             result_actiondict = None
             async with self.aiolock:
                 try:
-                    result_actiondict, error_code = await async_action_dispatcher(
+                    result_actiondict, error_code = await DISPATCHER.async_action_dispatcher(
                         self.world_cfg, A
                     )
                 except Exception as e:
@@ -1194,7 +1201,7 @@ class Orch(Base):
                         return ErrorCodes.none
 
                 # except asyncio.exceptions.TimeoutError:
-                #     result_actiondict, error_code = await async_private_dispatcher(
+                #     result_actiondict, error_code = await DISPATCHER.async_private_dispatcher(
                 #         self.world_cfg,
                 #         A.action_server.server_name,
                 #         "resend_active",
@@ -1664,7 +1671,7 @@ class Orch(Base):
                 info=True,
             )
             try:
-                _ = await async_action_dispatcher(self.world_cfg, A)
+                _ = await DISPATCHER.async_action_dispatcher(self.world_cfg, A)
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 # no estop endpoint for this action server?
@@ -2423,7 +2430,7 @@ class Orch(Base):
 
         This asynchronous method iterates through the configured action servers,
         excluding those with "bokeh" or "demovis" in their configuration, and
-        attempts to retrieve their status using the `async_private_dispatcher`.
+        attempts to retrieve their status using the `DISPATCHER.async_private_dispatcher`.
         The status of each server is summarized and returned in a dictionary.
 
         Returns:
@@ -2441,7 +2448,7 @@ class Orch(Base):
                 serv_addr = serv_dict["host"]
                 serv_port = serv_dict["port"]
                 try:
-                    response, error_code = await async_private_dispatcher(
+                    response, error_code = await DISPATCHER.async_private_dispatcher(
                         server_key=serv_key,
                         host=serv_addr,
                         port=serv_port,

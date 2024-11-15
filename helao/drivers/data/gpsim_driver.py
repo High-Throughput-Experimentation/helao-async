@@ -8,13 +8,20 @@ from helao.helpers.zstd_io import unzpickle
 from helao.servers.base import Base, Active
 from helao.helpers.executor import Executor
 from helao.helpers.premodels import Experiment
-from helao.helpers.dispatcher import async_private_dispatcher
 
 import numpy as np
 import gpflow
 from scipy.stats import norm
 from sklearn.metrics import mean_absolute_error
 
+from helao.helpers import dispatcher
+
+global DISPATCHER
+
+if dispatcher.DISPATCHER is None:
+    DISPATCHER = dispatcher.Dispatcher()
+else:
+    DISPATCHER = dispatcher.DISPATCHER
 
 def calc_eta(cp_dict):
     thresh_ts = max(cp_dict["t_s"]) - 4
@@ -413,7 +420,7 @@ class GPSim:
                 **kwargs,
             )
             self.base.print_message("queueing repeat experiment request on Orch")
-            resp, error = await async_private_dispatcher(
+            resp, error = await DISPATCHER.async_private_dispatcher(
                 orch_key,
                 orch_host,
                 orch_port,

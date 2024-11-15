@@ -1,4 +1,4 @@
-__all__ = ["async_action_dispatcher", "async_private_dispatcher", "private_dispatcher"]
+__all__ = ["private_dispatcher"]
 
 import traceback
 import asyncio
@@ -17,127 +17,130 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-SESSION = None
+DISPATCHER = None
 
 
-def make_session(timeout: int = 60):
-    client_timeout = aiohttp.ClientTimeout(total=timeout)
-    conn = aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True)
-    session = aiohttp.ClientSession(timeout=client_timeout, connector=conn)
-    return session
+class Dispatcher:
+    def __init__(self, timeout: int = 60):
+        client_timeout = aiohttp.ClientTimeout(total=timeout)
+        conn = aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True)
+        self.session = aiohttp.ClientSession(timeout=client_timeout, connector=conn)
 
 
-async def async_action_dispatcher(world_config_dict: dict, A: Action, params={}, timeout=60):
-    """
-    Asynchronously dispatches an action to the specified server and handles the response.
+    async def async_action_dispatcher(self, world_config_dict: dict, A: Action, params={}, timeout=60):
+        """
+        Asynchronously dispatches an action to the specified server and handles the response.
 
-    Args:
-        world_config_dict (dict): A dictionary containing the configuration of the world, including server details.
-        A (Action): An instance of the Action class containing details about the action to be dispatched.
-        params (dict, optional): Additional parameters to be sent with the request. Defaults to an empty dictionary.
+        Args:
+            world_config_dict (dict): A dictionary containing the configuration of the world, including server details.
+            A (Action): An instance of the Action class containing details about the action to be dispatched.
+            params (dict, optional): Additional parameters to be sent with the request. Defaults to an empty dictionary.
 
-    Returns:
-        tuple: A tuple containing the response from the server (or None if an error occurred) and an error code indicating the status of the request.
+        Returns:
+            tuple: A tuple containing the response from the server (or None if an error occurred) and an error code indicating the status of the request.
 
-    Raises:
-        Exception: If there is an issue with the request or response handling, an exception is caught and logged.
-    """
-    actd = world_config_dict["servers"][A.action_server.server_name]
-    act_addr = actd["host"]
-    act_port = actd["port"]
-    url = f"http://{act_addr}:{act_port}/{A.action_server.server_name}/{A.action_name}"
-    error_code = ErrorCodes.unspecified
-    response = None
-    if SESSION is None:
-        SESSION = make_session(timeout)
-    
-    async with SESSION.post(
-        url,
-        params=params,
-        json={"action": A.as_dict()},
-    ) as resp:
-        try:
-            response = await resp.json()
-            error_code = ErrorCodes.none
-            if resp.status != 200:
-                error_code = ErrorCodes.http
+        Raises:
+            Exception: If there is an issue with the request or response handling, an exception is caught and logged.
+        """
+        actd = world_config_dict["servers"][A.action_server.server_name]
+        act_addr = actd["host"]
+        act_port = actd["port"]
+        url = f"http://{act_addr}:{act_port}/{A.action_server.server_name}/{A.action_name}"
+        error_code = ErrorCodes.unspecified
+        response = None
+        
+        async with self.session.post(
+            url,
+            params=params,
+            json={"action": A.as_dict()},
+        ) as resp:
+            try:
+                response = await resp.json()
+                error_code = ErrorCodes.none
+                if resp.status != 200:
+                    error_code = ErrorCodes.http
+                    print_message(
+                        LOGGER,
+                        "orchestrator",
+                        f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}",
+                        error=True,
+                    )
+            except Exception as e:
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 print_message(
                     LOGGER,
                     "orchestrator",
-                    f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}",
+                    f"{A.action_server.server_name}/{A.action_name} DISPATCHER.async_action_dispatcher could not decide response: '{resp}', error={repr(e), tb,}",
                     error=True,
                 )
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            print_message(
-                LOGGER,
-                "orchestrator",
-                f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{resp}', error={repr(e), tb,}",
-                error=True,
-            )
-        finally:
-            resp.close()
-    await asyncio.sleep(0)
-    return response, error_code
+            finally:
+                resp.close()
+        await asyncio.sleep(0)
+        return response, error_code
 
 
-async def async_private_dispatcher(
-    server_key: str,
-    host: str,
-    port: int,
-    private_action: str,
-    params_dict: dict = {},
-    json_dict: dict = {},
-):
-    """
-    Asynchronously dispatches a private action to a specified server.
+    async def async_private_dispatcher(
+        self,
+        server_key: str,
+        host: str,
+        port: int,
+        private_action: str,
+        params_dict: dict = {},
+        json_dict: dict = {},
+    ):
+        """
+        Asynchronously dispatches a private action to a specified server.
 
-    Args:
-        server_key (str): The key identifying the server.
-        host (str): The host address of the server.
-        port (int): The port number of the server.
-        private_action (str): The private action to be dispatched.
-        params_dict (dict, optional): The dictionary of parameters to be sent in the request. Defaults to {}.
-        json_dict (dict, optional): The dictionary of JSON data to be sent in the request. Defaults to {}.
+        Args:
+            server_key (str): The key identifying the server.
+            host (str): The host address of the server.
+            port (int): The port number of the server.
+            private_action (str): The private action to be dispatched.
+            params_dict (dict, optional): The dictionary of parameters to be sent in the request. Defaults to {}.
+            json_dict (dict, optional): The dictionary of JSON data to be sent in the request. Defaults to {}.
 
-    Returns:
-        tuple: A tuple containing the response from the server and an error code.
-    """
-    url = f"http://{host}:{port}/{private_action}"
+        Returns:
+            tuple: A tuple containing the response from the server and an error code.
+        """
+        url = f"http://{host}:{port}/{private_action}"
 
-    error_code = ErrorCodes.unspecified
-    response = None
-    if SESSION is None:
-        SESSION = make_session()
-    
-    async with SESSION.post(
-        url,
-        params=params_dict,
-        json=json_dict,
-    ) as resp:
-        try:
-            response = await resp.json()
-            error_code = ErrorCodes.none
-            if resp.status != 200:
-                error_code = ErrorCodes.http
+        error_code = ErrorCodes.unspecified
+        response = None
+        
+        async with self.session.post(
+            url,
+            params=params_dict,
+            json=json_dict,
+        ) as resp:
+            try:
+                response = await resp.json()
+                error_code = ErrorCodes.none
+                if resp.status != 200:
+                    error_code = ErrorCodes.http
+                    print_message(
+                        LOGGER,
+                        "orchestrator",
+                        f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
+                        error=True,
+                    )
+            except Exception as e:
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 print_message(
                     LOGGER,
                     "orchestrator",
-                    f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
+                    f"{server_key}/{private_action} DISPATCHER.async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
                     error=True,
                 )
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            print_message(
-                LOGGER,
-                "orchestrator",
-                f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
-                error=True,
-            )
-        finally:
-            resp.close()
-    await asyncio.sleep(0)
-    return response, error_code
+            finally:
+                resp.close()
+        await asyncio.sleep(0)
+        return response, error_code
+
+    async def close(self):
+        """
+        Closes the session.
+        """
+        await self.session.close()
 
 
 def private_dispatcher(
@@ -189,7 +192,7 @@ def private_dispatcher(
                 print_message(
                     LOGGER,
                     "orchestrator",
-                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
+                    f"{server_key}/{private_action} DISPATCHER.async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
                     error=True,
                 )
                 response = None

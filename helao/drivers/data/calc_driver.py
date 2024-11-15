@@ -19,8 +19,14 @@ from ruamel.yaml import YAML
 from helao.servers.base import Base, Active
 from helao.helpers.premodels import Experiment
 from helao.helpers.file_mapper import FileMapper
-from helao.helpers.dispatcher import async_private_dispatcher
 
+from helao.helpers import dispatcher
+global DISPATCHER
+
+if dispatcher.DISPATCHER is None:
+    DISPATCHER = dispatcher.Dispatcher()
+else:
+    DISPATCHER = dispatcher.DISPATCHER
 
 def handlenan_savgol_filter(
     d_arr, window_length, polyorder, delta=1.0, deriv=0, replacenan_value=0.1
@@ -777,7 +783,7 @@ class Calc:
                 **kwargs,
             )
             self.base.print_message("queueing repeat experiment request on Orch")
-            resp, error = await async_private_dispatcher(
+            resp, error = await DISPATCHER.async_private_dispatcher(
                 self.base.orch_key,
                 self.base.orch_host,
                 self.base.orch_port,
@@ -837,7 +843,7 @@ class Calc:
                 **kwargs,
             )
             self.base.print_message("queueing repeat experiment request on Orch")
-            resp, error = await async_private_dispatcher(
+            resp, error = await DISPATCHER.async_private_dispatcher(
                 self.base.orch_key,
                 self.base.orch_host,
                 self.base.orch_port,

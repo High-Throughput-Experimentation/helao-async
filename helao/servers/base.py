@@ -36,7 +36,7 @@ from filelock import FileLock
 from fastapi import WebSocket
 from fastapi.dependencies.utils import get_flat_params
 
-from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
+from helao.helpers import dispatcher
 from helao.helpers.executor import Executor
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
@@ -76,6 +76,12 @@ from helao.core.error import ErrorCodes
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
 
+global DISPATCHER
+
+if dispatcher.DISPATCHER is None:
+    DISPATCHER = dispatcher.Dispatcher()
+else:
+    DISPATCHER = dispatcher.DISPATCHER
 
 class Base:
     """
@@ -748,7 +754,7 @@ class Base:
                 action_name=action_name
             )
         }
-        response, error_code = await async_private_dispatcher(
+        response, error_code = await DISPATCHER.async_private_dispatcher(
             server_key=client_servkey,
             host=client_host,
             port=client_port,
@@ -787,7 +793,7 @@ class Base:
             "server_port": self.server_cfg["port"],
         }
         self.print_message(f"sending non-blocking status: {json_dict}")
-        response, error_code = await async_private_dispatcher(
+        response, error_code = await DISPATCHER.async_private_dispatcher(
             server_key=client_servkey,
             host=client_host,
             port=client_port,
@@ -2894,7 +2900,7 @@ class Active:
                     export_params = {
                         k: action.action_params[k] for k in action.to_globalexp_params
                     }
-                    _, error_code = await async_private_dispatcher(
+                    _, error_code = await DISPATCHER.async_private_dispatcher(
                         server_key=action.orch_key,
                         host=action.orch_host,
                         port=action.orch_port,
@@ -3019,7 +3025,7 @@ class Active:
                         )
                         self.base.print_message(f"running queued {qact.action_name}")
                         qact.start_condition = ASC.no_wait
-                        await async_action_dispatcher(self.base.world_cfg, qact, qpars)
+                        await DISPATCHER.async_action_dispatcher(self.base.world_cfg, qact, qpars)
                 elif self.base.endpoint_queues[action.action_name].qsize() > 0:
                     self.base.print_message(
                         f"{action.action_name} was previously queued"
@@ -3027,7 +3033,7 @@ class Active:
                     qact, qpars = self.base.endpoint_queues[action.action_name].get()
                     self.base.print_message(f"running queued {action.action_name}")
                     qact.start_condition = ASC.no_wait
-                    await async_action_dispatcher(self.base.world_cfg, qact, qpars)
+                    await DISPATCHER.async_action_dispatcher(self.base.world_cfg, qact, qpars)
 
             # always returns the most recent action of active
         except Exception as e:

@@ -16,9 +16,16 @@ from bokeh.models import DataTable, TableColumn
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.data import DataPackageModel
 from helao.servers.vis import Vis
-from helao.helpers.dispatcher import async_private_dispatcher
 from helao.core.error import ErrorCodes
 
+from helao.helpers import dispatcher
+
+global DISPATCHER
+
+if dispatcher.DISPATCHER is None:
+    DISPATCHER = dispatcher.Dispatcher()
+else:
+    DISPATCHER = dispatcher.DISPATCHER
 
 valid_data_status = (
     None,
@@ -213,7 +220,7 @@ class C_palvis:
     async def add_points(self):
         # pull latest sample lists from PAL server and populate self.datasource.data
         # keep global_label, sample_creation_timecode, comment, volume, ph, electrolyte
-        resp, err = await async_private_dispatcher(
+        resp, err = await DISPATCHER.async_private_dispatcher(
             self.pal_key,
             self.palserv_host,
             self.palserv_port,

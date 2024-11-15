@@ -18,7 +18,14 @@ from helao.core.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
-from helao.helpers.dispatcher import async_private_dispatcher
+
+from helao.helpers import dispatcher
+global DISPATCHER
+
+if dispatcher.DISPATCHER is None:
+    DISPATCHER = dispatcher.Dispatcher()
+else:
+    DISPATCHER = dispatcher.DISPATCHER
 
 VALID_DATA_STATUS = (
     None,
@@ -335,7 +342,7 @@ class C_biovis:
         self.vis.print_message("stopping gamry measurement")
         self.vis.doc.add_next_tick_callback(
             partial(
-                async_private_dispatcher,
+                DISPATCHER.async_private_dispatcher,
                 server_key=self.potentiostat_key,
                 host=self.potserv_host,
                 port=self.potserv_port,
