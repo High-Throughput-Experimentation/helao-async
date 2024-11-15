@@ -17,12 +17,14 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-TIMEOUT = 60
+SESSION = None
 
-client_timeout = aiohttp.ClientTimeout(total=TIMEOUT)
-conn = aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True)
 
-SESSION = aiohttp.ClientSession(timeout=client_timeout, connector=conn)
+def make_session(timeout: int = 60):
+    client_timeout = aiohttp.ClientTimeout(total=timeout)
+    conn = aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True)
+    session = aiohttp.ClientSession(timeout=client_timeout, connector=conn)
+    return session
 
 
 async def async_action_dispatcher(world_config_dict: dict, A: Action, params={}, timeout=60):
@@ -46,6 +48,10 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={},
     url = f"http://{act_addr}:{act_port}/{A.action_server.server_name}/{A.action_name}"
     error_code = ErrorCodes.unspecified
     response = None
+    if SESSION is None:
+        global SESSION
+        SESSION = make_session(timeout)
+    
     async with SESSION.post(
         url,
         params=params,
@@ -102,6 +108,10 @@ async def async_private_dispatcher(
 
     error_code = ErrorCodes.unspecified
     response = None
+    if SESSION is None:
+        global SESSION
+        SESSION = make_session()
+    
     async with SESSION.post(
         url,
         params=params_dict,
