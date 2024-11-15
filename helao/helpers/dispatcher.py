@@ -38,14 +38,18 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={},
     act_port = actd["port"]
     url = f"http://{act_addr}:{act_port}/{A.action_server.server_name}/{A.action_name}"
     client_timeout = aiohttp.ClientTimeout(total=timeout)
-    conn = aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True)
+    # conn = aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True)
     error_code = ErrorCodes.unspecified
     response = None
-    async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
-        async with session.post(
+    # async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
+        # async with session.post(
+    if 1:
+        async with aiohttp.request(
+            "POST",
             url,
             params=params,
             json={"action": A.as_dict()},
+            timeout=client_timeout,
         ) as resp:
             try:
                 response = await resp.json()
@@ -66,8 +70,9 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={},
                     f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{resp}', error={repr(e), tb,}",
                     error=True,
                 )
-            resp.close()
-        await session.close()
+            finally:
+                resp.close()
+        # await session.close()
     await asyncio.sleep(0)
     return response, error_code
 
@@ -98,14 +103,18 @@ async def async_private_dispatcher(
     url = f"http://{host}:{port}/{private_action}"
 
     client_timeout = aiohttp.ClientTimeout(total=timeout)
-    conn = aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True)
+    # conn = aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True)
     error_code = ErrorCodes.unspecified
     response = None
-    async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
-        async with session.post(
+    # async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
+        # async with session.post(
+    if 1:
+        async with aiohttp.request(
+            "POST",
             url,
             params=params_dict,
             json=json_dict,
+            timeout=client_timeout,
         ) as resp:
             try:
                 response = await resp.json()
@@ -126,8 +135,9 @@ async def async_private_dispatcher(
                     f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
                     error=True,
                 )
-            resp.close()
-        await session.close()
+            finally:
+                resp.close()
+        # await session.close()
     await asyncio.sleep(0)
     return response, error_code
 
