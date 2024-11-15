@@ -48,8 +48,8 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={},
     url = f"http://{act_addr}:{act_port}/{A.action_server.server_name}/{A.action_name}"
     error_code = ErrorCodes.unspecified
     response = None
+    global SESSION
     if SESSION is None:
-        global SESSION
         SESSION = make_session(timeout)
     
     async with SESSION.post(
@@ -108,8 +108,8 @@ async def async_private_dispatcher(
 
     error_code = ErrorCodes.unspecified
     response = None
+    global SESSION
     if SESSION is None:
-        global SESSION
         SESSION = make_session()
     
     async with SESSION.post(
