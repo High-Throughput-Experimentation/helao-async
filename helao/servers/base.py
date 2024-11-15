@@ -76,6 +76,7 @@ from helao.core.error import ErrorCodes
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
 
+global DISPATCHER
 
 class Base:
     """

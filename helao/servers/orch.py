@@ -53,6 +53,7 @@ from helao.drivers.data.sync_driver import HelaoSyncer
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
 
+global DISPATCHER
 
 class Orch(Base):
     """
