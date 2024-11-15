@@ -66,6 +66,8 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={},
                     f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{resp}', error={repr(e), tb,}",
                     error=True,
                 )
+            resp.close()
+        await session.close()
     await asyncio.sleep(0)
     return response, error_code
 
@@ -124,6 +126,8 @@ async def async_private_dispatcher(
                     f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
                     error=True,
                 )
+            resp.close()
+        await session.close()
     await asyncio.sleep(0)
     return response, error_code
 
