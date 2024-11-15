@@ -234,6 +234,7 @@ class BaseAPI(HelaoFastAPI):
             else:
                 LOGGER.debug("got non-action POST request")
                 response = await call_next(request)
+            response.headers["Connection"] = "close"
             return response
 
         @self.exception_handler(StarletteHTTPException)
