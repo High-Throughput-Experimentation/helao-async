@@ -5,10 +5,10 @@ from helao.helpers.dispatcher import async_private_dispatcher
 HOST = "127.0.0.1"
 PORT = 8011
 NUM_JOBS = int(sys.argv[1])
-if len(sys.argv) > 2:
-    TIMEOUT = int(sys.argv[2])
-else:
-    TIMEOUT = 30
+# if len(sys.argv) > 2:
+#     TIMEOUT = int(sys.argv[2])
+# else:
+#     TIMEOUT = 30
 
 async def main():    
     server_key = "ORCH"
@@ -17,7 +17,7 @@ async def main():
     json_dict = {}
 
     tasks = [async_private_dispatcher(
-        server_key, HOST, PORT, private_action, params_dict, json_dict, TIMEOUT
+        server_key, HOST, PORT, private_action, params_dict, json_dict
     ) for _ in range(NUM_JOBS)]
 
     re_tups = await asyncio.gather(*tasks)
