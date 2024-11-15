@@ -165,7 +165,7 @@ class C_potvis:
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
     def callback_stop_measure(self, event):
-        self.vis.print_message("stopping gamry measurement")
+        LOGGER.debug("stopping gamry measurement")
         self.vis.doc.add_next_tick_callback(
             partial(
                 async_private_dispatcher,
@@ -179,9 +179,7 @@ class C_potvis:
         )
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(
-            f"'{self.potentiostat_key}' Bokeh session closed", info=True
-        )
+        LOGGER.info(f"'{self.potentiostat_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -245,9 +243,7 @@ class C_potvis:
         sender.value = value
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(
-            f" ... potentiostat visualizer subscribing to: {self.data_url}"
-        )
+        LOGGER.debug(f" ... potentiostat visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
@@ -296,7 +292,7 @@ class C_potvis:
         self.plot_prev.title.text = f"last {len(self.prev_action_uuids)} actions"
         xstr = self.data_dict_keys[self.xselect]
         ystr = self.data_dict_keys[self.yselect]
-        self.vis.print_message(f"{xstr}, {ystr}")
+        LOGGER.debug(f"{xstr}, {ystr}")
         colors = ["red", "blue", "orange", "green"]
         self.plot.line(
             x=xstr,
@@ -320,11 +316,11 @@ class C_potvis:
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
         if self.cur_action_uuid != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
-                self.vis.print_message(" ... reseting Gamry graph")
+                LOGGER.debug(" ... reseting Gamry graph")
                 self.prev_action_uuid = self.cur_action_uuid
                 if self.prev_action_uuid != "":
                     self.prev_action_uuids.append(self.prev_action_uuid)
-                    self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")
+                    LOGGER.debug(f"previous uuids: {self.prev_action_uuids}")
                     # copy old data to "prev" plot
                     self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
                         data=deepcopy(self.datasource.data)

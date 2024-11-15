@@ -54,13 +54,11 @@ def makeApp(confPrefix, server_key, helao_root):
         reinit = active.action.action_params["reinitialize"]
         npoints = active.action.action_params["num_random_points"]
         if not app.driver.initialized[pid] or reinit:
-            app.base.print_message(
-                f"initializing priors for plate {pid} with {npoints} random points"
-            )
+            LOGGER.debug(f"initializing priors for plate {pid} with {npoints} random points")
             await app.driver.init_priors_random(pid, npoints)
             app.driver.fit_model(pid)
         else:
-            app.base.print_message(f"plate {pid} is already initialized")
+            LOGGER.debug(f"plate {pid} is already initialized")
         finished_action = await active.finish()
         return finished_action.as_dict()
 

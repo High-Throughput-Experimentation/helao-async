@@ -31,10 +31,10 @@ class CPSim:
     def change_plate(self, plate_id):
         if plate_id in self.all_data:
             self.data = self.all_data[plate_id]
-            self.base.print_message(f"loaded plate_id: {plate_id}")
+            LOGGER.debug(f"loaded plate_id: {plate_id}")
             return True
         else:
-            self.base.print_message(f"plate_id: {plate_id} does not exist in dataset")
+            LOGGER.debug(f"plate_id: {plate_id} does not exist in dataset")
             return False
 
     def list_plates(self):
@@ -66,7 +66,7 @@ class CPSim:
 class CPSimExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("EcheSimExec initialized.")
+        LOGGER.debug("EcheSimExec initialized.")
         self.last_idx = 0
         self.start_time = time.time()  # instantiation time
         self.duration = self.active.action.action_params.get("duration", -1)

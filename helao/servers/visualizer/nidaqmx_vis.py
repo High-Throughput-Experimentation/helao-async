@@ -143,7 +143,7 @@ class C_nidaqmxvis:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(f"'{self.nidaqmx_key}' Bokeh session closed", info=True)
+        LOGGER.info(f"'{self.nidaqmx_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -180,7 +180,7 @@ class C_nidaqmxvis:
         sender.value = value
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(f" ... NImax visualizer subscribing to: {self.data_url}")
+        LOGGER.debug(f" ... NImax visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
@@ -269,7 +269,7 @@ class C_nidaqmxvis:
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
         if self.cur_action_uuid != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
-                self.vis.print_message(" ... reseting NImax graph")
+                LOGGER.debug(" ... reseting NImax graph")
                 self.prev_action_uuid = self.cur_action_uuid
                 self.prev_datasource.data = dict(deepcopy(self.datasource.data).items())
                 self.cur_action_uuid = new_action_uuid

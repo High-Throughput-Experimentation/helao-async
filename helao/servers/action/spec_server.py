@@ -49,12 +49,12 @@ def makeApp(confPrefix, server_key, helao_root):
         ] = -1,  # measurements longer than HTTP timeout should use acquire_spec_extrig
     ):
         """Acquire one or more spectrum if duration is positive."""
-        # app.base.print_message("!!! Starting acquire_spec action.")
+        # LOGGER.debug("!!! Starting acquire_spec action.")
         spec_header = {"wl": app.driver.pxwl} # type: ignore
         active = await app.base.setup_and_contain_action(
             action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
         )
-        # app.base.print_message("!!! acquire_spec action is active.")
+        # LOGGER.debug("!!! acquire_spec action is active.")
         starttime = time.time()
         # acquire at least 1 spectrum
         specdict = app.driver.acquire_spec_adv(**active.action.action_params) # type: ignore
@@ -126,7 +126,7 @@ def makeApp(confPrefix, server_key, helao_root):
         specdict = app.driver.acquire_spec_adv(**active.action.action_params)
         await active.enqueue_data_dflt(datadict=specdict)
         peak_int = specdict["peak_intensity"]
-        app.base.print_message(f"Initial peak intensity: {peak_int}", info=True)
+        LOGGER.info(f"Initial peak intensity: {peak_int}")
         target_avg = 0.5 * (
             active.action.action_params["target_peak_max"]
             + active.action.action_params["target_peak_min"]
@@ -147,15 +147,13 @@ def makeApp(confPrefix, server_key, helao_root):
             if current_int_time > active.action.action_params['max_integration_time']:
                 current_int_time = active.action.action_params['max_integration_time']
                 max_reached = True
-            app.base.print_message(
-                f"Adjusting integration time to: {current_int_time} ms", info=True
-            )
+            LOGGER.info(f"Adjusting integration time to: {current_int_time} ms")
             spec_params = active.action.action_params
             spec_params.update({"int_time_ms": current_int_time})
             specdict = app.driver.acquire_spec_adv(**spec_params)
             await active.enqueue_data_dflt(datadict=specdict)
             peak_int = specdict["peak_intensity"]
-            app.base.print_message(f"Current peak intensity: {peak_int}", info=True)
+            LOGGER.info(f"Current peak intensity: {peak_int}")
             adjust_count += 1
 
         active.action.action_params["peak_intensity"] = peak_int
@@ -179,9 +177,9 @@ def makeApp(confPrefix, server_key, helao_root):
         """Acquire spectra based on external trigger."""
         A = app.base.setup_action()
         A.action_abbr = "OPT"
-        # app.base.print_message("Setting up external trigger.", info=True)
+        # LOGGER.info("Setting up external trigger.")
         active_dict = await app.driver.acquire_spec_extrig(A)
-        # app.base.print_message("External trigger task initiated.", info=True)
+        # LOGGER.info("External trigger task initiated.")
         return active_dict
 
     @app.post(f"/{server_key}/stop_extrig_after", tags=["action"])

@@ -37,18 +37,18 @@ def config_loader(confArg, helao_root):
     """
     confPrefix = os.path.basename(confArg).replace(".py", "").replace(".yml", "")
     if confArg.endswith(".py") and os.path.exists(confArg):
-        print_message(LOGGER, "launcher", f"Loading config from {confArg}", info=True)
+        LOGGER.info(f"Loading config from {confArg}")
         conf_spec = spec_from_file_location("configs", confArg)
         conf_mod = module_from_spec(conf_spec)
         conf_spec.loader.exec_module(conf_mod)
         config = conf_mod.config
         full_path = os.path.abspath(confArg)
     elif confArg.endswith(".yml") and os.path.exists(confArg):
-        print_message(LOGGER, "launcher", f"Loading config from {confArg}", info=True)
+        LOGGER.info(f"Loading config from {confArg}")
         config = yml_load(Path(confArg))
         full_path = os.path.abspath(confArg)
     elif (confArg.endswith(".py") or confArg.endswith(".yml")) and not os.path.exists(confArg):
-        print_message(LOGGER, "launcher", f"Config not found at {os.path.abspath(confArg)}", error=True)
+        LOGGER.error(f"Config not found at {os.path.abspath(confArg)}")
         raise FileNotFoundError("Config argument ends with .py or .yml but expected path not found.")
     else:
         yml_path = os.path.join(helao_root, "helao", "configs", f"{confPrefix}.yml")
@@ -68,11 +68,6 @@ def config_loader(confArg, helao_root):
             )
         else:
             raise FileNotFoundError("Config argument was a prefix but .py or .yml could not be found.")
-        print_message(
-            LOGGER,
-            "launcher",
-            f"Loading config from {full_path}",
-            info=True,
-        )
+        LOGGER.info(f"Loading config from {full_path}")
     config["loaded_config_path"] = full_path
     return config

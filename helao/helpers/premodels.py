@@ -212,8 +212,8 @@ class Experiment(Sequence, ExperimentModel):
         #         "\n----------------------------------",
         #         error=True,
         #     )
-        #     print_message(LOGGER, "experiment", f"samples_in labels: {in_labels}", error=True)
-        #     print_message(LOGGER, "experiment", f"samples_out labels: {out_labels}", error=True)
+        #     LOGGER.error(f"samples_in labels: {in_labels}")
+        #     LOGGER.error(f"samples_out labels: {out_labels}")
 
 
 class Action(Experiment, ActionModel):
@@ -368,12 +368,7 @@ class ActionPlanMaker:
                         val = False
                 setattr(self.pars, key, val)
 
-        print_message(
-            LOGGER,
-            "ActionPlanMaker",
-            f"{self.expname}: params in self.pars are:" f" {vars(self.pars)}",
-            info=True,
-        )
+        LOGGER.info(f"{self.expname}: params in self.pars are:" f" {vars(self.pars)}")
 
     class _C:
         pass

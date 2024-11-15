@@ -64,36 +64,30 @@ if __name__ == "__main__":
         email_config = yml_load(CONFIG["alert_config_path"])
     else:
         email_config = {}
+    if config_loader.CONFIG is None:
+        config_loader.CONFIG = CONFIG
+    all_servers_config = CONFIG["servers"]
+    server_config = all_servers_config[server_key]
     if logging.LOGGER is None:
         logging.LOGGER = logging.make_logger(
             logger_name=server_key,
             log_dir=log_root,
             email_config=email_config,
-            log_level=CONFIG.get("log_level", 20),
+            log_level=server_config.get("log_level", 20),
         )
     LOGGER = logging.LOGGER
-    if config_loader.CONFIG is None:
-        config_loader.CONFIG = CONFIG
-    C = CONFIG["servers"]
-    S = C[server_key]
-    servHost = S["host"]
-    servPort = S["port"]
-    servPy = S["bokeh"]
-    launch_browser = S.get("params", {}).get("launch_browser", False)
+    servHost = server_config["host"]
+    servPort = server_config["port"]
+    servPy = server_config["bokeh"]
+    launch_browser = server_config.get("params", {}).get("launch_browser", False)
 
-    makeApp = import_module(f"helao.servers.{S['group']}.{S['bokeh']}").makeBokehApp
+    makeApp = import_module(f"helao.servers.{server_config['group']}.{server_config['bokeh']}").makeBokehApp
     root = CONFIG.get("root", None)
     if root is not None:
         log_root = os.path.join(root, "LOGS")
     else:
         log_root = None
-    print_message(
-        LOGGER,
-        "bokeh_launcher",
-        f" ---- starting  {server_key} ----",
-        log_dir=log_root,
-        info=True,
-    )
+    LOGGER.info(f" ---- starting  {server_key} ----")
 
     bokehapp = Server(
         {
@@ -108,13 +102,7 @@ if __name__ == "__main__":
         address=servHost,
         allow_websocket_origin=[f"{servHost}:{servPort}"],
     )
-    print_message(
-        LOGGER,
-        "bokeh_launcher",
-        f"started {server_key} {bokehapp}",
-        log_dir=log_root,
-        info=True,
-    )
+    LOGGER.info(f"started {server_key} {bokehapp}")
     bokehapp.start()
     if launch_browser:
         bokehapp.io_loop.add_callback(bokehapp.show, f"/{servPy}")

@@ -16,9 +16,7 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
     server_names = []
     for server_name, server_config in vis.world_cfg["servers"].items():
         if server_config.get("fast", server_config.get("demo", "")) == fast_key:
-            vis.print_message(
-                f"found server: '{fast_key}' under '{server_name}'", info=True
-            )
+            LOGGER.info(f"found server: '{fast_key}' under '{server_name}'")
             server_names.append((server_name, sorted(server_config.get("params", []))))
     return server_names
 

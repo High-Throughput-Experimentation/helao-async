@@ -92,7 +92,7 @@ class _BaseSampleAPI:
     async def _open_db(self):
         """Opens sqlite db file, retries if in use, and assigns connection & cursor."""
         while file_in_use(self._db):
-            self._base.print_message("db already in use, waiting", info=True)
+            self._LOGGER.info("db already in use, waiting")
             await asyncio.sleep(1)
         self._con = sqlite3.connect(self._db)
         self._cur = self._con.cursor()
@@ -155,7 +155,7 @@ class _BaseSampleAPI:
               );"""
         )
 
-        self._base.print_message(f"{self._sample_type} table created")
+        self._LOGGER.debug(f"{self._sample_type} table created")
         # commit changes
         self._con.commit()
 
@@ -190,10 +190,7 @@ class _BaseSampleAPI:
                     dfdict[key] = str(val)
 
                 if key not in self.column_names:
-                    self._base.print_message(
-                        f"Invalid {self._sample_type} data key '{key}', skipping it.",
-                        error=True,
-                    )
+                    self._LOGGER.error(f"Invalid {self._sample_type} data key '{key}', skipping it.")
                     keys_to_deletes.append(key)
 
             for key in keys_to_deletes:
@@ -218,7 +215,7 @@ class _BaseSampleAPI:
         if samples is None:
             samples = []
         while not self.ready:
-            self._base.print_message("db not ready", info=True)
+            self._LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
         await asyncio.sleep(0.01)
         ret_samples = []
@@ -231,15 +228,9 @@ class _BaseSampleAPI:
                 if added_sample.sample_type is not None:
                     ret_samples.append(added_sample)
                 else:
-                    self._base.print_message(
-                        "crtitical error, new_sample got NoneSample back from dn",
-                        error=True,
-                    )
+                    self._LOGGER.error("crtitical error, new_sample got NoneSample back from dn")
             else:
-                self._base.print_message(
-                    f"wrong sample type {type(sample)}!={self._sample_type}, skipping it",
-                    info=True,
-                )
+                self._LOGGER.info(f"wrong sample type {type(sample)}!={self._sample_type}, skipping it")
                 # ret_samples.append(NoneSample())
 
         return ret_samples
@@ -255,21 +246,18 @@ class _BaseSampleAPI:
             ).fetchall()
 
             if listOfTables == []:
-                self._base.print_message(
-                    f"{self._sample_type} table not found, creating it.",
-                    error=True,
-                )
+                self._LOGGER.error(f"{self._sample_type} table not found, creating it.")
                 self._create_init_db()
             else:
-                self._base.print_message(f"{self._sample_type} table found!")
+                self._LOGGER.debug(f"{self._sample_type} table found!")
             self._close_db()
-        self._base.print_message(f"'{self._sample_type}' db initialized")
+        self._LOGGER.debug(f"'{self._sample_type}' db initialized")
         self.ready = True
         await self.count_samples()  # has also a separate lock
 
     async def count_samples(self) -> int:
         while not self.ready:
-            self._base.print_message("db not ready", info=True)
+            self._LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
         await asyncio.sleep(0.01)
         lock = asyncio.Lock()
@@ -277,7 +265,7 @@ class _BaseSampleAPI:
             await self._open_db()
             self._cur.execute(f"select count(idx) from {self._sample_type};")
             counts = self._cur.fetchone()[0]
-            self._base.print_message(f"sqlite db {self._sample_type} count: {counts}")
+            self._LOGGER.debug(f"sqlite db {self._sample_type} count: {counts}")
             self._close_db()
             return counts
 
@@ -287,7 +275,7 @@ class _BaseSampleAPI:
         We expect to not have mixed sample types here.
         """
         while not self.ready:
-            self._base.print_message("db not ready", info=True)
+            self._LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
         await asyncio.sleep(0.01)
         ret_samples = []
@@ -301,9 +289,7 @@ class _BaseSampleAPI:
                     self._cur.execute(f"select count(idx) from {self._sample_type};")
                     counts = self._cur.fetchone()[0]
                     if counts > abs(sample.sample_no):
-                        self._base.print_message(
-                            f"getting sample: {self._sample_type} {counts+sample.sample_no+1}"
-                        )
+                        self._LOGGER.debug(f"getting sample: {self._sample_type} {counts+sample.sample_no+1}")
                         await asyncio.sleep(0.01)
                         retdf = pd.read_sql_query(
                             f"""select * from {self._sample_type} where idx={counts+sample.sample_no+1};""",
@@ -313,14 +299,12 @@ class _BaseSampleAPI:
                         if sample.sample_type is not None:
                             ret_samples.append(retsample)
                         else:
-                            self._base.print_message(
-                                f"sample '{sample.sample_no}' does not exist yet", info=True
-                            )
+                            self._LOGGER.info(f"sample '{sample.sample_no}' does not exist yet")
                     else:
-                        self._base.print_message(f"sample '{sample.sample_no}' does not exist yet", info=True)
+                        self._LOGGER.info(f"sample '{sample.sample_no}' does not exist yet")
                         # ret_samples.append(NoneSample())
                 elif sample.sample_no > 0:  # get sample from front
-                    self._base.print_message(f"getting sample: {self._sample_type} {sample.sample_no}")
+                    self._LOGGER.debug(f"getting sample: {self._sample_type} {sample.sample_no}")
                     await asyncio.sleep(0.01)
                     retdf = pd.read_sql_query(
                         f"""select * from {self._sample_type} where idx={sample.sample_no};""", con=self._con
@@ -329,9 +313,9 @@ class _BaseSampleAPI:
                     if retsample.sample_type is not None:
                         ret_samples.append(retsample)
                     else:
-                        self._base.print_message(f"sample '{sample.sample_no}' does not exist yet", info=True)
+                        self._LOGGER.info(f"sample '{sample.sample_no}' does not exist yet")
                 else:
-                    self._base.print_message("zero sample_no is not supported", info=True)
+                    self._LOGGER.info("zero sample_no is not supported")
             self._close_db()
         return ret_samples
 
@@ -341,7 +325,7 @@ class _BaseSampleAPI:
         We expect to not have mixed sample types here.
         """
         while not self.ready:
-            self._base.print_message("db not ready", info=True)
+            self._LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
         await asyncio.sleep(0.01)
         ret_samples = []
@@ -349,7 +333,7 @@ class _BaseSampleAPI:
         lock = asyncio.Lock()
         async with lock:
             await self._open_db()
-            self._base.print_message(f"getting {limit} samples of type {self._sample_type}")
+            self._LOGGER.debug(f"getting {limit} samples of type {self._sample_type}")
             await asyncio.sleep(0.01)
             retdf = pd.read_sql_query(
                 f"""
@@ -385,7 +369,7 @@ class _BaseSampleAPI:
                             cmd = f'''UPDATE {self._sample_type} SET {key} = NULL WHERE idx = {idx};'''
                         else:
                             cmd = f'''UPDATE {self._sample_type} SET {key} = {val} WHERE idx = {idx};'''
-                        self._base.print_message(f"dbcommand: {cmd}")
+                        self._LOGGER.debug(f"dbcommand: {cmd}")
                         self._cur.execute(cmd)
                     else:
                         if val is not None:
@@ -394,16 +378,16 @@ class _BaseSampleAPI:
                             cmd = f'''UPDATE {self._sample_type} SET {key} = "{val}" WHERE idx = {idx};'''
                         else:
                             cmd = f'''UPDATE {self._sample_type} SET {key} = NULL WHERE idx = {idx};'''
-                        self._base.print_message(f"dbcommand: {cmd}")
+                        self._LOGGER.debug(f"dbcommand: {cmd}")
                         self._cur.execute(cmd)
 
             else:
                 if key != "idx":
-                    self._base.print_message(f"unknown key '{key}' for updating sample", error=True)
+                    self._LOGGER.error(f"unknown key '{key}' for updating sample")
 
     async def update_samples(self, samples: List[SampleUnion] = []):
         while not self.ready:
-            self._base.print_message("db not ready", info=True)
+            self._LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
 
         await asyncio.sleep(0.01)
@@ -413,21 +397,19 @@ class _BaseSampleAPI:
             await self._open_db()
 
             for sample in samples:
-                self._base.print_message(
-                    f"updating sample '{self._sample_type}' '{sample.sample_no}'", info=True
-                )
+                self._LOGGER.info(f"updating sample '{self._sample_type}' '{sample.sample_no}'")
                 if sample.global_label is None:
-                    self._base.print_message("No global_label. Skipping sample.", info=True)
+                    self._LOGGER.info("No global_label. Skipping sample.")
                     continue
 
                 if sample.sample_no < 1:
-                    self._base.print_message(f"Cannot update sample '{sample.sample_no}'", info=True)
+                    self._LOGGER.info(f"Cannot update sample '{sample.sample_no}'")
                     continue
 
                 sample = await self._key_checks(sample)
 
                 # get the current info from db so we can perform some checks
-                self._base.print_message(f"getting sample {self._sample_type} {sample.sample_no}")
+                self._LOGGER.debug(f"getting sample {self._sample_type} {sample.sample_no}")
                 await asyncio.sleep(0.01)
                 retdf = pd.read_sql_query(
                     f"""select * from {self._sample_type} where idx={sample.sample_no};""", con=self._con
@@ -435,22 +417,16 @@ class _BaseSampleAPI:
                 prev_sample = self._df_to_sample(retdf)
 
                 if prev_sample.sample_type is None:
-                    self._base.print_message("update_samples: invalid sample", error=True)
+                    self._LOGGER.error("update_samples: invalid sample")
                     continue
 
                 # some safety checks
                 if sample.global_label != prev_sample.global_label:
-                    self._base.print_message(
-                        f"Cannot update sample '{sample.sample_no}', not the same 'global_label'",
-                        error=True,
-                    )
+                    self._LOGGER.error(f"Cannot update sample '{sample.sample_no}', not the same 'global_label'")
                     continue
 
                 if sample.sample_type != prev_sample.sample_type:
-                    self._base.print_message(
-                        f"Cannot update sample '{sample.sample_no}', not the same 'sample_type'",
-                        error=True,
-                    )
+                    self._LOGGER.error(f"Cannot update sample '{sample.sample_no}', not the same 'sample_type'")
                     continue
 
                 # update the last_update timecode
@@ -465,10 +441,7 @@ class _BaseSampleAPI:
                 keys_to_deletes = []
                 for key in dfdict.keys():
                     if key not in self.column_names:
-                        self._base.print_message(
-                            f"Invalid {self._sample_type} data key '{key}', skipping it.",
-                            error=True,
-                        )
+                        self._LOGGER.error(f"Invalid {self._sample_type} data key '{key}', skipping it.")
                         keys_to_deletes.append(key)
 
                 for key in keys_to_deletes:
@@ -481,11 +454,11 @@ class _BaseSampleAPI:
             self._close_db()
 
     async def get_platemap(self, samples: List[SampleUnion] = []) -> List[list]:
-        self._base.print_message(f"not supported for {self._sample_type}", error=True)
+        self._LOGGER.error(f"not supported for {self._sample_type}")
         return []
 
     async def get_samples_xy(self, samples: List[SampleUnion] = []) -> List[Tuple[float, float]]:
-        self._base.print_message(f"not supported for {self._sample_type}", error=True)
+        self._LOGGER.error(f"not supported for {self._sample_type}")
         return []
 
 
@@ -507,7 +480,7 @@ class LiquidSampleAPI(_BaseSampleAPI):
     async def old_jsondb_to_sqlitedb(self):
         old_liquid_sample_db = OldLiquidSampleAPI(self._base)
         counts = await old_liquid_sample_db.count_samples()
-        self._base.print_message(f"old db sample count: {counts}")
+        self._LOGGER.debug(f"old db sample count: {counts}")
         for i in range(counts):
             sample = LiquidSample(**{"sample_no": i + 1, "machine_name": gethostname().lower()})
             sample = await old_liquid_sample_db.get_samples(sample)
@@ -559,7 +532,7 @@ class SolidSampleAPI(_BaseSampleAPI):
         for sample in samples:
             pmmap = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
             if not pmmap:
-                self._base.print_message("invalid plate_id", error=True)
+                self._LOGGER.error("invalid plate_id")
             pmlist.append(pmmap)
         return pmlist
 
@@ -568,10 +541,7 @@ class SolidSampleAPI(_BaseSampleAPI):
         for sample in samples:
             pmdata = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
             if (sample.sample_no - 1) > len(pmdata) or (sample.sample_no - 1) < 0:
-                self._base.print_message(
-                    f"get_xy: invalid sample no '{sample.sample_no}' on plate {sample.plate_id}",
-                    warning=True,
-                )
+                self._LOGGER.warning(f"get_xy: invalid sample no '{sample.sample_no}' on plate {sample.plate_id}",)
                 xylist.append((None, None))
             else:
                 platex = pmdata[sample.sample_no - 1]["x"]
@@ -580,7 +550,7 @@ class SolidSampleAPI(_BaseSampleAPI):
         return xylist
 
     async def new_samples(self, samples: List[SampleUnion] = []) -> List[SampleUnion]:
-        self._base.print_message("new_sample is not supported yet for solid sample", error=True)
+        self._LOGGER.error("new_sample is not supported yet for solid sample")
         await asyncio.sleep(0.01)
         ret_samples = []
 
@@ -591,9 +561,7 @@ class SolidSampleAPI(_BaseSampleAPI):
         ret_samples = []
 
         for i, sample in enumerate(samples):
-            self._base.print_message(
-                f"getting sample {self._sample_type} {sample.sample_no} on plate {sample.plate_id}"
-            )
+            self._LOGGER.debug(f"getting sample {self._sample_type} {sample.sample_no} on plate {sample.plate_id}")
             await asyncio.sleep(0.01)
             if sample.machine_name == "legacy":
                 # verify legacy sample by getting its xy coordinates
@@ -607,14 +575,9 @@ class SolidSampleAPI(_BaseSampleAPI):
                         )
                     )
                 else:
-                    self._base.print_message(
-                        f"invalid legacy sample no '{sample.sample_no}' on plate {sample.plate_id}",
-                        warning=True,
-                    )
+                    self._LOGGER.warning(f"invalid legacy sample no '{sample.sample_no}' on plate {sample.plate_id}",)
             else:
-                self._base.print_message(
-                    "get_sample is not supported yet for non-legacy solid sample", error=True
-                )
+                self._LOGGER.error("get_sample is not supported yet for non-legacy solid sample")
 
         return ret_samples
 
@@ -643,9 +606,7 @@ class OldLiquidSampleAPI:
             f = open(os.path.join(self._dbfilepath, self._dbfile), "w")
             f.close()
 
-        self._base.print_message(
-            f"liquid sample no database is: {os.path.join(self._dbfilepath, self._dbfile)}"
-        )
+        self._LOGGER.debug(f"liquid sample no database is: {os.path.join(self._dbfilepath, self._dbfile)}")
 
     async def _open_db(self, mode):
         if os.path.exists(self._dbfilepath):
@@ -679,9 +640,9 @@ class OldLiquidSampleAPI:
                 line += "\n"
             await self.fdb.write(line)
 
-        self._base.print_message(f"new entry dict: {new_sample.model_dump()}")
+        self._LOGGER.debug(f"new entry dict: {new_sample.model_dump()}")
         new_sample.sample_no = await self.count_samples() + 1
-        self._base.print_message(f"new liquid sample no: {new_sample.sample_no}")
+        self._LOGGER.debug(f"new liquid sample no: {new_sample.sample_no}")
         # dump dict to separate json file
         await write_sample_no_jsonfile(
             f"{new_sample.sample_no:08d}__{new_sample.sample_creation_experiment_uuid}__{new_sample.sample_creation_action_uuid}.json",
@@ -729,10 +690,7 @@ class OldLiquidSampleAPI:
 
         # for now it only checks against local samples
         if sample.machine_name != gethostname().lower():
-            self._base.print_message(
-                f"can only load from local db, got {sample.machine_name}",
-                error=True,
-            )
+            self._LOGGER.error(f"can only load from local db, got {sample.machine_name}")
             return None  # return default empty one
 
         data = await get_sample_details(sample.sample_no)
@@ -742,7 +700,7 @@ class OldLiquidSampleAPI:
             sample_creation_experiment_uuid = data[1]
             sample_creation_action_uuid = data[2]
             filename = f"{fileID:08d}__{sample_creation_experiment_uuid}__{sample_creation_action_uuid}.json"
-            self._base.print_message(f"data json file: {filename}")
+            self._LOGGER.debug(f"data json file: {filename}")
 
             liquid_sample_jsondict = await load_json_file(filename, 1)
             # fix for old db version
@@ -791,7 +749,7 @@ class OldLiquidSampleAPI:
                 del liquid_sample_jsondict["DUID"]
 
             ret_liquid_sample = LiquidSample(**liquid_sample_jsondict)
-            self._base.print_message(f"data json content: {ret_liquid_sample.model_dump()}")
+            self._LOGGER.debug(f"data json content: {ret_liquid_sample.model_dump()}")
 
             return ret_liquid_sample
         else:
@@ -814,7 +772,7 @@ class UnifiedSampleDataAPI:
         await self.liquidAPI.init_db()
         await self.gasAPI.init_db()
         await self.assemblyAPI.init_db()
-        self._base.print_message("unified db initialized")
+        self._LOGGER.debug("unified db initialized")
         self.ready = True
 
     async def new_samples(self, samples: List[SampleUnion] = []) -> List[SampleUnion]:
@@ -851,10 +809,7 @@ class UnifiedSampleDataAPI:
         for i,sample_ in enumerate(samples):
             # print("sample", i, ":", sample_)
             sample = object_to_sample(sample_)
-            self._base.print_message(
-                f"retrieving sample {sample.get_global_label()} of sample_type {sample.sample_type}",
-                info=True,
-            )
+            self._LOGGER.info(f"retrieving sample {sample.get_global_label()} of sample_type {sample.sample_type}")
             if sample.sample_type == SampleType.liquid:
                 tmp = await self.liquidAPI.get_samples([sample])
                 for t in tmp:
@@ -875,15 +830,9 @@ class UnifiedSampleDataAPI:
                     # and then add the assembly to the return list
                     retval.append(t)
             elif sample.sample_type is None:
-                self._base.print_message(
-                    "got None sample",
-                    info=True,
-                )
+                self._LOGGER.info("got None sample")
             else:
-                self._base.print_message(
-                    f"validation error, type '{type(sample)}' is not a valid sample model",
-                    error=True,
-                )
+                self._LOGGER.error(f"validation error, type '{type(sample)}' is not a valid sample model")
 
         return retval
 
@@ -903,9 +852,7 @@ class UnifiedSampleDataAPI:
     async def update_samples(self, samples: List[SampleUnion] = []) -> None:
         for sample_ in samples:
             sample = object_to_sample(sample_)
-            self._base.print_message(
-                f"updating sample: {sample.global_label} of sample_type {sample.sample_type}", info=True
-            )
+            self._LOGGER.info(f"updating sample: {sample.global_label} of sample_type {sample.sample_type}")
             if sample.sample_type == SampleType.liquid:
                 await self.liquidAPI.update_samples([sample])
             elif sample.sample_type == SampleType.solid:
@@ -917,24 +864,15 @@ class UnifiedSampleDataAPI:
                 await self.update_samples(sample.parts)
                 await self.assemblyAPI.update_samples([sample])
             elif sample.sample_type is None:
-                self._base.print_message(
-                    "got None sample",
-                    info=True,
-                )
+                self._LOGGER.info("got None sample")
             else:
-                self._base.print_message(
-                    f"validation error, type '{type(sample)}' is not a valid sample model",
-                    error=True,
-                )
+                self._LOGGER.error(f"validation error, type '{type(sample)}' is not a valid sample model")
 
     async def get_samples_xy(self, samples: List[SampleUnion] = []) -> None:
         retval = []
         for sample_ in samples:
             sample = object_to_sample(sample_)
-            self._base.print_message(
-                f"getting sample_xy for: {sample.global_label} of sample_type {sample.sample_type}",
-                info=True,
-            )
+            self._LOGGER.info(f"getting sample_xy for: {sample.global_label} of sample_type {sample.sample_type}")
             if sample.sample_type == SampleType.liquid:
                 tmp = await self.liquidAPI.get_samples_xy([sample])
                 for t in tmp:
@@ -952,25 +890,16 @@ class UnifiedSampleDataAPI:
                 for t in tmp:
                     retval.append(t)
             elif sample.sample_type is None:
-                self._base.print_message(
-                    "got None sample",
-                    info=True,
-                )
+                self._LOGGER.info("got None sample")
             else:
-                self._base.print_message(
-                    f"validation error, type '{type(sample)}' is not a valid sample model",
-                    error=True,
-                )
+                self._LOGGER.error(f"validation error, type '{type(sample)}' is not a valid sample model")
         return retval
 
     async def get_platemap(self, samples: List[SampleUnion] = []) -> None:
         retval = []
         for sample_ in samples:
             sample = object_to_sample(sample_)
-            self._base.print_message(
-                f"getting platemap for: {sample.global_label} of sample_type {sample.sample_type}",
-                info=True,
-            )
+            self._LOGGER.info(f"getting platemap for: {sample.global_label} of sample_type {sample.sample_type}")
             if sample.sample_type == SampleType.liquid:
                 tmp = await self.liquidAPI.get_platemap([sample])
                 for t in tmp:
@@ -988,13 +917,7 @@ class UnifiedSampleDataAPI:
                 for t in tmp:
                     retval.append(t)
             elif sample.sample_type is None:
-                self._base.print_message(
-                    "got None sample",
-                    info=True,
-                )
+                self._LOGGER.info("got None sample")
             else:
-                self._base.print_message(
-                    f"validation error, type '{type(sample)}' is not a valid sample model",
-                    error=True,
-                )
+                self._LOGGER.error(f"validation error, type '{type(sample)}' is not a valid sample model")
         return retval

@@ -59,6 +59,10 @@ if __name__ == "__main__":
         email_config = yml_load(CONFIG["alert_config_path"])
     else:
         email_config = {}
+    if config_loader.CONFIG is None:
+        config_loader.CONFIG = CONFIG
+    all_servers_config = CONFIG["servers"]
+    server_config = all_servers_config[server_key]
     if logging.LOGGER is None:
         logging.LOGGER = logging.make_logger(
             logger_name=server_key,
@@ -67,12 +71,8 @@ if __name__ == "__main__":
             log_level=CONFIG.get("log_level", 20),
         )
     LOGGER = logging.LOGGER
-    if config_loader.CONFIG is None:
-        config_loader.CONFIG = CONFIG
-    C = CONFIG["servers"]
-    S = C[server_key]
 
-    makeApp = import_module(f"helao.servers.{S['group']}.{S['fast']}").makeApp
+    makeApp = import_module(f"helao.servers.{server_config['group']}.{server_config['fast']}").makeApp
     app = makeApp(confArg, server_key, helao_root)
     root = CONFIG.get("root", None)
     if root is not None:
@@ -93,11 +93,5 @@ if __name__ == "__main__":
     ] = f"\n[%(asctime)s_{server_key}]: %(levelprefix)s %(message)s\r"
     LOGGING_CONFIG["formatters"]["access"]["use_colors"] = False
 
-    print_message(
-        LOGGER,
-        "fast_launcher",
-        f" ---- starting  {server_key} ----",
-        log_dir=log_root,
-        info=True,
-    )
-    fastapp = uvicorn.run(app, host=S["host"], port=S["port"], log_level="warning")
+    LOGGER.info(f" ---- starting  {server_key} ----")
+    fastapp = uvicorn.run(app, host=server_config["host"], port=server_config["port"], log_level="warning")

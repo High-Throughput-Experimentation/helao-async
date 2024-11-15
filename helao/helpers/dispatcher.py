@@ -251,11 +251,7 @@ async def endpoints_available(req_list: list):
     if not all(responses):
         badinds = [i for i,v in enumerate(responses) if not v]
         unavailable = [(req_list[i], [states[i]]) for i in badinds]
-        print_message(
-            LOGGER,
-            "orchestrator",
-            f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}",
-        )
+        LOGGER.info(f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}")
         return False, unavailable
     else:
         return True, []

@@ -53,7 +53,7 @@ class MeerstetterTEC(object):
                 self._connect()
                 break
             except ResponseTimeout:
-                self.base.print_message(f"connection timeout, retrying attempt {i+1}")
+                LOGGER.debug(f"connection timeout, retrying attempt {i+1}")
         self.action = None
         self.active = None
         self.start_margin = self.config_dict.get("start_margin", 0)
@@ -139,7 +139,7 @@ class MeerstetterTEC(object):
 
     async def poll_sensor_loop(self, frequency: int = 1):
         waittime = 1.0 / frequency
-        self.base.print_message("Starting polling loop")
+        LOGGER.debug("Starting polling loop")
         while True:
             tec_vals = {k: v[0] for k, v in self.get_data().items()}
             if tec_vals:
@@ -151,14 +151,14 @@ class MeerstetterTEC(object):
         try:
             self.polling_task.cancel()
         except asyncio.CancelledError:
-            self.base.print_message("closed TEC polling loop task")
+            LOGGER.debug("closed TEC polling loop task")
         self.disable()
 
 
 class TECMonExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("TECMonExec initialized.")
+        LOGGER.debug("TECMonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 
@@ -194,7 +194,7 @@ STABLE_ID_MAP = {
 class TECWaitExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("TECWaitExec initialized.")
+        LOGGER.debug("TECWaitExec initialized.")
         self.start_time = time.time()
         self.duration = -1
         self.last_check = 0
@@ -202,9 +202,7 @@ class TECWaitExec(Executor):
 
     async def _pre_exec(self):
         "Setup methods, return error state."
-        self.active.base.print_message(
-            f"TECWait Executor sleeping for {self.initial_sleep} seconds."
-        )
+        LOGGER.debug(f"TECWait Executor sleeping for {self.initial_sleep} seconds.")
         await asyncio.sleep(self.initial_sleep)
         self.setup_err = ErrorCodes.none
         return {"error": self.setup_err}

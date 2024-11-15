@@ -104,7 +104,7 @@ class Executor:
         Returns:
             dict: A dictionary containing the setup error code with the key "error".
         """
-        self.active.base.print_message("generic Executor running setup methods.")
+        LOGGER.debug("generic Executor running setup methods.")
         self.setup_err = ErrorCodes.none
         return {"error": self.setup_err}
 

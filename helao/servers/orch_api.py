@@ -169,9 +169,7 @@ class OrchAPI(HelaoFastAPI):
                     # send active status but don't create active object
                     await self.orch.status_q.put(action.get_actmodel())
                     response = JSONResponse(action.as_dict())
-                    self.orch.print_message(
-                        f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
-                    )
+                    LOGGER.debug(f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}")
                     self.orch.endpoint_queues[endpoint].put(
                         (
                             action,
@@ -406,9 +404,9 @@ class OrchAPI(HelaoFastAPI):
             3. Logs a message indicating that the orchestrator has shut down.
             4. Waits for 0.75 seconds to ensure all processes have terminated properly.
             """
-            self.orch.print_message("Stopping operator", info=True)
+            LOGGER.info("Stopping operator")
             self.orch.bokehapp.stop()
-            self.orch.print_message("orch shutdown", info=True)
+            LOGGER.info("orch shutdown")
             time.sleep(0.75)
 
         # --- ORCH-specific endpoints ---
@@ -496,15 +494,11 @@ class OrchAPI(HelaoFastAPI):
             if os.path.exists(save_path):
                 queue_dict = pickle.load(open(save_path, "rb"))
             else:
-                self.orch.print_message(
-                    "Exported queues.pck does not exist. Cannot restore."
-                )
+                LOGGER.debug("Exported queues.pck does not exist. Cannot restore.")
             if self.orch.sequence_dq or self.orch.experiment_dq or self.orch.action_dq:
-                self.orch.print_message(
-                    "Existing queues are not empty. Cannot restore."
-                )
+                LOGGER.debug("Existing queues are not empty. Cannot restore.")
             else:
-                self.orch.print_message("Restoring queues from saved pck.")
+                LOGGER.debug("Restoring queues from saved pck.")
                 for x in queue_dict["act"]:
                     self.orch.action_dq.append(x)
                 for x in queue_dict["exp"]:
@@ -620,7 +614,7 @@ class OrchAPI(HelaoFastAPI):
             """
             # if self.orch.active_experiment is not None:
             #     self.orch.active_experiment.globalexp_params.update(params)
-            #     self.orch.print_message(f"Updated globalexp params with {params}.")
+            #     LOGGER.debug(f"Updated globalexp params with {params}.")
             #     return True
             # else:
             #     self.orch.print_message(
@@ -682,9 +676,9 @@ class OrchAPI(HelaoFastAPI):
             if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
                 await self.orch.estop_loop()
             elif self.orch.globalstatusmodel.loop_state == LoopStatus.estopped:
-                self.orch.print_message("orchestrator E-STOP flag already raised")
+                LOGGER.debug("orchestrator E-STOP flag already raised")
             else:
-                self.orch.print_message("orchestrator is not running")
+                LOGGER.debug("orchestrator is not running")
             return {}
 
         @self.post("/stop", tags=["private"])
@@ -714,7 +708,7 @@ class OrchAPI(HelaoFastAPI):
                 None
             """
             if self.orch.globalstatusmodel.loop_state != LoopStatus.estopped:
-                self.orch.print_message("orchestrator is not currently in E-STOP")
+                LOGGER.debug("orchestrator is not currently in E-STOP")
             else:
                 await self.orch.clear_estop()
 
@@ -727,7 +721,7 @@ class OrchAPI(HelaoFastAPI):
             Otherwise, it calls the `clear_error` method of the orchestrator to clear the error state.
             """
             if self.orch.globalstatusmodel.loop_state != LoopStatus.error:
-                self.orch.print_message("orchestrator is not currently in ERROR")
+                LOGGER.debug("orchestrator is not currently in ERROR")
             else:
                 await self.orch.clear_error()
 
@@ -1092,14 +1086,14 @@ class OrchAPI(HelaoFastAPI):
             )
             has_estop = getattr(self.driver, "estop", None)
             if has_estop is not None and callable(has_estop):
-                self.orch.print_message("driver has estop function", info=True)
+                LOGGER.info("driver has estop function")
                 await active.enqueue_data_dflt(
                     datadict={
                         "estop": await self.driver.estop(**active.action.action_params)
                     }
                 )
             else:
-                self.orch.print_message("driver has NO estop function", info=True)
+                LOGGER.info("driver has NO estop function")
                 self.orch.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.append(HloStatus.estopped)
@@ -1402,11 +1396,9 @@ class OrchAPI(HelaoFastAPI):
             current_params = list(self.orch.global_params.keys())
             self.orch.global_params = {}
             if current_params:
-                self.orch.print_message(
-                    "\n".join(["removed:"] + current_params), info=True
-                )
+                LOGGER.info("\n".join(["removed:"] + current_params))
             else:
-                self.orch.print_message("global_params was empty", info=True)
+                LOGGER.info("global_params was empty")
             active.action.action_params.update({"cleared": current_params})
             finished_action = await active.finish()
             return finished_action.as_dict()
@@ -1445,7 +1437,7 @@ class WaitExec(Executor):
             last_print_time (float): The last time a message was printed.
         """
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("WaitExec initialized.")
+        LOGGER.debug("WaitExec initialized.")
         self.poll_rate = 0.01
         self.duration = self.active.action.action_params.get("waittime", -1)
         self.print_every_secs = kwargs.get("print_every_secs", 5)
@@ -1490,7 +1482,7 @@ class WaitExec(Executor):
         return {"error": ErrorCodes.none, "status": status}
 
     async def _post_exec(self):
-        self.active.base.print_message(" ... wait action done")
+        LOGGER.debug(" ... wait action done")
         return {"error": ErrorCodes.none}
 
 

@@ -1037,10 +1037,7 @@ class HelaoSyncer:
                 tb = "".join(
                     traceback.format_exception(type(err), err, err.__traceback__)
                 )
-                self.base.print_message(
-                    f"Directory {remove_target} is empty, but could not removed. {repr(err), tb,}",
-                    error=True,
-                )
+                LOGGER.error(f"Directory {remove_target} is empty, but could not removed.", exc_info=True)
         else:
             sub_dirs = [x for x in contents if os.path.isdir(x)]
             sub_success = False
@@ -1099,7 +1096,7 @@ class HelaoSyncer:
         """
         task_name = task.get_name()
         if task_name in self.running_tasks:
-            # self.base.print_message(f"Removing {task_name} from running_tasks.")
+            # LOGGER.debug(f"Removing {task_name} from running_tasks.")
             self.running_tasks.pop(task_name)
         # else:
         #     self.base.print_message(
@@ -1134,7 +1131,7 @@ class HelaoSyncer:
         """
         while True:
             if len(self.running_tasks) < self.max_tasks:
-                # self.base.print_message("Getting next yml_target from queue.")
+                # LOGGER.debug("Getting next yml_target from queue.")
                 rank, yml_path = await self.task_queue.get()
                 # self.task_set.remove(yml_path.name)
                 # self.base.print_message(
@@ -1152,7 +1149,7 @@ class HelaoSyncer:
                         self.sync_exit_callback
                     )
                 # else:
-                #     print_message(f"{yml_target} sync is already in progress.")
+                #     LOGGER.info(f"{yml_target} sync is already in progress.)
             await asyncio.sleep(0.1)
 
     def get_progress(self, yml_path: Path):
@@ -1215,17 +1212,13 @@ class HelaoSyncer:
         """
         yml_path = Path(upath) if isinstance(upath, str) else upath
         if rank < rank_limit:
-            self.base.print_message(
-                f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request."
-            )
+            LOGGER.debug(f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request.")
         # elif yml_path.name in self.task_set:
         #     self.base.print_message(
         #         f"{str(yml_path)} is already queued, skipping enqueue request."
         #     )
         elif yml_path.name in self.running_tasks:
-            self.base.print_message(
-                f"{str(yml_path)} is already running, skipping enqueue request."
-            )
+            LOGGER.debug(f"{str(yml_path)} is already running, skipping enqueue request.")
         else:
             # self.task_set.add(yml_path.name)
             await self.task_queue.put((rank, yml_path))
@@ -1292,14 +1285,12 @@ class HelaoSyncer:
             # )
             return False
 
-        # self.base.print_message(f"{str(prog.yml.target)} status is finished, proceeding.")
+        # LOGGER.debug(f"{str(prog.yml.target)} status is finished, proceeding.")
 
         # first check if child objects are registered with API (non-actions)
         if prog.yml.type != "action":
             if prog.yml.active_children:
-                self.base.print_message(
-                    f"Cannot sync {str(prog.yml.target)}, children are still 'active'."
-                )
+                LOGGER.debug(f"Cannot sync {str(prog.yml.target)}, children are still 'active'.")
                 return False
             if prog.yml.finished_children:
                 # self.base.print_message(
@@ -1317,15 +1308,15 @@ class HelaoSyncer:
                 # )
                 self.running_tasks.pop(prog.yml.target.name)
                 await self.enqueue_yml(prog.yml.target, rank)
-                self.base.print_message(f"{str(prog.yml.target)} re-queued, exiting.")
+                LOGGER.debug(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
 
-        # self.base.print_message(f"{str(prog.yml.target)} children are synced, proceeding.")
+        # LOGGER.debug(f"{str(prog.yml.target)} children are synced, proceeding.")
 
         # next push files to S3 (actions only)
         if prog.yml.type == "action":
             # re-check file lists
-            # self.base.print_message(f"Checking file lists for {prog.yml.target.name}")
+            # LOGGER.debug(f"Checking file lists for {prog.yml.target.name}")
             prog.dict["files_pending"] += [
                 str(p)
                 for p in prog.yml.hlo_files + prog.yml.misc_files
@@ -1336,9 +1327,7 @@ class HelaoSyncer:
             while prog.dict.get("files_pending", []):
                 for sp in prog.dict["files_pending"]:
                     fp = Path(sp)
-                    self.base.print_message(
-                        f"Pushing {sp} to S3 for {prog.yml.target.name}"
-                    )
+                    LOGGER.debug(f"Pushing {sp} to S3 for {prog.yml.target.name}")
                     if fp.suffix == ".hlo":
                         if fp.stat().st_size < 1024**3:  # 1GB
                             file_s3_key = (
@@ -1346,7 +1335,7 @@ class HelaoSyncer:
                             )
                             if compress:
                                 file_s3_key += ".gz"
-                            self.base.print_message("Parsing hlo dicts.")
+                            LOGGER.debug("Parsing hlo dicts.")
                             try:
                                 file_meta, file_data = read_hlo(sp)
                             except Exception as err:
@@ -1360,9 +1349,7 @@ class HelaoSyncer:
                                 file_data = {}
                             msg = {"meta": file_meta, "data": file_data}
                         else:
-                            self.base.print_message(
-                                "hlo file larger than 1GB, converting to parquet."
-                            )
+                            LOGGER.debug("hlo file larger than 1GB, converting to parquet.")
                             file_s3_key = (
                                 f"raw_data/{meta['action_uuid']}/{fp.name}.parquet"
                             )
@@ -1381,20 +1368,18 @@ class HelaoSyncer:
                     else:
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}"
                         msg = fp
-                    self.base.print_message(f"Destination: {file_s3_key}")
+                    LOGGER.debug(f"Destination: {file_s3_key}")
                     file_success = await self.to_s3(
                         msg=msg,
                         target=file_s3_key,
                         compress=compress,
                     )
                     if file_success:
-                        self.base.print_message("Removing file from pending list.")
+                        LOGGER.debug("Removing file from pending list.")
                         prog.dict["files_pending"].remove(sp)
-                        self.base.print_message(
-                            f"Adding file to S3 dict. {fp.name}: {file_s3_key}"
-                        )
+                        LOGGER.debug(f"Adding file to S3 dict. {fp.name}: {file_s3_key}")
                         prog.dict["files_s3"].update({fp.name: file_s3_key})
-                        self.base.print_message(f"Updating progress: {prog.dict}")
+                        LOGGER.debug(f"Updating progress: {prog.dict}")
                         prog.write_dict()
 
                         # update files list with uploaded filename
@@ -1411,12 +1396,12 @@ class HelaoSyncer:
                             )
                             meta["files"].append(fileinfo)
                         if isinstance(msg, Path) and msg.suffix == ".parquet":
-                            self.base.print_message("cleaning up parquet file")
+                            LOGGER.debug("cleaning up parquet file")
                             msg.unlink()
 
         # if prog.yml is an experiment first check processes before pushing to API
         if prog.yml.type == "experiment":
-            self.base.print_message(f"Finishing processes for {prog.yml.target.name}")
+            LOGGER.debug(f"Finishing processes for {prog.yml.target.name}")
             retry_count = 0
             s3_unf, api_unf = prog.list_unfinished_procs()
             while s3_unf or api_unf:
@@ -1426,9 +1411,7 @@ class HelaoSyncer:
                 s3_unf, api_unf = prog.list_unfinished_procs()
                 retry_count += 1
             if s3_unf or api_unf:
-                self.base.print_message(
-                    f"Processes in {str(prog.yml.target)} did not sync after 3 tries."
-                )
+                LOGGER.debug(f"Processes in {str(prog.yml.target)} did not sync after 3 tries.")
                 return False
             if prog.dict["process_metas"]:
                 meta["process_list"] = [
@@ -1436,7 +1419,7 @@ class HelaoSyncer:
                     for _, d in sorted(prog.dict["process_metas"].items())
                 ]
 
-        self.base.print_message(f"Patching model for {prog.yml.target.name}")
+        LOGGER.debug(f"Patching model for {prog.yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
         meta = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(
             strip_private=True
@@ -1450,9 +1433,7 @@ class HelaoSyncer:
 
         # next push prog.yml to S3
         if not prog.s3_done or force_s3:
-            self.base.print_message(
-                f"Pushing prog.yml->json to S3 for {prog.yml.target.name}"
-            )
+            LOGGER.debug(f"Pushing prog.yml->json to S3 for {prog.yml.target.name}")
             uuid_key = patched_meta[f"{prog.yml.type}_uuid"]
             meta_s3_key = f"{prog.yml.type}/{uuid_key}.json"
             s3_success = await self.to_s3(meta, meta_s3_key)
@@ -1462,9 +1443,7 @@ class HelaoSyncer:
 
         # next push prog.yml to API
         if not prog.api_done or force_api:
-            self.base.print_message(
-                f"Pushing prog.yml to API for {prog.yml.target.name}"
-            )
+            LOGGER.debug(f"Pushing prog.yml to API for {prog.yml.target.name}")
             api_success = await self.to_api(meta, prog.yml.type)
             LOGGER.info(f"API push returned {api_success} for {prog.yml.target.name}")
             if api_success:
@@ -1478,16 +1457,14 @@ class HelaoSyncer:
         # move to synced
         if prog.s3_done and prog.api_done:
 
-            self.base.print_message(
-                f"Moving files to RUNS_SYNCED for {yml_target_name}"
-            )
+            LOGGER.debug(f"Moving files to RUNS_SYNCED for {yml_target_name}")
             for lock_path in prog.yml.lock_files:
                 lock_path.unlink()
             for file_path in prog.yml.misc_files + prog.yml.hlo_files:
-                self.base.print_message(f"Moving {str(file_path)}")
+                LOGGER.debug(f"Moving {str(file_path)}")
                 move_success = move_to_synced(file_path)
                 while not move_success:
-                    self.base.print_message(f"{file_path} is in use, retrying.")
+                    LOGGER.debug(f"{file_path} is in use, retrying.")
                     sleep(1)
                     move_success = move_to_synced(file_path)
 
@@ -1497,21 +1474,21 @@ class HelaoSyncer:
             yml_success = move_to_synced(yml_path)
             if yml_success:
                 result = prog.yml.cleanup()
-                self.base.print_message(f"Cleanup {yml_target_name} {result}.")
+                LOGGER.debug(f"Cleanup {yml_target_name} {result}.")
                 if result == "success":
-                    self.base.print_message("yml_success")
+                    LOGGER.debug("yml_success")
                     prog = self.get_progress(Path(yml_success))
-                    self.base.print_message("reassigning prog")
+                    LOGGER.debug("reassigning prog")
                     prog.dict["yml"] = str(yml_success)
-                    self.base.print_message("updating progress")
+                    LOGGER.debug("updating progress")
                     prog.write_dict()
 
             # pop children from progress dict
             if yml_type in ["experiment", "sequence"]:
                 children = prog.yml.children
-                self.base.print_message(f"Removing children from progress: {children}.")
+                LOGGER.debug(f"Removing children from progress: {children}.")
                 for childyml in children:
-                    # self.base.print_message(f"Clearing {childprog.yml.target.name}")
+                    # LOGGER.debug(f"Clearing {childprog.yml.target.name}")
                     finished_child_path = childyml.finished_path.parent
                     if finished_child_path.exists():
                         self.try_remove_empty(str(finished_child_path))
@@ -1524,7 +1501,7 @@ class HelaoSyncer:
                 self.try_remove_empty(str(prog.yml.finished_path.parent))
 
             if yml_type == "sequence":
-                self.base.print_message(f"Zipping {prog.yml.target.parent.name}.")
+                LOGGER.debug(f"Zipping {prog.yml.target.parent.name}.")
                 zip_target = prog.yml.target.parent.parent.joinpath(
                     f"{prog.yml.target.parent.name}.zip"
                 )
@@ -1533,10 +1510,10 @@ class HelaoSyncer:
                 )
                 zip_dir(prog.yml.target.parent, zip_target)
                 self.cleanup_root()
-                # self.base.print_message(f"Removing sequence from progress.")
+                # LOGGER.debug(f"Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
 
-            self.base.print_message(f"Removing {yml_target_name} from running_tasks.")
+            LOGGER.debug(f"Removing {yml_target_name} from running_tasks.")
             self.running_tasks.pop(yml_target_name)
 
             # if action contributes processes, update processes
@@ -1637,7 +1614,7 @@ class HelaoSyncer:
                 ShortActionModel(**act_meta).clean_dict(strip_private=True)
             )
 
-            # self.base.print_message(f"current experiment progress:\n{exp_prog.dict}")
+            # LOGGER.debug(f"current experiment progress:\n{exp_prog.dict}")
             if act_idx == min(exp_prog.dict["process_groups"][pidx]):
                 process_meta["process_timestamp"] = act_meta["action_timestamp"]
             if "technique_name" in act_meta:
@@ -1807,10 +1784,10 @@ class HelaoSyncer:
         """
         try:
             if self.s3 is None:
-                self.base.print_message("S3 is not configured. Skipping to S3 upload.")
+                LOGGER.debug("S3 is not configured. Skipping to S3 upload.")
                 return True
             if isinstance(msg, dict):
-                self.base.print_message("Converting dict to json.")
+                LOGGER.debug("Converting dict to json.")
                 uploadee = dict2json(msg)
                 uploader = self.s3.upload_fileobj
                 if compress:
@@ -1822,14 +1799,12 @@ class HelaoSyncer:
                     buffer.seek(0)
                     uploadee = buffer
             else:
-                self.base.print_message("Converting path to str")
+                LOGGER.debug("Converting path to str")
                 uploadee = str(msg)
                 uploader = self.s3.upload_file
             for i in range(retries + 1):
                 if i > 0:
-                    self.base.print_message(
-                        f"S3 retry [{i}/{retries}]: {self.bucket}, {target}"
-                    )
+                    LOGGER.debug(f"S3 retry [{i}/{retries}]: {self.bucket}, {target}")
                 try:
                     uploader(uploadee, self.bucket, target)
                     return True
@@ -1839,7 +1814,7 @@ class HelaoSyncer:
                     )
                     self.base.print_message(err)
                     await asyncio.sleep(30)
-            self.base.print_message(f"Did not upload {target} after {retries} tries.")
+            LOGGER.debug(f"Did not upload {target} after {retries} tries.")
             return False
         except Exception:
             LOGGER.error(f"Could not push {target}.", exc_info=True)
@@ -1866,49 +1841,41 @@ class HelaoSyncer:
             - If all retry attempts fail, the function will attempt to log the failure to a separate endpoint.
         """
         if self.api_host is None:
-            self.base.print_message(
-                "Modelyst API is not configured. Skipping to API push."
-            )
+            LOGGER.debug("Modelyst API is not configured. Skipping to API push.")
             return True
         req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
-        # self.base.print_message(f"preparing API push to {req_url}")
+        # LOGGER.debug(f"preparing API push to {req_url}")
         # meta_name = req_model.get(
         #     f"{meta_type.replace('process', 'technique')}_name",
         #     req_model["experiment_name"],
         # )
         meta_uuid = req_model[f"{meta_type}_uuid"]
-        self.base.print_message(f"attempting API push for {meta_type}: {meta_uuid}")
+        LOGGER.debug(f"attempting API push for {meta_type}: {meta_uuid}")
         try_create = True
         api_success = False
         last_status = 0
         last_response = {}
-        self.base.print_message("creating async request session")
+        LOGGER.debug("creating async request session")
         async with aiohttp.ClientSession() as session:
             for i in range(retries):
                 if not api_success:
-                    self.base.print_message(f"session attempt {i}")
+                    LOGGER.debug(f"session attempt {i}")
                     req_method = session.post if try_create else session.patch
                     api_str = f"API {'POST' if try_create else 'PATCH'}"
                     try:
-                        self.base.print_message("trying request")
+                        LOGGER.debug("trying request")
                         async with req_method(req_url, json=req_model) as resp:
-                            self.base.print_message("response received")
+                            LOGGER.debug("response received")
                             if resp.status == 200:
                                 api_success = True
                             elif resp.status == 400:
                                 try_create = False
-                            self.base.print_message(
-                                f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}"
-                            )
+                            LOGGER.debug(f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}")
                             last_response = await resp.json()
-                            self.base.print_message(
-                                f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}"
-                            )
+                            LOGGER.debug(f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}")
                             last_status = resp.status
                     except Exception as e:
-                        self.base.print_message(
-                            f"[{i+1}/{retries}] an exception occurred: {e}"
-                        )
+                        LOGGER.debug(f"[{i+1}/{retries}] an exception occurred: {e}")
                         await asyncio.sleep(30)
                 else:
                     break
@@ -1933,20 +1900,12 @@ class HelaoSyncer:
                         try:
                             async with session.post(fail_url, json=fail_model) as resp:
                                 if resp.status == 200:
-                                    self.base.print_message(
-                                        f"successful debug API push for {meta_type}: {meta_uuid}"
-                                    )
+                                    LOGGER.debug(f"successful debug API push for {meta_type}: {meta_uuid}")
                                     break
-                                self.base.print_message(
-                                    f"failed debug API push for {meta_type}: {meta_uuid}"
-                                )
-                                self.base.print_message(
-                                    f"response: {await resp.json()}"
-                                )
+                                LOGGER.debug(f"failed debug API push for {meta_type}: {meta_uuid}")
+                                LOGGER.debug(f"response: {await resp.json()}")
                         except TimeoutError:
-                            self.base.print_message(
-                                f"unable to post failure model for {meta_type}: {meta_uuid}"
-                            )
+                            LOGGER.debug(f"unable to post failure model for {meta_type}: {meta_uuid}")
                             await asyncio.sleep(30)
         return api_success
 
@@ -1972,9 +1931,7 @@ class HelaoSyncer:
         pending = glob(os.path.join(finished_dir, "**", "*-seq.yml"), recursive=True)
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
-        self.base.print_message(
-            f"Found {len(pending)} pending sequences in RUNS_FINISHED."
-        )
+        LOGGER.debug(f"Found {len(pending)} pending sequences in RUNS_FINISHED.")
         return pending
 
     async def finish_pending(self, omit_manual_exps: bool = True):
@@ -1993,9 +1950,7 @@ class HelaoSyncer:
             list: A list of pending sequences that were processed and enqueued.
         """
         pending = self.list_pending(omit_manual_exps)
-        self.base.print_message(
-            f"Enqueueing {len(pending)} sequences from RUNS_FINISHED."
-        )
+        LOGGER.debug(f"Enqueueing {len(pending)} sequences from RUNS_FINISHED.")
         for pp in pending:
             if os.path.exists(
                 pp.replace("RUNS_FINISHED", "RUNS_SYNCED").replace(".yml", ".progress")
@@ -2026,12 +1981,10 @@ class HelaoSyncer:
             ValueError: If the provided path is not in the RUNS_SYNCED directory.
         """
         if not os.path.exists(sync_path):
-            self.base.print_message(f"{sync_path} does not exist.")
+            LOGGER.debug(f"{sync_path} does not exist.")
             return False
         if "RUNS_SYNCED" not in sync_path:
-            self.base.print_message(
-                f"Cannot reset path that's not in RUNS_SYNCED: {sync_path}"
-            )
+            LOGGER.debug(f"Cannot reset path that's not in RUNS_SYNCED: {sync_path}")
             return False
         ## if path is a zip
         if sync_path.endswith(".zip"):
@@ -2052,10 +2005,10 @@ class HelaoSyncer:
                 zf.close()
                 if not os.path.exists(sync_path.replace(".zip", ".orig")):
                     shutil.move(sync_path, sync_path.replace(".zip", ".orig"))
-                self.base.print_message(f"Restored zip to {dest}")
+                LOGGER.debug(f"Restored zip to {dest}")
                 return True
             zf.close()
-            self.base.print_message("Zip does not contain a valid sequence.")
+            LOGGER.debug("Zip does not contain a valid sequence.")
             return False
 
         ## if path is a directory
@@ -2084,9 +2037,7 @@ class HelaoSyncer:
             # base_prgs = act_prgs + exp_prgs + seq_prgs
 
             if not base_prgs:
-                self.base.print_message(
-                    f"Did not find any .prg or .progress files in subdirectories of {sync_path}"
-                )
+                LOGGER.debug(f"Did not find any .prg or .progress files in subdirectories of {sync_path}")
                 self.unsync_dir(sync_path)
 
             else:
@@ -2109,9 +2060,7 @@ class HelaoSyncer:
                             os.path.join(base_dir, "**", "*.lock"), recursive=True
                         )
                     ]
-                    self.base.print_message(
-                        f"Removing {len(base_prgs) + len(sub_lock)} prg and progress files in subdirectories of {base_dir}"
-                    )
+                    LOGGER.debug(f"Removing {len(base_prgs) + len(sub_lock)} prg and progress files in subdirectories of {base_dir}")
                     for sp in sub_prgs + sub_lock:
                         os.remove(sp)
 
@@ -2120,17 +2069,13 @@ class HelaoSyncer:
 
             seq_zips = glob(os.path.join(sync_path, "**", "*.zip"), recursive=True)
             if not seq_zips:
-                self.base.print_message(
-                    f"Did not find any zip files in subdirectories of {sync_path}"
-                )
+                LOGGER.debug(f"Did not find any zip files in subdirectories of {sync_path}")
             else:
-                self.base.print_message(
-                    f"Found {len(seq_zips)} zip files in subdirectories of {sync_path}"
-                )
+                LOGGER.debug(f"Found {len(seq_zips)} zip files in subdirectories of {sync_path}")
                 for seq_zip in seq_zips:
                     self.reset_sync(seq_zip)
             return True
-        self.base.print_message("Arg was not a sequence path or zip.")
+        LOGGER.debug("Arg was not a sequence path or zip.")
         return False
 
     def shutdown(self):
