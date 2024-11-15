@@ -54,14 +54,6 @@ from helao.drivers.data.sync_driver import HelaoSyncer
 colorama.init(strip=not sys.stdout.isatty())
 
 
-global DISPATCHER
-
-if dispatcher.DISPATCHER is None:
-    DISPATCHER = dispatcher.Dispatcher()
-else:
-    DISPATCHER = dispatcher.DISPATCHER
-
-
 class Orch(Base):
     """
     Orch class is responsible for orchestrating sequences, experiments, and actions in a distributed system. It manages the lifecycle of these entities, handles exceptions, and communicates with various servers to dispatch and monitor actions.
@@ -305,6 +297,11 @@ class Orch(Base):
             driver_monitor (asyncio.Task): Task for monitoring the action server.
         """
         self.aloop = asyncio.get_running_loop()
+        global DISPATCHER
+        if dispatcher.DISPATCHER is None:
+            DISPATCHER = dispatcher.Dispatcher()
+        else:
+            DISPATCHER = dispatcher.DISPATCHER
         self.aloop.set_exception_handler(self.exception_handler)
         if self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())

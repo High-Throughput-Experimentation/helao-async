@@ -76,12 +76,6 @@ from helao.core.error import ErrorCodes
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
 
-global DISPATCHER
-
-if dispatcher.DISPATCHER is None:
-    DISPATCHER = dispatcher.Dispatcher()
-else:
-    DISPATCHER = dispatcher.DISPATCHER
 
 class Base:
     """
@@ -329,6 +323,11 @@ class Base:
             status_LOGGER (asyncio.Task): The task for logging status.
         """
         self.aloop = asyncio.get_running_loop()
+        global DISPATCHER
+        if dispatcher.DISPATCHER is None:
+            DISPATCHER = dispatcher.Dispatcher()
+        else:
+            DISPATCHER = dispatcher.DISPATCHER
         # produce warnings on coroutines taking longer than interval
         aiodebug.log_slow_callbacks.enable(30.0)
         # dump coroutine stack traces when event loop hangs for longer than interval
