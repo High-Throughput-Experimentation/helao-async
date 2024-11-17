@@ -54,6 +54,8 @@ if __name__ == "__main__":
     server_key = sys.argv[2]
     confArg = sys.argv[1]
     CONFIG = config_loader.config_loader(confArg, helao_root)
+    all_servers_config = CONFIG["servers"]
+    server_config = all_servers_config[server_key]
     log_root = os.path.join(CONFIG["root"], "LOGS") if "root" in CONFIG else None
     if CONFIG.get("alert_config_path", False):
         email_config = yml_load(CONFIG["alert_config_path"])
@@ -64,15 +66,15 @@ if __name__ == "__main__":
             logger_name=server_key,
             log_dir=log_root,
             email_config=email_config,
-            log_level=CONFIG.get("log_level", 20),
+            log_level=server_config.get("log_level", CONFIG.get("log_level", 20)),
         )
     LOGGER = logging.LOGGER
     if config_loader.CONFIG is None:
         config_loader.CONFIG = CONFIG
-    C = CONFIG["servers"]
-    S = C[server_key]
 
-    makeApp = import_module(f"helao.servers.{S['group']}.{S['fast']}").makeApp
+    makeApp = import_module(
+        f"helao.servers.{server_config['group']}.{server_config['fast']}"
+    ).makeApp
     app = makeApp(confArg, server_key, helao_root)
     root = CONFIG.get("root", None)
     if root is not None:
@@ -100,4 +102,10 @@ if __name__ == "__main__":
         log_dir=log_root,
         info=True,
     )
-    fastapp = uvicorn.run(app, host=S["host"], port=S["port"], log_level="warning", timeout_graceful_shutdown=5)
+    fastapp = uvicorn.run(
+        app,
+        host=server_config["host"],
+        port=server_config["port"],
+        log_level="warning",
+        timeout_graceful_shutdown=5,
+    )

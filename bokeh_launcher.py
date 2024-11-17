@@ -59,6 +59,8 @@ if __name__ == "__main__":
     server_key = sys.argv[2]
     confArg = sys.argv[1]
     CONFIG = config_loader.config_loader(confArg, helao_root)
+    all_servers_config = CONFIG["servers"]
+    server_config = all_servers_config[server_key]
     log_root = os.path.join(CONFIG["root"], "LOGS") if "root" in CONFIG else None
     if CONFIG.get("alert_config_path", False):
         email_config = yml_load(CONFIG["alert_config_path"])
@@ -69,19 +71,19 @@ if __name__ == "__main__":
             logger_name=server_key,
             log_dir=log_root,
             email_config=email_config,
-            log_level=CONFIG.get("log_level", 20),
+            log_level=server_config.get("log_level", CONFIG.get("log_level", 20)),
         )
     LOGGER = logging.LOGGER
     if config_loader.CONFIG is None:
         config_loader.CONFIG = CONFIG
-    C = CONFIG["servers"]
-    S = C[server_key]
-    servHost = S["host"]
-    servPort = S["port"]
-    servPy = S["bokeh"]
-    launch_browser = S.get("params", {}).get("launch_browser", False)
+    servHost = server_config["host"]
+    servPort = server_config["port"]
+    servPy = server_config["bokeh"]
+    launch_browser = server_config.get("params", {}).get("launch_browser", False)
 
-    makeApp = import_module(f"helao.servers.{S['group']}.{S['bokeh']}").makeBokehApp
+    makeApp = import_module(
+        f"helao.servers.{server_config['group']}.{server_config['bokeh']}"
+    ).makeBokehApp
     root = CONFIG.get("root", None)
     if root is not None:
         log_root = os.path.join(root, "LOGS")
