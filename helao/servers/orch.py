@@ -1145,8 +1145,9 @@ class Orch(Base):
             actserv_exists, _ = await endpoints_available([A.url])
             if not actserv_exists:
                 stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
-                self.stop_message = stop_message
+                self.current_stop_message = stop_message
                 await self.stop()
+                LOGGER.alert(f"ORCH STOPPED ~ {stop_message}")
                 self.action_dq.insert(0, A)
                 await self.update_operator(True)
                 return ErrorCodes.none
@@ -1186,7 +1187,7 @@ class Orch(Base):
                     ),
                 ]:
                     if cond:
-                        self.stop_message = stop_message
+                        self.current_stop_message = stop_message
                         await self.stop()
                         self.print_message(f"Re-queuing {A.action_name}")
                         self.action_dq.insert(0, A)
@@ -2414,6 +2415,7 @@ class Orch(Base):
                         f"{', '.join(bad_serves)} servers are unavailable"
                     )
                     await self.stop()
+                    LOGGER.alert(f"ORCH STOPPED ~ {self.current_stop_message}")
                     await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
 
