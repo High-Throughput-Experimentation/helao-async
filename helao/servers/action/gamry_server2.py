@@ -225,9 +225,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         SetStopAtDelayDIMax: Optional[int] = None,
         SetStopAtDelayADIMin: Optional[int] = None,
         SetStopAtDelayADIMax: Optional[int] = None,
-        alertThreshI_A: float = 0,
         alert_duration__s: float = -1,
+        alert_above: bool = True,
         alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
     ):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)
         use 4bit bitmask for triggers
@@ -261,9 +262,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         SetStopAtDelayXMax: Optional[
             int
         ] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
-        alertThreshI_A: float = 0,
         alert_duration__s: float = -1,
+        alert_above: bool = True,
         alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -298,9 +300,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         SetStopAtDelayXMax: Optional[
             int
         ] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
-        alertThreshEwe_V: float = 0,
         alert_duration__s: float = -1,
+        alert_above: bool = True,
         alert_sleep__s: float = -1,
+        alertThreshEwe_V: float = 0,
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -338,9 +341,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         SetStopAtDelayIMax: Optional[
             int
         ] = None,  # number of consecutive points above SetStopIMax to trigger early stopping
-        alertThreshI_A: float = 0,
         alert_duration__s: float = -1,
+        alert_above: bool = True,
         alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
@@ -368,9 +372,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         IErange: model_ierange = "auto",
         SetStopADVMin: Optional[float] = None,
         SetStopADVMax: Optional[float] = None,
-        alertThreshEwe_V: float = 0,
         alert_duration__s: float = -1,
+        alert_above: bool = True,
         alert_sleep__s: float = -1,
+        alertThreshEwe_V: float = 0,
     ):
         """mesasures open circuit potential
         use 4bit bitmask for triggers
@@ -395,9 +400,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        alertThreshI_A: float = 0,
         alert_duration__s: float = -1,
+        alert_above: bool = True,
         alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
     ):
         """Measure pulsed voltammetry"""
         active = await app.base.setup_and_contain_action()
