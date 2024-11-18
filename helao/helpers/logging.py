@@ -126,8 +126,9 @@ def make_logger(
         )
         email_handler.setLevel(ALERT_LEVEL)
         email_handler.setFormatter(formatter)
-        logger_instance.addHandler(email_handler)
-        # queue_listener = QueueListener(email_queue, email_handler)
+        # logger_instance.addHandler(email_handler)
+        queue_listener = QueueListener(email_queue, email_handler)
+        queue_listener.start()
         logger_instance.info(f"Email alerts enabled at log level: {ALERT_LEVEL}")
     else:
         logger_instance.info(f"Email alerts not enabled using config: {email_config}")
