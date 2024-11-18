@@ -36,6 +36,13 @@ from pathlib import Path
 
 LOGGER = None
 
+class TitledSMTPHandler(SMTPHandler):
+    def getSubject(self, record):
+        if '~' in record.message:
+            title = record.message.split("~")[0].strip()
+        else:
+            title = record.message.split()[0].strip()
+        return f"{record.levelname} - {title}"
 
 def make_logger(
     logger_name: Optional[str] = None,
@@ -104,7 +111,7 @@ def make_logger(
         ]
     print(email_conditions)
     if all(email_conditions):
-        email_handler = SMTPHandler(
+        email_handler = TitledSMTPHandler(
             mailhost=(mailhost, mailport),
             fromaddr=fromaddr,
             toaddrs=recipients,
