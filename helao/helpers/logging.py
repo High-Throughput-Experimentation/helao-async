@@ -88,7 +88,7 @@ def make_logger(
     console = logging.StreamHandler()
     console.setFormatter(colored_formatter)
     timed_rotation = TimedRotatingFileHandler(
-        filename=log_path, when="D", interval=1, backupCount=14
+        filename=log_path, when="D", interval=1, backupCount=90
     )
     timed_rotation.setFormatter(formatter)
 
@@ -109,7 +109,7 @@ def make_logger(
             x is not None
             for x in [mailhost, mailport, fromaddr, username, password, recipients]
         ]
-    print(email_conditions)
+    # print(email_conditions)
     if all(email_conditions):
         email_queue = Queue(-1)
         queue_handler = QueueHandler(email_queue)
