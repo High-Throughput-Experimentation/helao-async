@@ -51,13 +51,13 @@ class TitledSMTPHandler(SMTPHandler):
         return f"{record.levelname} - {title}"
 
 
-class TitledQueueHandler(QueueHandler):
-    def getSubject(self, record):
-        if "~" in record.message:
-            title = record.message.split("~")[0].strip()
-        else:
-            title = record.message.split()[0].strip()
-        return f"{record.levelname} - {title}"
+# class TitledQueueHandler(QueueHandler):
+#     def getSubject(self, record):
+#         if "~" in record.message:
+#             title = record.message.split("~")[0].strip()
+#         else:
+#             title = record.message.split()[0].strip()
+#         return f"{record.levelname} - {title}"
 
 
 def make_logger(
@@ -128,9 +128,9 @@ def make_logger(
     # print(email_conditions)
     if all(email_conditions):
         email_queue = Queue(-1)
-        queue_handler = TitledQueueHandler(email_queue)
+        queue_handler = QueueHandler(email_queue)
         queue_handler.setLevel(ALERT_LEVEL)
-        queue_handler.setFormatter(formatter)
+        # queue_handler.setFormatter(formatter)
         logger_instance.addHandler(queue_handler)
         email_handler = TitledSMTPHandler(
             mailhost=(mailhost, mailport),
