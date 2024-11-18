@@ -93,7 +93,7 @@ class BiologicExec(Executor):
                 self.ttl_params["ttl"] = "in"
 
             self.alert_params = {
-                k: self.active.action.action_params.get(k, False)
+                k: self.active.action.action_params.get(k, None)
                 for k in (
                     "alertThreshEwe_V",
                     "alertThreshI_A",
