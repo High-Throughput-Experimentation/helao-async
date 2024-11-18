@@ -237,6 +237,10 @@ async def biologic_dyn_endpoints(app=None):
         TTLwait: int = -1,
         TTLsend: int = -1,
         TTLduration: float = 1.0,
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -266,6 +270,10 @@ async def biologic_dyn_endpoints(app=None):
         TTLwait: int = -1,
         TTLsend: int = -1,
         TTLduration: float = 1.0,
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshEwe_V: float = 0,
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -298,6 +306,10 @@ async def biologic_dyn_endpoints(app=None):
         TTLwait: int = -1,
         TTLsend: int = -1,
         TTLduration: float = 1.0,
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
