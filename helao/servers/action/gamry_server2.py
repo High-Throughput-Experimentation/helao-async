@@ -87,7 +87,7 @@ class GamryExec(Executor):
                 k: self.action_params.get(k, -1) for k in ("TTLwait", "TTLsend")
             }
             self.alert_params = {
-                k: self.action_params.get(k, False)
+                k: self.action_params.get(k, None)
                 for k in (
                     "alertThreshEwe_V",
                     "alertThreshI_A",
