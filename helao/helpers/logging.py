@@ -92,6 +92,7 @@ def make_logger(
         logger_instance.addHandler(handler)
 
     mailhost = email_config.get("mailhost", None)
+    mailport = email_config.get("mailport", None)
     fromaddr = email_config.get("fromaddr", None)
     username = email_config.get("username", None)
     password = email_config.get("password", None)
@@ -100,11 +101,11 @@ def make_logger(
     if all(
         [
             x is not None
-            for x in [mailhost, fromaddr, username, password, recipients]
+            for x in [mailhost, mailport, fromaddr, username, password, recipients]
         ]
     ):
         email_handler = SMTPHandler(
-            mailhost=mailhost,
+            mailhost=(mailhost, mailport),
             fromaddr=fromaddr,
             toaddrs=recipients,
             subject=subject,
