@@ -76,7 +76,7 @@ def make_logger(
             "ERROR": "light_red",
             "CRITICAL": "red,bg_white",
             "ALERT": "light_purple",
-        red
+        },
         secondary_log_colors={},
         style="%",
     )
