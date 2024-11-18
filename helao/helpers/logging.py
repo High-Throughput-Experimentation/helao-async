@@ -102,6 +102,7 @@ def make_logger(
             x is not None
             for x in [mailhost, mailport, fromaddr, username, password, recipients]
         ]
+    print(email_conditions)
     if all(email_conditions):
         email_handler = SMTPHandler(
             mailhost=(mailhost, mailport),
