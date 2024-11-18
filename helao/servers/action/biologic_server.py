@@ -101,6 +101,7 @@ class BiologicExec(Executor):
                     "alert_sleep__s",
                 )
             }
+            self.last_alert_time = 0
 
             LOGGER.info("BiologicExec initialized.")
         except Exception:
@@ -145,23 +146,28 @@ class BiologicExec(Executor):
                 self.data_buffer[k].extend(v)
                 data_length = len(v)
             # check for alert thresholds at this point in data_buffer
-            min_duration = self.alert_params["alert_duration__s"]
-            if min_duration > 0 and self.data_buffer.get("t_s", [-1])[-1] > min_duration:
-                time_buffer = self.data_buffer["t_s"]
-                idx = 1
-                latest_t = time_buffer[-1]
-                slice_duration = latest_t - time_buffer[-idx]
-                while (len(time_buffer) > idx) and (slice_duration < min_duration):
-                    idx += 1
-                if slice_duration >= min_duration:
-                    for thresh_key in ("Ewe_V", "I_A"):
-                        thresh_val = self.alert_params.get(f"alertThresh{thresh_key}", None)
-                        slice_val = self.data_buffer[thresh_key][-idx]
-                        if thresh_val is not None:
-                            if all([x > thresh_val for x in slice_val]) and self.alert_params["alert_above"]:
-                                LOGGER.alert(f"{thresh_key} went above {thresh_val} for {min_duration}")
-                            if all([x < thresh_val for x in slice_val]) and not self.alert_params["alert_above"]:
-                                LOGGER.alert(f"{thresh_key} went below {thresh_val} for {min_duration}")
+            single_alert = self.alert_params["alert_sleep__s"] <= 0 and self.last_alert_time == 0
+            poll_iter_time = time.time()
+            if single_alert or poll_iter_time - self.last_alert_time > self.alert_params['alert_sleep__s']:
+                min_duration = self.alert_params["alert_duration__s"]
+                if min_duration > 0 and self.data_buffer.get("t_s", [-1])[-1] > min_duration:
+                    time_buffer = self.data_buffer["t_s"]
+                    idx = 1
+                    latest_t = time_buffer[-1]
+                    slice_duration = latest_t - time_buffer[-idx]
+                    while (len(time_buffer) > idx) and (slice_duration < min_duration):
+                        idx += 1
+                    if slice_duration >= min_duration:
+                        for thresh_key in ("Ewe_V", "I_A"):
+                            thresh_val = self.alert_params.get(f"alertThresh{thresh_key}", None)
+                            slice_val = self.data_buffer[thresh_key][-idx]
+                            if thresh_val is not None:
+                                if all([x > thresh_val for x in slice_val]) and self.alert_params["alert_above"]:
+                                    LOGGER.alert(f"{thresh_key} went above {thresh_val} for {min_duration}")
+                                    self.last_alert_time = poll_iter_time
+                                elif all([x < thresh_val for x in slice_val]) and not self.alert_params["alert_above"]:
+                                    LOGGER.alert(f"{thresh_key} went below {thresh_val} for {min_duration}")
+                                    self.last_alert_time = poll_iter_time
             if data_length:
                 self.data_buffer["channel"].extend(data_length * [self.channel])
                 resp.data.update({"channel": data_length * [self.channel]})
