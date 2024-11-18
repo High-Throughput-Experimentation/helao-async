@@ -20,7 +20,7 @@ __all__ = [
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="hispec_exp_standalone")
+    logger = logging.make_logger(__file__)
 else:
     logger = logging.LOGGER
 

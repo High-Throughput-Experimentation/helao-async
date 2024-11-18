@@ -10,7 +10,7 @@ from helao.core.version import get_filehash
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="import_sequences_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 

@@ -1,6 +1,11 @@
 import sys
 import asyncio
 from helao.helpers.dispatcher import async_private_dispatcher
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 HOST = "127.0.0.1"
 PORT = 8011
@@ -21,8 +26,8 @@ async def main():
     ) for _ in range(NUM_JOBS)]
 
     re_tups = await asyncio.gather(*tasks)
-    print([err for resp, err in re_tups])
-    print('main done')
+    LOGGER.info([err for resp, err in re_tups])
+    LOGGER.info('main done')
     sys.exit(0)
 
 

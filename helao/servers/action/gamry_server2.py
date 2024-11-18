@@ -43,7 +43,7 @@ from helao.drivers.pstat.gamry.technique import (
 
 global LOGGER
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="gamry_server_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 

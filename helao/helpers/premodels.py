@@ -30,7 +30,7 @@ from helao.core.models.action_start_condition import ActionStartCondition
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="default_premodels")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 

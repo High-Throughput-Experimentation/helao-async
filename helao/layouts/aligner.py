@@ -27,6 +27,11 @@ from bokeh.events import ButtonClick, DoubleTap, MouseWheel, Pan
 from bokeh.layouts import gridplot
 from bokeh.models.widgets import FileInput
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 from helao.core.models.data import DataModel
@@ -81,7 +86,7 @@ class Aligner:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def cleanup_session(self, session_context):
-        self.vis.print_message("Aligner Bokeh session closed", info=True)
+        LOGGER.info("Aligner Bokeh session closed")
         self.IOloop_run = False
         self.IOtask.cancel()
 
@@ -873,10 +878,10 @@ class Aligner:
                 new_matrix = np.matrix(json.loads(filecontent))
             except Exception as e:
                 tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.vis.print_message(f"error loading matrix {repr(e), tb,}", error=True)
+                LOGGER.error(f"error loading matrix ", exc_info=True)
                 new_matrix = self.motor.dflt_matrix
 
-            self.vis.print_message(f"loaded matrix \n'{new_matrix}'")
+            LOGGER.info(f"loaded matrix \n'{new_matrix}'")
             self.motor.update_plate_transfermatrix(newtransfermatrix=new_matrix)
         else:
             self.vis.doc.add_next_tick_callback(
@@ -929,8 +934,8 @@ class Aligner:
         motorxy = self.g_motor_position  # gets the displayed position
         # (4) add new motorxy to motor point list
         self.calib_ptsmotor.append(motorxy)
-        self.vis.print_message(f"motorxy: {motorxy}")
-        self.vis.print_message(f"platexy: {self.MarkerXYplate[selMarker]}")
+        LOGGER.info(f"motorxy: {motorxy}")
+        LOGGER.info(f"platexy: {self.MarkerXYplate[selMarker]}")
         self.vis.doc.add_next_tick_callback(
             partial(
                 self.update_status,
@@ -1168,7 +1173,7 @@ class Aligner:
                 transformation=TransformationModes.platexy,
             )
         elif self.motor.motor_busy:
-            self.vis.print_message("motor is busy", error=True)
+            LOGGER.error("motor is busy")
 
     async def motor_getxy(self):
         """gets current motor position from alignment server"""
@@ -1262,14 +1267,14 @@ class Aligner:
         # select the correct alignment procedure
         if len(validpts) == 3:
             # Three point alignment
-            self.vis.print_message("3P alignment")
+            LOGGER.info("3P alignment")
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_status, "3P alignment")
             )
             M = self.align_3p(platepts, motorpts)
         elif len(validpts) == 2:
             # Two point alignment
-            self.vis.print_message("2P alignment")
+            LOGGER.info("2P alignment")
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_status, "2P alignment")
             )
@@ -1283,14 +1288,14 @@ class Aligner:
             )
         elif len(validpts) == 1:
             # One point alignment
-            self.vis.print_message("1P alignment")
+            LOGGER.info("1P alignment")
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_status, "1P alignment")
             )
             M = self.align_1p([platepts[validpts[0]]], [motorpts[validpts[0]]])
         else:
             # No alignment
-            self.vis.print_message("0P alignment")
+            LOGGER.info("0P alignment")
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_status, "0P alignment")
             )
@@ -1299,7 +1304,7 @@ class Aligner:
         M = self.motor.transform.get_Mplate_Msystem(Mxy=M)
 
         self.plate_transfermatrix = self.cutoffdigits(M, self.cutoff)
-        self.vis.print_message("new TransferMatrix:")
+        LOGGER.info("new TransferMatrix:")
         self.vis.print_message(M)
 
         self.vis.doc.add_next_tick_callback(partial(self.update_TranferMatrixdisplay))
@@ -1327,7 +1332,7 @@ class Aligner:
     def align_3p(self, xyplate, xymotor):
         """Three point alignment"""
 
-        self.vis.print_message("Solving: xyMotor = M * xyPlate")
+        LOGGER.info("Solving: xyMotor = M * xyPlate")
         # can calculate the full transfer matrix
         # A = M*B --> M = A*B-1
         # A .. xymotor
@@ -1347,8 +1352,8 @@ class Aligner:
             ]
         )
         # solve linear system of equations
-        self.vis.print_message(f"xyMotor:\n {A}")
-        self.vis.print_message(f"xyPlate:\n {B}")
+        LOGGER.info(f"xyMotor:\n {A}")
+        LOGGER.info(f"xyPlate:\n {B}")
 
         try:
             M = np.dot(A, B.I)
@@ -1358,7 +1363,7 @@ class Aligner:
             # (previous function removes all duplicate xyplate points)
             # but can still produce a not valid Matrix
             # as xymotor plates might not be unique/faulty
-            self.vis.print_message(f"Matrix singular {repr(e), tb,}", error=True)
+            LOGGER.error(f"Matrix singular ", exc_info=True)
             M = TransferMatrix
         return M
 
@@ -1500,7 +1505,7 @@ class Aligner:
                         1,
                     ]  # dim needs to be always + 1 for later transformations
 
-                    self.vis.print_message(f"Motor :{self.g_motor_position}", info=True)
+                    LOGGER.info(f"Motor :{self.g_motor_position}")
                 elif "motor_status" in msg:
                     if all(status == "stopped" for status in msg["motor_status"]):
                         self.g_motor_ismoving = False
@@ -1510,7 +1515,7 @@ class Aligner:
                 self.motorpos_q.task_done()
             except Exception as e:
                 tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.vis.print_message(f"aligner IOloop error: {repr(e), tb,}", error=True)
+                LOGGER.error(f"aligner IOloop error: ", exc_info=True)
 
     def IOloop_helper(self):
         self.motor_readxmotor_text.value = (str)(self.g_motor_position[0])
@@ -1529,7 +1534,7 @@ class Aligner:
             tmpplate = self.motor.transform.transform_motorxy_to_platexy(
                 motorxy=self.g_motor_position
             )
-            self.vis.print_message(f"Plate: {tmpplate}", info=True)
+            LOGGER.info(f"Plate: {tmpplate}")
 
             # update cell marker position in plot
             self.markerdata.data = {"x0": [tmpplate[0]], "y0": [tmpplate[1]]}

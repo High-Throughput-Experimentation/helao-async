@@ -17,7 +17,7 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="yml_finisher_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 

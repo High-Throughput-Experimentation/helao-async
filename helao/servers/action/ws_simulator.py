@@ -16,6 +16,12 @@ from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import SampleUnion
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 from helao.servers.base import Base, Executor
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
@@ -36,7 +42,7 @@ class WsSim:
 
     async def poll_data_loop(self, frequency_hz: float = 10):
         waittime = 1.0 / frequency_hz
-        self.base.print_message("Starting polling loop")
+        LOGGER.info("Starting polling loop")
         while True:
             data_msg = {k: v * np.random.uniform() for k, v in self.scale_map.items()}
             await self.base.put_lbuf({"sim_dict": data_msg})
@@ -48,7 +54,7 @@ class WsSim:
 class WsExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("WsExec initialized.")
+        LOGGER.info("WsExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 

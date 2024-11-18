@@ -24,6 +24,11 @@ import re
 from enum import Enum
 import json
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 from helao.servers.base import Base, Active
 from helao.core.error import ErrorCodes
@@ -56,12 +61,6 @@ from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.helpers.premodels import Action
 from helao.helpers.update_sample_vol import update_vol
 
-from helao.helpers import logging
-
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="archive_driver_standalone")
-else:
-    LOGGER = logging.LOGGER
 
 class ScanDirection(str, Enum):
     raster_rows = "raster_rows"
@@ -102,21 +101,14 @@ class Archive:
         # get some empty db dicts from default config
 
         self.startup_positions = self.action_startup_config()
-        self.base.print_message(
-            f"Config trays_dict has {len(self.startup_positions.trays_dict)} keys"
-        )
+        LOGGER.info(f"Config trays_dict has {len(self.startup_positions.trays_dict)} keys")
         # compare default config to backup
 
         try:
             self.positions = self.load_config()
-            self.base.print_message(
-                f"Archive json has {len(self.positions.trays_dict)} keys"
-            )
+            LOGGER.info(f"Archive json has {len(self.positions.trays_dict)} keys")
         except IOError:
-            self.base.print_message(
-                f"'{self.archivejson}' does not exist, writing empty global dict.",
-                error=True,
-            )
+            LOGGER.error(f"'{self.archivejson}' does not exist, writing empty global dict.")
             self.write_config()
         # except Exception:
         # print_message(LOGGER, "launcher", f"Error loading '{pidFile}', writing empty global dict.", error = True)
@@ -127,16 +119,14 @@ class Archive:
         if len(self.positions.trays_dict) == len(self.startup_positions.trays_dict):
             for i, tray in self.positions.trays_dict.items():
                 if i not in self.startup_positions.trays_dict:
-                    self.base.print_message(
-                        f"tray key {i} from archive.json does not match config"
-                    )
+                    LOGGER.info(f"tray key {i} from archive.json does not match config")
                     failed = True
                     break
                 else:
                     if len(tray) == len(self.startup_positions.trays_dict[i]):
                         for slot in tray:
                             if slot not in self.startup_positions.trays_dict[i]:
-                                self.base.print_message("slot not present", error=True)
+                                LOGGER.error("slot not present")
                                 failed = True
                                 break
                             else:
@@ -144,27 +134,23 @@ class Archive:
                                     tray[slot],
                                     type(self.startup_positions.trays_dict[i][slot]),
                                 ):
-                                    self.base.print_message(
-                                        "not the same slot type", error=True
-                                    )
+                                    LOGGER.error("not the same slot type")
                                     failed = True
                                     break
 
                     else:
-                        self.base.print_message(
-                            "tray has not the same length", error=True
-                        )
+                        LOGGER.error("tray has not the same length")
                         failed = True
                         break
         else:
-            self.base.print_message("not the same length", error=True)
+            LOGGER.error("not the same length")
             failed = True
 
         if failed:
-            self.base.print_message("trays did not match", error=True)
+            LOGGER.error("trays did not match")
             self.positions.trays_dict = deepcopy(self.startup_positions.trays_dict)
         else:
-            self.base.print_message("trays matched", info=True)
+            LOGGER.info("trays matched")
 
         # check custom positions
         failed = False
@@ -183,10 +169,10 @@ class Archive:
             failed = True
 
         if failed:
-            self.base.print_message("customs did not match", error=True)
+            LOGGER.error("customs did not match")
             self.positions.customs_dict = deepcopy(self.startup_positions.customs_dict)
         else:
-            self.base.print_message("customs matched", info=True)
+            LOGGER.info("customs matched")
             # update all samples in tray and custom positions
             self.write_config()
             asyncio.gather(self.update_samples_from_db())
@@ -198,15 +184,13 @@ class Archive:
 
         pattern = re.compile("([a-zA-Z]+)([0-9]+)")
         if self.position_config is not None:
-            self.base.print_message("Loading positions defined in config.", info=True)
+            LOGGER.info("Loading positions defined in config.")
             for key, val in self.position_config.items():
                 key = key.lower()
                 test = pattern.match(key)
                 if test is None:
                     if key == "custom":
-                        self.base.print_message(
-                            "Custom position defined in config.", info=True
-                        )
+                        LOGGER.info("Custom position defined in config.")
                         for custom_name, custom_type in val.items():
                             positions.customs_dict.update(
                                 {
@@ -230,9 +214,7 @@ class Archive:
                                 elif slot == "slot3":
                                     slot_no = 3
                                 else:
-                                    self.base.print_message(
-                                        f"unknown slot item '{slot}'", error=True
-                                    )
+                                    LOGGER.error(f"unknown slot item '{slot}'")
                                     continue
 
                                 if slot_no is not None:
@@ -240,7 +222,7 @@ class Archive:
                                         positions.trays_dict[tmpi] = {}
 
                                     if slot_item is not None:
-                                        self.base.print_message(f"got {slot_item}")
+                                        LOGGER.info(f"got {slot_item}")
                                         if slot_item == "VT54":
                                             positions.trays_dict[tmpi][slot_no] = VT54()
                                         elif slot_item == "VT15":
@@ -249,15 +231,12 @@ class Archive:
                                             positions.trays_dict[tmpi][slot_no] = VT70()
 
                                         else:
-                                            self.base.print_message(
-                                                f"slot type {slot_item} not supported",
-                                                error=True,
-                                            )
+                                            LOGGER.error(f"slot type {slot_item} not supported")
                                             positions.trays_dict[tmpi][slot_no] = None
                                     else:
                                         positions.trays_dict[tmpi][slot_no] = None
-        self.base.print_message(f"trays: {positions.trays_dict}")
-        self.base.print_message(f"customs: {positions.customs_dict}")
+        LOGGER.info(f"trays: {positions.trays_dict}")
+        LOGGER.info(f"customs: {positions.customs_dict}")
         return positions  # trays_dict, custom_positions
 
     def load_config(self):
@@ -270,9 +249,7 @@ class Archive:
                     tb = "".join(
                         traceback.format_exception(type(e), e, e.__traceback__)
                     )
-                    self.base.print_message(
-                        f"error loading {self.archivejson}: {repr(e), tb,}", error=True
-                    )
+                    LOGGER.error(f"error loading {self.archivejson}: {repr(e), tb,}")
                     return Positions()
         #         data = pickle.load(f)
         #         self.positions.trays_dict = data.get("trays", [])
@@ -291,10 +268,10 @@ class Archive:
         #         pickle.dump(data, f)
 
     async def update_samples_from_db(self):
-        self.base.print_message("Updating all samples in position table.", info=True)
+        LOGGER.info("Updating all samples in position table.")
         # need to wait for the db to finish initializing
         while not self.unified_db.ready:
-            self.base.print_message("db not ready", info=True)
+            LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
 
         # first update all custom position samples
@@ -334,10 +311,7 @@ class Archive:
                 if _sample:
                     sample = _sample[0]
             else:
-                self.base.print_message(
-                    f"Bug found: reference sample was saved in archive.json file: {sample}",
-                    error=True,
-                )
+                LOGGER.error(f"Bug found: reference sample was saved in archive.json file: {sample}")
 
         return sample
 
@@ -568,9 +542,7 @@ class Archive:
             )
 
             samplelist = [v for _, v in sampletups]
-            self.base.print_message(
-                f"Found {len(samplelist)} vials on tray {tray}, slot {slot}. Exporting csv."
-            )
+            LOGGER.info(f"Found {len(samplelist)} vials on tray {tray}, slot {slot}. Exporting csv.")
 
             headerline = ";".join(
                 [
@@ -595,9 +567,7 @@ class Archive:
                 file_type="pal_icpms_file", file_path=csv_path, samples=samplelist
             )
         else:
-            self.base.print_message(
-                f"Slot {slot} not found in positions dict. Cannot export."
-            )
+            LOGGER.info(f"Slot {slot} not found in positions dict. Cannot export.")
 
     async def tray_query_sample(
         self, tray: int = None, slot: int = None, vial: int = None
@@ -661,9 +631,7 @@ class Archive:
                                         position
                                     ] = True
 
-            self.base.print_message(
-                f"new vial nr. {new_vial} in slot {new_slot} in tray {new_tray}"
-            )
+            LOGGER.info(f"new vial nr. {new_vial} in slot {new_slot} in tray {new_tray}")
             return {"tray": new_tray, "slot": new_slot, "vial": new_vial}
 
     async def tray_get_next_full(
@@ -1090,9 +1058,7 @@ class Archive:
                 for part in sample.parts:
                     if part.sample_type == SampleType.assembly:
                         # recursive unpacking
-                        self.base.print_message(
-                            "assembly contains an assembly", info=True
-                        )
+                        LOGGER.info("assembly contains an assembly")
                         (
                             tmp_samples_in,
                             tmp_samples_out,
@@ -1148,12 +1114,12 @@ class Archive:
         samples: List[SampleUnion] = []
 
         if action is None:
-            self.base.print_message("no action defined", error=True)
+            LOGGER.error("no action defined")
             error = ErrorCodes.critical
             return error, samples
 
         if not samples_in:
-            self.base.print_message("no samples_in to create samples_out", error=True)
+            LOGGER.error("no samples_in to create samples_out")
             error = ErrorCodes.not_available
             return error, []
 
@@ -1176,11 +1142,11 @@ class Archive:
             )
 
         source = [sample.get_global_label() for sample in samples_in]
-        self.base.print_message(f"source_global_label: '{source}'")
-        self.base.print_message(f"source_chemical: {source_chemical}")
-        self.base.print_message(f"source_partial_molarity: {source_partial_molarity}")
-        self.base.print_message(f"source_supplier: {source_supplier}")
-        self.base.print_message(f"source_lotnumber: {source_lotnumber}")
+        LOGGER.info(f"source_global_label: '{source}'")
+        LOGGER.info(f"source_chemical: {source_chemical}")
+        LOGGER.info(f"source_partial_molarity: {source_partial_molarity}")
+        LOGGER.info(f"source_supplier: {source_supplier}")
+        LOGGER.info(f"source_lotnumber: {source_lotnumber}")
 
         sample_dict = {
             "action_uuid": [action.action_uuid],
@@ -1211,10 +1177,7 @@ class Archive:
                 samples.append(AssemblySample(**sample_dict))
 
             else:
-                self.base.print_message(
-                    f"samples_out type {sample_out_type} is not supported yet.",
-                    error=True,
-                )
+                LOGGER.error(f"samples_out type {sample_out_type} is not supported yet.")
                 error = ErrorCodes.not_available
 
         elif len(samples_in) > 1:
@@ -1223,10 +1186,7 @@ class Archive:
                 all(sample.sample_type == SampleType.liquid for sample in samples_in)
                 and combine_liquids
             ):
-                self.base.print_message(
-                    f"combining liquids '{source}' into new liquid reference",
-                    info=True,
-                )
+                LOGGER.info(f"combining liquids '{source}' into new liquid reference")
                 sample_dict.update({"parts": samples_in})
                 samples.append(LiquidSample(**sample_dict))
 
@@ -1236,7 +1196,7 @@ class Archive:
 
         else:
             # this should never happen, else we found a bug
-            self.base.print_message("found a BUG in new_ref_samples", error=True)
+            LOGGER.error("found a BUG in new_ref_samples")
             error = ErrorCodes.bug
 
         return error, samples
@@ -1269,19 +1229,16 @@ class Archive:
             samples_in = await self.unified_db.get_samples(samples=[source_liquid_in])
 
             if not samples_in:
-                self.base.print_message(
-                    f"source_liquid_in '{source_liquid_in}' is not in db",
-                    error=True,
-                )
+                LOGGER.error(f"source_liquid_in '{source_liquid_in}' is not in db")
                 error = ErrorCodes.no_sample
                 return error, [], []
 
         if samples_in[0].sample_type != SampleType.liquid:
-            self.base.print_message("Not a liquid Sample", error=True)
+            LOGGER.error("Not a liquid Sample")
             return ErrorCodes.not_allowed, [], []
 
         if samples_in[0].volume_ml < volume_ml:
-            self.base.print_message("Not enough volume available", error=True)
+            LOGGER.error("Not enough volume available")
             return ErrorCodes.not_available, [], []
 
         samples_in[0].inheritance = SampleInheritance.give_only
@@ -1294,7 +1251,7 @@ class Archive:
         # and get sample from custom position
         if custom in self.positions.customs_dict:
             custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
-            self.base.print_message(f"custom sample in valid position: {custom_sample}")
+            LOGGER.info(f"custom sample in valid position: {custom_sample}")
         else:
             error = ErrorCodes.not_available
             return error, [], []
@@ -1305,15 +1262,13 @@ class Archive:
                 samples=[custom_sample]
             )
             if not custom_samples_in:
-                self.base.print_message("invalid sample in custom position", error=True)
+                LOGGER.error("invalid sample in custom position")
                 error = ErrorCodes.critical
                 return error, [], []
             else:
                 custom_sample = custom_samples_in[0]
 
-        self.base.print_message(
-            f"sample in custom position '{custom}' is {custom_sample.exp_dict()}"
-        )
+        LOGGER.info(f"sample in custom position '{custom}' is {custom_sample.exp_dict()}")
 
         # (4) create a new ref sample first for the amount we
         # take from samples_in
@@ -1362,10 +1317,7 @@ class Archive:
             )
 
             if not replaced:
-                self.base.print_message(
-                    "could not replace sample with assembly when adding liquid",
-                    error=True,
-                )
+                LOGGER.error("could not replace sample with assembly when adding liquid")
                 error = ErrorCodes.critical
 
         # (5-2)
@@ -1418,10 +1370,7 @@ class Archive:
 
             if not samples_out2:
                 # reference could not be converted to a real sample
-                self.base.print_message(
-                    "could not convert reference assembly to real assembly",
-                    error=True,
-                )
+                LOGGER.error("could not convert reference assembly to real assembly")
                 return ErrorCodes.critical, [], []
 
             # add new reference to samples out list
@@ -1432,10 +1381,7 @@ class Archive:
                 custom=custom, sample=samples_out2[0]
             )
             if not replaced:
-                self.base.print_message(
-                    "could not replace sample with assembly when adding liquid",
-                    error=True,
-                )
+                LOGGER.error("could not replace sample with assembly when adding liquid")
                 return ErrorCodes.critical, [], []
 
         # (5-2b) liquid + assembly case
@@ -1465,7 +1411,7 @@ class Archive:
 
             new_assembly_parts = []
 
-            self.base.print_message("recovering parts from assembly")
+            LOGGER.info("recovering parts from assembly")
             if loaded_liquid:
                 # create a new liquid mixture
                 error, new_liquid_mixture = await self.new_ref_samples(
@@ -1492,23 +1438,23 @@ class Archive:
                 # set inheritance and status for sample transfered out of source_liquid_in
                 samples_out[0].inheritance = SampleInheritance.allow_both
                 samples_out[0].status.append(SampleStatus.merged)
-                self.base.print_message("liquid recovered")
+                LOGGER.info("liquid recovered")
             if loaded_solid:
                 new_assembly_parts.append(loaded_solid[0])
-                self.base.print_message("solid recovered")
+                LOGGER.info("solid recovered")
             if loaded_gas:
                 new_assembly_parts.append(loaded_gas[0])
-                self.base.print_message("gas recovered")
+                LOGGER.info("gas recovered")
 
             # old assembly, mark as incorporated
             custom_sample.status = [SampleStatus.recovered]
-            self.base.print_message("old assembly status set to recovered")
+            LOGGER.info("old assembly status set to recovered")
 
             # add the old assembly to the samples_in which already contains source_liquid_in
             samples_in.append(custom_sample)
             samples_in_initial.append(deepcopy(custom_sample))
 
-            self.base.print_message("creating new assembly reference")
+            LOGGER.info("creating new assembly reference")
             # create a new ref sample for new assembly
             error, ref_samples_out2 = await self.new_ref_samples(
                 # input for assembly is the custom sample
@@ -1518,20 +1464,17 @@ class Archive:
                 sample_position=custom,
                 action=action,
             )
-            self.base.print_message("new assembly was successfully created")
+            LOGGER.info("new assembly was successfully created")
             ref_samples_out2[0].sample_position = custom
 
             # a reference assembly was successfully created
             # convert it now to a real sample
-            self.base.print_message("adding new assembly to sqlite db")
+            LOGGER.info("adding new assembly to sqlite db")
             samples_out2 = await self.unified_db.new_samples(samples=ref_samples_out2)
 
             if not samples_out2:
                 # reference could not be converted to a real sample
-                self.base.print_message(
-                    "could not convert reference assembly to real assembly",
-                    error=True,
-                )
+                LOGGER.error("could not convert reference assembly to real assembly")
                 return ErrorCodes.critical, [], []
 
             # add new reference to samples out list which already contains new liquid mixture
@@ -1542,10 +1485,7 @@ class Archive:
                 custom=custom, sample=samples_out2[0]
             )
             if not replaced:
-                self.base.print_message(
-                    "could not replace sample with assembly when adding liquid",
-                    error=True,
-                )
+                LOGGER.error("could not replace sample with assembly when adding liquid")
                 return ErrorCodes.critical, [], []
 
         # (5-3)
@@ -1585,10 +1525,7 @@ class Archive:
             samples_out2 = await self.unified_db.new_samples(samples=ref_samples_out2)
             if not samples_out2:
                 # reference could not be converted to a real sample
-                self.base.print_message(
-                    "could not convert reference assembly to real assembly",
-                    error=True,
-                )
+                LOGGER.error("could not convert reference assembly to real assembly")
                 return ErrorCodes.critical, [], []
 
             # add new reference to samples out list
@@ -1599,17 +1536,12 @@ class Archive:
                 custom=custom, sample=samples_out2[0]
             )
             if not replaced:
-                self.base.print_message(
-                    "could not replace sample with assembly when adding liquid",
-                    error=True,
-                )
+                LOGGER.error("could not replace sample with assembly when adding liquid")
                 return ErrorCodes.critical, [], []
 
         else:
             # nothing else possible
-            self.base.print_message(
-                f"Cannot add sample to position {custom}", error=True
-            )
+            LOGGER.error(f"Cannot add sample to position {custom}")
             return ErrorCodes.not_allowed, [], []
 
         # update all samples_out in the db
@@ -1646,19 +1578,16 @@ class Archive:
             samples_in = await self.unified_db.get_samples(samples=[source_gas_in])
 
             if not samples_in:
-                self.base.print_message(
-                    f"source_gas_in '{source_gas_in}' is not in db",
-                    error=True,
-                )
+                LOGGER.error(f"source_gas_in '{source_gas_in}' is not in db")
                 error = ErrorCodes.no_sample
                 return error, [], []
 
         if samples_in[0].sample_type != SampleType.gas:
-            self.base.print_message("Not a gas Sample", error=True)
+            LOGGER.error("Not a gas Sample")
             return ErrorCodes.not_allowed, [], []
 
         if samples_in[0].volume_ml < volume_ml:
-            self.base.print_message("Not enough volume available", error=True)
+            LOGGER.error("Not enough volume available")
             return ErrorCodes.not_available, [], []
 
         samples_in[0].inheritance = SampleInheritance.give_only
@@ -1671,7 +1600,7 @@ class Archive:
         # and get sample from custom position
         if custom in self.positions.customs_dict:
             custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
-            self.base.print_message(f"custom sample in valid position: {custom_sample}")
+            LOGGER.info(f"custom sample in valid position: {custom_sample}")
         else:
             error = ErrorCodes.not_available
             return error, [], []
@@ -1682,15 +1611,13 @@ class Archive:
                 samples=[custom_sample]
             )
             if not custom_samples_in:
-                self.base.print_message("invalid sample in custom position", error=True)
+                LOGGER.error("invalid sample in custom position")
                 error = ErrorCodes.critical
                 return error, [], []
             else:
                 custom_sample = custom_samples_in[0]
 
-        self.base.print_message(
-            f"sample in custom position '{custom}' is {custom_sample.exp_dict()}"
-        )
+        LOGGER.info(f"sample in custom position '{custom}' is {custom_sample.exp_dict()}")
 
         # (4) create a new ref sample first for the amount we
         # take from samples_in
@@ -1739,10 +1666,7 @@ class Archive:
             )
 
             if not replaced:
-                self.base.print_message(
-                    "could not replace sample with assembly when adding gas",
-                    error=True,
-                )
+                LOGGER.error("could not replace sample with assembly when adding gas")
                 error = ErrorCodes.critical
 
         # (5-3)
@@ -1782,10 +1706,7 @@ class Archive:
             samples_out2 = await self.unified_db.new_samples(samples=ref_samples_out2)
             if not samples_out2:
                 # reference could not be converted to a real sample
-                self.base.print_message(
-                    "could not convert reference assembly to real assembly",
-                    error=True,
-                )
+                LOGGER.error("could not convert reference assembly to real assembly")
                 return ErrorCodes.critical, [], []
 
             # add new reference to samples out list
@@ -1796,17 +1717,12 @@ class Archive:
                 custom=custom, sample=samples_out2[0]
             )
             if not replaced:
-                self.base.print_message(
-                    "could not replace sample with assembly when adding gas",
-                    error=True,
-                )
+                LOGGER.error("could not replace sample with assembly when adding gas")
                 return ErrorCodes.critical, [], []
 
         else:
             # nothing else possible
-            self.base.print_message(
-                f"Cannot add sample to position {custom}", error=True
-            )
+            LOGGER.error(f"Cannot add sample to position {custom}")
             return ErrorCodes.not_allowed, [], []
 
         # update all samples_out in the db
@@ -1840,7 +1756,7 @@ class Archive:
         for sample in samples:
             # first update it from the db (get the most recent info)
             sample = await self.update_samples_from_db_helper(sample=sample)
-            self.base.print_message(f"destroy: got sample {sample.get_global_label()}")
+            LOGGER.info(f"destroy: got sample {sample.get_global_label()}")
             if sample.sample_type == SampleType.liquid:
                 if destroy_liquid:
                     sample.destroy_sample()
@@ -1859,16 +1775,10 @@ class Archive:
             elif sample.sample_type == SampleType.assembly:
                 # unpacking will mark assemblies as destroyed
                 # and then this function can destroy its parts
-                self.base.print_message(
-                    "Cannot destroy assembly, unpack it first.",
-                    info=True,
-                )
+                LOGGER.info("Cannot destroy assembly, unpack it first.")
                 ret_samples.append(sample)
             elif sample.sample_type is None:
-                self.base.print_message(
-                    "got None sample",
-                    info=True,
-                )
+                LOGGER.info("got None sample")
             else:
                 self.base.print_message(
                     f"validation error, type '{type(sample)}' "
@@ -1889,7 +1799,7 @@ class Archive:
         samples_out = []
 
         if action is None:
-            self.base.print_message("no action defined", error=True)
+            LOGGER.error("no action defined")
             return samples_out
 
         for sample in reference_samples_in:

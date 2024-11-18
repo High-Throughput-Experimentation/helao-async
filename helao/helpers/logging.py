@@ -4,7 +4,7 @@ Usage:
 
     from helao.helpers import logging
     if logging.LOGGER is None:
-        logger = logging.make_logger()
+        logger = logging.make_logger(__file__)
     logger = logging.LOGGER
 
 """
@@ -97,6 +97,8 @@ def make_logger(
         style="%",
     )
 
+    if logger_name is None:
+        logger_name = os.path.basename(__file__).replace(".py", "") + "_standalone" # use script name
     logger_instance = logging.getLogger(logger_name)
     logger_instance.setLevel(log_level)
 

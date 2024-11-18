@@ -9,6 +9,11 @@ import time
 import asyncio
 import requests
 import aiofiles
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 from helao.core.error import ErrorCodes
 from helao.servers.base import Base
@@ -23,14 +28,12 @@ class AxisCam:
 
     def acquire_image(self):
         """Save image stream."""
-        self.base.print_message("creating http session")
+        LOGGER.info("creating http session")
         with requests.Session() as session:
-            self.base.print_message(
-                f"making get request to {self.config_dict['axis_ip']}"
-            )
+            LOGGER.info(f"making get request to {self.config_dict['axis_ip']}")
             resp = session.get(f"http://{self.config_dict['axis_ip']}/jpg/1/image.jpg")
             img = resp.content
-            self.base.print_message(f"acquired image {len(img)} at: {time.time()}")
+            LOGGER.info(f"acquired image {len(img)} at: {time.time()}")
         return img
 
     def shutdown(self):
@@ -43,7 +46,7 @@ class AxisCamExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, exec_id="axis")
         # current plan is 1 flow controller per COM
-        self.active.base.print_message("AxisCamExec initialized.")
+        LOGGER.info("AxisCamExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
         self.counter = 0
@@ -53,16 +56,14 @@ class AxisCamExec(Executor):
 
     async def _pre_exec(self):
         "Set flow rate."
-        self.active.base.print_message("AxisCamExec running setup methods.")
+        LOGGER.info("AxisCamExec running setup methods.")
         return {"error": ErrorCodes.none}
 
     async def write_image(self, imgbytes, epoch):
         """Write image to action output directory."""
         ymdhms = time.strftime("%Y%m%d.%H%M%S", time.localtime(epoch))
         filename = f"cam_{self.counter:06}_{ymdhms}.jpg"
-        self.active.base.print_message(
-            f"Writing image to: {os.path.join(self.output_dir, filename)}"
-        )
+        LOGGER.info(f"Writing image to: {os.path.join(self.output_dir, filename)}")
         async with aiofiles.open(os.path.join(self.output_dir, filename), "wb") as f:
             await f.write(imgbytes)
         live_dict = {"epoch_s": epoch, "filename": filename}
@@ -81,7 +82,7 @@ class AxisCamExec(Executor):
         #     f"Image acquisition started at {self.start_time}"
         # )
         img = self.active.base.fastapp.driver.acquire_image()
-        # self.active.base.print_message("image acquired")
+        # LOGGER.info("image acquired")
         live_dict = await self.write_image(img, self.start_time)
         return {"error": ErrorCodes.none, "data": live_dict}
 

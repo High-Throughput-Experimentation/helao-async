@@ -22,6 +22,12 @@ from typing import Union, Optional
 
 import numpy as np
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+    
 from helao.core.error import ErrorCodes
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
@@ -49,7 +55,7 @@ class AliCatMFC:
 
         self.dev_mfcs = make_str_enum("dev_mfcs", {key: key for key in self.fcs})
 
-        self.base.print_message(f"Managing {len(self.fcs)} devices:\n{self.fcs.keys()}")
+        LOGGER.info(f"Managing {len(self.fcs)} devices:\n{self.fcs.keys()}")
         # query status with self.mfc.get()
         # query pid settings with self.mfc.get_pid()
 
@@ -99,49 +105,47 @@ class AliCatMFC:
         return lines
 
     async def start_polling(self):
-        self.base.print_message("got 'start_polling' request, raising signal")
+        LOGGER.info("got 'start_polling' request, raising signal")
         # async with self.base.aiolock:
         await self.poll_signalq.put(True)
         while not self.polling:
-            self.base.print_message("waiting for polling loop to start")
+            LOGGER.info("waiting for polling loop to start")
             await asyncio.sleep(0.1)
 
     async def stop_polling(self):
-        self.base.print_message("got 'stop_polling' request, raising signal")
+        LOGGER.info("got 'stop_polling' request, raising signal")
         # async with self.base.aiolock:
         await self.poll_signalq.put(False)
         while self.polling:
-            self.base.print_message("waiting for polling loop to stop")
+            LOGGER.info("waiting for polling loop to stop")
             await asyncio.sleep(0.1)
 
     async def poll_signal_loop(self):
         while True:
             self.polling = await self.poll_signalq.get()
-            self.base.print_message("polling signal received")
+            LOGGER.info("polling signal received")
 
     async def poll_sensor_loop(self, waittime: float = 0.1):
-        self.base.print_message("MFC background task has started")
+        LOGGER.info("MFC background task has started")
         self.last_acquire = {dev_name: 0 for dev_name in self.fcs.keys()}
         lastupdate = 0
         while True:
             for dev_name, fc in self.fcs.items():
-                # self.base.print_message(f"Refreshing {dev_name} MFC")
+                # LOGGER.info(f"Refreshing {dev_name} MFC")
                 if self.polling:
                     checktime = time.time()
-                    # self.base.print_message(f"{dev_name} MFC checked at {checktime}")
+                    # LOGGER.info(f"{dev_name} MFC checked at {checktime}")
                     if checktime - lastupdate < waittime:
-                        # self.base.print_message("waiting for minimum update interval.")
+                        # LOGGER.info("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
-                    # self.base.print_message(f"Retrieving {dev_name} MFC status")
+                    # LOGGER.info(f"Retrieving {dev_name} MFC status")
                     try:
                         resp_dict = fc.get_status()
                     except Exception as e:
-                        self.base.print_message(
-                            f"Exception occured on get_status() {e}. Resetting MFC."
-                        )
+                        LOGGER.info(f"Exception occured on get_status() {e}. Resetting MFC.")
                         self.make_fc_instance(dev_name, self.config_dict["devices"][dev_name])
                         self.fcs[dev_name]._set_control_point(self.fcs_last_mode[dev_name], 5)
-                        self.base.print_message("MFC connection restored")
+                        LOGGER.info("MFC connection restored")
                         continue
                     # self.base.print_message(
                     #     f"Received {dev_name} MFC status:\n{resp_dict}"
@@ -160,14 +164,12 @@ class AliCatMFC:
                         self.fcs_last_mode[dev_name] = resp_dict["control_point"]
                         status_dict = {dev_name: resp_dict}
                         lastupdate = time.time()
-                        # self.base.print_message(f"Live buffer updated at {checktime}")
+                        # LOGGER.info(f"Live buffer updated at {checktime}")
                         # async with self.base.aiolock:
                         await self.base.put_lbuf(status_dict)
-                        # self.base.print_message("status sent to live buffer")
+                        # LOGGER.info("status sent to live buffer")
                     else:
-                        self.base.print_message(
-                            f"!!Received unexpected dict: {resp_dict}"
-                        )
+                        LOGGER.info(f"!!Received unexpected dict: {resp_dict}")
                 await asyncio.sleep(0.001)
 
     def list_gases(self, device_name: str):
@@ -215,7 +217,7 @@ class AliCatMFC:
     async def set_gas_mixture(self, device_name: str, gas_dict: dict):
         "Set MFC to gas mixture defined in gas_dict {gasname: integer_pct}"
         if sum(gas_dict.values()) != 100:
-            self.base.print_message("Gas mixture percentages do not add to 100.")
+            LOGGER.info("Gas mixture percentages do not add to 100.")
             return {}
         else:
             await self.stop_polling()
@@ -337,11 +339,11 @@ class AliCatMFC:
         """Await tasks prior to driver shutdown."""
         await self.stop_polling()
         await asyncio.sleep(0.5)
-        self.base.print_message("stopping MFC flows")
+        LOGGER.info("stopping MFC flows")
         await self.hold_valve_closed()
 
     async def estop(self, *args, **kwargs):
-        self.base.print_message("stopping MFC flows")
+        LOGGER.info("stopping MFC flows")
         await self.hold_valve_closed()
         return True
 
@@ -349,7 +351,7 @@ class AliCatMFC:
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
         # self.poll_signalq.put_nowait(False)
-        self.base.print_message("closing MFC connections")
+        LOGGER.info("closing MFC connections")
         for fc in self.fcs.values():
             fc.close()
 
@@ -360,12 +362,12 @@ class MfcExec(Executor):
         self.start_time = time.time()
         self.device_name = self.active.action.action_params["device_name"]
         # current plan is 1 flow controller per COM
-        self.active.base.print_message("MfcExec initialized.")
+        LOGGER.info("MfcExec initialized.")
         self.duration = self.active.action.action_params.get("duration", -1)
 
     async def _pre_exec(self):
         "Set flow rate."
-        self.active.base.print_message("MfcExec running setup methods.")
+        LOGGER.info("MfcExec running setup methods.")
         self.flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
         self.ramp_sccm_sec = self.active.action.action_params.get("ramp_sccm_sec", 0)
         if self.flowrate_sccm is not None:
@@ -374,7 +376,7 @@ class MfcExec(Executor):
                 flowrate_sccm=self.flowrate_sccm,
                 ramp_sccm_sec=self.ramp_sccm_sec,
             )
-            self.active.base.print_message(f"set_flowrate returned: {rate_resp}")
+            LOGGER.info(f"set_flowrate returned: {rate_resp}")
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
@@ -387,7 +389,7 @@ class MfcExec(Executor):
             openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
+            LOGGER.info(f"hold_cancel returned: {openvlv_resp}")
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
@@ -415,24 +417,22 @@ class MfcExec(Executor):
 
     async def _post_exec(self):
         "Restore valve hold."
-        self.active.base.print_message("MfcExec running cleanup methods.")
+        LOGGER.info("MfcExec running cleanup methods.")
         self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(
-                f"hold_valve_closed returned: {closevlv_resp}"
-            )
+            LOGGER.info(f"hold_valve_closed returned: {closevlv_resp}")
         else:
-            self.active.base.print_message("'stay_open' is True, skipping valve hold")
+            LOGGER.info("'stay_open' is True, skipping valve hold")
         return {"error": ErrorCodes.none}
 
 
 class PfcExec(MfcExec):
     async def _pre_exec(self):
         "Set pressure."
-        self.active.base.print_message("PfcExec running setup methods.")
+        LOGGER.info("PfcExec running setup methods.")
         self.pressure_psia = self.active.action.action_params.get("pressure_psia", None)
         self.ramp_psi_sec = self.active.action.action_params.get("ramp_psi_sec", 0)
         if self.pressure_psia is not None:
@@ -441,7 +441,7 @@ class PfcExec(MfcExec):
                 pressure_psia=self.pressure_psia,
                 ramp_psi_sec=self.ramp_psi_sec,
             )
-            self.active.base.print_message(f"set_pressure returned: {rate_resp}")
+            LOGGER.info(f"set_pressure returned: {rate_resp}")
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
@@ -454,7 +454,7 @@ class PfcExec(MfcExec):
             openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
+            LOGGER.info(f"hold_cancel returned: {openvlv_resp}")
         return {"error": ErrorCodes.none}
 
 
@@ -481,13 +481,13 @@ class MfcConstPresExec(MfcExec):
 
     async def _pre_exec(self):
         "Set flow rate."
-        self.active.base.print_message("MfcConstPresExec running setup methods.")
+        LOGGER.info("MfcConstPresExec running setup methods.")
         rate_resp = await self.active.base.fastapp.driver.set_flowrate(
             device_name=self.device_name,
             flowrate_sccm=self.flowrate_sccm,
             ramp_sccm_sec=self.ramp_sccm_sec,
         )
-        self.active.base.print_message(f"set_flowrate returned: {rate_resp}")
+        LOGGER.info(f"set_flowrate returned: {rate_resp}")
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
@@ -516,23 +516,19 @@ class MfcConstPresExec(MfcExec):
             and not self.filling
             and iter_time - self.last_fill >= self.refill_freq
         ):
-            self.active.base.print_message(
-                f"pressure below {self.target_pressure}, filling {fill_scc} scc over {fill_time} seconds"
-            )
+            LOGGER.info(f"pressure below {self.target_pressure}, filling {fill_scc} scc over {fill_time} seconds")
             self.filling = True
             openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
+            LOGGER.info(f"hold_cancel returned: {openvlv_resp}")
             self.fill_end = iter_time + fill_time
         elif self.filling and iter_time >= self.fill_end:
-            self.active.base.print_message("target volume filled, closing mfc valve")
+            LOGGER.info("target volume filled, closing mfc valve")
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(
-                f"hold_valve_closed returned: {closevlv_resp}"
-            )
+            LOGGER.info(f"hold_valve_closed returned: {closevlv_resp}")
             self.filling = False
             self.last_fill = iter_time
         elapsed_time = iter_time - self.start_time
@@ -548,17 +544,15 @@ class MfcConstPresExec(MfcExec):
 
     async def _post_exec(self):
         "Restore valve hold."
-        self.active.base.print_message("MfcConstPresExec running cleanup methods.")
+        LOGGER.info("MfcConstPresExec running cleanup methods.")
         self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(
-                f"hold_valve_closed returned: {closevlv_resp}"
-            )
+            LOGGER.info(f"hold_valve_closed returned: {closevlv_resp}")
         else:
-            self.active.base.print_message("'stay_open' is True, skipping valve hold")
+            LOGGER.info("'stay_open' is True, skipping valve hold")
         return {"error": ErrorCodes.none}
 
 
@@ -576,9 +570,7 @@ class MfcConstConcExec(MfcExec):
         self.fill_end = self.start_time
 
         self.co2serv_key = self.active.base.server_params.get("co2_server_name", None)
-        self.active.base.print_message(
-            f"checking config for co2 server named: {self.co2serv_key}"
-        )
+        LOGGER.info(f"checking config for co2 server named: {self.co2serv_key}")
         co2serv_config = self.active.base.world_cfg["servers"].get(
             self.co2serv_key, None
         )
@@ -586,9 +578,7 @@ class MfcConstConcExec(MfcExec):
             return
         co2serv_host = co2serv_config.get("host", None)
         co2serv_port = co2serv_config.get("port", None)
-        self.active.base.print_message(
-            f"subscribing to {self.co2serv_key} at {co2serv_host}:{co2serv_port}"
-        )
+        LOGGER.info(f"subscribing to {self.co2serv_key} at {co2serv_host}:{co2serv_port}")
 
         self.wsc = WSC(co2serv_host, co2serv_port, "ws_live")
 
@@ -596,9 +586,7 @@ class MfcConstConcExec(MfcExec):
         data_package = self.wsc.read_messages()
         while not data_package:
             data_package = self.wsc.read_messages()
-            self.active.base.print_message(
-                "No co2_ppm readings have been received, sleeping for 1 second"
-            )
+            LOGGER.info("No co2_ppm readings have been received, sleeping for 1 second")
             time.sleep(1)
         data_dict = defaultdict(list)
         for datalab, (dataval, epochsec) in data_package.items():
@@ -610,7 +598,7 @@ class MfcConstConcExec(MfcExec):
             else:
                 data_dict[datalab].append(dataval)
 
-        # self.active.base.print_message(f"got co2 data: {data_dict}")
+        # LOGGER.info(f"got co2 data: {data_dict}")
         co2_vec = data_dict.get("co2_ppm", [])
         # self.active.base.print_message(
         #     f"got co2_ppm from {self.co2serv_key}: {co2_vec}"
@@ -626,13 +614,13 @@ class MfcConstConcExec(MfcExec):
 
     async def _pre_exec(self):
         "Set flow rate."
-        self.active.base.print_message("MfcConstConcExec running setup methods.")
+        LOGGER.info("MfcConstConcExec running setup methods.")
         rate_resp = await self.active.base.fastapp.driver.set_flowrate(
             device_name=self.device_name,
             flowrate_sccm=self.flowrate_sccm,
             ramp_sccm_sec=self.ramp_sccm_sec,
         )
-        self.active.base.print_message(f"set_flowrate returned: {rate_resp}")
+        LOGGER.info(f"set_flowrate returned: {rate_resp}")
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
@@ -656,29 +644,25 @@ class MfcConstConcExec(MfcExec):
         self.last_acq_time = iter_time
         self.last_acq_flow = live_flow
         fill_time, fill_scc = self.eval_conc()
-        # self.active.base.print_message(f"eval_conc() returned {fill_time}, {fill_scc}")
+        # LOGGER.info(f"eval_conc() returned {fill_time}, {fill_scc}")
         if (
             fill_time > 0
             and not self.filling
             and iter_time - self.last_fill >= self.refill_freq
         ):
-            self.active.base.print_message(
-                f"filling {fill_scc} scc over {fill_time} seconds"
-            )
+            LOGGER.info(f"filling {fill_scc} scc over {fill_time} seconds")
             self.filling = True
             openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
+            LOGGER.info(f"hold_cancel returned: {openvlv_resp}")
             self.fill_end = iter_time + fill_time
         elif self.filling and iter_time >= self.fill_end:
-            self.active.base.print_message("target volume filled, closing mfc valve")
+            LOGGER.info("target volume filled, closing mfc valve")
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(
-                f"hold_valve_closed returned: {closevlv_resp}"
-            )
+            LOGGER.info(f"hold_valve_closed returned: {closevlv_resp}")
             self.filling = False
             self.last_fill = iter_time
         elapsed_time = iter_time - self.start_time
@@ -694,17 +678,15 @@ class MfcConstConcExec(MfcExec):
 
     async def _post_exec(self):
         "Restore valve hold."
-        self.active.base.print_message("MfcConstConcExec running cleanup methods.")
+        LOGGER.info("MfcConstConcExec running cleanup methods.")
         self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(
-                f"hold_valve_closed returned: {closevlv_resp}"
-            )
+            LOGGER.info(f"hold_valve_closed returned: {closevlv_resp}")
         else:
-            self.active.base.print_message("'stay_open' is True, skipping valve hold")
+            LOGGER.info("'stay_open' is True, skipping valve hold")
         return {"error": ErrorCodes.none}
 
 

@@ -28,7 +28,7 @@ from helao.drivers.spec.andor.driver import AndorDriver, DriverStatus
 
 global LOGGER
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="andor_server_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 

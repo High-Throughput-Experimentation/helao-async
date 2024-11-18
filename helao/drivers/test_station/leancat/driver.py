@@ -17,7 +17,7 @@ from helao.helpers import logging
 from logging.handlers import TimedRotatingFileHandler
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="leancat_driver_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 

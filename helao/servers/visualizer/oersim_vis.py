@@ -13,6 +13,12 @@ from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 from helao.core.models.hlostatus import HloStatus
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
@@ -112,7 +118,7 @@ class C_oersimvis:
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(f"'{self.server_key}' Bokeh session closed", info=True)
+        LOGGER.info(f"'{self.server_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -149,9 +155,7 @@ class C_oersimvis:
         sender.value = value
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(
-            f" ... potentiostat visualizer subscribing to: {self.data_url}"
-        )
+        LOGGER.info(f" ... potentiostat visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
@@ -234,12 +238,12 @@ class C_oersimvis:
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
         if self.cur_action_uuid != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
-                self.vis.print_message(" ... reseting CP graph")
+                LOGGER.info(" ... reseting CP graph")
                 self.prev_action_uuid = self.cur_action_uuid
                 self.prev_comp = self.cur_comp
                 if self.prev_action_uuid != "":
                     self.prev_action_uuids.append(self.prev_action_uuid)
-                    self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")
+                    LOGGER.info(f"previous uuids: {self.prev_action_uuids}")
                     # copy old data to "prev" plot
                     self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
                         data=deepcopy(self.datasource.data)
