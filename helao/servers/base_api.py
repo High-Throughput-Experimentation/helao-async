@@ -27,6 +27,11 @@ from helao.helpers import logging
 
 global LOGGER
 
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(logger_name="base_api_standalone")
+else:
+    LOGGER = logging.LOGGER
+
 
 class BaseAPI(HelaoFastAPI):
     """
@@ -138,7 +143,6 @@ class BaseAPI(HelaoFastAPI):
         )
         self.driver = None
         self.poller = None
-        LOGGER = logging.LOGGER
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
