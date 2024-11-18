@@ -12,4 +12,4 @@ LOGGER = logging.make_logger(
     log_level=20
 )
 
-LOGGER.alert("test alert")
+LOGGER.alert("TEST ~ this is a test alert")
