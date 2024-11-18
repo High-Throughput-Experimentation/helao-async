@@ -67,14 +67,20 @@ class BiologicExec(Executor):
             self.action_params = {
                 k: v
                 for k, v in self.active.action.action_params.items()
-                if not (k.startswith("TTL"))
+                if not (k.startswith("TTL")) and not (k.startswith("alert"))
             }
+            self.driver = self.active.base.fastapp.driver
+            self.channel = self.action_params["channel"]
+
+            # no external timer, event sink signals end of measurement
+            self.duration = -1
+            self.technique = kwargs["technique"]
 
             # parse gamry-style TTL params
             gttl_params = {
                 k: v
                 for k, v in self.active.action.action_params.items()
-                if k not in self.action_params
+                if k.startswith("TTL")
             }
             self.ttl_params = {}
             self.ttl_params["ttl"] = "none"
@@ -85,12 +91,16 @@ class BiologicExec(Executor):
             elif gttl_params.get("TTLwait", -1) >= 0:
                 self.ttl_params["ttl"] = "in"
 
-            self.driver = self.active.base.fastapp.driver
-            self.channel = self.action_params["channel"]
-
-            # no external timer, event sink signals end of measurement
-            self.duration = -1
-            self.technique = kwargs["technique"]
+            self.alert_params = {
+                k: self.active.action.action_params.get(k, False)
+                for k in (
+                    "alertThreshEwe_V",
+                    "alertThreshI_A",
+                    "alert_above",
+                    "alert_duration__s",
+                    "alert_sleep__s",
+                )
+            }
 
             LOGGER.info("BiologicExec initialized.")
         except Exception:
@@ -134,6 +144,24 @@ class BiologicExec(Executor):
             for k, v in resp.data.items():
                 self.data_buffer[k].extend(v)
                 data_length = len(v)
+            # check for alert thresholds at this point in data_buffer
+            min_duration = self.alert_params["alert_duration__s"]
+            if min_duration > 0 and self.data_buffer.get("t_s", [-1])[-1] > min_duration:
+                time_buffer = self.data_buffer["t_s"]
+                idx = 1
+                latest_t = time_buffer[-1]
+                slice_duration = latest_t - time_buffer[-idx]
+                while (len(time_buffer) > idx) and (slice_duration < min_duration):
+                    idx += 1
+                if slice_duration >= min_duration:
+                    for thresh_key in ("Ewe_V", "I_A"):
+                        thresh_val = self.alert_params.get(f"alertThresh{thresh_key}", None)
+                        slice_val = self.data_buffer[thresh_key][-idx]
+                        if thresh_val is not None:
+                            if all([x > thresh_val for x in slice_val]) and self.alert_params["alert_above"]:
+                                LOGGER.alert(f"{thresh_key} went above {thresh_val} for {min_duration}")
+                            if all([x < thresh_val for x in slice_val]) and not self.alert_params["alert_above"]:
+                                LOGGER.alert(f"{thresh_key} went below {thresh_val} for {min_duration}")
             if data_length:
                 self.data_buffer["channel"].extend(data_length * [self.channel])
                 resp.data.update({"channel": data_length * [self.channel]})

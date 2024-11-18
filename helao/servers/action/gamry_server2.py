@@ -128,31 +128,35 @@ class GamryExec(Executor):
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
-        resp = self.driver.get_data(self.poll_rate)
-        # populate executor buffer for output calculation
-        for k, v in resp.data.items():
-            self.data_buffer[k].extend(v)
-        # check for alert thresholds at this point in data_buffer
-        min_duration = self.alert_params["alert_duration__s"]
-        if min_duration > 0 and self.data_buffer.get("t_s", [-1])[-1] > min_duration:
-            time_buffer = self.data_buffer["t_s"]
-            idx = 1
-            latest_t = time_buffer[-1]
-            slice_duration = latest_t - time_buffer[-idx]
-            while (len(time_buffer) > idx) and (slice_duration < min_duration):
-                idx += 1
-            if slice_duration >= min_duration:
-                for thresh_key in ("Ewe_V", "I_A"):
-                    thresh_val = self.alert_params.get(f"alertThresh{thresh_key}", None)
-                    slice_val = self.data_buffer[thresh_key][-idx]
-                    if thresh_val is not None:
-                        if all([x > thresh_val for x in slice_val]) and self.alert_params["alert_above"]:
-                            LOGGER.alert(f"{thresh_key} went above {thresh_val} for {min_duration}")
-                        if all([x < thresh_val for x in slice_val]) and not self.alert_params["alert_above"]:
-                            LOGGER.alert(f"{thresh_key} went below {thresh_val} for {min_duration}")
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
-        status = HloStatus.active if resp.message != "done" else HloStatus.finished
-        return {"error": error, "status": status, "data": resp.data}
+        try:
+            resp = self.driver.get_data(self.poll_rate)
+            # populate executor buffer for output calculation
+            for k, v in resp.data.items():
+                self.data_buffer[k].extend(v)
+            # check for alert thresholds at this point in data_buffer
+            min_duration = self.alert_params["alert_duration__s"]
+            if min_duration > 0 and self.data_buffer.get("t_s", [-1])[-1] > min_duration:
+                time_buffer = self.data_buffer["t_s"]
+                idx = 1
+                latest_t = time_buffer[-1]
+                slice_duration = latest_t - time_buffer[-idx]
+                while (len(time_buffer) > idx) and (slice_duration < min_duration):
+                    idx += 1
+                if slice_duration >= min_duration:
+                    for thresh_key in ("Ewe_V", "I_A"):
+                        thresh_val = self.alert_params.get(f"alertThresh{thresh_key}", None)
+                        slice_val = self.data_buffer[thresh_key][-idx]
+                        if thresh_val is not None:
+                            if all([x > thresh_val for x in slice_val]) and self.alert_params["alert_above"]:
+                                LOGGER.alert(f"{thresh_key} went above {thresh_val} for {min_duration}")
+                            if all([x < thresh_val for x in slice_val]) and not self.alert_params["alert_above"]:
+                                LOGGER.alert(f"{thresh_key} went below {thresh_val} for {min_duration}")
+            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            status = HloStatus.active if resp.message != "done" else HloStatus.finished
+            return {"error": error, "status": status, "data": resp.data}
+        except Exception:
+            LOGGER.error("GamryExec poll error", exc_info=True)
+            return {"error": ErrorCodes.critical, "status": HloStatus.errored}
 
     async def _post_exec(self):
         resp = self.driver.cleanup(self.ttl_params)
