@@ -26,7 +26,12 @@ def alert(self, message, *args, **kws):
 logging.Logger.alert = alert
 
 from queue import Queue
-from logging.handlers import TimedRotatingFileHandler, SMTPHandler, QueueHandler, QueueListener
+from logging.handlers import (
+    TimedRotatingFileHandler,
+    SMTPHandler,
+    QueueHandler,
+    QueueListener,
+)
 from colorlog import ColoredFormatter
 import tempfile
 import os
@@ -36,13 +41,24 @@ from pathlib import Path
 
 LOGGER = None
 
+
 class TitledSMTPHandler(SMTPHandler):
     def getSubject(self, record):
-        if '~' in record.message:
+        if "~" in record.message:
             title = record.message.split("~")[0].strip()
         else:
             title = record.message.split()[0].strip()
         return f"{record.levelname} - {title}"
+
+
+class TitledQueueHandler(QueueHandler):
+    def getSubject(self, record):
+        if "~" in record.message:
+            title = record.message.split("~")[0].strip()
+        else:
+            title = record.message.split()[0].strip()
+        return f"{record.levelname} - {title}"
+
 
 def make_logger(
     logger_name: Optional[str] = None,
@@ -106,13 +122,13 @@ def make_logger(
     recipients = email_config.get("recipients", None)
     subject = email_config.get("subject", "Error in Helao")
     email_conditions = [
-            x is not None
-            for x in [mailhost, mailport, fromaddr, username, password, recipients]
-        ]
+        x is not None
+        for x in [mailhost, mailport, fromaddr, username, password, recipients]
+    ]
     # print(email_conditions)
     if all(email_conditions):
         email_queue = Queue(-1)
-        queue_handler = QueueHandler(email_queue)
+        queue_handler = TitledQueueHandler(email_queue)
         queue_handler.setLevel(ALERT_LEVEL)
         queue_handler.setFormatter(formatter)
         logger_instance.addHandler(queue_handler)
