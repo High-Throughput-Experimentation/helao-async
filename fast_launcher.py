@@ -97,13 +97,7 @@ if __name__ == "__main__":
     ] = f"\n[%(asctime)s_{server_key}]: %(levelprefix)s %(message)s\r"
     LOGGING_CONFIG["formatters"]["access"]["use_colors"] = False
 
-    print_message(
-        LOGGER,
-        "fast_launcher",
-        f" ---- starting  {server_key} ----",
-        log_dir=log_root,
-        info=True,
-    )
+    LOGGER.info(f" ---- starting  {server_key} ----")
     fastapp = uvicorn.run(
         app,
         host=server_config["host"],

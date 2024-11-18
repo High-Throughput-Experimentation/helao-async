@@ -332,11 +332,7 @@ class ExpYml(HelaoYml):
                     self.create_process(group_idx)
                     self.progress.write()
             else:
-                print_message(
-                    LOGGER,
-                    "DB",
-                    f"Cannot create process {group_idx} with actions still pending.",
-                )
+                LOGGER.info(f"Cannot create process {group_idx} with actions still pending.")
             # self.progress.read()
         group_keys = sorted([k for k in self.progress.keys() if isinstance(k, int)])
         process_metas = [self.progress[k]["meta"] for k in group_keys]

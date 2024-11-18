@@ -64,7 +64,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message(LOGGER, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            LOGGER.error(f"invalid 'custom_type': {self.custom_type}")
             return False
 
     def dilution_allowed(self) -> bool:
@@ -73,7 +73,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message(LOGGER, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            LOGGER.error(f"invalid 'custom_type': {self.custom_type}")
             return False
 
     def is_destroyed(self) -> bool:
@@ -92,7 +92,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message(LOGGER, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            LOGGER.error(f"invalid 'custom_type': {self.custom_type}")
             return False
 
     def unload(self) -> SampleUnion:
@@ -104,14 +104,12 @@ class Custom(BaseModel, HelaoDict):
 
     def load(self, sample_in: SampleUnion) -> Tuple[bool, SampleUnion]:
         if self.sample != NoneSample():
-            print_message(
-                LOGGER, "archive", "sample already loaded. Unload first to load new one.", error=True
-            )
+            LOGGER.error("sample already loaded. Unload first to load new one.")
             return False, NoneSample()
 
         self.sample = deepcopy(sample_in)
         self.blocked = False
-        print_message(LOGGER, "archive", f"loaded sample {sample_in.global_label}", info=True)
+        LOGGER.info(f"loaded sample {sample_in.global_label}")
         return True, deepcopy(sample_in)
 
 

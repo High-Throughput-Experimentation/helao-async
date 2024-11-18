@@ -92,13 +92,7 @@ if __name__ == "__main__":
         log_root = os.path.join(root, "LOGS")
     else:
         log_root = None
-    print_message(
-        LOGGER,
-        "bokeh_launcher",
-        f" ---- starting  {server_key} ----",
-        log_dir=log_root,
-        info=True,
-    )
+    LOGGER.info(f" ---- starting  {server_key} ----")
 
     bokehapp = Server(
         {
@@ -113,13 +107,7 @@ if __name__ == "__main__":
         address=servHost,
         allow_websocket_origin=[f"{servHost}:{servPort}"],
     )
-    print_message(
-        LOGGER,
-        "bokeh_launcher",
-        f"started {server_key} {bokehapp}",
-        log_dir=log_root,
-        info=True,
-    )
+    LOGGER.info(f"started {server_key} {bokehapp}")
     bokehapp.start()
     if launch_browser:
         bokehapp.io_loop.add_callback(bokehapp.show, f"/{servPy}")
