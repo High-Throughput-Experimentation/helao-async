@@ -53,7 +53,10 @@ if __name__ == "__main__":
     helao_root = os.path.dirname(os.path.realpath(__file__))
     server_key = sys.argv[2]
     confArg = sys.argv[1]
-    CONFIG = config_loader.config_loader(confArg, helao_root)
+    if config_loader.CONFIG is None:
+        config_loader.CONFIG = config_loader.config_loader(confArg, helao_root)
+    CONFIG = config_loader.CONFIG
+        
     all_servers_config = CONFIG["servers"]
     server_config = all_servers_config[server_key]
     log_root = os.path.join(CONFIG["root"], "LOGS") if "root" in CONFIG else None
@@ -69,8 +72,7 @@ if __name__ == "__main__":
             log_level=server_config.get("log_level", CONFIG.get("log_level", 20)),
         )
     LOGGER = logging.LOGGER
-    if config_loader.CONFIG is None:
-        config_loader.CONFIG = CONFIG
+    LOGGER.info(f"Loaded config from: {CONFIG['loaded_config_path']}")
 
     makeApp = import_module(
         f"helao.servers.{server_config['group']}.{server_config['fast']}"
