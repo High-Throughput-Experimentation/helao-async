@@ -123,7 +123,7 @@ class Base:
         sync_ntp_task_run (bool): NTP sync task running flag.
         ntp_syncer (asyncio.Task, optional): NTP sync task.
         bufferer (asyncio.Task, optional): Live buffer task.
-        status_LOGGER (asyncio.Task, optional): Status logger task.
+        status_logger (asyncio.Task, optional): Status logger task.
 
     Methods:
         __init__(self, fastapp, dyn_endpoints=None): Initialize the Base class.
@@ -320,7 +320,7 @@ class Base:
             sync_ntp_task_run (bool): Flag indicating if the NTP sync task has run.
             ntp_syncer (asyncio.Task): The task for NTP synchronization.
             bufferer (asyncio.Task): The task for live buffering.
-            status_LOGGER (asyncio.Task): The task for logging status.
+            status_logger (asyncio.Task): The task for logging status.
         """
         self.aloop = asyncio.get_running_loop()
         # produce warnings on coroutines taking longer than interval
@@ -340,7 +340,7 @@ class Base:
         self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
-        self.status_LOGGER = self.aloop.create_task(self.log_status_task())
+        self.status_logger = self.aloop.create_task(self.log_status_task())
 
     def dyn_endpoints_init(self):
         """
@@ -1245,7 +1245,7 @@ class Base:
         This method performs the following actions:
         1. Sets the `sync_ntp_task_run` flag to False to stop NTP synchronization.
         2. Detaches all subscribers by calling `detach_subscribers`.
-        3. Cancels the `status_LOGGER` task.
+        3. Cancels the `status_logger` task.
         4. Cancels the `ntp_syncer` task.
 
         Returns:
@@ -1253,7 +1253,7 @@ class Base:
         """
         self.sync_ntp_task_run = False
         await self.detach_subscribers()
-        self.status_LOGGER.cancel()
+        self.status_logger.cancel()
         self.ntp_syncer.cancel()
 
     async def write_act(self, action):
@@ -1842,7 +1842,7 @@ class Active:
         Returns:
             None
         """
-        self.data_LOGGER = self.base.aloop.create_task(self.log_data_task())
+        self.data_logger = self.base.aloop.create_task(self.log_data_task())
         if self.action.save_act:
             os.makedirs(
                 os.path.join(
@@ -2981,7 +2981,7 @@ class Active:
                 self.file_conn_dict = {}
 
                 # finish the data writer
-                self.data_LOGGER.cancel()
+                self.data_logger.cancel()
                 l10 = self.base.actives.pop(self.active_uuid, None)
                 if l10 is not None:
                     i10 = [

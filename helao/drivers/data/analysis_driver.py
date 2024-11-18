@@ -39,13 +39,6 @@ from helao.drivers.data.analyses.echeuvis_stability import (
 from helao.drivers.data.analyses.uvis_bkgsubnorm import DryUvisAnalysis, DRYUVIS_QUERY
 from helao.drivers.data.analyses.icpms_local import IcpmsAnalysis
 
-from helao.helpers import logging
-
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="sync_driver_standalone")
-else:
-    LOGGER = logging.LOGGER
-
 
 class HelaoAnalysisSyncer(HelaoSyncer):
     """
