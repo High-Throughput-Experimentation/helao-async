@@ -116,6 +116,8 @@ def make_logger(
         email_handler.setFormatter(formatter)
         logger_instance.addHandler(email_handler)
         logger_instance.info(f"Email alerts enabled at log level: {ALERT_LEVEL}")
+    else:
+        logger_instance.info(f"Email alerts not enabled using config: {email_config}")
 
     logger_instance.info(f"writing log events to {log_path}")
     return logger_instance
