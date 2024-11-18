@@ -1595,6 +1595,7 @@ class Orch(Base):
         await self.intend_none()
 
         self.current_stop_message = "E-STOP" + reason_suffix
+        LOGGER.alert("ORCH E-STOP")
         await self.update_operator(True)
 
     async def stop_loop(self):
