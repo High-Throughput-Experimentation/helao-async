@@ -98,12 +98,11 @@ def make_logger(
     password = email_config.get("password", None)
     recipients = email_config.get("recipients", None)
     subject = email_config.get("subject", "Error in Helao")
-    if all(
-        [
+    email_conditions = [
             x is not None
             for x in [mailhost, mailport, fromaddr, username, password, recipients]
         ]
-    ):
+    if all(email_conditions):
         email_handler = SMTPHandler(
             mailhost=(mailhost, mailport),
             fromaddr=fromaddr,
