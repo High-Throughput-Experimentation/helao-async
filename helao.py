@@ -49,7 +49,7 @@ import helao.tests.unit_test_sample_models
 
 from helao.helpers import logging
 
-LAUNCH_LOGGER = logging.make_logger(logger_name="launcher")
+LAUNCH_LOGGER = logging.make_logger(__file__)
     
 # from helao.tests.unit_test_sample_models import sample_model_unit_test
 

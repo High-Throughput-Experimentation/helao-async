@@ -16,6 +16,12 @@ from copy import copy
 from scipy.signal import savgol_filter
 from ruamel.yaml import YAML
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 from helao.servers.base import Base, Active
 from helao.helpers.premodels import Experiment
 from helao.helpers.file_mapper import FileMapper
@@ -89,10 +95,7 @@ class Calc:
         ymls = sorted([x for x in paths if x.endswith(".yml")])
 
         if len(hlos) != len(ymls):
-            self.base.print_message(
-                f"mismatch number of data files ({len(hlos)}), metadata files ({len(ymls)})",
-                error=True,
-            )
+            LOGGER.error(f"mismatch number of data files ({len(hlos)}), metadata files ({len(ymls)})")
             return {}
 
         hlo_dict = {}
@@ -321,9 +324,7 @@ class Calc:
                 }
 
         if not specd:
-            self.base.print_message(
-                "Missing references and/or data. Cannot calculate FOMs."
-            )
+            LOGGER.info("Missing references and/or data. Cannot calculate FOMs.")
             return {}
 
         pred = {}
@@ -714,21 +715,15 @@ class Calc:
             elif purge_if == "above":
                 loop_condition = mean_co2_ppm > co2_ppm_thresh
             else:
-                self.base.print_message(
-                    "'purge_if' parameter was an unsupported string, using value 'above'"
-                )
+                LOGGER.info("'purge_if' parameter was an unsupported string, using value 'above'")
                 loop_condition = mean_co2_ppm > co2_ppm_thresh
         else:
             purge_if = float(purge_if)
             if abs(purge_if) >= 1.0:
-                self.base.print_message(
-                    "abs('purge_if') parameter is numerical and > 1.0, treating as percentage of threshold"
-                )
+                LOGGER.info("abs('purge_if') parameter is numerical and > 1.0, treating as percentage of threshold")
                 purge_if = purge_if / 100
             else:
-                self.base.print_message(
-                    "abs('purge_if') parameter is numerical and < 1.0, treating as fraction of threshold"
-                )
+                LOGGER.info("abs('purge_if') parameter is numerical and < 1.0, treating as fraction of threshold")
             ## old behavior: signed value determines over or under threshold
             ## purge_if<0 means purge if current ppm is below pct diff
             ## purge_if>0 means purge if current ppm is above pct diff
@@ -764,19 +759,15 @@ class Calc:
                 break
 
         if loop_condition and num_consecutive_repeats > max_repeats:
-            self.base.print_message(
-                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_repeats ({max_repeats}) reached. Exiting."
-            )
+            LOGGER.info(f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_repeats ({max_repeats}) reached. Exiting.")
         elif loop_condition:
-            self.base.print_message(
-                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition. Looping."
-            )
+            LOGGER.info(f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition. Looping.")
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
                 experiment_params=repeat_experiment_params,
                 **kwargs,
             )
-            self.base.print_message("queueing repeat experiment request on Orch")
+            LOGGER.info("queueing repeat experiment request on Orch")
             resp, error = await async_private_dispatcher(
                 self.base.orch_key,
                 self.base.orch_host,
@@ -788,12 +779,10 @@ class Calc:
                     "experiment": rep_exp.clean_dict(),
                 },
             )
-            self.base.print_message(f"insert_experiment got response: {resp}")
-            self.base.print_message(f"insert_experiment returned error: {error}")
+            LOGGER.info(f"insert_experiment got response: {resp}")
+            LOGGER.info(f"insert_experiment returned error: {error}")
         else:
-            self.base.print_message(
-                f"mean_co2_ppm: {mean_co2_ppm} meets threshold condition. Exiting."
-            )
+            LOGGER.info(f"mean_co2_ppm: {mean_co2_ppm} meets threshold condition. Exiting.")
 
         return_dict = {
             "epoch": float(time.time()),
@@ -816,19 +805,15 @@ class Calc:
             fill_needed = True
             fill_vol = target_volume_ul - present_volume_ul
             repeat_experiment_params = {"fill_volume_ul": fill_vol}
-            self.base.print_message(
-                f"current syringe volume: {present_volume_ul} does not meet threshold condition. Refilling"
-            )
+            LOGGER.info(f"current syringe volume: {present_volume_ul} does not meet threshold condition. Refilling")
         elif check_volume_ul == 0:
             fill_needed = True
             fill_vol = target_volume_ul - present_volume_ul
             repeat_experiment_params = {"fill_volume_ul": fill_vol}
-            self.base.print_message(f"Refilling to target volume: {target_volume_ul}")
+            LOGGER.info(f"Refilling to target volume: {target_volume_ul}")
         else:
             fill_needed = False
-            self.base.print_message(
-                f"current syringe volume: {present_volume_ul} does meet threshold condition. No action needed."
-            )
+            LOGGER.info(f"current syringe volume: {present_volume_ul} does meet threshold condition. No action needed.")
 
         if fill_needed:
             rep_exp = Experiment(
@@ -836,7 +821,7 @@ class Calc:
                 experiment_params=repeat_experiment_params,
                 **kwargs,
             )
-            self.base.print_message("queueing repeat experiment request on Orch")
+            LOGGER.info("queueing repeat experiment request on Orch")
             resp, error = await async_private_dispatcher(
                 self.base.orch_key,
                 self.base.orch_host,
@@ -848,8 +833,8 @@ class Calc:
                     "experiment": rep_exp.clean_dict(),
                 },
             )
-            self.base.print_message(f"insert_experiment got response: {resp}")
-            self.base.print_message(f"insert_experiment returned error: {error}")
+            LOGGER.info(f"insert_experiment got response: {resp}")
+            LOGGER.info(f"insert_experiment returned error: {error}")
 
         return_dict = {
             "epoch": float(time.time()),

@@ -2,6 +2,12 @@ import os
 import asyncio
 import time
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+    
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.helpers.zstd_io import unzpickle
@@ -226,9 +232,7 @@ class GPSim:
                 if idx in self.available[plate_key]:
                     self.available[plate_key].remove(idx)
             self.global_step += 1
-        self.base.print_message(
-            f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points"
-        )
+        LOGGER.info(f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points")
         return data
 
     async def fit_model(self, plate_id, orch_str: str = ""):
@@ -412,7 +416,7 @@ class GPSim:
                 experiment_params=repeat_experiment_params,
                 **kwargs,
             )
-            self.base.print_message("queueing repeat experiment request on Orch")
+            LOGGER.info("queueing repeat experiment request on Orch")
             resp, error = await async_private_dispatcher(
                 orch_key,
                 orch_host,
@@ -424,12 +428,10 @@ class GPSim:
                     "experiment": rep_exp.clean_dict(),
                 },
             )
-            self.base.print_message(f"insert_experiment got response: {resp}")
-            self.base.print_message(f"insert_experiment returned error: {error}")
+            LOGGER.info(f"insert_experiment got response: {resp}")
+            LOGGER.info(f"insert_experiment returned error: {error}")
         else:
-            self.base.print_message(
-                f"Threshold condition {stop_condition} {thresh_value} has been met."
-            )
+            LOGGER.info(f"Threshold condition {stop_condition} {thresh_value} has been met.")
         return_dict = progress
         return_dict.update(
             {
@@ -444,7 +446,7 @@ class GPSim:
 class GPSimExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("GPSimExec initialized.")
+        LOGGER.info("GPSimExec initialized.")
         self.start_time = time.time()  # instantiation time
         self.duration = self.active.action.action_params.get("duration", -1)
         self.plate_id = self.active.action.action_params["plate_id"]

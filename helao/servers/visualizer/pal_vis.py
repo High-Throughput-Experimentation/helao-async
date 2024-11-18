@@ -13,6 +13,12 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 from bokeh.models import DataTable, TableColumn
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.data import DataPackageModel
 from helao.servers.vis import Vis
@@ -179,7 +185,7 @@ class C_palvis:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(f"'{self.pal_key}' Bokeh session closed", info=True)
+        LOGGER.info(f"'{self.pal_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -235,7 +241,7 @@ class C_palvis:
                 self.datasource[smptype].data = self.data_dict[smptype]
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(f" ... PAL visualizer subscribing to: {self.data_url}")
+        LOGGER.info(f" ... PAL visualizer subscribing to: {self.data_url}")
         retry_limit = 5
         for _ in range(retry_limit):
             try:
@@ -264,7 +270,7 @@ class C_palvis:
                 )
                 await asyncio.sleep(1)
             if not self.IOloop_data_run:
-                self.vis.print_message("IOloop closed", info=True)
+                LOGGER.info("IOloop closed")
                 break
 
     def reset_plot(self):

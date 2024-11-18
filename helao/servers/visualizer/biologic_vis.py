@@ -14,6 +14,13 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 from bokeh.models import Button
 from bokeh.events import ButtonClick
+
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 from helao.core.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
 from helao.servers.vis import Vis
@@ -184,9 +191,7 @@ class C_biovis:
             self.reset_plot(ch, auuid, forceupdate=True)
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(
-            f"'{self.potentiostat_key}' Bokeh session closed", info=True
-        )
+        LOGGER.info(f"'{self.potentiostat_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -227,9 +232,7 @@ class C_biovis:
         sender.value = value
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(
-            f" ... potentiostat visualizer subscribing to: {self.data_url}"
-        )
+        LOGGER.info(f" ... potentiostat visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
@@ -289,7 +292,7 @@ class C_biovis:
         )
         xstr = self.data_dict_keys[self.xselect]
         ystr = self.data_dict_keys[self.yselect]
-        self.vis.print_message(f"{xstr}, {ystr}")
+        LOGGER.info(f"{xstr}, {ystr}")
         colors = ["red", "blue", "orange", "green"]
         self.channel_plots[channel].line(
             x=xstr,
@@ -311,7 +314,7 @@ class C_biovis:
     def reset_plot(self, channel, new_action_uuid=None, forceupdate: bool = False):
         if self.channel_action_uuid[channel] != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
-                self.vis.print_message(f" ... reseting channel {channel} graph")
+                LOGGER.info(f" ... reseting channel {channel} graph")
                 self.channel_action_uuid_prev[channel] = self.channel_action_uuid[
                     channel
                 ]
@@ -332,7 +335,7 @@ class C_biovis:
             self._add_plots(channel)
 
     def callback_stop_measure(self, event, channel):
-        self.vis.print_message("stopping gamry measurement")
+        LOGGER.info("stopping gamry measurement")
         self.vis.doc.add_next_tick_callback(
             partial(
                 async_private_dispatcher,

@@ -12,6 +12,11 @@ from fastapi import Body
 import numpy as np
 import pandas as pd
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 from helao.servers.base import Base
 from helao.servers.base_api import BaseAPI
 from helao.helpers.make_str_enum import make_str_enum
@@ -33,13 +38,13 @@ class MotionSim:
     def solid_get_samples_xy(self, plate_id: int, sample_no: int, *args, **kwargs):
         rowmatch = self.pmdf.query(f"Sample=={sample_no}")
         if len(rowmatch)==0:
-            self.base.print_message(f"Could not locate sample_no: {sample_no} on plate_id: {plate_id}")
+            LOGGER.info(f"Could not locate sample_no: {sample_no} on plate_id: {plate_id}")
             retxy = [None, None]
         else:
             if len(rowmatch)>1:
-                self.base.print_message(f"Found multiple locations matching plate_id: {plate_id}, sample_no: {sample_no}, returning first match.")
+                LOGGER.info(f"Found multiple locations matching plate_id: {plate_id}, sample_no: {sample_no}, returning first match.")
             else:
-                self.base.print_message(f"Found x,y")
+                LOGGER.info(f"Found x,y")
             firstmatch = rowmatch.iloc[0]
             retxy = [float(firstmatch.x), float(firstmatch.y)]
         return {"platexy": retxy}

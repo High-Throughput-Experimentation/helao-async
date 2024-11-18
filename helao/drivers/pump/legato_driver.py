@@ -11,6 +11,11 @@ import asyncio
 from typing import Optional
 
 # import traceback
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 from helao.core.models.hlostatus import HloStatus
 from helao.core.error import ErrorCodes
@@ -116,26 +121,26 @@ class KDS100:
         self.last_state = "unknown"
 
     async def start_polling(self):
-        self.base.print_message("got 'start_polling' request, raising signal")
+        LOGGER.info("got 'start_polling' request, raising signal")
         async with self.base.aiolock:
             await self.poll_signalq.put(True)
         while not self.polling:
-            self.base.print_message("waiting for polling loop to start")
+            LOGGER.info("waiting for polling loop to start")
             await asyncio.sleep(0.1)
 
     async def stop_polling(self):
-        self.base.print_message("got 'stop_polling' request, raising signal")
+        LOGGER.info("got 'stop_polling' request, raising signal")
         async with self.base.aiolock:
             await self.poll_signalq.put(False)
         while self.polling:
-            self.base.print_message("waiting for polling loop to stop")
+            LOGGER.info("waiting for polling loop to stop")
             await asyncio.sleep(0.1)
 
     async def poll_signal_loop(self):
         await self.safe_state()
         while True:
             self.polling = await self.poll_signalq.get()
-            self.base.print_message("polling signal received")
+            LOGGER.info("polling signal received")
 
     async def send(self, pump_name: str, cmd: str):
         if not cmd.endswith("\r"):
@@ -158,7 +163,7 @@ class KDS100:
         return resp
 
     async def poll_sensor_loop(self, frequency: int = 10):
-        self.base.print_message("polling background task has started")
+        LOGGER.info("polling background task has started")
         waittime = 1.0 / frequency
         lastupdate = 0
         while True:
@@ -166,15 +171,15 @@ class KDS100:
                 for plab, pdict in self.config_dict.get("pumps", {}).items():
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
-                        # self.base.print_message("waiting for minimum update interval.")
+                        # LOGGER.info("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     addr = pdict["address"]
                     status_resp = await self.send(plab, "status")
-                    # self.base.print_message(f"received status: {status_resp}")
+                    # LOGGER.info(f"received status: {status_resp}")
                     lastupdate = time.time()
                     status_prompt = status_resp[-1]
                     status = status_resp[0]
-                    # self.base.print_message(f"current status: {status}")
+                    # LOGGER.info(f"current status: {status}")
                     addrstate_rate, pumptime, pumpvol, flags = status.split()
                     raddr = int(addrstate_rate[:2])
                     # self.base.print_message(
@@ -191,14 +196,12 @@ class KDS100:
                             else:
                                 continue
                         if state != self.last_state:
-                            self.base.print_message(
-                                f"pump state changed from '{self.last_state}' to '{state}'"
-                            )
+                            LOGGER.info(f"pump state changed from '{self.last_state}' to '{state}'")
                             self.last_state = state
                         rate = int(addrstate_rate.split(state_split)[-1])
                         pumptime = int(pumptime)
                         pumpvol = int(pumpvol)
-                        # self.base.print_message(f"flags: {flags.lower()}")
+                        # LOGGER.info(f"flags: {flags.lower()}")
                         (
                             motor_dir,
                             limit_status,
@@ -223,9 +226,9 @@ class KDS100:
                         }
                         # self.base.print_message(status_dict[plab]["status"])
                         await self.base.put_lbuf(status_dict)
-                        # self.base.print_message("status sent to live buffer")
+                        # LOGGER.info("status sent to live buffer")
                     else:
-                        self.base.print_message("pump address does not match config")
+                        LOGGER.info("pump address does not match config")
                 # await asyncio.sleep(0.01)
             else:
                 await asyncio.sleep(0.05)
@@ -244,7 +247,7 @@ class KDS100:
                 break
             else:
                 continue
-        self.base.print_message(f"command response returned status: {state}")
+        LOGGER.info(f"command response returned status: {state}")
         status_dict = {"status": state}
         self.base.live_buffer[pump_name][0].update(status_dict)
 
@@ -367,41 +370,35 @@ class KDS100:
             idle_resp = f"{addr:02}:\x11"
             poll_resp = await self.send(plab, "poll on")
             if poll_resp[-1] != idle_resp:
-                self.base.print_message(f"Error setting pump '{plab}' to 'POLL on'.")
-                self.base.print_message(f"Server returned: {poll_resp[0]}")
+                LOGGER.info(f"Error setting pump '{plab}' to 'POLL on'.")
+                LOGGER.info(f"Server returned: {poll_resp[0]}")
             nvram_resp = await self.send(plab, "nvram off")
             if nvram_resp[-1] != idle_resp:
-                self.base.print_message(f"Error setting pump '{plab}' to 'NVRAM off'.")
-                self.base.print_message(f"Server returned: {nvram_resp[0]}")
+                LOGGER.info(f"Error setting pump '{plab}' to 'NVRAM off'.")
+                LOGGER.info(f"Server returned: {nvram_resp[0]}")
             stop_resp = await self.stop_pump(plab)
             if stop_resp[-1] != idle_resp:
-                self.base.print_message(f"Error stopping pump '{plab}'.")
-                self.base.print_message(f"Server returned: {stop_resp[0]}")
+                LOGGER.info(f"Error stopping pump '{plab}'.")
+                LOGGER.info(f"Server returned: {stop_resp[0]}")
             cleartime_resp = await self.clear_time(plab)
             if cleartime_resp[-1] != idle_resp:
-                self.base.print_message(
-                    f"Error clearing time params for pump '{plab}'."
-                )
-                self.base.print_message(f"Server returned: {cleartime_resp[0]}")
+                LOGGER.info(f"Error clearing time params for pump '{plab}'.")
+                LOGGER.info(f"Server returned: {cleartime_resp[0]}")
             clearvol_resp = await self.clear_target_volume(plab)
             if clearvol_resp[-1] != idle_resp:
-                self.base.print_message(
-                    f"Error clearing volume params for pump '{plab}'."
-                )
-                self.base.print_message(f"Server returned: {clearvol_resp[0]}")
+                LOGGER.info(f"Error clearing volume params for pump '{plab}'.")
+                LOGGER.info(f"Server returned: {clearvol_resp[0]}")
             diameter_resp = await self.set_diameter(plab, pdict["diameter"])
             if diameter_resp[-1] != idle_resp:
-                self.base.print_message(
-                    f"Error setting syringe diameter on pump '{plab}'."
-                )
-                self.base.print_message(f"Server returned: {diameter_resp[0]}")
+                LOGGER.info(f"Error setting syringe diameter on pump '{plab}'.")
+                LOGGER.info(f"Server returned: {diameter_resp[0]}")
             self.update_status_from_response(diameter_resp)
 
     async def shutdown(self):
         # this gets called when the server is shut down
         # or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
-        self.base.print_message("shutting down syringe pump(s)")
+        LOGGER.info("shutting down syringe pump(s)")
         await self.safe_state()
         self.com.close()
 
@@ -412,22 +409,22 @@ class PumpExec(Executor):
         self.direction = direction
         # current plan is 1 pump per COM
         self.pump_name = list(self.active.base.server_params["pumps"].keys())[0]
-        self.active.base.print_message("PumpExec initialized.")
+        LOGGER.info("PumpExec initialized.")
 
     async def _pre_exec(self):
         "Set rate and volume params, then run."
-        self.active.base.print_message("PumpExec running setup methods.")
+        LOGGER.info("PumpExec running setup methods.")
         rate_resp = await self.active.base.fastapp.driver.set_rate(
             pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
             direction=self.direction,
         )
-        self.active.base.print_message(f"set_rate returned: {rate_resp}")
+        LOGGER.info(f"set_rate returned: {rate_resp}")
         vol_resp = await self.active.base.fastapp.driver.set_target_volume(
             pump_name=self.pump_name,
             vol_val=self.active.action.action_params["volume_uL"],
         )
-        self.active.base.print_message(f"set_target_volume returned: {vol_resp}")
+        LOGGER.info(f"set_target_volume returned: {vol_resp}")
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
@@ -435,13 +432,13 @@ class PumpExec(Executor):
             pump_name=self.pump_name,
             direction=self.direction,
         )
-        self.active.base.print_message(f"start_pump returned: {start_resp}")
+        LOGGER.info(f"start_pump returned: {start_resp}")
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
         live_buffer, _ = self.active.base.get_lbuf(self.pump_name)
         pump_status = live_buffer["status"]
-        # self.active.base.print_message(f"poll iter status: {pump_status}")
+        # LOGGER.info(f"poll iter status: {pump_status}")
         await asyncio.sleep(0.01)
         if pump_status in ["infusing", "withdrawing"]:
             return {"error": ErrorCodes.none, "status": HloStatus.active}
@@ -452,20 +449,20 @@ class PumpExec(Executor):
 
     async def _manual_stop(self):
         stop_resp = await self.active.base.fastapp.driver.stop_pump(self.pump_name)
-        self.active.base.print_message(f"stop_pump returned: {stop_resp}")
+        LOGGER.info(f"stop_pump returned: {stop_resp}")
         return {"error": ErrorCodes.none}
 
     async def _post_exec(self):
-        self.active.base.print_message("PumpExec running cleanup methods.")
+        LOGGER.info("PumpExec running cleanup methods.")
         clearvol_resp = await self.active.base.fastapp.driver.clear_volume(
             pump_name=self.pump_name,
             direction=self.direction,
         )
-        self.active.base.print_message(f"clear_volume returned: {clearvol_resp}")
+        LOGGER.info(f"clear_volume returned: {clearvol_resp}")
         cleartar_resp = await self.active.base.fastapp.driver.clear_target_volume(
             pump_name=self.pump_name,
         )
-        self.active.base.print_message(f"clear_target_volume returned: {cleartar_resp}")
+        LOGGER.info(f"clear_target_volume returned: {cleartar_resp}")
         return {"error": ErrorCodes.none}
 
 

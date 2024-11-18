@@ -9,7 +9,7 @@ __all__ = ["HelaoAnalysisSyncer"]
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="analysis_driver_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
@@ -197,9 +197,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         """
         self.task_set.add(calc_tup[0])
         await self.task_queue.put((rank, calc_tup))
-        self.base.print_message(
-            f"Added {str(calc_tup[0])} to syncer queue with priority {rank}."
-        )
+        LOGGER.info(f"Added {str(calc_tup[0])} to syncer queue with priority {rank}.")
 
     async def syncer(self):
         """
@@ -222,11 +220,11 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             This method is designed to run indefinitely and should be managed appropriately to ensure it does not block other operations.
 
         """
-        self.base.print_message("Starting syncer queue processor task.")
+        LOGGER.info("Starting syncer queue processor task.")
         while True:
             if len(self.running_tasks) < self.max_tasks:
                 rank, calc_tup = await self.task_queue.get()
-                self.base.print_message(f"creating ana task for {calc_tup[0]}.")
+                LOGGER.info(f"creating ana task for {calc_tup[0]}.")
                 self.running_tasks[str(calc_tup[0])] = asyncio.create_task(
                     self.sync_ana(calc_tup, rank=rank), name=str(calc_tup[0])
                 )
@@ -259,15 +257,15 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             bool: True if the synchronization was successful, False otherwise.
         """
         process_uuid, process_df, analysis_params, ana_func = calc_tup
-        # self.base.print_message(f"performing analysis {analysis_name}")
-        # self.base.print_message(f"using params {analysis_params}")
+        # LOGGER.info(f"performing analysis {analysis_name}")
+        # LOGGER.info(f"using params {analysis_params}")
         if analysis_params is None:
             analysis_params = {}
         eua = ana_func(process_uuid, process_df, analysis_params)
-        # self.base.print_message("calculating analysis output")
+        # LOGGER.info("calculating analysis output")
         calc_result = eua.calc_output()
         if calc_result:
-            # self.base.print_message("exporting analysis output")
+            # LOGGER.info("exporting analysis output")
             model_dict, output_dict = eua.export_analysis(
                 bucket=self.bucket,
                 region=self.region,
@@ -295,7 +293,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             s3_model_target = f"analysis/{eua.analysis_uuid}.json"
 
             if not self.config_dict.get("local_only", False):
-                self.base.print_message("uploading analysis model to S3 bucket")
+                LOGGER.info("uploading analysis model to S3 bucket")
                 try:
                     s3_model_success = await self.to_s3(model_dict, s3_model_target)
                 except Exception as e:
@@ -305,13 +303,11 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     print(tb)
             else:
                 s3_model_success = True
-                self.base.print_message(
-                    "Analysis server config set to local_only, skipping S3/API push."
-                )
+                LOGGER.info("Analysis server config set to local_only, skipping S3/API push.")
 
             outputs = model_dict.get("outputs", [])
             output_successes = []
-            # self.base.print_message("uploading analysis outputs to S3 bucket")
+            # LOGGER.info("uploading analysis outputs to S3 bucket")
             for output in outputs:
                 s3_dict_keys = output["output_keys"]
                 s3_dict = {k: v for k, v in output_dict.items() if k in s3_dict_keys}
@@ -336,13 +332,10 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             api_success = True
 
             if s3_model_success and s3_output_success and api_success:
-                self.base.print_message(f"Successfully synced {eua.analysis_uuid}")
+                LOGGER.info(f"Successfully synced {eua.analysis_uuid}")
                 return True
 
-        self.base.print_message(
-            f"Analysis {eua.analysis_uuid} sync failed for process_uuid {process_uuid}.",
-            warning=True,
-        )
+        LOGGER.warning(f"Analysis {eua.analysis_uuid} sync failed for process_uuid {process_uuid}.")
         self.running_tasks.pop(str(process_uuid))
         return False
 
@@ -361,7 +354,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         """
         req_url = f"https://{self.api_host}/analyses/"
         meta_uuid = req_model["analysis_uuid"]
-        self.base.print_message(f"attempting API push for analysis: {meta_uuid}")
+        LOGGER.info(f"attempting API push for analysis: {meta_uuid}")
         try_create = True
         api_success = False
         last_status = 0
@@ -377,18 +370,12 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                                 api_success = True
                             elif resp.status == 400:
                                 try_create = False
-                            self.base.print_message(
-                                f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}"
-                            )
+                            LOGGER.info(f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}")
                             last_response = await resp.json()
-                            self.base.print_message(
-                                f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}"
-                            )
+                            LOGGER.info(f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}")
                             last_status = resp.status
                     except Exception as e:
-                        self.base.print_message(
-                            f"[{i+1}/{retries}] an exception occurred: {e}"
-                        )
+                        LOGGER.info(f"[{i+1}/{retries}] an exception occurred: {e}")
             if not api_success:
                 meta_s3_key = f"analysis/{meta_uuid}.json"
                 fail_model = {
@@ -409,14 +396,10 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     for _ in range(retries):
                         async with session.post(fail_url, json=fail_model) as resp:
                             if resp.status == 200:
-                                self.base.print_message(
-                                    f"successful debug API push for analysis: {meta_uuid}"
-                                )
+                                LOGGER.info(f"successful debug API push for analysis: {meta_uuid}")
                                 break
-                            self.base.print_message(
-                                f"failed debug API push for analysis: {meta_uuid}"
-                            )
-                            self.base.print_message(f"response: {await resp.json()}")
+                            LOGGER.info(f"failed debug API push for analysis: {meta_uuid}")
+                            LOGGER.info(f"response: {await resp.json()}")
         return api_success
 
     async def batch_calc_echeuvis(
@@ -515,9 +498,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
 
         retry_counter = 0
         while df.shape[0] == 0 and retry_counter < 3:
-            self.base.print_message(
-                "query returned 0 rows, checking again in 5 seconds."
-            )
+            LOGGER.info("query returned 0 rows, checking again in 5 seconds.")
             time.sleep(5)
             df = pgs3.LOADER.get_recent(
                 query=DRYUVIS_QUERY, min_date=min_date, plate_id=plate_id

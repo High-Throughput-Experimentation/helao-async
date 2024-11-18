@@ -3,6 +3,11 @@ from types import MethodType
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 class Executor:
     """
@@ -104,7 +109,7 @@ class Executor:
         Returns:
             dict: A dictionary containing the setup error code with the key "error".
         """
-        self.active.base.print_message("generic Executor running setup methods.")
+        LOGGER.info("generic Executor running setup methods.")
         self.setup_err = ErrorCodes.none
         return {"error": self.setup_err}
 
