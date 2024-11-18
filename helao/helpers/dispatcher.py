@@ -52,20 +52,10 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={},
                 error_code = ErrorCodes.none
                 if resp.status != 200:
                     error_code = ErrorCodes.http
-                    print_message(
-                        LOGGER,
-                        "orchestrator",
-                        f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}",
-                        error=True,
-                    )
+                    LOGGER.error(f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}")
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                print_message(
-                    LOGGER,
-                    "orchestrator",
-                    f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{resp}', error={repr(e), tb,}",
-                    error=True,
-                )
+                LOGGER.error(f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{resp}'), {tb}",)
             resp.close()
         await session.close()
     await asyncio.sleep(0)
@@ -112,20 +102,10 @@ async def async_private_dispatcher(
                 error_code = ErrorCodes.none
                 if resp.status != 200:
                     error_code = ErrorCodes.http
-                    print_message(
-                        LOGGER,
-                        "orchestrator",
-                        f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
-                        error=True,
-                    )
+                    LOGGER.error(f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')")
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                print_message(
-                    LOGGER,
-                    "orchestrator",
-                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
-                    error=True,
-                )
+                LOGGER.error(f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), {tb}")
             resp.close()
         await session.close()
     await asyncio.sleep(0)
@@ -170,18 +150,12 @@ def private_dispatcher(
                     response = str(resp)
                 if resp.status_code != 200:
                     error_code = ErrorCodes.http
-                    print_message(
-                        LOGGER,
-                        "orchestrator",
-                        f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}', error={repr(error_code)}",
+                    LOGGER.error(f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}')}",
                         error=True,
                     )
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                print_message(
-                    LOGGER,
-                    "orchestrator",
-                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
+                LOGGER.error(f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), tb}",
                     error=True,
                 )
                 response = None
@@ -255,11 +229,7 @@ async def endpoints_available(req_list: list):
     if not all(responses):
         badinds = [i for i,v in enumerate(responses) if not v]
         unavailable = [(req_list[i], [states[i]]) for i in badinds]
-        print_message(
-            LOGGER,
-            "orchestrator",
-            f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}",
-        )
+        LOGGER.info(f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}")
         return False, unavailable
     else:
         return True, []

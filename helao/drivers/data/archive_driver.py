@@ -111,7 +111,7 @@ class Archive:
             LOGGER.error(f"'{self.archivejson}' does not exist, writing empty global dict.")
             self.write_config()
         # except Exception:
-        # print_message(LOGGER, "launcher", f"Error loading '{pidFile}', writing empty global dict.", error = True)
+        # LOGGER.error(f"Error loading '{pidFile}', writing empty global dict.")
         # self.write_config()
 
         # check trays
@@ -338,7 +338,7 @@ class Archive:
         )
 
         if not load_samples_in:
-            print_message(LOGGER, "archive", "Sample does not exist in DB.", warning=True)
+            LOGGER.warning("Sample does not exist in DB.")
             return error, sample
 
         position_found = False
@@ -1032,7 +1032,7 @@ class Archive:
         )
 
         if not load_samples_in:
-            print_message(LOGGER, "archive", "Sample does not exist in DB.", warning=True)
+            LOGGER.warning("Sample does not exist in DB.")
             return False, NoneSample(), {}
 
         if custom in self.positions.customs_dict:

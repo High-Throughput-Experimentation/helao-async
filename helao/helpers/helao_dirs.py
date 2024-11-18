@@ -49,11 +49,7 @@ def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
         user_seq = os.path.join(root, "USER_CONFIG", "SEQ")
         ana_root = os.path.join(root, "ANALYSES")
         process_root = os.path.join(root, "PROCESSES")
-        print_message(
-            LOGGER,
-            "DIR",
-            f"Found root directory in config: {world_cfg['root']}",
-        )
+        LOGGER.info(f"Found root directory in config: {world_cfg['root']}")
         check_dir(root)
         check_dir(save_root)
         check_dir(log_root)
