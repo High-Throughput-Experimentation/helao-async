@@ -25,8 +25,8 @@ def alert(self, message, *args, **kws):
 
 logging.Logger.alert = alert
 
-
-from logging.handlers import TimedRotatingFileHandler, SMTPHandler
+from queue import Queue
+from logging.handlers import TimedRotatingFileHandler, SMTPHandler, QueueHandler, QueueListener
 from colorlog import ColoredFormatter
 import tempfile
 import os
@@ -111,6 +111,11 @@ def make_logger(
         ]
     print(email_conditions)
     if all(email_conditions):
+        email_queue = Queue(-1)
+        queue_handler = QueueHandler(email_queue)
+        queue_handler.setLevel(ALERT_LEVEL)
+        queue_handler.setFormatter(formatter)
+        logger_instance.addHandler(queue_handler)
         email_handler = TitledSMTPHandler(
             mailhost=(mailhost, mailport),
             fromaddr=fromaddr,
@@ -121,7 +126,8 @@ def make_logger(
         )
         email_handler.setLevel(ALERT_LEVEL)
         email_handler.setFormatter(formatter)
-        logger_instance.addHandler(email_handler)
+        # logger_instance.addHandler(email_handler)
+        queue_listener = QueueListener(email_queue, email_handler)
         logger_instance.info(f"Email alerts enabled at log level: {ALERT_LEVEL}")
     else:
         logger_instance.info(f"Email alerts not enabled using config: {email_config}")
