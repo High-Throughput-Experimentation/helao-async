@@ -140,10 +140,10 @@ class GamryExec(Executor):
             single_alert = self.alert_params["alert_sleep__s"] <= 0 and self.last_alert_time == 0
             ongoing_alert = self.alert_params["alert_sleep__s"] > 0 and (poll_iter_time - self.last_alert_time > self.alert_params['alert_sleep__s'])
             if single_alert or ongoing_alert:
-                LOGGER.info(f"single_alert: {single_alert}, ongoing_alert: {ongoing_alert}")
+                LOGGER.debug(f"single_alert: {single_alert}, ongoing_alert: {ongoing_alert}")
                 min_duration = self.alert_params["alert_duration__s"]
                 if min_duration > 0 and self.data_buffer.get("t_s", [-1])[-1] > min_duration:
-                    LOGGER.info(f"elapsed time is above min_duration: {min_duration}")
+                    LOGGER.debug(f"elapsed time is above min_duration: {min_duration}")
                     time_buffer = self.data_buffer["t_s"]
                     idx = 1
                     latest_t = time_buffer[-1]
@@ -151,19 +151,19 @@ class GamryExec(Executor):
                     while (len(time_buffer) > idx) and (slice_duration < min_duration):
                         idx += 1
                         slice_duration = latest_t - time_buffer[-idx]
-                    LOGGER.info(f"slice index is: {-idx}")
+                    LOGGER.debug(f"slice index is: {-idx}")
                     if slice_duration >= min_duration:
-                        LOGGER.info(f"slice_duration {slice_duration:.3f} is above min_duration")
+                        LOGGER.debug(f"slice_duration {slice_duration:.3f} is above min_duration")
                         for thresh_key in ("Ewe_V", "I_A"):
                             thresh_val = self.alert_params.get(f"alertThresh{thresh_key}", None)
                             data_dq = self.data_buffer[thresh_key]
                             slice_vals = list(itertools.islice(data_dq, len(data_dq)-idx, len(data_dq)))
                             if thresh_val is not None:
                                 if all([x > thresh_val for x in slice_vals]) and self.alert_params["alert_above"]:
-                                    LOGGER.alert(f"{thresh_key} went above {thresh_val} for {min_duration}")
+                                    LOGGER.alert(f"{thresh_key} went above {thresh_val} for {min_duration} seconds.")
                                     self.last_alert_time = poll_iter_time
                                 elif all([x < thresh_val for x in slice_vals]) and not self.alert_params["alert_above"]:
-                                    LOGGER.alert(f"{thresh_key} went below {thresh_val} for {min_duration}")
+                                    LOGGER.alert(f"{thresh_key} went below {thresh_val} for {min_duration} seconds.")
                                     self.last_alert_time = poll_iter_time
             error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
             status = HloStatus.active if resp.message != "done" else HloStatus.finished
