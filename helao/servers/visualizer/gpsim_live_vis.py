@@ -124,7 +124,7 @@ class C_gpsimlivevis:
         self._add_plots()
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(f"'{self.live_key}' Bokeh session closed", info=True)
+        LOGGER.info(f"'{self.live_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -204,7 +204,7 @@ class C_gpsimlivevis:
             self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(" ... Live visualizer receiving messages.")
+        LOGGER.info(" ... Live visualizer receiving messages.")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()

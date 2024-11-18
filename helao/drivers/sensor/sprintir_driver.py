@@ -52,7 +52,7 @@ class SprintIR:
         )
 
         # set POLL and flush present buffer until empty
-        self.base.print_message("Setting sensor to polling mode.")
+        LOGGER.info("Setting sensor to polling mode.")
         self.com.write(b"K 2\r\n")
         # self.send("K 2")
         self.send("! 0")
@@ -82,9 +82,9 @@ class SprintIR:
         ]
         ifw_map = {v: k for k, v in fw_map}
         self.fw = {}
-        self.base.print_message("Reading scaling factor and initial co2 ppm.")
+        LOGGER.info("Reading scaling factor and initial co2 ppm.")
         for k, v in fw_map:
-            self.base.print_message(f"checking {k}")
+            LOGGER.info(f"checking {k}")
             resp, aux = self.send(v)
             if resp:
                 fw_val = resp[0].split()[-1].replace(v, "").strip()
@@ -98,7 +98,7 @@ class SprintIR:
             time.sleep(0.1)
 
         # set streaming mode before starting async task
-        self.base.print_message("Setting sensor to polling mode.")
+        LOGGER.info("Setting sensor to polling mode.")
         self.com.write(b"K 2\r\n")
 
         self.action = None
@@ -149,7 +149,7 @@ class SprintIR:
                 if self.IO_do_meas:
                     # are we in estop?
                     if not self.base.actionservermodel.estop:
-                        self.base.print_message("CO2-sense got measurement request")
+                        LOGGER.info("CO2-sense got measurement request")
                         try:
                             await asyncio.wait_for(
                                 self.continuous_record(),
@@ -159,23 +159,21 @@ class SprintIR:
                             pass
                         if self.base.actionservermodel.estop:
                             self.IO_do_meas = False
-                            self.base.print_message(
-                                "CO2-sense is in estop after measurement.", error=True
-                            )
+                            LOGGER.error("CO2-sense is in estop after measurement.")
                         else:
-                            self.base.print_message("setting CO2-sense to idle")
+                            LOGGER.info("setting CO2-sense to idle")
                             # await self.stat.set_idle()
-                        self.base.print_message("CO2 measurement is done")
+                        LOGGER.info("CO2 measurement is done")
                     else:
                         self.active.action.action_status.append(HloStatus.estopped)
                         self.IO_do_meas = False
-                        self.base.print_message("CO2-sense is in estop.", error=True)
+                        LOGGER.error("CO2-sense is in estop.")
 
                 # endpoint can return even we got errors
                 self.IO_continue = True
 
                 if self.active:
-                    self.base.print_message("CO2-sense finishes active action")
+                    LOGGER.info("CO2-sense finishes active action")
                     active_not_finished = True
                     while active_not_finished:
                         try:
@@ -190,7 +188,7 @@ class SprintIR:
         except asyncio.CancelledError:
             # endpoint can return even we got errors
             self.IO_continue = True
-            self.base.print_message("IOloop task was cancelled")
+            LOGGER.info("IOloop task was cancelled")
 
     def send(self, command_str: str):
         if not command_str.endswith("\r\n"):
@@ -212,9 +210,7 @@ class SprintIR:
             elif strip:
                 aux_resp.append(strip)
         if aux_resp:
-            self.base.print_message(
-                f"Received auxiliary responses: {aux_resp}", info=True
-            )
+            LOGGER.info(f"Received auxiliary responses: {aux_resp}")
         # while not cmd_resp:
         #     repeats = self.send(command_str)
         #     cmd_resp += repeats[0]
@@ -235,7 +231,7 @@ class SprintIR:
 
     async def poll_sensor_loop(self, frequency: int = 4, reset_after: int = 5):
         waittime = 1.0 / frequency
-        self.base.print_message("Starting polling loop")
+        LOGGER.info("Starting polling loop")
         blanks = 0
         while True:
             if blanks == reset_after:
@@ -248,7 +244,7 @@ class SprintIR:
             try:
                 co2_level = self.read_stream()
             except Exception as err:
-                self.base.print_message(f"Could not parse streaming value, got {err}")
+                LOGGER.info(f"Could not parse streaming value, got {err}")
                 continue
             if co2_level:
                 msg_dict = {
@@ -258,9 +254,7 @@ class SprintIR:
                 if msg_dict["co2_ppm"] >= 0 and msg_dict["co2_ppm"] < 1e6:
                     await self.base.put_lbuf(msg_dict)
                 else:
-                    self.base.print_message(
-                        f"Got unreasonable co2_ppm value {msg_dict['co2_ppm']}"
-                    )
+                    LOGGER.info(f"Got unreasonable co2_ppm value {msg_dict['co2_ppm']}")
                 blanks = 0
             else:
                 blanks += 1
@@ -313,11 +307,11 @@ class SprintIR:
             await asyncio.sleep(0.01)
             # await asyncio.sleep(self.recording_rate)
 
-        self.base.print_message("polling loop duration complete, finishing")
+        LOGGER.info("polling loop duration complete, finishing")
         if self.IO_measuring:
             self.IO_do_meas = False
             self.IO_measuring = False
-            self.base.print_message("signaling IOloop to stop")
+            LOGGER.info("signaling IOloop to stop")
             self.set_IO_signalq_nowait(False)
         else:
             pass
@@ -337,16 +331,14 @@ class SprintIR:
         # validate samples_in
         samples_in = await self.unified_db.get_samples(A.samples_in)
         if not samples_in and not self.allow_no_sample:
-            self.base.print_message(
-                "Server got no valid sample, cannot start measurement!", error=True
-            )
+            LOGGER.error("Server got no valid sample, cannot start measurement!")
             A.samples_in = []
             A.error_code = ErrorCodes.no_sample
             activeDict = A.as_dict()
         else:
             self.samples_in = samples_in
             self.action = A
-            # self.base.print_message("Writing initial spec_helao__file", info=True)
+            # LOGGER.info("Writing initial spec_helao__file")
             file_header = self.fw
             dflt_conn_key = self.base.dflt_file_conn_key()
             file_conn_params = FileConnParams(
@@ -372,7 +364,7 @@ class SprintIR:
                 samples=[sample_in for sample_in in self.samples_in], IO="in"
             )
 
-            self.base.print_message(f"start_time: {self.start_time}")
+            LOGGER.info(f"start_time: {self.start_time}")
             self.active.finish_hlo_header(
                 realtime=self.base.get_realtime_nowait(),
                 file_conn_keys=self.active.action.file_conn_keys,
@@ -396,18 +388,18 @@ class SprintIR:
         try:
             self.polling_task.cancel()
         except asyncio.CancelledError:
-            self.base.print_message("closed sensor polling loop task")
+            LOGGER.info("closed sensor polling loop task")
         try:
             self.recording_task.cancel()
         except asyncio.CancelledError:
-            self.base.print_message("closed sensor recording loop task")
+            LOGGER.info("closed sensor recording loop task")
         self.com.close()
 
 
 class CO2MonExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("CO2MonExec initialized.")
+        LOGGER.info("CO2MonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
         self.total = 0
@@ -417,7 +409,7 @@ class CO2MonExec(Executor):
         """Read CO2 ppm from live buffer."""
         live_dict = {}
         co2_ppm, epoch_s = self.active.base.get_lbuf("co2_ppm")
-        # self.active.base.print_message(f"got from live buffer: {co2_ppm}")
+        # LOGGER.info(f"got from live buffer: {co2_ppm}")
         self.total += co2_ppm
         self.num_acqs += 1
         live_dict["co2_ppm"] = co2_ppm
@@ -429,8 +421,8 @@ class CO2MonExec(Executor):
         else:
             status = HloStatus.finished
         await asyncio.sleep(0.01)
-        # self.active.base.print_message(f"sending status: {status}")
-        # self.active.base.print_message(f"sending data: {live_dict}")
+        # LOGGER.info(f"sending status: {status}")
+        # LOGGER.info(f"sending data: {live_dict}")
         return {
             "error": ErrorCodes.none,
             "status": status,

@@ -70,9 +70,9 @@ class ArchiveSim:
     def load_plate_id(self, plate_id: int, *args, **kwargs):
         if plate_id in self.list_plates():
             if plate_id == self.loaded_plate_id:
-                self.base.print_message(f"plate {plate_id} is already loaded")
+                LOGGER.info(f"plate {plate_id} is already loaded")
             else:
-                self.base.print_message(f"loading {plate_id} for measurement")
+                LOGGER.info(f"loading {plate_id} for measurement")
                 plated = [d for d in self.platespaces if d["plate_id"] == plate_id][0]
                 self.loaded_plate_id = plate_id
                 self.loaded_ph = plated["solution_ph"]
@@ -87,7 +87,7 @@ class ArchiveSim:
                 # "space": self.loaded_space,
             }
         else:
-            self.base.print_message(f"{plate_id} not found")
+            LOGGER.info(f"{plate_id} not found")
             return {}
 
     def list_spaces(self):
@@ -120,7 +120,7 @@ class ArchiveSim:
             match = self.loaded_df.iloc[self.loaded_space.index(element_fracs)]
             sample_no = int(match.Sample)
             compstr = '-'.join([f"{e}{f:.1f}" for e,f in zip(self.loaded_els, element_fracs)])
-            self.base.print_message(f"acquired sample {sample_no} with composition {compstr}")
+            LOGGER.info(f"acquired sample {sample_no} with composition {compstr}")
             eta3 = float(match.EtaV_CP3)
             eta10 = float(match.EtaV_CP10)
             acq_dict = {k: v for k, v in zip(self.loaded_els, element_fracs)}
@@ -130,7 +130,7 @@ class ArchiveSim:
             self.measured_space.append(acq_dict)
             return sample_no
         else:
-            self.base.print_message(f"did not find sample with composition {compstr}")
+            LOGGER.info(f"did not find sample with composition {compstr}")
             return False
 
     def shutdown(self):
