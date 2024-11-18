@@ -133,4 +133,5 @@ def make_logger(
         logger_instance.info(f"Email alerts not enabled using config: {email_config}")
 
     logger_instance.info(f"writing log events to {log_path}")
+    logger_instance.propagate = False
     return logger_instance
