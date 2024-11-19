@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from helao.helpers import logging
 import os
-import aiohttp
 
 __all__ = ["HelaoBokehAPI", "HelaoFastAPI"]
 
@@ -56,7 +55,7 @@ class HelaoFastAPI(FastAPI):
             logging.LOGGER = logging.make_logger(
                 logger_name=helao_srv, log_dir=os.path.join(helao_cfg["root"], "LOGS")
             )
-        self.tcp_connector = aiohttp.TCPConnector(force_close=True, limit=1000)
+        self.tcp_connector = None
 
 
 class HelaoBokehAPI:
@@ -93,4 +92,3 @@ class HelaoBokehAPI:
         self.doc = doc
         self.doc.title = self.doc_name
         self.vis = object()
-        self.tcp_connector = aiohttp.TCPConnector(force_close=True, limit=1000)

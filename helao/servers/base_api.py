@@ -7,6 +7,7 @@ import faulthandler
 from copy import copy
 from socket import gethostname
 
+import aiohttp
 from helao.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
@@ -274,6 +275,7 @@ class BaseAPI(HelaoFastAPI):
             - If the driver class is not a subclass of HelaoDriver, it initializes the driver with the base instance.
             - Initializes dynamic endpoints for the base instance.
             """
+            self.tcp_connector = aiohttp.TCPConnector(force_close=True, limit=1000)
             self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
 
             self.root_dir = self.base.world_cfg.get("root", None)

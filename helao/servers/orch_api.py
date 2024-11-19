@@ -8,6 +8,7 @@ from enum import Enum
 from socket import gethostname
 from typing import Union, Optional, List
 
+import aiohttp
 from fastapi import Body, WebSocket, Request
 from fastapi.routing import APIRoute
 from fastapi.exception_handlers import http_exception_handler
@@ -226,6 +227,7 @@ class OrchAPI(HelaoFastAPI):
             Returns:
                 None
             """
+            self.tcp_connector = aiohttp.TCPConnector(force_close=True, limit=1000)
             self.orch = Orch(fastapp=self)
 
             self.orch.myinit()
