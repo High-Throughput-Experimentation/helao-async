@@ -81,9 +81,7 @@ def make_logger(
         logger_name = os.path.basename(logger_name).replace(".py", "")
     temp_dir = tempfile.gettempdir()
     log_dir = temp_dir if log_dir is None else log_dir
-    print(log_dir)
-    log_path = os.path.join(log_dir, f"{logger_name}.log")
-    print(log_path)
+    log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
     formatter = logging.Formatter(format_string)
     # for stream output
@@ -113,8 +111,7 @@ def make_logger(
             filename=log_path, when="D", interval=1, backupCount=90
         )
     except OSError:
-        temp_log_dir = tempfile.TemporaryDirectory().name
-        temp_log_path = Path(os.path.join(temp_log_dir, f"{logger_name}.log"))
+        temp_log_path = Path(os.path.join(temp_dir, f"{logger_name}.log"))
         print(f"Can't write to {log_path}. Redirecting to: {temp_log_path}")
         timed_rotation = TimedRotatingFileHandler(
             filename=temp_log_path, when="D", interval=1, backupCount=90
