@@ -218,7 +218,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_LSV", tags=["action"])
     async def run_LSV(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
         Vfinal__V: float = 1.0,  # Final value in volts or amps.
@@ -243,6 +243,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alert_above: bool = True,
         alert_sleep__s: float = -1,
         alertThreshI_A: float = 0,
+        comment: str = "",
     ):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)
         use 4bit bitmask for triggers
@@ -256,7 +257,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CA", tags=["action"])
     async def run_CA(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
@@ -280,6 +281,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alert_above: bool = True,
         alert_sleep__s: float = -1,
         alertThreshI_A: float = 0,
+        comment: str = "",
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -294,7 +296,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CP", tags=["action"])
     async def run_CP(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Ival__A: float = 0.0,
         Tval__s: float = 10.0,
@@ -318,6 +320,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alert_above: bool = True,
         alert_sleep__s: float = -1,
         alertThreshEwe_V: float = 0,
+        comment: str = "",
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -331,7 +334,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CV", tags=["action"])
     async def run_CV(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
         Vapex1__V: float = 1.0,  # Apex 1 value in volts or amps.
@@ -359,6 +362,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alert_above: bool = True,
         alert_sleep__s: float = -1,
         alertThreshI_A: float = 0,
+        comment: str = "",
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
@@ -373,7 +377,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_OCV", tags=["action"])
     async def run_OCV(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
@@ -390,6 +394,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alert_above: bool = True,
         alert_sleep__s: float = -1,
         alertThreshEwe_V: float = 0,
+        comment: str = "",
     ):
         """mesasures open circuit potential
         use 4bit bitmask for triggers
@@ -403,7 +408,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_RCA", tags=["action"])
     async def run_RCA(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Vinit__V: float = 0.0,
         Tinit__s: float = 0.5,
@@ -418,6 +423,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alert_above: bool = True,
         alert_sleep__s: float = -1,
         alertThreshI_A: float = 0,
+        comment: str = "",
     ):
         """Measure pulsed voltammetry"""
         active = await app.base.setup_and_contain_action()
