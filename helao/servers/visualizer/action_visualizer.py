@@ -1,5 +1,6 @@
 __all__ = ["makeBokehApp"]
 
+import os
 from importlib import import_module
 from socket import gethostname
 
@@ -25,6 +26,7 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
 
 def makeBokehApp(doc, confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
+    config_filename = os.path.basename(config["loaded_config_path"])
 
     app = HelaoVis(
         config=config,
@@ -37,7 +39,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
             [
                 Spacer(width=20),
                 Div(
-                    text=f"<b>Action visualizer on {gethostname().lower()} -- config: {confPrefix}.py</b>",
+                    text=f"<b>Action visualizer on {gethostname().lower()} -- config: {config_filename}</b>",
                     width=1004,
                     height=32,
                     style={"font-size": "200%", "color": "#CB4335"},
