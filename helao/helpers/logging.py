@@ -99,8 +99,6 @@ def make_logger(
         style="%",
     )
 
-    if logger_name is None:
-        logger_name = os.path.basename(__file__).replace(".py", "") + "_standalone" # use script name
     logger_instance = logging.getLogger(logger_name)
     logger_instance.setLevel(log_level)
 
@@ -112,7 +110,7 @@ def make_logger(
             filename=log_path, when="D", interval=1, backupCount=90
         )
     except OSError:
-        temp_log_dir = tempfile.gettempdir() 
+        temp_log_dir = tempfile.TemporaryDirectory().name
         temp_log_path = Path(os.path.join(temp_log_dir, f"{logger_name}.log"))
         print(f"Can't write to {log_path}. Redirecting to: {temp_log_path}")
         timed_rotation = TimedRotatingFileHandler(
