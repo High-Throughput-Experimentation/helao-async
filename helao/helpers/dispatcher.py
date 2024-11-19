@@ -38,7 +38,7 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={},
     act_port = actd["port"]
     url = f"http://{act_addr}:{act_port}/{A.action_server.server_name}/{A.action_name}"
     client_timeout = aiohttp.ClientTimeout(total=timeout)
-    conn = aiohttp.TCPConnector(keepalive_timeout=0, enable_cleanup_closed=True)
+    conn = aiohttp.TCPConnector(keepalive_timeout=0, enable_cleanup_closed=True, limit=1000)
     error_code = ErrorCodes.unspecified
     response = None
     async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
@@ -88,7 +88,7 @@ async def async_private_dispatcher(
     url = f"http://{host}:{port}/{private_action}"
 
     client_timeout = aiohttp.ClientTimeout(total=timeout)
-    conn = aiohttp.TCPConnector(keepalive_timeout=0, enable_cleanup_closed=True)
+    conn = aiohttp.TCPConnector(keepalive_timeout=0, enable_cleanup_closed=True, limit=1000)
     error_code = ErrorCodes.unspecified
     response = None
     async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:

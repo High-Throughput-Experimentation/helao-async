@@ -1083,7 +1083,7 @@ class Base:
         # except asyncio.CancelledError:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"status LOGGER task was cancelled with error: {repr(e), tb,}")
+            LOGGER.error(f"status logger task was cancelled with error: {repr(e), tb,}")
 
     async def detach_subscribers(self):
         """
