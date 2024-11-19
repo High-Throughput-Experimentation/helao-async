@@ -150,14 +150,10 @@ def private_dispatcher(
                     response = str(resp)
                 if resp.status_code != 200:
                     error_code = ErrorCodes.http
-                    LOGGER.error(f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}')}",
-                        error=True,
-                    )
+                    LOGGER.error(f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}')")
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), tb}",
-                    error=True,
-                )
+                LOGGER.error(f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), {tb}")
                 response = None
             return response, error_code
 
