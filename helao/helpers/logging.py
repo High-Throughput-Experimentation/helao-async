@@ -77,6 +77,8 @@ def make_logger(
     Returns:
         logging.Logger: Configured logger instance.
     """
+    if logger_name is not None and logger_name.endswith(".py"):
+        logger_name = logger_name.replace(".py", "")
     log_dir = tempfile.gettempdir() if log_dir is None else log_dir
     log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
@@ -105,9 +107,17 @@ def make_logger(
     # create handlers
     console = logging.StreamHandler()
     console.setFormatter(colored_formatter)
-    timed_rotation = TimedRotatingFileHandler(
-        filename=log_path, when="D", interval=1, backupCount=90
-    )
+    try:
+        timed_rotation = TimedRotatingFileHandler(
+            filename=log_path, when="D", interval=1, backupCount=90
+        )
+    except OSError:
+        temp_log_dir = tempfile.gettempdir() 
+        temp_log_path = Path(os.path.join(temp_log_dir, f"{logger_name}.log"))
+        print(f"Can't write to {log_path}. Redirecting to: {temp_log_path}")
+        timed_rotation = TimedRotatingFileHandler(
+            filename=temp_log_path, when="D", interval=1, backupCount=90
+        )
     timed_rotation.setFormatter(formatter)
 
     # set log level and attach default handlers
