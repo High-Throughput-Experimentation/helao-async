@@ -9,6 +9,11 @@ from helao.core.models.sample import LiquidSample, SampleUnion
 from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 async def galil_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
@@ -52,9 +57,9 @@ async def galil_dyn_endpoints(app=None):
                     oneoff=False,
                     poll_rate=active.action.action_params["acquisition_rate"],
                 )
-                app.base.print_message("Starting executor task.")
+                LOGGER.info("Starting executor task.")
                 active_action_dict = active.start_executor(executor)
-                app.base.print_message("Returning active dict.")
+                LOGGER.info("Returning active dict.")
                 return active_action_dict
 
             @app.post(f"/{server_key}/cancel_acquire_analog_in", tags=["action"])

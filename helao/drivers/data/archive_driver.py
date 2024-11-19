@@ -356,7 +356,7 @@ class Archive:
                             )
                             position_found = True
         if not position_found:
-            print_message(LOGGER, "archive", f"could not find tray {tray}, slot {slot}, vial {vial} in defined positions or set position is already occupied.")   
+            LOGGER.info(f"could not find tray {tray}, slot {slot}, vial {vial} in defined positions or set position is already occupied.")   
         
         # update with information from db
         sample = await self._update_samples(sample)
