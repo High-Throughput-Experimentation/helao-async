@@ -82,7 +82,7 @@ def make_logger(
     temp_dir = tempfile.gettempdir()
     log_dir = temp_dir if log_dir is None else log_dir
     print(log_dir)
-    log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
+    log_path = os.path.join(log_dir, f"{logger_name}.log")
     print(log_path)
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
     formatter = logging.Formatter(format_string)
