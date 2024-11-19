@@ -78,7 +78,7 @@ def make_logger(
         logging.Logger: Configured logger instance.
     """
     if logger_name is not None and logger_name.endswith(".py"):
-        logger_name = logger_name.replace(".py", "")
+        logger_name = os.path.basename(logger_name).replace(".py", "")
     temp_dir = tempfile.gettempdir()
     log_dir = temp_dir if log_dir is None else log_dir
     print(log_dir)
