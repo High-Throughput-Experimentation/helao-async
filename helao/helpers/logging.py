@@ -79,9 +79,11 @@ def make_logger(
     """
     if logger_name is not None and logger_name.endswith(".py"):
         logger_name = logger_name.replace(".py", "")
-    print(tempfile.gettempdir())
-    log_dir = tempfile.gettempdir() if log_dir is None else log_dir
+    temp_dir = tempfile.gettempdir()
+    log_dir = temp_dir if log_dir is None else log_dir
+    print(log_dir)
     log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
+    print(log_path)
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
     formatter = logging.Formatter(format_string)
     # for stream output
