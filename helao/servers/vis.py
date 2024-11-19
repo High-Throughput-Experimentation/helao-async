@@ -99,6 +99,7 @@ class Vis:
         Raises:
             ValueError: If the root directory is not defined in the configuration.
         """
+        self.bokehapp = bokehapp
         self.server = MachineModel(
             server_name=bokehapp.helao_srv, machine_name=gethostname().lower()
         )

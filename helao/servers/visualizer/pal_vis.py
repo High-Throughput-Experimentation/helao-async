@@ -229,6 +229,7 @@ class C_palvis:
                 "give_only": "true" if 0 in self.inheritance_select else "false",
             },
             {},
+            connector=self.vis.bokehapp.tcp_connector,
         )
         if err == ErrorCodes.none:
             for smptype in ["solid", "liquid", "gas", "assembly"]:

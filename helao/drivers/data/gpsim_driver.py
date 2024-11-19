@@ -427,6 +427,7 @@ class GPSim:
                     "idx": 0,
                     "experiment": rep_exp.clean_dict(),
                 },
+                connector=self.base.fastapp.tcp_connector,
             )
             LOGGER.info(f"insert_experiment got response: {resp}")
             LOGGER.info(f"insert_experiment returned error: {error}")

@@ -18,7 +18,9 @@ else:
     LOGGER = logging.LOGGER
 
 
-async def async_action_dispatcher(world_config_dict: dict, A: Action, params={}, timeout=60):
+async def async_action_dispatcher(
+    world_config_dict: dict, A: Action, params={}, timeout=60, connector=None
+):
     """
     Asynchronously dispatches an action to the specified server and handles the response.
 
@@ -38,7 +40,12 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={},
     act_port = actd["port"]
     url = f"http://{act_addr}:{act_port}/{A.action_server.server_name}/{A.action_name}"
     client_timeout = aiohttp.ClientTimeout(total=timeout)
-    conn = aiohttp.TCPConnector(keepalive_timeout=0, enable_cleanup_closed=True, limit=1000)
+    if connector is None:
+        conn = aiohttp.TCPConnector(
+            keepalive_timeout=0, enable_cleanup_closed=True, limit=1000
+        )
+    else:
+        conn = connector
     error_code = ErrorCodes.unspecified
     response = None
     async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
@@ -52,10 +59,14 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={},
                 error_code = ErrorCodes.none
                 if resp.status != 200:
                     error_code = ErrorCodes.http
-                    LOGGER.error(f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}")
+                    LOGGER.error(
+                        f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}"
+                    )
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{resp}'), {tb}",)
+                LOGGER.error(
+                    f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{resp}'), {tb}",
+                )
             resp.close()
         await session.close()
     await asyncio.sleep(0)
@@ -70,6 +81,7 @@ async def async_private_dispatcher(
     params_dict: dict = {},
     json_dict: dict = {},
     timeout: int = 60,
+    connector=None,
 ):
     """
     Asynchronously dispatches a private action to a specified server.
@@ -88,7 +100,12 @@ async def async_private_dispatcher(
     url = f"http://{host}:{port}/{private_action}"
 
     client_timeout = aiohttp.ClientTimeout(total=timeout)
-    conn = aiohttp.TCPConnector(keepalive_timeout=0, enable_cleanup_closed=True, limit=1000)
+    if connector is None:
+        conn = aiohttp.TCPConnector(
+            keepalive_timeout=0, enable_cleanup_closed=True, limit=1000
+        )
+    else:
+        conn = connector
     error_code = ErrorCodes.unspecified
     response = None
     async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
@@ -102,10 +119,14 @@ async def async_private_dispatcher(
                 error_code = ErrorCodes.none
                 if resp.status != 200:
                     error_code = ErrorCodes.http
-                    LOGGER.error(f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')")
+                    LOGGER.error(
+                        f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')"
+                    )
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), {tb}")
+                LOGGER.error(
+                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), {tb}"
+                )
             resp.close()
         await session.close()
     await asyncio.sleep(0)
@@ -150,10 +171,14 @@ def private_dispatcher(
                     response = str(resp)
                 if resp.status_code != 200:
                     error_code = ErrorCodes.http
-                    LOGGER.error(f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}')")
+                    LOGGER.error(
+                        f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}')"
+                    )
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), {tb}")
+                LOGGER.error(
+                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), {tb}"
+                )
                 response = None
             return response, error_code
 
@@ -208,24 +233,26 @@ async def endpoints_available(req_list: list):
             cent = status // 100
             if cent == 2:
                 isavail = True
-                states.append('success')
+                states.append("success")
             elif cent == 4:
-                states.append('client error')
+                states.append("client error")
             elif cent == 5:
-                states.append('server error')
+                states.append("server error")
             else:
-                states.append('no success')
+                states.append("no success")
         except aiohttp.ClientSSLError:
-            states.append('cert failure')
+            states.append("cert failure")
         except aiohttp.ClientConnectionError:
-            states.append('could not connect')
+            states.append("could not connect")
         except asyncio.TimeoutError:
-            states.append('timeout')
+            states.append("timeout")
         responses.append(isavail)
     if not all(responses):
-        badinds = [i for i,v in enumerate(responses) if not v]
+        badinds = [i for i, v in enumerate(responses) if not v]
         unavailable = [(req_list[i], [states[i]]) for i in badinds]
-        LOGGER.info(f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}")
+        LOGGER.info(
+            f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}"
+        )
         return False, unavailable
     else:
         return True, []

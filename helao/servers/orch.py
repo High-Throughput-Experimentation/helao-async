@@ -176,6 +176,7 @@ class Orch(Base):
             fastapp: The FastAPI application instance.
         """
         super().__init__(fastapp)
+        self.fastap = fastapp
         self.experiment_lib, self.experiment_codehash_lib = import_experiments(
             world_config_dict=self.world_cfg,
             experiment_path=None,
@@ -497,6 +498,7 @@ class Orch(Base):
                                 "client_port": self.server_cfg["port"],
                             },
                             json_dict={},
+                            connector=self.fastapp.tcp_connector,
                         )
                         # print(response)
                         # print(error_code)
@@ -517,12 +519,16 @@ class Orch(Base):
                     LOGGER.info(f"Subscribed to {serv_key} at {serv_addr}:{serv_port}")
                 else:
                     fails.append(serv_key)
-                    LOGGER.info(f"Failed to subscribe to {serv_key} at {serv_addr}:{serv_port}. Check connection.")
+                    LOGGER.info(
+                        f"Failed to subscribe to {serv_key} at {serv_addr}:{serv_port}. Check connection."
+                    )
 
         if len(fails) == 0:
             self.init_success = True
         else:
-            LOGGER.info("Orchestrator cannot action experiment_dq unless all FastAPI servers in config file are accessible.")
+            LOGGER.info(
+                "Orchestrator cannot action experiment_dq unless all FastAPI servers in config file are accessible."
+            )
 
     async def update_nonblocking(
         self, actionmodel: Action, server_host: str, server_port: int
@@ -566,7 +572,9 @@ class Orch(Base):
         """
         resp_tups = []
         for server_key, exec_id, server_host, server_port in self.nonblocking:
-            LOGGER.info(f"Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}")
+            LOGGER.info(
+                f"Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}"
+            )
             # print(server_key, exec_id, server_host, server_port)
             response, error_code = await async_private_dispatcher(
                 server_key=server_key,
@@ -575,6 +583,7 @@ class Orch(Base):
                 private_action="stop_executor",
                 params_dict={"executor_id": exec_id},
                 json_dict={},
+                connector=self.fastapp.tcp_connector,
             )
             resp_tups.append((response, error_code))
         return resp_tups
@@ -673,7 +682,9 @@ class Orch(Base):
                 await websocket.send_text(json.dumps(globstat_msg.as_dict()))
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.warning(f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}")
+            LOGGER.warning(
+                f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}"
+            )
             if gs_sub in self.globstat_q.subscribers:
                 self.globstat_q.remove(gs_sub)
 
@@ -825,12 +836,16 @@ class Orch(Base):
             if self.use_db:
                 try:
                     meta_s3_key = f"sequence/{self.seq_model.sequence_uuid}.json"
-                    LOGGER.info(f"uploading initial active sequence json to s3 ({meta_s3_key})")
+                    LOGGER.info(
+                        f"uploading initial active sequence json to s3 ({meta_s3_key})"
+                    )
                     await self.syncer.to_s3(
                         self.seq_model.clean_dict(strip_private=True), meta_s3_key
                     )
                 except Exception as e:
-                    LOGGER.error(f"Error uploading initial active sequence json to s3: {e}")
+                    LOGGER.error(
+                        f"Error uploading initial active sequence json to s3: {e}"
+                    )
 
             self.aloop.create_task(self.seq_unpacker())
             await asyncio.sleep(1)
@@ -881,7 +896,9 @@ class Orch(Base):
             if k in self.global_params:
                 self.active_experiment.experiment_params[v] = self.global_params[k]
 
-        LOGGER.info(f"new active experiment is {self.active_experiment.experiment_name}")
+        LOGGER.info(
+            f"new active experiment is {self.active_experiment.experiment_name}"
+        )
         await self.put_lbuf(
             {
                 self.active_experiment.experiment_uuid: {
@@ -974,12 +991,16 @@ class Orch(Base):
         if self.use_db:
             try:
                 meta_s3_key = f"experiment/{self.exp_model.experiment_uuid}.json"
-                LOGGER.info(f"uploading initial active experiment json to s3 ({meta_s3_key})")
+                LOGGER.info(
+                    f"uploading initial active experiment json to s3 ({meta_s3_key})"
+                )
                 await self.syncer.to_s3(
                     self.exp_model.clean_dict(strip_private=True), meta_s3_key
                 )
             except Exception as e:
-                LOGGER.error(f"Error uploading initial active experiment json to s3: {e}")
+                LOGGER.error(
+                    f"Error uploading initial active experiment json to s3: {e}"
+                )
         return ErrorCodes.none
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
@@ -1117,7 +1138,9 @@ class Orch(Base):
                 await self.update_operator(True)
                 return ErrorCodes.none
 
-            LOGGER.info(f"dispatching action {A.action_name} on server {A.action_server.server_name}")
+            LOGGER.info(
+                f"dispatching action {A.action_name} on server {A.action_server.server_name}"
+            )
             # keep running counter of dispatched actions
             A.orch_submit_order = self.globalstatusmodel.counter_dispatched_actions[
                 self.active_experiment.experiment_uuid
@@ -1162,12 +1185,15 @@ class Orch(Base):
                 #         "resend_active",
                 #         params_dict={},
                 #         json_dict={"action_uuid": A.action_uuid},
+                #         connector=self.fastapp.tcp_connector,
                 #     )
 
                 result_uuid = result_actiondict["action_uuid"]
                 self.last_action_uuid = result_uuid
                 self.track_action_uuid(UUID(result_uuid))
-                LOGGER.info(f"Action {A.action_name} dispatched with uuid: {result_uuid}")
+                LOGGER.info(
+                    f"Action {A.action_name} dispatched with uuid: {result_uuid}"
+                )
                 self.put_lbuf_nowait(
                     {result_uuid: {"action_name": A.action_name, "status": "active"}}
                 )
@@ -1204,13 +1230,17 @@ class Orch(Base):
                                     actname
                                 ].nonactive_dict[actstat][resuuid] = resmod
                             except:
-                                LOGGER.info(f"{actstat} not found in globalstatus.nonactive_dict")
+                                LOGGER.info(
+                                    f"{actstat} not found in globalstatus.nonactive_dict"
+                                )
 
             try:
                 result_action = Action(**result_actiondict)
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"returned result is not a valid Action BaseModel: {repr(e), tb,}")
+                LOGGER.error(
+                    f"returned result is not a valid Action BaseModel: {repr(e), tb,}"
+                )
                 return ErrorCodes.critical
 
             if result_action.error_code is not ErrorCodes.none:
@@ -1257,7 +1287,9 @@ class Orch(Base):
                             LOGGER.info(f"updating {k2} in global vars")
                             self.global_params[k2] = result_action.action_output[k1]
                         else:
-                            LOGGER.info(f"key {k1} not found in action output or params")
+                            LOGGER.info(
+                                f"key {k1} not found in action output or params"
+                            )
 
             # # this will recursively call the next no_wait action in queue, and return its error
             # if self.action_dq and not self.step_thru_actions:
@@ -1315,9 +1347,15 @@ class Orch(Base):
             while self.globalstatusmodel.loop_state == LoopStatus.started and (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):
-                LOGGER.info(f"current content of action_dq: {[self.action_dq[i] for i in range(min(len(self.action_dq), 5))]}... ({len(self.action_dq)})")
-                LOGGER.info(f"current content of experiment_dq: {[self.experiment_dq[i] for i in range(min(len(self.experiment_dq), 5))]}... ({len(self.experiment_dq)})")
-                LOGGER.info(f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})")
+                LOGGER.info(
+                    f"current content of action_dq: {[self.action_dq[i] for i in range(min(len(self.action_dq), 5))]}... ({len(self.action_dq)})"
+                )
+                LOGGER.info(
+                    f"current content of experiment_dq: {[self.experiment_dq[i] for i in range(min(len(self.experiment_dq), 5))]}... ({len(self.experiment_dq)})"
+                )
+                LOGGER.info(
+                    f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})"
+                )
                 # check driver states
                 na_drivers = [
                     k for k, (_, v) in self.status_summary.items() if v == "unknown"
@@ -1325,7 +1363,9 @@ class Orch(Base):
                 if na_drivers:
                     na_driver_retries = 0
                     while na_driver_retries < 5 and na_drivers:
-                        LOGGER.info(f"unknown driver states: {', '.join(na_drivers)}, retrying in 5 seconds")
+                        LOGGER.info(
+                            f"unknown driver states: {', '.join(na_drivers)}, retrying in 5 seconds"
+                        )
                         await asyncio.sleep(5)
                         na_drivers = [
                             k
@@ -1371,14 +1411,18 @@ class Orch(Base):
                         self.current_stop_message = "Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence."
                         await self.stop()
                 elif self.experiment_dq:
-                    LOGGER.info("!!!waiting for all actions to finish before dispatching next experiment")
+                    LOGGER.info(
+                        "!!!waiting for all actions to finish before dispatching next experiment"
+                    )
                     LOGGER.info("finishing last experiment")
                     await self.finish_active_experiment()
                     LOGGER.info("!!!dispatching next experiment")
                     error_code = await self.loop_task_dispatch_experiment()
                 # if no acts and no exps, disptach next sequence
                 elif self.sequence_dq:
-                    LOGGER.info("!!!waiting for all actions to finish before dispatching next sequence")
+                    LOGGER.info(
+                        "!!!waiting for all actions to finish before dispatching next sequence"
+                    )
                     LOGGER.info("finishing last sequence")
                     await self.finish_active_sequence()
                     LOGGER.info("!!!dispatching next sequence")
@@ -1591,13 +1635,19 @@ class Orch(Base):
             )
 
             A = Action(**action_dict)
-            LOGGER.info(f"Sending estop={switch} request to {actionservermodel.action_server.disp_name()}")
+            LOGGER.info(
+                f"Sending estop={switch} request to {actionservermodel.action_server.disp_name()}"
+            )
             try:
-                _ = await async_action_dispatcher(self.world_cfg, A)
+                _ = await async_action_dispatcher(
+                    self.world_cfg, A, connector=self.fastapp.tcp_connector
+                )
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 # no estop endpoint for this action server?
-                LOGGER.error(f"estop for {actionservermodel.action_server.disp_name()} failed with: {repr(e), tb,}")
+                LOGGER.error(
+                    f"estop for {actionservermodel.action_server.disp_name()} failed with: {repr(e), tb,}"
+                )
 
     async def skip(self):
         """
@@ -1872,7 +1922,7 @@ class Orch(Base):
         List all experiments with their indices.
 
         Returns:
-            list of tuple: A list of tuples where each tuple contains the index of the 
+            list of tuple: A list of tuples where each tuple contains the index of the
             experiment and the experiment name.
         """
         return [
@@ -2011,7 +2061,9 @@ class Orch(Base):
                 if D.experiment_uuid == by_uuid
             ][0]
         else:
-            LOGGER.info("No arguments given for locating existing experiment to remove.")
+            LOGGER.info(
+                "No arguments given for locating existing experiment to remove."
+            )
             return None
         del self.experiment_dq[i]
 
@@ -2082,7 +2134,7 @@ class Orch(Base):
     async def finish_active_sequence(self):
         """
         Completes the currently active sequence by performing the following steps:
-        
+
         1. Waits for all actions to complete using `orch_wait_for_all_actions`.
         2. Updates the status of the active sequence from `HloStatus.active` to `HloStatus.finished`.
         3. Writes the active sequence to a persistent storage using `write_seq`.
@@ -2091,7 +2143,7 @@ class Orch(Base):
         6. Resets the active sequence and related counters.
         7. Clears the dispatched actions counter in the global status model.
         8. Initiates a task to move the sequence directory if a database server exists.
-        
+
         This method ensures that the sequence is properly finalized and all related
         resources are cleaned up.
         """
@@ -2121,7 +2173,7 @@ class Orch(Base):
     async def finish_active_experiment(self):
         """
         Finalizes the currently active experiment by performing the following steps:
-        
+
         1. Waits for all actions to complete.
         2. Stops any non-blocking action executors.
         3. Updates the status of the active experiment to 'finished'.
@@ -2135,11 +2187,15 @@ class Orch(Base):
         # we need to wait for all actions to finish first
         await self.orch_wait_for_all_actions()
         while len(self.nonblocking) > 0:
-            LOGGER.info(f"Stopping non-blocking action executors ({len(self.nonblocking)})")
+            LOGGER.info(
+                f"Stopping non-blocking action executors ({len(self.nonblocking)})"
+            )
             await self.clear_nonblocking()
             await asyncio.sleep(1)
         if self.active_experiment is not None:
-            LOGGER.info(f"finished exp uuid is: {self.active_experiment.experiment_uuid}, adding matching acts to it")
+            LOGGER.info(
+                f"finished exp uuid is: {self.active_experiment.experiment_uuid}, adding matching acts to it"
+            )
             await self.put_lbuf(
                 {
                     self.active_experiment.experiment_uuid: {
@@ -2215,12 +2271,12 @@ class Orch(Base):
     async def shutdown(self):
         """
         Asynchronously shuts down the server by performing the following actions:
-        
+
         1. Detaches all subscribers.
         2. Cancels the status logger.
         3. Cancels the NTP syncer.
         4. Cancels the status subscriber.
-        
+
         This method ensures that all ongoing tasks are properly terminated and resources are released.
         """
         await self.detach_subscribers()
@@ -2276,7 +2332,9 @@ class Orch(Base):
         check_time = self.current_wait_ts
         while check_time - self.current_wait_ts < waittime:
             if check_time - last_print_time > print_every_secs - 0.01:
-                LOGGER.info(f" ... orch waited {(check_time-self.current_wait_ts):.1f} sec / {waittime:.1f} sec")
+                LOGGER.info(
+                    f" ... orch waited {(check_time-self.current_wait_ts):.1f} sec / {waittime:.1f} sec"
+                )
                 last_print_time = check_time
             await asyncio.sleep(0.01)  # 10 msec sleep
             check_time = time.time()
@@ -2365,6 +2423,7 @@ class Orch(Base):
                             "client_port": self.server_cfg["port"],
                         },
                         json_dict={},
+                        connector=self.fastapp.tcp_connector,
                     )
                     if response is not None and error_code == ErrorCodes.none:
                         busy_endpoints = []
