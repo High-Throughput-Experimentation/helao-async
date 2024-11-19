@@ -77,7 +77,7 @@ def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
             old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
             nots_counter = 0
             for old_log in old_log_txts:
-                print_message(LOGGER, "launcher", f"Compressing: {old_log}")
+                LOGGER.info(f"Compressing: {old_log}")
                 try:
                     timestamp_found = False
                     timestamp = ""
@@ -108,7 +108,7 @@ def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
                         zf.write(old_log, arcname)
                     os.remove(old_log)
                 except Exception as e:
-                    print_message(LOGGER, "launcher", f"Error compressing log: {old_log}, {e}")
+                    LOGGER.info(f"Error compressing log: {old_log}, {e}")
 
     else:
         helaodirs = HelaoDirs(

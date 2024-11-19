@@ -19,6 +19,11 @@ from helao.drivers.mfc.alicat_driver import (
 )
 from helao.helpers.config_loader import config_loader
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 async def mfc_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
@@ -75,7 +80,7 @@ async def mfc_dyn_endpoints(app=None):
             return finished_action.as_dict()
 
     else:
-        app.base.print_message(f"server_name {co2_sensor_key} was not found in config.")
+        LOGGER.info(f"server_name {co2_sensor_key} was not found in config.")
         app.base.print_message(app.helao_cfg["servers"])
 
     if devices:

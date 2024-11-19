@@ -45,7 +45,7 @@ async def gamry_dyn_endpoints(app=None):
     enable_pstat = False
 
     while not app.driver.ready:
-        app.base.print_message("waiting for gamry init", info=True)
+        LOGGER.info("waiting for gamry init")
         await asyncio.sleep(1)
 
     if app.driver.pstat is not None:

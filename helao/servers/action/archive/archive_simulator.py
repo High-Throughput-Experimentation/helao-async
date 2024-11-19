@@ -17,6 +17,7 @@ if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
+
 from helao.servers.base import Base
 from helao.servers.base_api import BaseAPI
 from helao.helpers.make_str_enum import make_str_enum
@@ -251,14 +252,14 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         active = await app.base.setup_and_contain_action()
         sample_no = app.driver.acquire(**active.action.action_params)
-        app.base.print_message(f"/acquire endpoint retrieved sample_no: {sample_no}")
+        LOGGER.info(f"/acquire endpoint retrieved sample_no: {sample_no}")
         active.action.action_params.update(
             {
                 "_acq_sample_no": sample_no,
             }
         )
         finished_action = await active.finish()
-        app.base.print_message(f"final action_params: {', '.join(finished_action.action_params.keys())}")
+        LOGGER.info(f"final action_params: {', '.join(finished_action.action_params.keys())}")
         return finished_action.as_dict()
 
     return app
