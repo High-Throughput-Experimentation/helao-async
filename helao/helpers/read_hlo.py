@@ -36,36 +36,37 @@ def read_hlo(path: str, keep_keys: list = [], omit_keys: list = []) -> Tuple[dic
             - The first dictionary contains the metadata.
             - The second dictionary contains the data, where each key maps to a list of values.
     """
-    path_to_hlo = Path(path)
-    with path_to_hlo.open() as f:
-        lines = f.readlines()
-        
-    sep_index = lines.index("%%\n")
-    meta =  {}
-    if sep_index > 0:
-        meta = dict(yml_load("".join(lines[:sep_index])))
-
     if keep_keys and omit_keys:
         print("Both keep_keys and omit_keys are provided. keep_keys will take precedence.")
-
+    
+    path_to_hlo = Path(path)
+    header_lines = []
+    header_end = False
     data = defaultdict(list)
-    for line in lines[sep_index + 1 :]:
-        line_dict = json.loads(line)
-        # print(line_dict)
-        if keep_keys:
-            for k, v in line_dict.items():
-                if k in keep_keys:
-                    if isinstance(v, list):
-                        data[k] += v
-                    else:
-                        data[k].append(v)
-        elif omit_keys:
-            for k, v in line_dict.items():
-                if k not in omit_keys:
-                    if isinstance(v, list):
-                        data[k] += v
-                    else:
-                        data[k].append(v)
+
+    with path_to_hlo.open() as f:
+        for line in f:
+            if line == "%%\n":
+                header_end = True
+            elif not header_end:
+                header_lines.append(line)
+            else:
+                line_dict = json.loads(line)
+                if keep_keys:
+                    for k, v in line_dict.items():
+                        if k in keep_keys:
+                            if isinstance(v, list):
+                                data[k] += v
+                            else:
+                                data[k].append(v)
+                elif omit_keys:
+                    for k, v in line_dict.items():
+                        if k not in omit_keys:
+                            if isinstance(v, list):
+                                data[k] += v
+                            else:
+                                data[k].append(v)
+    meta = dict(yml_load("".join(header_lines)))
 
     return meta, data
 
