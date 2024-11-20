@@ -367,17 +367,23 @@ async def biologic_dyn_endpoints(app=None):
     @app.post(f"/{server_key}/run_PEIS", tags=["action"])
     async def run_PEIS(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Vinit__V: float = 0.01,  # Initial value in volts or amps.
         Vamp__V: float = 0.1,  # Amplitude value in volts
-        Finit__Hz: float = 1,  # Initial frequency in Hz.
-        Ffinal__Hz: float = 10000,  # Final frequency in Hz.
+        Finit__Hz: float = 1000,  # Initial frequency in Hz.
+        Ffinal__Hz: float = 1000000,  # Final frequency in Hz.
+        FrequencyNumber: int = 60,
+        Duration__s: float = 0,  # Duration in seconds.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        vs_initial: bool = False,  # True if vs initial, False if vs previous.
+        SweepMode: str = 'log',
+        Repeats: int = 10,
+        DelayFraction: float = 0.1,
+        # vs_initial: bool = False,  # True if vs initial, False if vs previous.
         IRange: EC_IRange = EC_IRange.AUTO,
         ERange: EC_ERange = EC_ERange.AUTO,
         Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
+        
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -396,14 +402,19 @@ async def biologic_dyn_endpoints(app=None):
     @app.post(f"/{server_key}/run_GEIS", tags=["action"])
     async def run_GEIS(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Iinit__A: float = 0.01,  # Initial value in volts or amps.
         Iamp__A: float = 0.1,  # Final value in volts or amps.
         Finit__Hz: float = 1,  # Initial frequency in Hz.
         Ffinal__Hz: float = 10000,  # Final frequency in Hz.
+        FrequencyNumber: int = 60,
+        Duration__s: float = 0,  # Duration in seconds.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        vs_initial: bool = False,  # True if vs initial, False if vs previous.
+        SweepMode: str = 'log',
+        Repeats: int = 10,
+        DelayFraction: float = 0.1,
+        # vs_initial: bool = False,  # True if vs initial, False if vs previous.
         IRange: EC_IRange = EC_IRange.AUTO,
         ERange: EC_ERange = EC_ERange.AUTO,
         Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
