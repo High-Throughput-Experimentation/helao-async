@@ -1,5 +1,6 @@
 __all__ = ["async_action_dispatcher", "async_private_dispatcher", "private_dispatcher"]
 
+import time
 import traceback
 import asyncio
 import aiohttp
@@ -7,8 +8,6 @@ import requests
 
 from helao.helpers.premodels import Action
 from helao.core.error import ErrorCodes
-
-from helao.helpers.print_message import print_message
 
 from helao.helpers import logging
 
@@ -70,6 +69,7 @@ async def async_private_dispatcher(
     params_dict: dict = {},
     json_dict: dict = {},
     timeout: int = 60,
+    retries: int = 5,
 ):
     """
     Asynchronously dispatches a private action to a specified server.
@@ -86,28 +86,36 @@ async def async_private_dispatcher(
         tuple: A tuple containing the response from the server and an error code.
     """
     url = f"http://{host}:{port}/{private_action}"
+    success = False
+    retry_count = 0
 
     client_timeout = aiohttp.ClientTimeout(total=timeout)
     conn = aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True, limit=1000)
     error_code = ErrorCodes.unspecified
     response = None
-    async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
-        async with session.post(
-            url,
-            params=params_dict,
-            json=json_dict,
-        ) as resp:
-            try:
-                response = await resp.json()
-                error_code = ErrorCodes.none
-                if resp.status != 200:
-                    error_code = ErrorCodes.http
-                    LOGGER.error(f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')")
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), {tb}")
-            resp.close()
-        await session.close()
+
+    while not success and retry_count < retries:
+        try:
+            async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
+                async with session.post(
+                    url,
+                    params=params_dict,
+                    json=json_dict,
+                ) as resp:
+                    response = await resp.json()
+                    error_code = ErrorCodes.none
+                    if resp.status != 200:
+                        error_code = ErrorCodes.http
+                        LOGGER.error(f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')")
+                    resp.close()
+                await session.close()
+                success = True
+        except Exception:
+            retry_count += 1
+            await asyncio.sleep(120)
+            response = None
+    if not success:
+            LOGGER.error(f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{response}')", exc_info=True)
     await asyncio.sleep(0)
     return response, error_code
 
