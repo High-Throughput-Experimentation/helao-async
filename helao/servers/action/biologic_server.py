@@ -31,7 +31,14 @@ from helao.helpers.executor import Executor
 from helao.helpers import logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.drivers.pstat.biologic.driver import BiologicDriver
-from helao.drivers.pstat.biologic.enum import EC_IRange, EC_ERange, EC_Bandwidth, EC_IRange_map, EC_ERange_map, EC_Bandwidth_map
+from helao.drivers.pstat.biologic.enum import (
+    EC_IRange,
+    EC_ERange,
+    EC_Bandwidth,
+    EC_IRange_map,
+    EC_ERange_map,
+    EC_Bandwidth_map,
+)
 from helao.drivers.pstat.biologic.technique import (
     BiologicTechnique,
     TECH_OCV,
@@ -148,34 +155,68 @@ class BiologicExec(Executor):
                 data_length = len(v)
             # check for alert thresholds at this point in data_buffer
             poll_iter_time = time.time()
-            single_alert = self.alert_params["alert_sleep__s"] <= 0 and self.last_alert_time == 0
-            ongoing_alert = self.alert_params["alert_sleep__s"] > 0 and (poll_iter_time - self.last_alert_time > self.alert_params['alert_sleep__s'])
-            if single_alert or ongoing_alert:
-                LOGGER.debug(f"single_alert: {single_alert}, ongoing_alert: {ongoing_alert}")
-                min_duration = self.alert_params["alert_duration__s"]
-                if min_duration > 0 and self.data_buffer.get("t_s", [-1])[-1] > min_duration:
-                    LOGGER.debug(f"elapsed time is above min_duration: {min_duration}")
-                    time_buffer = self.data_buffer["t_s"]
-                    idx = 1
-                    latest_t = time_buffer[-1]
-                    slice_duration = latest_t - time_buffer[-idx]
-                    while (len(time_buffer) > idx) and (slice_duration < min_duration):
-                        idx += 1
+            if self.alert_params["alert_sleep__s"] is not None:
+                single_alert = (
+                    self.alert_params["alert_sleep__s"] <= 0
+                    and self.last_alert_time == 0
+                )
+                ongoing_alert = self.alert_params["alert_sleep__s"] > 0 and (
+                    poll_iter_time - self.last_alert_time
+                    > self.alert_params["alert_sleep__s"]
+                )
+                if single_alert or ongoing_alert:
+                    LOGGER.debug(
+                        f"single_alert: {single_alert}, ongoing_alert: {ongoing_alert}"
+                    )
+                    min_duration = self.alert_params["alert_duration__s"]
+                    if (
+                        min_duration > 0
+                        and self.data_buffer.get("t_s", [-1])[-1] > min_duration
+                    ):
+                        LOGGER.debug(
+                            f"elapsed time is above min_duration: {min_duration}"
+                        )
+                        time_buffer = self.data_buffer["t_s"]
+                        idx = 1
+                        latest_t = time_buffer[-1]
                         slice_duration = latest_t - time_buffer[-idx]
-                    LOGGER.debug(f"slice index is: {-idx}")
-                    if slice_duration >= min_duration:
-                        LOGGER.debug(f"slice_duration {slice_duration:.3f} is above min_duration")
-                        for thresh_key in ("Ewe_V", "I_A"):
-                            thresh_val = self.alert_params.get(f"alertThresh{thresh_key}", None)
-                            data_dq = self.data_buffer[thresh_key]
-                            slice_vals = list(itertools.islice(data_dq, len(data_dq)-idx, len(data_dq)))
-                            if thresh_val is not None:
-                                if all([x > thresh_val for x in slice_vals]) and self.alert_params["alert_above"]:
-                                    LOGGER.alert(f"{thresh_key} went above {thresh_val} for {min_duration} seconds.")
-                                    self.last_alert_time = poll_iter_time
-                                elif all([x < thresh_val for x in slice_vals]) and not self.alert_params["alert_above"]:
-                                    LOGGER.alert(f"{thresh_key} went below {thresh_val} for {min_duration} seconds.")
-                                    self.last_alert_time = poll_iter_time
+                        while (len(time_buffer) > idx) and (
+                            slice_duration < min_duration
+                        ):
+                            idx += 1
+                            slice_duration = latest_t - time_buffer[-idx]
+                        LOGGER.debug(f"slice index is: {-idx}")
+                        if slice_duration >= min_duration:
+                            LOGGER.debug(
+                                f"slice_duration {slice_duration:.3f} is above min_duration"
+                            )
+                            for thresh_key in ("Ewe_V", "I_A"):
+                                thresh_val = self.alert_params.get(
+                                    f"alertThresh{thresh_key}", None
+                                )
+                                data_dq = self.data_buffer[thresh_key]
+                                slice_vals = list(
+                                    itertools.islice(
+                                        data_dq, len(data_dq) - idx, len(data_dq)
+                                    )
+                                )
+                                if thresh_val is not None:
+                                    if (
+                                        all([x > thresh_val for x in slice_vals])
+                                        and self.alert_params["alert_above"]
+                                    ):
+                                        LOGGER.alert(
+                                            f"{thresh_key} went above {thresh_val} for {min_duration} seconds."
+                                        )
+                                        self.last_alert_time = poll_iter_time
+                                    elif (
+                                        all([x < thresh_val for x in slice_vals])
+                                        and not self.alert_params["alert_above"]
+                                    ):
+                                        LOGGER.alert(
+                                            f"{thresh_key} went below {thresh_val} for {min_duration} seconds."
+                                        )
+                                        self.last_alert_time = poll_iter_time
             if data_length:
                 self.data_buffer["channel"].extend(data_length * [self.channel])
                 resp.data.update({"channel": data_length * [self.channel]})
@@ -183,12 +224,12 @@ class BiologicExec(Executor):
                 ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
             )
             status = HloStatus.active
-            
+
             if resp.message == "done":
                 status = HloStatus.finished
             if resp.response == "failed":
                 status = HloStatus.errored
-                
+
             return {"error": error, "status": status, "data": resp.data}
         except Exception:
             LOGGER.error("BiologicExec poll error", exc_info=True)
@@ -262,9 +303,15 @@ async def biologic_dyn_endpoints(app=None):
         (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CA"
-        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
-        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
-        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[active.action.action_params["Bandwidth"]]
+        active.action.action_params["IRange"] = EC_IRange_map[
+            active.action.action_params["IRange"]
+        ]
+        active.action.action_params["ERange"] = EC_ERange_map[
+            active.action.action_params["ERange"]
+        ]
+        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[
+            active.action.action_params["Bandwidth"]
+        ]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CA)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -294,9 +341,15 @@ async def biologic_dyn_endpoints(app=None):
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CP"
-        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
-        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
-        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[active.action.action_params["Bandwidth"]]
+        active.action.action_params["IRange"] = EC_IRange_map[
+            active.action.action_params["IRange"]
+        ]
+        active.action.action_params["ERange"] = EC_ERange_map[
+            active.action.action_params["ERange"]
+        ]
+        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[
+            active.action.action_params["Bandwidth"]
+        ]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CP)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -336,9 +389,15 @@ async def biologic_dyn_endpoints(app=None):
             * active.action.action_params["ScanRate__V_s"]
         )
         active.action.action_abbr = "CV"
-        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
-        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
-        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[active.action.action_params["Bandwidth"]]
+        active.action.action_params["IRange"] = EC_IRange_map[
+            active.action.action_params["IRange"]
+        ]
+        active.action.action_params["ERange"] = EC_ERange_map[
+            active.action.action_params["ERange"]
+        ]
+        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[
+            active.action.action_params["Bandwidth"]
+        ]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -376,14 +435,13 @@ async def biologic_dyn_endpoints(app=None):
         FrequencyNumber: int = 60,
         Duration__s: float = 0,  # Duration in seconds.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        SweepMode: str = 'log',
+        SweepMode: str = "log",
         Repeats: int = 10,
         DelayFraction: float = 0.1,
         # vs_initial: bool = False,  # True if vs initial, False if vs previous.
         IRange: EC_IRange = EC_IRange.AUTO,
         ERange: EC_ERange = EC_ERange.AUTO,
         Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
-        
         channel: int = 0,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -392,9 +450,15 @@ async def biologic_dyn_endpoints(app=None):
         """run Potentiostatic EIS"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "PEIS"
-        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
-        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
-        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[active.action.action_params["Bandwidth"]]
+        active.action.action_params["IRange"] = EC_IRange_map[
+            active.action.action_params["IRange"]
+        ]
+        active.action.action_params["ERange"] = EC_ERange_map[
+            active.action.action_params["ERange"]
+        ]
+        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[
+            active.action.action_params["Bandwidth"]
+        ]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_PEIS)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -411,7 +475,7 @@ async def biologic_dyn_endpoints(app=None):
         FrequencyNumber: int = 60,
         Duration__s: float = 0,  # Duration in seconds.
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        SweepMode: str = 'log',
+        SweepMode: str = "log",
         Repeats: int = 10,
         DelayFraction: float = 0.1,
         # vs_initial: bool = False,  # True if vs initial, False if vs previous.
@@ -426,9 +490,15 @@ async def biologic_dyn_endpoints(app=None):
         """run Galvanostataic EIS"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "GEIS"
-        active.action.action_params["IRange"] = EC_IRange_map[active.action.action_params["IRange"]]
-        active.action.action_params["ERange"] = EC_ERange_map[active.action.action_params["ERange"]]
-        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[active.action.action_params["Bandwidth"]]
+        active.action.action_params["IRange"] = EC_IRange_map[
+            active.action.action_params["IRange"]
+        ]
+        active.action.action_params["ERange"] = EC_ERange_map[
+            active.action.action_params["ERange"]
+        ]
+        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[
+            active.action.action_params["Bandwidth"]
+        ]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_GEIS)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
