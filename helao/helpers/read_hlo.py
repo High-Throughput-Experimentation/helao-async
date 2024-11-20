@@ -26,7 +26,7 @@ import zipfile
 
 from helao.helpers.yml_tools import yml_load
 
-def read_hlo(path: str) -> Tuple[dict, dict]:
+def read_hlo(path: str, keep_keys: list = [], omit_keys: list = []) -> Tuple[dict, dict]:
     """
     Reads a .hlo file and returns its metadata and data.
     Args:
@@ -45,15 +45,27 @@ def read_hlo(path: str) -> Tuple[dict, dict]:
     if sep_index > 0:
         meta = dict(yml_load("".join(lines[:sep_index])))
 
+    if keep_keys and omit_keys:
+        print("Both keep_keys and omit_keys are provided. keep_keys will take precedence.")
+
     data = defaultdict(list)
     for line in lines[sep_index + 1 :]:
         line_dict = json.loads(line)
         # print(line_dict)
-        for k, v in line_dict.items():
-            if isinstance(v, list):
-                data[k] += v
-            else:
-                data[k].append(v)
+        if keep_keys:
+            for k, v in line_dict.items():
+                if k in keep_keys:
+                    if isinstance(v, list):
+                        data[k] += v
+                    else:
+                        data[k].append(v)
+        elif omit_keys:
+            for k, v in line_dict.items():
+                if k not in omit_keys:
+                    if isinstance(v, list):
+                        data[k] += v
+                    else:
+                        data[k].append(v)
 
     return meta, data
 
