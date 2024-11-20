@@ -110,8 +110,9 @@ async def async_private_dispatcher(
                     resp.close()
                 await session.close()
                 success = True
-        except Exception:
+        except Exception as e:
             retry_count += 1
+            LOGGER.warning(f"{server_key}/{private_action} POST request encountered an error: {e}, sleeping for 120 seconds before retrying...")
             await asyncio.sleep(120)
             response = None
     if not success:
