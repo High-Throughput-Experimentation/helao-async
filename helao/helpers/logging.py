@@ -35,7 +35,7 @@ from logging.handlers import (
 from colorlog import ColoredFormatter
 import tempfile
 import os
-from gzip import gzip
+import gzip
 
 from typing import Optional
 from pathlib import Path
