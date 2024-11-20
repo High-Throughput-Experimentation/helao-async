@@ -59,7 +59,7 @@ def read_hlo(path: str, keep_keys: list = [], omit_keys: list = []) -> Tuple[dic
                                 data[k] += v
                             else:
                                 data[k].append(v)
-                elif omit_keys:
+                else:
                     for k, v in line_dict.items():
                         if k not in omit_keys:
                             if isinstance(v, list):
