@@ -121,8 +121,6 @@ async def async_private_dispatcher(
                         LOGGER.error(
                             f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')"
                         )
-                    resp.close()
-                await session.close()
                 success = True
         except Exception as e:
             retry_count += 1
