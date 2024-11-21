@@ -1043,6 +1043,7 @@ class OrchAPI(HelaoFastAPI):
             """
             active = await self.orch.setup_and_contain_action()
             self.orch.current_stop_message = active.action.action_params["reason"]
+            LOGGER.warning(active.action.action_params["reason"])
             await self.orch.stop()
             await self.orch.update_operator(True)
             finished_action = await active.finish()
@@ -1207,6 +1208,7 @@ class OrchAPI(HelaoFastAPI):
                 await self.orch.clear_experiments()
                 await self.orch.clear_sequences()
                 self.orch.current_stop_message = active.action.action_params["reason"]
+                LOGGER.warning(active.action.action_params["reason"])
                 await self.orch.update_operator(True)
 
             finished_action = await active.finish()
