@@ -225,7 +225,7 @@ class Base:
                 "Missing 'run_type' in config, cannot create server object.",
             )
 
-        self.actives: Dict[UUID, object] = {}
+        self.actives: Dict[UUID, Active] = {}
         self.last_10_active = []
         self.executors = {}  # shortcut to running Executors
         # basemodel to describe the full action server
