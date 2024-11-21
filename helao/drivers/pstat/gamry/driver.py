@@ -444,8 +444,8 @@ class GamryDriver(HelaoDriver):
         try:
             process_ids = {
                 p.pid: p
-                for p in psutil.process_iter(["name", "connections"])
-                if p.info["name"].startswith("GamryCom")
+                for p in psutil.process_iter(["name"])
+                if p.info["name"].lower().startswith("gamrycom")
             }
 
             for pid in process_ids:
