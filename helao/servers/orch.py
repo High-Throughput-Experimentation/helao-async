@@ -266,7 +266,7 @@ class Orch(Base):
         LOGGER.error(f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}")
         LOGGER.info("setting E-STOP flag on active actions")
         for _, active in self.actives.items():
-            active.set_estop()
+            active.stop_action_task()
 
     def myinit(self):
         """
@@ -1523,7 +1523,7 @@ class Orch(Base):
         self.globalstatusmodel.loop_state = LoopStatus.estopped
 
         # force stop all running actions in the status dict (for this orch)
-        await self.estop_actions(switch=True)
+        await self.estop_actions(switch=False)  # don't latch actionserver model
 
         # reset loop intend
         await self.intend_none()
