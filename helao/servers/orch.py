@@ -1111,6 +1111,7 @@ class Orch(Base):
             if not actserv_exists:
                 stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
                 self.current_stop_message = stop_message
+                LOGGER.warning(stop_message)
                 await self.stop()
                 LOGGER.alert(f"ORCH STOPPED ~ {stop_message}")
                 self.action_dq.insert(0, A)
@@ -1149,6 +1150,7 @@ class Orch(Base):
                 ]:
                     if cond:
                         self.current_stop_message = stop_message
+                        LOGGER.warning(stop_message)
                         await self.stop()
                         LOGGER.info(f"Re-queuing {A.action_name}")
                         self.action_dq.insert(0, A)
@@ -1334,9 +1336,8 @@ class Orch(Base):
                         ]
                         na_driver_retries += 1
                     if na_drivers:
-                        self.current_stop_message = (
-                            f"unknown driver states: {', '.join(na_drivers)}"
-                        )
+                        self.current_stop_message = (f"unknown driver states: {', '.join(na_drivers)}")
+                        LOGGER.warning((f"unknown driver states: {', '.join(na_drivers)}"))
                         await self.stop()
 
                 if (
@@ -1354,6 +1355,7 @@ class Orch(Base):
                         await asyncio.sleep(0.2)
                     if self.action_dq and self.step_thru_actions:
                         self.current_stop_message = "Step-thru actions is enabled, use 'Start Orch' to dispatch next action."
+                        LOGGER.warning("Step-thru actions is enabled, use 'Start Orch' to dispatch next action.")
                         await self.stop()
                     elif (
                         not self.action_dq
@@ -1361,6 +1363,7 @@ class Orch(Base):
                         and self.step_thru_experiments
                     ):
                         self.current_stop_message = "Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment."
+                        LOGGER.warning("Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment.")
                         await self.stop()
                     elif (
                         not self.action_dq
@@ -1369,6 +1372,7 @@ class Orch(Base):
                         and self.step_thru_sequences
                     ):
                         self.current_stop_message = "Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence."
+                        LOGGER.warning("Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence.")
                         await self.stop()
                 elif self.experiment_dq:
                     LOGGER.info("!!!waiting for all actions to finish before dispatching next experiment")
@@ -1525,6 +1529,7 @@ class Orch(Base):
         await self.intend_none()
 
         self.current_stop_message = "E-STOP" + reason_suffix
+        LOGGER.warning("E-STOP" + reason_suffix)
         LOGGER.alert("ORCH E-STOP")
         await self.update_operator(True)
 
@@ -2320,14 +2325,13 @@ class Orch(Base):
                 if active_endpoints:
                     unique_endpoints = list(set(active_endpoints))
                     still_alive, unavail = await endpoints_available(unique_endpoints)
-                if not still_alive:
-                    bad_serves = [x.strip("/".split("/")[-2]) for x, _ in unavail]
-                    self.current_stop_message = (
-                        f"{', '.join(bad_serves)} servers are unavailable"
-                    )
-                    await self.stop()
-                    LOGGER.alert(f"ORCH STOPPED ~ {self.current_stop_message}")
-                    await self.update_operator(True)
+                    if not still_alive:
+                        bad_serves = [x.strip("/".split("/")[-2]) for x, _ in unavail]
+                        self.current_stop_message = (f"{', '.join(bad_serves)} servers are unavailable")
+                        LOGGER.warning((f"{', '.join(bad_serves)} servers are unavailable"))
+                        await self.stop()
+                        LOGGER.alert(f"ORCH STOPPED ~ {self.current_stop_message}")
+                        await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
 
     async def ping_action_servers(self):
