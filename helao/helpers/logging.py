@@ -35,12 +35,18 @@ from logging.handlers import (
 from colorlog import ColoredFormatter
 import tempfile
 import os
-import gzip
+import subprocess
 
 from typing import Optional
 from pathlib import Path
 
 LOGGER = None
+
+
+class GZipRotator:
+    def __call__(self, source, dest):
+        os.rename(source, dest)
+        subprocess.Popen(["gzip", dest])
 
 
 class TitledSMTPHandler(SMTPHandler):
@@ -111,6 +117,7 @@ def make_logger(
         timed_rotation = TimedRotatingFileHandler(
             filename=log_path, when="D", interval=1, backupCount=90
         )
+        timed_rotation.rotator = GZipRotator()
     except OSError:
         temp_log_path = Path(os.path.join(temp_dir, f"{logger_name}.log"))
         print(f"Can't write to {log_path}. Redirecting to: {temp_log_path}")
