@@ -424,6 +424,24 @@ class GamryDriver(HelaoDriver):
         except Exception:
             LOGGER.warn("Could not cleanly disconnect from pstat.", exc_info=True)
         try:
+            kill_success = self.kill_gamrycom().response
+            if kill_success == DriverResponseType.success:
+                LOGGER.info("Successfully killed GamryCOM.")
+            else:
+                raise SystemError("Failed to kill GamryCOM.")
+            self.connect()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("reset error", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+    
+    def kill_gamrycom(self) -> DriverResponse:
+        try:
             process_ids = {
                 p.pid: p
                 for p in psutil.process_iter(["name", "connections"])
@@ -443,12 +461,11 @@ class GamryDriver(HelaoDriver):
                         "Failed to terminate server GamryCom after 3 retries."
                     )
                     raise SystemError(f"GamryCOM on PID: {pid} is still running.")
-            self.connect()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
-            LOGGER.error("reset error", exc_info=True)
+            LOGGER.error("kill_gamrycom error", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
@@ -458,3 +475,7 @@ class GamryDriver(HelaoDriver):
         """Pass-through shutdown events for BaseAPI."""
         self.cleanup()
         self.disconnect()
+        try:
+            self.kill_gamrycom().response
+        except Exception:
+            LOGGER.error("shutdown error", exc_info=True)
