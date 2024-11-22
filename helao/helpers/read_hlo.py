@@ -59,21 +59,14 @@ def read_hlo(
             elif not header_end:
                 header_lines.append(line)
             else:
-                line_dict = parser.parse_in_place(line).export()
-                if keep_keys:
-                    for k, v in line_dict.items():
-                        if k in keep_keys:
-                            if isinstance(v, list):
-                                data[k] += v
-                            else:
-                                data[k].append(v)
-                else:
-                    for k, v in line_dict.items():
-                        if k not in omit_keys:
-                            if isinstance(v, list):
-                                data[k] += v
-                            else:
-                                data[k].append(v)
+                line_dict = parser.parse_in_place(line)
+                for k, jv in line_dict.items():
+                    if k in keep_keys or k not in omit_keys:
+                        v = jv.export()
+                        if isinstance(v, list):
+                            data[k] += v
+                        else:
+                            data[k].append(v)
     if header_lines:
         meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
     else:
@@ -299,20 +292,13 @@ class HelaoData:
                         header_lines.append(line)
                     else:
                         line_dict = parser.parse_in_place(line).export()
-                        if keep_keys:
-                            for k, v in line_dict.items():
-                                if k in keep_keys:
-                                    if isinstance(v, list):
-                                        data[k] += v
-                                    else:
-                                        data[k].append(v)
-                        else:
-                            for k, v in line_dict.items():
-                                if k not in omit_keys:
-                                    if isinstance(v, list):
-                                        data[k] += v
-                                    else:
-                                        data[k].append(v)
+                        for k, jv in line_dict.items():
+                            if k in keep_keys or k not in omit_keys:
+                                v = jv.export()
+                                if isinstance(v, list):
+                                    data[k] += v
+                                else:
+                                    data[k].append(v)
             if header_lines:
                 meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
             else:

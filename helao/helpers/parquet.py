@@ -50,7 +50,7 @@ def read_hlo_header(file_path):
     return yd, data_start_index
 
 
-def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
+def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100, keep_keys=[], omit_keys=[]):
     """
     Reads data from a file in chunks and yields the data as dictionaries.
 
@@ -71,12 +71,14 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
             if i < data_start_index:
                 continue
             else:
-                jd = parser.parse_in_place(line).export()
-                for k, val in jd.items():
-                    if isinstance(val, list):
-                        chunkd[k] += val
-                    else:
-                        chunkd[k].append(val)
+                jd = parser.parse_in_place(line)
+                for k, jval in jd.items():
+                    if k in keep_keys or k not in omit_keys:
+                        val = jval.export()
+                        if isinstance(val, list):
+                            chunkd[k] += val
+                        else:
+                            chunkd[k].append(val)
                 if (i - data_start_index + 1) % chunk_size == 0:
                     yield dict(chunkd), max([len(v) for v in chunkd.values()])
                     chunkd = defaultdict(list)
