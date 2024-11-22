@@ -90,14 +90,14 @@ ECHEUVIS_multiCA_led_defaults = {
     "toggleSpec_time": -1,
     "spec_ref_duration": 5,
     "spec_int_time_ms": SPEC_INT_MS,
-    "spec_n_avg": 1,
+    "spec_n_avg": 2,
     "spec_technique": "T_UVVIS",
     "random_start_potential": False,
     "use_z_motor": True,
     "cell_engaged_z": 1.5,
     "cell_disengaged_z": 0,
     "cell_vent_wait": 10.0,
-    "cell_fill_wait": 35.0,
+    "cell_fill_wait": 45.0,
 }
 
 ECHEUVIS_postseq_defaults = {"recent": False}
