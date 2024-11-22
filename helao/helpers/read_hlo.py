@@ -12,10 +12,11 @@ Classes:
             __repr__(self):
                 Returns a string representation of the object.
 """
+
 __all__ = ["read_hlo", "HelaoData"]
 
 import os
-import json
+import cysimdjson
 import builtins
 from pathlib import Path
 from typing import Tuple
@@ -23,10 +24,14 @@ from collections import defaultdict
 from glob import glob
 from zipfile import ZipFile
 import zipfile
+from tqdm import tqdm
 
 from helao.helpers.yml_tools import yml_load
 
-def read_hlo(path: str, keep_keys: list = [], omit_keys: list = []) -> Tuple[dict, dict]:
+
+def read_hlo(
+    path: str, keep_keys: list = [], omit_keys: list = []
+) -> Tuple[dict, dict]:
     """
     Reads a .hlo file and returns its metadata and data.
     Args:
@@ -37,21 +42,24 @@ def read_hlo(path: str, keep_keys: list = [], omit_keys: list = []) -> Tuple[dic
             - The second dictionary contains the data, where each key maps to a list of values.
     """
     if keep_keys and omit_keys:
-        print("Both keep_keys and omit_keys are provided. keep_keys will take precedence.")
-    
+        print(
+            "Both keep_keys and omit_keys are provided. keep_keys will take precedence."
+        )
+
     path_to_hlo = Path(path)
     header_lines = []
     header_end = False
     data = defaultdict(list)
+    parser = cysimdjson.JSONParser()
 
-    with path_to_hlo.open() as f:
-        for line in f:
-            if line == "%%\n":
+    with open(str(path_to_hlo), "rb") as f:
+        for line in tqdm(f):
+            if line.decode("utf8").startswith("%%"):
                 header_end = True
             elif not header_end:
                 header_lines.append(line)
             else:
-                line_dict = json.loads(line)
+                line_dict = parser.parse_in_place(line).export()
                 if keep_keys:
                     for k, v in line_dict.items():
                         if k in keep_keys:
@@ -66,7 +74,10 @@ def read_hlo(path: str, keep_keys: list = [], omit_keys: list = []) -> Tuple[dic
                                 data[k] += v
                             else:
                                 data[k].append(v)
-    meta = dict(yml_load("".join(header_lines)))
+    if header_lines:
+        meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
+    else:
+        meta = {}
 
     return meta, data
 
@@ -102,12 +113,13 @@ class HelaoData:
         data: Returns the data from the first data file.
         __repr__(): Returns a string representation of the object.
     """
+
     def __init__(self, target: str, **kwargs):
         """
         Initialize a HelaoData object.
 
         Parameters:
-        target (str): The target file or directory. This can be a path to a zip file, 
+        target (str): The target file or directory. This can be a path to a zip file,
                       a directory, or a YAML file.
         **kwargs: Additional keyword arguments.
             - zflist (list): List of files in the zip archive.
@@ -253,7 +265,9 @@ class HelaoData:
             )
         )
 
-    def read_hlo(self, hlotarget):
+    def read_hlo(
+        self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
+    ) -> Tuple[dict, dict]:
         """
         Reads and processes a .hlo file from a zip archive or directly.
 
@@ -272,22 +286,37 @@ class HelaoData:
               into a defaultdict of lists.
         """
         if self.target.endswith(".zip"):
-            with ZipFile(self.target, "r") as zf:
-                lines = zf.open(hlotarget).readlines()
-
-            lines = [x.decode("UTF-8").replace("\r\n", "\n") for x in lines]
-            sep_index = lines.index("%%\n")
-            meta = yml_load("".join(lines[:sep_index]))
-
+            header_lines = []
+            header_end = False
             data = defaultdict(list)
-            for line in lines[sep_index + 1 :]:
-                line_dict = json.loads(line)
-                # print(line_dict)
-                for k, v in line_dict.items():
-                    if isinstance(v, list):
-                        data[k] += v
+            parser = cysimdjson.JSONParser()
+
+            with ZipFile(self.target, "r") as zf:
+                for line in zf.open(hlotarget):
+                    if line.decode("utf8").startswith("%%"):
+                        header_end = True
+                    elif not header_end:
+                        header_lines.append(line)
                     else:
-                        data[k].append(v)
+                        line_dict = parser.parse_in_place(line).export()
+                        if keep_keys:
+                            for k, v in line_dict.items():
+                                if k in keep_keys:
+                                    if isinstance(v, list):
+                                        data[k] += v
+                                    else:
+                                        data[k].append(v)
+                        else:
+                            for k, v in line_dict.items():
+                                if k not in omit_keys:
+                                    if isinstance(v, list):
+                                        data[k] += v
+                                    else:
+                                        data[k].append(v)
+            if header_lines:
+                meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
+            else:
+                meta = {}
             return meta, data
         else:
             return read_hlo(hlotarget)

@@ -14,6 +14,7 @@ Functions:
         Reads the custom metadata from a Parquet file.
 """
 import json
+import cysimdjson
 from ruamel.yaml import YAML
 from collections import defaultdict
 
@@ -63,13 +64,14 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
             - dict: A dictionary where keys are the JSON keys from the file and values are lists of the corresponding values.
             - int: The maximum length of the lists in the dictionary.
     """
-    with open(file_path) as f:
+    parser = cysimdjson.JSONParser()
+    with open(file_path, "rb") as f:
         chunkd = defaultdict(list)
         for i, line in enumerate(f):
             if i < data_start_index:
                 continue
             else:
-                jd = json.loads(line.strip())
+                jd = parser.parse_in_place(line).export()
                 for k, val in jd.items():
                     if isinstance(val, list):
                         chunkd[k] += val
@@ -134,6 +136,7 @@ def read_helao_metadata(parquet_file_path):
     Returns:
         dict: A dictionary containing the Helao metadata.
     """
+    parser = cysimdjson.JSONParser()
     meta = pq.read_metadata(parquet_file_path)
-    metadict = json.loads(meta.metadata.get(b"helao_metadata", b"{}").decode())
+    metadict = parser.parse(meta.metadata.get(b"helao_metadata", b"{}"))
     return metadict

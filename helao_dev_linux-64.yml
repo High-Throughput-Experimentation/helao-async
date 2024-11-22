@@ -6,6 +6,7 @@ dependencies:
   - pip:
     - aiodebug
     - aioshutil
+    - cysimdjson
     - nidaqmx
     - plumbum
     - pydasher
