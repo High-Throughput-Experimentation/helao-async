@@ -55,6 +55,8 @@ class BiologicDriver(HelaoDriver):
         self.pstat = None
         self.connection_raised = False
         self.channels = {i: None for i in range(self.num_channels)}
+        self.channel_params = {i: {} for i in range(self.num_channels)}
+        self.channel_technique = {i: None for i in range(self.num_channels)}
         self.connect()
         self.connection_ctx = None
 
@@ -144,6 +146,8 @@ class BiologicDriver(HelaoDriver):
             self.channels[channel] = technique.easy_class(
                 device=self.pstat, params=listed_params, channels=[channel]
             )
+            self.channel_params[channel] = listed_params
+            self.channel_technique[channel] = technique
             self.channels[channel].field_remap = technique.field_map
             response = DriverResponse(
                 response=DriverResponseType.success,
@@ -157,6 +161,37 @@ class BiologicDriver(HelaoDriver):
             )
             self.cleanup(channel)
         return response
+
+    def list_techniques(self, channel: int = 0):
+        if channel not in self.channels:
+            raise ValueError(f"Channel {channel} does not exist.")
+        if self.channels[channel] is None:
+            raise ValueError(f"Channel {channel} has not been set up.")
+        techlist = [
+            (i, tp) for i, tp in enumerate(self.channels[channel].device.__techniques)
+        ]
+        return techlist
+
+    def update_parameters(self, channel: int = 0, new_params: dict = {}):
+        if channel not in self.channels:
+            raise ValueError(f"Channel {channel} does not exist.")
+        if self.channels[channel] is None:
+            raise ValueError(f"Channel {channel} has not been set up.")
+        technique = self.channel_technique[channel]
+        parmap = technique.parameter_map
+        mapped_params = {parmap[k]: v for k, v in new_params.items() if k in parmap}
+        listed = ["voltages", "currents", "durations"]
+        listed_params = {k: [v] if k in listed else v for k, v in mapped_params.items()}
+        techind, existing_tp = self.list_techniques(channel)[-1]
+        existing_tech, existing_params = existing_tp
+        updated_params = {**existing_params, **listed_params}
+        self.channels[channel].device.update_params(
+            ch=channel,
+            technique=existing_tech,
+            parameters=updated_params,
+            index=techind,
+            types=self.channels[channel]._parameter_types,
+        )
 
     def start_channel(self, channel: int = 0, ttl_params: dict = {}) -> DriverResponse:
         """Apply signal and begin data acquisition."""
@@ -221,19 +256,18 @@ class BiologicDriver(HelaoDriver):
                     for _ in range(len(latest_segment.data)):
                         values_list.append(segment_values)
                     latest_segment = await program._retrieve_data_segment(channel)
-            
+
             parsed = [
                 program._fields(*program._field_values(datum, segment))
                 for datum in segment_data
             ]
-            
+
             data = pd.DataFrame(parsed).to_dict(orient="list")
             data = {program.field_remap[k]: v for k, v in data.items()}
             values = pd.DataFrame(values_list).to_dict(orient="list")
             values = {f"_{k}": v for k, v in values.items()}
-            
-            data.update(values)
 
+            data.update(values)
 
             response = DriverResponse(
                 response=DriverResponseType.success,
@@ -281,6 +315,8 @@ class BiologicDriver(HelaoDriver):
             if channel_state == DriverStatus.busy:
                 raise ValueError(f"Channel {channel} is busy.")
             self.channels[channel] = None
+            self.channel_params[channel] = {}
+            self.channel_technique[channel] = None
             response = DriverResponse(
                 response=DriverResponseType.success,
                 status=DriverStatus.ok,
