@@ -1,6 +1,5 @@
 __all__ = ["async_action_dispatcher", "async_private_dispatcher", "private_dispatcher"]
 
-import time
 import traceback
 import asyncio
 import aiohttp
@@ -18,7 +17,11 @@ else:
 
 
 async def async_action_dispatcher(
-    world_config_dict: dict, A: Action, params={}, timeout=60
+    world_config_dict: dict,
+    A: Action,
+    params: dict = {},
+    timeout: int = 60,
+    retries: int = 5,
 ):
     """
     Asynchronously dispatches an action to the specified server and handles the response.
@@ -38,33 +41,46 @@ async def async_action_dispatcher(
     act_addr = actd["host"]
     act_port = actd["port"]
     url = f"http://{act_addr}:{act_port}/{A.action_server.server_name}/{A.action_name}"
+    success = False
+    retry_count = 0
+
     client_timeout = aiohttp.ClientTimeout(total=timeout)
     conn = aiohttp.TCPConnector(
         force_close=True, enable_cleanup_closed=True, limit=1000
     )
     error_code = ErrorCodes.unspecified
     response = None
-    async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
-        async with session.post(
-            url,
-            params=params,
-            json={"action": A.as_dict()},
-        ) as resp:
-            try:
-                response = await resp.json()
-                error_code = ErrorCodes.none
-                if resp.status != 200:
-                    error_code = ErrorCodes.http
-                    LOGGER.error(
-                        f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}"
-                    )
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(
-                    f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{resp}'), {tb}",
-                )
-            resp.close()
-        await session.close()
+
+    while not success and retry_count < retries:
+        try:
+            async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
+                async with session.post(
+                    url,
+                    params=params,
+                    json={"action": A.as_dict()},
+                ) as resp:
+                    response = await resp.json()
+                    error_code = ErrorCodes.none
+                    if resp.status != 200:
+                        error_code = ErrorCodes.http
+                        LOGGER.error(
+                            f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}"
+                        )
+                success = True
+        except Exception as e:
+            retry_count += 1
+            retry_wait = retry_count * timeout / 2
+            LOGGER.warning(
+                f"{A.action_server.server_name}/{A.action_name} encountered an error: {e}, sleeping for {retry_wait} seconds before retrying..."
+            )
+            await asyncio.sleep(retry_wait)
+            response = None
+    if not success:
+        LOGGER.error(
+            f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{response}')",
+            exc_info=True,
+        )
+                
     await asyncio.sleep(0)
     return response, error_code
 
