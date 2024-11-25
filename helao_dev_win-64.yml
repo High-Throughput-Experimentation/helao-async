@@ -6,7 +6,7 @@ dependencies:
   - pip:
     - aiodebug
     - aioshutil
-    - cysimdjson
+    - cysimdjson  # requires https://aka.ms/vs/17/release/vs_BuildTools.exe (Visual Studio Build Tools 2022, Desktop development with C++)
     - nidaqmx
     - plumbum
     - pydasher
@@ -70,6 +70,7 @@ dependencies:
   - termcolor
   - tqdm
   - uvicorn
+  - vs2022_win-64
   - websockets
   - zeroconf
   - zeromq
