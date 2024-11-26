@@ -8,11 +8,13 @@ DATA_RATE = 0.1
 
 
 def run_ocv(pstat):
-    pstat.setup(
+    resp = pstat.setup(
         technique=TECH_OCV,
         signal_params={"Tval__s": DURATION_SECONDS, "AcqInterval__s": DATA_RATE},
     )
-    pstat.measure()
+    print(f"setup response: {resp.message}")
+    resp = pstat.measure()
+    print(f"start response: {resp.message}")
     state = "busy"
     time.sleep(DATA_RATE)
     while state == "busy":
