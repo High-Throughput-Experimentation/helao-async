@@ -78,11 +78,11 @@ servers:
       max_speed_count_sec: 25000
       ipstr: 192.168.200.219
       axis_id:
-        x: A
-        y: B
+        x: B
+        y: A
       axis_zero:
-        A: 0
-        B: 0
+        A: 127.5
+        B: 76.5
       timeout: 600
   PSTAT:
     host: hte-eche-11.htejcap.caltech.edu
