@@ -52,12 +52,8 @@ def read_hlo(
     data = defaultdict(list)
 
     with open(str(path_to_hlo), "rb") as f:
-        for line in tqdm(f):
-            if line.decode("utf8").startswith("%%"):
-                header_end = True
-            elif not header_end:
-                header_lines.append(line)
-            else:
+        for line in f:
+            if header_end:
                 line_dict = orjson.loads(line)
                 for k in line_dict:
                     if k in keep_keys or k not in omit_keys:
@@ -66,6 +62,10 @@ def read_hlo(
                             data[k] += v
                         else:
                             data[k].append(v)
+            elif line.decode("utf8").startswith("%%"):
+                header_end = True
+            elif not header_end:
+                header_lines.append(line)
     if header_lines:
         meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
     else:
@@ -284,11 +284,7 @@ class HelaoData:
 
             with ZipFile(self.target, "r") as zf:
                 for line in zf.open(hlotarget):
-                    if line.decode("utf8").startswith("%%"):
-                        header_end = True
-                    elif not header_end:
-                        header_lines.append(line)
-                    else:
+                    if header_end:
                         line_dict = orjson.loads(line)
                         for k in line_dict:
                             if k in keep_keys or k not in omit_keys:
@@ -297,6 +293,10 @@ class HelaoData:
                                     data[k] += v
                                 else:
                                     data[k].append(v)
+                    elif line.decode("utf8").startswith("%%"):
+                        header_end = True
+                    elif not header_end:
+                        header_lines.append(line)
             if header_lines:
                 meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
             else:
