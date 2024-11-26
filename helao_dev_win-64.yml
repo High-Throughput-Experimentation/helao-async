@@ -70,7 +70,6 @@ dependencies:
   - termcolor
   - tqdm
   - uvicorn
-  - vs2022_win-64
   - websockets
   - zeroconf
   - zeromq
