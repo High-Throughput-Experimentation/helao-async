@@ -23,9 +23,7 @@ import psutil
 import time
 from enum import Enum
 from copy import copy
-from _ctypes import COMError
 
-import asyncio
 import numpy as np
 
 from helao.drivers.helao_driver import (
