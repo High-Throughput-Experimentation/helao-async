@@ -16,7 +16,7 @@ Classes:
 __all__ = ["read_hlo", "HelaoData"]
 
 import os
-import cysimdjson
+import orjson
 import builtins
 from pathlib import Path
 from typing import Tuple
@@ -50,7 +50,6 @@ def read_hlo(
     header_lines = []
     header_end = False
     data = defaultdict(list)
-    parser = cysimdjson.JSONParser()
 
     with open(str(path_to_hlo), "rb") as f:
         for line in tqdm(f):
@@ -59,10 +58,10 @@ def read_hlo(
             elif not header_end:
                 header_lines.append(line)
             else:
-                line_dict = parser.parse_in_place(line)
-                for k, jv in line_dict.items():
+                line_dict = orjson.loads(line)
+                for k in line_dict:
                     if k in keep_keys or k not in omit_keys:
-                        v = jv.export()
+                        v = line_dict[k]
                         if isinstance(v, list):
                             data[k] += v
                         else:
@@ -282,7 +281,6 @@ class HelaoData:
             header_lines = []
             header_end = False
             data = defaultdict(list)
-            parser = cysimdjson.JSONParser()
 
             with ZipFile(self.target, "r") as zf:
                 for line in zf.open(hlotarget):
@@ -291,10 +289,10 @@ class HelaoData:
                     elif not header_end:
                         header_lines.append(line)
                     else:
-                        line_dict = parser.parse_in_place(line).export()
-                        for k, jv in line_dict.items():
+                        line_dict = orjson.loads(line)
+                        for k in line_dict:
                             if k in keep_keys or k not in omit_keys:
-                                v = jv.export()
+                                v = line_dict[k]
                                 if isinstance(v, list):
                                     data[k] += v
                                 else:
