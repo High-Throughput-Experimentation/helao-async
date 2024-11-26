@@ -13,8 +13,7 @@ Functions:
     read_helao_metadata(parquet_file_path):
         Reads the custom metadata from a Parquet file.
 """
-import json
-import cysimdjson
+import orjson
 from ruamel.yaml import YAML
 from collections import defaultdict
 
@@ -64,17 +63,16 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100, keep_keys=
             - dict: A dictionary where keys are the JSON keys from the file and values are lists of the corresponding values.
             - int: The maximum length of the lists in the dictionary.
     """
-    parser = cysimdjson.JSONParser()
     with open(file_path, "rb") as f:
         chunkd = defaultdict(list)
         for i, line in enumerate(f):
             if i < data_start_index:
                 continue
             else:
-                jd = parser.parse_in_place(line)
-                for k, jval in jd.items():
+                jd = orjson.loads(line)
+                for k in jd:
                     if k in keep_keys or k not in omit_keys:
-                        val = jval.export()
+                        val = jd[k]
                         if isinstance(val, list):
                             chunkd[k] += val
                         else:
@@ -113,7 +111,7 @@ def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100):
         if schema is None:
             schema = table.schema
             existing_metadata = schema.metadata
-            custom_metadata = json.dumps(header.get("optional", {})).encode("utf8")
+            custom_metadata = orjson.dumps(header.get("optional", {}))
             metadata = {**{"helao_metadata": custom_metadata}, **existing_metadata}
 
         table = table.replace_schema_metadata(metadata)
@@ -138,7 +136,6 @@ def read_helao_metadata(parquet_file_path):
     Returns:
         dict: A dictionary containing the Helao metadata.
     """
-    parser = cysimdjson.JSONParser()
     meta = pq.read_metadata(parquet_file_path)
-    metadict = parser.parse(meta.metadata.get(b"helao_metadata", b"{}"))
+    metadict = orjson.loads(meta.metadata.get(b"helao_metadata", b"{}"))
     return metadict

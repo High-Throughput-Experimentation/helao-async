@@ -6,7 +6,6 @@ dependencies:
   - pip:
     - aiodebug
     - aioshutil
-    - cysimdjson
     - nidaqmx
     - plumbum
     - pydasher
@@ -32,6 +31,7 @@ dependencies:
   - munch
   - ntplib
   - numpy=1
+  - orjson
   - pandas
   - paramiko
   - picologging
