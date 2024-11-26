@@ -1,7 +1,7 @@
 import sys
 import time
-from ..driver import GamryDriver
-from ..technique import TECH_OCV
+from helao.drivers.pstat.gamry.driver import GamryDriver
+from helao.drivers.pstat.gamry.technique import TECH_OCV
 
 DURATION_SECONDS = 10.0
 DATA_RATE = 0.1
