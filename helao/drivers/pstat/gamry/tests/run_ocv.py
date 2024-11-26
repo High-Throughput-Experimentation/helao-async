@@ -47,6 +47,7 @@ def main():
     print(f"device id: {device_id}")
 
     print(f"Running OCV for {DURATION_SECONDS} seconds, recording every {DATA_RATE} seconds.")
+    run_ocv(pstat)
 
     return True
 
