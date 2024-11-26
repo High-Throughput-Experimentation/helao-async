@@ -14,6 +14,7 @@ def run_ocv(pstat):
     )
     pstat.measure()
     state = "busy"
+    time.sleep(DATA_RATE)
     while state == "busy":
         resp = pstat.get_data(DATA_RATE)
         print(f"got data: {resp.data}")
