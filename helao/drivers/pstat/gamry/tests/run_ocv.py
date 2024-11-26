@@ -49,6 +49,9 @@ def main():
     print(f"Running OCV for {DURATION_SECONDS} seconds, recording every {DATA_RATE} seconds.")
     run_ocv(pstat)
 
+    print(f"Closing connection.")
+    pstat.disconnect()
+
     return True
 
 
