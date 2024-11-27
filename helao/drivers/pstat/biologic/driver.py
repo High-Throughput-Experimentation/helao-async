@@ -185,7 +185,8 @@ class BiologicDriver(HelaoDriver):
         listed_params = {k: [v] if k in listed else v for k, v in mapped_params.items()}
         techind, existing_tp = self.list_techniques(channel)[-1]
         existing_tech, existing_params = existing_tp
-        updated_params = {**existing_params, **listed_params}
+        # updated_params = {**existing_params, **listed_params}
+        updated_params = {**listed_params}
         self.channels[channel].device.update_parameters(
             ch=channel,
             technique=existing_tech,
