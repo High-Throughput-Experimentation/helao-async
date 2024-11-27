@@ -29,14 +29,14 @@ SORTED_IRANGE = [x for x in EC_IRange if "1" in x]
 SORTED_IRANGE.sort(key=lambda x: IRANGE_UMAP[x[0]] * int(x[1:]), reverse=True)
 
 
-def auto_IRange(current: float, threshold_factor: float = 2.0) -> EC_IRange:
+def auto_IRange(current: float, threshold_factor: float = 2.0) -> IRange:
     """Select EC_IRange based on absolute current and threshold factor."""
     thresholds = [threshold_factor * 10**-i for i in range(1, 11)]
     irange = EC_IRange.a1
     for threshold, strenum in zip(thresholds, SORTED_IRANGE):
         if abs(current) <= abs(threshold):
             irange = strenum
-    return irange
+    return EC_IRange_map[irange]
 
 
 class EC_ERange(StrEnum):
