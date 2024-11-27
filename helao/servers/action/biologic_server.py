@@ -228,7 +228,7 @@ class BiologicExec(Executor):
                 next_irange = auto_IRange(last_current)
                 if next_irange != self.last_irange:
                     LOGGER.info(f"changing IRange to {next_irange}")
-                    self.driver.update_parameters(self.channel, {"IRange": next_irange})
+                    self.driver.update_parameters(self.channel, {"I_Range": next_irange})
                     self.last_irange = next_irange
             error = (
                 ErrorCodes.none if resp.response == "success" else ErrorCodes.critical

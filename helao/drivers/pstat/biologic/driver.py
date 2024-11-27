@@ -171,7 +171,6 @@ class BiologicDriver(HelaoDriver):
             (i, tp)
             for i, tp in enumerate(self.channels[channel].device.techniques[channel])
         ]
-        print("!!!", self.channels[channel].device.techniques[channel])
         return techlist
 
     def update_parameters(self, channel: int = 0, new_params: dict = {}):
@@ -187,7 +186,6 @@ class BiologicDriver(HelaoDriver):
         techind, existing_tp = self.list_techniques(channel)[-1]
         existing_tech, existing_params = existing_tp
         updated_params = {**existing_params, **listed_params}
-        print("!!!", updated_params)
         self.channels[channel].device.update_parameters(
             ch=channel,
             technique=existing_tech,
