@@ -168,8 +168,10 @@ class BiologicDriver(HelaoDriver):
         if self.channels[channel] is None:
             raise ValueError(f"Channel {channel} has not been set up.")
         techlist = [
-            (i, tp) for i, tp in enumerate(self.channels[channel].device.techniques)
+            (i, tp)
+            for i, tp in enumerate(self.channels[channel].device.techniques[channel])
         ]
+        print("!!!", self.channels[channel].device.techniques[channel])
         return techlist
 
     def update_parameters(self, channel: int = 0, new_params: dict = {}):
