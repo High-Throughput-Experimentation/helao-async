@@ -38,6 +38,7 @@ from helao.drivers.pstat.biologic.enum import (
     EC_IRange_map,
     EC_ERange_map,
     EC_Bandwidth_map,
+    auto_IRange
 )
 from helao.drivers.pstat.biologic.technique import (
     BiologicTechnique,
@@ -79,6 +80,8 @@ class BiologicExec(Executor):
             }
             self.driver = self.active.base.fastapp.driver
             self.channel = self.action_params["channel"]
+            self.custom_autoirange = self.action_params.get("custom_autoirange", False)
+            self.last_irange = self.action_params.get("IRange", "AUTO")
 
             # no external timer, event sink signals end of measurement
             self.duration = -1
@@ -220,6 +223,13 @@ class BiologicExec(Executor):
             if data_length:
                 self.data_buffer["channel"].extend(data_length * [self.channel])
                 resp.data.update({"channel": data_length * [self.channel]})
+            if self.custom_autoirange and self.data_buffer.get("I_A", []):
+                last_current = self.data_buffer["I_A"][-1]
+                next_irange = auto_IRange(last_current)
+                if next_irange != self.last_irange:
+                    LOGGER.info(f"changing IRange to {next_irange}")
+                    self.driver.update_parameters(self.channel, {"IRange": next_irange})
+                    self.last_irange = next_irange
             error = (
                 ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
             )
@@ -296,6 +306,7 @@ async def biologic_dyn_endpoints(app=None):
         alert_above: bool = True,
         alert_sleep__s: float = -1,
         alertThreshI_A: float = 0,
+        custom_autoirange: bool = False,
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -377,6 +388,7 @@ async def biologic_dyn_endpoints(app=None):
         alert_above: bool = True,
         alert_sleep__s: float = -1,
         alertThreshI_A: float = 0,
+        custom_autoirange: bool = False,
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
