@@ -182,18 +182,15 @@ class BiologicDriver(HelaoDriver):
         parmap = technique.parameter_map
         mapped_params = {parmap[k]: v for k, v in new_params.items() if k in parmap}
         listed = ["voltages", "currents", "durations"]
-        listed_params = {k: [v] if k in listed else v for k, v in mapped_params.items()}
+        updated_params = {k: [v] if k in listed else v for k, v in mapped_params.items()}
         techind, existing_tp = self.list_techniques(channel)[-1]
-        existing_tech, existing_params = existing_tp
-        # updated_params = {**existing_params, **listed_params}
-        updated_params = {**listed_params}
+        existing_tech, _ = existing_tp
         self.channels[channel].device.update_parameters(
             ch=channel,
             technique=existing_tech,
             parameters=updated_params,
             index=techind,
-            # types=self.channels[channel]._parameter_types,
-            types=None,
+            types=self.channels[channel]._parameter_types,
         )
 
     def start_channel(self, channel: int = 0, ttl_params: dict = {}) -> DriverResponse:
