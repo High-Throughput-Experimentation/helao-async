@@ -5,7 +5,7 @@ from pyAndorSDK3 import AndorSDK3, CameraException
 import numpy as np
 import time as time
 import pandas as pd
-import json
+from typing import Optional
 from pyAndorSpectrograph.spectrograph import ATSpectrograph
 
 # save a default log file system temp
@@ -602,7 +602,7 @@ class AndorDriver(HelaoDriver):
             self.cleanup()
         return response
 
-    def get_data(self, frames: int, total_duration: float, external: bool = True, first_tick: float = None) -> DriverResponse:
+    def get_data(self, frames: int, total_duration: float, external: bool = True, first_tick: Optional[float] = None) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
             status = DriverStatus.busy

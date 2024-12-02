@@ -4,6 +4,7 @@ import os
 import zipfile
 import re
 from glob import glob
+from typing import Optional
 
 from helao.helpers.print_message import print_message
 from helao.core.models.helaodirs import HelaoDirs
@@ -15,7 +16,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
+def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
     """
     Initializes and verifies the directory structure for the Helao application based on the provided configuration.
 

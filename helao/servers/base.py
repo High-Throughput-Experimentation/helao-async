@@ -35,6 +35,7 @@ from filelock import FileLock
 from fastapi import WebSocket
 from fastapi.dependencies.utils import get_flat_params
 
+from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
 from helao.helpers.executor import Executor
 from helao.helpers.helao_dirs import helao_dirs
@@ -139,7 +140,7 @@ class Base:
         contain_action(self, activeparams: ActiveParams): Contain an action.
         get_active_info(self, action_uuid: UUID): Get active action information.
         get_ntp_time(self): Get the current time from the NTP server.
-        send_statuspackage(self, client_servkey: str, client_host: str, client_port: int, action_name: str = None): Send a status package to a client.
+        send_statuspackage(self, client_servkey: str, client_host: str, client_port: int, action_name: Optional[str] = None): Send a status package to a client.
         send_nbstatuspackage(self, client_servkey: str, client_host: str, client_port: int, actionmodel: ActionModel): Send a non-blocking status package to a client.
         attach_client(self, client_servkey: str, client_host: str, client_port: int, retry_limit=5): Attach a client for status updates.
         detach_client(self, client_servkey: str, client_host: str, client_port: int): Detach a client from status updates.
@@ -152,8 +153,8 @@ class Base:
         get_lbuf(self, live_key): Get data from the live buffer.
         log_status_task(self, retry_limit: int = 5): Task to log status changes and send updates to clients.
         detach_subscribers(self): Detach all subscribers.
-        get_realtime(self, epoch_ns: float = None, offset: float = None) -> float: Get the current real-time.
-        get_realtime_nowait(self, epoch_ns: float = None, offset: float = None) -> float: Get the current real-time without waiting.
+        get_realtime(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float: Get the current real-time.
+        get_realtime_nowait(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float: Get the current real-time without waiting.
         sync_ntp_task(self, resync_time: int = 1800): Task to regularly sync with the NTP server.
         shutdown(self): Shutdown the server and tasks.
         write_act(self, action): Write action metadata to a file.
@@ -169,7 +170,7 @@ class Base:
     """
 
     # TODO: add world_cfg: dict parameter for BaseAPI to pass config instead of fastapp
-    def __init__(self, fastapp, dyn_endpoints=None):
+    def __init__(self, fastapp: HelaoFastAPI, dyn_endpoints=None):
         """
         Initialize the server object.
 
@@ -575,7 +576,7 @@ class Base:
     async def setup_and_contain_action(
         self,
         json_data_keys: List[str] = [],
-        action_abbr: str = None,
+        action_abbr: Optional[str] = None,
         file_type: str = "helao__file",
         hloheader: HloHeaderModel = HloHeaderModel(),
     ):
@@ -711,7 +712,7 @@ class Base:
         client_servkey: str,
         client_host: str,
         client_port: int,
-        action_name: str = None,
+        action_name: Optional[str] = None,
     ):
         """
         Asynchronously sends a status package to a specified client.
@@ -1102,7 +1103,7 @@ class Base:
         await self.data_q.put(StopAsyncIteration)
         await asyncio.sleep(1)
 
-    async def get_realtime(self, epoch_ns: float = None, offset: float = None) -> float:
+    async def get_realtime(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
         """
         Asynchronously retrieves the real-time value.
 
@@ -1116,7 +1117,7 @@ class Base:
         return self.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
-        self, epoch_ns: float = None, offset: float = None
+        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
     ) -> float:
         """
         Calculate the real-time in nanoseconds, optionally adjusted by an offset.
@@ -1511,25 +1512,25 @@ class Active:
         myinit(self):
             Initializes the data logger and action file.
 
-        init_datafile(self, header, file_type, json_data_keys, file_sample_label, filename, file_group: HloFileGroup, file_conn_key: str = None, action: Action = None):
+        init_datafile(self, header, file_type, json_data_keys, file_sample_label, filename, file_group: HloFileGroup, file_conn_key: Optional[str] = None, action: Optional[Action] = None):
             Initializes a data file with the given parameters.
 
-        finish_hlo_header(self, file_conn_keys: List[UUID] = None, realtime: float = None):
+        finish_hlo_header(self, file_conn_keys: Optional[List[UUID]] = None, realtime: Optional[float] = None):
             Adds a timestamp to the data file header.
 
         add_status(self, action=None):
             Sends the status of the most recent active action.
 
-        set_estop(self, action: Action = None):
+        set_estop(self, action: Optional[Action] = None):
             Sets the emergency stop status for the action.
 
-        set_error(self, error_code: ErrorCodes = None, action: Action = None):
+        set_error(self, error_code: Optional[ErrorCodes] = None, action: Optional[Action] = None):
             Sets the error status for the action.
 
-        get_realtime(self, epoch_ns: float = None, offset: float = None) -> float:
+        get_realtime(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
             Gets the current real-time with optional epoch and offset.
 
-        get_realtime_nowait(self, epoch_ns: float = None, offset: float = None) -> float:
+        get_realtime_nowait(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
             Gets the current real-time without waiting.
 
         write_live_data(self, output_str: str, file_conn_key: UUID):
@@ -1538,13 +1539,13 @@ class Active:
         enqueue_data_dflt(self, datadict: dict):
             Enqueues data to a default file connection key.
 
-        enqueue_data(self, datamodel: DataModel, action: Action = None):
+        enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
             Enqueues data to the data queue.
 
-        enqueue_data_nowait(self, datamodel: DataModel, action: Action = None):
+        enqueue_data_nowait(self, datamodel: DataModel, action: Optional[Action] = None):
             Enqueues data to the data queue without waiting.
 
-        assemble_data_msg(self, datamodel: DataModel, action: Action = None) -> DataPackageModel:
+        assemble_data_msg(self, datamodel: DataModel, action: Optional[Action] = None) -> DataPackageModel:
             Assembles a data message for the given data model and action.
 
         add_new_listen_uuid(self, new_uuid: UUID):
@@ -1559,16 +1560,16 @@ class Active:
         log_data_task(self):
             Subscribes to the data queue and writes data to the file.
 
-        write_file(self, output_str: str, file_type: str, filename: str = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: str = None, sample_str: str = None, file_sample_label: str = None, json_data_keys: str = None, action: Action = None):
+        write_file(self, output_str: str, file_type: str, filename: Optional[str] = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: Optional[str] = None, sample_str: Optional[str] = None, file_sample_label: Optional[str] = None, json_data_keys: Optional[str] = None, action: Optional[Action] = None):
             Writes a complete file with the given parameters.
 
-        write_file_nowait(self, output_str: str, file_type: str, filename: str = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: str = None, sample_str: str = None, file_sample_label: str = None, json_data_keys: str = None, action: Action = None):
+        write_file_nowait(self, output_str: str, file_type: str, filename: Optional[str] = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: Optional[str] = None, sample_str: Optional[str] = None, file_sample_label: Optional[str] = None, json_data_keys: Optional[str] = None, action: Optional[Action] = None):
             Writes a complete file with the given parameters without waiting.
 
         set_sample_action_uuid(self, sample: SampleUnion, action_uuid: UUID):
             Sets the action UUID for the given sample.
 
-        append_sample(self, samples: List[SampleUnion], IO: str, action: Action = None):
+        append_sample(self, samples: List[SampleUnion], IO: str, action: Optional[Action] = None):
             Adds samples to the input or output sample list.
 
         split_and_keep_active(self):
@@ -1586,10 +1587,10 @@ class Active:
         substitute(self):
             Closes all file connections.
 
-        finish(self, finish_uuid_list: List[UUID] = None) -> Action:
+        finish(self, finish_uuid_list: Optional[List[UUID]] = None) -> Action:
             Finishes the actions in the UUID list and performs cleanup.
 
-        track_file(self, file_type: str, file_path: str, samples: List[SampleUnion], action: Action = None):
+        track_file(self, file_type: str, file_path: str, samples: List[SampleUnion], action: Optional[Action] = None):
             Adds auxiliary files to the file dictionary.
 
         relocate_files(self):
@@ -1806,8 +1807,8 @@ class Active:
         file_sample_label,
         filename,
         file_group: HloFileGroup,
-        file_conn_key: str = None,
-        action: Action = None,
+        file_conn_key: Optional[str] = None,
+        action: Optional[Action] = None,
     ):
         """
         Initializes a data file with the provided parameters and generates the necessary file information.
@@ -1879,8 +1880,8 @@ class Active:
 
     def finish_hlo_header(
         self,
-        file_conn_keys: List[UUID] = None,
-        realtime: float = None,
+        file_conn_keys: Optional[List[UUID]] = None,
+        realtime: Optional[float] = None,
     ):
         """
         Finalizes the HLO header for the given file connection keys.
@@ -1936,7 +1937,7 @@ class Active:
         if not action.nonblocking:
             await self.base.status_q.put(action.get_actmodel())
 
-    def set_estop(self, action: Action = None):
+    def set_estop(self, action: Optional[Action] = None):
         """
         Sets the emergency stop (E-STOP) status for the given action.
 
@@ -1952,7 +1953,7 @@ class Active:
         action.action_status.append(HloStatus.estopped)
         LOGGER.error(f"E-STOP {str(action.action_uuid)} on {action.action_name} status.")
 
-    async def set_error(self, error_code: ErrorCodes = None, action: Action = None):
+    async def set_error(self, error_code: Optional[ErrorCodes] = None, action: Optional[Action] = None):
         """
         Sets the error status and error code for the given action.
 
@@ -1977,7 +1978,7 @@ class Active:
 
         LOGGER.error(f"ERROR {str(action.action_uuid)} on {action.action_name} status.")
 
-    async def get_realtime(self, epoch_ns: float = None, offset: float = None) -> float:
+    async def get_realtime(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
         """
         Asynchronously retrieves the real-time value.
 
@@ -1991,7 +1992,7 @@ class Active:
         return self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
-        self, epoch_ns: float = None, offset: float = None
+        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
     ) -> float:
         """
         Retrieve the current real-time value without waiting.
@@ -2042,7 +2043,7 @@ class Active:
             )
         )
 
-    async def enqueue_data(self, datamodel: DataModel, action: Action = None):
+    async def enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
         """
         Asynchronously enqueues data into the data queue.
 
@@ -2062,7 +2063,7 @@ class Active:
         if datamodel.data:
             self.num_data_queued += 1
 
-    def enqueue_data_nowait(self, datamodel: DataModel, action: Action = None):
+    def enqueue_data_nowait(self, datamodel: DataModel, action: Optional[Action] = None):
         """
         Enqueues a data message into the queue without waiting.
 
@@ -2086,7 +2087,7 @@ class Active:
             self.num_data_queued += 1
 
     def assemble_data_msg(
-        self, datamodel: DataModel, action: Action = None
+        self, datamodel: DataModel, action: Optional[Action] = None
     ) -> DataPackageModel:
         """
         Assembles a data message package from the given data model and action.
@@ -2358,13 +2359,13 @@ class Active:
         self,
         output_str: str,
         file_type: str,
-        filename: str = None,
+        filename: Optional[str] = None,
         file_group: HloFileGroup = HloFileGroup.aux_files,
-        header: str = None,
-        sample_str: str = None,
-        file_sample_label: str = None,
-        json_data_keys: str = None,
-        action: Action = None,
+        header: Optional[str] = None,
+        sample_str: Optional[str] = None,
+        file_sample_label: Optional[str] = None,
+        json_data_keys: Optional[str] = None,
+        action: Optional[Action] = None,
     ):
         """
         Asynchronously writes a string to a file with specified parameters.
@@ -2447,13 +2448,13 @@ class Active:
         self,
         output_str: str,
         file_type: str,
-        filename: str = None,
+        filename: Optional[str] = None,
         file_group: HloFileGroup = HloFileGroup.aux_files,
-        header: str = None,
-        sample_str: str = None,
-        file_sample_label: str = None,
-        json_data_keys: str = None,
-        action: Action = None,
+        header: Optional[str] = None,
+        sample_str: Optional[str] = None,
+        file_sample_label: Optional[str] = None,
+        json_data_keys: Optional[str] = None,
+        action: Optional[Action] = None,
     ):
         """
         Writes a file asynchronously without waiting for the operation to complete.
@@ -2529,7 +2530,7 @@ class Active:
                 self.set_sample_action_uuid(sample=part, action_uuid=action_uuid)
 
     async def append_sample(
-        self, samples: List[SampleUnion], IO: str, action: Action = None
+        self, samples: List[SampleUnion], IO: str, action: Optional[Action] = None
     ):
         """
         Append samples to the specified action's input or output list.
@@ -2733,7 +2734,7 @@ class Active:
 
     async def finish(
         self,
-        finish_uuid_list: List[UUID] = None,
+        finish_uuid_list: Optional[List[UUID]] = None,
         # end_state: HloStatus = HloStatus.finished
     ) -> Action:
         """
@@ -2927,7 +2928,7 @@ class Active:
         file_type: str,
         file_path: str,
         samples: List[SampleUnion],
-        action: Action = None,
+        action: Optional[Action] = None,
     ) -> None:
         """
         Tracks a file by adding its information to the associated action.

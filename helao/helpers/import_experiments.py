@@ -2,6 +2,7 @@ __all__ = ["import_experiments"]
 
 import os
 import time
+from typing import Optional
 from importlib.machinery import SourceFileLoader
 from helao.helpers.print_message import print_message
 from helao.core.version import get_filehash
@@ -15,9 +16,9 @@ else:
 
 def import_experiments(
     world_config_dict: dict,
-    experiment_path: str = None,
+    experiment_path: Optional[str] = None,
     server_name: str = "",
-    user_experiment_path: str = None,
+    user_experiment_path: Optional[str] = None,
 ):
     """Import experiment functions into environment."""
 

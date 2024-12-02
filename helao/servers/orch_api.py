@@ -41,6 +41,8 @@ else:
 
 
 class OrchAPI(HelaoFastAPI):
+    orch: Orch
+    
     def __init__(
         self,
         config,
@@ -549,11 +551,8 @@ class OrchAPI(HelaoFastAPI):
                 list: A list of UUIDs of the cleared active actions.
             """
             cleared_actives = []
-            for actionservermodel in list(
-                self.orch.globalstatusmodel.server_dict.values()
-            ):
-                updatemodel = copy(actionservermodel)
-                for endpointmodel in actionservermodel.endpoints.values():
+            for actionservermodel in self.orch.globalstatusmodel.server_dict.values():
+                for endpointkey, endpointmodel in actionservermodel.endpoints.items():
                     active_items = list(endpointmodel.active_dict.items())
                     for uuid, statusmodel in active_items:
                         endpointmodel.active_dict.pop(uuid)
@@ -564,7 +563,8 @@ class OrchAPI(HelaoFastAPI):
                         endpointmodel.nonactive_dict[HloStatus.skipped].update(
                             {uuid: statusmodel}
                         )
-                await self.orch.update_status(actionservermodel=updatemodel)
+                    actionservermodel.endpoints[endpointkey] = endpointmodel
+                await self.orch.update_status(actionservermodel=actionservermodel)
             return cleared_actives
 
         @self.post("/update_nonblocking", tags=["private"])

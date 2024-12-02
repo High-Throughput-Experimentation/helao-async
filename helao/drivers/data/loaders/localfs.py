@@ -197,7 +197,7 @@ class LocalLoader:
             metad = FM.read_yml(path)
         return metad
 
-    def get_act(self, index=None, path: str = None):
+    def get_act(self, index=None, path: Optional[str] = None):
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
@@ -206,7 +206,7 @@ class LocalLoader:
         self.act_cache[path] = metad
         return HelaoAction(path, metad, self)
 
-    def get_exp(self, index=None, path: str = None):
+    def get_exp(self, index=None, path: Optional[str] = None):
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
@@ -215,7 +215,7 @@ class LocalLoader:
         self.exp_cache[path] = metad
         return HelaoExperiment(path, metad, self)
 
-    def get_seq(self, index=None, path: str = None):
+    def get_seq(self, index=None, path: Optional[str] = None):
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
@@ -224,7 +224,7 @@ class LocalLoader:
         self.seq_cache[path] = metad
         return HelaoSequence(path, metad, self)
 
-    def get_prc(self, index=None, path: str = None):
+    def get_prc(self, index=None, path: Optional[str] = None):
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:

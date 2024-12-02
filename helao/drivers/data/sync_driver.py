@@ -1475,11 +1475,11 @@ class HelaoSyncer:
                 result = prog.yml.cleanup()
                 LOGGER.info(f"Cleanup {yml_target_name} {result}.")
                 if result == "success":
-                    LOGGER.info("yml_success")
+                    LOGGER.debug("yml_success")
                     prog = self.get_progress(Path(yml_success))
-                    LOGGER.info("reassigning prog")
+                    LOGGER.debug("reassigning prog")
                     prog.dict["yml"] = str(yml_success)
-                    LOGGER.info("updating progress")
+                    LOGGER.debug("updating progress")
                     prog.write_dict()
 
             # pop children from progress dict
@@ -1786,7 +1786,7 @@ class HelaoSyncer:
                 LOGGER.info("S3 is not configured. Skipping to S3 upload.")
                 return True
             if isinstance(msg, dict):
-                LOGGER.info("Converting dict to json.")
+                LOGGER.debug("Converting dict to json.")
                 uploadee = dict2json(msg)
                 uploader = self.s3.upload_fileobj
                 if compress:
@@ -1854,17 +1854,17 @@ class HelaoSyncer:
         api_success = False
         last_status = 0
         last_response = {}
-        LOGGER.info("creating async request session")
+        LOGGER.debug("creating async request session")
         async with aiohttp.ClientSession() as session:
             for i in range(retries):
                 if not api_success:
-                    LOGGER.info(f"session attempt {i}")
+                    LOGGER.debug(f"session attempt {i}")
                     req_method = session.post if try_create else session.patch
                     api_str = f"API {'POST' if try_create else 'PATCH'}"
                     try:
-                        LOGGER.info("trying request")
+                        LOGGER.debug("trying request")
                         async with req_method(req_url, json=req_model) as resp:
-                            LOGGER.info("response received")
+                            LOGGER.debug("response received")
                             if resp.status == 200:
                                 api_success = True
                             elif resp.status == 400:
