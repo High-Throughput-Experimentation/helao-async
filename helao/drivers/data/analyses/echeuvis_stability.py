@@ -14,6 +14,13 @@ from scipy.stats import binned_statistic
 from helao.core.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 from .base_analysis import BaseAnalysis
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
 from helao.core.models.run_use import RunUse
@@ -442,26 +449,50 @@ class EcheUvisAnalysis(BaseAnalysis):
         )
 
         # aggregate insitu CA spectra over final t seconds, omitting first n
-        agg_insitu = aggfunc(
-            itup[2][
-                np.where(
-                    (itup[1][ap["skip_first_n"] :] - itup[1].max())
-                    >= -ap["agg_last_secs"]
-                )[0].min() :
-            ],
-            axis=0,
-        )
+        try:
+            agg_insitu = aggfunc(
+                itup[2][
+                    np.where(
+                        (itup[1][ap["skip_first_n"] :] - itup[1].max())
+                        >= -ap["agg_last_secs"]
+                    )[0].min() :
+                ],
+                axis=0,
+            )
+        except Exception:
+            LOGGER.error(f"Cannot skip first {ap['skip_first_n']} spectra of insitu CA, aggregating last {ap['agg_last_secs']} seconds.", exc_info=True)
+            agg_insitu = aggfunc(
+                itup[2][
+                    np.where(
+                        (itup[1][0] - itup[1].max())
+                        >= -ap["agg_last_secs"]
+                    )[0].min() :
+                ],
+                axis=0,
+            )
 
         # aggregate presitu OCV spectra over final t seconds, omitting first n
-        agg_presitu = aggfunc(
-            ptup[2][
-                np.where(
-                    (ptup[1][ap["skip_first_n"] :] - ptup[1].max())
-                    >= -ap["agg_last_secs"]
-                )[0].min() :
-            ],
-            axis=0,
-        )
+        try:    
+            agg_presitu = aggfunc(
+                ptup[2][
+                    np.where(
+                        (ptup[1][ap["skip_first_n"] :] - ptup[1].max())
+                        >= -ap["agg_last_secs"]
+                    )[0].min() :
+                ],
+                axis=0,
+            )
+        except Exception:
+            LOGGER.error(f"Cannot skip first {ap['skip_first_n']} spectra of insitu CA, aggregating last {ap['agg_last_secs']} seconds.", exc_info=True)
+            agg_presitu = aggfunc(
+                ptup[2][
+                    np.where(
+                        (ptup[1][0] - ptup[1].max())
+                        >= -ap["agg_last_secs"]
+                    )[0].min() :
+                ],
+                axis=0,
+            )
 
         inds = range(len(wl[wlindlo:wlindhi]))
         nbins = np.round(len(wl[wlindlo:wlindhi]) / ap["bin_width"]).astype(int)
