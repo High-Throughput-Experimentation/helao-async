@@ -460,7 +460,7 @@ class EcheUvisAnalysis(BaseAnalysis):
                 axis=0,
             )
         except Exception:
-            LOGGER.error(f"Cannot skip first {ap['skip_first_n']} spectra of insitu CA, aggregating last {ap['agg_last_secs']} seconds.", exc_info=True)
+            LOGGER.warning(f"Cannot skip first {ap['skip_first_n']} spectra of insitu CA, aggregating last {ap['agg_last_secs']} seconds.", exc_info=True)
             agg_insitu = aggfunc(
                 itup[2][
                     np.where(
@@ -483,7 +483,7 @@ class EcheUvisAnalysis(BaseAnalysis):
                 axis=0,
             )
         except Exception:
-            LOGGER.error(f"Cannot skip first {ap['skip_first_n']} spectra of insitu CA, aggregating last {ap['agg_last_secs']} seconds.", exc_info=True)
+            LOGGER.warning(f"Cannot skip first {ap['skip_first_n']} spectra of presitu CA, aggregating last {ap['agg_last_secs']} seconds.", exc_info=True)
             agg_presitu = aggfunc(
                 ptup[2][
                     np.where(
