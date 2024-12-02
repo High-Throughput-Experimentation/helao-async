@@ -192,7 +192,8 @@ class BiologicDriver(HelaoDriver):
             technique=existing_tech,
             parameters=updated_params,
             index=techind,
-            types=self.channels[channel]._parameter_types,
+            # types=self.channels[channel]._parameter_types,
+            types=None,
         )
 
     def start_channel(self, channel: int = 0, ttl_params: dict = {}) -> DriverResponse:
