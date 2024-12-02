@@ -99,8 +99,8 @@ class PalAction(BaseModel, HelaoDict):
 
 class PalMicroCam(BaseModel, HelaoDict):
     # scalar values which are the same for each repetition of the PAL method
-    method: str = None  # name of methods
-    tool: str = None
+    method: Optional[str] = None  # name of methods
+    tool: Optional[str] = None
     volume_ul: int = 0  # uL
     # this holds a single resuested source and destination
     requested_dest: PALposition = PALposition()
@@ -134,8 +134,8 @@ class PalCam(BaseModel, HelaoDict):
     cur_run: int = 0
 
     joblist: list = Field(default=[])
-    joblist_time: int = None
-    aux_output_filepath: str = None
+    joblist_time: Optional[int] = None
+    aux_output_filepath: Optional[str] = None
 
 
 class PAL:

@@ -25,7 +25,7 @@ import json
 import os
 import sys
 import importlib
-from typing import List
+from typing import List, Optional
 from pybase64 import b64decode
 from socket import gethostname
 import inspect
@@ -1937,7 +1937,7 @@ class BokehOperator:
 
         return private_input, param_input
 
-    def get_sample_infos(self, PMnum: List = None, sender=None):
+    def get_sample_infos(self, PMnum: Optional[List] = None, sender=None):
         LOGGER.info("updating samples")
 
         private_input, param_input = self.find_param_private_input(sender)

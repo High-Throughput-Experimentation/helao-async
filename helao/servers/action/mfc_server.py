@@ -40,7 +40,7 @@ async def mfc_dyn_endpoints(app=None):
             target_co2_ppm: float = 1e5,
             headspace_scc: float = 7.5,
             refill_freq_sec: float = 10.0,
-            flowrate_sccm: float = None,
+            flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
             stay_open: bool = False,
             duration: float = -1,
@@ -90,7 +90,7 @@ async def mfc_dyn_endpoints(app=None):
             action: Action = Body({}, embed=True),
             action_version: int = 2,
             device_name: app.driver.dev_mfcs = devices[0],
-            flowrate_sccm: float = None,
+            flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
             stay_open: bool = False,
             duration: float = -1,
@@ -134,7 +134,7 @@ async def mfc_dyn_endpoints(app=None):
             action: Action = Body({}, embed=True),
             action_version: int = 2,
             device_name: app.driver.dev_mfcs = devices[0],
-            pressure_psia: float = None,
+            pressure_psia: Optional[float] = None,
             ramp_psi_sec: float = 0,
             stay_open: bool = False,
             duration: float = -1,
@@ -178,7 +178,7 @@ async def mfc_dyn_endpoints(app=None):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
-            flowrate_sccm: float = None,
+            flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="set_flow")
@@ -191,7 +191,7 @@ async def mfc_dyn_endpoints(app=None):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
-            pressure_psia: float = None,
+            pressure_psia: Optional[float] = None,
             ramp_psi_sec: float = 0,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="set_pressure")
@@ -242,7 +242,7 @@ async def mfc_dyn_endpoints(app=None):
             target_pressure: float = 14.7,
             total_gas_scc: float = 7.0,
             refill_freq_sec: float = 10.0,
-            flowrate_sccm: float = None,
+            flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
             stay_open: bool = False,
             duration: float = -1,

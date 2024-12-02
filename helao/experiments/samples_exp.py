@@ -220,7 +220,7 @@ def generate_sample_no_list(
     plate_id: int = 1,
     sample_code: int = 0,
     skip_n_samples: int = 0,
-    direction: str = None,
+    direction: Optional[str] = None,
     sample_nos: List[int] = [],
     sample_nos_operator: str = "",
     # platemap_xys: List[Tuple[int, int]] = [],

@@ -2,6 +2,7 @@ __all__ = ["import_sequences"]
 
 import os
 import time
+from typing import Optional
 from importlib.machinery import SourceFileLoader
 
 from helao.helpers.print_message import print_message
@@ -16,9 +17,9 @@ else:
 
 def import_sequences(
     world_config_dict: dict,
-    sequence_path: str = None,
+    sequence_path: Optional[str] = None,
     server_name: str = "",
-    user_sequence_path: str = None,
+    user_sequence_path: Optional[str] = None,
 ):
     """Import sequence functions into environment."""
 
