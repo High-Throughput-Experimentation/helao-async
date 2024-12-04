@@ -16,7 +16,7 @@ import asyncio
 import os
 from datetime import datetime
 from copy import deepcopy
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 import traceback
 
 from socket import gethostname
@@ -54,7 +54,6 @@ from helao.helpers.sample_positions import (
 )
 
 
-from helao.helpers.print_message import print_message
 from helao.helpers.unpack_samples import unpack_samples_helper
 
 from helao.helpers.sample_api import UnifiedSampleDataAPI
@@ -317,9 +316,9 @@ class Archive:
 
     async def tray_load(
         self,
-        tray: int = None,
-        slot: int = None,
-        vial: int = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        vial: Optional[int] = None,
         load_sample_in: Union[SampleUnion, dict] = None,
         *args,
         **kwargs,
@@ -363,7 +362,7 @@ class Archive:
         return error, sample
 
     async def tray_unload(
-        self, tray: int = None, slot: int = None, *args, **kwargs
+        self, tray: Optional[int] = None, slot: Optional[int] = None, *args, **kwargs
     ) -> Tuple[bool, List[SampleUnion], List[SampleUnion], dict]:
         samples = []
         unloaded = False
@@ -444,7 +443,7 @@ class Archive:
         return True, samples_in, samples_out, tray_dict
 
     async def tray_export_json(
-        self, tray: int = None, slot: int = None, *args, **kwargs
+        self, tray: Optional[int] = None, slot: Optional[int] = None, *args, **kwargs
     ):
         self.write_config()
 
@@ -454,7 +453,7 @@ class Archive:
                     if self.positions.trays_dict[tray][slot] is not None:
                         return self.positions.trays_dict[tray][slot].as_dict()
 
-    async def tray_export_csv(self, tray: int = None, slot: int = None, myactive=None):
+    async def tray_export_csv(self, tray: Optional[int] = None, slot: Optional[int] = None, myactive=None):
         self.write_config()  # save backup
 
         if tray in self.positions.trays_dict:
@@ -497,13 +496,13 @@ class Archive:
 
     async def tray_export_icpms(
         self,
-        tray: int = None,
-        slot: int = None,
-        myactive: Active = None,
-        survey_runs: int = None,
-        main_runs: int = None,
-        rack: int = None,
-        dilution_factor: float = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        myactive: Optional[Active] = None,
+        survey_runs: Optional[int] = None,
+        main_runs: Optional[int] = None,
+        rack: Optional[int] = None,
+        dilution_factor: Optional[float] = None,
     ):
         self.write_config()  # save backup
 
@@ -570,7 +569,7 @@ class Archive:
             LOGGER.info(f"Slot {slot} not found in positions dict. Cannot export.")
 
     async def tray_query_sample(
-        self, tray: int = None, slot: int = None, vial: int = None
+        self, tray: Optional[int] = None, slot: Optional[int] = None, vial: Optional[int] = None
     ) -> Tuple[ErrorCodes, SampleUnion]:
         vial -= 1
         sample = NoneSample()
@@ -635,7 +634,7 @@ class Archive:
             return {"tray": new_tray, "slot": new_slot, "vial": new_vial}
 
     async def tray_get_next_full(
-        self, after_tray: int = None, after_slot: int = None, after_vial: int = None
+        self, after_tray: Optional[int] = None, after_slot: Optional[int] = None, after_vial: Optional[int] = None
     ):
         """Finds the next full vial after the current vial position
         defined in micropal."""
@@ -683,10 +682,10 @@ class Archive:
 
     async def tray_update_position(
         self,
-        tray: int = None,
-        slot: int = None,
-        vial: int = None,
-        sample: SampleUnion = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        vial: Optional[int] = None,
+        sample: Optional[SampleUnion] = None,
         dilute: bool = False,
         *args,
         **kwargs,
@@ -709,7 +708,7 @@ class Archive:
 
         return False
 
-    def custom_is_destroyed(self, custom: str = None) -> bool:
+    def custom_is_destroyed(self, custom: Optional[str] = None) -> bool:
         """checks if the custom position is a waste, injector
         and similar position which fully comsumes and destroyes a
         sample if selected as a destination"""
@@ -719,26 +718,26 @@ class Archive:
         else:
             return False
 
-    def custom_assembly_allowed(self, custom: str = None):
+    def custom_assembly_allowed(self, custom: Optional[str] = None):
         if custom in self.positions.customs_dict:
             return self.positions.customs_dict[custom].assembly_allowed()
         else:
             return False
 
-    def custom_dest_allowed(self, custom: str = None):
+    def custom_dest_allowed(self, custom: Optional[str] = None):
         if custom in self.positions.customs_dict:
             return self.positions.customs_dict[custom].dest_allowed()
         else:
             return False
 
-    def custom_dilution_allowed(self, custom: str = None):
+    def custom_dilution_allowed(self, custom: Optional[str] = None):
         if custom in self.positions.customs_dict:
             return self.positions.customs_dict[custom].dilution_allowed()
         else:
             return False
 
     async def custom_query_sample(
-        self, custom: str = None, *args, **kwargs
+        self, custom: Optional[str] = None, *args, **kwargs
     ) -> Tuple[ErrorCodes, SampleUnion]:
         sample = NoneSample()
         error = ErrorCodes.none
@@ -752,7 +751,7 @@ class Archive:
         return error, sample
 
     async def custom_replace_sample(
-        self, custom: str = None, sample: SampleUnion = None
+        self, custom: Optional[str] = None, sample: Optional[SampleUnion] = None
     ) -> Tuple[bool, SampleUnion]:
         if sample is None:
             return False, NoneSample()
@@ -777,8 +776,8 @@ class Archive:
 
     async def custom_update_position(
         self,
-        custom: str = None,
-        sample: SampleUnion = None,
+        custom: Optional[str] = None,
+        sample: Optional[SampleUnion] = None,
         dilute: bool = False,
         *args,
         **kwargs,
@@ -834,7 +833,7 @@ class Archive:
         keep_liquid: bool = False,
         keep_solid: bool = False,
         keep_gas: bool = False,
-        action: Action = None,
+        action: Optional[Action] = None,
         *args,
         **kwargs,
     ) -> Tuple[bool, List[SampleUnion], List[SampleUnion], dict]:
@@ -872,14 +871,14 @@ class Archive:
 
     async def custom_unload(
         self,
-        custom: str = None,
+        custom: Optional[str] = None,
         destroy_liquid: bool = False,
         destroy_gas: bool = False,
         destroy_solid: bool = False,
         keep_liquid: bool = False,
         keep_solid: bool = False,
         keep_gas: bool = False,
-        action: Action = None,
+        action: Optional[Action] = None,
         *args,
         **kwargs,
     ) -> Tuple[bool, List[SampleUnion], List[SampleUnion], dict]:
@@ -1017,7 +1016,7 @@ class Archive:
         return samples_in, samples_out
 
     async def custom_load(
-        self, custom: str = None, load_sample_in: SampleUnion = None, *args, **kwargs
+        self, custom: Optional[str] = None, load_sample_in: Optional[SampleUnion] = None, *args, **kwargs
     ):
         sample = NoneSample()
         loaded = False
@@ -1102,7 +1101,7 @@ class Archive:
         samples_in: List[SampleUnion],
         sample_out_type: str = "",
         sample_position: str = "",
-        action: Action = None,
+        action: Optional[Action] = None,
         # combine multiple liquids into a new
         # liquid sample
         combine_liquids: bool = False,
@@ -1203,12 +1202,12 @@ class Archive:
 
     async def custom_add_liquid(
         self,
-        custom: str = None,
-        source_liquid_in: LiquidSample = None,
+        custom: Optional[str] = None,
+        source_liquid_in: Optional[LiquidSample] = None,
         volume_ml: float = 0.0,
         combine_liquids: bool = False,
         dilute_liquids: bool = True,
-        action: Action = None,
+        action: Optional[Action] = None,
     ) -> Tuple[bool, List[SampleUnion], List[SampleUnion]]:
         """adds new liquid from a 'reservoir' to a custom position"""
 
@@ -1554,10 +1553,10 @@ class Archive:
 
     async def custom_add_gas(
         self,
-        custom: str = None,
-        source_gas_in: GasSample = None,
+        custom: Optional[str] = None,
+        source_gas_in: Optional[GasSample] = None,
         volume_ml: float = 0.0,
-        action: Action = None,
+        action: Optional[Action] = None,
     ) -> Tuple[bool, List[SampleUnion], List[SampleUnion]]:
         """adds new gas from a 'reservoir' to a custom position"""
 
@@ -1733,7 +1732,7 @@ class Archive:
 
         return error, samples_in_initial, samples_out
 
-    async def destroy_sample(self, sample: SampleUnion = None) -> bool:
+    async def destroy_sample(self, sample: Optional[SampleUnion] = None) -> bool:
         """will mark a sample as destroyed in the sample db
         and update its parameters accordingly"""
         # first update it from the db (get the most recent info)
@@ -1793,7 +1792,7 @@ class Archive:
         return ret_samples
 
     async def create_samples(
-        self, reference_samples_in: List[SampleUnion], action: Action = None
+        self, reference_samples_in: List[SampleUnion], action: Optional[Action] = None
     ) -> List[SampleUnion]:
         """creates new samples in the db from provided refernces samples"""
         samples_out = []
@@ -1831,14 +1830,14 @@ class Archive:
     async def generate_plate_sample_no_list(
         self,
         active=None,
-        plate_id: int = None,
-        sample_code: int = None,
-        skip_n_samples: int = None,
-        direction: ScanDirection = None,
+        plate_id: Optional[int] = None,
+        sample_code: Optional[int] = None,
+        skip_n_samples: Optional[int] = None,
+        direction: Optional[ScanDirection] = None,
         sample_nos: List[int] = [],
-        sample_nos_operator: ScanOperator = None,
+        sample_nos_operator: Optional[ScanOperator] = None,
         platemap_xys: List[Tuple[int, int]] = [],
-        platemap_xys_operator: ScanOperator = None,
+        platemap_xys_operator: Optional[ScanOperator] = None,
     ):
         """generate the sample list based on filters:
         - which direction to move

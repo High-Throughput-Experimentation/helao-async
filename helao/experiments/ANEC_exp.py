@@ -1404,8 +1404,8 @@ def ANEC_sub_photo_CV(
 def ANEC_sub_GCLiquid_analysis(
     experiment: Experiment,
     experiment_version: int = 1,
-    # startGC: bool = None,
-    # sampletype: str = None,
+    # startGC: Optional[bool] = None,
+    # sampletype: Optional[str] = None,
     tool: str = "LS 1",
     source_tray: int = 2,
     source_slot: int = 1,
@@ -1459,8 +1459,8 @@ def ANEC_sub_GCLiquid_analysis(
 def ANEC_sub_HPLCLiquid_analysis(
     experiment: Experiment,
     experiment_version: int = 1,
-    # startGC: bool = None,
-    # sampletype: str = None,
+    # startGC: Optional[bool] = None,
+    # sampletype: Optional[str] = None,
     tool: str = "LS 1",
     source_tray: int = 2,
     source_slot: int = 1,

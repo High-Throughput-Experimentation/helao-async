@@ -16,6 +16,7 @@ from uuid import UUID
 import json
 import traceback
 import inspect
+from typing import Optional
 
 import time
 from functools import partial
@@ -35,6 +36,7 @@ from helao.core.error import ErrorCodes
 
 from helao.servers.operator.bokeh_operator import BokehOperator
 from helao.servers.vis import HelaoVis
+from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
 from helao.helpers.dispatcher import (
@@ -167,8 +169,9 @@ class Orch(Base):
         ping_action_servers(): Pings action servers.
         action_server_monitor(): Monitors action servers.
     """
+    bokehapp: Server
 
-    def __init__(self, fastapp):
+    def __init__(self, fastapp: HelaoFastAPI):
         """
         Initializes the orchestrator server.
 
@@ -579,7 +582,7 @@ class Orch(Base):
             resp_tups.append((response, error_code))
         return resp_tups
 
-    async def update_status(self, actionservermodel: ActionServerModel = None):
+    async def update_status(self, actionservermodel: Optional[ActionServerModel] = None):
         """
         Asynchronously updates the status of the action server and the global status model.
 
@@ -1205,8 +1208,8 @@ class Orch(Base):
                                 self.globalstatusmodel.server_dict[srvkey].endpoints[
                                     actname
                                 ].nonactive_dict[actstat][resuuid] = resmod
-                            except:
-                                LOGGER.info(f"{actstat} not found in globalstatus.nonactive_dict")
+                            except Exception:
+                                LOGGER.info(f"{actstat} not found in globalstatus.nonactive_dict", exc_info=True)
 
             try:
                 result_action = Action(**result_actiondict)
@@ -1422,10 +1425,9 @@ class Orch(Base):
         #     LOGGER.info("serious orch exception occurred")
         #     return False
 
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+        except Exception:
             LOGGER.error("serious orch exception occurred")
-            LOGGER.error(f"ERROR: ", exc_info=True)
+            LOGGER.error("ERROR: ", exc_info=True)
             await self.estop_loop()
             return False
 
@@ -1798,7 +1800,7 @@ class Orch(Base):
         seq: Sequence,
         experimentmodel: Experiment,
         prepend: bool = False,
-        at_index: int = None,
+        at_index: Optional[int] = None,
     ):
         """
         Adds an experiment to the sequence.
@@ -1992,7 +1994,7 @@ class Orch(Base):
                 LOGGER.info(f"uuid {check_uuid} not found in list of error statuses:")
                 LOGGER.info(", ")
 
-    def remove_experiment(self, by_index: int = None, by_uuid: UUID = None):
+    def remove_experiment(self, by_index: Optional[int] = None, by_uuid: Optional[UUID] = None):
         """
         Removes an experiment from the experiment queue.
 
@@ -2023,9 +2025,9 @@ class Orch(Base):
     def replace_action(
         self,
         sup_action: Action,
-        by_index: int = None,
-        by_uuid: UUID = None,
-        by_action_order: int = None,
+        by_index: Optional[int] = None,
+        by_uuid: Optional[UUID] = None,
+        by_action_order: Optional[int] = None,
     ):
         """
         Substitute a queued action with a new action.

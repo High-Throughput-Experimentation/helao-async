@@ -46,7 +46,7 @@ class CustomTypes(str, Enum):
 
 
 class Custom(BaseModel, HelaoDict):
-    sample: SampleUnion = NoneSample()
+    sample: Optional[SampleUnion] = NoneSample()
     custom_name: str
     custom_type: CustomTypes
     blocked: bool = False
@@ -184,7 +184,7 @@ class _VT_template(BaseModel, HelaoDict):
     def load(
         self,
         sample: SampleUnion,
-        vial: int = None,
+        vial: Optional[int] = None,
     ) -> SampleUnion:
         vial -= 1
         ret_sample = NoneSample()
