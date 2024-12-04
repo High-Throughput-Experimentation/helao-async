@@ -96,12 +96,15 @@ servers:
     host: hte-adss-03.htejcap.caltech.edu
     port: 8004
     group: action
-    fast: gamry_server2
+    fast: biologic_server
+#    fast: gamry_server2
     params:
-      allow_no_sample: true
-      dev_id: 0
-      filterfreq_hz: 1000.0
-      grounded: true
+      address: 192.168.200.100
+      num_channels: 1
+      # allow_no_sample: true
+      # dev_id: 0
+      # filterfreq_hz: 1000.0gotc
+      # grounded: true
   NI:
     host: hte-adss-03.htejcap.caltech.edu
     port: 8006
