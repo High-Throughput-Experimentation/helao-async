@@ -1,5 +1,6 @@
 import time
 from types import MethodType
+from typing import Optional
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 
@@ -62,7 +63,7 @@ class Executor:
         active,
         poll_rate: float = 0.2,
         oneoff: bool = True,
-        exec_id: str = None,
+        exec_id: Optional[str] = None,
         concurrent: bool = True,
         **kwargs
     ):

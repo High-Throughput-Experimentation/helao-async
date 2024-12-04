@@ -82,7 +82,7 @@ async def galil_dyn_endpoints(app=None):
                 action: Action = Body({}, embed=True),
                 action_version: int = 2,
                 ao_item: app.driver.dev_aoitems = None,
-                value: float = None,
+                value: Optional[float] = None,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="set_ao")
 

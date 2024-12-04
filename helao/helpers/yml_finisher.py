@@ -2,7 +2,7 @@ __all__ = ["yml_finisher"]
 
 import os
 import asyncio
-from typing import Union
+from typing import Union, Optional
 from glob import glob
 from pathlib import Path
 
@@ -74,7 +74,7 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
 
 
 async def move_dir(
-    hobj: Union[Sequence, Experiment, Action], base: object = None, retry_delay: int = 5
+    hobj: Union[Sequence, Experiment, Action], base: Optional[object] = None, retry_delay: int = 5
 ):
     """
     Move directory from RUNS_ACTIVE to RUNS_FINISHED or RUNS_DIAG based on the type and attributes of the provided object.

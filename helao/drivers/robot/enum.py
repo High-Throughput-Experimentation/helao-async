@@ -1,19 +1,20 @@
 from enum import Enum
 from pydantic import BaseModel
+from typing import Optional
 from helao.core.models.sample import SampleType
 
 
 class _cam(BaseModel):
-    name: str = None
-    file_name: str = None
-    file_path: str = None
-    sample_out_type: str = None  # should not be assembly, only liquid, solid...
+    name: Optional[str] = None
+    file_name: Optional[str] = None
+    file_path: Optional[str] = None
+    sample_out_type: Optional[str] = None  # should not be assembly, only liquid, solid...
     ttl_start: bool = False
     ttl_continue: bool = False
     ttl_done: bool = False
 
-    source: str = None
-    dest: str = None
+    source: Optional[str] = None
+    dest: Optional[str] = None
 
 class _positiontype(str, Enum):
     tray = "tray"
