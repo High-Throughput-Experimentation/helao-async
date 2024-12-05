@@ -378,7 +378,7 @@ def main():
                     f"{gen_ts()} Dispatching measurement sequence: {insitu_seq.sequence_uuid}"
                 )
                 operator.start()
-                time.sleep(5)
+                time.sleep(10)
 
                 # wait for sequence start (orch_state == "busy")
                 current_state, active_insitu_seq, last_seq = wait_for_orch(
@@ -413,9 +413,8 @@ def main():
                         f"{gen_ts()} Data request {data_request.id} status: {output.status}"
                     )
 
-            if data_request:
                 # wait for sequence end (orch_state == "idle")
-                current_state, _, _ = wait_for_orch(operator, LoopStatus.stopped)
+                current_state, active_insitu_seq, last_seq = wait_for_orch(operator, LoopStatus.stopped)
                 if current_state in [LoopStatus.error, LoopStatus.estopped]:
                     with CLIENT:
                         output = CLIENT.set_status(
@@ -466,7 +465,7 @@ def main():
                 )
                 operator.start()
 
-                time.sleep(5)
+                time.sleep(10)
 
                 # wait for analysis start (orch_state == "busy")
                 current_state, active_ana_seq, last_seq = wait_for_orch(
