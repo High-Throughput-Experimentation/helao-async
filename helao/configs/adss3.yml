@@ -8,10 +8,10 @@ builtin_ref_motorxy_2:
   - 35
 builtin_ref_motorxy_3:
   - -32
-  - 25
+  - 27
 builtin_ref_motorxy_4:
   - -32
-  - 15
+  - 19
 builtin_ref_motorxy_5:
   - -32
   - 5
