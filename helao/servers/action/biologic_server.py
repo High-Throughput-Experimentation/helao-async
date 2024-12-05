@@ -413,6 +413,10 @@ async def biologic_dyn_endpoints(app=None):
         TTLwait: int = -1,
         TTLsend: int = -1,
         TTLduration: float = 1.0,
+        RSD_threshold: float = 1,
+        simple_threshold: float = 0.3,
+        signal_change_threshold: float = 0.01,
+        amplitude_threshold: float = 0.05,
     ):
         """mesasures open circuit potential
         use 4bit bitmask for triggers
