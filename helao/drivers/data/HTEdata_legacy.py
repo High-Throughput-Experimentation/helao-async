@@ -6,7 +6,7 @@ __all__ = ["HTEdata"]
 
 
 from helao.servers.base import Base
-from helaocore.data import HTELegacyAPI
+from helao.core.data import HTELegacyAPI
 
 
 # class LocalDataHandler:

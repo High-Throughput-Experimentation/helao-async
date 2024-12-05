@@ -9,7 +9,7 @@ from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
-from helaocore.models.sample import SampleUnion
+from helao.core.models.sample import SampleUnion
 from helao.drivers.mfc.alicat_driver import (
     AliCatMFC,
     MfcExec,
@@ -19,6 +19,11 @@ from helao.drivers.mfc.alicat_driver import (
 )
 from helao.helpers.config_loader import config_loader
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 async def mfc_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
@@ -35,7 +40,7 @@ async def mfc_dyn_endpoints(app=None):
             target_co2_ppm: float = 1e5,
             headspace_scc: float = 7.5,
             refill_freq_sec: float = 10.0,
-            flowrate_sccm: float = None,
+            flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
             stay_open: bool = False,
             duration: float = -1,
@@ -75,7 +80,7 @@ async def mfc_dyn_endpoints(app=None):
             return finished_action.as_dict()
 
     else:
-        app.base.print_message(f"server_name {co2_sensor_key} was not found in config.")
+        LOGGER.info(f"server_name {co2_sensor_key} was not found in config.")
         app.base.print_message(app.helao_cfg["servers"])
 
     if devices:
@@ -85,7 +90,7 @@ async def mfc_dyn_endpoints(app=None):
             action: Action = Body({}, embed=True),
             action_version: int = 2,
             device_name: app.driver.dev_mfcs = devices[0],
-            flowrate_sccm: float = None,
+            flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
             stay_open: bool = False,
             duration: float = -1,
@@ -129,7 +134,7 @@ async def mfc_dyn_endpoints(app=None):
             action: Action = Body({}, embed=True),
             action_version: int = 2,
             device_name: app.driver.dev_mfcs = devices[0],
-            pressure_psia: float = None,
+            pressure_psia: Optional[float] = None,
             ramp_psi_sec: float = 0,
             stay_open: bool = False,
             duration: float = -1,
@@ -173,7 +178,7 @@ async def mfc_dyn_endpoints(app=None):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
-            flowrate_sccm: float = None,
+            flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="set_flow")
@@ -186,7 +191,7 @@ async def mfc_dyn_endpoints(app=None):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
-            pressure_psia: float = None,
+            pressure_psia: Optional[float] = None,
             ramp_psi_sec: float = 0,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="set_pressure")
@@ -237,7 +242,7 @@ async def mfc_dyn_endpoints(app=None):
             target_pressure: float = 14.7,
             total_gas_scc: float = 7.0,
             refill_freq_sec: float = 10.0,
-            flowrate_sccm: float = None,
+            flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
             stay_open: bool = False,
             duration: float = -1,

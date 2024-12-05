@@ -24,7 +24,7 @@ stage.get_full_status()
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="kinesis_driver_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 

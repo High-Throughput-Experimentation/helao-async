@@ -5,8 +5,13 @@ import asyncio
 import serial
 import minimalmodbus
 
-from helaocore.error import ErrorCodes
-from helaocore.models.hlostatus import HloStatus
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
 
@@ -42,19 +47,15 @@ class CM0134:
     async def poll_sensor_loop(self, frequency: int = 2):
         """Continuous polling loop which populates live buffer with O2 ppm values."""
         waittime = 1.0 / frequency
-        self.base.print_message("Starting polling loop")
+        LOGGER.info("Starting polling loop")
         while True:
             try:
                 o2_level = self.inst.read_register(1, functioncode=4) * 10
             except minimalmodbus.NoResponseError as err:
-                self.base.print_message(
-                    f"NoResponseError: Driver polling rate is too fast. {err}"
-                )
+                LOGGER.info(f"NoResponseError: Driver polling rate is too fast. {err}")
                 continue
             except serial.SerialException as err:
-                self.base.print_message(
-                    f"Device {self.config_dict['device']} is in use. {err}"
-                )
+                LOGGER.info(f"Device {self.config_dict['device']} is in use. {err}")
                 continue
             if o2_level:
                 msg_dict = {"o2_ppm": int(o2_level)}
@@ -66,7 +67,7 @@ class CM0134:
         try:
             self.polling_task.cancel()
         except asyncio.CancelledError:
-            self.base.print_message("closed sensor polling loop task")
+            LOGGER.info("closed sensor polling loop task")
         self.inst.serial.close()
 
 
@@ -75,7 +76,7 @@ class O2MonExec(Executor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("O2MonExec initialized.")
+        LOGGER.info("O2MonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 

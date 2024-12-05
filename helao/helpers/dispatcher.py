@@ -6,19 +6,23 @@ import aiohttp
 import requests
 
 from helao.helpers.premodels import Action
-from helaocore.error import ErrorCodes
-
-from helao.helpers.print_message import print_message
+from helao.core.error import ErrorCodes
 
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="dispatcher_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
 
-async def async_action_dispatcher(world_config_dict: dict, A: Action, params={}):
+async def async_action_dispatcher(
+    world_config_dict: dict,
+    A: Action,
+    params: dict = {},
+    timeout: int = 60,
+    retries: int = 5,
+):
     """
     Asynchronously dispatches an action to the specified server and handles the response.
 
@@ -37,33 +41,48 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={})
     act_addr = actd["host"]
     act_port = actd["port"]
     url = f"http://{act_addr}:{act_port}/{A.action_server.server_name}/{A.action_name}"
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            url,
-            params=params,
-            json={"action": A.as_dict()},
-        ) as resp:
-            error_code = ErrorCodes.none
-            try:
-                response = await resp.json()
-                if resp.status != 200:
-                    error_code = ErrorCodes.http
-                    print_message(
-                        LOGGER,
-                        "orchestrator",
-                        f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}",
-                        error=True,
-                    )
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                print_message(
-                    LOGGER,
-                    "orchestrator",
-                    f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{resp}', error={repr(e), tb,}",
-                    error=True,
-                )
-                response = None
-            return response, error_code
+    success = False
+    retry_count = 0
+
+    client_timeout = aiohttp.ClientTimeout(total=timeout)
+    conn = aiohttp.TCPConnector(
+        force_close=True, enable_cleanup_closed=True, limit=1000
+    )
+    error_code = ErrorCodes.unspecified
+    response = None
+
+    while not success and retry_count < retries:
+        try:
+            async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
+                async with session.post(
+                    url,
+                    params=params,
+                    json={"action": A.as_dict()},
+                ) as resp:
+                    response = await resp.json()
+                    error_code = ErrorCodes.none
+                    if resp.status != 200:
+                        error_code = ErrorCodes.http
+                        LOGGER.error(
+                            f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}"
+                        )
+                success = True
+        except Exception as e:
+            retry_count += 1
+            retry_wait = retry_count * timeout / 2
+            LOGGER.warning(
+                f"{A.action_server.server_name}/{A.action_name} encountered an error: {e}, sleeping for {retry_wait} seconds before retrying..."
+            )
+            await asyncio.sleep(retry_wait)
+            response = None
+    if not success:
+        LOGGER.error(
+            f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{response}')",
+            exc_info=True,
+        )
+                
+    await asyncio.sleep(0)
+    return response, error_code
 
 
 async def async_private_dispatcher(
@@ -73,6 +92,8 @@ async def async_private_dispatcher(
     private_action: str,
     params_dict: dict = {},
     json_dict: dict = {},
+    timeout: int = 60,
+    retries: int = 5,
 ):
     """
     Asynchronously dispatches a private action to a specified server.
@@ -89,34 +110,49 @@ async def async_private_dispatcher(
         tuple: A tuple containing the response from the server and an error code.
     """
     url = f"http://{host}:{port}/{private_action}"
+    success = False
+    retry_count = 0
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            url,
-            params=params_dict,
-            json=json_dict,
-        ) as resp:
-            error_code = ErrorCodes.none
-            try:
-                response = await resp.json()
-                if resp.status != 200:
-                    error_code = ErrorCodes.http
-                    print_message(
-                        LOGGER,
-                        "orchestrator",
-                        f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
-                        error=True,
-                    )
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                print_message(
-                    LOGGER,
-                    "orchestrator",
-                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
-                    error=True,
-                )
-                response = None
-            return response, error_code
+    client_timeout = aiohttp.ClientTimeout(total=timeout)
+    conn = aiohttp.TCPConnector(
+        force_close=True, enable_cleanup_closed=True, limit=1000
+    )
+    error_code = ErrorCodes.unspecified
+    response = None
+
+    while not success and retry_count < retries:
+        try:
+            async with aiohttp.ClientSession(
+                timeout=client_timeout, connector=conn
+            ) as session:
+                async with session.post(
+                    url,
+                    params=params_dict,
+                    json=json_dict,
+                ) as resp:
+                    response = await resp.json()
+                    error_code = ErrorCodes.none
+                    if resp.status != 200:
+                        error_code = ErrorCodes.http
+                        LOGGER.error(
+                            f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')"
+                        )
+                success = True
+        except Exception as e:
+            retry_count += 1
+            retry_wait = retry_count * timeout / 2
+            LOGGER.warning(
+                f"{server_key}/{private_action} POST request encountered an error: {e}, sleeping for {retry_wait} seconds before retrying..."
+            )
+            await asyncio.sleep(retry_wait)
+            response = None
+    if not success:
+        LOGGER.error(
+            f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{response}')",
+            exc_info=True,
+        )
+    await asyncio.sleep(0)
+    return response, error_code
 
 
 def private_dispatcher(
@@ -157,19 +193,13 @@ def private_dispatcher(
                     response = str(resp)
                 if resp.status_code != 200:
                     error_code = ErrorCodes.http
-                    print_message(
-                        LOGGER,
-                        "orchestrator",
-                        f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}', error={repr(error_code)}",
-                        error=True,
+                    LOGGER.error(
+                        f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}')"
                     )
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                print_message(
-                    LOGGER,
-                    "orchestrator",
-                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
-                    error=True,
+                LOGGER.error(
+                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), {tb}"
                 )
                 response = None
             return response, error_code
@@ -225,27 +255,25 @@ async def endpoints_available(req_list: list):
             cent = status // 100
             if cent == 2:
                 isavail = True
-                states.append('success')
+                states.append("success")
             elif cent == 4:
-                states.append('client error')
+                states.append("client error")
             elif cent == 5:
-                states.append('server error')
+                states.append("server error")
             else:
-                states.append('no success')
+                states.append("no success")
         except aiohttp.ClientSSLError:
-            states.append('cert failure')
+            states.append("cert failure")
         except aiohttp.ClientConnectionError:
-            states.append('could not connect')
+            states.append("could not connect")
         except asyncio.TimeoutError:
-            states.append('timeout')
+            states.append("timeout")
         responses.append(isavail)
     if not all(responses):
-        badinds = [i for i,v in enumerate(responses) if not v]
+        badinds = [i for i, v in enumerate(responses) if not v]
         unavailable = [(req_list[i], [states[i]]) for i in badinds]
-        print_message(
-            LOGGER,
-            "orchestrator",
-            f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}",
+        LOGGER.info(
+            f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}"
         )
         return False, unavailable
     else:

@@ -23,14 +23,14 @@ from helao.sequences.ECHEUVIS_seq import (
     ECHEUVIS_postseq,
     ECHEUVIS_diagnostic_CV,
 )
-from helaocore.models.orchstatus import LoopStatus
+from helao.core.models.orchstatus import LoopStatus
 
 TEST = False
 SPEC_INT_MS = 35
-ELECTROLYTE_SHORT_NAME = "OER7"
-ELECTROLYTE_SAMPLE_NO = 374
-ELECTROLYTE_PH = 7
-REF_OFFSET = 0.149
+ELECTROLYTE_SHORT_NAME = "OER1"
+ELECTROLYTE_SAMPLE_NO = 448
+ELECTROLYTE_PH = 1
+REF_OFFSET = 0.168
 QC_EVERY = 20
 
 UVIS_T_defaults = {
@@ -90,14 +90,14 @@ ECHEUVIS_multiCA_led_defaults = {
     "toggleSpec_time": -1,
     "spec_ref_duration": 5,
     "spec_int_time_ms": SPEC_INT_MS,
-    "spec_n_avg": 2,
+    "spec_n_avg": 3,
     "spec_technique": "T_UVVIS",
     "random_start_potential": False,
     "use_z_motor": True,
     "cell_engaged_z": 1.5,
     "cell_disengaged_z": 0,
     "cell_vent_wait": 10.0,
-    "cell_fill_wait": 35.0,
+    "cell_fill_wait": 45.0,
 }
 
 ECHEUVIS_postseq_defaults = {"recent": False}

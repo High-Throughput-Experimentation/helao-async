@@ -5,7 +5,7 @@ __all__ = ["Spacingmethod", "PALtools", "PALposition", "PAL", "GCsampletype"]
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="pal_driver_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
@@ -23,10 +23,10 @@ import psutil
 
 from helao.helpers.premodels import Action
 from helao.servers.base import Base
-from helaocore.error import ErrorCodes
-from helaocore.helaodict import HelaoDict
+from helao.core.error import ErrorCodes
+from helao.core.helaodict import HelaoDict
 
-from helaocore.models.sample import (
+from helao.core.models.sample import (
     SampleUnion,
     NoneSample,
     AssemblySample,
@@ -34,10 +34,10 @@ from helaocore.models.sample import (
     SampleInheritance,
     SampleType,
 )
-from helaocore.models.file import FileConnParams
+from helao.core.models.file import FileConnParams
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.update_sample_vol import update_vol
-from helaocore.models.data import DataModel
+from helao.core.models.data import DataModel
 from helao.drivers.data.archive_driver import Archive
 from helao.drivers.robot.enum import (
     PALtools,
@@ -99,8 +99,8 @@ class PalAction(BaseModel, HelaoDict):
 
 class PalMicroCam(BaseModel, HelaoDict):
     # scalar values which are the same for each repetition of the PAL method
-    method: str = None  # name of methods
-    tool: str = None
+    method: Optional[str] = None  # name of methods
+    tool: Optional[str] = None
     volume_ul: int = 0  # uL
     # this holds a single resuested source and destination
     requested_dest: PALposition = PALposition()
@@ -134,8 +134,8 @@ class PalCam(BaseModel, HelaoDict):
     cur_run: int = 0
 
     joblist: list = Field(default=[])
-    joblist_time: int = None
-    aux_output_filepath: str = None
+    joblist_time: Optional[int] = None
+    aux_output_filepath: Optional[str] = None
 
 
 class PAL:
@@ -167,11 +167,9 @@ class PAL:
                 "continue", None
             )
             self.triggerport_done = self.config_dict["trigger"].get("done", None)
-            self.base.print_message(f"PAL start trigger port: {self.triggerport_start}")
-            self.base.print_message(
-                f"PAL continue trigger port: {self.triggerport_continue}"
-            )
-            self.base.print_message(f"PAL done trigger port: {self.triggerport_done}")
+            LOGGER.info(f"PAL start trigger port: {self.triggerport_start}")
+            LOGGER.info(f"PAL continue trigger port: {self.triggerport_continue}")
+            LOGGER.info(f"PAL done trigger port: {self.triggerport_done}")
             self.triggers = True
 
         # for passing action object from technique method to measure loop
@@ -252,7 +250,7 @@ class PAL:
         elif req_tool in names:
             idx = names.index(req_tool)
         if idx is None:
-            self.base.print_message(f"unknown PAL tool: {req_tool}", error=True)
+            LOGGER.error(f"unknown PAL tool: {req_tool}")
             return None
         else:
             return PALtools(vals[idx]).value
@@ -270,15 +268,13 @@ class PAL:
     async def _clear_trigger_qs(self):
         while not self.IO_trigger_startq.empty():
             timecode = await self.IO_trigger_startq.get()
-            self.base.print_message(f"startq was not empty: '{timecode}'", error=True)
+            LOGGER.error(f"startq was not empty: '{timecode}'")
         while not self.IO_trigger_continueq.empty():
             timecode = await self.IO_trigger_continueq.get()
-            self.base.print_message(
-                f"continyeq was not empty: '{timecode}'", error=True
-            )
+            LOGGER.error(f"continyeq was not empty: '{timecode}'")
         while not self.IO_trigger_doneq.empty():
             timecode = await self.IO_trigger_doneq.get()
-            self.base.print_message(f"doneq was not empty: '{timecode}'", error=True)
+            LOGGER.error(f"doneq was not empty: '{timecode}'")
 
     async def _poll_trigger_task(self):
         prev_start = False
@@ -325,9 +321,7 @@ class PAL:
                             self.active.get_realtime_nowait()
                         )
                         prev_start = deepcopy(new_start)
-                        self.base.print_message(
-                            "IOq: got PAL 'start' trigger poll", info=True
-                        )
+                        LOGGER.info("IOq: got PAL 'start' trigger poll")
                     if (new_start ^ prev_start) and not new_start:
                         prev_start = deepcopy(new_start)
 
@@ -336,9 +330,7 @@ class PAL:
                             self.active.get_realtime_nowait()
                         )
                         prev_continue = deepcopy(new_continue)
-                        self.base.print_message(
-                            "IOq: got PAL 'continue' trigger poll", info=True
-                        )
+                        LOGGER.info("IOq: got PAL 'continue' trigger poll")
 
                     if (new_continue ^ prev_continue) and not new_continue:
                         prev_continue = deepcopy(new_continue)
@@ -348,9 +340,7 @@ class PAL:
                             self.active.get_realtime_nowait()
                         )
                         prev_done = deepcopy(new_done)
-                        self.base.print_message(
-                            "IOq: got PAL 'done' trigger poll", info=True
-                        )
+                        LOGGER.info("IOq: got PAL 'done' trigger poll")
 
                     if (new_done ^ prev_done) and not new_done:
                         prev_done = deepcopy(new_done)
@@ -359,9 +349,7 @@ class PAL:
 
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"_poll_trigger_task excited with error: {repr(e), tb,}", error=True
-            )
+            LOGGER.error(f"_poll_trigger_task excited with error: {repr(e), tb,}")
 
     async def _sendcommand_main(self, palcam: PalCam) -> ErrorCodes:
         """PAL takes liquid from sample_in and puts it in sample_out"""
@@ -371,41 +359,35 @@ class PAL:
         # and update the microcams with correct positions and samples_out
         error = await self._sendcommand_prechecks(palcam)
         if error is not ErrorCodes.none:
-            self.base.print_message(
-                f"Got error after pre-checks: '{error}'", error=True
-            )
+            LOGGER.error(f"Got error after pre-checks: '{error}'")
             return error
 
         # assemble complete PAL command from microcams to submit a full joblist
         error = await self._sendcommand_submitjoblist_helper(palcam)
         if error is not ErrorCodes.none:
-            self.base.print_message(
-                f"Got error after sendcommand_ssh_helper: '{error}'", error=True
-            )
+            LOGGER.error(f"Got error after sendcommand_ssh_helper: '{error}'")
             return error
 
         if error is not ErrorCodes.none:
             return error
 
         # wait for each microcam cam
-        self.base.print_message("Waiting now for all microcams")
+        LOGGER.info("Waiting now for all microcams")
         for i, microcam in enumerate(palcam.microcams):
 
             if not self.IO_signalq.empty():
                 self.IO_measuring = await self.IO_signalq.get()
             if not self.IO_measuring:
-                self.base.print_message("IO_measuring is true, breaking microcam loop.")
+                LOGGER.info("IO_measuring is true, breaking microcam loop.")
                 break
 
-            self.base.print_message(f"waiting now '{microcam.method}'")
+            LOGGER.info(f"waiting now '{microcam.method}'")
             # wait for each repeat of the same microcam
             for palaction in microcam.run:
                 if not self.IO_signalq.empty():
                     self.IO_measuring = await self.IO_signalq.get()
                 if not self.IO_measuring:
-                    self.base.print_message(
-                        "IO_measuring is true, breaking palaction loop."
-                    )
+                    LOGGER.info("IO_measuring is true, breaking palaction loop.")
                     break
 
                 # (0) split action
@@ -420,7 +402,7 @@ class PAL:
                 self.active.action.action_sub_name = microcam.method
                 self.IO_palcam.samples_in = []
                 self.IO_palcam.samples_out = []
-                self.base.print_message("waiting now for palaction")
+                LOGGER.info("waiting now for palaction")
                 # waiting now for all three PAL triggers
                 # continue is used as the sampling timestamp
                 # populates the three trigger timings in palaction
@@ -431,9 +413,7 @@ class PAL:
                     # there is not much we can do here
                     # as we have not control of pal directly
                     self.active.action.error_code = error
-                    self.base.print_message(
-                        f"Got error after triggerwait: '{error}'", error=True
-                    )
+                    LOGGER.error(f"Got error after triggerwait: '{error}'")
 
                 # after each pal trigger:
                 # as a pal action can contain many actions which modify
@@ -491,9 +471,7 @@ class PAL:
                                 dest_tmp[0]
                             )
                         else:
-                            self.base.print_message(
-                                "Sample does not exist in db", error=True
-                            )
+                            LOGGER.error("Sample does not exist in db")
                             return ErrorCodes.critical
                     else:
                         self.base.print_message(
@@ -511,9 +489,7 @@ class PAL:
                 # convert these to real samples by adding them to the db
                 # update sample creation time
                 for sample_out in palaction.samples_out:
-                    self.base.print_message(
-                        f" converting ref sample {sample_out} to real sample", info=True
-                    )
+                    LOGGER.info(f" converting ref sample {sample_out} to real sample")
                     sample_out.sample_creation_timecode = palaction.continue_time
 
                     # if the sample was destroyed during this run set its
@@ -646,7 +622,7 @@ class PAL:
                                 errors=[],
                             )
                         )
-                        self.base.print_message(f"PAL data: {tmpdata}")
+                        LOGGER.info(f"PAL data: {tmpdata}")
 
                 # (9) add samples_in/out to active.action
                 # add sample in and out to exp
@@ -664,13 +640,11 @@ class PAL:
         # wait another 20sec for program to close
         # after final done
         tmp_time = 20
-        self.base.print_message(f"waiting {tmp_time}sec for PAL to close", info=True)
+        LOGGER.info(f"waiting {tmp_time}sec for PAL to close")
         await asyncio.sleep(tmp_time)
-        self.base.print_message(
-            f"done waiting {tmp_time}sec for PAL to close", info=True
-        )
+        LOGGER.info(f"done waiting {tmp_time}sec for PAL to close")
         if self.PAL_pid is not None:
-            self.base.print_message("waiting for PAL pid to finish", info=True)
+            LOGGER.info("waiting for PAL pid to finish")
             self.PAL_pid.communicate()
             self.PAL_pid = None
 
@@ -704,9 +678,7 @@ class PAL:
             slot_pos = newvialpos["slot"]
             vial_pos = newvialpos["vial"]
 
-            self.base.print_message(
-                f"diluting liquid sample in tray {tray_pos}, slot {slot_pos}, vial {vial_pos}"
-            )
+            LOGGER.info(f"diluting liquid sample in tray {tray_pos}, slot {slot_pos}, vial {vial_pos}")
 
             # need to get the sample which is currently in this vial
             # and also add it to global samples_in
@@ -719,12 +691,10 @@ class PAL:
                     sample.status = [SampleStatus.preserved]
                 else:
                     error = ErrorCodes.not_available
-                    self.base.print_message(
-                        "error converting old liquid_sample to basemodel.", error=True
-                    )
+                    LOGGER.error("error converting old liquid_sample to basemodel.")
 
         else:
-            self.base.print_message("no full vial slots", error=True)
+            LOGGER.error("no full vial slots")
             error = ErrorCodes.not_available
 
         return error, tray_pos, slot_pos, vial_pos, sample
@@ -743,9 +713,7 @@ class PAL:
         )
 
         if error != ErrorCodes.none:
-            self.base.print_message(
-                "PAL_source: Requested tray position does not exist.", error=True
-            )
+            LOGGER.error("PAL_source: Requested tray position does not exist.")
             error = ErrorCodes.critical
 
         elif sample_in == NoneSample():
@@ -786,14 +754,10 @@ class PAL:
         )
 
         if error != ErrorCodes.none:
-            self.base.print_message(
-                "PAL_source: Requested custom position does not exist.", error=True
-            )
+            LOGGER.error("PAL_source: Requested custom position does not exist.")
             error = ErrorCodes.critical
         elif sample_in == NoneSample():
-            self.base.print_message(
-                f"PAL_source: No sample in custom position '{source}'", error=True
-            )
+            LOGGER.error(f"PAL_source: No sample in custom position '{source}'")
             error = ErrorCodes.not_available
 
         return PALposition(position=source, samples_initial=[sample_in], error=error)
@@ -802,9 +766,7 @@ class PAL:
         self, microcam: PalMicroCam
     ) -> PALposition:
         """source can never be empty, throw an error"""
-        self.base.print_message(
-            "PAL_source: PAL source cannot be 'next_empty_vial'", error=True
-        )
+        LOGGER.error("PAL_source: PAL source cannot be 'next_empty_vial'")
         return PALposition(error=ErrorCodes.not_available)
 
     async def _sendcommand_check_source_next_full(
@@ -826,7 +788,7 @@ class PAL:
             after_vial=microcam.requested_source.vial,
         )
         if error != ErrorCodes.none:
-            self.base.print_message("PAL_source: No next full vial", error=True)
+            LOGGER.error("PAL_source: No next full vial")
             return PALposition(error=ErrorCodes.not_available)
 
         elif sample_in == NoneSample():
@@ -951,9 +913,7 @@ class PAL:
         )
 
         if error != ErrorCodes.none:
-            self.base.print_message(
-                "PAL_dest: Requested tray position does not exist.", error=True
-            )
+            LOGGER.error("PAL_dest: Requested tray position does not exist.")
             return PALposition(error=ErrorCodes.critical), samples_out_list
 
         # check if a sample is present in destination
@@ -1048,9 +1008,7 @@ class PAL:
             return PALposition(error=ErrorCodes.critical), samples_out_list
 
         if not self.archive.custom_dest_allowed(dest):
-            self.base.print_message(
-                f"PAL_dest: custom position '{dest}' cannot be dest.", error=True
-            )
+            LOGGER.error(f"PAL_dest: custom position '{dest}' cannot be dest.")
             return PALposition(error=ErrorCodes.critical), samples_out_list
 
         error, sample_in = await self.archive.custom_query_sample(dest)
@@ -1103,10 +1061,7 @@ class PAL:
             # sample is already present
             # either create an assembly or dilute it
             # first check what type is present
-            self.base.print_message(
-                f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'",
-                info=True,
-            )
+            LOGGER.info(f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'")
 
             if sample_in.sample_type == SampleType.assembly:
                 # need to check if we already go the same type in
@@ -1136,9 +1091,7 @@ class PAL:
                         sample_type=SampleType.gas, assembly=sample_in
                     )
                 else:
-                    self.base.print_message(
-                        "PAL_dest: Found a BUG: unsupported sample type.", error=True
-                    )
+                    LOGGER.error("PAL_dest: Found a BUG: unsupported sample type.")
                     return PALposition(error=ErrorCodes.bug), samples_out_list
 
                 if test is True:
@@ -1163,9 +1116,7 @@ class PAL:
                     microcam.run[-1].samples_in.append(deepcopy(sample_in))
                 else:
                     # add a new part to assembly
-                    self.base.print_message(
-                        "PAL_dest: Adding new part to assembly", info=True
-                    )
+                    LOGGER.info("PAL_dest: Adding new part to assembly")
                     if len(microcam.run[-1].samples_in) > 1:
                         # sample_in should only hold one sample at that point
                         self.base.print_message(
@@ -1342,18 +1293,14 @@ class PAL:
         )
 
         if newvialpos["tray"] is None:
-            self.base.print_message(
-                "PAL_dest: empty vial slot is not available", error=True
-            )
+            LOGGER.error("PAL_dest: empty vial slot is not available")
             return PALposition(error=ErrorCodes.not_available), samples_out_list
 
         # dest = _positiontype.tray
         dest_tray = newvialpos["tray"]
         dest_slot = newvialpos["slot"]
         dest_vial = newvialpos["vial"]
-        self.base.print_message(
-            f"PAL_dest: archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}"
-        )
+        LOGGER.info(f"PAL_dest: archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}")
 
         error, samples_out_list = await self.archive.new_ref_samples(
             samples_in=microcam.run[
@@ -1364,9 +1311,7 @@ class PAL:
             action=self.active.action,
         )
 
-        self.base.print_message(
-            f"new reference sample for empty vial: {samples_out_list}"
-        )
+        LOGGER.info(f"new reference sample for empty vial: {samples_out_list}")
 
         if error != ErrorCodes.none:
             return PALposition(error=error), samples_out_list
@@ -1418,7 +1363,7 @@ class PAL:
             after_vial=microcam.requested_dest.vial,
         )
         if error != ErrorCodes.none:
-            self.base.print_message("PAL_dest: No next full vial", error=True)
+            LOGGER.error("PAL_dest: No next full vial")
             return PALposition(error=ErrorCodes.not_available), samples_out_list
         if sample_in == NoneSample():
             self.base.print_message(
@@ -1429,10 +1374,7 @@ class PAL:
 
         # a sample is already present in the tray position
         # we add more sample to it, e.g. dilute it
-        self.base.print_message(
-            f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'",
-            info=True,
-        )
+        LOGGER.info(f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'")
         sample_in.inheritance = SampleInheritance.receive_only
         sample_in.status = [SampleStatus.preserved]
 
@@ -1530,13 +1472,9 @@ class PAL:
         # a quick message if samples will be diluted or not
         for i, sample in enumerate(microcam.run[-1].samples_in):
             if microcam.run[-1].dilute[i]:
-                self.base.print_message(
-                    f"PAL: Diluting sample_in '{sample.global_label}'.", info=True
-                )
+                LOGGER.info(f"PAL: Diluting sample_in '{sample.global_label}'.")
             else:
-                self.base.print_message(
-                    f"PAL: Not diluting sample_in '{sample.global_label}'.", info=True
-                )
+                LOGGER.info(f"PAL: Not diluting sample_in '{sample.global_label}'.")
 
         return ErrorCodes.none
 
@@ -1566,14 +1504,10 @@ class PAL:
                 if self.cams[microcam.method].value.file_name is not None:
                     microcam.cam = self.cams[microcam.method].value
                 else:
-                    self.base.print_message(
-                        f"cam method '{microcam.method}' is not available", error=True
-                    )
+                    LOGGER.error(f"cam method '{microcam.method}' is not available")
                     return ErrorCodes.not_available
             else:
-                self.base.print_message(
-                    f"cam method '{microcam.method}' is not available", error=True
-                )
+                LOGGER.error(f"cam method '{microcam.method}' is not available")
                 return ErrorCodes.not_available
 
             # set runs to empty list
@@ -1594,7 +1528,7 @@ class PAL:
 
                 # add cam to cammand list
                 camfile = os.path.join(microcam.cam.file_path, microcam.cam.file_name)
-                self.base.print_message(f"adding cam '{camfile}'")
+                LOGGER.info(f"adding cam '{camfile}'")
                 wash1 = "False"
                 wash2 = "False"
                 wash3 = "False"
@@ -1635,17 +1569,15 @@ class PAL:
         error = ErrorCodes.none
         # only wait if triggers are configured
         if not self.triggers:
-            self.base.print_message("No triggers configured", error=True)
+            LOGGER.error("No triggers configured")
             return error
 
-        self.base.print_message("waiting for PAL start trigger", info=True)
+        LOGGER.info("waiting for PAL start trigger")
         try:
             val = await asyncio.wait_for(self.IO_trigger_startq.get(), self.timeout)
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"PAL start trigger timeout with error: {repr(e), tb,}", error=True
-            )
+            LOGGER.error(f"PAL start trigger timeout with error: {repr(e), tb,}")
             # also need to set IO_continue and IO_error
             # so active can return
             # else it will return after real first continue trigger
@@ -1654,36 +1586,28 @@ class PAL:
             return ErrorCodes.start_timeout
 
         palaction.start_time = val
-        self.base.print_message(
-            "got PAL start trigger, waiting for PAL continue trigger", info=True
-        )
+        LOGGER.info("got PAL start trigger, waiting for PAL continue trigger")
 
         try:
             val = await asyncio.wait_for(self.IO_trigger_continueq.get(), self.timeout)
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"PAL continue trigger timeout with error: {repr(e), tb,}", error=True
-            )
+            LOGGER.error(f"PAL continue trigger timeout with error: {repr(e), tb,}")
             return ErrorCodes.continue_timeout
 
         self.IO_continue = True
         palaction.continue_time = val
-        self.base.print_message(
-            "got PAL continue trigger, waiting for PAL done trigger", info=True
-        )
+        LOGGER.info("got PAL continue trigger, waiting for PAL done trigger")
 
         try:
             val = await asyncio.wait_for(self.IO_trigger_doneq.get(), self.timeout)
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"PAL done trigger timeout with error: {repr(e), tb,}", error=True
-            )
+            LOGGER.error(f"PAL done trigger timeout with error: {repr(e), tb,}")
             return ErrorCodes.done_timeout
 
         palaction.done_time = val
-        self.base.print_message("got PAL done trigger", info=True)
+        LOGGER.info("got PAL done trigger")
 
         return error
 
@@ -1697,7 +1621,7 @@ class PAL:
         # kill PAL if program is open
         error = await self.kill_PAL()
         if error is not ErrorCodes.none:
-            self.base.print_message("Could not close PAL", error=True)
+            LOGGER.error("Could not close PAL")
             return error
 
         await self._clear_trigger_qs()
@@ -1705,7 +1629,7 @@ class PAL:
         if self.sshhost == "localhost":
 
             FIFO_rshs_dir, rshs_logfile = os.path.split(palcam.aux_output_filepath)
-            self.base.print_message(f"RSHS saving to: {FIFO_rshs_dir}")
+            LOGGER.info(f"RSHS saving to: {FIFO_rshs_dir}")
 
             if not os.path.exists(FIFO_rshs_dir):
                 os.makedirs(FIFO_rshs_dir, exist_ok=True, cwd=FIFO_rshs_dir)
@@ -1718,17 +1642,15 @@ class PAL:
                 [f'/loadmethod "{job.method}" "{job.params}"' for job in palcam.joblist]
             )
             cmd_to_execute = f"PAL {tmpjob} /start /quit"
-            self.base.print_message(f"PAL command: '{cmd_to_execute}'", info=True)
+            LOGGER.info(f"PAL command: '{cmd_to_execute}'")
             try:
                 # result = os.system(cmd_to_execute)
                 palcam.joblist_time = self.active.get_realtime_nowait()
                 self.PAL_pid = subprocess.Popen(cmd_to_execute, shell=True)
-                self.base.print_message(f"PAL command send: {self.PAL_pid}")
+                LOGGER.info(f"PAL command send: {self.PAL_pid}")
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message(
-                    "CMD error. Could not send commands.", error=True
-                )
+                LOGGER.error("CMD error. Could not send commands.")
                 self.base.print_message(repr(e), tb, error=True)
                 error = ErrorCodes.cmd_error
         elif self.sshhost is not None:
@@ -1760,7 +1682,7 @@ class PAL:
                 FIFO_rshs_dir = FIFO_rshs_dir.replace("C:\\", "")
                 FIFO_rshs_dir = FIFO_rshs_dir.replace("\\", "/")
 
-                self.base.print_message(f"RSHS saving to: /cygdrive/c/{FIFO_rshs_dir}")
+                LOGGER.info(f"RSHS saving to: /cygdrive/c/{FIFO_rshs_dir}")
 
                 # creating remote folder and logfile on RSHS
                 rshs_path = "/cygdrive/c"
@@ -1776,7 +1698,7 @@ class PAL:
                         ) = mysshclient.exec_command(sshcmd)
                 if not rshs_path.endswith("/"):
                     rshs_path += "/"
-                self.base.print_message(f"final RSHS path: {rshs_path}")
+                LOGGER.info(f"final RSHS path: {rshs_path}")
 
                 rshs_logfilefull = rshs_path + rshs_logfile
                 sshcmd = f"touch {rshs_logfilefull}"
@@ -1793,7 +1715,7 @@ class PAL:
                     mysshclient_stdout,
                     mysshclient_stderr,
                 ) = mysshclient.exec_command(sshcmd)
-                self.base.print_message(f"final RSHS logfile: {rshs_logfilefull}")
+                LOGGER.info(f"final RSHS logfile: {rshs_logfilefull}")
 
                 tmpjob = " ".join(
                     [
@@ -1803,7 +1725,7 @@ class PAL:
                 )
                 cmd_to_execute = f"tmux new-window PAL {tmpjob} /start /quit"
 
-                self.base.print_message(f"PAL command: '{cmd_to_execute}'", info=True)
+                LOGGER.info(f"PAL command: '{cmd_to_execute}'")
 
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -1890,7 +1812,7 @@ class PAL:
                     sample=palaction.source.samples_final[0],
                 )
         else:
-            self.base.print_message("No sample in PAL source.", info=True)
+            LOGGER.info("No sample in PAL source.")
 
         if palaction.dest.samples_final:
             if palaction.dest.position == "tray":
@@ -1906,7 +1828,7 @@ class PAL:
                     sample=palaction.dest.samples_final[0],
                 )
         else:
-            self.base.print_message("No sample in PAL dest.", info=True)
+            LOGGER.info("No sample in PAL dest.")
 
         if not retval:
             error = ErrorCodes.not_available
@@ -1917,13 +1839,13 @@ class PAL:
         """updates sample volume only for input (sample_in)
         samples, output (sample_out) are always new samples"""
         if len(palaction.samples_in_delta_vol_ml) != len(palaction.samples_in):
-            self.base.print_message("len(samples_in) != len(delta_vol)", error=True)
+            LOGGER.error("len(samples_in) != len(delta_vol)")
             return
         if len(palaction.dilute) != len(palaction.samples_in):
-            self.base.print_message("len(samples_in) != len(dilute)", error=True)
+            LOGGER.error("len(samples_in) != len(dilute)")
             return
         if len(palaction.dilute_type) != len(palaction.samples_in):
-            self.base.print_message("len(samples_in) != len(sample_type)", error=True)
+            LOGGER.error("len(samples_in) != len(sample_type)")
             return
 
         for i, sample in enumerate(palaction.samples_in):
@@ -1951,7 +1873,7 @@ class PAL:
                 and not self.IO_measuring
                 and not self.base.actionservermodel.estop
             ):
-                self.base.print_message("init PAL IO loop", info=True)
+                LOGGER.info("init PAL IO loop")
                 self.IO_error = ErrorCodes.none
                 # do a check of the PAL tool
                 for microcam in palcam.microcams:
@@ -1981,27 +1903,27 @@ class PAL:
                     self.IO_continue = False
                     await self.set_IO_signalq(True)
                     # wait for first continue trigger
-                    # self.base.print_message("waiting for first continue", info=True)
+                    # LOGGER.info("waiting for first continue")
                     # while not self.IO_continue:
                     #     await asyncio.sleep(0.01)
-                    # self.base.print_message("got first continue", info=True)
+                    # LOGGER.info("got first continue")
                 else:
-                    self.base.print_message("Error during PAL IOloop init", error=True)
+                    LOGGER.error("Error during PAL IOloop init")
 
                 activeDict = self.active.action.as_dict()
 
             elif self.base.actionservermodel.estop:
-                self.base.print_message("PAL is in estop.", error=True)
+                LOGGER.error("PAL is in estop.")
                 A.error_code = ErrorCodes.estop
                 activeDict = A.as_dict()
 
             elif self.sshhost is None:
-                self.base.print_message("No PAL host specified.", error=True)
+                LOGGER.error("No PAL host specified.")
                 A.error_code = ErrorCodes.not_available
                 activeDict = A.as_dict()
 
             else:
-                self.base.print_message("PAL method already in progress.", error=True)
+                LOGGER.error("PAL method already in progress.")
                 A.error_code = ErrorCodes.in_progress
                 activeDict = A.as_dict()
         except Exception:
@@ -2037,9 +1959,7 @@ class PAL:
                     # loop over the requested runs of one complete
                     # microcam list run
                     for run in range(self.IO_palcam.totalruns):
-                        self.base.print_message(
-                            f"PAL run {run+1} of {self.IO_palcam.totalruns}"
-                        )
+                        LOGGER.info(f"PAL run {run+1} of {self.IO_palcam.totalruns}")
                         # need to make a deepcopy as we modify this object during the run
                         # but each run should start from the same initial
                         # params again
@@ -2056,20 +1976,15 @@ class PAL:
                         # between send ssh and continue (or any other offset)
 
                         if len(self.IO_palcam.sampleperiod) < (run + 1):
-                            self.base.print_message(
-                                "len(sampleperiod) < (run), using 0.0", info=True
-                            )
+                            LOGGER.info("len(sampleperiod) < (run), using 0.0")
                             sampleperiod = 0.0
                         else:
                             sampleperiod = self.IO_palcam.sampleperiod[run]
 
                         cur_time = time.time()
                         if self.IO_palcam.spacingmethod == Spacingmethod.linear:
-                            self.base.print_message("PAL linear scheduling")
-                            self.base.print_message(
-                                f"time since last PAL run {(cur_time-last_run_time)}",
-                                info=True,
-                            )
+                            LOGGER.info("PAL linear scheduling")
+                            LOGGER.info(f"time since last PAL run {(cur_time-last_run_time)}")
                             self.base.print_message(
                                 f"requested time between "
                                 f"PAL runs "
@@ -2082,14 +1997,11 @@ class PAL:
                                 - self.IO_palcam.timeoffset
                             )
                         elif self.IO_palcam.spacingmethod == Spacingmethod.geometric:
-                            self.base.print_message("PAL geometric scheduling")
+                            LOGGER.info("PAL geometric scheduling")
                             timepoint = (
                                 self.IO_palcam.spacingfactor**run
                             ) * sampleperiod
-                            self.base.print_message(
-                                f"time since last PAL run {(cur_time-last_run_time)}",
-                                info=True,
-                            )
+                            LOGGER.info(f"time since last PAL run {(cur_time-last_run_time)}")
                             self.base.print_message(
                                 f"requested time between "
                                 f"PAL runs {timepoint-prev_timepoint-self.IO_palcam.timeoffset}",
@@ -2103,11 +2015,8 @@ class PAL:
                             )
                             prev_timepoint = timepoint  # todo: consider time lag
                         elif self.IO_palcam.spacingmethod == Spacingmethod.custom:
-                            self.base.print_message("PAL custom scheduling")
-                            self.base.print_message(
-                                f"time since PAL start {(cur_time-start_time)}",
-                                info=True,
-                            )
+                            LOGGER.info("PAL custom scheduling")
+                            LOGGER.info(f"time since PAL start {(cur_time-start_time)}")
                             self.base.print_message(
                                 f"time for next PAL run "
                                 f"since start "
@@ -2121,18 +2030,13 @@ class PAL:
                             )
 
                         # only wait for positive time
-                        self.base.print_message(
-                            f"PAL waits {diff_time} for sending next command", info=True
-                        )
+                        LOGGER.info(f"PAL waits {diff_time} for sending next command")
                         if diff_time > 0:
                             await asyncio.sleep(diff_time)
 
                         # if PAL is still busy, enter a wait loop for non-busy status
                         if not self.IO_measuring:
-                            self.base.print_message(
-                                "PAL still busy after sleep interval, wait for release.",
-                                info=True,
-                            )
+                            LOGGER.info("PAL still busy after sleep interval, wait for release.")
                             while True:
                                 self.IO_measuring = await self.IO_signalq.get()
                                 if not self.IO_measuring:
@@ -2140,9 +2044,9 @@ class PAL:
 
                         # finally submit a single PAL run
                         last_run_time = time.time()
-                        self.base.print_message("PAL sendcommand def start", info=True)
+                        LOGGER.info("PAL sendcommand def start")
                         self.IO_error = await self._sendcommand_main(run_palcam)
-                        self.base.print_message("PAL sendcommand def end", info=True)
+                        LOGGER.info("PAL sendcommand def end")
 
                         if self.IO_trigger_task is not None:
                             self.IO_trigger_task.cancel()
@@ -2159,20 +2063,16 @@ class PAL:
         checks samples_in"""
         self.IO_action_run_counter = 0
 
-        self.base.print_message(
-            f"Active action uuid is {self.active.action.action_uuid}"
-        )
+        LOGGER.info(f"Active action uuid is {self.active.action.action_uuid}")
         if self.active:
             self.active.finish_hlo_header(
                 file_conn_keys=self.active.action.file_conn_keys,
                 realtime=await self.active.get_realtime(),
             )
 
-        self.base.print_message(f"PAL_samples_in: {self.IO_palcam.samples_in}")
+        LOGGER.info(f"PAL_samples_in: {self.IO_palcam.samples_in}")
         # update sample list with correct information from db if possible
-        self.base.print_message(
-            "getting current sample information for all sample_in from db"
-        )
+        LOGGER.info("getting current sample information for all sample_in from db")
         self.IO_palcam.samples_in = await self.archive.unified_db.get_samples(
             samples=self.IO_palcam.samples_in
         )
@@ -2182,7 +2082,7 @@ class PAL:
         and updates exp samples in and out"""
 
         if self.PAL_pid is not None:
-            self.base.print_message("waiting for PAL pid to finish")
+            LOGGER.info("waiting for PAL pid to finish")
             self.PAL_pid.communicate()
             self.PAL_pid = None
 
@@ -2196,12 +2096,12 @@ class PAL:
         self.IO_action_run_counter = 0
 
         if self.base.actionservermodel.estop:
-            self.base.print_message("PAL is in estop.")
+            LOGGER.info("PAL is in estop.")
         else:
-            self.base.print_message("setting PAL to idle")
+            LOGGER.info("setting PAL to idle")
 
         self.IO_measuring = False
-        self.base.print_message("PAL is done")
+        LOGGER.info("PAL is done")
 
         # await asyncio.sleep(0.1)
 
@@ -2863,14 +2763,11 @@ class PAL:
         )
 
     def shutdown(self):
-        self.base.print_message("shutting down pal")
+        LOGGER.info("shutting down pal")
         self.set_IO_signalq_nowait(False)
         retries = 0
         while self.active is not None and retries < 10:
-            self.base.print_message(
-                f"Got shutdown, but Active is not yet done!, retry {retries}",
-                info=True,
-            )
+            LOGGER.info(f"Got shutdown, but Active is not yet done!, retry {retries}")
             # set it again
             self.set_IO_signalq_nowait(False)
             time.sleep(1)
@@ -2898,7 +2795,7 @@ class PAL:
     async def kill_PAL(self) -> ErrorCodes:
         """kills PAL program if its still open"""
         error_code = ErrorCodes.none
-        self.base.print_message("killing PAL", info=True)
+        LOGGER.info("killing PAL")
 
         if self.sshhost == "localhost":
 
@@ -2908,7 +2805,7 @@ class PAL:
             error_code = await self.kill_PAL_cygwin()
 
         if error_code is not ErrorCodes.none:
-            self.base.print_message("Could not close PAL", error=True)
+            LOGGER.error("Could not close PAL")
 
         return error_code
 
@@ -2962,19 +2859,17 @@ class PAL:
         }
 
         for pid in pyPids:
-            self.base.print_message(f"killing PAL on PID: {pid}", info=True)
+            LOGGER.info(f"killing PAL on PID: {pid}")
             p = psutil.Process(pid)
             for _ in range(3):
                 # os.kill(p.pid, signal.SIGTERM)
                 p.terminate()
                 time.sleep(0.5)
                 if not psutil.pid_exists(p.pid):
-                    self.base.print_message("Successfully terminated PAL.", info=True)
+                    LOGGER.info("Successfully terminated PAL.")
                     break
             if psutil.pid_exists(p.pid):
-                self.base.print_message(
-                    "Failed to terminate server PAL after 3 retries.", error=True
-                )
+                LOGGER.error("Failed to terminate server PAL after 3 retries.")
                 return ErrorCodes.critical
 
         # if none is found return True

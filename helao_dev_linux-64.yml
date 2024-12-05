@@ -31,6 +31,7 @@ dependencies:
   - munch
   - ntplib
   - numpy=1
+  - orjson
   - pandas
   - paramiko
   - picologging

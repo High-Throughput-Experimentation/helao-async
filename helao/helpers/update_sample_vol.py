@@ -1,10 +1,10 @@
-from helaocore.models.sample import _BaseSample
+from helao.core.models.sample import _BaseSample
 from helao.helpers.print_message import print_message
 
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="update_sample_vol_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
@@ -30,12 +30,7 @@ def update_vol(BS: _BaseSample, delta_vol_ml: float, dilute: bool):
         old_vol = BS.volume_ml
         tot_vol = old_vol + delta_vol_ml
         if tot_vol <= 0:
-            print_message(
-                LOGGER,
-                "model",
-                "new volume is <= 0, setting it to zero and setting status to destroyed",
-                error=True,
-            )
+            LOGGER.error("new volume is <= 0, setting it to zero and setting status to destroyed")
             BS.zero_volume()
             tot_vol = 0
         BS.volume_ml = tot_vol
@@ -43,9 +38,7 @@ def update_vol(BS: _BaseSample, delta_vol_ml: float, dilute: bool):
             if hasattr(BS, "dilution_factor"):
                 old_df = BS.dilution_factor
                 if old_vol <= 0:
-                    print_message(
-                        LOGGER, "model", "previous volume is <= 0, setting new df to 0.", error=True
-                    )
+                    LOGGER.error("previous volume is <= 0, setting new df to 0.")
                     new_df = -1
                 else:
                     new_df = tot_vol / (old_vol / old_df)

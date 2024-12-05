@@ -15,7 +15,7 @@ import pandas as pd
 
 from helao.servers.base import Base
 from helao.servers.base_api import BaseAPI
-from helaocore.models.sample import LiquidSample, SampleUnion
+from helao.core.models.sample import LiquidSample, SampleUnion
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 

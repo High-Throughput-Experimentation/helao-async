@@ -46,7 +46,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def get_elements_plateid(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: int = None,
+        plateid: Optional[int] = None,
     ):
         """Gets the elements from the screening print in the info file"""
         active = await app.base.setup_and_contain_action()
@@ -64,7 +64,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def get_platemap_plateid(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: int = None,
+        plateid: Optional[int] = None,
     ):
         """gets platemap"""
         active = await app.base.setup_and_contain_action()
@@ -82,7 +82,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def get_platexycalibration(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: int = None,
+        plateid: Optional[int] = None,
     ):
         """gets saved plate alignment matrix"""
         active = await app.base.setup_and_contain_action()
@@ -100,7 +100,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def save_platexycalibration(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: int = None,
+        plateid: Optional[int] = None,
     ):
         """saves alignment matrix"""
         active = await app.base.setup_and_contain_action()
@@ -118,7 +118,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def check_plateid(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: int = None,
+        plateid: Optional[int] = None,
     ):
         """checks that the plate_id (info file) exists"""
         active = await app.base.setup_and_contain_action()
@@ -134,7 +134,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def check_printrecord_plateid(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: int = None,
+        plateid: Optional[int] = None,
     ):
         """checks that a print record exist in the info file"""
         active = await app.base.setup_and_contain_action()
@@ -152,7 +152,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def check_annealrecord_plateid(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: int = None,
+        plateid: Optional[int] = None,
     ):
         """checks that a anneal record exist in the info file"""
         active = await app.base.setup_and_contain_action()
@@ -170,7 +170,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def get_info_plateid(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: int = None,
+        plateid: Optional[int] = None,
     ):
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
@@ -185,7 +185,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def get_rcp_plateid(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: int = None,
+        plateid: Optional[int] = None,
     ):
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(

@@ -5,10 +5,15 @@ from fastapi import Body, Query
 from helao.servers.base_api import BaseAPI
 from helao.drivers.io.galil_io_driver import Galil, TriggerType, AiMonExec
 from helao.helpers.premodels import Action
-from helaocore.models.sample import LiquidSample, SampleUnion
-from helaocore.error import ErrorCodes
+from helao.core.models.sample import LiquidSample, SampleUnion
+from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 async def galil_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
@@ -52,9 +57,9 @@ async def galil_dyn_endpoints(app=None):
                     oneoff=False,
                     poll_rate=active.action.action_params["acquisition_rate"],
                 )
-                app.base.print_message("Starting executor task.")
+                LOGGER.info("Starting executor task.")
                 active_action_dict = active.start_executor(executor)
-                app.base.print_message("Returning active dict.")
+                LOGGER.info("Returning active dict.")
                 return active_action_dict
 
             @app.post(f"/{server_key}/cancel_acquire_analog_in", tags=["action"])
@@ -77,7 +82,7 @@ async def galil_dyn_endpoints(app=None):
                 action: Action = Body({}, embed=True),
                 action_version: int = 2,
                 ao_item: app.driver.dev_aoitems = None,
-                value: float = None,
+                value: Optional[float] = None,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="set_ao")
 

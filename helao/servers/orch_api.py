@@ -17,30 +17,32 @@ from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
 from helao.servers.orch import Orch
-from helaocore.models.server import ActionServerModel
-from helaocore.models.action import ActionModel
-from helaocore.models.machine import MachineModel
-from helaocore.models.orchstatus import LoopStatus
-from helaocore.models.action_start_condition import ActionStartCondition as ASC
+from helao.core.models.server import ActionServerModel
+from helao.core.models.action import ActionModel
+from helao.core.models.machine import MachineModel
+from helao.core.models.orchstatus import LoopStatus
+from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
-from helaocore.error import ErrorCodes
-from helaocore.models.experiment import ExperimentModel
-from helaocore.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
+from helao.core.models.experiment import ExperimentModel
+from helao.core.models.hlostatus import HloStatus
 from starlette.types import Message
 from starlette.responses import JSONResponse, Response
+
 
 from helao.helpers import logging
 
 global LOGGER
-
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="orch_api_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
 
 class OrchAPI(HelaoFastAPI):
+    orch: Orch
+    
     def __init__(
         self,
         config,
@@ -169,9 +171,7 @@ class OrchAPI(HelaoFastAPI):
                     # send active status but don't create active object
                     await self.orch.status_q.put(action.get_actmodel())
                     response = JSONResponse(action.as_dict())
-                    self.orch.print_message(
-                        f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
-                    )
+                    LOGGER.info(f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}")
                     self.orch.endpoint_queues[endpoint].put(
                         (
                             action,
@@ -406,9 +406,9 @@ class OrchAPI(HelaoFastAPI):
             3. Logs a message indicating that the orchestrator has shut down.
             4. Waits for 0.75 seconds to ensure all processes have terminated properly.
             """
-            self.orch.print_message("Stopping operator", info=True)
+            LOGGER.info("Stopping operator")
             self.orch.bokehapp.stop()
-            self.orch.print_message("orch shutdown", info=True)
+            LOGGER.info("orch shutdown")
             time.sleep(0.75)
 
         # --- ORCH-specific endpoints ---
@@ -496,15 +496,11 @@ class OrchAPI(HelaoFastAPI):
             if os.path.exists(save_path):
                 queue_dict = pickle.load(open(save_path, "rb"))
             else:
-                self.orch.print_message(
-                    "Exported queues.pck does not exist. Cannot restore."
-                )
+                LOGGER.info("Exported queues.pck does not exist. Cannot restore.")
             if self.orch.sequence_dq or self.orch.experiment_dq or self.orch.action_dq:
-                self.orch.print_message(
-                    "Existing queues are not empty. Cannot restore."
-                )
+                LOGGER.info("Existing queues are not empty. Cannot restore.")
             else:
-                self.orch.print_message("Restoring queues from saved pck.")
+                LOGGER.info("Restoring queues from saved pck.")
                 for x in queue_dict["act"]:
                     self.orch.action_dq.append(x)
                 for x in queue_dict["exp"]:
@@ -538,12 +534,7 @@ class OrchAPI(HelaoFastAPI):
             """
             if actionservermodel is None:
                 return False
-            self.orch.print_message(
-                f"orch '{self.orch.server.server_name}' "
-                f"got status from "
-                f"'{actionservermodel.action_server.server_name}': "
-                f"{actionservermodel.endpoints}"
-            )
+            LOGGER.info(f"orch '{self.orch.server.server_name}' got status from '{actionservermodel.action_server.server_name}': {actionservermodel.endpoints}")
             return await self.orch.update_status(actionservermodel=actionservermodel)
 
         @self.post("/clear_actives", tags=["private"])
@@ -560,11 +551,8 @@ class OrchAPI(HelaoFastAPI):
                 list: A list of UUIDs of the cleared active actions.
             """
             cleared_actives = []
-            for actionservermodel in list(
-                self.orch.globalstatusmodel.server_dict.values()
-            ):
-                updatemodel = copy(actionservermodel)
-                for endpointmodel in actionservermodel.endpoints.values():
+            for actionservermodel in self.orch.globalstatusmodel.server_dict.values():
+                for endpointkey, endpointmodel in actionservermodel.endpoints.items():
                     active_items = list(endpointmodel.active_dict.items())
                     for uuid, statusmodel in active_items:
                         endpointmodel.active_dict.pop(uuid)
@@ -575,7 +563,8 @@ class OrchAPI(HelaoFastAPI):
                         endpointmodel.nonactive_dict[HloStatus.skipped].update(
                             {uuid: statusmodel}
                         )
-                await self.orch.update_status(actionservermodel=updatemodel)
+                    actionservermodel.endpoints[endpointkey] = endpointmodel
+                await self.orch.update_status(actionservermodel=actionservermodel)
             return cleared_actives
 
         @self.post("/update_nonblocking", tags=["private"])
@@ -595,13 +584,7 @@ class OrchAPI(HelaoFastAPI):
             Returns:
                 dict: A dictionary containing the result of the update operation.
             """
-            self.orch.print_message(
-                f"'{self.orch.server.server_name.upper()}' "
-                f"got nonblocking status from "
-                f"'{actionmodel.action_server.server_name}': "
-                f"exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status} "
-                f"on {server_host}:{server_port}"
-            )
+            LOGGER.info(f"'{self.orch.server.server_name.upper()}' got nonblocking status from '{actionmodel.action_server.server_name}': exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status} on {server_host}:{server_port}")
             result_dict = await self.orch.update_nonblocking(
                 actionmodel, server_host, server_port
             )
@@ -620,7 +603,7 @@ class OrchAPI(HelaoFastAPI):
             """
             # if self.orch.active_experiment is not None:
             #     self.orch.active_experiment.globalexp_params.update(params)
-            #     self.orch.print_message(f"Updated globalexp params with {params}.")
+            #     LOGGER.info(f"Updated globalexp params with {params}.")
             #     return True
             # else:
             #     self.orch.print_message(
@@ -682,9 +665,9 @@ class OrchAPI(HelaoFastAPI):
             if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
                 await self.orch.estop_loop()
             elif self.orch.globalstatusmodel.loop_state == LoopStatus.estopped:
-                self.orch.print_message("orchestrator E-STOP flag already raised")
+                LOGGER.info("orchestrator E-STOP flag already raised")
             else:
-                self.orch.print_message("orchestrator is not running")
+                LOGGER.info("orchestrator is not running")
             return {}
 
         @self.post("/stop", tags=["private"])
@@ -714,7 +697,7 @@ class OrchAPI(HelaoFastAPI):
                 None
             """
             if self.orch.globalstatusmodel.loop_state != LoopStatus.estopped:
-                self.orch.print_message("orchestrator is not currently in E-STOP")
+                LOGGER.info("orchestrator is not currently in E-STOP")
             else:
                 await self.orch.clear_estop()
 
@@ -727,7 +710,7 @@ class OrchAPI(HelaoFastAPI):
             Otherwise, it calls the `clear_error` method of the orchestrator to clear the error state.
             """
             if self.orch.globalstatusmodel.loop_state != LoopStatus.error:
-                self.orch.print_message("orchestrator is not currently in ERROR")
+                LOGGER.info("orchestrator is not currently in ERROR")
             else:
                 await self.orch.clear_error()
 
@@ -1060,6 +1043,7 @@ class OrchAPI(HelaoFastAPI):
             """
             active = await self.orch.setup_and_contain_action()
             self.orch.current_stop_message = active.action.action_params["reason"]
+            LOGGER.warning(active.action.action_params["reason"])
             await self.orch.stop()
             await self.orch.update_operator(True)
             finished_action = await active.finish()
@@ -1092,14 +1076,14 @@ class OrchAPI(HelaoFastAPI):
             )
             has_estop = getattr(self.driver, "estop", None)
             if has_estop is not None and callable(has_estop):
-                self.orch.print_message("driver has estop function", info=True)
+                LOGGER.info("driver has estop function")
                 await active.enqueue_data_dflt(
                     datadict={
                         "estop": await self.driver.estop(**active.action.action_params)
                     }
                 )
             else:
-                self.orch.print_message("driver has NO estop function", info=True)
+                LOGGER.info("driver has NO estop function")
                 self.orch.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.append(HloStatus.estopped)
@@ -1224,6 +1208,7 @@ class OrchAPI(HelaoFastAPI):
                 await self.orch.clear_experiments()
                 await self.orch.clear_sequences()
                 self.orch.current_stop_message = active.action.action_params["reason"]
+                LOGGER.warning(active.action.action_params["reason"])
                 await self.orch.update_operator(True)
 
             finished_action = await active.finish()
@@ -1406,7 +1391,7 @@ class OrchAPI(HelaoFastAPI):
                     "\n".join(["removed:"] + current_params), info=True
                 )
             else:
-                self.orch.print_message("global_params was empty", info=True)
+                LOGGER.info("global_params was empty")
             active.action.action_params.update({"cleared": current_params})
             finished_action = await active.finish()
             return finished_action.as_dict()
@@ -1445,7 +1430,7 @@ class WaitExec(Executor):
             last_print_time (float): The last time a message was printed.
         """
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("WaitExec initialized.")
+        LOGGER.info("WaitExec initialized.")
         self.poll_rate = 0.01
         self.duration = self.active.action.action_params.get("waittime", -1)
         self.print_every_secs = kwargs.get("print_every_secs", 5)
@@ -1490,7 +1475,7 @@ class WaitExec(Executor):
         return {"error": ErrorCodes.none, "status": status}
 
     async def _post_exec(self):
-        self.active.base.print_message(" ... wait action done")
+        LOGGER.info(" ... wait action done")
         return {"error": ErrorCodes.none}
 
 

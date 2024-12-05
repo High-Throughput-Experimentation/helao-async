@@ -12,9 +12,14 @@ from typing import Optional
 from enum import IntEnum, Enum
 
 # import traceback
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
-from helaocore.models.hlostatus import HloStatus
-from helaocore.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
 
@@ -127,38 +132,38 @@ class SIMDOS:
         self.last_state = "unknown"
 
     async def start_polling(self):
-        self.base.print_message("got 'start_polling' request, raising signal", info=True)
+        LOGGER.info("got 'start_polling' request, raising signal")
         try:
             async with asyncio.timeout(2):
                 await self.poll_signalq.put(True)
             while not self.polling:
-                self.base.print_message("waiting for polling loop to start", warn=True)
+                LOGGER.warning("waiting for polling loop to start")
                 await asyncio.sleep(0.1)
         except TimeoutError:
             if self.poll_signalq.full():
                 self.poll_signalq.get_nowait()  # unsure if we should set polling directly, do normal put, or put_nowait
             self.polling = True
-            self.base.print_message("could not raise start signal, forcing polling loop to start", warn=True)
+            LOGGER.warning("could not raise start signal, forcing polling loop to start")
 
     async def stop_polling(self):
-        self.base.print_message("got 'stop_polling' request, raising signal", info=True)
+        LOGGER.info("got 'stop_polling' request, raising signal")
         try:
             async with asyncio.timeout(2):
                 await self.poll_signalq.put(False)
             while self.polling:
-                self.base.print_message("waiting for polling loop to stop", warn=True)
+                LOGGER.warning("waiting for polling loop to stop")
                 await asyncio.sleep(0.1)
         except TimeoutError:
             if self.poll_signalq.full():
                 self.poll_signalq.get_nowait()
             self.polling = False
-            self.base.print_message("could not raise start signal, forcing polling loop to stop", warn=True)
+            LOGGER.warning("could not raise start signal, forcing polling loop to stop")
 
 
     async def poll_signal_loop(self):
         while True:
             self.polling = await self.poll_signalq.get()
-            self.base.print_message("polling signal received")
+            LOGGER.info("polling signal received")
 
     def send(self, cmd: str):
         addr = self.config_dict["address"]
@@ -175,11 +180,11 @@ class SIMDOS:
         # strip frame
         resp = [x.decode("ascii").split("\x06\x02")[-1].split("\x03")[0] for x in resp]
         if not resp:
-            self.base.print_message("command did not return a valid response")
+            LOGGER.info("command did not return a valid response")
             print(full_resp)
             return None
         if len(resp) > 1:
-            self.base.print_message("command returned multiple responses, using first")
+            LOGGER.info("command returned multiple responses, using first")
         return resp[0]
 
     def get_opstat(self):
@@ -233,7 +238,7 @@ class SIMDOS:
         return state_dict
 
     async def poll_sensor_loop(self, frequency: int = 10):
-        self.base.print_message("polling background task has started")
+        LOGGER.info("polling background task has started")
         waittime = 1.0 / frequency
         lastupdate = 0
         while True:
@@ -248,11 +253,11 @@ class SIMDOS:
                 ]:
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
-                        # self.base.print_message("waiting for minimum update interval.")
+                        # LOGGER.info("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
 
                     resp_dict = func()
-                    # self.base.print_message(f"received status: {resp_dict}")
+                    # LOGGER.info(f"received status: {resp_dict}")
                     for k, v in resp_dict.items():
                         status_dict[f"{group}_{k}"] = v
 
@@ -267,7 +272,7 @@ class SIMDOS:
                     if k.startswith("fault_") and fv != 0
                 ]
                 if faults:
-                    self.base.print_message(f"fault detected, stopping simdos executors")
+                    LOGGER.info(f"fault detected, stopping simdos executors")
                     for executor in self.base.executors.values():
                         executor.stop_action_task()
 
@@ -291,7 +296,7 @@ class SIMDOS:
         if self.get_mode() == mode:
             success = True
         else:
-            self.base.print_message(f"could not set pump mode to {mode.name}")
+            LOGGER.info(f"could not set pump mode to {mode.name}")
         return success
 
     def get_run_param(self, param: PumpParam):
@@ -300,7 +305,7 @@ class SIMDOS:
         if resp is not None:
             return int(resp)
         else:
-            self.base.print_message(f"could not validate {param.name}")
+            LOGGER.info(f"could not validate {param.name}")
             return -1
 
     def set_run_param(self, param: PumpParam, val: int):
@@ -308,7 +313,7 @@ class SIMDOS:
         lo_lim, hi_lim = PUMPLIMS[param]
         parcmd = param.value
         if val < lo_lim or val > hi_lim:
-            self.base.print_message(f"{param.name} setpoint is out of range [{lo_lim}, {hi_lim}]")
+            LOGGER.info(f"{param.name} setpoint is out of range [{lo_lim}, {hi_lim}]")
         else:
             resp = self.send(f"{parcmd}{val:08}")
             print(resp)
@@ -317,9 +322,9 @@ class SIMDOS:
                 check = self.send(f"?{parcmd}")
             if check is not None and int(check) == val:
                 success = True
-                self.base.print_message(f"successfully set {param.name} to {val}")
+                LOGGER.info(f"successfully set {param.name} to {val}")
             else:
-                self.base.print_message(f"could not validate {param.name} setpoint")
+                LOGGER.info(f"could not validate {param.name} setpoint")
         return success
 
     async def stop(self):
@@ -367,25 +372,25 @@ class RunExec(Executor):
         super().__init__(*args, **kwargs)
         # current plan is 1 pump per COM
         self.driver = self.active.base.fastapp.driver
-        self.active.base.print_message("RunExec initialized.")
+        LOGGER.info("RunExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params["duration_sec"]
 
     async def _pre_exec(self):
         "Set rate and volume params, then run."
-        self.active.base.print_message("RunExec running setup methods.")
+        LOGGER.info("RunExec running setup methods.")
         await self.driver.stop_polling()
         error = ErrorCodes.none
         mode = PumpMode.continuous
         setmode_resp = self.driver.set_mode(mode)
         if not setmode_resp:
-            self.active.base.print_message(f"could not set pump mode to {mode.name}")
+            LOGGER.info(f"could not set pump mode to {mode.name}")
             error = ErrorCodes.cmd_error
         param = PumpParam.rate
         val = self.active.action.action_params["rate_uL_min"]
         setrate_resp = self.driver.set_run_param(param, val)
         if not setrate_resp:
-            self.active.base.print_message(f"could not set pump {param.name} to {val}")
+            LOGGER.info(f"could not set pump {param.name} to {val}")
             error = ErrorCodes.cmd_error
         return {"error": error}
 
@@ -394,7 +399,7 @@ class RunExec(Executor):
         self.start_time = time.time()
         start_resp = await self.driver.start()
         if not start_resp:
-            self.active.base.print_message("could not start pump")
+            LOGGER.info("could not start pump")
             error = ErrorCodes.cmd_error
         await self.driver.start_polling()
         return {"error": error}
@@ -412,19 +417,19 @@ class RunExec(Executor):
         error = ErrorCodes.none
         stop_resp = await self.driver.stop()
         if not stop_resp:
-            self.active.base.print_message("could not stop pump")
+            LOGGER.info("could not stop pump")
             error = ErrorCodes.cmd_error
         return {"error": error}
 
 #     async def _post_exec(self):
-#         self.active.base.print_message("PumpExec running cleanup methods.")
+#         LOGGER.info("PumpExec running cleanup methods.")
 #         clearvol_resp = self.active.base.fastapp.driver.clear_volume(
 #             pump_name=self.pump_name,
 #             direction=self.direction,
 #         )
-#         self.active.base.print_message(f"clear_volume returned: {clearvol_resp}")
+#         LOGGER.info(f"clear_volume returned: {clearvol_resp}")
 #         cleartar_resp = self.active.base.fastapp.driver.clear_target_volume(
 #             pump_name=self.pump_name,
 #         )
-#         self.active.base.print_message(f"clear_target_volume returned: {cleartar_resp}")
+#         LOGGER.info(f"clear_target_volume returned: {cleartar_resp}")
 #         return {"error": ErrorCodes.none}

@@ -25,20 +25,27 @@ import json
 import os
 import sys
 import importlib
-from typing import List
+from typing import List, Optional
 from pybase64 import b64decode
 from socket import gethostname
 import inspect
 from pydantic import BaseModel
 import numpy as np
 from functools import partial
+
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 from helao.helpers.to_json import parse_bokeh_input
 from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 
-from helaocore.models.experiment import ExperimentModel
-from helaocore.models.orchstatus import LoopStatus
+from helao.core.models.experiment import ExperimentModel
+from helao.core.models.orchstatus import LoopStatus
 from helao.helpers.premodels import Sequence, Experiment
 
 from bokeh.layouts import column
@@ -100,9 +107,7 @@ class BokehOperator:
         for server_name, server_config in self.vis.world_cfg["servers"].items():
             if server_config.get("fast", "") == "pal_server":
                 self.pal_name = server_name
-                self.vis.print_message(
-                    f"found PAL server: '{self.pal_name}'", info=True
-                )
+                LOGGER.info(f"found PAL server: '{self.pal_name}'")
                 break
 
         self.dev_customitems = []
@@ -789,14 +794,14 @@ class BokehOperator:
         self.orch.orch_op = self
 
     def cleanup_session(self, session_context):
-        self.vis.print_message("BokehOperator session closed", info=True)
+        LOGGER.info("BokehOperator session closed")
         self.IOloop_run = False
         self.IOtask.cancel()
 
     def get_sequence_lib(self):
         """Populates sequences (library) and sequence_list (dropdown selector)."""
         self.sequences = []
-        self.vis.print_message(f"found sequences: {list(self.sequence_lib)}")
+        LOGGER.info(f"found sequences: {list(self.sequence_lib)}")
         for i, sequence in enumerate(self.sequence_lib):
             tmpdoc = self.sequence_lib[sequence].__doc__
             if tmpdoc is None:
@@ -854,7 +859,7 @@ class BokehOperator:
     def get_experiment_lib(self):
         """Populates experiments (library) and experiment_list (dropdown selector)."""
         self.experiments = []
-        self.vis.print_message(f"found experiment: {list(self.experiment_lib)}")
+        LOGGER.info(f"found experiment: {list(self.experiment_lib)}")
         for i, experiment in enumerate(self.experiment_lib):
             tmpdoc = self.experiment_lib[experiment].__doc__
             if tmpdoc is None:
@@ -914,7 +919,7 @@ class BokehOperator:
         self.seqspec_select_list = []
         self.seqspecs = []
         specfiles = self.seqspec_parser.lister(self.seqspec_folder)
-        self.vis.print_message(f"found specs: {specfiles}")
+        LOGGER.info(f"found specs: {specfiles}")
         for fp in specfiles:
             self.seqspecs.append(fp)
             self.seqspec_select_list.append(os.path.basename(fp))
@@ -985,7 +990,7 @@ class BokehOperator:
 
         # self.action_source.stream(self.action_lists, rollover=action_count)
         self.action_source.data = self.action_lists
-        # self.vis.print_message(f"current queued actions: ({len(self.orch.action_dq)})")
+        # LOGGER.info(f"current queued actions: ({len(self.orch.action_dq)})")
 
     async def get_active_actions(self):
         """get action list from orch"""
@@ -1014,7 +1019,7 @@ class BokehOperator:
 
         # self.active_action_source.stream(self.active_action_lists, rollover=action_count)
         self.active_action_source.data = self.active_action_lists
-        # self.vis.print_message(f"current active actions: {self.active_action_lists}")
+        # LOGGER.info(f"current active actions: {self.active_action_lists}")
 
     async def get_orch_status_summary(self):
         for key in self.action_server_lists:
@@ -1106,7 +1111,7 @@ class BokehOperator:
 
     def callback_clicked_pmplot(self, event, sender):
         """double click/tap on PM plot to add/move marker"""
-        self.vis.print_message(f"DOUBLE TAP PMplot: {event.x}, {event.y}")
+        LOGGER.info(f"DOUBLE TAP PMplot: {event.x}, {event.y}")
         # get coordinates of doubleclick
         platex = event.x
         platey = event.y
@@ -1175,18 +1180,18 @@ class BokehOperator:
             )
 
     def callback_estop_orch(self, event):
-        self.vis.print_message("estop orch")
+        LOGGER.info("estop orch")
         self.vis.doc.add_next_tick_callback(partial(self.orch.estop_loop))
 
     def callback_start_orch(self, event):
         if self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
-            self.vis.print_message("starting orch")
+            LOGGER.info("starting orch")
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
         elif self.orch.globalstatusmodel.loop_state == LoopStatus.estopped:
-            self.vis.print_message("orch is in estop", error=True)
+            LOGGER.error("orch is in estop")
         else:
-            self.vis.print_message("Cannot start orch when not in a stopped state.")
+            LOGGER.info("Cannot start orch when not in a stopped state.")
 
     def callback_add_expplan(self, event):
         """add experiment plan as new sequence to orch sequence_dq"""
@@ -1218,32 +1223,32 @@ class BokehOperator:
         )
 
     def callback_stop_orch(self, event):
-        self.vis.print_message("stopping operator orch")
+        LOGGER.info("stopping operator orch")
         self.vis.doc.add_next_tick_callback(partial(self.orch.stop))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_skip_exp(self, event):
-        self.vis.print_message("skipping experiment")
+        LOGGER.info("skipping experiment")
         self.vis.doc.add_next_tick_callback(partial(self.orch.skip))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_expplan(self, event):
-        self.vis.print_message("clearing exp plan table")
+        LOGGER.info("clearing exp plan table")
         self.sequence = None
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_sequences(self, event):
-        self.vis.print_message("clearing experiments")
+        LOGGER.info("clearing experiments")
         self.vis.doc.add_next_tick_callback(partial(self.orch.clear_sequences))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_experiments(self, event):
-        self.vis.print_message("clearing experiments")
+        LOGGER.info("clearing experiments")
         self.vis.doc.add_next_tick_callback(partial(self.orch.clear_experiments))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_actions(self, event):
-        self.vis.print_message("clearing actions")
+        LOGGER.info("clearing actions")
         self.vis.doc.add_next_tick_callback(partial(self.orch.clear_actions))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -1309,16 +1314,14 @@ class BokehOperator:
 
     def populate_sequence(self):
         selected_sequence = self.sequence_dropdown.value
-        self.vis.print_message(f"selected sequence from list: {selected_sequence}")
+        LOGGER.info(f"selected sequence from list: {selected_sequence}")
 
         sequence_params = {
             paraminput.title: parse_bokeh_input(paraminput.value)
             for paraminput in self.seq_param_input
         }
         for k, v in sequence_params.items():
-            self.vis.print_message(
-                f"added sequence param '{k}' with value {v} and type {type(v)} "
-            )
+            LOGGER.info(f"added sequence param '{k}' with value {v} and type {type(v)} ")
 
         self.write_params("seq", selected_sequence, sequence_params)
         expplan_list = self.orch.unpack_sequence(
@@ -1345,15 +1348,13 @@ class BokehOperator:
 
     def populate_experimentmodel(self) -> ExperimentModel:
         selected_experiment = self.experiment_dropdown.value
-        self.vis.print_message(f"selected experiment from list: {selected_experiment}")
+        LOGGER.info(f"selected experiment from list: {selected_experiment}")
         experiment_params = {
             paraminput.title: parse_bokeh_input(paraminput.value)
             for paraminput in self.exp_param_input
         }
         for k, v in experiment_params.items():
-            self.vis.print_message(
-                f"added experiment param '{k}' with value {v} and type {type(v)} "
-            )
+            LOGGER.info(f"added experiment param '{k}' with value {v} and type {type(v)} ")
         self.write_params("exp", selected_experiment, experiment_params)
         experimentmodel = ExperimentModel(
             experiment_name=selected_experiment, experiment_params=experiment_params
@@ -1936,8 +1937,8 @@ class BokehOperator:
 
         return private_input, param_input
 
-    def get_sample_infos(self, PMnum: List = None, sender=None):
-        self.vis.print_message("updating samples")
+    def get_sample_infos(self, PMnum: Optional[List] = None, sender=None):
+        LOGGER.info("updating samples")
 
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
@@ -1958,9 +1959,9 @@ class BokehOperator:
             buf = ""
             if PMnum is not None and pmdata:
                 if PMnum[0] is not None:  # need to check as this can also happen
-                    self.vis.print_message(f"selected sample_no: {PMnum[0]+1}")
+                    LOGGER.info(f"selected sample_no: {PMnum[0]+1}")
                     if PMnum[0] > len(pmdata) or PMnum[0] < 0:
-                        self.vis.print_message("invalid sample no")
+                        LOGGER.info("invalid sample no")
                         self.vis.doc.add_next_tick_callback(
                             partial(self.update_input_value, input_sample_no, "")
                         )
@@ -2073,9 +2074,7 @@ class BokehOperator:
                 self.vis.doc.add_next_tick_callback(partial(self.update_tables))
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.vis.print_message(
-                    f"BokehOperator IOloop error: {repr(e), tb,}", error=True
-                )
+                LOGGER.error(f"BokehOperator IOloop error: {repr(e), tb,}")
 
     def get_last_seq_pars(self):
         loaded_pars = self.read_params("seq", self.sequence_dropdown.value)

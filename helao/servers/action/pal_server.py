@@ -20,7 +20,7 @@ from helao.drivers.robot.pal_driver import (
 )
 from helao.drivers.data.archive_driver import ScanDirection, ScanOperator
 
-from helaocore.models.sample import (
+from helao.core.models.sample import (
     SampleType,
     LiquidSample,
     GasSample,
@@ -28,7 +28,7 @@ from helaocore.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helaocore.models.data import DataModel
+from helao.core.models.data import DataModel
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
@@ -37,7 +37,7 @@ from helao.helpers import logging  # get LOGGER from BaseAPI instance
 
 global LOGGER
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="pal_server_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
@@ -256,9 +256,9 @@ def makeApp(confPrefix, server_key, helao_root):
         async def PAL_injection_custom_GC(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            startGC: bool = None,
-            sampletype: GCsampletype = None,
-            tool: PALtools = None,
+            startGC: Optional[bool] = None,
+            sampletype: Optional[GCsampletype] = None,
+            tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             dest: dev_customitems = None,
             volume_ul: int = 2,
@@ -278,7 +278,7 @@ def makeApp(confPrefix, server_key, helao_root):
         async def PAL_injection_custom_HPLC(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: PALtools = None,
+            tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             dest: dev_customitems = None,
             volume_ul: int = 2,
@@ -325,7 +325,7 @@ def makeApp(confPrefix, server_key, helao_root):
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
-            tool: PALtools = None,
+            tool: Optional[PALtools] = None,
             volume_ul: int = 2,
             source_tray: int = 1,
             source_slot: int = 1,
@@ -354,7 +354,7 @@ def makeApp(confPrefix, server_key, helao_root):
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
-            tool: PALtools = None,
+            tool: Optional[PALtools] = None,
             volume_ul: int = 2,
             source_tray: int = 1,
             source_slot: int = 1,
@@ -381,7 +381,7 @@ def makeApp(confPrefix, server_key, helao_root):
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
-            tool: PALtools = None,
+            tool: Optional[PALtools] = None,
             volume_ul: int = 2,
             source: dev_customitems = None,
             dest_tray: int = 1,
@@ -407,7 +407,7 @@ def makeApp(confPrefix, server_key, helao_root):
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
-            tool: PALtools = None,
+            tool: Optional[PALtools] = None,
             volume_ul: int = 2,
             source: dev_customitems = None,
             dest: dev_customitems = None,
@@ -427,7 +427,7 @@ def makeApp(confPrefix, server_key, helao_root):
         async def PAL_archive(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: PALtools = None,
+            tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             volume_ul: int = 200,
             sampleperiod: List[float] = Body([0], embed=True),
@@ -449,7 +449,7 @@ def makeApp(confPrefix, server_key, helao_root):
     #     async def PAL_fill(
     #         action: Action = \
     #                 Body({}, embed=True),
-    #         tool: PALtools = None,
+    #         tool: Optional[PALtools] = None,
     #         source: dev_customitems = None,
     #         dest: dev_customitems = None,
     #         volume_ul: int = 200,
@@ -468,7 +468,7 @@ def makeApp(confPrefix, server_key, helao_root):
     #     async def PAL_fillfixed(
     #         action: Action = \
     #                 Body({}, embed=True),
-    #         tool: PALtools = None,
+    #         tool: Optional[PALtools] = None,
     #         source: dev_customitems = None,
     #         dest: dev_customitems = None,
     #         volume_ul: int = 200, # this value is only for exp, a fixed value is used
@@ -488,7 +488,7 @@ def makeApp(confPrefix, server_key, helao_root):
         async def PAL_deepclean(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: PALtools = None,
+            tool: Optional[PALtools] = None,
             volume_ul: Optional[
                 int
             ] = 200,  # this value is only for exp, a fixed value is used
@@ -508,7 +508,7 @@ def makeApp(confPrefix, server_key, helao_root):
         async def PAL_dilute(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: PALtools = None,
+            tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             volume_ul: int = 200,
             dest_tray: int = 0,
@@ -534,7 +534,7 @@ def makeApp(confPrefix, server_key, helao_root):
         async def PAL_autodilute(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: PALtools = None,
+            tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             volume_ul: int = 200,
             sampleperiod: List[float] = Body([0.0], embed=True),
@@ -555,9 +555,9 @@ def makeApp(confPrefix, server_key, helao_root):
     async def archive_tray_query_sample(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        tray: int = None,
-        slot: int = None,
-        vial: int = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        vial: Optional[int] = None,
     ):
         active = await app.base.setup_and_contain_action(action_abbr="query_sample")
         error_code, sample = await app.driver.archive.tray_query_sample(
@@ -598,9 +598,9 @@ def makeApp(confPrefix, server_key, helao_root):
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
             embed=True,
         ),
-        tray: int = None,
-        slot: int = None,
-        vial: int = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        vial: Optional[int] = None,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="load_sample",
@@ -621,8 +621,8 @@ def makeApp(confPrefix, server_key, helao_root):
     async def archive_tray_unload(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        tray: int = None,
-        slot: int = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
     ):
         """Resets app.driver vial table."""
         active = await app.base.setup_and_contain_action(action_abbr="unload_sample")
@@ -644,7 +644,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def archive_tray_new(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        req_vol: float = None,
+        req_vol: Optional[float] = None,
     ):
         """Returns an empty vial position for given max volume.
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.
@@ -667,9 +667,9 @@ def makeApp(confPrefix, server_key, helao_root):
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
             embed=True,
         ),
-        tray: int = None,
-        slot: int = None,
-        vial: int = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        vial: Optional[int] = None,
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
         active = await app.base.setup_and_contain_action()
@@ -687,8 +687,8 @@ def makeApp(confPrefix, server_key, helao_root):
     async def archive_tray_export_json(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        tray: int = None,
-        slot: int = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="traytojson",
@@ -706,12 +706,12 @@ def makeApp(confPrefix, server_key, helao_root):
     async def archive_tray_export_icpms(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        tray: int = None,
-        slot: int = None,
-        survey_runs: int = None,
-        main_runs: int = None,
-        rack: int = None,
-        dilution_factor: float = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        survey_runs: Optional[int] = None,
+        main_runs: Optional[int] = None,
+        rack: Optional[int] = None,
+        dilution_factor: Optional[float] = None,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="traytoicpms",
@@ -732,8 +732,8 @@ def makeApp(confPrefix, server_key, helao_root):
     async def archive_tray_export_csv(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        tray: int = None,
-        slot: int = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="traytocsv",
@@ -1059,12 +1059,12 @@ def makeApp(confPrefix, server_key, helao_root):
         plate_id: int = 1,
         sample_code: int = Query(0, ge=0, le=2),
         skip_n_samples: int = Query(0, ge=0),
-        direction: ScanDirection = None,
+        direction: Optional[ScanDirection] = None,
         sample_nos: List[int] = [],
-        sample_nos_operator: ScanOperator = None,
+        sample_nos_operator: Optional[ScanOperator] = None,
         # platemap_xys: List[Tuple[int, int]] = [],
         platemap_xys: list = [],
-        platemap_xys_operator: ScanOperator = None,
+        platemap_xys_operator: Optional[ScanOperator] = None,
     ):
         active = await app.base.setup_and_contain_action()
         await app.driver.archive.generate_plate_sample_no_list(

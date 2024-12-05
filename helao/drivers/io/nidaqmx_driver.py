@@ -20,15 +20,20 @@ from nidaqmx.constants import TriggerType
 from helao.helpers.premodels import Action
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helaocore.models.sample import SampleInheritance, SampleStatus
-from helaocore.models.file import FileConnParams, HloHeaderModel
+from helao.core.models.sample import SampleInheritance, SampleStatus
+from helao.core.models.file import FileConnParams, HloHeaderModel
 from helao.helpers.active_params import ActiveParams
-from helaocore.models.data import DataModel
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.data import DataModel
+from helao.core.models.hlostatus import HloStatus
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 class cNIMAX:
     def __init__(self, action_serv: Base):
@@ -64,7 +69,7 @@ class cNIMAX:
 
         self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
 
-        self.base.print_message("init NI-MAX")
+        LOGGER.info("init NI-MAX")
 
         self.action = (
             None  # for passing action object from technique method to measure loop
@@ -81,7 +86,7 @@ class cNIMAX:
             )
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(f"NImax error: {repr(e), tb,}", error=True)
+            LOGGER.error(f"NImax error: ", exc_info=True)
             raise e
         self.time_stamp = time.time()
 
@@ -427,9 +432,7 @@ class cNIMAX:
 
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message(
-                    f"canceling NImax IV stream: {repr(e), tb,}", error=True
-                )
+                LOGGER.error(f"canceling NImax IV stream: {repr(e), tb,}")
 
         elif self.base.actionservermodel.estop and self.IO_do_meas:
             _ = self.task_6289cellcurrent.read(
@@ -452,9 +455,7 @@ class cNIMAX:
                 number_of_samples_per_channel=number_of_samples
             )
             # task should be already off or should be closed soon
-            self.base.print_message(
-                "meas was turned off but NImax IV task is still running ..."
-            )
+            LOGGER.info("meas was turned off but NImax IV task is still running ...")
             # self.task_6289cellcurrent.close()
             # self.task_6284cellvoltage.close()
 
@@ -471,7 +472,7 @@ class cNIMAX:
                 if self.IO_do_meas and not self.IO_measuring:
                     # are we in estop?
                     if not self.base.actionservermodel.estop:
-                        self.base.print_message("NImax IV task got measurement request")
+                        LOGGER.info("NImax IV task got measurement request")
 
                         # start slave first
                         self.task_6284cellvoltage.start()
@@ -481,7 +482,7 @@ class cNIMAX:
                         # wait for first callback interrupt
                         while not self.IO_measuring:
                             await asyncio.sleep(0.1)
-                        self.base.print_message("got IO_measuring", info=True)
+                        LOGGER.info("got IO_measuring")
 
                         # get timecode and correct for offset from first interrupt
                         self.IOloopstarttime = (
@@ -495,10 +496,7 @@ class cNIMAX:
                                 self.IO_do_meas = await self.IO_signalq.get()
                             await asyncio.sleep(0.1)
 
-                        self.base.print_message(
-                            f"NImax IV finished with IO_do_meas {self.IO_do_meas}",
-                            info=True,
-                        )
+                        LOGGER.info(f"NImax IV finished with IO_do_meas {self.IO_do_meas}")
 
                         # await self.IO_signalq.put(False)
                         self.IO_do_meas = False
@@ -511,31 +509,25 @@ class cNIMAX:
                         self.samples_in = []
 
                         if self.base.actionservermodel.estop:
-                            self.base.print_message("NImax IV task is in estop.")
+                            LOGGER.info("NImax IV task is in estop.")
                         else:
-                            self.base.print_message("setting NImax IV task to idle")
-                        self.base.print_message("NImax IV task measurement is done")
+                            LOGGER.info("setting NImax IV task to idle")
+                        LOGGER.info("NImax IV task measurement is done")
                     else:
                         self.IO_do_meas = False
-                        self.base.print_message("NImax IV task is in estop.")
+                        LOGGER.info("NImax IV task is in estop.")
 
                 elif self.IO_do_meas and self.IO_measuring:
-                    self.base.print_message(
-                        "got measurement request but NImax IV task is busy"
-                    )
+                    LOGGER.info("got measurement request but NImax IV task is busy")
                 elif not self.IO_do_meas and self.IO_measuring:
-                    self.base.print_message(
-                        "got stop request, measurement will stop next cycle"
-                    )
+                    LOGGER.info("got stop request, measurement will stop next cycle")
                 else:
-                    self.base.print_message(
-                        "got stop request but NImax IV task is idle"
-                    )
+                    LOGGER.info("got stop request but NImax IV task is idle")
 
-            self.base.print_message(f"IOloop got IOloop_run {self.IOloop_run}")
+            LOGGER.info(f"IOloop got IOloop_run {self.IOloop_run}")
 
         except asyncio.CancelledError:
-            self.base.print_message("IOloop task was cancelled")
+            LOGGER.info("IOloop task was cancelled")
 
     async def Heatloop(
         self,
@@ -595,7 +587,7 @@ class cNIMAX:
     async def set_digital_out(
         self, do_port=None, do_name: str = "", on: bool = False, *args, **kwargs
     ):
-        self.base.print_message(f"do_port '{do_name}': {do_port} is {on}")
+        LOGGER.info(f"do_port '{do_name}': {do_port} is {on}")
         on = bool(on)
         cmds = []
         err_code = ErrorCodes.none
@@ -626,7 +618,7 @@ class cNIMAX:
     async def get_digital_in(
         self, di_port=None, di_name: str = "", on: bool = False, *args, **kwargs
     ):
-        self.base.print_message(f"di_port '{di_name}': {di_port}")
+        LOGGER.info(f"di_port '{di_name}': {di_port}")
         on = None
         err_code = ErrorCodes.none
         if di_port is not None:
@@ -660,9 +652,7 @@ class cNIMAX:
             # first validate the provided samples
             samples_in = await self.unified_db.get_samples(A.samples_in)
             if not samples_in and not self.allow_no_sample:
-                self.base.print_message(
-                    "NI got no valid sample, cannot start measurement!", error=True
-                )
+                LOGGER.error("NI got no valid sample, cannot start measurement!")
                 A.error_code = ErrorCodes.no_sample
                 activeDict = A.as_dict()
             else:
@@ -826,14 +816,11 @@ class cNIMAX:
         return switch
 
     def shutdown(self):
-        self.base.print_message("shutting down nidaqmx")
+        LOGGER.info("shutting down nidaqmx")
         self.set_IO_signalq_nowait(False)
         retries = 0
         while self.active is not None and retries < 10:
-            self.base.print_message(
-                f"Got shutdown, but Active is not yet done!, retry {retries}",
-                info=True,
-            )
+            LOGGER.info(f"Got shutdown, but Active is not yet done!, retry {retries}")
             # set it again
             self.set_IO_signalq_nowait(False)
             time.sleep(1)
@@ -847,7 +834,7 @@ class cNIMAX:
 class DevMonExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("DevMonExec initialized.")
+        LOGGER.info("DevMonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 

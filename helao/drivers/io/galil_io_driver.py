@@ -26,11 +26,18 @@ import traceback
 import asyncio
 from typing import Union, Optional, List
 
+
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.make_str_enum import make_str_enum
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import HloStatus
 
 from helao.drivers.io.enum import TriggerType
 
@@ -80,7 +87,7 @@ class Galil:
 
         # if this is the main instance let us make a galil connection
         self.g = gclib.py()
-        self.base.print_message(f"gclib version: {self.g.GVersion()}")
+        LOGGER.info(f"gclib version: {self.g.GVersion()}")
         # TODO: error checking here: Galil can crash an dcarsh program
         galil_ip = self.config_dict.get("galil_ip_str", None)
         self.galil_enabled = None
@@ -93,7 +100,7 @@ class Galil:
                 self.galilprgdownload = self.g.GProgramDownload
                 self.galil_enabled = True
             else:
-                self.base.print_message("no Galil IP configured", error=True)
+                LOGGER.error("no Galil IP configured")
                 self.galil_enabled = False
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -113,7 +120,7 @@ class Galil:
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
 
     async def poll_sensor_loop(self, frequency: int = 4):
-        self.base.print_message("polling background task has started")
+        LOGGER.info("polling background task has started")
         waittime = 1.0 / frequency
         lastupdate = 0
         while True:
@@ -122,7 +129,7 @@ class Galil:
                     status_dict = {}
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
-                        # self.base.print_message("waiting for minimum update interval.")
+                        # LOGGER.info("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     ai_resp = await self.get_analog_in(ai_name)
                     if (
@@ -139,31 +146,31 @@ class Galil:
         pass
 
     async def start_polling(self):
-        self.base.print_message("got 'start_polling' request, raising signal")
+        LOGGER.info("got 'start_polling' request, raising signal")
         async with self.base.aiolock:
             await self.poll_signalq.put(True)
         while not self.polling:
-            self.base.print_message("waiting for polling loop to start")
+            LOGGER.info("waiting for polling loop to start")
             await asyncio.sleep(0.1)
 
     async def stop_polling(self):
-        self.base.print_message("got 'stop_polling' request, raising signal")
+        LOGGER.info("got 'stop_polling' request, raising signal")
         async with self.base.aiolock:
             await self.poll_signalq.put(False)
         while self.polling:
-            self.base.print_message("waiting for polling loop to stop")
+            LOGGER.info("waiting for polling loop to stop")
             await asyncio.sleep(0.1)
 
     async def poll_signal_loop(self):
         while True:
             self.polling = await self.poll_signalq.get()
-            self.base.print_message("polling signal received")
+            LOGGER.info("polling signal received")
 
     async def estop(self, switch: bool, *args, **kwargs):
         # this will estop the io
         # set estop: switch=true
         # release estop: switch=false
-        self.base.print_message("IO Estop")
+        LOGGER.info("IO Estop")
         if switch:
             for ao_name in self.dev_ao.keys():
                 await self.set_digital_out(
@@ -190,7 +197,7 @@ class Galil:
         if ai_name in self.dev_ai:
             ai_port = self.dev_ai[ai_name]
             cmd = f"MG @AN[{int(ai_port)}]"
-            # self.base.print_message(f"cmd: '{cmd}'", info=True)
+            # LOGGER.info(f"cmd: '{cmd}'")
             ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
@@ -210,7 +217,7 @@ class Galil:
         if di_name in self.dev_di:
             di_port = self.dev_di[di_name]
             cmd = f"MG @IN[{int(di_port)}]"
-            # self.base.print_message(f"cmd: '{cmd}'", info=True)
+            # LOGGER.info(f"cmd: '{cmd}'")
             ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
@@ -230,7 +237,7 @@ class Galil:
         if do_name in self.dev_do:
             do_port = self.dev_do[do_name]
             cmd = f"MG @OUT[{int(do_port)}]"
-            # self.base.print_message(f"cmd: '{cmd}'", info=True)
+            # LOGGER.info(f"cmd: '{cmd}'")
             ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
@@ -276,10 +283,10 @@ class Galil:
                 cmd = f"SB {int(do_port)}"
             else:
                 cmd = f"CB {int(do_port)}"
-            # self.base.print_message(f"cmd: '{cmd}'", info=True)
+            # LOGGER.info(f"cmd: '{cmd}'")
             _ = self.galilcmd(cmd)
             cmd = f"MG @OUT[{int(do_port)}]"
-            # self.base.print_message(f"cmd: '{cmd}'", info=True)
+            # LOGGER.info(f"cmd: '{cmd}'")
             ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
@@ -296,7 +303,7 @@ class Galil:
         # self.galilcmd("UL;")  # begin upload
         # upload line by line from DMC_prog
         self.galilprgdownload("DL;")
-        self.base.print_message(f"DMC prg:\n{DMC_prog}", info=True)
+        LOGGER.info(f"DMC prg:\n{DMC_prog}")
         self.galilprgdownload(DMC_prog + "\x00")
 
     async def set_digital_cycle(
@@ -400,9 +407,7 @@ class Galil:
             self.digital_cycle_subthread = [i + 1 for i in range(len(out_ports))]
 
         else:
-            self.base.print_message(
-                "set_digital_cycle parameters are not valid", error=True
-            )
+            LOGGER.error("set_digital_cycle parameters are not valid")
             return {"error_code": ErrorCodes.not_available}
 
         if stop_via_ttl:
@@ -475,25 +480,23 @@ class Galil:
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
-        self.base.print_message("shutting down galil io")
+        LOGGER.info("shutting down galil io")
         self.galil_enabled = False
         try:
             self.g.GClose()
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"could not close galil connection: {repr(e), tb,}", error=True
-            )
+            LOGGER.error(f"could not close galil connection: {repr(e), tb,}")
         return {"shutdown"}
 
 
 class AiMonExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("AiMonExec initialized.")
+        LOGGER.info("AiMonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
-        self.active.base.print_message("AiMonExec init complete.")
+        LOGGER.info("AiMonExec init complete.")
 
     async def _poll(self):
         """Read analog inputs from live buffer."""

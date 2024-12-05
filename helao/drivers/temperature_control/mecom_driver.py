@@ -6,8 +6,13 @@ import logging
 from mecom import MeCom, ResponseException, WrongChecksum
 from mecom.exceptions import ResponseTimeout
 
-from helaocore.error import ErrorCodes
-from helaocore.models.hlostatus import HloStatus
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
 
@@ -53,7 +58,7 @@ class MeerstetterTEC(object):
                 self._connect()
                 break
             except ResponseTimeout:
-                self.base.print_message(f"connection timeout, retrying attempt {i+1}")
+                LOGGER.info(f"connection timeout, retrying attempt {i+1}")
         self.action = None
         self.active = None
         self.start_margin = self.config_dict.get("start_margin", 0)
@@ -139,7 +144,7 @@ class MeerstetterTEC(object):
 
     async def poll_sensor_loop(self, frequency: int = 1):
         waittime = 1.0 / frequency
-        self.base.print_message("Starting polling loop")
+        LOGGER.info("Starting polling loop")
         while True:
             tec_vals = {k: v[0] for k, v in self.get_data().items()}
             if tec_vals:
@@ -151,14 +156,14 @@ class MeerstetterTEC(object):
         try:
             self.polling_task.cancel()
         except asyncio.CancelledError:
-            self.base.print_message("closed TEC polling loop task")
+            LOGGER.info("closed TEC polling loop task")
         self.disable()
 
 
 class TECMonExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("TECMonExec initialized.")
+        LOGGER.info("TECMonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 
@@ -194,7 +199,7 @@ STABLE_ID_MAP = {
 class TECWaitExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("TECWaitExec initialized.")
+        LOGGER.info("TECWaitExec initialized.")
         self.start_time = time.time()
         self.duration = -1
         self.last_check = 0
@@ -202,9 +207,7 @@ class TECWaitExec(Executor):
 
     async def _pre_exec(self):
         "Setup methods, return error state."
-        self.active.base.print_message(
-            f"TECWait Executor sleeping for {self.initial_sleep} seconds."
-        )
+        LOGGER.info(f"TECWait Executor sleeping for {self.initial_sleep} seconds.")
         await asyncio.sleep(self.initial_sleep)
         self.setup_err = ErrorCodes.none
         return {"error": self.setup_err}

@@ -56,16 +56,16 @@ from typing import Optional, List
 from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.sample import SolidSample, LiquidSample
-from helaocore.models.machine import MachineModel
-from helaocore.models.process_contrib import ProcessContrib
+from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.sample import SolidSample, LiquidSample
+from helao.core.models.machine import MachineModel
+from helao.core.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
 
 from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.drivers.robot.pal_driver import Spacingmethod, PALtools
 
-from helaocore.models.run_use import RunUse
+from helao.core.models.run_use import RunUse
 
 
 EXPERIMENTS = __all__

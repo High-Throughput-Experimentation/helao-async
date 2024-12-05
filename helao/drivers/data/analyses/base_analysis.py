@@ -2,13 +2,13 @@ from typing import Optional
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel
-from helaocore.models.analysis import (
+from helao.core.models.analysis import (
     AnalysisOutputModel,
     AnalysisModel,
     AnalysisInput
 )
-from helaocore.models.s3locator import S3Locator
-from helaocore.models.run_use import RunUse
+from helao.core.models.s3locator import S3Locator
+from helao.core.models.run_use import RunUse
 from helao.helpers.set_time import set_time
 from pydasher.serialization import hasher
 

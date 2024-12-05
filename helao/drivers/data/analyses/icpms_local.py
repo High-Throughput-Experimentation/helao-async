@@ -6,8 +6,8 @@ from typing import List
 
 from pydantic import BaseModel
 
-from helaocore.version import get_filehash
-from helaocore.models.analysis import AnalysisDataModel, AnalysisInput
+from helao.core.version import get_filehash
+from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
 
 from .base_analysis import BaseAnalysis
 from ...data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader

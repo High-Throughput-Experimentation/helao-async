@@ -20,10 +20,10 @@ __all__ = [
 from typing import Optional
 from socket import gethostname
 
-from helaocore.models.sample import SolidSample
-from helaocore.models.machine import MachineModel as MM
-from helaocore.models.process_contrib import ProcessContrib
-from helaocore.models.run_use import RunUse
+from helao.core.models.sample import SolidSample
+from helao.core.models.machine import MachineModel as MM
+from helao.core.models.process_contrib import ProcessContrib
+from helao.core.models.run_use import RunUse
 
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker

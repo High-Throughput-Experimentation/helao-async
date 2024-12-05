@@ -13,6 +13,12 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 from bokeh.models import LinearAxis, Range1d
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 from helao.drivers.temperature_control.mecom_driver import DEFAULT_QUERIES
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
@@ -120,7 +126,7 @@ class C_tec:
         self._add_plots()
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(f"'{self.live_key}' Bokeh session closed", info=True)
+        LOGGER.info(f"'{self.live_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -195,9 +201,7 @@ class C_tec:
         self.datasource_table.stream(table_data_dict, rollover=len(keys))
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(
-            f" ... Temperature sensor visualizer subscribing to: {self.data_url}"
-        )
+        LOGGER.info(f" ... Temperature sensor visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()

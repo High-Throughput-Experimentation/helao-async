@@ -20,7 +20,7 @@ __all__ = [
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="hispec_exp_standalone")
+    logger = logging.make_logger(__file__)
 else:
     logger = logging.LOGGER
 
@@ -38,10 +38,10 @@ from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.helpers.spec_map import SPECSRV_MAP
 from helao.drivers.io.enum import TriggerType
 
-from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.machine import MachineModel as MM
-from helaocore.models.process_contrib import ProcessContrib
-from helaocore.models.electrolyte import Electrolyte
+from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.machine import MachineModel as MM
+from helao.core.models.process_contrib import ProcessContrib
+from helao.core.models.electrolyte import Electrolyte
 
 
 EXPERIMENTS = __all__
@@ -95,9 +95,12 @@ def HISPEC_sub_SpEC(
     ] = 0.02,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
     cycles: int = 1,
-    gamry_i_range: str = "auto",
+    # gamry_i_range: str = "auto",
     gamrychannelwait: int = -1,
     gamrychannelsend: int = 0,
+    IRange: str = "m10",
+    ERange: str = "v10",
+    Bandwidth: str = "BW4",
     solution_ph: float = 0,
     ref_vs_nhe: float = 0.21,
     toggle1_source: str = "spec_trig",
@@ -116,11 +119,11 @@ def HISPEC_sub_SpEC(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    CV_duration_sec = abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
-    CV_duration_sec += abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
-    CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * cycles
+    CV_duration_sec = abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec # time from initial to Vertex 1
+    CV_duration_sec += abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec # time from vertex 1 to vertex 2 (imagine for now num scans =1)
+    CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec # time from vertex to to final
     CV_duration_sec += (
-        abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * 2.0 * (cycles - 1)
+        abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * 2.0 * (cycles - 1) # now, if C>1 we have c-1 triangular waveforms inserted after the first vertex 1.
     )
 
     if int(round(toggle1_time)) == -1:
@@ -185,7 +188,9 @@ def HISPEC_sub_SpEC(
             "Cycles": cycles,
             "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": gamry_i_range,
+            "IRange": IRange,
+            "ERange": ERange,
+            "Bandwidth": Bandwidth, 
         },
         # from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_previous,

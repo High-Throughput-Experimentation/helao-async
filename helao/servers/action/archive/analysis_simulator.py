@@ -16,7 +16,7 @@ from helao.servers.base import Base
 from helao.servers.base_api import BaseAPI
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
 

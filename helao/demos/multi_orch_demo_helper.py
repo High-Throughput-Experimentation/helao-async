@@ -10,7 +10,7 @@ core_root = os.path.join(repo_root, "helao-core")
 sys.path.append(async_root)
 sys.path.append(core_root)
 
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.premodels import Sequence
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.dispatcher import private_dispatcher

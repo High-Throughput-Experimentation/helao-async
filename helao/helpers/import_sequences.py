@@ -2,23 +2,24 @@ __all__ = ["import_sequences"]
 
 import os
 import time
+from typing import Optional
 from importlib.machinery import SourceFileLoader
 
 from helao.helpers.print_message import print_message
-from helaocore.version import get_filehash
+from helao.core.version import get_filehash
 
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="import_sequences_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
 def import_sequences(
     world_config_dict: dict,
-    sequence_path: str = None,
+    sequence_path: Optional[str] = None,
     server_name: str = "",
-    user_sequence_path: str = None,
+    user_sequence_path: Optional[str] = None,
 ):
     """Import sequence functions into environment."""
 

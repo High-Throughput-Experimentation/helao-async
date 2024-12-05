@@ -12,6 +12,7 @@ __all__ = ["makeApp"]
 
 import asyncio
 import time
+import itertools
 from typing import Optional, List
 from collections import defaultdict, deque
 
@@ -19,9 +20,9 @@ import numpy as np
 import pandas as pd
 from fastapi import Body, Query
 
-from helaocore.error import ErrorCodes
-from helaocore.models.sample import SampleUnion
-from helaocore.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
+from helao.core.models.sample import SampleUnion
+from helao.core.models.hlostatus import HloStatus
 
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
@@ -42,7 +43,7 @@ from helao.drivers.pstat.gamry.technique import (
 
 global LOGGER
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="gamry_server_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
@@ -85,7 +86,17 @@ class GamryExec(Executor):
             self.ttl_params = {
                 k: self.action_params.get(k, -1) for k in ("TTLwait", "TTLsend")
             }
-
+            self.alert_params = {
+                k: self.action_params.get(k, None)
+                for k in (
+                    "alertThreshEwe_V",
+                    "alertThreshI_A",
+                    "alert_above",
+                    "alert_duration__s",
+                    "alert_sleep__s",
+                )
+            }
+            self.last_alert_time = 0
 
             LOGGER.info("GamryExec initialized.")
         except Exception:
@@ -119,13 +130,83 @@ class GamryExec(Executor):
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
-        resp = self.driver.get_data(self.poll_rate)
-        # populate executor buffer for output calculation
-        for k, v in resp.data.items():
-            self.data_buffer[k].extend(v)
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
-        status = HloStatus.active if resp.message != "done" else HloStatus.finished
-        return {"error": error, "status": status, "data": resp.data}
+        try:
+            resp = self.driver.get_data(self.poll_rate)
+            # populate executor buffer for output calculation
+            for k, v in resp.data.items():
+                self.data_buffer[k].extend(v)
+            # check for alert thresholds at this point in data_buffer
+            poll_iter_time = time.time()
+            if self.alert_params["alert_sleep__s"] is not None:
+                single_alert = (
+                    self.alert_params["alert_sleep__s"] <= 0
+                    and self.last_alert_time == 0
+                )
+                ongoing_alert = self.alert_params["alert_sleep__s"] > 0 and (
+                    poll_iter_time - self.last_alert_time
+                    > self.alert_params["alert_sleep__s"]
+                )
+                if single_alert or ongoing_alert:
+                    LOGGER.debug(
+                        f"single_alert: {single_alert}, ongoing_alert: {ongoing_alert}"
+                    )
+                    min_duration = self.alert_params["alert_duration__s"]
+                    if (
+                        min_duration > 0
+                        and self.data_buffer.get("t_s", [-1])[-1] > min_duration
+                    ):
+                        LOGGER.debug(
+                            f"elapsed time is above min_duration: {min_duration}"
+                        )
+                        time_buffer = self.data_buffer["t_s"]
+                        idx = 1
+                        latest_t = time_buffer[-1]
+                        slice_duration = latest_t - time_buffer[-idx]
+                        while (len(time_buffer) > idx) and (
+                            slice_duration < min_duration
+                        ):
+                            idx += 1
+                            slice_duration = latest_t - time_buffer[-idx]
+                        LOGGER.debug(f"slice index is: {-idx}")
+                        if slice_duration >= min_duration:
+                            LOGGER.debug(
+                                f"slice_duration {slice_duration:.3f} is above min_duration"
+                            )
+                            for thresh_key in ("Ewe_V", "I_A"):
+                                thresh_val = self.alert_params.get(
+                                    f"alertThresh{thresh_key}", None
+                                )
+                                data_dq = self.data_buffer[thresh_key]
+                                slice_vals = list(
+                                    itertools.islice(
+                                        data_dq, len(data_dq) - idx, len(data_dq)
+                                    )
+                                )
+                                if thresh_val is not None:
+                                    if (
+                                        all([x > thresh_val for x in slice_vals])
+                                        and self.alert_params["alert_above"]
+                                    ):
+                                        LOGGER.alert(
+                                            f"{thresh_key} went above {thresh_val} for {min_duration} seconds."
+                                        )
+                                        self.last_alert_time = poll_iter_time
+                                    elif (
+                                        all([x < thresh_val for x in slice_vals])
+                                        and not self.alert_params["alert_above"]
+                                    ):
+                                        LOGGER.alert(
+                                            f"{thresh_key} went below {thresh_val} for {min_duration} seconds."
+                                        )
+                                        self.last_alert_time = poll_iter_time
+            error = (
+                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+            )
+            status = HloStatus.active if resp.message != "done" else HloStatus.finished
+            return {"error": error, "status": status, "data": resp.data}
+        except Exception:
+            LOGGER.error("GamryExec poll error", exc_info=True)
+            return {"error": ErrorCodes.critical, "status": HloStatus.errored}
 
     async def _post_exec(self):
         resp = self.driver.cleanup(self.ttl_params)
@@ -150,8 +231,6 @@ class GamryExec(Executor):
                 amplitude_thresh,
             )
             self.active.action.action_params["has_bubble"] = has_bubble
-        
-        
 
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
         return {"error": error, "data": {}}
@@ -175,7 +254,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_LSV", tags=["action"])
     async def run_LSV(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
         Vfinal__V: float = 1.0,  # Final value in volts or amps.
@@ -196,6 +275,11 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         SetStopAtDelayDIMax: Optional[int] = None,
         SetStopAtDelayADIMin: Optional[int] = None,
         SetStopAtDelayADIMax: Optional[int] = None,
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
+        comment: str = "",
     ):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)
         use 4bit bitmask for triggers
@@ -209,7 +293,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CA", tags=["action"])
     async def run_CA(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
@@ -217,10 +301,23 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        SetStopXMin: Optional[float] = None,  # lower current threshold to trigger early stopping
-        SetStopXMax: Optional[float] = None,  # upper current threshold to trigger early stopping
-        SetStopAtDelayXMin: Optional[int] = None,  # number of consecutive points below SetStopXMin to trigger early stopping
-        SetStopAtDelayXMax: Optional[int] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
+        SetStopXMin: Optional[
+            float
+        ] = None,  # lower current threshold to trigger early stopping
+        SetStopXMax: Optional[
+            float
+        ] = None,  # upper current threshold to trigger early stopping
+        SetStopAtDelayXMin: Optional[
+            int
+        ] = None,  # number of consecutive points below SetStopXMin to trigger early stopping
+        SetStopAtDelayXMax: Optional[
+            int
+        ] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
+        comment: str = "",
     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -235,7 +332,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CP", tags=["action"])
     async def run_CP(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Ival__A: float = 0.0,
         Tval__s: float = 10.0,
@@ -243,10 +340,23 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        SetStopXMin: Optional[float] = None,  # lower potential threshold to trigger early stopping
-        SetStopXMax: Optional[float] = None,  # upper potential threshold to trigger early stopping
-        SetStopAtDelayXMin: Optional[int] = None,  # number of consecutive points below SetStopXMin to trigger early stopping
-        SetStopAtDelayXMax: Optional[int] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
+        SetStopXMin: Optional[
+            float
+        ] = None,  # lower potential threshold to trigger early stopping
+        SetStopXMax: Optional[
+            float
+        ] = None,  # upper potential threshold to trigger early stopping
+        SetStopAtDelayXMin: Optional[
+            int
+        ] = None,  # number of consecutive points below SetStopXMin to trigger early stopping
+        SetStopAtDelayXMax: Optional[
+            int
+        ] = None,  # number of consecutive points above SetStopXMax to trigger early stopping
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshEwe_V: float = 0,
+        comment: str = "",
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -260,7 +370,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CV", tags=["action"])
     async def run_CV(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
         Vapex1__V: float = 1.0,  # Apex 1 value in volts or amps.
@@ -272,10 +382,23 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
-        SetStopIMin: Optional[float] = None,  # lower current threshold to trigger early stopping
-        SetStopIMax: Optional[float] = None,  # upper current threshold to trigger early stopping
-        SetStopAtDelayIMin: Optional[int] = None,  # number of consecutive points below SetStopIMin to trigger early stopping
-        SetStopAtDelayIMax: Optional[int] = None,  # number of consecutive points above SetStopIMax to trigger early stopping
+        SetStopIMin: Optional[
+            float
+        ] = None,  # lower current threshold to trigger early stopping
+        SetStopIMax: Optional[
+            float
+        ] = None,  # upper current threshold to trigger early stopping
+        SetStopAtDelayIMin: Optional[
+            int
+        ] = None,  # number of consecutive points below SetStopIMin to trigger early stopping
+        SetStopAtDelayIMax: Optional[
+            int
+        ] = None,  # number of consecutive points above SetStopIMax to trigger early stopping
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
+        comment: str = "",
     ):
         """Cyclic Voltammetry (most widely used technique
         for acquireing information about electrochemical reactions)
@@ -290,7 +413,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_OCV", tags=["action"])
     async def run_OCV(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
@@ -303,6 +426,11 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         IErange: model_ierange = "auto",
         SetStopADVMin: Optional[float] = None,
         SetStopADVMax: Optional[float] = None,
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshEwe_V: float = 0,
+        comment: str = "",
     ):
         """mesasures open circuit potential
         use 4bit bitmask for triggers
@@ -316,7 +444,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_RCA", tags=["action"])
     async def run_RCA(
         action: Action = Body({}, embed=True),
-        action_version: int = 2,
+        action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
         Vinit__V: float = 0.0,
         Tinit__s: float = 0.5,
@@ -327,6 +455,11 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
+        comment: str = "",
     ):
         """Measure pulsed voltammetry"""
         active = await app.base.setup_and_contain_action()
@@ -424,5 +557,5 @@ def makeApp(confPrefix, server_key, helao_root):
         state = app.driver.pstat.State()
         state = dict([x.split("\t") for x in state.split("\r\n") if x])
         return state
-        
+
     return app

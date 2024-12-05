@@ -44,10 +44,10 @@ from typing import Optional
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.drivers.robot.pal_driver import PALtools
-from helaocore.models.sample import SolidSample, LiquidSample
-from helaocore.models.machine import MachineModel
-from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.process_contrib import ProcessContrib
+from helao.core.models.sample import SolidSample, LiquidSample
+from helao.core.models.machine import MachineModel
+from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
 from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.drivers.io.enum import TriggerType
@@ -1404,8 +1404,8 @@ def ANEC_sub_photo_CV(
 def ANEC_sub_GCLiquid_analysis(
     experiment: Experiment,
     experiment_version: int = 1,
-    # startGC: bool = None,
-    # sampletype: str = None,
+    # startGC: Optional[bool] = None,
+    # sampletype: Optional[str] = None,
     tool: str = "LS 1",
     source_tray: int = 2,
     source_slot: int = 1,
@@ -1459,8 +1459,8 @@ def ANEC_sub_GCLiquid_analysis(
 def ANEC_sub_HPLCLiquid_analysis(
     experiment: Experiment,
     experiment_version: int = 1,
-    # startGC: bool = None,
-    # sampletype: str = None,
+    # startGC: Optional[bool] = None,
+    # sampletype: Optional[str] = None,
     tool: str = "LS 1",
     source_tray: int = 2,
     source_slot: int = 1,

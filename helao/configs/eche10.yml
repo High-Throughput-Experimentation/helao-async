@@ -32,6 +32,7 @@ sequence_params:
   gamrychannelsend: 0
 run_type: echeuvis
 root: C:\INST_hlo
+alert_config_path: K:\users\hte\.credentials\alert_eche10.yml
 servers:
   ORCH:
     host: hte-eche-10.htejcap.caltech.edu
