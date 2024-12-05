@@ -18,19 +18,19 @@ from uuid import UUID
 from helao.helpers.print_message import print_message
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.set_time import set_time
-from helaocore.models.action import ActionModel, ShortActionModel
-from helaocore.models.experiment import (
+from helao.core.models.action import ActionModel, ShortActionModel
+from helao.core.models.experiment import (
     ExperimentModel,
     ShortExperimentModel,
 )
-from helaocore.models.sequence import SequenceModel
-from helaocore.models.hlostatus import HloStatus
-from helaocore.models.action_start_condition import ActionStartCondition
+from helao.core.models.sequence import SequenceModel
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.action_start_condition import ActionStartCondition
 
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="default_premodels")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
@@ -212,8 +212,8 @@ class Experiment(Sequence, ExperimentModel):
         #         "\n----------------------------------",
         #         error=True,
         #     )
-        #     print_message(LOGGER, "experiment", f"samples_in labels: {in_labels}", error=True)
-        #     print_message(LOGGER, "experiment", f"samples_out labels: {out_labels}", error=True)
+        #     LOGGER.error(f"samples_in labels: {in_labels}")
+        #     LOGGER.error(f"samples_out labels: {out_labels}")
 
 
 class Action(Experiment, ActionModel):

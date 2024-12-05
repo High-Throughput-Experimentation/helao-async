@@ -34,6 +34,7 @@ Execution:
     - Starts the Bokeh server with the specified host, port, and application.
     - Optionally launches a browser to display the Bokeh application.
 """
+
 __all__ = []
 
 import sys
@@ -45,6 +46,7 @@ import colorama
 from helao.helpers.print_message import print_message
 from helao.helpers import logging
 from helao.helpers import config_loader
+from helao.helpers.yml_tools import yml_load
 
 global LOGGER
 global CONFIG
@@ -56,33 +58,41 @@ if __name__ == "__main__":
     helao_root = os.path.dirname(os.path.realpath(__file__))
     server_key = sys.argv[2]
     confArg = sys.argv[1]
-    CONFIG = config_loader.config_loader(confArg, helao_root)
-    log_root = os.path.join(CONFIG["root"], "LOGS") if "root" in CONFIG else None
-    if logging.LOGGER is None:
-        logging.LOGGER = logging.make_logger(logger_name=server_key, log_dir=log_root)
-    LOGGER = logging.LOGGER
     if config_loader.CONFIG is None:
-        config_loader.CONFIG = CONFIG
-    C = CONFIG["servers"]
-    S = C[server_key]
-    servHost = S["host"]
-    servPort = S["port"]
-    servPy = S["bokeh"]
-    launch_browser = S.get("params", {}).get("launch_browser", False)
+        config_loader.CONFIG = config_loader.config_loader(confArg, helao_root)
+    CONFIG = config_loader.CONFIG
 
-    makeApp = import_module(f"helao.servers.{S['group']}.{S['bokeh']}").makeBokehApp
+    all_servers_config = CONFIG["servers"]
+    server_config = all_servers_config[server_key]
+    log_root = os.path.join(CONFIG["root"], "LOGS") if "root" in CONFIG else None
+    if CONFIG.get("alert_config_path", False):
+        email_config = yml_load(CONFIG["alert_config_path"])
+    else:
+        email_config = {}
+    if logging.LOGGER is None:
+        logging.LOGGER = logging.make_logger(
+            logger_name=server_key,
+            log_dir=log_root,
+            email_config=email_config,
+            log_level=server_config.get("log_level", CONFIG.get("log_level", 20)),
+        )
+    LOGGER = logging.LOGGER
+    LOGGER.info(f"Loaded config from: {CONFIG['loaded_config_path']}")
+
+    servHost = server_config["host"]
+    servPort = server_config["port"]
+    servPy = server_config["bokeh"]
+    launch_browser = server_config.get("params", {}).get("launch_browser", False)
+
+    makeApp = import_module(
+        f"helao.servers.{server_config['group']}.{server_config['bokeh']}"
+    ).makeBokehApp
     root = CONFIG.get("root", None)
     if root is not None:
         log_root = os.path.join(root, "LOGS")
     else:
         log_root = None
-    print_message(
-        LOGGER,
-        "bokeh_launcher",
-        f" ---- starting  {server_key} ----",
-        log_dir=log_root,
-        info=True,
-    )
+    LOGGER.info(f" ---- starting  {server_key} ----")
 
     bokehapp = Server(
         {
@@ -97,13 +107,7 @@ if __name__ == "__main__":
         address=servHost,
         allow_websocket_origin=[f"{servHost}:{servPort}"],
     )
-    print_message(
-        LOGGER,
-        "bokeh_launcher",
-        f"started {server_key} {bokehapp}",
-        log_dir=log_root,
-        info=True,
-    )
+    LOGGER.info(f"started {server_key} {bokehapp}")
     bokehapp.start()
     if launch_browser:
         bokehapp.io_loop.add_callback(bokehapp.show, f"/{servPy}")

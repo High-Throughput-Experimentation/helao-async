@@ -4,7 +4,7 @@ __all__ = ["Orch"]
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="orch_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
@@ -16,6 +16,7 @@ from uuid import UUID
 import json
 import traceback
 import inspect
+from typing import Optional
 
 import time
 from functools import partial
@@ -27,14 +28,15 @@ import colorama
 from fastapi import WebSocket
 from bokeh.server.server import Server
 
-from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.hlostatus import HloStatus
-from helaocore.models.server import ActionServerModel, GlobalStatusModel
-from helaocore.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
-from helaocore.error import ErrorCodes
+from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.server import ActionServerModel, GlobalStatusModel
+from helao.core.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
+from helao.core.error import ErrorCodes
 
 from helao.servers.operator.bokeh_operator import BokehOperator
 from helao.servers.vis import HelaoVis
+from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
 from helao.helpers.dispatcher import (
@@ -167,8 +169,9 @@ class Orch(Base):
         ping_action_servers(): Pings action servers.
         action_server_monitor(): Monitors action servers.
     """
+    bokehapp: Server
 
-    def __init__(self, fastapp):
+    def __init__(self, fastapp: HelaoFastAPI):
         """
         Initializes the orchestrator server.
 
@@ -261,15 +264,12 @@ class Orch(Base):
             - The exception message and traceback.
             - A message indicating that the E-STOP flag is being set on active actions.
         """
-        self.print_message(f"Got exception from coroutine: {context}", error=True)
+        LOGGER.error(f"Got exception from coroutine: {context}")
         exc = context.get("exception")
-        self.print_message(
-            f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}",
-            error=True,
-        )
-        self.print_message("setting E-STOP flag on active actions")
+        LOGGER.error(f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}")
+        LOGGER.info("setting E-STOP flag on active actions")
         for _, active in self.actives.items():
-            active.set_estop()
+            active.stop_action_task()
 
     def myinit(self):
         """
@@ -379,7 +379,7 @@ class Orch(Base):
             address=servHost,
             allow_websocket_origin=[f"{servHost}:{servPort}"],
         )
-        self.print_message(f"started bokeh server {self.bokehapp}", info=True)
+        LOGGER.info(f"started bokeh server {self.bokehapp}")
         self.bokehapp.start()
         if self.server_params.get("launch_browser", False):
             self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
@@ -441,7 +441,7 @@ class Orch(Base):
         #         self.print_message(
         #             "No interrupt, returning to while loop to check condition."
         #         )
-        #         self.print_message("This message will print again after 10 seconds.")
+        #         LOGGER.info("This message will print again after 10 seconds.")
         #         self.last_interrupt = time.time()
         #     return None
 
@@ -482,7 +482,7 @@ class Orch(Base):
         fails = []
         for serv_key, serv_dict in self.world_cfg["servers"].items():
             if "bokeh" not in serv_dict and "demovis" not in serv_dict:
-                self.print_message(f"trying to subscribe to {serv_key} status")
+                LOGGER.info(f"trying to subscribe to {serv_key} status")
 
                 success = False
                 serv_addr = serv_dict["host"]
@@ -517,22 +517,15 @@ class Orch(Base):
                         await asyncio.sleep(2)
 
                 if success:
-                    self.print_message(
-                        f"Subscribed to {serv_key} at {serv_addr}:{serv_port}"
-                    )
+                    LOGGER.info(f"Subscribed to {serv_key} at {serv_addr}:{serv_port}")
                 else:
                     fails.append(serv_key)
-                    self.print_message(
-                        f"Failed to subscribe to {serv_key} at {serv_addr}:{serv_port}. Check connection."
-                    )
+                    LOGGER.info(f"Failed to subscribe to {serv_key} at {serv_addr}:{serv_port}. Check connection.")
 
         if len(fails) == 0:
             self.init_success = True
         else:
-            self.print_message(
-                "Orchestrator cannot action experiment_dq unless "
-                "all FastAPI servers in config file are accessible."
-            )
+            LOGGER.info("Orchestrator cannot action experiment_dq unless all FastAPI servers in config file are accessible.")
 
     async def update_nonblocking(
         self, actionmodel: Action, server_host: str, server_port: int
@@ -576,9 +569,7 @@ class Orch(Base):
         """
         resp_tups = []
         for server_key, exec_id, server_host, server_port in self.nonblocking:
-            self.print_message(
-                f"Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}"
-            )
+            LOGGER.info(f"Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}")
             # print(server_key, exec_id, server_host, server_port)
             response, error_code = await async_private_dispatcher(
                 server_key=server_key,
@@ -591,7 +582,7 @@ class Orch(Base):
             resp_tups.append((response, error_code))
         return resp_tups
 
-    async def update_status(self, actionservermodel: ActionServerModel = None):
+    async def update_status(self, actionservermodel: Optional[ActionServerModel] = None):
         """
         Asynchronously updates the status of the action server and the global status model.
 
@@ -654,9 +645,7 @@ class Orch(Base):
                 self.globalstatusmodel.orch_state = OrchStatus.idle
             else:
                 self.globalstatusmodel.orch_state = OrchStatus.busy
-                self.print_message(
-                    f"running_states: {self.globalstatusmodel.active_dict}"
-                )
+                LOGGER.info(f"running_states: {self.globalstatusmodel.active_dict}")
 
             # now push it to the interrupt_q
             await self.interrupt_q.put(self.globalstatusmodel)
@@ -679,7 +668,7 @@ class Orch(Base):
         Raises:
             Exception: If an error occurs during the WebSocket communication or subscription handling.
         """
-        self.print_message("got new global status subscriber")
+        LOGGER.info("got new global status subscriber")
         await websocket.accept()
         gs_sub = self.globstat_q.subscribe()
         try:
@@ -687,10 +676,7 @@ class Orch(Base):
                 await websocket.send_text(json.dumps(globstat_msg.as_dict()))
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.print_message(
-                f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
-                warning=True,
-            )
+            LOGGER.warning(f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}")
             if gs_sub in self.globstat_q.subscribers:
                 self.globstat_q.remove(gs_sub)
 
@@ -782,11 +768,9 @@ class Orch(Base):
             ErrorCodes: The error code indicating the result of the operation.
         """
         if self.sequence_dq:
-            self.print_message("getting new sequence from sequence_dq")
+            LOGGER.info("getting new sequence from sequence_dq")
             self.active_sequence = self.sequence_dq.popleft()
-            self.print_message(
-                f"new active sequence is {self.active_sequence.sequence_name}"
-            )
+            LOGGER.info(f"new active sequence is {self.active_sequence.sequence_name}")
             await self.put_lbuf(
                 {
                     self.active_sequence.sequence_uuid: {
@@ -804,7 +788,7 @@ class Orch(Base):
 
             # from global params
             for k, v in self.active_sequence.from_globalexp_params.items():
-                self.print_message(f"{k}:{v}")
+                LOGGER.info(f"{k}:{v}")
                 if k in self.global_params:
                     self.active_sequence.sequence_params[v] = self.global_params[k]
 
@@ -844,23 +828,18 @@ class Orch(Base):
             if self.use_db:
                 try:
                     meta_s3_key = f"sequence/{self.seq_model.sequence_uuid}.json"
-                    self.print_message(
-                        f"uploading initial active sequence json to s3 ({meta_s3_key})"
-                    )
+                    LOGGER.info(f"uploading initial active sequence json to s3 ({meta_s3_key})")
                     await self.syncer.to_s3(
                         self.seq_model.clean_dict(strip_private=True), meta_s3_key
                     )
                 except Exception as e:
-                    self.print_message(
-                        f"Error uploading initial active sequence json to s3: {e}",
-                        error=True,
-                    )
+                    LOGGER.error(f"Error uploading initial active sequence json to s3: {e}")
 
             self.aloop.create_task(self.seq_unpacker())
             await asyncio.sleep(1)
 
         else:
-            self.print_message("sequence queue is empty, cannot start orch loop")
+            LOGGER.info("sequence queue is empty, cannot start orch loop")
 
             self.globalstatusmodel.loop_state = LoopStatus.stopped
             await self.intend_none()
@@ -883,12 +862,12 @@ class Orch(Base):
         Returns:
             ErrorCodes: The error code indicating the result of the operation.
         """
-        self.print_message("action_dq is empty, getting new actions")
+        LOGGER.info("action_dq is empty, getting new actions")
         # wait for all actions in last/active experiment to finish
-        # self.print_message("finishing last active experiment first")
+        # LOGGER.info("finishing last active experiment first")
         # await self.finish_active_experiment()
 
-        # self.print_message("getting new experiment to fill action_dq")
+        # LOGGER.info("getting new experiment to fill action_dq")
         # generate uids when populating,
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
@@ -898,16 +877,14 @@ class Orch(Base):
         self.active_experiment.sequence_uuid = self.active_sequence.sequence_uuid
         self.active_seq_exp_counter += 1
 
-        # self.print_message("copying global vars to experiment")
+        # LOGGER.info("copying global vars to experiment")
         # copy requested global param to experiment params
         for k, v in self.active_experiment.from_globalexp_params.items():
-            self.print_message(f"{k}:{v}")
+            LOGGER.info(f"{k}:{v}")
             if k in self.global_params:
                 self.active_experiment.experiment_params[v] = self.global_params[k]
 
-        self.print_message(
-            f"new active experiment is {self.active_experiment.experiment_name}"
-        )
+        LOGGER.info(f"new active experiment is {self.active_experiment.experiment_name}")
         await self.put_lbuf(
             {
                 self.active_experiment.experiment_uuid: {
@@ -952,14 +929,14 @@ class Orch(Base):
             self.active_experiment.experiment_name
         ]
         if unpacked_acts is None:
-            self.print_message("no actions in experiment", error=True)
+            LOGGER.error("no actions in experiment")
             self.action_dq = zdeque([])
             return ErrorCodes.none
 
         process_order_groups = defaultdict(list)
         process_count = 0
         init_process_uuids = [gen_uuid()]
-        # self.print_message("setting action order")
+        # LOGGER.info("setting action order")
 
         ## actions are not instantiated until experiment is unpacked
         for i, act in enumerate(unpacked_acts):
@@ -990,11 +967,9 @@ class Orch(Base):
             self.active_experiment.process_list = process_list
         # loop through actions again
 
-        # self.print_message("adding unpacked actions to action_dq")
-        self.print_message(f"got: {self.action_dq}")
-        self.print_message(
-            f"optional params: {self.active_experiment.experiment_params}"
-        )
+        # LOGGER.info("adding unpacked actions to action_dq")
+        LOGGER.info(f"got: {self.action_dq}")
+        LOGGER.info(f"optional params: {self.active_experiment.experiment_params}")
 
         # write a temporary exp
         self.exp_model = self.active_experiment.get_exp()
@@ -1002,17 +977,12 @@ class Orch(Base):
         if self.use_db:
             try:
                 meta_s3_key = f"experiment/{self.exp_model.experiment_uuid}.json"
-                self.print_message(
-                    f"uploading initial active experiment json to s3 ({meta_s3_key})"
-                )
+                LOGGER.info(f"uploading initial active experiment json to s3 ({meta_s3_key})")
                 await self.syncer.to_s3(
                     self.exp_model.clean_dict(strip_private=True), meta_s3_key
                 )
             except Exception as e:
-                self.print_message(
-                    f"Error uploading initial active experiment json to s3: {e}",
-                    error=True,
-                )
+                LOGGER.error(f"Error uploading initial active experiment json to s3: {e}")
         return ErrorCodes.none
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
@@ -1053,16 +1023,16 @@ class Orch(Base):
             - If an action dispatch fails, the method stops the orchestrator and re-queues
               the action.
         """
-        # self.print_message("actions in action_dq, processing them")
+        # LOGGER.info("actions in action_dq, processing them")
         if self.globalstatusmodel.loop_intent == LoopIntent.stop:
-            self.print_message("stopping orchestrator")
+            LOGGER.info("stopping orchestrator")
             # monitor status of running action_dq, then end loop
             while self.globalstatusmodel.loop_state != LoopStatus.stopped:
                 # wait for all orch actions to finish first
                 await self.orch_wait_for_all_actions()
                 if self.globalstatusmodel.orch_state == OrchStatus.idle:
                     await self.intend_none()
-                    self.print_message("got stop")
+                    LOGGER.info("got stop")
                     self.globalstatusmodel.loop_state = LoopStatus.stopped
                     break
 
@@ -1070,11 +1040,11 @@ class Orch(Base):
             # clear action queue, forcing next experiment
             self.action_dq.clear()
             await self.intend_none()
-            self.print_message("skipping to next experiment")
+            LOGGER.info("skipping to next experiment")
         elif self.globalstatusmodel.loop_intent == LoopIntent.estop:
             self.action_dq.clear()
             await self.intend_none()
-            self.print_message("estopping")
+            LOGGER.info("estopping")
             self.globalstatusmodel.loop_state = LoopStatus.estopped
         else:
             # all action blocking is handled like preempt,
@@ -1083,12 +1053,10 @@ class Orch(Base):
 
             # see async_action_dispatcher for unpacking
             if A.start_condition == ActionStartCondition.no_wait:
-                self.print_message("orch is dispatching an unconditional action")
+                LOGGER.info("orch is dispatching an unconditional action")
             else:
                 if A.start_condition == ActionStartCondition.wait_for_endpoint:
-                    self.print_message(
-                        "orch is waiting for endpoint to become available"
-                    )
+                    LOGGER.info("orch is waiting for endpoint to become available")
                     endpoint_free = self.globalstatusmodel.endpoint_free(
                         action_server=A.action_server, endpoint_name=A.action_name
                     )
@@ -1098,7 +1066,7 @@ class Orch(Base):
                             action_server=A.action_server, endpoint_name=A.action_name
                         )
                 elif A.start_condition == ActionStartCondition.wait_for_server:
-                    self.print_message("orch is waiting for server to become available")
+                    LOGGER.info("orch is waiting for server to become available")
                     server_free = self.globalstatusmodel.server_free(
                         action_server=A.action_server
                     )
@@ -1108,7 +1076,7 @@ class Orch(Base):
                             action_server=A.action_server
                         )
                 elif A.start_condition == ActionStartCondition.wait_for_orch:
-                    self.print_message("orch is waiting for wait action to end")
+                    LOGGER.info("orch is waiting for wait action to end")
                     wait_free = self.globalstatusmodel.endpoint_free(
                         action_server=A.orchestrator, endpoint_name="wait"
                     )
@@ -1118,7 +1086,7 @@ class Orch(Base):
                             action_server=A.orchestrator, endpoint_name="wait"
                         )
                 elif A.start_condition == ActionStartCondition.wait_for_previous:
-                    self.print_message("orch is waiting for previous action to finish")
+                    LOGGER.info("orch is waiting for previous action to finish")
                     previous_action_active = (
                         self.last_action_uuid
                         in self.globalstatusmodel.active_dict.keys()
@@ -1135,25 +1103,25 @@ class Orch(Base):
                 else:  # unsupported value
                     await self.orch_wait_for_all_actions()
 
-            # self.print_message("copying global vars to action")
+            # LOGGER.info("copying global vars to action")
             # copy requested global param to action params
             for k, v in A.from_globalexp_params.items():
-                self.print_message(f"{k}:{v}")
+                LOGGER.info(f"{k}:{v}")
                 if k in self.global_params:
                     A.action_params[v] = self.global_params[k]
 
             actserv_exists, _ = await endpoints_available([A.url])
             if not actserv_exists:
                 stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
-                self.stop_message = stop_message
+                self.current_stop_message = stop_message
+                LOGGER.warning(stop_message)
                 await self.stop()
+                LOGGER.alert(f"ORCH STOPPED ~ {stop_message}")
                 self.action_dq.insert(0, A)
                 await self.update_operator(True)
                 return ErrorCodes.none
 
-            self.print_message(
-                f"dispatching action {A.action_name} on server {A.action_server.server_name}"
-            )
+            LOGGER.info(f"dispatching action {A.action_name} on server {A.action_server.server_name}")
             # keep running counter of dispatched actions
             A.orch_submit_order = self.globalstatusmodel.counter_dispatched_actions[
                 self.active_experiment.experiment_uuid
@@ -1170,9 +1138,7 @@ class Orch(Base):
                         self.world_cfg, A
                     )
                 except Exception as e:
-                    self.print_message(
-                        f"Error while dispatching action {A.action_name}: {e}"
-                    )
+                    LOGGER.info(f"Error while dispatching action {A.action_name}: {e}")
                     error_code = ErrorCodes.http
 
                 for cond, stop_message in [
@@ -1186,9 +1152,10 @@ class Orch(Base):
                     ),
                 ]:
                     if cond:
-                        self.stop_message = stop_message
+                        self.current_stop_message = stop_message
+                        LOGGER.warning(stop_message)
                         await self.stop()
-                        self.print_message(f"Re-queuing {A.action_name}")
+                        LOGGER.info(f"Re-queuing {A.action_name}")
                         self.action_dq.insert(0, A)
                         await self.update_operator(True)
                         return ErrorCodes.none
@@ -1205,9 +1172,7 @@ class Orch(Base):
                 result_uuid = result_actiondict["action_uuid"]
                 self.last_action_uuid = result_uuid
                 self.track_action_uuid(UUID(result_uuid))
-                self.print_message(
-                    f"Action {A.action_name} dispatched with uuid: {result_uuid}"
-                )
+                LOGGER.info(f"Action {A.action_name} dispatched with uuid: {result_uuid}")
                 self.put_lbuf_nowait(
                     {result_uuid: {"action_name": A.action_name, "status": "active"}}
                 )
@@ -1243,19 +1208,14 @@ class Orch(Base):
                                 self.globalstatusmodel.server_dict[srvkey].endpoints[
                                     actname
                                 ].nonactive_dict[actstat][resuuid] = resmod
-                            except:
-                                self.print_message(
-                                    f"{actstat} not found in globalstatus.nonactive_dict"
-                                )
+                            except Exception:
+                                LOGGER.info(f"{actstat} not found in globalstatus.nonactive_dict", exc_info=True)
 
             try:
                 result_action = Action(**result_actiondict)
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.print_message(
-                    f"returned result is not a valid Action BaseModel: {repr(e), tb,}",
-                    error=True,
-                )
+                LOGGER.error(f"returned result is not a valid Action BaseModel: {repr(e), tb,}")
                 return ErrorCodes.critical
 
             if result_action.error_code is not ErrorCodes.none:
@@ -1283,30 +1243,26 @@ class Orch(Base):
                     # )
                     for k in result_action.to_globalexp_params:
                         if k in result_action.action_params:
-                            self.print_message(f"updating {k} in global vars")
+                            LOGGER.info(f"updating {k} in global vars")
                             self.global_params[k] = result_action.action_params[k]
                         elif k in result_action.action_output:
-                            self.print_message(f"updating {k} in global vars")
+                            LOGGER.info(f"updating {k} in global vars")
                             self.global_params[k] = result_action.action_output[k]
                         else:
-                            self.print_message(
-                                f"key {k} not found in action output or params"
-                            )
+                            LOGGER.info(f"key {k} not found in action output or params")
                 elif isinstance(result_action.to_globalexp_params, dict):
                     # self.print_message(
                     #     f"copying global vars {', '.join(result_action.to_globalexp_params.keys())} back to experiment"
                     # )
                     for k1, k2 in result_action.to_globalexp_params.items():
                         if k1 in result_action.action_params:
-                            self.print_message(f"updating {k2} in global vars")
+                            LOGGER.info(f"updating {k2} in global vars")
                             self.global_params[k2] = result_action.action_params[k1]
                         elif k1 in result_action.action_output:
-                            self.print_message(f"updating {k2} in global vars")
+                            LOGGER.info(f"updating {k2} in global vars")
                             self.global_params[k2] = result_action.action_output[k1]
                         else:
-                            self.print_message(
-                                f"key {k1} not found in action output or params"
-                            )
+                            LOGGER.info(f"key {k1} not found in action output or params")
 
             # # this will recursively call the next no_wait action in queue, and return its error
             # if self.action_dq and not self.step_thru_actions:
@@ -1350,13 +1306,13 @@ class Orch(Base):
         Raises:
             Exception: If an unexpected error occurs during the loop execution.
         """
-        self.print_message("--- started operator orch ---")
-        self.print_message(f"current orch status: {self.globalstatusmodel.orch_state}")
+        LOGGER.info("--- started operator orch ---")
+        LOGGER.info(f"current orch status: {self.globalstatusmodel.orch_state}")
         # clause for resuming paused action list
-        # self.print_message(f"current orch sequences: {list(self.sequence_dq)[:5]}... ({len(self.sequence_dq)})")
-        # self.print_message(f"current orch descisions: {list(self.experiment_dq)[:5]}... ({len(self.experiment_dq)})")
-        # self.print_message(f"current orch actions: {list(self.action_dq)[:5]}... ({len(self.action_dq)})")
-        # self.print_message("--- resuming orch loop now ---")
+        # LOGGER.info(f"current orch sequences: {list(self.sequence_dq)[:5]}... ({len(self.sequence_dq)})")
+        # LOGGER.info(f"current orch descisions: {list(self.experiment_dq)[:5]}... ({len(self.experiment_dq)})")
+        # LOGGER.info(f"current orch actions: {list(self.action_dq)[:5]}... ({len(self.action_dq)})")
+        # LOGGER.info("--- resuming orch loop now ---")
 
         self.globalstatusmodel.loop_state = LoopStatus.started
 
@@ -1364,15 +1320,9 @@ class Orch(Base):
             while self.globalstatusmodel.loop_state == LoopStatus.started and (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):
-                self.print_message(
-                    f"current content of action_dq: {[self.action_dq[i] for i in range(min(len(self.action_dq), 5))]}... ({len(self.action_dq)})"
-                )
-                self.print_message(
-                    f"current content of experiment_dq: {[self.experiment_dq[i] for i in range(min(len(self.experiment_dq), 5))]}... ({len(self.experiment_dq)})"
-                )
-                self.print_message(
-                    f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})"
-                )
+                LOGGER.info(f"current content of action_dq: {[self.action_dq[i] for i in range(min(len(self.action_dq), 5))]}... ({len(self.action_dq)})")
+                LOGGER.info(f"current content of experiment_dq: {[self.experiment_dq[i] for i in range(min(len(self.experiment_dq), 5))]}... ({len(self.experiment_dq)})")
+                LOGGER.info(f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})")
                 # check driver states
                 na_drivers = [
                     k for k, (_, v) in self.status_summary.items() if v == "unknown"
@@ -1380,9 +1330,7 @@ class Orch(Base):
                 if na_drivers:
                     na_driver_retries = 0
                     while na_driver_retries < 5 and na_drivers:
-                        self.print_message(
-                            f"unknown driver states: {', '.join(na_drivers)}, retrying in 5 seconds"
-                        )
+                        LOGGER.info(f"unknown driver states: {', '.join(na_drivers)}, retrying in 5 seconds")
                         await asyncio.sleep(5)
                         na_drivers = [
                             k
@@ -1391,9 +1339,8 @@ class Orch(Base):
                         ]
                         na_driver_retries += 1
                     if na_drivers:
-                        self.current_stop_message = (
-                            f"unknown driver states: {', '.join(na_drivers)}"
-                        )
+                        self.current_stop_message = (f"unknown driver states: {', '.join(na_drivers)}")
+                        LOGGER.warning((f"unknown driver states: {', '.join(na_drivers)}"))
                         await self.stop()
 
                 if (
@@ -1402,7 +1349,7 @@ class Orch(Base):
                 ):
                     await self.estop_loop()
                 elif self.action_dq:
-                    self.print_message("!!!dispatching next action", info=True)
+                    LOGGER.info("!!!dispatching next action")
                     error_code = await self.loop_task_dispatch_action()
                     while (
                         self.last_dispatched_action_uuid
@@ -1411,6 +1358,7 @@ class Orch(Base):
                         await asyncio.sleep(0.2)
                     if self.action_dq and self.step_thru_actions:
                         self.current_stop_message = "Step-thru actions is enabled, use 'Start Orch' to dispatch next action."
+                        LOGGER.warning("Step-thru actions is enabled, use 'Start Orch' to dispatch next action.")
                         await self.stop()
                     elif (
                         not self.action_dq
@@ -1418,6 +1366,7 @@ class Orch(Base):
                         and self.step_thru_experiments
                     ):
                         self.current_stop_message = "Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment."
+                        LOGGER.warning("Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment.")
                         await self.stop()
                     elif (
                         not self.action_dq
@@ -1426,34 +1375,27 @@ class Orch(Base):
                         and self.step_thru_sequences
                     ):
                         self.current_stop_message = "Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence."
+                        LOGGER.warning("Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence.")
                         await self.stop()
                 elif self.experiment_dq:
-                    self.print_message(
-                        "!!!waiting for all actions to finish before dispatching next experiment",
-                        info=True,
-                    )
-                    self.print_message("finishing last experiment")
+                    LOGGER.info("!!!waiting for all actions to finish before dispatching next experiment")
+                    LOGGER.info("finishing last experiment")
                     await self.finish_active_experiment()
-                    self.print_message("!!!dispatching next experiment", info=True)
+                    LOGGER.info("!!!dispatching next experiment")
                     error_code = await self.loop_task_dispatch_experiment()
                 # if no acts and no exps, disptach next sequence
                 elif self.sequence_dq:
-                    self.print_message(
-                        "!!!waiting for all actions to finish before dispatching next sequence",
-                        info=True,
-                    )
-                    self.print_message("finishing last sequence")
+                    LOGGER.info("!!!waiting for all actions to finish before dispatching next sequence")
+                    LOGGER.info("finishing last sequence")
                     await self.finish_active_sequence()
-                    self.print_message("!!!dispatching next sequence", info=True)
+                    LOGGER.info("!!!dispatching next sequence")
                     error_code = await self.loop_task_dispatch_sequence()
                 else:
-                    self.print_message("all queues are empty")
-                    self.print_message("--- stopping operator orch ---", info=True)
+                    LOGGER.info("all queues are empty")
+                    LOGGER.info("--- stopping operator orch ---")
                 # check error responses from dispatching this loop iter
                 if error_code is not ErrorCodes.none:
-                    self.print_message(
-                        f"stopping orch with error code: {error_code}", error=True
-                    )
+                    LOGGER.error(f"stopping orch with error code: {error_code}")
                     await self.intend_estop()
                 await self.update_operator(True)
 
@@ -1463,14 +1405,14 @@ class Orch(Base):
             if (
                 not self.action_dq and self.active_experiment is not None
             ):  # in case of interrupt, don't finish exp
-                self.print_message("finishing final experiment")
+                LOGGER.info("finishing final experiment")
                 await self.finish_active_experiment()
             if (
                 not self.experiment_dq
                 and not self.action_dq
                 and self.active_sequence is not None
             ):  # in case of interrupt, don't finish seq
-                self.print_message("finishing final sequence")
+                LOGGER.info("finishing final sequence")
                 await self.finish_active_sequence()
 
             if self.globalstatusmodel.loop_state != OrchStatus.estopped:
@@ -1480,13 +1422,12 @@ class Orch(Base):
             return True
 
         # except asyncio.CancelledError:
-        #     self.print_message("serious orch exception occurred",error = True)
+        #     LOGGER.info("serious orch exception occurred")
         #     return False
 
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.print_message("serious orch exception occurred", error=True)
-            self.print_message(f"ERROR: {repr(e), tb,}", error=True)
+        except Exception:
+            LOGGER.error("serious orch exception occurred")
+            LOGGER.error("ERROR: ", exc_info=True)
             await self.estop_loop()
             return False
 
@@ -1502,21 +1443,19 @@ class Orch(Base):
             None
         """
 
-        # self.print_message("orch is waiting for all action_dq to finish")
+        # LOGGER.info("orch is waiting for all action_dq to finish")
 
         # some actions are active
         # we need to wait for them to finish
         while not self.globalstatusmodel.actions_idle():
             if time.time() - self.last_interrupt > 10.0:
-                self.print_message(
-                    "some actions are still active, waiting for status update"
-                )
+                LOGGER.info("some actions are still active, waiting for status update")
             # we check again once the active action
             # updates its status again
             await self.wait_for_interrupt()
-            # self.print_message("got status update")
+            # LOGGER.info("got status update")
             # we got a status update
-        # self.print_message("all actions are idle")
+        # LOGGER.info("all actions are idle")
 
     async def start(self):
         """
@@ -1538,9 +1477,9 @@ class Orch(Base):
             ):  # resume actions from a paused run
                 await self.start_loop()
             else:
-                self.print_message("experiment list is empty")
+                LOGGER.info("experiment list is empty")
         else:
-            self.print_message("already running")
+            LOGGER.info("already running")
         self.current_stop_message = ""
         await self.update_operator(True)
 
@@ -1556,14 +1495,12 @@ class Orch(Base):
             Returns:
                 LoopStatus: The current state of the orchestration loop after attempting to start it.
             """
-            self.print_message("starting orch loop")
+            LOGGER.info("starting orch loop")
             self.loop_task = asyncio.create_task(self.dispatch_loop_task())
         elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
-            self.print_message(
-                "E-STOP flag was raised, clear E-STOP before starting.", error=True
-            )
+            LOGGER.error("E-STOP flag was raised, clear E-STOP before starting.")
         else:
-            self.print_message("loop already started.")
+            LOGGER.info("loop already started.")
         return self.globalstatusmodel.loop_state
 
     async def estop_loop(self, reason: str = ""):
@@ -1582,18 +1519,20 @@ class Orch(Base):
             reason (str, optional): An optional reason for the emergency stop. Defaults to an empty string.
         """
         reason_suffix = f"{' ' + reason if reason else ''}"
-        self.print_message("estopping orch" + reason_suffix, error=True)
+        LOGGER.info("estopping orch")
 
         # set globalstatusmodel.loop_state to estop
         self.globalstatusmodel.loop_state = LoopStatus.estopped
 
         # force stop all running actions in the status dict (for this orch)
-        await self.estop_actions(switch=True)
+        await self.estop_actions(switch=False)  # don't latch actionserver model
 
         # reset loop intend
         await self.intend_none()
 
         self.current_stop_message = "E-STOP" + reason_suffix
+        LOGGER.warning("E-STOP" + reason_suffix)
+        LOGGER.alert("ORCH E-STOP")
         await self.update_operator(True)
 
     async def stop_loop(self):
@@ -1619,7 +1558,7 @@ class Orch(Base):
             Exception: If the estop command fails for any action server, an exception is caught and logged.
 
         """
-        self.print_message("estopping all servers", info=True)
+        LOGGER.info("estopping all servers")
 
         # create a dict for current active_experiment
         # (estop happens during the active_experiment)
@@ -1659,19 +1598,13 @@ class Orch(Base):
             )
 
             A = Action(**action_dict)
-            self.print_message(
-                f"Sending estop={switch} request to {actionservermodel.action_server.disp_name()}",
-                info=True,
-            )
+            LOGGER.info(f"Sending estop={switch} request to {actionservermodel.action_server.disp_name()}")
             try:
                 _ = await async_action_dispatcher(self.world_cfg, A)
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 # no estop endpoint for this action server?
-                self.print_message(
-                    f"estop for {actionservermodel.action_server.disp_name()} failed with: {repr(e), tb,}",
-                    error=True,
-                )
+                LOGGER.error(f"estop for {actionservermodel.action_server.disp_name()} failed with: {repr(e), tb,}")
 
     async def skip(self):
         """
@@ -1686,7 +1619,7 @@ class Orch(Base):
         if self.globalstatusmodel.loop_state == LoopStatus.started:
             await self.intend_skip()
         else:
-            self.print_message("orchestrator not running, clearing action queue")
+            LOGGER.info("orchestrator not running, clearing action queue")
             self.action_dq.clear()
 
     async def intend_skip(self):
@@ -1714,9 +1647,9 @@ class Orch(Base):
         if self.globalstatusmodel.loop_state == LoopStatus.started:
             await self.intend_stop()
         elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
-            self.print_message("orchestrator E-STOP flag was raised; nothing to stop")
+            LOGGER.info("orchestrator E-STOP flag was raised; nothing to stop")
         else:
-            self.print_message("orchestrator is not running")
+            LOGGER.info("orchestrator is not running")
 
     async def intend_stop(self):
         """
@@ -1775,7 +1708,7 @@ class Orch(Base):
             None
         """
         # which were estopped first
-        self.print_message("clearing estopped uuids")
+        LOGGER.info("clearing estopped uuids")
         self.globalstatusmodel.clear_in_finished(hlostatus=HloStatus.estopped)
         # release estop for all action servers
         await self.estop_actions(switch=False)
@@ -1796,7 +1729,7 @@ class Orch(Base):
             None
         """
         # currently only resets the error dict
-        self.print_message("clearing errored uuids")
+        LOGGER.info("clearing errored uuids")
         self.globalstatusmodel.clear_in_finished(hlostatus=HloStatus.errored)
         await self.interrupt_q.put("cleared_errored")
 
@@ -1810,7 +1743,7 @@ class Orch(Base):
         Returns:
             None
         """
-        self.print_message("clearing sequence queue")
+        LOGGER.info("clearing sequence queue")
         self.sequence_dq.clear()
 
     async def clear_experiments(self):
@@ -1823,7 +1756,7 @@ class Orch(Base):
         Returns:
             None
         """
-        self.print_message("clearing experiment queue")
+        LOGGER.info("clearing experiment queue")
         self.experiment_dq.clear()
 
     async def clear_actions(self):
@@ -1836,7 +1769,7 @@ class Orch(Base):
         Returns:
             None
         """
-        self.print_message("clearing action queue")
+        LOGGER.info("clearing action queue")
         self.action_dq.clear()
 
     async def add_sequence(self, sequence: Sequence):
@@ -1867,7 +1800,7 @@ class Orch(Base):
         seq: Sequence,
         experimentmodel: Experiment,
         prepend: bool = False,
-        at_index: int = None,
+        at_index: Optional[int] = None,
     ):
         """
         Adds an experiment to the sequence.
@@ -1905,10 +1838,10 @@ class Orch(Base):
             self.experiment_dq.insert(i=at_index, x=D)
         elif prepend:
             self.experiment_dq.appendleft(D)
-            # self.print_message(f"experiment {D.experiment_name} prepended to queue")
+            # LOGGER.info(f"experiment {D.experiment_name} prepended to queue")
         else:
             self.experiment_dq.append(D)
-            # self.print_message(f"experiment {D.experiment_name} appended to queue")
+            # LOGGER.info(f"experiment {D.experiment_name} appended to queue")
         return D.experiment_uuid
 
     def list_sequences(self, limit=10):
@@ -2045,7 +1978,7 @@ class Orch(Base):
             hlostatus=HloStatus.errored,
         )
         if not error_uuids:
-            self.print_message("There are no error statuses to replace")
+            LOGGER.info("There are no error statuses to replace")
         else:
             if check_uuid in error_uuids:
                 EA_act = error_uuids[check_uuid]
@@ -2058,12 +1991,10 @@ class Orch(Base):
                 new_action.action_retry = EA_act.action_retry + 1
                 self.action_dq.appendleft(new_action)
             else:
-                self.print_message(
-                    f"uuid {check_uuid} not found in list of error statuses:"
-                )
-                self.print_message(", ".join(self.error_uuids))
+                LOGGER.info(f"uuid {check_uuid} not found in list of error statuses:")
+                LOGGER.info(", ")
 
-    def remove_experiment(self, by_index: int = None, by_uuid: UUID = None):
+    def remove_experiment(self, by_index: Optional[int] = None, by_uuid: Optional[UUID] = None):
         """
         Removes an experiment from the experiment queue.
 
@@ -2087,18 +2018,16 @@ class Orch(Base):
                 if D.experiment_uuid == by_uuid
             ][0]
         else:
-            self.print_message(
-                "No arguments given for locating existing experiment to remove."
-            )
+            LOGGER.info("No arguments given for locating existing experiment to remove.")
             return None
         del self.experiment_dq[i]
 
     def replace_action(
         self,
         sup_action: Action,
-        by_index: int = None,
-        by_uuid: UUID = None,
-        by_action_order: int = None,
+        by_index: Optional[int] = None,
+        by_uuid: Optional[UUID] = None,
+        by_action_order: Optional[int] = None,
     ):
         """
         Substitute a queued action with a new action.
@@ -2127,9 +2056,7 @@ class Orch(Base):
                 if A.action_order == by_action_order
             ][0]
         else:
-            self.print_message(
-                "No arguments given for locating existing action to replace."
-            )
+            LOGGER.info("No arguments given for locating existing action to replace.")
             return None
         # get action_order of selected action which gets replaced
         current_action_order = self.action_dq[i].action_order
@@ -2215,17 +2142,11 @@ class Orch(Base):
         # we need to wait for all actions to finish first
         await self.orch_wait_for_all_actions()
         while len(self.nonblocking) > 0:
-            self.print_message(
-                f"Stopping non-blocking action executors ({len(self.nonblocking)})"
-            )
+            LOGGER.info(f"Stopping non-blocking action executors ({len(self.nonblocking)})")
             await self.clear_nonblocking()
             await asyncio.sleep(1)
         if self.active_experiment is not None:
-            self.print_message(
-                f"finished exp uuid is: "
-                f"{self.active_experiment.experiment_uuid}, "
-                f"adding matching acts to it"
-            )
+            LOGGER.info(f"finished exp uuid is: {self.active_experiment.experiment_uuid}, adding matching acts to it")
             await self.put_lbuf(
                 {
                     self.active_experiment.experiment_uuid: {
@@ -2356,19 +2277,17 @@ class Orch(Base):
         """
         # handle long waits as a separate task so HTTP timeout doesn't occur
         waittime = active.action.action_params["waittime"]
-        self.print_message(" ... wait action:", waittime)
+        LOGGER.info(" ... wait action:")
         self.current_wait_ts = time.time()
         last_print_time = self.current_wait_ts
         check_time = self.current_wait_ts
         while check_time - self.current_wait_ts < waittime:
             if check_time - last_print_time > print_every_secs - 0.01:
-                self.print_message(
-                    f" ... orch waited {(check_time-self.current_wait_ts):.1f} sec / {waittime:.1f} sec"
-                )
+                LOGGER.info(f" ... orch waited {(check_time-self.current_wait_ts):.1f} sec / {waittime:.1f} sec")
                 last_print_time = check_time
             await asyncio.sleep(0.01)  # 10 msec sleep
             check_time = time.time()
-        self.print_message(" ... wait action done")
+        LOGGER.info(" ... wait action done")
         finished_action = await active.finish()
         self.last_wait_ts = check_time
         return finished_action
@@ -2408,13 +2327,13 @@ class Orch(Base):
                 if active_endpoints:
                     unique_endpoints = list(set(active_endpoints))
                     still_alive, unavail = await endpoints_available(unique_endpoints)
-                if not still_alive:
-                    bad_serves = [x.strip("/".split("/")[-2]) for x, _ in unavail]
-                    self.current_stop_message = (
-                        f"{', '.join(bad_serves)} servers are unavailable"
-                    )
-                    await self.stop()
-                    await self.update_operator(True)
+                    if not still_alive:
+                        bad_serves = [x.strip("/".split("/")[-2]) for x, _ in unavail]
+                        self.current_stop_message = (f"{', '.join(bad_serves)} servers are unavailable")
+                        LOGGER.warning((f"{', '.join(bad_serves)} servers are unavailable"))
+                        await self.stop()
+                        LOGGER.alert(f"ORCH STOPPED ~ {self.current_stop_message}")
+                        await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
 
     async def ping_action_servers(self):

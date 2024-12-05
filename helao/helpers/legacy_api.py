@@ -7,6 +7,11 @@ from typing import Optional
 
 import numpy
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 class HTELegacyAPI:
     def __init__(self, Serv_class):
@@ -32,7 +37,7 @@ class HTELegacyAPI:
         self.els_cache = {}
 
     def get_rcp_plateid(self, plateid: int):
-        self.base.print_message(f" ... get rcp for plateid: {plateid}")
+        LOGGER.info(f" ... get rcp for plateid: {plateid}")
         return None
 
     def get_info_plateid(self, plateid: int):
@@ -43,13 +48,11 @@ class HTELegacyAPI:
 
             # 2. gets the elements from the screening print in the info file (see getelements_plateid()) and presents them to user
             elements = self.get_elements_plateid(plateid)
-            self.base.print_message(f" ... Elements: {elements}")
+            LOGGER.info(f" ... Elements: {elements}")
 
             # 3. checks that a print and anneal record exist in the info file
             if "prints" not in infod or "anneals" not in infod:
-                self.base.print_message(
-                    "Warning: no print or anneal record exists", warning=True
-                )
+                LOGGER.warning("Warning: no print or anneal record exists")
 
             # 4. gets platemap and passes to alignment code
             # pmpath=getplatemappath_plateid(plateid, return_pmidstr=True)
@@ -234,23 +237,21 @@ class HTELegacyAPI:
             p, pmidstr = self.pmpath_pid_cache[plateid]
         else:
             pmfold = self.tryprependpath(self.PLATEMAPFOLDERS, "")
-            self.base.print_message(f"PM folder is {pmfold}", info=True)
+            LOGGER.info(f"PM folder is {pmfold}")
             p = None
             if pmidstr is None:
                 pmidstr = ""
                 infop = self.getinfopath_plateid(plateid)
                 if infop is None:
-                    self.base.print_message("getinfopath_plateid returned None", info=True)
+                    LOGGER.info("getinfopath_plateid returned None")
                     if erroruifcn is not None:
                         p = erroruifcn("", self.tryprependpath(self.PLATEMAPFOLDERS, ""))
                     return (p, pmidstr) if return_pmidstr else p
-                self.base.print_message(f"reading {infop}", info=True)
+                LOGGER.info(f"reading {infop}")
                 with open(infop, mode="r") as f:
                     s = f.read(1000)
                 if pmfold == "" or (infokey not in s and "prints" not in s):
-                    self.base.print_message(
-                        "PM folder is '' or info has no print.", info=True
-                    )
+                    LOGGER.info("PM folder is '' or info has no print.")
                     if erroruifcn is not None:
                         p = erroruifcn("", self.tryprependpath(self.PLATEMAPFOLDERS, ""))
                     return (p, pmidstr) if return_pmidstr else p
@@ -472,10 +473,7 @@ class HTELegacyAPI:
             if (
                 "," not in s[s.find("(") : s.find(")")]
             ):  # needed because sometimes x,y in fiducials is comma delim and sometimes not
-                self.base.print_message(
-                    "WARNING: commas inserted into fiducials line to adhere to format.",
-                    warning=True,
-                )
+                LOGGER.warning("WARNING: commas inserted into fiducials line to adhere to format.")
                 self.base.print_message(s)
                 s = (
                     s.replace(

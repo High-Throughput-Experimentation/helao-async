@@ -7,7 +7,7 @@ __all__ = ["makeApp"]
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="kinesis_server_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
@@ -25,9 +25,9 @@ from helao.drivers.motion.kinesis_driver import (
 )
 from helao.helpers.config_loader import config_loader
 
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.executor import Executor
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import HloStatus
 
 
 class KinesisMotorExec(Executor):

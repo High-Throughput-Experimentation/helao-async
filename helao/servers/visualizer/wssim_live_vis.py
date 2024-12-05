@@ -12,6 +12,12 @@ from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+    
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
@@ -113,7 +119,7 @@ class C_simlivevis:
         self._add_plots()
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(f"'{self.live_key}' Bokeh session closed", info=True)
+        LOGGER.info(f"'{self.live_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -189,7 +195,7 @@ class C_simlivevis:
             self.datasource_table.stream(table_data_dict, rollover=len(keys))
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(" ... Live visualizer receiving messages.")
+        LOGGER.info(" ... Live visualizer receiving messages.")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()

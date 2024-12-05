@@ -23,19 +23,26 @@ import json
 import os
 from socket import gethostname
 from copy import deepcopy
+from typing import Optional
 import traceback
 
 
 from bokeh.server.server import Server
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+    
 from helao.servers.base import Base
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.premodels import Action
 from helao.servers.vis import HelaoVis
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.helpers.active_params import ActiveParams
-from helaocore.models.file import FileConnParams
-from helaocore.models.sample import SolidSample
+from helao.core.models.file import FileConnParams
+from helao.core.models.sample import SolidSample
 
 from helao.layouts.aligner import Aligner
 from helao.drivers.motion.enum import MoveModes, TransformationModes
@@ -73,9 +80,7 @@ class Galil:
             self.plate_transfermatrix = self.dflt_matrix
 
         self.save_transfermatrix(file=self.file_backup_transfermatrix)
-        self.base.print_message(
-            f"plate_transfermatrix is: \n{self.plate_transfermatrix}", info=True
-        )
+        LOGGER.info(f"plate_transfermatrix is: \n{self.plate_transfermatrix}")
 
         self.M_instr = None
         Mplate = self.load_transfermatrix(
@@ -90,9 +95,7 @@ class Galil:
             self.M_instr = self.convert_Mplate_to_Minstr(Mplate=Mplate.tolist())
 
         if self.M_instr is None:
-            self.base.print_message(
-                "Did not find refernce plate, loading Minstr from config"
-            )
+            LOGGER.info("Did not find refernce plate, loading Minstr from config")
 
             self.M_instr = self.config_dict.get(
                 "M_instr",
@@ -103,7 +106,7 @@ class Galil:
                     [0, 0, 0, 1],
                 ],
             )
-        self.base.print_message(f"Minstr is: {self.M_instr}", info=True)
+        LOGGER.info(f"Minstr is: {self.M_instr}")
 
         self.motor_timeout = self.config_dict.get("timeout", 60)
         self.motor_max_speed_count_sec = self.config_dict.get(
@@ -124,7 +127,7 @@ class Galil:
 
         # if this is the main instance let us make a galil connection
         self.g = gclib.py()
-        self.base.print_message(f"gclib version: {self.g.GVersion()}")
+        LOGGER.info(f"gclib version: {self.g.GVersion()}")
         # TODO: error checking here: Galil can crash an dcarsh program
         galil_ip = self.config_dict.get("galil_ip_str", None)
         self.galil_enabled = None
@@ -151,21 +154,21 @@ class Galil:
                 ]
                 for axl in self.axis_id.values():
                     cmd = f"MG _MO{axl}"
-                    self.base.print_message(f"init axis {axl}: {cmd}", info=True)
+                    LOGGER.info(f"init axis {axl}: {cmd}")
                     q = self.galilcmd(cmd)
-                    self.base.print_message(f"Motor off?: {q} {float(q)==1}")
+                    LOGGER.info(f"Motor off?: {q} {float(q)==1}")
                     if float(q) == 1:
                         cmd = f"SH{axl}"
-                        self.base.print_message(f"init axis {axl}: {cmd}", info=True)
+                        LOGGER.info(f"init axis {axl}: {cmd}")
                         self.galilcmd(cmd)
                     for ac, av in axis_init:
                         cmd = f"{ac}{axl}={av}"
-                        self.base.print_message(f"init axis {axl}: {cmd}", info=True)
+                        LOGGER.info(f"init axis {axl}: {cmd}")
                         self.galilcmd(cmd)
 
                 self.galil_enabled = True
             else:
-                self.base.print_message("no Galil IP configured", error=True)
+                LOGGER.error("no Galil IP configured")
                 self.galil_enabled = False
         except Exception as e:
             tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -218,7 +221,7 @@ class Galil:
             address=servHost,
             allow_websocket_origin=[f"{servHost}:{servPort}"],
         )
-        self.base.print_message(f"started bokeh server {self.bokehapp}", info=True)
+        LOGGER.info(f"started bokeh server {self.bokehapp}")
         self.bokehapp.start()
         # self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
 
@@ -238,7 +241,7 @@ class Galil:
             return "error"
 
         axis = self.get_all_axis()
-        self.base.print_message(f"axis: {axis}")
+        LOGGER.info(f"axis: {axis}")
         if "Rx" in axis:
             axis.remove("Rx")
         if "Ry" in axis:
@@ -246,7 +249,7 @@ class Galil:
         if "Rz" in axis:
             axis.remove("Rz")
         #            axis.pop(axis.index('Rz'))
-        self.base.print_message(f"axis: {axis}")
+        LOGGER.info(f"axis: {axis}")
 
         if axis is not None:
             # go slow to find the same position every time
@@ -288,14 +291,14 @@ class Galil:
 
             # set absolute zero to current position
             q = self.galilcmd("TP")  # query position of all axis
-            # self.base.print_message(f"q1: {q}")
+            # LOGGER.info(f"q1: {q}")
             cmd = "DP "
             for i in range(len(q.split(","))):
                 if i == 0:
                     cmd += "0"
                 else:
                     cmd += ",0"
-            # self.base.print_message(f"cmd: {cmd}")
+            # LOGGER.info(f"cmd: {cmd}")
 
             # sets abs zero here
             _ = self.galilcmd(cmd)
@@ -405,7 +408,7 @@ class Galil:
 
         # need to get absolute motor position first
         tmpmotorpos = await self.query_axis_position(axis=self.get_all_axis())
-        self.base.print_message(f"current absolute motor positions: {tmpmotorpos}")
+        LOGGER.info(f"current absolute motor positions: {tmpmotorpos}")
         # don't use dicts as we do math on these vectors
         # x, y, z, Rx, Ry, Rz
         current_positionvec = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -414,7 +417,7 @@ class Galil:
         req_positionvec = [None, None, None, None, None, None]
 
         reqdict = dict(zip(axis, d_mm))
-        self.base.print_message(f"requested position ({mode}): {reqdict}")
+        LOGGER.info(f"requested position ({mode}): {reqdict}")
 
         for idx, ax in enumerate(["x", "y", "z", "Rx", "Ry", "Rz"]):
             if ax in tmpmotorpos["ax"]:
@@ -426,26 +429,20 @@ class Galil:
                 if ax in reqdict:
                     req_positionvec[idx] = reqdict[ax]
 
-        self.base.print_message(f"motor position vector: {current_positionvec[0:3]}")
-        self.base.print_message(f"requested position vector ({mode}) {req_positionvec}")
+        LOGGER.info(f"motor position vector: {current_positionvec[0:3]}")
+        LOGGER.info(f"requested position vector ({mode}) {req_positionvec}")
 
         if transformation == TransformationModes.motorxy:
             # nothing to do
-            self.base.print_message(
-                f"motion: got motorxy ({mode}), no transformation necessary"
-            )
+            LOGGER.info(f"motion: got motorxy ({mode}), no transformation necessary")
         elif transformation == TransformationModes.platexy:
-            self.base.print_message(
-                f"motion: got platexy ({mode}), converting to motorxy"
-            )
+            LOGGER.info(f"motion: got platexy ({mode}), converting to motorxy")
             motorxy = [0, 0, 1]
             motorxy[0] = current_positionvec[0]
             motorxy[1] = current_positionvec[1]
             current_platexy = self.transform.transform_motorxy_to_platexy(motorxy)
             # transform.transform_motorxyz_to_instrxyz(current_positionvec[0:3])
-            self.base.print_message(
-                f"current plate position (calc from motor): {current_platexy}"
-            )
+            LOGGER.info(f"current plate position (calc from motor): {current_platexy}")
             if mode == MoveModes.relative:
                 new_platexy = [0, 0, 1]
 
@@ -459,9 +456,9 @@ class Galil:
                 else:
                     new_platexy[1] = current_platexy[1]
 
-                self.base.print_message(f"new platexy (abs): {new_platexy}")
+                LOGGER.info(f"new platexy (abs): {new_platexy}")
                 new_motorxy = self.transform.transform_platexy_to_motorxy(new_platexy)
-                self.base.print_message(f"new motorxy (abs): {new_motorxy}")
+                LOGGER.info(f"new motorxy (abs): {new_motorxy}")
                 axis = ["x", "y"]
                 d_mm = [d for d in new_motorxy[0:2]]
                 mode = MoveModes.absolute
@@ -478,9 +475,9 @@ class Galil:
                 else:
                     new_platexy[1] = current_platexy[1]
 
-                self.base.print_message(f"new platexy (abs): {new_platexy}")
+                LOGGER.info(f"new platexy (abs): {new_platexy}")
                 new_motorxy = self.transform.transform_platexy_to_motorxy(new_platexy)
-                self.base.print_message(f"new motorxy (abs): {new_motorxy}")
+                LOGGER.info(f"new motorxy (abs): {new_motorxy}")
                 axis = ["x", "y"]
                 d_mm = [d for d in new_motorxy[0:2]]
 
@@ -495,16 +492,12 @@ class Galil:
                 if ax == "y":
                     xyvec[1] = d_mm[1]
         elif transformation == TransformationModes.instrxy:
-            self.base.print_message(f"mode: {mode}")
-            self.base.print_message(
-                f"motion: got instrxyz ({mode}), converting to motorxy"
-            )
+            LOGGER.info(f"mode: {mode}")
+            LOGGER.info(f"motion: got instrxyz ({mode}), converting to motorxy")
             current_instrxyz = self.transform.transform_motorxyz_to_instrxyz(
                 current_positionvec[0:3]
             )
-            self.base.print_message(
-                f"current instrument position (calc from motor): {current_instrxyz}"
-            )
+            LOGGER.info(f"current instrument position (calc from motor): {current_instrxyz}")
             if mode == MoveModes.relative:
                 new_instrxyz = current_instrxyz
                 for i in range(3):
@@ -512,14 +505,12 @@ class Galil:
                         new_instrxyz[i] = new_instrxyz[i] + req_positionvec[i]
                     else:
                         new_instrxyz[i] = new_instrxyz[i]
-                self.base.print_message(
-                    f"new instrument position (abs): {new_instrxyz}"
-                )
+                LOGGER.info(f"new instrument position (abs): {new_instrxyz}")
                 # transform from instrxyz to motorxyz
                 new_motorxyz = self.transform.transform_instrxyz_to_motorxyz(
                     new_instrxyz[0:3]
                 )
-                self.base.print_message(f"new motor position (abs): {new_motorxyz}")
+                LOGGER.info(f"new motor position (abs): {new_motorxyz}")
                 axis = ["x", "y", "z"]
                 d_mm = [d for d in new_motorxyz[0:3]]
                 mode = MoveModes.absolute
@@ -530,21 +521,19 @@ class Galil:
                         new_instrxyz[i] = req_positionvec[i]
                     else:
                         new_instrxyz[i] = new_instrxyz[i]
-                self.base.print_message(
-                    f"new instrument position (abs): {new_instrxyz}"
-                )
+                LOGGER.info(f"new instrument position (abs): {new_instrxyz}")
                 new_motorxyz = self.transform.transform_instrxyz_to_motorxyz(
                     new_instrxyz[0:3]
                 )
-                self.base.print_message(f"new motor position (abs): {new_motorxyz}")
+                LOGGER.info(f"new motor position (abs): {new_motorxyz}")
                 axis = ["x", "y", "z"]
                 d_mm = [d for d in new_motorxyz[0:3]]
             elif mode == MoveModes.homing:
                 # not coordinate conversoion needed as these are not used (but length is still checked)
                 pass
 
-        self.base.print_message(f"final axis requested: {axis}")
-        self.base.print_message(f"final d ({mode}) requested: {d_mm}")
+        LOGGER.info(f"final axis requested: {axis}")
+        LOGGER.info(f"final d ({mode}) requested: {d_mm}")
 
         # return value arrays for multi axis movement
         ret_moved_axis = []
@@ -573,9 +562,7 @@ class Galil:
         # remove not configured axis
         for ax in deepcopy(axis):
             if ax not in self.axis_id:
-                self.base.print_message(
-                    f"'{ax}' is not in '{self.axis_id}', removing it.", info=True
-                )
+                LOGGER.info(f"'{ax}' is not in '{self.axis_id}', removing it.")
                 axis.pop(axis.index(ax))
 
         # TODO: if same axis is moved twice
@@ -606,9 +593,7 @@ class Galil:
             # recalculate the distance in mm into distance in counts
             # if 1:
             try:
-                self.base.print_message(
-                    f"count_to_mm: {axl}, {self.config_dict['count_to_mm'][axl]}"
-                )
+                LOGGER.info(f"count_to_mm: {axl}, {self.config_dict['count_to_mm'][axl]}")
                 float_counts = (
                     d / self.config_dict["count_to_mm"][axl]
                 )  # calculate float dist from steupd
@@ -630,9 +615,7 @@ class Galil:
                 self._speed = speed
             except Exception as e:
                 tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message(
-                    f"motor numerical error for axis '{ax}': {repr(e), tb,}", error=True
-                )
+                LOGGER.error(f"motor numerical error for axis '{ax}': {repr(e), tb,}")
                 # something went wrong in the numerical part so we give that as feedback
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
@@ -669,7 +652,7 @@ class Galil:
                 timeofmove.append(abs(counts / speed))
 
                 # ret = ""
-                # self.base.print_message(f"BUGCHECK: {cmd_seq}")
+                # LOGGER.info(f"BUGCHECK: {cmd_seq}")
                 # BUG
                 # TODO
                 # it can happen that it crashes below for some reasons
@@ -677,7 +660,7 @@ class Galil:
                 for cmd in cmd_seq:
                     _ = self.galilcmd(cmd)
                     # ret.join(_)
-                # self.base.print_message(f"Galil cmd: {cmd_seq}")
+                # LOGGER.info(f"Galil cmd: {cmd_seq}")
                 ret_moved_axis.append(axl)
                 ret_speed.append(speed)
                 ret_accepted_rel_dist.append(None)
@@ -690,7 +673,7 @@ class Galil:
                 # continue
             except Exception as e:
                 tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message(f"motor error: '{repr(e), tb,}'", error=True)
+                LOGGER.error(f"motor error: '", exc_info=True)
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
                 ret_accepted_rel_dist.append(None)
@@ -701,7 +684,7 @@ class Galil:
                 continue
 
         # get max time until all axis are expected to have stopped
-        self.base.print_message(f"timeofmove: {timeofmove}")
+        LOGGER.info(f"timeofmove: {timeofmove}")
         if len(timeofmove) > 0:
             tmax = max(timeofmove)
             if tmax > 30 * 60:
@@ -710,7 +693,7 @@ class Galil:
             tmax = 0
 
         # wait for expected axis move time before checking if axis stoppped
-        self.base.print_message(f"axis expected to stop in {tmax} sec")
+        LOGGER.info(f"axis expected to stop in {tmax} sec")
 
         if not self.base.actionservermodel.estop:
 
@@ -734,7 +717,7 @@ class Galil:
                 for erridx, err_code in enumerate(ret_err_code):
                     if qmove["err_code"][erridx] != ErrorCodes.none:
                         newret_err_code.append(ErrorCodes.timeout)
-                        self.base.print_message("motor timeout error", error=True)
+                        LOGGER.error("motor timeout error")
                     else:
                         newret_err_code.append(err_code)
 
@@ -776,7 +759,7 @@ class Galil:
         # server example:
         # http://127.0.0.1:8000/motor/query/position?axis=x
         if not self.galil_enabled:
-            self.base.print_message("Galil is disabled", error=True)
+            LOGGER.error("Galil is disabled")
             return {"ax": [], "position": []}
         # convert single axis move to list
         if not isinstance(axis, list):
@@ -785,7 +768,7 @@ class Galil:
         # first get the relative position (actual only the current position of the encoders)
         # to get how many axis are present
         qTP = self.galilcmd("TP")  # query position of all axis
-        self.base.print_message(f"q (TP): {qTP}")
+        LOGGER.info(f"q (TP): {qTP}")
         cmd = "PA "
         for i in range(len(qTP.split(","))):
             if i == 0:
@@ -795,7 +778,7 @@ class Galil:
         q = self.galilcmd(cmd)  # query position of all axis
         # _ = self.galilcmd("PF 10.4")  # set format
         # q = self.galilcmd("TP")  # query position of all axis
-        self.base.print_message(f"q (PA): {q}")
+        LOGGER.info(f"q (PA): {q}")
         # now we need to map these outputs to the ABCDEFG... channels
         # and then map that to xyz so it is humanly readable
         axlett = "ABCDEFGH"
@@ -833,7 +816,7 @@ class Galil:
     async def query_axis_moving(self, axis, *args, **kwargs):
         # this functions queries the status of the axis
         if not self.galil_enabled:
-            self.base.print_message("Galil is disabled", error=True)
+            LOGGER.error("Galil is disabled")
             return {"motor_status": [], "err_code": ErrorCodes.not_available}
 
         q = self.galilcmd("SC")
@@ -892,7 +875,7 @@ class Galil:
         # this will estop the axis
         # set estop: switch=true
         # release estop: switch=false
-        self.base.print_message("Axis Estop")
+        LOGGER.info("Axis Estop")
         if switch == True:
             await self.stop_axis(self.get_all_axis())
             await self.motor_off(self.get_all_axis())
@@ -991,17 +974,13 @@ class Galil:
                 cmd = f"MG _MO{axl}"
                 q = self.galilcmd(cmd)
                 if float(q) == 1:
-                    self.base.print_message(
-                        f"turning on motor for axis '{axl}' ", error=True
-                    )
+                    LOGGER.error(f"turning on motor for axis '{axl}' ")
                     cmd_seq = [f"ST{axl}", f"SH{axl}"]
 
                     for cmd in cmd_seq:
                         _ = self.galilcmd(cmd)
                 else:
-                    self.base.print_message(
-                        f"motor for axis '{axl}' is already on", error=True
-                    )
+                    LOGGER.error(f"motor for axis '{axl}' is already on")
 
         ret = await self.query_axis_moving(axis=axis)
         ret.update(await self.query_axis_position(axis=axis))
@@ -1015,17 +994,15 @@ class Galil:
         # or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
         # self.stop_axis(self.get_all_axis())
-        self.base.print_message("shutting down galil motion")
+        LOGGER.info("shutting down galil motion")
         self.galil_enabled = False
         try:
-            # self.base.print_message("turning all motors off", info = True)
+            # LOGGER.info("turning all motors off")
             # self.motor_off_shutdown(axis = self.get_all_axis())
             self.g.GClose()
         except Exception as e:
             tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"could not close galil connection: {repr(e), tb,}", error=True
-            )
+            LOGGER.error(f"could not close galil connection: {repr(e), tb,}")
         if self.aligner_enabled and self.aligner:
             self.aligner.IOtask.cancel()
         return {"shutdown"}
@@ -1037,9 +1014,7 @@ class Galil:
     def save_transfermatrix(self, file):
         if file is not None:
             filedir, filename = os.path.split(file)
-            self.base.print_message(
-                f"saving calib '{filename}' to '{filedir}'", info=True
-            )
+            LOGGER.info(f"saving calib '{filename}' to '{filedir}'")
             if not os.path.exists(filedir):
                 os.makedirs(filedir, exist_ok=True)
 
@@ -1053,22 +1028,18 @@ class Galil:
                     data = f.readline()
                     new_matrix = np.matrix(json.loads(data))
                     if new_matrix.shape != self.dflt_matrix.shape:
-                        self.base.print_message(
-                            f"matrix \n'{new_matrix}' has wrong shape", error=True
-                        )
+                        LOGGER.error(f"matrix \n'{new_matrix}' has wrong shape")
                         return None
                     else:
-                        self.base.print_message(f"loaded matrix \n'{new_matrix}'")
+                        LOGGER.info(f"loaded matrix \n'{new_matrix}'")
                         return new_matrix
 
                 except Exception as e:
                     tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-                    self.base.print_message(
-                        f"error loading matrix for '{file}': {repr(e), tb,}", error=True
-                    )
+                    LOGGER.error(f"error loading matrix for '{file}': {repr(e), tb,}")
                     return None
         else:
-            self.base.print_message(f"matrix file '{file}' not found", error=True)
+            LOGGER.error(f"matrix file '{file}' not found")
             return None
 
     def update_plate_transfermatrix(self, newtransfermatrix):
@@ -1083,16 +1054,13 @@ class Galil:
         self.plate_transfermatrix = matrix
         self.transform.update_Mplatexy(Mxy=self.plate_transfermatrix)
         self.save_transfermatrix(file=self.file_backup_transfermatrix)
-        self.base.print_message(
-            f"updated plate_transfermatrix is: \n{self.plate_transfermatrix}",
-            info=True,
-        )
+        LOGGER.info(f"updated plate_transfermatrix is: \n{self.plate_transfermatrix}")
         return self.plate_transfermatrix
 
     def reset_plate_transfermatrix(self):
         self.update_plate_transfermatrix(newtransfermatrix=self.dflt_matrix)
 
-    async def solid_get_platemap(self, plate_id: int = None, **kwargs) -> dict:
+    async def solid_get_platemap(self, plate_id: Optional[int] = None, **kwargs) -> dict:
         return {
             "platemap": await self.unified_db.get_platemap(
                 [SolidSample(plate_id=plate_id)]
@@ -1101,8 +1069,8 @@ class Galil:
 
     async def solid_get_samples_xy(
         self,
-        plate_id: int = None,
-        sample_no: int = None,
+        plate_id: Optional[int] = None,
+        sample_no: Optional[int] = None,
         **kwargs,
     ) -> dict:
         return {
@@ -1151,8 +1119,8 @@ class TransformXY:
             platexy = np.insert(platexy, 2, 0)
         # for _ in range(4-len(platexy)):
         #     platexy = np.append(platexy,1)
-        # self.base.print_message(" ... M:\n", self.M)
-        # self.base.print_message(" ... xy:", platexy)
+        # LOGGER.info(" ... M:\n")
+        # LOGGER.info(" ... xy:")
         motorxy = np.dot(self.M, platexy)
         motorxy = np.delete(motorxy, 2)
         motorxy = np.array(motorxy)[0]
@@ -1168,8 +1136,8 @@ class TransformXY:
             motorxy = np.insert(motorxy, 2, 1)
         if len(motorxy) == 3:
             motorxy = np.insert(motorxy, 2, 0)
-        # self.base.print_message(" ... Minv:\n", self.Minv)
-        # self.base.print_message(" ... xy:", motorxy)
+        # LOGGER.info(" ... Minv:\n")
+        # LOGGER.info(" ... xy:")
         platexy = np.dot(self.Minv, motorxy)
         platexy = np.delete(platexy, 2)
         platexy = np.array(platexy)[0]
@@ -1181,8 +1149,8 @@ class TransformXY:
         if len(motorxyz) == 3:
             # append 1 at end
             motorxyz = np.append(motorxyz, 1)
-        # self.base.print_message(" ... Minstrinv:\n", self.Minstrinv)
-        # self.base.print_message(" ... xyz:", motorxyz)
+        # LOGGER.info(" ... Minstrinv:\n")
+        # LOGGER.info(" ... xyz:")
         instrxyz = np.dot(self.Minstrinv, motorxyz)
         return np.array(instrxyz)[0]
 
@@ -1191,8 +1159,8 @@ class TransformXY:
         instrxyz = np.asarray(instrxyz)
         if len(instrxyz) == 3:
             instrxyz = np.append(instrxyz, 1)
-        # self.base.print_message(" ... Minstr:\n", self.Minstr)
-        # self.base.print_message(" ... xyz:", instrxyz)
+        # LOGGER.info(" ... Minstr:\n")
+        # LOGGER.info(" ... xyz:")
 
         motorxyz = np.dot(self.Minstr, instrxyz)
         return np.array(motorxyz)[0]
@@ -1297,21 +1265,21 @@ class TransformXY:
         """returns Mx part of Minstr"""
         Mx = np.asmatrix(np.identity(4))
         Mx[0, 0:4] = self.Minstrxyz[0, 0:4]
-        # self.base.print_message(" ... Mx", Mx)
+        # LOGGER.info(" ... Mx")
         return Mx
 
     def My(self):
         """returns My part of Minstr"""
         My = np.asmatrix(np.identity(4))
         My[1, 0:4] = self.Minstrxyz[1, 0:4]
-        # self.base.print_message(" ... My", My)
+        # LOGGER.info(" ... My")
         return My
 
     def Mz(self):
         """returns Mz part of Minstr"""
         Mz = np.asmatrix(np.identity(4))
         Mz[2, 0:4] = self.Minstrxyz[2, 0:4]
-        # self.base.print_message(" ... Mz", Mz)
+        # LOGGER.info(" ... Mz")
         return Mz
 
     def Mplatewarp(self, platexy):
@@ -1324,10 +1292,10 @@ class TransformXY:
         when angles are changed.
         Follows stacking experiment from bottom to top (plate)"""
 
-        self.base.print_message("updating M")
+        LOGGER.info("updating M")
 
         if self.seq is None:
-            self.base.print_message("seq is empty, using default transformation")
+            LOGGER.info("seq is empty, using default transformation")
             # default case, we simply have xy calibration
             self.M = np.dot(self.Minstrxyz, self.Mplate)
         else:
@@ -1344,28 +1312,28 @@ class TransformXY:
             # experiment does not matter so should define it like this in the config
             # if we want to use this
             if axstr.find("xy") == 0 and axstr.find("z") <= 2:
-                self.base.print_message("got xyz seq")
+                LOGGER.info("got xyz seq")
                 self.Minstr = self.Minstrxyz
                 Mcommon1 = True
 
             for ax in self.seq:
                 if ax == "x" and not Mcommon1:
-                    self.base.print_message("got x seq")
+                    LOGGER.info("got x seq")
                     self.Minstr = np.dot(self.Minstr, self.Mx())
                 elif ax == "y" and not Mcommon1:
-                    self.base.print_message("got y seq")
+                    LOGGER.info("got y seq")
                     self.Minstr = np.dot(self.Minstr, self.My())
                 elif ax == "z" and not Mcommon1:
-                    self.base.print_message("got z seq")
+                    LOGGER.info("got z seq")
                     self.Minstr = np.dot(self.Minstr, self.Mz())
                 elif ax == "Rx":
-                    self.base.print_message("got Rx seq")
+                    LOGGER.info("got Rx seq")
                     self.Minstr = np.dot(self.Minstr, self.Rx())
                 elif ax == "Ry":
-                    self.base.print_message("got Ry seq")
+                    LOGGER.info("got Ry seq")
                     self.Minstr = np.dot(self.Minstr, self.Ry())
                 elif ax == "Rz":
-                    self.base.print_message("got Rz seq")
+                    LOGGER.info("got Rz seq")
                     self.Minstr = np.dot(self.Minstr, self.Rz())
 
             self.M = np.dot(self.Minstr, self.Mplate)
@@ -1375,7 +1343,7 @@ class TransformXY:
                 self.Minv = self.M.I
             except Exception as e:
                 tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message(f"System Matrix singular {repr(e), tb,}", error=True)
+                LOGGER.error(f"System Matrix singular ", exc_info=True)
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
                 self.Minv = np.matrix(
                     [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, -1]]
@@ -1385,7 +1353,7 @@ class TransformXY:
                 self.Minstrinv = self.Minstr.I
             except Exception as e:
                 tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message(f"Instrument Matrix singular {repr(e), tb,}", error=True)
+                LOGGER.error(f"Instrument Matrix singular ", exc_info=True)
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
                 self.Minstrinv = np.matrix(
                     [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, -1]]
@@ -1433,6 +1401,6 @@ class TransformXY:
             return self.Mplatexy
         except Exception as e:
             tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(f"Instrument Matrix singular {repr(e), tb,}", error=True)
+            LOGGER.error(f"Instrument Matrix singular ", exc_info=True)
             # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
             self.Minv = np.matrix([[0, 0, 0], [0, 0, 0], [0, 0, -1]])

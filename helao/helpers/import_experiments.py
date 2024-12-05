@@ -2,22 +2,23 @@ __all__ = ["import_experiments"]
 
 import os
 import time
+from typing import Optional
 from importlib.machinery import SourceFileLoader
 from helao.helpers.print_message import print_message
-from helaocore.version import get_filehash
+from helao.core.version import get_filehash
 
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="import_experiments_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
 def import_experiments(
     world_config_dict: dict,
-    experiment_path: str = None,
+    experiment_path: Optional[str] = None,
     server_name: str = "",
-    user_experiment_path: str = None,
+    user_experiment_path: Optional[str] = None,
 ):
     """Import experiment functions into environment."""
 

@@ -11,7 +11,7 @@ import random
 from typing import List
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.helpers.spec_map import SPEC_MAP
-from helaocore.models.electrolyte import Electrolyte
+from helao.core.models.electrolyte import Electrolyte
 
 
 SEQUENCES = __all__

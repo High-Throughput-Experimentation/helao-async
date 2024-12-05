@@ -5,10 +5,10 @@ from pydantic import BaseModel, Field, validator
 from uuid import UUID
 
 
-from helaocore.models.file import FileConnParams
+from helao.core.models.file import FileConnParams
 
 from helao.helpers.premodels import Action
-from helaocore.helaodict import HelaoDict
+from helao.core.helaodict import HelaoDict
 
 
 class ActiveParams(BaseModel, HelaoDict):

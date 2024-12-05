@@ -1,8 +1,14 @@
 import time
 from types import MethodType
-from helaocore.error import ErrorCodes
-from helaocore.models.hlostatus import HloStatus
+from typing import Optional
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 class Executor:
     """
@@ -57,7 +63,7 @@ class Executor:
         active,
         poll_rate: float = 0.2,
         oneoff: bool = True,
-        exec_id: str = None,
+        exec_id: Optional[str] = None,
         concurrent: bool = True,
         **kwargs
     ):
@@ -104,7 +110,7 @@ class Executor:
         Returns:
             dict: A dictionary containing the setup error code with the key "error".
         """
-        self.active.base.print_message("generic Executor running setup methods.")
+        LOGGER.info("generic Executor running setup methods.")
         self.setup_err = ErrorCodes.none
         return {"error": self.setup_err}
 

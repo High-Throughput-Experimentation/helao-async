@@ -1,0 +1,24 @@
+dummy: true
+simulation: true
+run_type: gamry
+root: C:\INST_hlo
+alert_config_path: C:\INST_hlo\USER_CONFIG\alert_gamry.yml
+servers:
+  PSTAT:
+    host: 127.0.0.1
+    port: 8001
+    group: action
+    fast: gamry_server2
+    params:
+      allow_no_sample: true
+      dev_id: 0
+      filterfreq_hz: 1000.0
+      grounded: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'PSTAT Visualizer'
+      launch_browser: true

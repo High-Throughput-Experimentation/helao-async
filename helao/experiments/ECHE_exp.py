@@ -26,11 +26,11 @@ from typing import Optional
 from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.sample import SolidSample, LiquidSample
-from helaocore.models.machine import MachineModel
-from helaocore.models.process_contrib import ProcessContrib
-from helaocore.models.electrolyte import Electrolyte
+from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.sample import SolidSample, LiquidSample
+from helao.core.models.machine import MachineModel
+from helao.core.models.process_contrib import ProcessContrib
+from helao.core.models.electrolyte import Electrolyte
 from helao.helpers.ref_electrode import REF_TABLE
 
 from helao.drivers.motion.enum import MoveModes, TransformationModes

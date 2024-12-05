@@ -19,7 +19,7 @@ __all__ = [
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    logger = logging.make_logger(logger_name="echeuvis_exp_standalone")
+    logger = logging.make_logger(__file__)
 else:
     logger = logging.LOGGER
 
@@ -37,10 +37,10 @@ from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.helpers.spec_map import SPECSRV_MAP
 from helao.drivers.io.enum import TriggerType
 
-from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.machine import MachineModel as MM
-from helaocore.models.process_contrib import ProcessContrib
-from helaocore.models.electrolyte import Electrolyte
+from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.machine import MachineModel as MM
+from helao.core.models.process_contrib import ProcessContrib
+from helao.core.models.electrolyte import Electrolyte
 
 
 EXPERIMENTS = __all__
@@ -126,7 +126,7 @@ def ECHEUVIS_sub_CV_led(
 
     CV_duration_sec = abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
     CV_duration_sec += abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
-    CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * cycles
+    CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec
     CV_duration_sec += (
         abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * 2.0 * (cycles - 1)
     )

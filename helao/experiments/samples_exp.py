@@ -15,14 +15,14 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 
-# from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.sample import (
+# from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.sample import (
     LiquidSample,
     GasSample,
     AssemblySample,
     SolidSample,
 )
-from helaocore.models.machine import MachineModel
+from helao.core.models.machine import MachineModel
 
 
 EXPERIMENTS = __all__
@@ -220,7 +220,7 @@ def generate_sample_no_list(
     plate_id: int = 1,
     sample_code: int = 0,
     skip_n_samples: int = 0,
-    direction: str = None,
+    direction: Optional[str] = None,
     sample_nos: List[int] = [],
     sample_nos_operator: str = "",
     # platemap_xys: List[Tuple[int, int]] = [],

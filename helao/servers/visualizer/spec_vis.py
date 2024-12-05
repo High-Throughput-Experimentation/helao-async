@@ -15,7 +15,13 @@ from bokeh.models import ColumnDataSource
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 
-from helaocore.models.hlostatus import HloStatus
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
+from helao.core.models.hlostatus import HloStatus
 
 from helao.servers.vis import Vis
 from helao.helpers.dispatcher import private_dispatcher
@@ -154,7 +160,7 @@ class C_specvis:
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(f"'{self.spec_key}' Bokeh session closed", info=True)
+        LOGGER.info(f"'{self.spec_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -214,9 +220,7 @@ class C_specvis:
         sender.value = value
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(
-            f" ... spectrometer visualizer subscribing to: {self.data_url}"
-        )
+        LOGGER.info(f" ... spectrometer visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
@@ -295,7 +299,7 @@ class C_specvis:
         """Clear current plot and move data to previous plot"""
         if self.cur_action_uuid != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
-                self.vis.print_message(" ... reseting spectrometer graph")
+                LOGGER.info(" ... reseting spectrometer graph")
                 self.prev_action_uuid = self.cur_action_uuid
                 self.prev_datasource.data = dict(deepcopy(self.datasource.data).items())
                 self.cur_action_uuid = new_action_uuid

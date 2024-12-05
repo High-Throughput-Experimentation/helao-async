@@ -15,9 +15,9 @@ from typing import Optional, List
 
 from fastapi import Body
 
-from helaocore.error import ErrorCodes
-from helaocore.models.hlostatus import HloStatus
-from helaocore.models.file import HloHeaderModel
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.file import HloHeaderModel
 
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
@@ -28,7 +28,7 @@ from helao.drivers.spec.andor.driver import AndorDriver, DriverStatus
 
 global LOGGER
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="andor_server_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 

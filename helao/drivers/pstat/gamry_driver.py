@@ -21,14 +21,20 @@ from collections import defaultdict
 
 import numpy as np
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 from helao.helpers.premodels import Action
 from helao.servers.base import Base
-from helaocore.error import ErrorCodes
-from helaocore.models.sample import SampleInheritance, SampleStatus
-from helaocore.models.data import DataModel
-from helaocore.models.file import FileConnParams, HloHeaderModel
+from helao.core.error import ErrorCodes
+from helao.core.models.sample import SampleInheritance, SampleStatus
+from helao.core.models.data import DataModel
+from helao.core.models.file import FileConnParams, HloHeaderModel
 from helao.helpers.active_params import ActiveParams
-from helaocore.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import HloStatus
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 
 from helao.drivers.pstat.enum import (
@@ -182,27 +188,25 @@ class gamry:
                 if self.IO_do_meas:
                     # are we in estop?
                     if not self.base.actionservermodel.estop:
-                        self.base.print_message("Gamry got measurement request")
+                        LOGGER.info("Gamry got measurement request")
                         await self.measure()
                         if self.base.actionservermodel.estop:
                             self.IO_do_meas = False
-                            self.base.print_message(
-                                "Gamry is in estop after measurement.", error=True
-                            )
+                            LOGGER.error("Gamry is in estop after measurement.")
                         else:
-                            self.base.print_message("setting Gamry to idle")
+                            LOGGER.info("setting Gamry to idle")
                             # await self.stat.set_idle()
-                        self.base.print_message("Gamry measurement is done")
+                        LOGGER.info("Gamry measurement is done")
                     else:
                         self.active.action.action_status.append(HloStatus.estopped)
                         self.IO_do_meas = False
-                        self.base.print_message("Gamry is in estop.", error=True)
+                        LOGGER.error("Gamry is in estop.")
 
                 # endpoint can return even we got errors
                 self.IO_continue = True
 
                 if self.active:
-                    self.base.print_message("gamry finishes active action")
+                    LOGGER.info("gamry finishes active action")
                     _ = await self.active.finish()
                     self.active = None
                     self.action = None
@@ -211,7 +215,7 @@ class gamry:
         except asyncio.CancelledError:
             # endpoint can return even we got errors
             self.IO_continue = True
-            self.base.print_message("IOloop task was cancelled")
+            LOGGER.info("IOloop task was cancelled")
 
     def kill_GamryCom(self):
         """script can be blocked or crash if GamryCom is still open and busy"""
@@ -222,43 +226,37 @@ class gamry:
         }
 
         for pid in pyPids:
-            self.base.print_message(f"killing GamryCom on PID: {pid}")
+            LOGGER.info(f"killing GamryCom on PID: {pid}")
             p = psutil.Process(pid)
             for _ in range(3):
                 # os.kill(p.pid, signal.SIGTERM)
                 p.terminate()
                 time.sleep(0.5)
                 if not psutil.pid_exists(p.pid):
-                    self.base.print_message("Successfully terminated GamryCom.")
+                    LOGGER.info("Successfully terminated GamryCom.")
                     return True
             if psutil.pid_exists(p.pid):
-                self.base.print_message(
-                    "Failed to terminate server GamryCom after 3 retries."
-                )
+                LOGGER.info("Failed to terminate server GamryCom after 3 retries.")
                 return False
 
     async def init_Gamry(self, devid):
         """connect to a Gamry"""
         try:
             self.devices = client.CreateObject("GamryCOM.GamryDeviceList")
-            self.base.print_message(f"GamryDeviceList: {self.devices.EnumSections()}")
-            # self.base.print_message(f"{len(self.devices.EnumSections())}")
+            LOGGER.info(f"GamryDeviceList: {self.devices.EnumSections()}")
+            # LOGGER.info(f"{len(self.devices.EnumSections())}")
             if len(self.devices.EnumSections()) >= devid + 1:
                 self.FIFO_Gamryname = self.devices.EnumSections()[devid]
 
                 if self.FIFO_Gamryname.find("IFC") == 0:
                     self.pstat = client.CreateObject("GamryCOM.GamryPC6Pstat")
-                    self.base.print_message(
-                        f"Gamry, using Interface {self.pstat}", info=True
-                    )
+                    LOGGER.info(f"Gamry, using Interface {self.pstat}")
                 elif self.FIFO_Gamryname.find("REF") == 0:
                     self.pstat = client.CreateObject("GamryCOM.GamryPC5Pstat")
-                    self.base.print_message(
-                        f"Gamry, using Reference {self.pstat}", info=True
-                    )
+                    LOGGER.info(f"Gamry, using Reference {self.pstat}")
                 elif self.FIFO_Gamryname.find("PCI") == 0:
                     self.pstat = client.CreateObject("GamryCOM.GamryPstat")
-                    self.base.print_message(f"Gamry, using PCI {self.pstat}", info=True)
+                    LOGGER.info(f"Gamry, using PCI {self.pstat}")
                 # else: # old version before Framework 7.06
                 #     self.pstat = client.CreateObject('GamryCOM.GamryPstat')
                 #     self.base.print_message('Gamry, using Farmework , 7.06?', self.pstat)
@@ -275,26 +273,19 @@ class gamry:
                     self.gamry_range_enum = Gamry_IErange_dflt
 
                 self.pstat.Init(self.devices.EnumSections()[devid])
-                # self.base.print_message("", self.pstat)
-                self.base.print_message(
-                    f"Connected to Gamry on DevID {devid}!", info=True
-                )
+                # LOGGER.info("")
+                LOGGER.info(f"Connected to Gamry on DevID {devid}!")
 
             else:
                 self.pstat = None
-                self.base.print_message(
-                    f"No potentiostat is connected on DevID {devid}! Have you turned it on?",
-                    error=True,
-                )
+                LOGGER.error(f"No potentiostat is connected on DevID {devid}! Have you turned it on?")
 
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             # this will lock up the potentiostat server
             # happens when a not activated Gamry is connected and turned on
             # TODO: find a way to avoid it
-            self.base.print_message(
-                f"fatal error initializing Gamry: {repr(e), tb,}", error=True
-            )
+            LOGGER.error(f"fatal error initializing Gamry: {repr(e), tb,}")
         self.ready = True
 
     async def open_connection(self):
@@ -308,15 +299,13 @@ class gamry:
                 self.pstat.Open()
                 return ErrorCodes.none
             else:
-                self.base.print_message(
-                    "open_connection: Gamry not initialized!", error=True
-                )
+                LOGGER.error("open_connection: Gamry not initialized!")
                 return ErrorCodes.not_initialized
 
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             # self.pstat = None
-            self.base.print_message(f"Gamry error init: {repr(e)} {tb}", error=True)
+            LOGGER.error(f"Gamry error init", exc_info=True)
             return ErrorCodes.critical
 
     def close_connection(self):
@@ -327,9 +316,7 @@ class gamry:
                 self.pstat.Close()
                 return ErrorCodes.none
             else:
-                self.base.print_message(
-                    "close_connection: Gamry not initialized!", error=True
-                )
+                LOGGER.error("close_connection: Gamry not initialized!")
                 return ErrorCodes.not_initialized
         except Exception:
             # self.pstat = None
@@ -341,7 +328,7 @@ class gamry:
             self.IO_measuring = False
             self.dtaq.Run(False)
             self.pstat.SetCell(self.GamryCOM.CellOff)
-            self.base.print_message("signaling IOloop to stop")
+            LOGGER.info("signaling IOloop to stop")
             self.set_IO_signalq_nowait(False)
 
             # delete this at the very last step
@@ -433,14 +420,12 @@ class gamry:
                     self.pstat.SetIERangeMode(True)
 
                 if self.IO_IErange == self.gamry_range_enum.auto:
-                    self.base.print_message("auto I range selected")
+                    LOGGER.info("auto I range selected")
                     self.pstat.SetIERange(0.03)
                     if not self.FIFO_Gamryname.startswith("IFC1010"):
                         self.pstat.SetIERangeMode(True)
                 else:
-                    self.base.print_message(
-                        f"I-range: {self.IO_IErange.value}, mode{IErangesdict[self.IO_IErange.name]} selected"
-                    )
+                    LOGGER.info(f"I-range: {self.IO_IErange.value}, mode{IErangesdict[self.IO_IErange.name]} selected")
                     self.pstat.SetIERange(IErangesdict[self.IO_IErange.name])
                     if not self.FIFO_Gamryname.startswith("IFC1010"):
                         self.pstat.SetIERangeMode(False)
@@ -545,9 +530,7 @@ class gamry:
                     self.pstat.SetIERange(ierangeval)
                     # subset of stop conditions
 
-                    self.base.print_message(
-                        f"Using vmin threshold = {act_params['stop_vmin']}, {type(act_params['stop_vmin'])}"
-                    )
+                    LOGGER.info(f"Using vmin threshold = {act_params['stop_vmin']}, {type(act_params['stop_vmin'])}")
                     if act_params.get("stop_vmin", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopXMin(True, act_params["stop_vmin"])
@@ -883,20 +866,18 @@ class gamry:
 
                 # Gamry Signal not available
                 else:
-                    self.base.print_message(f"'mode {mode} not supported'", error=True)
+                    LOGGER.error(f"'mode {mode} not supported'")
                     error = ErrorCodes.not_available
 
                 if error is ErrorCodes.none:
                     try:
-                        self.base.print_message(
-                            f"creating dtaq '{Dtaqmode}'", info=True
-                        )
+                        LOGGER.info(f"creating dtaq '{Dtaqmode}'")
                         self.dtaq = client.CreateObject(Dtaqmode)
                         if Dtaqtype:
                             self.dtaq.Init(self.pstat, Dtaqtype, *argv)
                         else:
                             self.dtaq.Init(self.pstat, *argv)
-                        self.base.print_message(f"applying {len(dtaq_lims)} limits")
+                        LOGGER.info(f"applying {len(dtaq_lims)} limits")
                         for limfn in dtaq_lims:
                             limfn(self.dtaq)
 
@@ -904,10 +885,7 @@ class gamry:
                         tb = "".join(
                             traceback.format_exception(type(e), e, e.__traceback__)
                         )
-                        self.base.print_message(
-                            f"Gamry Error during setup: {gamry_error_decoder(e)} {tb}",
-                            error=True,
-                        )
+                        LOGGER.error(f"Gamry Error during setup: {gamry_error_decoder(e)} {tb}")
 
                     # This method, when enabled,
                     # allows for longer experiments with fewer points,
@@ -918,20 +896,14 @@ class gamry:
                         self.dtaq.SetDecimation(False)
 
                     self.dtaqsink = GamryDtaqEvents(self.dtaq)
-                    self.base.print_message(
-                        f"initialized dtaqsink with status {self.dtaqsink.status} in mode setup_{mode}"
-                    )
+                    LOGGER.info(f"initialized dtaqsink with status {self.dtaqsink.status} in mode setup_{mode}")
 
             except comtypes.COMError as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message(
-                    f"Gamry error during measurement setup: {repr(e)} {tb}", error=True
-                )
+                LOGGER.error(f"Gamry error during measurement setup: {repr(e)} {tb}")
                 error = ErrorCodes.critical
         else:
-            self.base.print_message(
-                "measurement_setup: Gamry not initialized!", error=True
-            )
+            LOGGER.error("measurement_setup: Gamry not initialized!")
             error = ErrorCodes.not_initialized
 
         return error
@@ -961,10 +933,10 @@ class gamry:
             # push the signal ramp over
             try:
                 self.pstat.SetSignal(self.IO_sigramp)
-                self.base.print_message("signal ramp set")
+                LOGGER.info("signal ramp set")
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message("gamry error in signal")
+                LOGGER.info("gamry error in signal")
                 self.base.print_message(gamry_error_decoder(e))
                 self.base.print_message(tb)
                 self.pstat.SetCell(self.GamryCOM.CellOff)
@@ -978,12 +950,12 @@ class gamry:
             # self.pstat.SetDigitalOut
             # self.pstat.DigitalIn
 
-            self.base.print_message(f"Gamry DigiOut state: {self.pstat.DigitalOut()}")
-            self.base.print_message(f"Gamry DigiIn state: {self.pstat.DigitalIn()}")
+            LOGGER.info(f"Gamry DigiOut state: {self.pstat.DigitalOut()}")
+            LOGGER.info(f"Gamry DigiIn state: {self.pstat.DigitalIn()}")
             # first, wait for trigger
             if self.IO_TTLwait >= 0:
                 bits = self.pstat.DigitalIn()
-                self.base.print_message(f"Gamry DIbits: {bits}, waiting for trigger.")
+                LOGGER.info(f"Gamry DIbits: {bits}, waiting for trigger.")
                 while self.IO_do_meas:
                     bits = self.pstat.DigitalIn()
                     if self.IO_TTLwait & bits:
@@ -1034,11 +1006,11 @@ class gamry:
             try:
                 # get current time and start measurement
                 self.dtaq.Run(True)
-                self.base.print_message("running dtaq")
+                LOGGER.info("running dtaq")
                 self.IO_measuring = True
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message("gamry error run")
+                LOGGER.info("gamry error run")
                 self.base.print_message(gamry_error_decoder(e))
                 self.base.print_message(tb)
                 self.close_pstat_connection()
@@ -1114,9 +1086,7 @@ class gamry:
                     last_update = time.time()
 
                 if time.time() - last_update > 5 * self.sample_rate:
-                    self.base.print_message(
-                        f"Pstat did not send additional data after 5 d_t intervals, ending measurement."
-                    )
+                    LOGGER.info(f"Pstat did not send additional data after 5 d_t intervals, ending measurement.")
                     await self.active.enqueue_data(
                         datamodel=DataModel(
                             data={}, errors=[], status=HloStatus.finished
@@ -1124,7 +1094,7 @@ class gamry:
                     )
                     sink_status = "done"
                 else:
-                    # self.base.print_message(f"counter: {counter}, tmpc: {tmpc}")
+                    # LOGGER.info(f"counter: {counter}, tmpc: {tmpc}")
                     counter = tmpc
                     sink_status = self.dtaqsink.status
 
@@ -1168,7 +1138,7 @@ class gamry:
 
     def shutdown(self):
         # close all connection and objects to gamry
-        self.base.print_message("shutting down gamry")
+        LOGGER.info("shutting down gamry")
         if self.IO_measuring:
             # file and Gamry connection will be closed with the meas loop
             self.IO_do_meas = False  # will stop meas loop
@@ -1177,10 +1147,7 @@ class gamry:
         # give some time to finish all data
         retries = 0
         while self.active is not None and retries < 10:
-            self.base.print_message(
-                f"Got shutdown, but Active is not yet done!, retry {retries}",
-                info=True,
-            )
+            LOGGER.info(f"Got shutdown, but Active is not yet done!, retry {retries}")
             self.set_IO_signalq_nowait(False)
             time.sleep(1)
             retries += 1
@@ -1226,10 +1193,10 @@ class gamry:
                 return number * exp
 
         if requested_range is None:
-            self.base.print_message("could not detect IErange, using 'auto'", warn=True)
+            LOGGER.warning("could not detect IErange, using 'auto'")
             return self.gamry_range_enum.auto
 
-        self.base.print_message(f"got IErange request for {requested_range}", info=True)
+        LOGGER.info(f"got IErange request for {requested_range}")
 
         names = [e.name.lower() for e in self.gamry_range_enum]
         vals = [e.value.lower() for e in self.gamry_range_enum]
@@ -1270,13 +1237,11 @@ class gamry:
                     break
 
             if idx is None:
-                self.base.print_message(
-                    "could not detect IErange, using 'auto'", error=True
-                )
+                LOGGER.error("could not detect IErange, using 'auto'")
                 return self.gamry_range_enum.auto
 
         ret_range = self.gamry_range_enum(lookupvals[idx])
-        self.base.print_message(f"detected IErange: {ret_range}", info=True)
+        LOGGER.info(f"detected IErange: {ret_range}")
         return ret_range
 
     async def technique_wrapper(
@@ -1287,9 +1252,7 @@ class gamry:
         act.error_code = ErrorCodes.none
         samples_in = await self.unified_db.get_samples(act.samples_in)
         if not samples_in and not self.allow_no_sample:
-            self.base.print_message(
-                "Gamry got no valid sample, cannot start measurement!", error=True
-            )
+            LOGGER.error("Gamry got no valid sample, cannot start measurement!")
             act.samples_in = []
             act.error_code = ErrorCodes.no_sample
 
@@ -1334,7 +1297,7 @@ class gamry:
                     self.IO_sigramp.Init(*sigfunc_params)
                     act.error_code = ErrorCodes.none
                 except comtypes.COMError as _:
-                    self.base.print_message("COMError, reinstantiating connection.")
+                    LOGGER.info("COMError, reinstantiating connection.")
                     # remake connection
                     self.kill_GamryCom()
                     self.GamryCOM = client.GetModule(
@@ -1348,9 +1311,7 @@ class gamry:
                         traceback.format_exception(type(e), e, e.__traceback__)
                     )
                     act.error_code = gamry_error_decoder(e)
-                    self.base.print_message(
-                        f"IO_sigramp.Init error: {act.error_code} {tb}", error=True
-                    )
+                    LOGGER.error(f"IO_sigramp.Init error: {act.error_code} {tb}")
 
                 self.samples_in = samples_in
                 self.action = act

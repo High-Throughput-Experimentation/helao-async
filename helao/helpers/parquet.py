@@ -13,7 +13,7 @@ Functions:
     read_helao_metadata(parquet_file_path):
         Reads the custom metadata from a Parquet file.
 """
-import json
+import orjson
 from ruamel.yaml import YAML
 from collections import defaultdict
 
@@ -49,7 +49,7 @@ def read_hlo_header(file_path):
     return yd, data_start_index
 
 
-def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
+def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100, keep_keys=[], omit_keys=[]):
     """
     Reads data from a file in chunks and yields the data as dictionaries.
 
@@ -63,18 +63,20 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
             - dict: A dictionary where keys are the JSON keys from the file and values are lists of the corresponding values.
             - int: The maximum length of the lists in the dictionary.
     """
-    with open(file_path) as f:
+    with open(file_path, "rb") as f:
         chunkd = defaultdict(list)
         for i, line in enumerate(f):
             if i < data_start_index:
                 continue
             else:
-                jd = json.loads(line.strip())
-                for k, val in jd.items():
-                    if isinstance(val, list):
-                        chunkd[k] += val
-                    else:
-                        chunkd[k].append(val)
+                jd = orjson.loads(line)
+                for k in jd:
+                    if k in keep_keys or k not in omit_keys:
+                        val = jd[k]
+                        if isinstance(val, list):
+                            chunkd[k] += val
+                        else:
+                            chunkd[k].append(val)
                 if (i - data_start_index + 1) % chunk_size == 0:
                     yield dict(chunkd), max([len(v) for v in chunkd.values()])
                     chunkd = defaultdict(list)
@@ -109,7 +111,7 @@ def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100):
         if schema is None:
             schema = table.schema
             existing_metadata = schema.metadata
-            custom_metadata = json.dumps(header.get("optional", {})).encode("utf8")
+            custom_metadata = orjson.dumps(header.get("optional", {}))
             metadata = {**{"helao_metadata": custom_metadata}, **existing_metadata}
 
         table = table.replace_schema_metadata(metadata)
@@ -135,5 +137,5 @@ def read_helao_metadata(parquet_file_path):
         dict: A dictionary containing the Helao metadata.
     """
     meta = pq.read_metadata(parquet_file_path)
-    metadict = json.loads(meta.metadata.get(b"helao_metadata", b"{}").decode())
+    metadict = orjson.loads(meta.metadata.get(b"helao_metadata", b"{}"))
     return metadict

@@ -4,7 +4,7 @@ Usage:
 
     from helao.helpers import logging
     if logging.LOGGER is None:
-        logger = logging.make_logger()
+        logger = logging.make_logger(__file__)
     logger = logging.LOGGER
 
 """
@@ -12,10 +12,30 @@ Usage:
 # import picologging as logging
 # from picologging.handlers import TimedRotatingFileHandler
 import logging
-from logging.handlers import TimedRotatingFileHandler, SMTPHandler
+
+ALERT_LEVEL = 60
+logging.addLevelName(ALERT_LEVEL, "ALERT")
+
+
+def alert(self, message, *args, **kws):
+    if self.isEnabledFor(ALERT_LEVEL):
+        # Yes, logger takes its '*args' as 'args'.
+        self._log(ALERT_LEVEL, message, args, **kws)
+
+
+logging.Logger.alert = alert
+
+from queue import Queue
+from logging.handlers import (
+    TimedRotatingFileHandler,
+    SMTPHandler,
+    QueueHandler,
+    QueueListener,
+)
 from colorlog import ColoredFormatter
 import tempfile
 import os
+import subprocess
 
 from typing import Optional
 from pathlib import Path
@@ -23,13 +43,35 @@ from pathlib import Path
 LOGGER = None
 
 
+class GZipRotator:
+    def __call__(self, source, dest):
+        os.rename(source, dest)
+        subprocess.Popen(["gzip", dest])
+
+
+class TitledSMTPHandler(SMTPHandler):
+    def getSubject(self, record):
+        if "~" in record.message:
+            title = record.message.split("~")[0].strip()
+        else:
+            title = record.message.split()[0].strip()
+        return f"{record.levelname} - {title}"
+
+
+# class TitledQueueHandler(QueueHandler):
+#     def getSubject(self, record):
+#         if "~" in record.message:
+#             title = record.message.split("~")[0].strip()
+#         else:
+#             title = record.message.split()[0].strip()
+#         return f"{record.levelname} - {title}"
+
+
 def make_logger(
     logger_name: Optional[str] = None,
     log_dir: Optional[str] = None,
     log_level: int = 20,  # 10 (DEBUG), 20 (INFO), 30 (WARNING), 40 (ERROR), 50 (CRITICAL)
-    email_creds: Optional[dict] = None,
-    email_recipients: Optional[list] = None,
-    email_subject: str = "Error from Helao",
+    email_config: dict = {},
 ):
     """
     Creates and configures a logger instance with both console and file handlers.
@@ -42,7 +84,10 @@ def make_logger(
     Returns:
         logging.Logger: Configured logger instance.
     """
-    log_dir = tempfile.gettempdir() if log_dir is None else log_dir
+    if logger_name is not None and logger_name.endswith(".py"):
+        logger_name = os.path.basename(logger_name).replace(".py", "")
+    temp_dir = tempfile.gettempdir()
+    log_dir = temp_dir if log_dir is None else log_dir
     log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
     formatter = logging.Formatter(format_string)
@@ -56,9 +101,10 @@ def make_logger(
             "WARNING": "yellow",
             "ERROR": "light_red",
             "CRITICAL": "red,bg_white",
+            "ALERT": "light_purple",
         },
         secondary_log_colors={},
-        style='%'
+        style="%",
     )
 
     logger_instance = logging.getLogger(logger_name)
@@ -67,9 +113,17 @@ def make_logger(
     # create handlers
     console = logging.StreamHandler()
     console.setFormatter(colored_formatter)
-    timed_rotation = TimedRotatingFileHandler(
-        filename=log_path, when="D", interval=1, backupCount=14
-    )
+    try:
+        timed_rotation = TimedRotatingFileHandler(
+            filename=log_path, when="D", interval=1, backupCount=90
+        )
+        timed_rotation.rotator = GZipRotator()
+    except OSError:
+        temp_log_path = Path(os.path.join(temp_dir, f"{logger_name}.log"))
+        print(f"Can't write to {log_path}. Redirecting to: {temp_log_path}")
+        timed_rotation = TimedRotatingFileHandler(
+            filename=temp_log_path, when="D", interval=1, backupCount=90
+        )
     timed_rotation.setFormatter(formatter)
 
     # set log level and attach default handlers
@@ -78,21 +132,41 @@ def make_logger(
         handler.setLevel(log_level)
         logger_instance.addHandler(handler)
 
-    if log_level > 20:
-        if email_creds is not None and email_recipients is not None:
-            email_handler = SMTPHandler(
-                mailhost=email_creds["mailhost"],
-                fromaddr=email_creds["fromaddr"],
-                toaddrs=email_recipients,
-                subject=email_subject,
-                credentials=(email_creds["username"], email_creds["password"]),
-                secure=(),
-            )
-            email_handler.setLevel(log_level)
-            email_handler.setFormatter(formatter)
-            logger_instance.addHandler(email_handler)
-        
-        
+    mailhost = email_config.get("mailhost", None)
+    mailport = email_config.get("mailport", None)
+    fromaddr = email_config.get("fromaddr", None)
+    username = email_config.get("username", None)
+    password = email_config.get("password", None)
+    recipients = email_config.get("recipients", None)
+    subject = email_config.get("subject", "Error in Helao")
+    email_conditions = [
+        x is not None
+        for x in [mailhost, mailport, fromaddr, username, password, recipients]
+    ]
+    # print(email_conditions)
+    if all(email_conditions):
+        email_queue = Queue(-1)
+        queue_handler = QueueHandler(email_queue)
+        queue_handler.setLevel(ALERT_LEVEL)
+        # queue_handler.setFormatter(formatter)
+        logger_instance.addHandler(queue_handler)
+        email_handler = TitledSMTPHandler(
+            mailhost=(mailhost, mailport),
+            fromaddr=fromaddr,
+            toaddrs=recipients,
+            subject=subject,
+            credentials=(username, password),
+            secure=(),
+        )
+        email_handler.setLevel(ALERT_LEVEL)
+        email_handler.setFormatter(formatter)
+        # logger_instance.addHandler(email_handler)
+        queue_listener = QueueListener(email_queue, email_handler)
+        queue_listener.start()
+        logger_instance.info(f"Email alerts enabled at log level: {ALERT_LEVEL}")
+    else:
+        logger_instance.info(f"Email alerts not enabled using config: {email_config}")
 
     logger_instance.info(f"writing log events to {log_path}")
+    logger_instance.propagate = False
     return logger_instance

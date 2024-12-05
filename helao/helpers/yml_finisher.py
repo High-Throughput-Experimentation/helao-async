@@ -2,7 +2,7 @@ __all__ = ["yml_finisher"]
 
 import os
 import asyncio
-from typing import Union
+from typing import Union, Optional
 from glob import glob
 from pathlib import Path
 
@@ -17,7 +17,7 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="yml_finisher_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
@@ -74,7 +74,7 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
 
 
 async def move_dir(
-    hobj: Union[Sequence, Experiment, Action], base: object = None, retry_delay: int = 5
+    hobj: Union[Sequence, Experiment, Action], base: Optional[object] = None, retry_delay: int = 5
 ):
     """
     Move directory from RUNS_ACTIVE to RUNS_FINISHED or RUNS_DIAG based on the type and attributes of the provided object.

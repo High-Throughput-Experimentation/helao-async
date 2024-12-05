@@ -13,19 +13,24 @@ from helao.helpers.eval import eval_val
 from helao.servers.base import Base
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.premodels import Action
-from helaocore.models.machine import MachineModel
+from helao.core.models.machine import MachineModel
 from fastapi import Body, WebSocket, WebSocketDisconnect, Request
 from fastapi.routing import APIRoute
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from helaocore.models.hlostatus import HloStatus
-from helaocore.models.action_start_condition import ActionStartCondition as ASC
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK
 
 from helao.helpers import logging
 
 global LOGGER
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 
 class BaseAPI(HelaoFastAPI):
@@ -138,7 +143,6 @@ class BaseAPI(HelaoFastAPI):
         )
         self.driver = None
         self.poller = None
-        LOGGER = logging.LOGGER
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
@@ -183,9 +187,7 @@ class BaseAPI(HelaoFastAPI):
                         # send active status but don't create active object
                         await self.base.status_q.put(action.get_actmodel())
                         response = JSONResponse(action.as_dict())
-                        self.base.print_message(
-                            f"action request for {action.action_name} received, but server does not allow concurrency, queuing action {action.action_uuid}"
-                        )
+                        LOGGER.info(f"action request for {action.action_name} received, but server does not allow concurrency, queuing action {action.action_uuid}")
                         self.base.local_action_queue.put((action, {},))
                     else:
                         LOGGER.debug("action endpoint is available")
@@ -222,9 +224,7 @@ class BaseAPI(HelaoFastAPI):
                     # send active status but don't create active object
                     await self.base.status_q.put(action.get_actmodel())
                     response = JSONResponse(action.as_dict())
-                    self.base.print_message(
-                        f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
-                    )
+                    LOGGER.info(f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}")
                     self.base.endpoint_queues[endpoint].put(
                         (
                             action,
@@ -564,7 +564,7 @@ class BaseAPI(HelaoFastAPI):
             Returns:
                 dict: A dictionary containing the return values of the `shutdown` and `async_shutdown` methods, if they exist.
             """
-            self.base.print_message("action shutdown", info=True)
+            LOGGER.info("action shutdown")
             await self.base.shutdown()
 
             shutdown = getattr(self.driver, "shutdown", None)
@@ -572,18 +572,16 @@ class BaseAPI(HelaoFastAPI):
 
             retvals = {}
             if shutdown is not None and callable(shutdown):
-                self.base.print_message("driver has shutdown function", info=True)
+                LOGGER.info("driver has shutdown function")
                 retvals["shutdown"] = shutdown()
             else:
-                self.base.print_message("driver has NO shutdown function", info=True)
+                LOGGER.info("driver has NO shutdown function")
                 retvals["shutdown"] = None
             if async_shutdown is not None and callable(async_shutdown):
-                self.base.print_message("driver has async_shutdown function", info=True)
+                LOGGER.info("driver has async_shutdown function")
                 retvals["async_shutdown"] = await async_shutdown()
             else:
-                self.base.print_message(
-                    "driver has NO async_shutdown function", info=True
-                )
+                LOGGER.info("driver has NO async_shutdown function")
                 retvals["async_shutdown"] = None
 
             if self.root_dir is not None:
@@ -617,14 +615,14 @@ class BaseAPI(HelaoFastAPI):
             )
             has_estop = getattr(self.driver, "estop", None)
             if has_estop is not None and callable(has_estop):
-                self.base.print_message("driver has estop function", info=True)
+                LOGGER.info("driver has estop function")
                 await active.enqueue_data_dflt(
                     datadict={
                         "estop": await self.driver.estop(**active.action.action_params)
                     }
                 )
             else:
-                self.base.print_message("driver has NO estop function", info=True)
+                LOGGER.info("driver has NO estop function")
                 self.base.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.append(HloStatus.estopped)

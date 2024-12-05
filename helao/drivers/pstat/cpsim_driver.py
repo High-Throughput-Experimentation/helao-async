@@ -3,8 +3,14 @@ import time
 import asyncio
 import functools
 
-from helaocore.error import ErrorCodes
-from helaocore.models.hlostatus import HloStatus
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+    
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 from helao.helpers.zstd_io import unzpickle
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
@@ -31,10 +37,10 @@ class CPSim:
     def change_plate(self, plate_id):
         if plate_id in self.all_data:
             self.data = self.all_data[plate_id]
-            self.base.print_message(f"loaded plate_id: {plate_id}")
+            LOGGER.info(f"loaded plate_id: {plate_id}")
             return True
         else:
-            self.base.print_message(f"plate_id: {plate_id} does not exist in dataset")
+            LOGGER.info(f"plate_id: {plate_id} does not exist in dataset")
             return False
 
     def list_plates(self):
@@ -66,7 +72,7 @@ class CPSim:
 class CPSimExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("EcheSimExec initialized.")
+        LOGGER.info("EcheSimExec initialized.")
         self.last_idx = 0
         self.start_time = time.time()  # instantiation time
         self.duration = self.active.action.action_params.get("duration", -1)

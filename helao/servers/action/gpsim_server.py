@@ -16,6 +16,11 @@ from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 from helao.drivers.data.gpsim_driver import GPSim, GPSimExec
 
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
@@ -60,7 +65,7 @@ def makeApp(confPrefix, server_key, helao_root):
             await app.driver.init_priors_random(pid, npoints)
             app.driver.fit_model(pid)
         else:
-            app.base.print_message(f"plate {pid} is already initialized")
+            LOGGER.info(f"plate {pid} is already initialized")
         finished_action = await active.finish()
         return finished_action.as_dict()
 

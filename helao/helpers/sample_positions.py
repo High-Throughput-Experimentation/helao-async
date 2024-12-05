@@ -20,18 +20,18 @@ from typing import (
 from enum import Enum
 from pydantic import BaseModel, Field, root_validator
 
-from helaocore.models.sample import (
+from helao.core.models.sample import (
     SampleUnion,
     NoneSample,
     object_to_sample,
 )
 from helao.helpers.print_message import print_message
-from helaocore.helaodict import HelaoDict
+from helao.core.helaodict import HelaoDict
 
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="sample_positions_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
@@ -46,7 +46,7 @@ class CustomTypes(str, Enum):
 
 
 class Custom(BaseModel, HelaoDict):
-    sample: SampleUnion = NoneSample()
+    sample: Optional[SampleUnion] = NoneSample()
     custom_name: str
     custom_type: CustomTypes
     blocked: bool = False
@@ -64,7 +64,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message(LOGGER, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            LOGGER.error(f"invalid 'custom_type': {self.custom_type}")
             return False
 
     def dilution_allowed(self) -> bool:
@@ -73,7 +73,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message(LOGGER, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            LOGGER.error(f"invalid 'custom_type': {self.custom_type}")
             return False
 
     def is_destroyed(self) -> bool:
@@ -92,7 +92,7 @@ class Custom(BaseModel, HelaoDict):
         elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
-            print_message(LOGGER, "archive", f"invalid 'custom_type': {self.custom_type}", error=True)
+            LOGGER.error(f"invalid 'custom_type': {self.custom_type}")
             return False
 
     def unload(self) -> SampleUnion:
@@ -104,14 +104,12 @@ class Custom(BaseModel, HelaoDict):
 
     def load(self, sample_in: SampleUnion) -> Tuple[bool, SampleUnion]:
         if self.sample != NoneSample():
-            print_message(
-                LOGGER, "archive", "sample already loaded. Unload first to load new one.", error=True
-            )
+            LOGGER.error("sample already loaded. Unload first to load new one.")
             return False, NoneSample()
 
         self.sample = deepcopy(sample_in)
         self.blocked = False
-        print_message(LOGGER, "archive", f"loaded sample {sample_in.global_label}", info=True)
+        LOGGER.info(f"loaded sample {sample_in.global_label}")
         return True, deepcopy(sample_in)
 
 
@@ -186,7 +184,7 @@ class _VT_template(BaseModel, HelaoDict):
     def load(
         self,
         sample: SampleUnion,
-        vial: int = None,
+        vial: Optional[int] = None,
     ) -> SampleUnion:
         vial -= 1
         ret_sample = NoneSample()

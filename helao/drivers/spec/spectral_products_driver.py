@@ -8,11 +8,16 @@ import traceback
 
 import numpy as np
 
-from helaocore.error import ErrorCodes
-from helaocore.models.data import DataModel
-from helaocore.models.file import FileConnParams, HloHeaderModel
-from helaocore.models.sample import SampleInheritance, SampleStatus
-from helaocore.models.hlostatus import HloStatus
+from helao.helpers import logging
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+from helao.core.error import ErrorCodes
+from helao.core.models.data import DataModel
+from helao.core.models.file import FileConnParams, HloHeaderModel
+from helao.core.models.sample import SampleInheritance, SampleStatus
+from helao.core.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI
@@ -43,7 +48,7 @@ class SM303:
             self.setup_sm303()
             self.spec.spCloseGivenChannel(self.dev_num)
         else:
-            self.base.print_message("SMdbUSBm.dll not found.", error=True)
+            LOGGER.error("SMdbUSBm.dll not found.")
             self.spec = None
         self.ready = False
         self.action = None
@@ -95,7 +100,7 @@ class SM303:
                 if self.IO_do_meas:
                     # are we in estop?
                     if not self.base.actionservermodel.estop:
-                        self.base.print_message("Spec got measurement request")
+                        LOGGER.info("Spec got measurement request")
                         try:
                             await asyncio.wait_for(
                                 self.continuous_read(),
@@ -106,23 +111,21 @@ class SM303:
                             pass
                         if self.base.actionservermodel.estop:
                             self.IO_do_meas = False
-                            self.base.print_message(
-                                "Spec is in estop after measurement.", error=True
-                            )
+                            LOGGER.error("Spec is in estop after measurement.")
                         else:
-                            self.base.print_message("setting Spec to idle")
+                            LOGGER.info("setting Spec to idle")
                             # await self.stat.set_idle()
-                        self.base.print_message("Spec measurement is done")
+                        LOGGER.info("Spec measurement is done")
                     else:
                         self.active.action.action_status.append(HloStatus.estopped)
                         self.IO_do_meas = False
-                        self.base.print_message("Spec is in estop.", error=True)
+                        LOGGER.error("Spec is in estop.")
 
                 # endpoint can return even we got errors
                 self.IO_continue = True
 
                 if self.active is not None:
-                    self.base.print_message("Spec finishes active action")
+                    LOGGER.info("Spec finishes active action")
                     # active_not_finished = True
                     # while active_not_finished and self.active is not None:
                     #     try:
@@ -138,7 +141,7 @@ class SM303:
         except asyncio.CancelledError:
             # endpoint can return even we got errors
             self.IO_continue = True
-            self.base.print_message("IOloop task was cancelled")
+            LOGGER.info("IOloop task was cancelled")
 
     def setup_sm303(self):
         try:
@@ -175,26 +178,20 @@ class SM303:
             self.wl_saved = (ctypes.c_double * 1024)()
             self.spec.spGetWLTable(ctypes.byref(self.wl_saved), self.dev_num)
             self.pxwl = list(self.wl_saved)
-            self.base.print_message(
-                f"Loaded wavelength range from EEPROM: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
-            )
+            LOGGER.info(f"Loaded wavelength range from EEPROM: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels.")
             self.ready = True
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"fatal error initializing SM303: {repr(e), tb,}", error=True
-            )
+            LOGGER.error(f"fatal error initializing SM303: {repr(e), tb,}")
 
     def set_trigger_mode(self, mode: SpecTrigType = SpecTrigType.off):
         resp = self.spec.spSetTrgEx(mode, self.dev_num)
         time.sleep(0.1)
         if resp == 1:
-            self.base.print_message(f"Successfully set trigger mode to {str(mode)}")
+            LOGGER.info(f"Successfully set trigger mode to {str(mode)}")
             self.trigmode = mode
             return True
-        self.base.print_message(
-            f"Could not set trigger mode to {str(mode)}", error=True
-        )
+        LOGGER.error(f"Could not set trigger mode to {str(mode)}")
         return False
 
     def set_extedge_mode(self, mode: TriggerType = TriggerType.risingedge):
@@ -202,14 +199,10 @@ class SM303:
         resp = self.spec.spSetExtEdgeMode(cedge_mode, self.dev_num)
         time.sleep(0.1)
         if resp == 1:
-            self.base.print_message(
-                f"Successfully set ext. trigger edge mode to {str(mode)}"
-            )
+            LOGGER.info(f"Successfully set ext. trigger edge mode to {str(mode)}")
             self.edgemode = mode
             return True
-        self.base.print_message(
-            f"Could not set ext. trigger edge mode to {str(mode)}", error=True
-        )
+        LOGGER.error(f"Could not set ext. trigger edge mode to {str(mode)}")
         return False
 
     def set_integration_time(self, int_time: float = 7.0):
@@ -219,14 +212,10 @@ class SM303:
         resp = self.spec.spSetDblIntEx(cint_time, self.dev_num)
         time.sleep(0.1)
         if resp == 1:
-            self.base.print_message(
-                f"Successfully set integration time to {int_time:.1f} msec"
-            )
+            LOGGER.info(f"Successfully set integration time to {int_time:.1f} msec")
             self.int_time = cint_time
             return True
-        self.base.print_message(
-            f"Could not set integration time to {int_time:.1f}", error=True
-        )
+        LOGGER.error(f"Could not set integration time to {int_time:.1f}")
         return False
 
     def acquire_spec_adv(self, int_time_ms: float, **kwargs):
@@ -271,11 +260,9 @@ class SM303:
                 retdict["peak_intensity"] = float(arr_data[lower_lim:upper_lim].max())
                 return retdict
             else:
-                self.base.print_message("No data available.", info=True)
+                LOGGER.info("No data available.")
                 return {"error_code": ErrorCodes.not_available}
-        self.base.print_message(
-            "Trigger or integration time could not be set.", info=True
-        )
+        LOGGER.info("Trigger or integration time could not be set.")
         return {"error_code": ErrorCodes.not_available}
 
     async def acquire_spec_extrig(self, A: Action):
@@ -319,7 +306,7 @@ class SM303:
             else:
                 self.samples_in = samples_in
                 self.action = A
-                # self.base.print_message("Writing initial spec_helao__file", info=True)
+                # LOGGER.info("Writing initial spec_helao__file")
                 spec_header = {"wl": self.pxwl}
                 dflt_conn_key = self.base.dflt_file_conn_key()
                 self.active = await self.base.contain_action(
@@ -348,9 +335,9 @@ class SM303:
                 )
 
                 self.start_time = time.time()
-                self.base.print_message(f"start_time: {self.start_time}")
+                LOGGER.info(f"start_time: {self.start_time}")
                 self.spec_time = time.time()
-                self.base.print_message(f"spec_time: {self.spec_time}")
+                LOGGER.info(f"spec_time: {self.spec_time}")
                 self.active.finish_hlo_header(
                     realtime=self.base.get_realtime_nowait(),
                     file_conn_keys=self.active.action.file_conn_keys,
@@ -431,14 +418,14 @@ class SM303:
             except asyncio.exceptions.TimeoutError:
                 self.data = []
             # if first_print:
-            # self.base.print_message(f"spReadDataAdvEx was called")
+            # LOGGER.info(f"spReadDataAdvEx was called")
             if self.data:
                 self.data = [self._data[i] for i in range(1056)][10:1034]
                 # enqueue data
                 datadict = {"epoch_s": self.spec_time}
                 datadict.update({f"ch_{i:04}": x for i, x in enumerate(self.data)})
                 # if first_print:
-                #     self.base.print_message("writing initial data")
+                #     LOGGER.info("writing initial data")
                 await self.active.enqueue_data(
                     datamodel=DataModel(
                         data={self.active.action.file_conn_keys[0]: datadict},
@@ -451,7 +438,7 @@ class SM303:
             self.spec_time = time.time()
             # first_print = False
 
-        self.base.print_message("polling loop duration complete, finishing")
+        LOGGER.info("polling loop duration complete, finishing")
         self.trigger_duration = 0
         self.close_spec_connection()
         return {"measure": "done_extrig"}
@@ -461,7 +448,7 @@ class SM303:
             self.IO_do_meas = False  # will stop meas loop
             self.IO_measuring = False
             self.unset_external_trigger()
-            self.base.print_message("signaling IOloop to stop")
+            LOGGER.info("signaling IOloop to stop")
             self.set_IO_signalq_nowait(False)
         else:
             pass
@@ -491,7 +478,7 @@ class SM303:
         self.spec.spSetTrgEx(ctypes.c_short(10), self.dev_num)  # 10=SP_TRIGGER_OFF
 
     def shutdown(self):
-        self.base.print_message("shutting down SM303")
+        LOGGER.info("shutting down SM303")
         # self.unset_external_trigger()
         # self.spec.spSetTEC(ctypes.c_long(0), self.dev_num)
         self.spec.spCloseGivenChannel(self.dev_num)

@@ -4,18 +4,19 @@ import os
 import zipfile
 import re
 from glob import glob
+from typing import Optional
 
 from helao.helpers.print_message import print_message
-from helaocore.models.helaodirs import HelaoDirs
+from helao.core.models.helaodirs import HelaoDirs
 
 from helao.helpers import logging
 
 if logging.LOGGER is None:
-    LOGGER = logging.make_logger(logger_name="helao_dirs_standalone")
+    LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
-def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
+def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
     """
     Initializes and verifies the directory structure for the Helao application based on the provided configuration.
 
@@ -49,11 +50,7 @@ def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
         user_seq = os.path.join(root, "USER_CONFIG", "SEQ")
         ana_root = os.path.join(root, "ANALYSES")
         process_root = os.path.join(root, "PROCESSES")
-        print_message(
-            LOGGER,
-            "DIR",
-            f"Found root directory in config: {world_cfg['root']}",
-        )
+        LOGGER.info(f"Found root directory in config: {world_cfg['root']}")
         check_dir(root)
         check_dir(save_root)
         check_dir(log_root)
@@ -81,7 +78,7 @@ def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
             old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
             nots_counter = 0
             for old_log in old_log_txts:
-                print_message(LOGGER, "launcher", f"Compressing: {old_log}")
+                LOGGER.info(f"Compressing: {old_log}")
                 try:
                     timestamp_found = False
                     timestamp = ""
@@ -112,7 +109,7 @@ def helao_dirs(world_cfg: dict, server_name: str = None) -> HelaoDirs:
                         zf.write(old_log, arcname)
                     os.remove(old_log)
                 except Exception as e:
-                    print_message(LOGGER, "launcher", f"Error compressing log: {old_log}, {e}")
+                    LOGGER.info(f"Error compressing log: {old_log}, {e}")
 
     else:
         helaodirs = HelaoDirs(

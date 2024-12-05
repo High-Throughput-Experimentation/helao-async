@@ -48,7 +48,7 @@ from helao.drivers.motion.galil_motion_driver import (
 from helao.servers.base_api import BaseAPI
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
-from helaocore.error import ErrorCodes
+from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
 
@@ -128,7 +128,7 @@ async def galil_dyn_endpoints(app=None):
         async def toMotorXY(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            platexy: str = None,
+            platexy: Optional[str] = None,
         ):
             """Converts plate to motor xy"""
             active = await app.base.setup_and_contain_action(action_abbr="tomotorxy")
@@ -147,7 +147,7 @@ async def galil_dyn_endpoints(app=None):
         async def toPlateXY(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            motorxy: str = None,
+            motorxy: Optional[str] = None,
         ):
             """Converts motor to plate xy"""
             active = await app.base.setup_and_contain_action(action_abbr="toplatexy")
@@ -165,7 +165,7 @@ async def galil_dyn_endpoints(app=None):
         async def MxytoMPlate(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            Mxy: str = None,
+            Mxy: Optional[str] = None,
         ):
             """removes Minstr from Msystem to obtain Mplate for alignment"""
             active = await app.base.setup_and_contain_action(action_abbr="mxytomplate")
@@ -187,7 +187,7 @@ async def galil_dyn_endpoints(app=None):
                 action_version: int = 1,
                 d_mm: List[float] = [0, 0],
                 axis: List[str] = ["x", "y"],
-                speed: int = None,
+                speed: Optional[int] = None,
                 mode: MoveModes = MoveModes.relative,
                 transformation: TransformationModes = TransformationModes.motorxy,  # default, nothing to do
             ):
@@ -211,7 +211,7 @@ async def galil_dyn_endpoints(app=None):
                 action_version: int = 1,
                 axis: dev_axisitems = None,
                 d_mm: float = 0,
-                speed: int = None,
+                speed: Optional[int] = None,
                 mode: MoveModes = MoveModes.relative,
                 transformation: TransformationModes = TransformationModes.motorxy,  # default, nothing to do
             ):
@@ -336,7 +336,7 @@ async def galil_dyn_endpoints(app=None):
         async def solid_get_platemap(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            plate_id: int = None,
+            plate_id: Optional[int] = None,
         ):
             active = await app.base.setup_and_contain_action()
             datadict = await app.driver.solid_get_platemap(
@@ -350,8 +350,8 @@ async def galil_dyn_endpoints(app=None):
         async def solid_get_samples_xy(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            plate_id: int = None,
-            sample_no: int = None,
+            plate_id: Optional[int] = None,
+            sample_no: Optional[int] = None,
         ):
             active = await app.base.setup_and_contain_action()
             datadict = await app.driver.solid_get_samples_xy(
@@ -381,8 +381,8 @@ async def galil_dyn_endpoints(app=None):
         async def solid_get_nearest_specref(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            plate_id: int = None,
-            sample_no: int = None,
+            plate_id: Optional[int] = None,
+            sample_no: Optional[int] = None,
             specref_code: int = 1,
         ):
             active = await app.base.setup_and_contain_action()
