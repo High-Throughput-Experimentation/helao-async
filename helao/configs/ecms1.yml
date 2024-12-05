@@ -101,7 +101,7 @@ servers:
     params:
       devices:
         CO2:
-          port: COM3
+          port: COM7
           unit_id: A
     verbose: false
 
