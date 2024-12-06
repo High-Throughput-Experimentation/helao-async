@@ -414,7 +414,7 @@ def main():
                     )
 
                 # wait for sequence end (orch_state == "idle")
-                current_state, active_insitu_seq, last_seq = wait_for_orch(operator, LoopStatus.stopped)
+                current_state, _, last_seq = wait_for_orch(operator, LoopStatus.stopped)
                 if current_state in [LoopStatus.error, LoopStatus.estopped]:
                     with CLIENT:
                         output = CLIENT.set_status(
@@ -488,7 +488,7 @@ def main():
                         return -1
 
                 # wait for analysis end (orch_state == "idle")
-                current_state, active_ana_seq, last_seq = wait_for_orch(
+                current_state, _, last_seq = wait_for_orch(
                     operator, LoopStatus.stopped
                 )
                 if current_state in [LoopStatus.error, LoopStatus.estopped]:
@@ -559,7 +559,7 @@ def main():
                             return -1
 
                     # wait for QC end (orch_state == "idle")
-                    current_state, active_qc_seq, last_seq = wait_for_orch(
+                    current_state, _, last_seq = wait_for_orch(
                         operator, LoopStatus.stopped
                     )
 
