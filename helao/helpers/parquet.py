@@ -16,10 +16,10 @@ Functions:
 import orjson
 from ruamel.yaml import YAML
 from collections import defaultdict
-
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+import json
 
 yaml = YAML()
 
@@ -102,16 +102,38 @@ def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100):
     current_idx = 0
     header, data_start = read_hlo_header(input_hlo_path)
 
+    df_headers = header['optional']['wl']
+    df_headers = ['Time (s)'] + df_headers   
+
     for chunk, chunklen in read_hlo_data_chunks(
         input_hlo_path, data_start, chunk_size=chunk_size
     ):
         df = pd.DataFrame(chunk, index=range(current_idx, current_idx + chunklen))
+        # convert from ticktime to time
+        df.iloc[:,0] = df.iloc[:,0].apply(lambda x: x - df.iloc[0, 0])
+
+        # rename the collumns using df_headers
+        df.columns = df_headers
+
+        # set the index to the first column
+        df.set_index('Time (s)', inplace=True)
+        df.columns.name ='Wavelength (nm)'
+
+        # drop the first column
+        df.drop(df.columns[0], axis=1, inplace=True)
+        # downsample the data to every 1 nm
+        df=df.T.groupby(df.columns//1).mean().T
+        
+
+
+        current_idx += chunklen
+        
         current_idx += chunklen
         table = pa.Table.from_pandas(df)
         if schema is None:
             schema = table.schema
             existing_metadata = schema.metadata
-            custom_metadata = orjson.dumps(header.get("optional", {}))
+            custom_metadata = json.dumps(header.get("optional", {})).encode("utf8")
             metadata = {**{"helao_metadata": custom_metadata}, **existing_metadata}
 
         table = table.replace_schema_metadata(metadata)
@@ -124,7 +146,6 @@ def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100):
 
     if writer:
         writer.close()
-
 
 def read_helao_metadata(parquet_file_path):
     """
