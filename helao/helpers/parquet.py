@@ -145,7 +145,7 @@ def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100, HiSpEC:b
             df=df.T.groupby(df.columns//1).mean().T
 
             # insert the time collumn from df into df0 as collumn 0
-            df.insert(0, 'Time (s)', df0.iloc[:,0])
+            df.insert(0, 't_s', df0.iloc[:,0])
 
             df.columns= df.columns.astype(str)
  
@@ -199,6 +199,6 @@ def read_helao_metadata(parquet_file_path):
 
 
 if __name__ == "__main__":    
-    input_hlo_path = r"/Users/benj/Documents/SpEC_Class_2/test_data/ANDORSPEC-0.0.0.0__0.hlo"
+    input_hlo_path = r"/Users/benj/Documents/MnOxEpoxidation2/2024-07-18-MnOx-attempt3/1mVSpEC/ANDORSPEC-0.0.0.0__0.hlo"
     output_parquet_path = r"/Users/benj/Documents/SpEC_Class_2/test_data/test.parquet"
     hlo_to_parquet(input_hlo_path, output_parquet_path, HiSpEC=True)
