@@ -1199,7 +1199,7 @@ class Orch(Base):
                             try:
                                 if (
                                     resuuid
-                                    in self.globalstatusmodel.nonactive_dict[actstat]
+                                    in self.globalstatusmodel.nonactive_dict.get(actstat, {})
                                 ):
                                     break
                                 self.globalstatusmodel.nonactive_dict[actstat][
