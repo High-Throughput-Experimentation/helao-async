@@ -7,6 +7,7 @@ from copy import copy
 from enum import Enum
 from socket import gethostname
 from typing import Union, Optional, List
+from datetime import datetime
 
 from fastapi import Body, WebSocket, Request
 from fastapi.routing import APIRoute
@@ -42,7 +43,7 @@ else:
 
 class OrchAPI(HelaoFastAPI):
     orch: Orch
-    
+
     def __init__(
         self,
         config,
@@ -171,7 +172,9 @@ class OrchAPI(HelaoFastAPI):
                     # send active status but don't create active object
                     await self.orch.status_q.put(action.get_actmodel())
                     response = JSONResponse(action.as_dict())
-                    LOGGER.info(f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}")
+                    LOGGER.info(
+                        f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
+                    )
                     self.orch.endpoint_queues[endpoint].put(
                         (
                             action,
@@ -395,22 +398,6 @@ class OrchAPI(HelaoFastAPI):
             """
             shutdown_event()
 
-        @self.on_event("shutdown")
-        def shutdown_event():
-            """
-            Shuts down the operator and the Bokeh application.
-
-            This function performs the following steps:
-            1. Logs a message indicating that the operator is stopping.
-            2. Stops the Bokeh application.
-            3. Logs a message indicating that the orchestrator has shut down.
-            4. Waits for 0.75 seconds to ensure all processes have terminated properly.
-            """
-            LOGGER.info("Stopping operator")
-            self.orch.bokehapp.stop()
-            LOGGER.info("orch shutdown")
-            time.sleep(0.75)
-
         # --- ORCH-specific endpoints ---
         @self.post("/global_status", tags=["private"])
         def global_status():
@@ -423,7 +410,7 @@ class OrchAPI(HelaoFastAPI):
             return self.orch.globalstatusmodel.as_json()
 
         @self.post("/export_queues", tags=["private"])
-        def export_queues():
+        def export_queues(timestamp_pck: bool = False):
             """
             Exports the current state of various queues and active elements in the orchestrator to a pickle file.
 
@@ -459,12 +446,16 @@ class OrchAPI(HelaoFastAPI):
                 "last_dispatched_act": self.orch.last_dispatched_action_uuid,
                 "last_50_act_uuids": self.orch.last_50_action_uuids,
             }
-            save_path = os.path.join(save_dir, "STATES", "queues.pck")
+            if timestamp_pck:
+                pck_name = f"queues_{datetime.now().strftime('%Y%m%d.%H%M%S')}.pck"
+            else:
+                pck_name = "queues.pck"
+            save_path = os.path.join(save_dir, "STATES", pck_name)
             pickle.dump(queue_dict, open(save_path, "wb"))
             return save_path
 
         @self.post("/import_queues", tags=["private"])
-        def import_queues():
+        def import_queues(pck_path: Optional[str] = None):
             """
             Imports and restores the state of various queues from a saved pickle file.
 
@@ -492,7 +483,10 @@ class OrchAPI(HelaoFastAPI):
                 str: The path to the pickle file used for restoring the queues.
             """
             save_dir = self.orch.world_cfg["root"]
-            save_path = os.path.join(save_dir, "STATES", "queues.pck")
+            if pck_path is None:
+                save_path = os.path.join(save_dir, "STATES", "queues.pck")
+            else:
+                save_path = pck_path.strip('"').strip("'")
             if os.path.exists(save_path):
                 queue_dict = pickle.load(open(save_path, "rb"))
             else:
@@ -534,7 +528,9 @@ class OrchAPI(HelaoFastAPI):
             """
             if actionservermodel is None:
                 return False
-            LOGGER.info(f"orch '{self.orch.server.server_name}' got status from '{actionservermodel.action_server.server_name}': {actionservermodel.endpoints}")
+            LOGGER.info(
+                f"orch '{self.orch.server.server_name}' got status from '{actionservermodel.action_server.server_name}': {actionservermodel.endpoints}"
+            )
             return await self.orch.update_status(actionservermodel=actionservermodel)
 
         @self.post("/clear_actives", tags=["private"])
@@ -584,7 +580,9 @@ class OrchAPI(HelaoFastAPI):
             Returns:
                 dict: A dictionary containing the result of the update operation.
             """
-            LOGGER.info(f"'{self.orch.server.server_name.upper()}' got nonblocking status from '{actionmodel.action_server.server_name}': exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status} on {server_host}:{server_port}")
+            LOGGER.info(
+                f"'{self.orch.server.server_name.upper()}' got nonblocking status from '{actionmodel.action_server.server_name}': exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status} on {server_host}:{server_port}"
+            )
             result_dict = await self.orch.update_nonblocking(
                 actionmodel, server_host, server_port
             )
@@ -1396,6 +1394,36 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
+        @self.on_event("shutdown")
+        def shutdown_event():
+            """
+            Shuts down the operator and the Bokeh application.
+
+            This function performs the following steps:
+            1. Logs a message indicating that the operator is stopping.
+            2. Stops the Bokeh application.
+            3. Logs a message indicating that the orchestrator has shut down.
+            4. Waits for 0.75 seconds to ensure all processes have terminated properly.
+            """
+            if any(
+                [
+                    len(x) > 0
+                    for x in (
+                        self.orch.sequence_dq,
+                        self.orch.experiment_dq,
+                        self.orch.action_dq,
+                    )
+                ]
+            ):
+                export_path = export_queues(timestamp_pck=True)
+                LOGGER.info(
+                    f"Orch queues are not empty, exported queues to {export_path}"
+                )
+            LOGGER.info("Stopping operator")
+            self.orch.bokehapp.stop()
+            LOGGER.info("orch shutdown")
+            time.sleep(0.75)
+
 
 class WaitExec(Executor):
     """
@@ -1413,13 +1441,14 @@ class WaitExec(Executor):
         _poll(): Periodically checks the elapsed time and updates the status.
         _post_exec(): Logs the completion of the wait action and returns a result dictionary.
     """
+
     def __init__(self, *args, **kwargs):
         """
         Initializes the WaitExec class.
 
         Args:
             *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments. 
+            **kwargs: Arbitrary keyword arguments.
                 - print_every_secs (int, optional): Interval in seconds for printing messages. Defaults to 5.
 
         Attributes:
@@ -1490,6 +1519,7 @@ class checkcond(str, Enum):
         isnot (str): Represents a condition where values are not equal.
         uncond (str): Represents an unconditional state.
     """
+
     equals = "equals"
     below = "below"
     above = "above"
