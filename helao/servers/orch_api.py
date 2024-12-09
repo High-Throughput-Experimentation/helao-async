@@ -432,27 +432,7 @@ class OrchAPI(HelaoFastAPI):
             Returns:
                 str: The file path where the pickle file is saved.
             """
-            save_dir = self.orch.world_cfg["root"]
-            queue_dict = {
-                "seq": list(self.orch.sequence_dq),
-                "exp": list(self.orch.experiment_dq),
-                "act": list(self.orch.action_dq),
-                "active_exp": self.orch.active_experiment,
-                "last_exp": self.orch.last_experiment,
-                "active_seq": self.orch.active_sequence,
-                "last_seq": self.orch.last_sequence,
-                "active_counter": self.orch.active_seq_exp_counter,
-                "last_act": self.orch.last_action_uuid,
-                "last_dispatched_act": self.orch.last_dispatched_action_uuid,
-                "last_50_act_uuids": self.orch.last_50_action_uuids,
-            }
-            if timestamp_pck:
-                pck_name = f"queues_{datetime.now().strftime('%Y%m%d.%H%M%S')}.pck"
-            else:
-                pck_name = "queues.pck"
-            save_path = os.path.join(save_dir, "STATES", pck_name)
-            pickle.dump(queue_dict, open(save_path, "wb"))
-            return save_path
+            return self.orch.export_queues(timestamp_pck)
 
         @self.post("/import_queues", tags=["private"])
         def import_queues(pck_path: Optional[str] = None):
@@ -482,36 +462,7 @@ class OrchAPI(HelaoFastAPI):
             Returns:
                 str: The path to the pickle file used for restoring the queues.
             """
-            save_dir = self.orch.world_cfg["root"]
-            if pck_path is None:
-                save_path = os.path.join(save_dir, "STATES", "queues.pck")
-            else:
-                save_path = pck_path.strip('"').strip("'")
-            if os.path.exists(save_path):
-                queue_dict = pickle.load(open(save_path, "rb"))
-            else:
-                LOGGER.info("Exported queues.pck does not exist. Cannot restore.")
-            if self.orch.sequence_dq or self.orch.experiment_dq or self.orch.action_dq:
-                LOGGER.info("Existing queues are not empty. Cannot restore.")
-            else:
-                LOGGER.info("Restoring queues from saved pck.")
-                for x in queue_dict["act"]:
-                    self.orch.action_dq.append(x)
-                for x in queue_dict["exp"]:
-                    self.orch.experiment_dq.append(x)
-                for x in queue_dict["seq"]:
-                    self.orch.sequence_dq.append(x)
-                self.orch.active_experiment = queue_dict["active_exp"]
-                self.orch.last_experiment = queue_dict["last_exp"]
-                self.orch.active_sequence = queue_dict["active_seq"]
-                self.orch.last_sequence = queue_dict["last_seq"]
-                self.orch.active_seq_exp_counter = queue_dict["active_counter"]
-                self.orch.last_action_uuid = queue_dict["last_act"]
-                self.orch.last_dispatched_action_uuid = queue_dict[
-                    "last_dispatched_act"
-                ]
-                self.orch.last_50_action_uuids = queue_dict["last_50_act_uuids"]
-            return save_path
+            return self.orch.import_queues(pck_path)
 
         @self.post("/update_status", tags=["private"])
         async def update_status(
@@ -1415,7 +1366,7 @@ class OrchAPI(HelaoFastAPI):
                     )
                 ]
             ):
-                export_path = export_queues(timestamp_pck=True)
+                export_path = self.orch.export_queues(timestamp_pck=True)
                 LOGGER.info(
                     f"Orch queues are not empty, exported queues to {export_path}"
                 )

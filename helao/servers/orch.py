@@ -1,6 +1,8 @@
 __all__ = ["Orch"]
 
-
+import pickle
+import os
+from datetime import datetime
 from helao.helpers import logging
 
 if logging.LOGGER is None:
@@ -1419,6 +1421,18 @@ class Orch(Base):
                 self.globalstatusmodel.loop_state = LoopStatus.stopped
             await self.intend_none()
             await self.update_operator(True)
+
+            if any(
+                [
+                    len(x) > 0
+                    for x in (
+                        self.sequence_dq,
+                        self.experiment_dq,
+                        self.action_dq,
+                    )
+                ]
+            ):
+                self.export_queues(timestamp_pck=True)
             return True
 
         # except asyncio.CancelledError:
@@ -2410,3 +2424,108 @@ class Orch(Base):
             self.status_summary = await self.ping_action_servers()
             await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
+
+    def export_queues(self, timestamp_pck: bool = False):
+        """
+        Exports the current state of various queues and active elements in the orchestrator to a pickle file.
+
+        The function collects the following data from the orchestrator:
+        - Sequence queue
+        - Experiment queue
+        - Action queue
+        - Active experiment
+        - Last experiment
+        - Active sequence
+        - Last sequence
+        - Active sequence-experiment counter
+        - Last action UUID
+        - Last dispatched action UUID
+        - Last 50 action UUIDs
+
+        The collected data is saved as a dictionary in a pickle file located in the "STATES" directory under the root path specified in the orchestrator's world configuration.
+
+        Returns:
+            str: The file path where the pickle file is saved.
+        """
+        save_dir = self.world_cfg["root"]
+        queue_dict = {
+            "seq": list(self.sequence_dq),
+            "exp": list(self.experiment_dq),
+            "act": list(self.action_dq),
+            "active_exp": self.active_experiment,
+            "last_exp": self.last_experiment,
+            "active_seq": self.active_sequence,
+            "last_seq": self.last_sequence,
+            "active_counter": self.active_seq_exp_counter,
+            "last_act": self.last_action_uuid,
+            "last_dispatched_act": self.last_dispatched_action_uuid,
+            "last_50_act_uuids": self.last_50_action_uuids,
+            "global_status_model": self.globalstatusmodel,
+        }
+        if timestamp_pck:
+            pck_name = f"queues_{datetime.now().strftime('%Y%m%d.%H%M%S')}.pck"
+        else:
+            pck_name = "queues.pck"
+        save_path = os.path.join(save_dir, "STATES", pck_name)
+        pickle.dump(queue_dict, open(save_path, "wb"))
+        return save_path
+
+    def import_queues(self, pck_path: Optional[str] = None):
+        """
+        Imports and restores the state of various queues from a saved pickle file.
+
+        This function attempts to load a previously saved state of action, experiment,
+        and sequence queues from a pickle file located at "STATES/queues.pck" within
+        the directory specified by `self.orch.world_cfg["root"]`. If the file does not
+        exist, or if any of the current queues are not empty, the function will print
+        an appropriate message and will not restore the queues.
+
+        Upon successful restoration, the function updates the following attributes of
+        `self.orch`:
+        - action_dq
+        - experiment_dq
+        - sequence_dq
+        - active_experiment
+        - last_experiment
+        - active_sequence
+        - last_sequence
+        - active_seq_exp_counter
+        - last_action_uuid
+        - last_dispatched_action_uuid
+        - last_50_action_uuids
+
+        Returns:
+            str: The path to the pickle file used for restoring the queues.
+        """
+        save_dir = self.world_cfg["root"]
+        if pck_path is None:
+            save_path = os.path.join(save_dir, "STATES", "queues.pck")
+        else:
+            save_path = pck_path.strip('"').strip("'")
+        if os.path.exists(save_path):
+            queue_dict = pickle.load(open(save_path, "rb"))
+        else:
+            LOGGER.info("Exported queues.pck does not exist. Cannot restore.")
+            return save_path
+        if self.sequence_dq or self.experiment_dq or self.action_dq:
+            LOGGER.info("Existing queues are not empty. Cannot restore.")
+        else:
+            LOGGER.info("Restoring queues from saved pck.")
+            for x in queue_dict["act"]:
+                self.action_dq.append(x)
+            for x in queue_dict["exp"]:
+                self.experiment_dq.append(x)
+            for x in queue_dict["seq"]:
+                self.sequence_dq.append(x)
+            self.active_experiment = queue_dict["active_exp"]
+            self.last_experiment = queue_dict["last_exp"]
+            self.active_sequence = queue_dict["active_seq"]
+            self.last_sequence = queue_dict["last_seq"]
+            self.active_seq_exp_counter = queue_dict["active_counter"]
+            self.last_action_uuid = queue_dict["last_act"]
+            self.last_dispatched_action_uuid = queue_dict[
+                "last_dispatched_act"
+            ]
+            self.last_50_action_uuids = queue_dict["last_50_act_uuids"]
+            self.globalstatusmodel = queue_dict["globalstatusmodel"]
+        return save_path
