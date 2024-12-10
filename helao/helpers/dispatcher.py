@@ -45,13 +45,13 @@ async def async_action_dispatcher(
     retry_count = 0
 
     client_timeout = aiohttp.ClientTimeout(total=timeout)
-    conn = aiohttp.TCPConnector(
-        force_close=True, enable_cleanup_closed=True, limit=1000
-    )
     error_code = ErrorCodes.unspecified
     response = None
 
     while not success and retry_count < retries:
+        conn = aiohttp.TCPConnector(
+            force_close=True, enable_cleanup_closed=True, limit=1000
+        )
         try:
             async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
                 async with session.post(
@@ -75,6 +75,8 @@ async def async_action_dispatcher(
             )
             await asyncio.sleep(retry_wait)
             response = None
+        finally:
+            conn.close()
     if not success:
         LOGGER.error(
             f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{response}')",
@@ -114,13 +116,13 @@ async def async_private_dispatcher(
     retry_count = 0
 
     client_timeout = aiohttp.ClientTimeout(total=timeout)
-    conn = aiohttp.TCPConnector(
-        force_close=True, enable_cleanup_closed=True, limit=1000
-    )
     error_code = ErrorCodes.unspecified
     response = None
 
     while not success and retry_count < retries:
+        conn = aiohttp.TCPConnector(
+            force_close=True, enable_cleanup_closed=True, limit=1000
+        )
         try:
             async with aiohttp.ClientSession(
                 timeout=client_timeout, connector=conn
@@ -146,6 +148,8 @@ async def async_private_dispatcher(
             )
             await asyncio.sleep(retry_wait)
             response = None
+        finally:
+            conn.close()
     if not success:
         LOGGER.error(
             f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{response}')",
