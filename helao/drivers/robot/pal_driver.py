@@ -284,29 +284,20 @@ class PAL:
             return
         try:
             with nidaqmx.Task() as task:
-                self.base.print_message(
-                    f"using trigger port "
-                    f"'{self.triggerport_start}' "
-                    "for 'start' trigger",
-                    info=True,
+                LOGGER.info(
+                    f"using trigger port '{self.triggerport_start}' for 'start' trigger"
                 )
                 task.di_channels.add_di_chan(
                     self.triggerport_start, line_grouping=LineGrouping.CHAN_PER_LINE
                 )
-                self.base.print_message(
-                    f"using trigger port "
-                    f"'{self.triggerport_continue}' "
-                    f"for 'continue' trigger",
-                    info=True,
+                LOGGER.info(
+                    f"using trigger port '{self.triggerport_continue}' for 'continue' trigger"
                 )
                 task.di_channels.add_di_chan(
                     self.triggerport_continue, line_grouping=LineGrouping.CHAN_PER_LINE
                 )
-                self.base.print_message(
-                    f"using trigger port "
-                    f"'{self.triggerport_done}' "
-                    "for 'done' trigger",
-                    info=True,
+                LOGGER.info(
+                    f"using trigger port '{self.triggerport_done}' for 'done' trigger"
                 )
                 task.di_channels.add_di_chan(
                     self.triggerport_done, line_grouping=LineGrouping.CHAN_PER_LINE
@@ -475,7 +466,9 @@ class PAL:
                             LOGGER.error("Sample does not exist in db")
                             return ErrorCodes.critical
                     else:
-                        LOGGER.error("palaction.dest.samples_initial should not contain ref samples")
+                        LOGGER.error(
+                            "palaction.dest.samples_initial should not contain ref samples"
+                        )
                         return ErrorCodes.bug
                 # update the action_uuid
                 for sample in palaction.dest.samples_initial:
@@ -675,7 +668,9 @@ class PAL:
             slot_pos = newvialpos["slot"]
             vial_pos = newvialpos["vial"]
 
-            LOGGER.info(f"diluting liquid sample in tray {tray_pos}, slot {slot_pos}, vial {vial_pos}")
+            LOGGER.info(
+                f"diluting liquid sample in tray {tray_pos}, slot {slot_pos}, vial {vial_pos}"
+            )
 
             # need to get the sample which is currently in this vial
             # and also add it to global samples_in
@@ -714,13 +709,7 @@ class PAL:
             error = ErrorCodes.critical
 
         elif sample_in == NoneSample():
-            self.base.print_message(
-                f"PAL_source: No sample in tray "
-                f"{microcam.requested_source.tray}, "
-                f"slot {microcam.requested_source.slot}, "
-                f"vial {microcam.requested_source.vial}",
-                error=True,
-            )
+            LOGGER.error( f"PAL_source: No sample in tray {microcam.requested_source.tray}, slot {microcam.requested_source.slot}, vial {microcam.requested_source.vial}")
             error = ErrorCodes.not_available
 
         return PALposition(
@@ -739,11 +728,7 @@ class PAL:
         source = microcam.requested_source.position  # custom position name
 
         if source is None:
-            self.base.print_message(
-                "PAL_source: Invalid PAL source "
-                "'NONE' for 'custom' position method.",
-                error=True,
-            )
+            LOGGER.error("PAL_source: Invalid PAL source 'NONE' for 'custom' position method.")
             return PALposition(error=ErrorCodes.not_available)
 
         error, sample_in = await self.archive.custom_query_sample(
@@ -789,10 +774,7 @@ class PAL:
             return PALposition(error=ErrorCodes.not_available)
 
         elif sample_in == NoneSample():
-            self.base.print_message(
-                "PAL_source: More then one sample in source position. This is not allowed.",
-                error=True,
-            )
+            LOGGER.error("PAL_source: More then one sample in source position. This is not allowed.")
             return PALposition(error=ErrorCodes.critical)
 
         return PALposition(
@@ -854,12 +836,7 @@ class PAL:
             and palposition.samples_initial[0] != NoneSample()
         ):
 
-            self.base.print_message(
-                f"PAL_source: Got sample "
-                f"'{palposition.samples_initial[0].global_label}' "
-                f"in position '{palposition.position}'",
-                info=True,
-            )
+            LOGGER.info(f"PAL_source: Got sample '{palposition.samples_initial[0].global_label}' in position '{palposition.position}'")
             # done with checking source type
             # setting inheritance and status to None for all samples
             # in sample_in (will be updated when dest is decided)
@@ -875,12 +852,7 @@ class PAL:
             # this should never happen
             # else we have a bug in the source checks
             if palposition.position is not None:
-                self.base.print_message(
-                    f"BUG check PAL_source: "
-                    f"Got sample no sample in position "
-                    f"'{palposition.position}'",
-                    error=True,
-                )
+                LOGGER.error(f"BUG check PAL_source: Got sample no sample in position '{palposition.position}'")
 
         microcam.run.append(
             PalAction(
@@ -916,21 +888,9 @@ class PAL:
         # check if a sample is present in destination
         if sample_in == NoneSample():
             # no sample in dest, create a new sample reference
-            self.base.print_message(
-                f"PAL_dest: No sample in tray "
-                f"{microcam.requested_dest.tray}, "
-                f"slot {microcam.requested_dest.slot}, "
-                f"vial {microcam.requested_dest.vial}",
-                info=True,
-            )
+            LOGGER.info(f"PAL_dest: No sample in tray {microcam.requested_dest.tray}, slot {microcam.requested_dest.slot}, vial {microcam.requested_dest.vial}")
             if len(microcam.run[-1].samples_in) > 1:
-                self.base.print_message(
-                    f"PAL_dest: Found a BUG: "
-                    f"Assembly not allowed for PAL dest "
-                    f"'{dest}' for 'tray' "
-                    f"position method.",
-                    error=True,
-                )
+                LOGGER.error(f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.")
                 return PALposition(error=ErrorCodes.bug), samples_out_list
 
             error, samples_out_list = await self.archive.new_ref_samples(
@@ -956,12 +916,7 @@ class PAL:
         else:
             # a sample is already present in the tray position
             # we add more sample to it, e.g. dilute it
-            self.base.print_message(
-                f"PAL_dest: Got sample "
-                f"'{sample_in.global_label}' "
-                f"in position '{dest}'",
-                info=True,
-            )
+            LOGGER.info(f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'")
             # we can only add liquid to vials (diluite them, no assembly here)
             sample_in.inheritance = SampleInheritance.receive_only
             sample_in.status = [SampleStatus.preserved]
@@ -998,10 +953,7 @@ class PAL:
 
         dest = microcam.requested_dest.position
         if dest is None:
-            self.base.print_message(
-                "PAL_dest: Invalid PAL dest 'NONE' for 'custom' position method.",
-                error=True,
-            )
+            LOGGER.error("PAL_dest: Invalid PAL dest 'NONE' for 'custom' position method.")
             return PALposition(error=ErrorCodes.critical), samples_out_list
 
         if not self.archive.custom_dest_allowed(dest):
@@ -1010,30 +962,17 @@ class PAL:
 
         error, sample_in = await self.archive.custom_query_sample(dest)
         if error != ErrorCodes.none:
-            self.base.print_message(
-                f"PAL_dest: Invalid PAL dest '{dest}' for 'custom' position method.",
-                error=True,
-            )
+            LOGGER.error(f"PAL_dest: Invalid PAL dest '{dest}' for 'custom' position method.")
             return PALposition(error=error), samples_out_list
 
         # check if a sample is already present in the custom position
         if sample_in == NoneSample():
             # no sample in custom position, create a new sample reference
-            self.base.print_message(
-                f"PAL_dest: No sample in custom position "
-                "'{dest}', creating new "
-                "sample reference.",
-                info=True,
-            )
+            LOGGER.info(f"PAL_dest: No sample in custom position '{dest}', creating new sample reference.")
 
             # cannot create an assembly
             if len(microcam.run[-1].samples_in) > 1:
-                self.base.print_message(
-                    "PAL_dest: Found a BUG: "
-                    "Too many input samples. "
-                    "Cannot create an assembly here.",
-                    error=True,
-                )
+                LOGGER.error("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.")
                 return PALposition(error=ErrorCodes.bug), samples_out_list
 
             # this should actually never create an assembly
@@ -1058,7 +997,9 @@ class PAL:
             # sample is already present
             # either create an assembly or dilute it
             # first check what type is present
-            LOGGER.info(f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'")
+            LOGGER.info(
+                f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
+            )
 
             if sample_in.sample_type == SampleType.assembly:
                 # need to check if we already go the same type in
@@ -1068,12 +1009,7 @@ class PAL:
                 # source input should only hold a single sample
                 # but better check for sure
                 if len(microcam.run[-1].samples_in) > 1:
-                    self.base.print_message(
-                        "PAL_dest: Found a BUG: "
-                        "Too many input samples. "
-                        "Cannot create an assembly here.",
-                        error=True,
-                    )
+                    LOGGER.error("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.")
                     return PALposition(error=ErrorCodes.bug), samples_out_list
 
                 test = False
@@ -1116,10 +1052,7 @@ class PAL:
                     LOGGER.info("PAL_dest: Adding new part to assembly")
                     if len(microcam.run[-1].samples_in) > 1:
                         # sample_in should only hold one sample at that point
-                        self.base.print_message(
-                            f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.",
-                            error=True,
-                        )
+                        LOGGER.error(f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.")
                         return PALposition(error=ErrorCodes.bug), samples_out_list
 
                     # first create a new sample from the source sample
@@ -1178,22 +1111,12 @@ class PAL:
                 # we now create an assembly if allowed
                 if not self.archive.custom_assembly_allowed(dest):
                     # no assembly allowed
-                    self.base.print_message(
-                        f"PAL_dest: Assembly not allowed "
-                        f"for PAL dest '{dest}' for "
-                        f"'custom' position method.",
-                        error=True,
-                    )
+                    LOGGER.error(f"PAL_dest: Assembly not allowed for PAL dest '{dest}' for 'custom' position method.")
                     return PALposition(error=ErrorCodes.not_allowed), samples_out_list
 
                 # cannot create an assembly from an assembly
                 if len(microcam.run[-1].samples_in) > 1:
-                    self.base.print_message(
-                        "PAL_dest: Found a BUG: "
-                        "Too many input samples. "
-                        "Cannot create an assembly here.",
-                        error=True,
-                    )
+                    LOGGER.error("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.")
                     return PALposition(error=ErrorCodes.bug), samples_out_list
 
                 # dest_sample = sample_in
@@ -1232,12 +1155,7 @@ class PAL:
                 tmp_samples_in = [sample_in]
                 # and also add the newly created sample ref to it
                 tmp_samples_in.append(samples_out_list[0])
-                self.base.print_message(
-                    f"PAL_dest: Creating assembly from "
-                    f"'{[sample.global_label for sample in tmp_samples_in]}'"
-                    f" in position '{dest}'",
-                    info=True,
-                )
+                LOGGER.info(f"PAL_dest: Creating assembly from '{[sample.global_label for sample in tmp_samples_in]}' in position '{dest}'")
                 error, samples_out2_list = await self.archive.new_ref_samples(
                     samples_in=tmp_samples_in,
                     sample_out_type=SampleType.assembly,
@@ -1297,7 +1215,9 @@ class PAL:
         dest_tray = newvialpos["tray"]
         dest_slot = newvialpos["slot"]
         dest_vial = newvialpos["vial"]
-        LOGGER.info(f"PAL_dest: archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}")
+        LOGGER.info(
+            f"PAL_dest: archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}"
+        )
 
         error, samples_out_list = await self.archive.new_ref_samples(
             samples_in=microcam.run[
@@ -1363,15 +1283,14 @@ class PAL:
             LOGGER.error("PAL_dest: No next full vial")
             return PALposition(error=ErrorCodes.not_available), samples_out_list
         if sample_in == NoneSample():
-            self.base.print_message(
-                "PAL_dest: More then one sample in source position. This is not allowed.",
-                error=True,
-            )
+            LOGGER.error("PAL_dest: More then one sample in source position. This is not allowed.")
             return PALposition(error=ErrorCodes.critical), samples_out_list
 
         # a sample is already present in the tray position
         # we add more sample to it, e.g. dilute it
-        LOGGER.info(f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'")
+        LOGGER.info(
+            f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
+        )
         sample_in.inheritance = SampleInheritance.receive_only
         sample_in.status = [SampleStatus.preserved]
 
@@ -1645,10 +1564,8 @@ class PAL:
                 palcam.joblist_time = self.active.get_realtime_nowait()
                 self.PAL_pid = subprocess.Popen(cmd_to_execute, shell=True)
                 LOGGER.info(f"PAL command send: {self.PAL_pid}")
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            except Exception:
                 LOGGER.error("CMD error. Could not send commands.")
-                self.base.print_message(repr(e), tb, error=True)
                 error = ErrorCodes.cmd_error
         elif self.sshhost is not None:
             ssh_connected = False
@@ -1662,14 +1579,10 @@ class PAL:
                         hostname=self.sshhost, username=self.sshuser, pkey=k
                     )
                     ssh_connected = True
-                except Exception as e:
-                    tb = "".join(
-                        traceback.format_exception(type(e), e, e.__traceback__)
-                    )
+                except Exception:
                     ssh_connected = False
-                    self.base.print_message(
-                        f"SSH connection error. Retrying in 1 seconds.\n{repr(e), tb,}",
-                        error=True,
+                    LOGGER.error(
+                        f"SSH connection error. Retrying in 1 seconds.", exc_info=True
                     )
                     await asyncio.sleep(1)
 
@@ -1724,11 +1637,9 @@ class PAL:
 
                 LOGGER.info(f"PAL command: '{cmd_to_execute}'")
 
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message(
-                    f"SSH connection error 1. Could not send commands.\n{repr(e), tb,}",
-                    error=True,
+            except Exception:
+                LOGGER.error(
+                    "SSH connection error 1. Could not send commands.", exc_info=True
                 )
 
                 error = ErrorCodes.ssh_error
@@ -1743,11 +1654,9 @@ class PAL:
                     ) = mysshclient.exec_command(cmd_to_execute)
                     mysshclient.close()
 
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                self.base.print_message(
-                    f"SSH connection error 2. Could not send commands.\n{repr(e), tb,}",
-                    error=True,
+            except Exception:
+                LOGGER.error(
+                    "SSH connection error 2. Could not send commands.", exc_info=True
                 )
                 error = ErrorCodes.ssh_error
 
@@ -1981,12 +1890,11 @@ class PAL:
                         cur_time = time.time()
                         if self.IO_palcam.spacingmethod == Spacingmethod.linear:
                             LOGGER.info("PAL linear scheduling")
-                            LOGGER.info(f"time since last PAL run {(cur_time-last_run_time)}")
-                            self.base.print_message(
-                                f"requested time between "
-                                f"PAL runs "
-                                f"{sampleperiod-self.IO_palcam.timeoffset}",
-                                info=True,
+                            LOGGER.info(
+                                f"time since last PAL run {(cur_time-last_run_time)}"
+                            )
+                            LOGGER.info(
+                                f"requested time between PAL runs {sampleperiod-self.IO_palcam.timeoffset}",
                             )
                             diff_time = (
                                 sampleperiod
@@ -1998,11 +1906,11 @@ class PAL:
                             timepoint = (
                                 self.IO_palcam.spacingfactor**run
                             ) * sampleperiod
-                            LOGGER.info(f"time since last PAL run {(cur_time-last_run_time)}")
-                            self.base.print_message(
-                                f"requested time between "
-                                f"PAL runs {timepoint-prev_timepoint-self.IO_palcam.timeoffset}",
-                                info=True,
+                            LOGGER.info(
+                                f"time since last PAL run {(cur_time-last_run_time)}"
+                            )
+                            LOGGER.info(
+                                f"requested time between PAL runs {timepoint-prev_timepoint-self.IO_palcam.timeoffset}"
                             )
                             diff_time = (
                                 timepoint
@@ -2014,11 +1922,8 @@ class PAL:
                         elif self.IO_palcam.spacingmethod == Spacingmethod.custom:
                             LOGGER.info("PAL custom scheduling")
                             LOGGER.info(f"time since PAL start {(cur_time-start_time)}")
-                            self.base.print_message(
-                                f"time for next PAL run "
-                                f"since start "
-                                f"{sampleperiod-self.IO_palcam.timeoffset}",
-                                info=True,
+                            LOGGER.info(
+                                f"time for next PAL run since start {sampleperiod-self.IO_palcam.timeoffset}"
                             )
                             diff_time = (
                                 sampleperiod
@@ -2033,7 +1938,9 @@ class PAL:
 
                         # if PAL is still busy, enter a wait loop for non-busy status
                         if not self.IO_measuring:
-                            LOGGER.info("PAL still busy after sleep interval, wait for release.")
+                            LOGGER.info(
+                                "PAL still busy after sleep interval, wait for release."
+                            )
                             while True:
                                 self.IO_measuring = await self.IO_signalq.get()
                                 if not self.IO_measuring:
@@ -2818,12 +2725,10 @@ class PAL:
                     hostname=self.sshhost, username=self.sshuser, pkey=k
                 )
                 ssh_connected = True
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            except Exception:
                 ssh_connected = False
-                self.base.print_message(
-                    f"SSH connection error. Retrying in 1 seconds.\n{repr(e), tb,}",
-                    error=True,
+                LOGGER.error(
+                    "SSH connection error. Retrying in 1 seconds.", exc_info=True
                 )
                 await asyncio.sleep(1)
 
@@ -2836,13 +2741,10 @@ class PAL:
             ) = mysshclient.exec_command(sshcmd)
             mysshclient.close()
 
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"SSH connection error 1. Could not send commands.\n{repr(e), tb,}",
-                error=True,
+        except Exception:
+            LOGGER.error(
+                "SSH connection error 1. Could not send commands.", exc_info=True
             )
-            self.base.print_message(e, error=True)
 
             return ErrorCodes.ssh_error
 
