@@ -414,6 +414,7 @@ class PAL:
                     # as we have not control of pal directly
                     self.active.action.error_code = error
                     LOGGER.error(f"Got error after triggerwait: '{error}'")
+                    return ErrorCodes.critical
 
                 # after each pal trigger:
                 # as a pal action can contain many actions which modify
@@ -474,11 +475,7 @@ class PAL:
                             LOGGER.error("Sample does not exist in db")
                             return ErrorCodes.critical
                     else:
-                        self.base.print_message(
-                            "palaction.dest.samples_initial "
-                            "should not contain ref samples",
-                            error=True,
-                        )
+                        LOGGER.error("palaction.dest.samples_initial should not contain ref samples")
                         return ErrorCodes.bug
                 # update the action_uuid
                 for sample in palaction.dest.samples_initial:
