@@ -437,7 +437,7 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
         return response
-    
+
     def kill_gamrycom(self) -> DriverResponse:
         try:
             process_ids = {
@@ -463,7 +463,7 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
-            LOGGER.error("kill_gamrycom error", exc_info=True)
+            LOGGER.warning("kill_gamrycom error", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
