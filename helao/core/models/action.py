@@ -65,6 +65,7 @@ class ActionModel(ShortActionModel):
     process_uuid: Optional[UUID] = None
     data_request_id: Optional[UUID] = None
     # process_group_index: Optional[int] = 0 # unnecessary if we rely on process_finish as group terminator
+    sync_data: bool = True
 
     @property
     def url(self):

@@ -291,7 +291,7 @@ class ActionPlanMaker:
         self.pars = self._C()
 
         exp_paramdict = {}
-        
+
         LOGGER.debug(f"args {_args}")
         LOGGER.debug(f"locals {_locals}")
 
@@ -322,7 +322,7 @@ class ActionPlanMaker:
             else:
                 exp_paramdict.update({arg: argparam})
         LOGGER.debug(f"exp_paramdict {exp_paramdict}")
-              
+
         # check if an Experiment was detected
         if self._experiment is None:
             print_message(
@@ -413,7 +413,7 @@ class ActionPlanMaker:
         exp = self._experiment
         exp.action_plan = self.action_list
         return exp
-        
+
 
 class ExperimentPlanMaker:
     def __init__(
