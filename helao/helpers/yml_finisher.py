@@ -130,14 +130,16 @@ async def move_dir(
         return {}
 
     new_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", dest_dir))
+    nosync_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", "RUNS_NOSYNC"))
     await aiofiles.os.makedirs(new_dir, exist_ok=True)
+    await aiofiles.os.makedirs(nosync_dir, exist_ok=True)
 
     copy_success = False
     copy_retries = 0
     src_list = glob(os.path.join(yml_dir, "*"))
 
     while (not copy_success) and copy_retries <= 60:
-        dst_list = [p.replace("RUNS_ACTIVE", dest_dir) for p in src_list]
+        dst_list = [p.replace("RUNS_ACTIVE", "RUNS_NOSYNC" if not p.endswith(".yml") and not hobj.sync_data else dest_dir) for p in src_list]
         await asyncio.gather(
             *[aioshutil.copy(src, dst) for src, dst in zip(src_list, dst_list)],
             return_exceptions=True,

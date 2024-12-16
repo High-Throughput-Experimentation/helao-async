@@ -140,6 +140,7 @@ class HelaoData:
         self.ord = ["seq", "exp", "act"]
         self.abbrd = {"seq": "sequence", "exp": "experiment", "act": "action"}
         self.target = target
+        self.nosync_files = []
         if self.target.endswith(".zip"):  # this will always be a zipped sequence
             with ZipFile(target, "r") as zf:
                 if "zflist" in kwargs:
@@ -193,6 +194,7 @@ class HelaoData:
                 and p.startswith(self.ymldir)
                 and os.path.dirname(p) == self.ymldir
             ]
+            nosync_path = os.path.dirname(self.target).replace("RUNS_SYNCED", "RUNS_NOSYNC")
         else:
             if os.path.isdir(self.target):
                 self.ymldir = self.target
@@ -230,6 +232,10 @@ class HelaoData:
                 )
             ]
             self.data_files = glob(os.path.join(self.ymldir, "*.hlo"))
+            nosync_path = self.ymldir.replace("RUNS_SYNCED", "RUNS_NOSYNC")
+
+        if os.path.exists(nosync_path):
+            self.nosync_files += [p for p in glob(os.path.join(nosync_path, "*.hlo"))]
 
         self.name = self.yml.get(f"{self.abbrd[self.type]}_name", "NA")
         self.params = self.yml.get(f"{self.abbrd[self.type]}_params", {})
@@ -277,7 +283,7 @@ class HelaoData:
             - data (defaultdict): The data parsed from the .hlo file, organized
               into a defaultdict of lists.
         """
-        if self.target.endswith(".zip"):
+        if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
             header_lines = []
             header_end = False
             data = defaultdict(list)
@@ -326,7 +332,12 @@ class HelaoData:
         Returns:
             The data read from the first file in the `data_files` list.
         """
-        return self.read_hlo(self.data_files[0])
+        if self.data_files:
+            return self.read_hlo(self.data_files[0])
+        elif self.nosync_files:
+            return self.read_hlo(self.nosync_files[0])
+        else:
+            return {}, {}
 
     def __repr__(self):
         return f"{self.abbrd[self.type]}: {self.name} @ {self.timestamp} CONTAINING {len(self.children)} children"

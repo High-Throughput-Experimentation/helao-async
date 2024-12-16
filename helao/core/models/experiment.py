@@ -58,3 +58,4 @@ class ExperimentModel(ExperimentTemplate):
     orch_key: Optional[str] = None
     orch_host: Optional[str] = None
     orch_port: Optional[int] = None
+    sync_data: bool = True
