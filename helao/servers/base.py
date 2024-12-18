@@ -217,9 +217,7 @@ class Base:
             )
 
         if "run_type" in self.world_cfg:
-            self.print_message(
-                f"Found run_type in config: {self.world_cfg['run_type']}",
-            )
+            LOGGER.info(f"Found run_type in config: {self.world_cfg['run_type']}")
             self.run_type = self.world_cfg["run_type"].lower()
         else:
             raise ValueError(
@@ -496,12 +494,7 @@ class Base:
                     LOGGER.info(f"found Action BaseModel under parameter '{arg}'")
                     action = argparam
                 else:
-                    self.print_message(
-                        f"critical error: found another Action BaseModel"
-                        f" under parameter '{arg}',"
-                        f" skipping it",
-                        error=True,
-                    )
+                    LOGGER.error(f"critical error: found another Action BaseModel under parameter '{arg}', skipping it")
             else:
                 paramdict.update({arg: argparam})
 
@@ -687,11 +680,7 @@ class Base:
                 self.ntp_response = response
                 self.ntp_last_sync = response.orig_time
                 self.ntp_offset = response.offset
-                self.print_message(
-                    f"retrieved time at "
-                    f"{ctime(self.ntp_response.tx_timestamp)} "
-                    f"from {self.ntp_server}",
-                )
+                LOGGER.info(f"retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}")
             except ntplib.NTPException:
                 LOGGER.info(f"{self.ntp_server} ntp timeout")
                 self.ntp_last_sync = time()
@@ -826,21 +815,12 @@ class Base:
                 success = True
                 break
             else:
-                self.print_message(
-                    f"Failed to add {combo_key} to "
-                    f"{self.server.server_name} status subscriber list.",
-                    error=True,
-                )
+                LOGGER.error(f"Failed to add {combo_key} to {self.server.server_name} status subscriber list.")
 
             if success:
                 LOGGER.info(f"Attached {combo_key} to status ws on {self.server.server_name}.")
             else:
-                self.print_message(
-                    f"failed to attach {combo_key} to status ws "
-                    f"on {self.server.server_name} "
-                    f"after {retry_limit} attempts.",
-                    error=True,
-                )
+                LOGGER.error(f"failed to attach {combo_key} to status ws on {self.server.server_name} after {retry_limit} attempts.")
 
         return success
 
@@ -1065,11 +1045,7 @@ class Base:
                     if success:
                         LOGGER.info(f"Pushed status message to {client_servkey}.")
                     else:
-                        self.print_message(
-                            f"Failed to push status message to "
-                            f"{client_servkey} after {retry_limit} attempts.",
-                            error=True,
-                        )
+                        LOGGER.error(f"Failed to push status message to {client_servkey} after {retry_limit} attempts.")
                     sleep(0.3)
                 # now delete the errored and finsihed statuses after
                 # all are send to the subscribers
@@ -2282,11 +2258,7 @@ class Active:
 
                     if file_conn_key not in self.file_conn_dict:
                         if output_action.save_data:
-                            self.base.print_message(
-                                f"'{file_conn_key}' does not exist in "
-                                "file_conn '{self.file_conn_dict}'.",
-                                error=True,
-                            )
+                            LOGGER.warning(f"'{file_conn_key}' does not exist in file_conn '{self.file_conn_dict}'.")
                         else:
                             # got data but saving is disabled,
                             # e.g. no file was created,
@@ -2299,13 +2271,7 @@ class Active:
                     if self.file_conn_dict[file_conn_key].file is None:
                         if not self.file_conn_dict[file_conn_key].params.json_data_keys:
                             jsonkeys = [key for key in sample_data.keys()]
-                            self.base.print_message(
-                                "no json_data_keys defined, "
-                                f"using keys from first "
-                                f"data message: "
-                                f"{jsonkeys[:10]}",
-                                info=True,
-                            )
+                            LOGGER.info("no json_data_keys defined, using keys from first data message: {jsonkeys[:10]}")
 
                             self.file_conn_dict[file_conn_key].params.json_data_keys = (
                                 jsonkeys
@@ -2389,7 +2355,7 @@ class Active:
         json_data_keys : str, optional
             JSON data keys related to the file content.
         action : Action, optional
-            The action context in which the file is being written. If not provided, 
+            The action context in which the file is being written. If not provided,
             the current action context will be used.
 
         Returns:
@@ -2830,12 +2796,7 @@ class Active:
                             data={}, errors=[], status=HloStatus.finished
                         )
                     )
-                    self.base.print_message(
-                        f"Waiting for data_stream finished"
-                        f" package: "
-                        f" {[action.data_stream_status for action in self.action_list]}",
-                        info=True,
-                    )
+                    LOGGER.info(f"Waiting for data_stream finished package: {[action.data_stream_status for action in self.action_list]}")
                     await asyncio.sleep(0.1)
                     retry_counter += 1
 
@@ -2854,11 +2815,7 @@ class Active:
                                     data={}, errors=[], status=HloStatus.finished
                                 )
                             )
-                            self.base.print_message(
-                                f"Setting datastream to finished:"
-                                f" {action.data_stream_status}",
-                                info=True,
-                            )
+                            LOGGER.info(f"Setting datastream to finished: {action.data_stream_status}")
                     write_iter += 1
                     await asyncio.sleep(0.1)
 
@@ -2937,7 +2894,7 @@ class Active:
             file_type (str): The type of the file being tracked.
             file_path (str): The path to the file being tracked.
             samples (List[SampleUnion]): A list of samples associated with the file.
-            action (Action, optional): The action associated with the file. If not provided, 
+            action (Action, optional): The action associated with the file. If not provided,
                                        the current action will be used.
 
         Returns:
@@ -3056,12 +3013,7 @@ class Active:
             if success:
                 LOGGER.info(f"Attached {client_servkey} to status ws on {self.base.server.server_name}.")
             else:
-                self.base.print_message(
-                    f"failed to attach {client_servkey} to status ws "
-                    f"on {self.base.server.server_name} "
-                    f"after {retry_limit} attempts.",
-                    error=True,
-                )
+                LOGGER.error(f"failed to attach {client_servkey} to status ws on {self.base.server.server_name} after {retry_limit} attempts.")
 
     async def action_loop_task(self, executor: Executor):
         """

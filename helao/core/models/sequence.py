@@ -36,3 +36,4 @@ class SequenceModel(SequenceTemplate):
     data_request_id: Optional[UUID] = None
     orchestrator: MachineModel = MachineModel()
     experiment_list: List[ShortExperimentModel] = Field(default=[])  # list of completed experiments from experimentmodel_list (premodels.py)
+    sync_data: bool = True
