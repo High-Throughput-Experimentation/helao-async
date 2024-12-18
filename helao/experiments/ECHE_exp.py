@@ -349,7 +349,7 @@ def ECHE_sub_OCV(
             "SampleRate": SampleRate,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
-            "IErange": "auto",
+            #"IErange": "auto",
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -360,6 +360,7 @@ def ECHE_sub_OCV(
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
+        to_globalexp_params={"Ewe_V__mean_final": "HiSpEC_OCV"},
     )
     return apm.action_list  # returns complete action list to orch
 
