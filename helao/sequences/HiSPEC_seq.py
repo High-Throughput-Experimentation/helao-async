@@ -26,7 +26,7 @@ def HiSpEC_CV(
     solution_ph: float = 0,
 
     #######
-    Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
+    #Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
     Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
