@@ -32,7 +32,7 @@ def TEST_sub_noblocking(
 ):
     apm = ActionPlanMaker()
     apm.add(
-        ORCH_server, "wait", {"waittime": wait_time * 10}, nonblocking=True, to_globalexp_params={"wait_time": "test_wait"}
+        ORCH_server, "wait", {"waittime": wait_time * 10}, nonblocking=True, to_globalexp_params={"waittime": "test_wait"}
     )
     apm.add(ORCH_server, "wait", {"waittime": wait_time})
     exp = apm.experiment
