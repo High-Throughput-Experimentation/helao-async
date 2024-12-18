@@ -107,7 +107,7 @@ servers:
         we_vent: 5
         ce_vent: 8
         spec_trig: 1
-        we_ce_flow: 2
+        we_flow: 2
         we_pump: 3
         ce_pump: 7
         ce_flow: 4

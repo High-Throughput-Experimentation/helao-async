@@ -143,7 +143,7 @@ def HISPEC_sub_SpEC(
             "exp_time": 0.0098,
             "framerate": 98,
             "timeout": 15000,
-        },
+        },sync_data=False
     )
 
     apm.add(
