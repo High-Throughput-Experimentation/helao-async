@@ -17,12 +17,12 @@ SEQUENCES = __all__
 
 
 def HiSpEC_CV(
-    sequence_version: int = 1, # @Dan - what is this?
-    plate_id: int = 1, # @Dan - what is this?
-    plate_sample_no_list: list = [2], # @Dan - what is this?
-    reservoir_electrolyte: Electrolyte = "p1MH1MCLO4",
-    reservoir_liquid_sample_no: int = 1, # @Dan - I don't think I need this but did not want to delete
-    solution_bubble_gas: str = "None", 
+    sequence_version: int = 1, # @Dan - what is this? -- this is a version number for the sequence, you should increment it when you modify sequence arguments and the experiment list
+    plate_id: int = 1, # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
+    plate_sample_no_list: list = [2], # @Dan - what is this? -- the sample_no is uniquely assigned to an x,y location on a material library according to its plate map which was defined at the synthesis step
+    reservoir_electrolyte: Electrolyte = "p1MH1MCLO4",  # @Ben -- this is an enum for a common abbreviation we give to our electrolytes used in our screening protocols, they typically have an integer pH at the end, see helao.core.models.electrolyte and add one there if needed
+    reservoir_liquid_sample_no: int = 1, # @Dan -- what is this? -- this is the liquid sample number in the liquid sample database, you will need to 'create' a liquid sample for the electrolyte you're using, so that the cell is filled with a liquid sample that inherits the reservoir attributes
+    solution_bubble_gas: str = "None",
     solution_ph: float = 0,
 
     #######
@@ -53,7 +53,7 @@ def HiSpEC_CV(
     #####
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
-    use_z_motor: bool = False,
+    use_z_motor: bool = False,  # @Ben -- I think this should default to True
     cell_engaged_z: float = 2.5, # need to find out what this should be.
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
@@ -61,7 +61,7 @@ def HiSpEC_CV(
 ):
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment("ECHEUVIS_sub_startup", {})
+    epm.add_experiment("ECHEUVIS_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
     # if use_z_motor:
     #     epm.add_experiment(
     #         "ECHEUVIS_sub_disengage",
@@ -191,7 +191,7 @@ def HiSpEC_CV(
                     "flow_ce": True,
                     "z_height": cell_engaged_z,
                     "fill_wait": cell_fill_wait,
-                    "calibrate_intensity": False, #@Dan - kept this action but turned this flag to false to prevent it trying to access doric WLED - not sure if this will work...
+                    "calibrate_intensity": False, #@Dan - kept this action but turned this flag to false to prevent it trying to access doric WLED - not sure if this will work... -- it should work because the references to doric_wled aren't going to be used
                     "max_integration_time": int(10)
                 },
             )
@@ -205,7 +205,7 @@ def HiSpEC_CV(
         epm.add_experiment(
             "ECHE_sub_OCV",
             {
-                "experiment": "OCV",# @Dan - what is this?
+                "experiment": "OCV",# @Dan - what is this? -- this shouldn't be here, it's not a valid parameter value for ECHE_sub_OCV, delete this line
                 "Tval__s": 0.1,
                 "SampleRate":0.01,
             }
@@ -229,11 +229,11 @@ def HiSpEC_CV(
                 "ref_vs_nhe": ref_vs_nhe,
                 "toggle1_source": toggle1_source,
                 "toggle1_init_delay": toggle1_init_delay,
-                "toggle1_duty": toggle1_duty,   
+                "toggle1_duty": toggle1_duty,
             })
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
-    
+
     if use_z_motor:
         # leave cell sealed w/solution for storage
         epm.add_experiment(
