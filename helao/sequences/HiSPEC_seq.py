@@ -61,7 +61,7 @@ def HiSpEC_CV(
 ):
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment("ECHEUVIS_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
+    epm.add_experiment("HISPEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
     
     if use_z_motor:
         epm.add_experiment(
@@ -177,7 +177,7 @@ def HiSpEC_CV(
     #         "skip_nspec": calc_skip_nspec,
     #     },
     # )
-    epm.add_experiment("ECHEUVIS_sub_shutdown", {})
+    epm.add_experiment("HISPEC_sub_shutdown", {})
 
     return epm.experiment_plan_list  # returns complete experiment list
 
@@ -547,7 +547,7 @@ def ECHEUVIS_diagnostic_CV(
     cell_fill_wait: float = 30.0,
 ):
     epm = ExperimentPlanMaker()
-    epm.add_experiment("ECHEUVIS_sub_startup", {})
+    epm.add_experiment("HISPEC_sub_startup", {})
     epm.add_experiment(
         "ECHEUVIS_sub_disengage",
         {
@@ -666,7 +666,7 @@ def ECHEUVIS_diagnostic_CV(
             "fill_wait": 5.0,
         },
     )
-    epm.add_experiment("ECHEUVIS_sub_shutdown", {})
+    epm.add_experiment("HISPEC_sub_shutdown", {})
 
     return epm.experiment_plan_list  # returns complete experiment list
 
@@ -714,7 +714,7 @@ def ECHEUVIS_multiCA_led(
 ):
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment("ECHEUVIS_sub_startup", {})
+    epm.add_experiment("HISPEC_sub_startup", {})
     # if use_z_motor:
     #     epm.add_experiment(
     #         "ECHEUVIS_sub_disengage",
@@ -1045,7 +1045,7 @@ def ECHEUVIS_multiCA_led(
     #         "skip_nspec": calc_skip_nspec,
     #     },
     # )
-    epm.add_experiment("ECHEUVIS_sub_shutdown", {})
+    epm.add_experiment("HISPEC_sub_shutdown", {})
 
     return epm.experiment_plan_list  # returns complete experiment list
 
