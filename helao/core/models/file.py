@@ -80,3 +80,4 @@ class FileInfo(BaseModel, HelaoDict):
     sample: List[str] = Field(default=[])
     action_uuid: Optional[UUID] = None
     run_use: Optional[RunUse] = None
+    nosync: bool = False
