@@ -6,8 +6,8 @@ simulation: false
 experiment_libraries:
   - samples_exp
   - HISPEC_exp
-  # - ECHE_exp
-  # - ECHEUVIS_exp
+  - ECHE_exp
+  - ECHEUVIS_exp
   # - UVIS_exp
   # - TEST_exp
 # experiment_params:
