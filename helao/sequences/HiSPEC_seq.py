@@ -133,7 +133,8 @@ def HiSpEC_CV(
         epm.add_experiment(
             "HiSPEC_sub_SpEC",
             {
-                "Vinit_vsRHE": Vinit_vsRHE,
+                #"Vinit_vsRHE": Vinit_vsRHE,
+
                 "Vapex1_vsRHE": Vapex1_vsRHE,
                 "Vapex2_vsRHE": Vapex2_vsRHE,
                 "Vfinal_vsRHE": Vfinal_vsRHE,
@@ -149,7 +150,7 @@ def HiSpEC_CV(
                 "toggle1_source": toggle1_source,
                 "toggle1_init_delay": toggle1_init_delay,
                 "toggle1_duty": toggle1_duty,
-            })
+            }, from_globalexp_params={"HiSpEC_OCV": "Vinit_vsRHE"})
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
