@@ -14,9 +14,9 @@ experiment_libraries:
 #   toggle_is_shutter: false
 #   gamrychannelwait: -1
 #   gamrychannelsend: 0
-# sequence_libraries:
+sequence_libraries:
 #   - ECHE_seq
-#   - ECHEUVIS_seq
+    - HiSPEC_seq
 #   - UVIS_T_seq
 #   - TEST_seq
 # sequence_params:
