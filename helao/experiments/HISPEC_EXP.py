@@ -51,7 +51,7 @@ MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname().lower()).as_di
 IO_server = MM(server_name="IO", machine_name=gethostname().lower()).as_dict()
 ANDOR_server = MM(server_name="ANDOR", machine_name=gethostname().lower()).as_dict()
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
-# PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
+PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 # CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
 # ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
