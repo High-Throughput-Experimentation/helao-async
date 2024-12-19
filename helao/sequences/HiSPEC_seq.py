@@ -54,7 +54,7 @@ def HiSpEC_CV(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     use_z_motor: bool = True,  # @Ben -- I think this should default to True
-    cell_engaged_z: float = 3, # need to find out what this should be.
+    cell_engaged_z: float = 3.5, # need to find out what this should be.
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
     cell_fill_wait: float = 30.0,
