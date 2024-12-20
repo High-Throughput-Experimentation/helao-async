@@ -131,7 +131,7 @@ def HiSpEC_CV(
                 )
 
         epm.add_experiment(
-            "HiSPEC_sub_SpEC",
+            "HISPEC_sub_SpEC",
             {
                 #"Vinit_vsRHE": Vinit_vsRHE,
 
