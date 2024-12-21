@@ -202,9 +202,36 @@ def HISPEC_sub_SpEC(
             ProcessContrib.samples_out,
         ],
     )
-
     return apm.action_list  # returns complete action list to orch
 
+def HiSPEC_sub_PEIS(
+apm.add(
+        PSTAT_server,
+        "run_PEIS",{
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        Vinit__V: float = 0.01,  # Initial value in volts or amps.
+        Vamp__V: float = 0.1,  # Amplitude value in volts
+        Finit__Hz: float = 1000,  # Initial frequency in Hz.
+        Ffinal__Hz: float = 1000000,  # Final frequency in Hz.
+        FrequencyNumber: int = 60,
+        Duration__s: float = 0,  # Duration in seconds.
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        SweepMode: str = "log",
+        Repeats: int = 10,
+        DelayFraction: float = 0.1,
+        # vs_initial: bool = False,  # True if vs initial, False if vs previous.
+        IRange: EC_IRange = EC_IRange.AUTO,
+        ERange: EC_ERange = EC_ERange.AUTO,
+        Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
+        channel: int = 0,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+        TTLduration: float = 1.0,
+        }
+        )
+        return apm.action_list  # returns complete action list to orch
+
+    
 
 
 # def HISPEC_sub_CV_DOtrigger(
