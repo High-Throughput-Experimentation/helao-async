@@ -269,8 +269,8 @@ class Base:
                 .PostProcess
             )
         elif self.hlo_postprocess_script:
-            LOGGER.info(f"Loading hlo post-processor from processors module")
-            proc_spec = spec_from_file_location("processors", f"{self.hlo_postprocess_script}.py")
+            LOGGER.info("Loading hlo post-processor from processors module")
+            proc_spec = spec_from_file_location("hlo_post", os.path.join("helao", "processors", f"{self.hlo_postprocess_script}.py"))
             proc_mod = module_from_spec(proc_spec)
             proc_spec.loader.exec_module(proc_mod)
             self.hlo_postprocessor = proc_mod.PostProcess
