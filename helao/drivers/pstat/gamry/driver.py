@@ -462,6 +462,11 @@ class GamryDriver(HelaoDriver):
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
+        except ProcessLookupError:
+            LOGGER.warning("kill_gamrycom error, process not found")
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
         except Exception:
             LOGGER.warning("kill_gamrycom error", exc_info=True)
             response = DriverResponse(
