@@ -4,6 +4,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
+import os
 from typing import List
 from copy import copy
 from helao.core.models.file import FileInfo
@@ -20,7 +21,7 @@ class PostProcess(HloPostProcessor):
         for act_file in self.files:
             try:
                 if act_file.file_type == "helao__file":
-                    file_path = str(self.output_dir.joinpath(act_file.file_name))
+                    file_path = os.path.join(self.output_dir, act_file.file_name)
                     _, data = read_hlo(file_path)
                     df = pd.DataFrame(data)
                     df.to_csv(file_path.replace(".hlo", ".csv"), index=False)
