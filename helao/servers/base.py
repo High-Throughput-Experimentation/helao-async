@@ -1,6 +1,7 @@
 __all__ = ["Base", "ActiveParams", "Active", "DummyBase"]
 
 from helao.helpers import logging
+
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
@@ -255,11 +256,15 @@ class Base:
         self.endpoint_queues = {}
         self.local_action_queue = Queue()
         self.fast_urls = []
-        
+
         self.hlo_postprocess_script = self.server_cfg.get("hlo_postprocess_script", "")
 
-        if self.hlo_postprocess_script.endswith(".py") and os.path.exists(self.hlo_postprocess_script):
-            LOGGER.info(f"Loading hlo post-processor from {self.hlo_postprocess_script}")
+        if self.hlo_postprocess_script.endswith(".py") and os.path.exists(
+            self.hlo_postprocess_script
+        ):
+            LOGGER.info(
+                f"Loading hlo post-processor from {self.hlo_postprocess_script}"
+            )
             self.hlo_postprocessor = (
                 SourceFileLoader(
                     "hlo_post",
@@ -270,7 +275,12 @@ class Base:
             )
         elif self.hlo_postprocess_script:
             LOGGER.info("Loading hlo post-processor from processors module")
-            proc_spec = spec_from_file_location("hlo_post", os.path.join("helao", "processors", f"{self.hlo_postprocess_script}.py"))
+            proc_spec = spec_from_file_location(
+                "hlo_post",
+                os.path.join(
+                    "helao", "processors", f"{self.hlo_postprocess_script}.py"
+                ),
+            )
             proc_mod = module_from_spec(proc_spec)
             proc_spec.loader.exec_module(proc_mod)
             self.hlo_postprocessor = proc_mod.PostProcess
@@ -438,7 +448,9 @@ class Base:
                     {route.name: EndpointModel(endpoint_name=route.name)}
                 )
                 self.actionservermodel.endpoints[route.name].sort_status()
-        LOGGER.info(f"Found {len(self.actionservermodel.endpoints.keys())} endpoints for status monitoring on {self.server.server_name}.")
+        LOGGER.info(
+            f"Found {len(self.actionservermodel.endpoints.keys())} endpoints for status monitoring on {self.server.server_name}."
+        )
         self.fast_urls = self.get_endpoint_urls()
         self.endpoint_queues_init()
 
@@ -519,17 +531,23 @@ class Base:
                     LOGGER.info(f"found Action BaseModel under parameter '{arg}'")
                     action = argparam
                 else:
-                    LOGGER.error(f"critical error: found another Action BaseModel under parameter '{arg}', skipping it")
+                    LOGGER.error(
+                        f"critical error: found another Action BaseModel under parameter '{arg}', skipping it"
+                    )
             else:
                 paramdict.update({arg: argparam})
 
         if action is None:
-            LOGGER.error("critical error: no Action BaseModel was found by setup_action, using blank Action.")
+            LOGGER.error(
+                "critical error: no Action BaseModel was found by setup_action, using blank Action."
+            )
             action = Action()
 
         for key, val in paramdict.items():
             if key not in action.action_params:
-                LOGGER.info(f"local var '{key}' not found in action.action_params, addding it.")
+                LOGGER.info(
+                    f"local var '{key}' not found in action.action_params, addding it."
+                )
                 action.action_params.update({key: val})
 
         LOGGER.info(f"Action.action_params: {action.action_params}")
@@ -705,7 +723,9 @@ class Base:
                 self.ntp_response = response
                 self.ntp_last_sync = response.orig_time
                 self.ntp_offset = response.offset
-                LOGGER.info(f"retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}")
+                LOGGER.info(
+                    f"retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}"
+                )
             except ntplib.NTPException:
                 LOGGER.info(f"{self.ntp_server} ntp timeout")
                 self.ntp_last_sync = time()
@@ -823,7 +843,9 @@ class Base:
         LOGGER.info("attaching status subscriber")
 
         if combo_key in self.status_clients:
-            LOGGER.info(f"Client {combo_key} is already subscribed to {self.server.server_name} status updates.")
+            LOGGER.info(
+                f"Client {combo_key} is already subscribed to {self.server.server_name} status updates."
+            )
             # self.detach_client(client_servkey, client_host, client_port)  # refresh
         self.status_clients.add(combo_key)
 
@@ -836,16 +858,24 @@ class Base:
                 action_name=None,
             )
             if response is not None and error_code == ErrorCodes.none:
-                LOGGER.info(f"Added {combo_key} to {self.server.server_name} status subscriber list.")
+                LOGGER.info(
+                    f"Added {combo_key} to {self.server.server_name} status subscriber list."
+                )
                 success = True
                 break
             else:
-                LOGGER.error(f"Failed to add {combo_key} to {self.server.server_name} status subscriber list.")
+                LOGGER.error(
+                    f"Failed to add {combo_key} to {self.server.server_name} status subscriber list."
+                )
 
             if success:
-                LOGGER.info(f"Attached {combo_key} to status ws on {self.server.server_name}.")
+                LOGGER.info(
+                    f"Attached {combo_key} to status ws on {self.server.server_name}."
+                )
             else:
-                LOGGER.error(f"failed to attach {combo_key} to status ws on {self.server.server_name} after {retry_limit} attempts.")
+                LOGGER.error(
+                    f"failed to attach {combo_key} to status ws on {self.server.server_name} after {retry_limit} attempts."
+                )
 
         return success
 
@@ -900,7 +930,9 @@ class Base:
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"Status websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}")
+            LOGGER.error(
+                f"Status websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}"
+            )
             if status_sub in self.status_q.subscribers:
                 self.status_q.remove(status_sub)
 
@@ -929,7 +961,9 @@ class Base:
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}")
+            LOGGER.error(
+                f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}"
+            )
             if data_sub in self.data_q.subscribers:
                 self.data_q.remove(data_sub)
 
@@ -956,7 +990,9 @@ class Base:
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}")
+            LOGGER.error(
+                f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}"
+            )
             if live_sub in self.live_q.subscribers:
                 self.live_q.remove(live_sub)
 
@@ -1045,7 +1081,9 @@ class Base:
 
                 # sort the status (nonactive_dict is empty at this point)
                 self.actionservermodel.endpoints[status_msg.action_name].sort_status()
-                LOGGER.info(f"log_status_task sending status {status_msg.action_status} for action {status_msg.action_name} with uuid {status_msg.action_uuid} on {status_msg.action_server.disp_name()} to subscribers ({self.status_clients}).")
+                LOGGER.info(
+                    f"log_status_task sending status {status_msg.action_status} for action {status_msg.action_name} with uuid {status_msg.action_uuid} on {status_msg.action_server.disp_name()} to subscribers ({self.status_clients})."
+                )
                 if len(self.status_clients) == 0 and self.orch_key is not None:
                     await self.attach_client(
                         self.orch_key, self.orch_host, self.orch_port
@@ -1053,7 +1091,9 @@ class Base:
 
                 for combo_key in self.status_clients.copy():
                     client_servkey, client_host, client_port = combo_key
-                    LOGGER.info(f"log_status_task trying to send status to {client_servkey}.")
+                    LOGGER.info(
+                        f"log_status_task trying to send status to {client_servkey}."
+                    )
                     success = False
                     for _ in range(retry_limit):
                         response, error_code = await self.send_statuspackage(
@@ -1070,7 +1110,9 @@ class Base:
                     if success:
                         LOGGER.info(f"Pushed status message to {client_servkey}.")
                     else:
-                        LOGGER.error(f"Failed to push status message to {client_servkey} after {retry_limit} attempts.")
+                        LOGGER.error(
+                            f"Failed to push status message to {client_servkey} after {retry_limit} attempts."
+                        )
                     sleep(0.3)
                 # now delete the errored and finsihed statuses after
                 # all are send to the subscribers
@@ -1104,7 +1146,9 @@ class Base:
         await self.data_q.put(StopAsyncIteration)
         await asyncio.sleep(1)
 
-    async def get_realtime(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
+    async def get_realtime(
+        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+    ) -> float:
         """
         Asynchronously retrieves the real-time value.
 
@@ -1245,7 +1289,9 @@ class Base:
             async with aiofiles.open(output_file, mode="w+") as f:
                 await f.write(yml_dumps(output_dict))
         else:
-            LOGGER.info(f"writing meta file for action '{action.action_name}' is disabled.")
+            LOGGER.info(
+                f"writing meta file for action '{action.action_name}' is disabled."
+            )
 
     async def write_exp(self, experiment, manual=False):
         """
@@ -1668,7 +1714,9 @@ class Active:
             LOGGER.info("Manual Action.")
 
         if not self.base.helaodirs.save_root:
-            LOGGER.info("Root save directory not specified, cannot save action results.")
+            LOGGER.info(
+                "Root save directory not specified, cannot save action results."
+            )
             self.action.save_data = False
             self.action.save_act = False
         else:
@@ -1695,8 +1743,12 @@ class Active:
             self.file_conn_dict[file_conn_key] = FileConn(params=file_conn_param)
             self.action.file_conn_keys.append(file_conn_key)
 
-        LOGGER.info(f"save_act is '{self.action.save_act}' for action '{self.action.action_name}'")
-        LOGGER.info(f"save_data is '{self.action.save_data}' for action '{self.action.action_name}'")
+        LOGGER.info(
+            f"save_act is '{self.action.save_act}' for action '{self.action.action_name}'"
+        )
+        LOGGER.info(
+            f"save_data is '{self.action.save_data}' for action '{self.action.action_name}'"
+        )
 
         self.manual_stop = False
         self.action_loop_running = False
@@ -1716,7 +1768,9 @@ class Active:
         try:
             _ = futr.result()
         except Exception as exc:
-            LOGGER.info(f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}")
+            LOGGER.info(
+                f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}"
+            )
 
     def start_executor(self, executor: Executor):
         """
@@ -1933,7 +1987,9 @@ class Active:
         if action is None:
             action = self.action
 
-        LOGGER.info(f"Adding {str(action.action_uuid)} to {action.action_name} status list.")
+        LOGGER.info(
+            f"Adding {str(action.action_uuid)} to {action.action_name} status list."
+        )
 
         if not action.nonblocking:
             await self.base.status_q.put(action.get_actmodel())
@@ -1952,9 +2008,13 @@ class Active:
         if action is None:
             action = self.action
         action.action_status.append(HloStatus.estopped)
-        LOGGER.error(f"E-STOP {str(action.action_uuid)} on {action.action_name} status.")
+        LOGGER.error(
+            f"E-STOP {str(action.action_uuid)} on {action.action_name} status."
+        )
 
-    async def set_error(self, error_code: Optional[ErrorCodes] = None, action: Optional[Action] = None):
+    async def set_error(
+        self, error_code: Optional[ErrorCodes] = None, action: Optional[Action] = None
+    ):
         """
         Sets the error status and error code for the given action.
 
@@ -1979,7 +2039,9 @@ class Active:
 
         LOGGER.error(f"ERROR {str(action.action_uuid)} on {action.action_name} status.")
 
-    async def get_realtime(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
+    async def get_realtime(
+        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+    ) -> float:
         """
         Asynchronously retrieves the real-time value.
 
@@ -2064,7 +2126,9 @@ class Active:
         if datamodel.data:
             self.num_data_queued += 1
 
-    def enqueue_data_nowait(self, datamodel: DataModel, action: Optional[Action] = None):
+    def enqueue_data_nowait(
+        self, datamodel: DataModel, action: Optional[Action] = None
+    ):
         """
         Enqueues a data message into the queue without waiting.
 
@@ -2270,7 +2334,9 @@ class Active:
                 self.action.data_stream_status = data_status
 
                 if data_status not in (None, HloStatus.active):
-                    LOGGER.info(f"data_stream: skipping package for status: {data_status}")
+                    LOGGER.info(
+                        f"data_stream: skipping package for status: {data_status}"
+                    )
                     continue
 
                 for file_conn_key, sample_data in data_dict.items():
@@ -2278,17 +2344,23 @@ class Active:
                         file_conn_key=file_conn_key
                     )
                     if output_action is None:
-                        LOGGER.error("data LOGGER could not find action for file_conn_key")
+                        LOGGER.error(
+                            "data LOGGER could not find action for file_conn_key"
+                        )
                         continue
 
                     if file_conn_key not in self.file_conn_dict:
                         if output_action.save_data:
-                            LOGGER.warning(f"'{file_conn_key}' does not exist in file_conn '{self.file_conn_dict}'.")
+                            LOGGER.warning(
+                                f"'{file_conn_key}' does not exist in file_conn '{self.file_conn_dict}'."
+                            )
                         else:
                             # got data but saving is disabled,
                             # e.g. no file was created,
                             # e.g. file_conn_key is not in self.file_conn_dict
-                            LOGGER.info("data logging is disabled for action '{output_action.action_name}'")
+                            LOGGER.info(
+                                "data logging is disabled for action '{output_action.action_name}'"
+                            )
 
                         continue
 
@@ -2296,7 +2368,9 @@ class Active:
                     if self.file_conn_dict[file_conn_key].file is None:
                         if not self.file_conn_dict[file_conn_key].params.json_data_keys:
                             jsonkeys = [key for key in sample_data.keys()]
-                            LOGGER.info("no json_data_keys defined, using keys from first data message: {jsonkeys[:10]}")
+                            LOGGER.info(
+                                "no json_data_keys defined, using keys from first data message: {jsonkeys[:10]}"
+                            )
 
                             self.file_conn_dict[file_conn_key].params.json_data_keys = (
                                 jsonkeys
@@ -2821,7 +2895,9 @@ class Active:
                             data={}, errors=[], status=HloStatus.finished
                         )
                     )
-                    LOGGER.info(f"Waiting for data_stream finished package: {[action.data_stream_status for action in self.action_list]}")
+                    LOGGER.info(
+                        f"Waiting for data_stream finished package: {[action.data_stream_status for action in self.action_list]}"
+                    )
                     await asyncio.sleep(0.1)
                     retry_counter += 1
 
@@ -2832,7 +2908,9 @@ class Active:
                     self.num_data_queued > self.num_data_written
                     and write_iter < write_retries
                 ):
-                    LOGGER.info(f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 0.1 second.")
+                    LOGGER.info(
+                        f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 0.1 second."
+                    )
                     for action in self.action_list:
                         if action.data_stream_status != HloStatus.active:
                             await self.enqueue_data(
@@ -2840,7 +2918,9 @@ class Active:
                                     data={}, errors=[], status=HloStatus.finished
                                 )
                             )
-                            LOGGER.info(f"Setting datastream to finished: {action.data_stream_status}")
+                            LOGGER.info(
+                                f"Setting datastream to finished: {action.data_stream_status}"
+                            )
                     write_iter += 1
                     await asyncio.sleep(0.1)
 
@@ -2860,9 +2940,11 @@ class Active:
 
                 # call custom hlo post-processor if it exists
                 if self.base.hlo_postprocessor is not None:
-                    updated_file_list = self.base.hlo_postprocessor(self.action).process()
+                    updated_file_list = self.base.hlo_postprocessor(
+                        self.action, self.base.helaodirs.save_root
+                    ).process()
                     self.action.files = updated_file_list
-                
+
                 l10 = self.base.actives.pop(self.active_uuid, None)
                 if l10 is not None:
                     i10 = [
@@ -3027,7 +3109,9 @@ class Active:
         """
         for combo_key in self.base.status_clients:
             client_servkey, client_host, client_port = combo_key
-            LOGGER.info(f"executor trying to send non-blocking status to {client_servkey}.")
+            LOGGER.info(
+                f"executor trying to send non-blocking status to {client_servkey}."
+            )
             success = False
             for _ in range(retry_limit):
                 response, error_code = await self.base.send_nbstatuspackage(
@@ -3042,9 +3126,13 @@ class Active:
                     break
 
             if success:
-                LOGGER.info(f"Attached {client_servkey} to status ws on {self.base.server.server_name}.")
+                LOGGER.info(
+                    f"Attached {client_servkey} to status ws on {self.base.server.server_name}."
+                )
             else:
-                LOGGER.error(f"failed to attach {client_servkey} to status ws on {self.base.server.server_name} after {retry_limit} attempts.")
+                LOGGER.error(
+                    f"failed to attach {client_servkey} to status ws on {self.base.server.server_name} after {retry_limit} attempts."
+                )
 
     async def action_loop_task(self, executor: Executor):
         """
@@ -3192,6 +3280,7 @@ class DummyBase:
         async put_lbuf(message: dict): Asynchronously updates the live buffer with the given message.
         get_lbuf(buf_key: str): Retrieves the value and timestamp from the live buffer for the given key.
     """
+
     def __init__(self) -> None:
         """
         Initializes the base server with default settings.
