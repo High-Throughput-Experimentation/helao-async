@@ -256,7 +256,7 @@ class Base:
         self.local_action_queue = Queue()
         self.fast_urls = []
         
-        self.hlo_postprocess_script = self.server_params.get("hlo_postprocess_script", "")
+        self.hlo_postprocess_script = self.server_cfg.get("hlo_postprocess_script", "")
 
         if self.hlo_postprocess_script.endswith(".py") and os.path.exists(self.hlo_postprocess_script):
             LOGGER.info(f"Loading hlo post-processor from {self.hlo_postprocess_script}")
