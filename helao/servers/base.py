@@ -6,6 +6,10 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
+from importlib.util import spec_from_file_location
+from importlib.util import module_from_spec
+from importlib.machinery import SourceFileLoader
+
 import asyncio
 import json
 import os
@@ -251,6 +255,27 @@ class Base:
         self.endpoint_queues = {}
         self.local_action_queue = Queue()
         self.fast_urls = []
+        
+        self.hlo_postprocess_script = self.server_params.get("hlo_postprocess_script", "")
+
+        if self.hlo_postprocess_script.endswith(".py") and os.path.exists(self.hlo_postprocess_script):
+            LOGGER.info(f"Loading hlo post-processor from {self.hlo_postprocess_script}")
+            self.hlo_postprocessor = (
+                SourceFileLoader(
+                    "hlo_post",
+                    self.hlo_postprocess_script,
+                )
+                .load_module()
+                .PostProcess
+            )
+        elif self.hlo_postprocess_script:
+            LOGGER.info(f"Loading hlo post-processor from processors module")
+            proc_spec = spec_from_file_location("processors", f"{self.hlo_postprocess_script}.py")
+            proc_mod = module_from_spec(proc_spec)
+            proc_spec.loader.exec_module(proc_mod)
+            self.hlo_postprocessor = proc_mod.PostProcess
+        else:
+            self.hlo_postprocessor = None
 
         self.ntp_last_sync_file = None
         if self.helaodirs.root is not None:
@@ -2832,6 +2857,12 @@ class Active:
 
                 # finish the data writer
                 self.data_logger.cancel()
+
+                # call custom hlo post-processor if it exists
+                if self.base.hlo_postprocessor is not None:
+                    updated_file_list = self.base.hlo_postprocessor.process(self.action)
+                    self.action.files = updated_file_list
+                
                 l10 = self.base.actives.pop(self.active_uuid, None)
                 if l10 is not None:
                     i10 = [
