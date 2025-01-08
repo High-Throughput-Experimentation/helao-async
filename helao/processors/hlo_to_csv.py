@@ -14,8 +14,6 @@ from helao.helpers.read_hlo import read_hlo
 import pandas as pd
 
 class PostProcess(HloPostProcessor):
-    def __init__(self, action: Action):
-        super().__init__(action)
 
     def process(self) -> List[FileInfo]:
         processed_file_list = []
