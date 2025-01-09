@@ -24,10 +24,14 @@ class PostProcess(HloPostProcessor):
                     file_path = os.path.join(self.output_dir, act_file.file_name)
                     _, data = read_hlo(file_path)
                     df = pd.DataFrame(data)
-                    df.to_csv(file_path.replace(".hlo", ".csv"), index=False)
+                    action_comment = self.action.action_params.get("comment", "")
+                    new_file_path = file_path.replace(".hlo", ".csv")
+                    if action_comment:
+                        new_file_path = new_file_path.replace(".csv", f"_{action_comment}.csv")
+                    df.to_csv(new_file_path, index=False)
                     new_file = copy(act_file)
                     new_file.file_type = "csv__file"
-                    new_file.file_name = act_file.file_name.replace(".hlo", ".csv")
+                    new_file.file_name = os.path.basename(new_file_path)
                     processed_file_list.append(new_file)
                     
             except Exception: 
