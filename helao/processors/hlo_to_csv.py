@@ -8,7 +8,6 @@ import os
 from typing import List
 from copy import copy
 from helao.core.models.file import FileInfo
-from helao.helpers.premodels import Action
 from helao.helpers.hlo_postprocessor import HloPostProcessor
 
 from helao.helpers.read_hlo import read_hlo
