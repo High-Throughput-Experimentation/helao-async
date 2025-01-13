@@ -176,13 +176,13 @@ class GamryExec(Executor):
                                 thresh_val = self.alert_params.get(
                                     f"alertThresh{thresh_key}", None
                                 )
-                                data_dq = self.data_buffer[thresh_key]
-                                slice_vals = list(
-                                    itertools.islice(
-                                        data_dq, len(data_dq) - idx, len(data_dq)
-                                    )
-                                )
                                 if thresh_val is not None:
+                                    data_dq = self.data_buffer[thresh_key]
+                                    slice_vals = list(
+                                        itertools.islice(
+                                            data_dq, len(data_dq) - idx, len(data_dq)
+                                        )
+                                    )
                                     if (
                                         all([x > thresh_val for x in slice_vals])
                                         and self.alert_params["alert_above"]
@@ -206,6 +206,7 @@ class GamryExec(Executor):
             return {"error": error, "status": status, "data": resp.data}
         except Exception:
             LOGGER.error("GamryExec poll error", exc_info=True)
+            print(data_dq)
             return {"error": ErrorCodes.critical, "status": HloStatus.errored}
 
     async def _post_exec(self):
