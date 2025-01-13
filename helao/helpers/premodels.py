@@ -255,6 +255,8 @@ class Action(Experiment, ActionModel):
             # -- (1) -- set missing sequence parameters
             manual_suffix = f"{self.action_server.server_name}-{self.action_name}"
             self.sequence_name = f"mseq-ACT_{manual_suffix}"
+            if self.action_params.get("comment", ""):
+                self.sequence_label = self.action_params["comment"]
             self.init_seq(time_offset=time_offset)
             # -- (2) -- set missing experiment parameters
             self.experiment_name = f"mexp-ACT_{manual_suffix}"
