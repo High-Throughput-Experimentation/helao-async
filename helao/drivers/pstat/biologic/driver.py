@@ -23,6 +23,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
+import numpy as np
 import pandas as pd
 import easy_biologic as ebl
 
@@ -263,11 +264,15 @@ class BiologicDriver(HelaoDriver):
             ]
 
             data = pd.DataFrame(parsed).to_dict(orient="list")
-            data = {program.field_remap[k]: v for k, v in data.items()}
+            data = {program.field_remap[k]: v for k, v in data.items()}            
             values = pd.DataFrame(values_list).to_dict(orient="list")
             values = {f"_{k}": v for k, v in values.items()}
 
             data.update(values)
+            
+            if 'modulus' in data.keys():
+                data["R_ohm"] = -np.array(data['modulus']) * np.sin(np.array(data['phase']))
+                data["X_ohm"] = np.array(data['modulus']) * np.cos(np.array(data['phase']))
 
             response = DriverResponse(
                 response=DriverResponseType.success,

@@ -38,6 +38,7 @@ VALID_ACTION_NAME = (
     "run_CP",
     "run_CV",
     "run_OCV",
+    "run_PEIS",
 )
 
 
@@ -69,7 +70,7 @@ class C_biovis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "P_W", "cycle"]
+        self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "P_W", "R", "X"]
 
         # separate data sources for each channel
         self.channel_datasources = {
@@ -269,6 +270,7 @@ class C_biovis:
                             if len(v) < max_len:
                                 pad_len = max_len - len(v)
                                 data_dict[k] += ["NaN"] * pad_len
+
                         self.channel_datasources[pstat_channel].stream(
                             data_dict, rollover=self.max_points
                         )
