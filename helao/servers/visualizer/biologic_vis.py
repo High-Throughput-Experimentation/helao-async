@@ -70,7 +70,7 @@ class C_biovis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "P_W", "R", "X"]
+        self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "P_W", "R_ohm", "X_ohm"]
 
         # separate data sources for each channel
         self.channel_datasources = {
