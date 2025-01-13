@@ -2,7 +2,7 @@
 Experiment library for HISPEC
 server_key must be a FastAPI action server defined in config
 """
-
+# everything is a 'machine model schema'
 __all__ = [
     "HISPEC_sub_SpEC",
     # "HISPEC_sub_CV_DOtrigger",
@@ -12,9 +12,10 @@ __all__ = [
     # "HISPEC_sub_interrupt",
     "HISPEC_sub_startup",
     "HISPEC_sub_shutdown",
+    "HiSPEC_sub_PEIS",
     # "HISPEC_sub_engage",
     # "HISPEC_sub_disengage",
-    # "HISPEC_analysis_stability",
+    # "HISPEC_analysis_stability", 
 ]
 
 from helao.helpers import logging
@@ -45,8 +46,8 @@ from helao.core.models.electrolyte import Electrolyte
 
 
 EXPERIMENTS = __all__
-
-PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname().lower()).as_dict()
+# these must all be defined but you may not use any of them in the experiment
+PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname().lower()).as_dict() # get host name as local server
 MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname().lower()).as_dict()
 IO_server = MM(server_name="IO", machine_name=gethostname().lower()).as_dict()
 ANDOR_server = MM(server_name="ANDOR", machine_name=gethostname().lower()).as_dict()
@@ -102,7 +103,7 @@ def HISPEC_sub_SpEC(
     ERange: str = "v10",
     Bandwidth: str = "BW4",
     solution_ph: float = 0,
-    ref_vs_nhe: float = 0.21,
+    ref_vs_nhe: float = 0.0,
     toggle1_source: str = "spec_trig",
     toggle1_init_delay: float = 0.0,
     toggle1_duty: float = 0.5,
@@ -206,41 +207,62 @@ def HISPEC_sub_SpEC(
 
 
 
-# def HiSPEC_sub_PEIS(
-#     experiment: Experiment,
-#     PSTAT_server,
-#     "run_PEIS",
-#     {
-#     Vinit__V: float = 0.01,  # Initial value in volts or amps.
-#     Vamp__V: float = 0.1,  # Amplitude value in volts
-#     Finit__Hz: float = 1000,  # Initial frequency in Hz.
-#     Ffinal__Hz: float = 1000000,  # Final frequency in Hz.
-#     FrequencyNumber: int = 60,
-#     Duration__s: float = 0,  # Duration in seconds.
-#     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-#     SweepMode: str = "log",
-#     Repeats: int = 10,
-#     DelayFraction: float = 0.1,
-#     # vs_initial: bool = False,  # True if vs initial, False if vs previous.
-#     IRange: EC_IRange = EC_IRange.AUTO,
-#     ERange: EC_ERange = EC_ERange.AUTO,
-#     Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
-#     channel: int = 0,
-#     TTLwait: int = -1,
-#     TTLsend: int = -1,
-#     TTLduration: float = 1.0
-#     })
-#     start_condition=ActionStartCondition.wait_for_previous,
-#     technique_name="CV",
-#     process_finish=True,
-#     process_contrib=[
-#             ProcessContrib.files,
-#             ProcessContrib.samples_in,
-#             ProcessContrib.samples_out,
-#         ],
-#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-#     apm.add(PAL_server, "run_PEIS")
-#     return apm.action_list  # returns complete action list to orch
+def HiSPEC_sub_PEIS(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Vinit__V: float = 0.01,  # Initial value in volts or amps.
+    Vamp__V: float = 0.1,  # Amplitude value in volts
+    Finit__Hz: float = 1000,  # Initial frequency in Hz.
+    Ffinal__Hz: float = 1000000,  # Final frequency in Hz.
+    FrequencyNumber: int = 60,
+    Duration__s: float = 0,  # Duration in seconds.
+    AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+    SweepMode: str = "log",
+    Repeats: int = 10,
+    DelayFraction: float = 0.1,
+    # vs_initial: bool = False,  # True if vs initial, False if vs previous.
+    IRange: str = "m10",
+    ERange: str = "v10",
+    Bandwidth: str = "BW4",
+    channel: int = 0,
+    TTLwait: int = -1,
+    TTLsend: int = -1,
+    TTLduration: float = 1.0):
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(action_server=PSTAT_server,
+             action_name="run_PEIS",
+             action_params={
+                    "Vinit__V": Vinit__V,
+                    "Vamp__V": Vamp__V,
+                    "Finit__Hz": Finit__Hz,
+                    "Ffinal__Hz": Ffinal__Hz,
+                    "FrequencyNumber": FrequencyNumber,
+                    "Duration__s": Duration__s,
+                    "AcqInterval__s": AcqInterval__s,
+                    "SweepMode": SweepMode,
+                    "Repeats": Repeats,
+                    "DelayFraction": DelayFraction,
+                    "IRange": IRange,
+                    "ERange": ERange,
+                    "Bandwidth": Bandwidth,
+                    "channel": channel,
+                    "TTLwait": TTLwait,
+                    "TTLsend": TTLsend,
+                    "TTLduration": TTLduration,
+
+             })
+
+    start_condition=ActionStartCondition.wait_for_previous,
+    technique_name="PEIS",
+    process_finish=True,
+    process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+ 
+    return apm.action_list  # returns complete action list to orch
 
 
 # def HISPEC_sub_CV_DOtrigger(
