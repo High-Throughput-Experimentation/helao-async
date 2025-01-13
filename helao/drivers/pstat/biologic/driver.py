@@ -271,8 +271,8 @@ class BiologicDriver(HelaoDriver):
             data.update(values)
             
             if 'modulus' in data.keys():
-                data["R_ohm"] = -np.array(data['modulus']) * np.sin(np.array(data['phase']))
-                data["X_ohm"] = np.array(data['modulus']) * np.cos(np.array(data['phase']))
+                data["R_ohm"] = (-np.array(data['modulus']) * np.sin(np.array(data['phase']))).tolist()
+                data["X_ohm"] = (np.array(data['modulus']) * np.cos(np.array(data['phase']))).tolist()
 
             response = DriverResponse(
                 response=DriverResponseType.success,
