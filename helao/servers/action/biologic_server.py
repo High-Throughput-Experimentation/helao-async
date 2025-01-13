@@ -432,8 +432,8 @@ async def biologic_dyn_endpoints(app=None):
         action: Action = Body({}, embed=True),
         action_version: int = 3,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
-        Vinit__V: float = 0.01,  # Initial value in volts or amps.
-        Vamp__V: float = 0.1,  # Amplitude value in volts
+        Vinit__V: float = 0.00,  # Initial value in volts or amps.
+        Vamp__V: float = 0.01,  # Amplitude value in volts
         Finit__Hz: float = 1000,  # Initial frequency in Hz.
         Ffinal__Hz: float = 1000000,  # Final frequency in Hz.
         FrequencyNumber: int = 60,
