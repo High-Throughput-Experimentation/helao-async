@@ -15,6 +15,14 @@ def PSTAT_exp_CP(
     acqinterval_s: float = 0.1,
     gamry_i_range: str = "auto",
     comment: str = "",
+    alert_duration_sec: float = -1,
+    alert_above: bool = True,
+    alert_sleep_sec: float = -1,
+    alert_thresh_Ewe_V: float = -1,
+    stop_current_min: str = "",
+    stop_current_max: str = "",
+    stop_current_min_delay_sec: str = "",
+    stop_current_max_delay_sec: str = "",
     num_repeats: int = 1,
 ):
     """Run a looping CP experiment for num_repeats times.
@@ -38,7 +46,15 @@ def PSTAT_exp_CP(
         "Tval__s": duration_s,
         "AcqInterval__s": acqinterval_s,
         "IErange": gamry_i_range,
-        "comment": comment
+        "comment": comment,
+        "alert_duration_s": alert_duration_sec,
+        "alert_above": alert_above,
+        "alert_sleep__s": alert_sleep_sec,
+        "alertTreshEwe_V": alert_thresh_Ewe_V,
+        "SetStopXMin": float(stop_current_min) if stop_current_min!="" else None,
+        "SetStopXMax": float(stop_current_max) if stop_current_max!="" else None,
+        "SetStopAtDelayXMin": int(stop_current_min_delay_sec) if stop_current_min_delay_sec!="" else None,
+        "SetStopAtDelayXMax": int(stop_current_max_delay_sec) if stop_current_max_delay_sec!="" else None,
     }
 
     for _ in range(num_repeats):
