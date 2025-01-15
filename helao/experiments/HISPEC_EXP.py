@@ -210,10 +210,10 @@ def HISPEC_sub_SpEC(
 def HiSPEC_sub_PEIS(
     experiment: Experiment,
     experiment_version: int = 1,
-    Vinit__V: float = 0.01,  # Initial value in volts or amps.
-    Vamp__V: float = 0.1,  # Amplitude value in volts
-    Finit__Hz: float = 1000,  # Initial frequency in Hz.
-    Ffinal__Hz: float = 1000000,  # Final frequency in Hz.
+    Vinit__V: float = 0.0,  # Initial value in volts or amps.
+    Vamp__V: float = 0.01,  # Amplitude value in volts
+    Finit__Hz: float = 1,  # Initial frequency in Hz.
+    Ffinal__Hz: float = 2000000,  # Final frequency in Hz.
     FrequencyNumber: int = 60,
     Duration__s: float = 0,  # Duration in seconds.
     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
