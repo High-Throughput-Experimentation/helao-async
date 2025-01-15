@@ -415,7 +415,7 @@ class Orch(Base):
 
         return doc
 
-    async def wait_for_interrupt(self):
+    async def wait_for_interrupt(self, pending_action: Optional[Action] = None):
         """
         Asynchronously waits for an interrupt message from the interrupt queue.
 
@@ -455,7 +455,11 @@ class Orch(Base):
             if isinstance(interrupt, GlobalStatusModel):
                 self.incoming = interrupt
                 await self.globstat_q.put(interrupt.as_json())
-        return None
+
+        if pending_action is not None and self.globalstatusmodel.loop_intent == LoopIntent.stop:
+            self.action_dq.insert(0, pending_action)
+            return False
+        return True
 
     async def subscribe_all(self, retry_limit: int = 15):
         """
@@ -1084,7 +1088,8 @@ class Orch(Base):
                         action_server=A.action_server, endpoint_name=A.action_name
                     )
                     while not endpoint_free:
-                        await self.wait_for_interrupt()
+                        if not await self.wait_for_interrupt():
+                            return ErrorCodes.none
                         endpoint_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.action_server, endpoint_name=A.action_name
                         )
@@ -1094,7 +1099,8 @@ class Orch(Base):
                         action_server=A.action_server
                     )
                     while not server_free:
-                        await self.wait_for_interrupt()
+                        if not await self.wait_for_interrupt():
+                            return ErrorCodes.none
                         server_free = self.globalstatusmodel.server_free(
                             action_server=A.action_server
                         )
@@ -1104,7 +1110,8 @@ class Orch(Base):
                         action_server=A.orchestrator, endpoint_name="wait"
                     )
                     while not wait_free:
-                        await self.wait_for_interrupt()
+                        if not await self.wait_for_interrupt():
+                            return ErrorCodes.none
                         wait_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.orchestrator, endpoint_name="wait"
                         )
@@ -1115,7 +1122,8 @@ class Orch(Base):
                         in self.globalstatusmodel.active_dict.keys()
                     )
                     while previous_action_active:
-                        await self.wait_for_interrupt()
+                        if not await self.wait_for_interrupt():
+                            return ErrorCodes.none
                         previous_action_active = (
                             self.last_action_uuid
                             in self.globalstatusmodel.active_dict.keys()
