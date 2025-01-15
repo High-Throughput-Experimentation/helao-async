@@ -82,7 +82,7 @@ class HelaoDict:
     def as_dict(self):
         d = deepcopy(vars(self))
         attr_only = self._serialize_dict(dict_in=d)
-        clean_nans = nan2None(attr_only)
+        clean_nans = {k: nan2None(v) for k, v in attr_only.items()}
         return clean_nans
 
     def clean_dict(self, strip_private: bool = False):
