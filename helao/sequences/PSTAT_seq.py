@@ -49,7 +49,7 @@ def CP_loop(
 
     # CP
     epm.add_experiment(
-        "PSTAT_exp_CP_loop",
+        "PSTAT_exp_CP",
         {
             "CP_current": CP_current,
             "samplerate_sec": CP_samplerate_sec,
