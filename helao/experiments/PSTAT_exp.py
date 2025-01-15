@@ -1,3 +1,12 @@
+from socket import gethostname
+
+from helao.core.models.machine import MachineModel
+from helao.helpers.premodels import Experiment, ActionPlanMaker
+
+__all__ = ["PSTAT_exp_CP"]
+EXPERIMENTS = __all__
+PSTAT_server = MachineModel(server_name="PSTAT", machine_name=gethostname().lower()).as_dict()
+
 def PSTAT_exp_CP(
     experiment: Experiment,
     experiment_version: int = 1,
