@@ -20,7 +20,15 @@ def CP_loop(
     CP_samplerate_sec: float = 0.1,
     gamry_i_range: str = "auto",
     comment: str = "",
-    num_repeats: int = 1
+    num_repeats: int = 1,
+    alert_duration_sec: float = -1,
+    alert_above: bool = True,
+    alert_sleep_sec: float = -1,
+    alert_thresh_Ewe_V: float = -1,
+    stop_current_min: str = "",
+    stop_current_max: str = "",
+    stop_current_min_delay_sec: str = "",
+    stop_current_max_delay_sec: str = "",
 ):
     """Run a looping CP for num_repeats times.
 
@@ -48,7 +56,15 @@ def CP_loop(
             "CP_duration_sec": CP_duration_sec,
             "gamry_i_range": gamry_i_range,
             "comment": comment,
-            "num_repeats": num_repeats
+            "num_repeats": num_repeats,
+            "alert_duration_sec": alert_duration_sec,
+            "alert_above": alert_above,
+            "alert_sleep_sec": alert_sleep_sec,
+            "alert_thresh_Ewe_V": alert_thresh_Ewe_V,
+            "step_stop_current_min": stop_current_min,
+            "step_stop_current_max": stop_current_max,
+            "step_stop_current_min_delay_sec": stop_current_min_delay_sec,
+            "step_stop_current_max_delay_sec": stop_current_max_delay_sec,
         },
     )
 
