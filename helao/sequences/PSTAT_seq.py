@@ -51,9 +51,9 @@ def CP_loop(
     epm.add_experiment(
         "PSTAT_exp_CP",
         {
-            "CP_current": CP_current,
-            "samplerate_sec": CP_samplerate_sec,
-            "CP_duration_sec": CP_duration_sec,
+            "current": CP_current,
+            "acqinterval_s": CP_samplerate_sec,
+            "duration_s": CP_duration_sec,
             "gamry_i_range": gamry_i_range,
             "comment": comment,
             "num_repeats": num_repeats,
