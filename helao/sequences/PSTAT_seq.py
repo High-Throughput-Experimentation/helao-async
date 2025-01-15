@@ -19,7 +19,7 @@ def CP_loop(
     CP_duration_sec: float = 3600,
     CP_samplerate_sec: float = 0.1,
     gamry_i_range: str = "auto",
-    comment: str = ""
+    comment: str = "",
     num_repeats: int = 1
 ):
     """Run a looping CP for num_repeats times.
@@ -47,7 +47,7 @@ def CP_loop(
             "samplerate_sec": CP_samplerate_sec,
             "CP_duration_sec": CP_duration_sec,
             "gamry_i_range": gamry_i_range,
-            "comment": comment
+            "comment": comment,
             "num_repeats": num_repeats
         },
     )
