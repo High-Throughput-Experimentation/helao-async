@@ -27,8 +27,8 @@ def CP_loop(
     alert_thresh_Ewe_V: float = -1,
     stop_voltage_min: str = "",
     stop_voltage_max: str = "",
-    stop_voltage_min_delay_sec: str = "",
-    stop_voltage_max_delay_sec: str = "",
+    stop_voltage_min_delay_pts: str = "",
+    stop_voltage_max_delay_pts: str = "",
 ):
     """Run a looping CP for num_repeats times.
 
@@ -63,8 +63,8 @@ def CP_loop(
             "alert_thresh_Ewe_V": alert_thresh_Ewe_V,
             "stop_voltage_min": stop_voltage_min,
             "stop_voltage_max": stop_voltage_max,
-            "stop_voltage_min_delay_sec": stop_voltage_min_delay_sec,
-            "stop_voltage_max_delay_sec": stop_voltage_max_delay_sec,
+            "stop_voltage_min_delay_pts": stop_voltage_min_delay_pts,
+            "stop_voltage_max_delay_pts": stop_voltage_max_delay_pts,
         },
     )
 

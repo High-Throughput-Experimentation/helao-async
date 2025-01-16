@@ -21,8 +21,8 @@ def PSTAT_exp_CP(
     alert_thresh_Ewe_V: float = -1,
     stop_voltage_min: str = "",
     stop_voltage_max: str = "",
-    stop_voltage_min_delay_sec: str = "",
-    stop_voltage_max_delay_sec: str = "",
+    stop_voltage_min_delay_pts: str = "",
+    stop_voltage_max_delay_pts: str = "",
     num_repeats: int = 1,
 ):
     """Run a looping CP experiment for num_repeats times.
@@ -53,8 +53,8 @@ def PSTAT_exp_CP(
         "alertTreshEwe_V": alert_thresh_Ewe_V,
         "SetStopXMin": float(stop_voltage_min) if stop_voltage_min!="" else None,
         "SetStopXMax": float(stop_voltage_max) if stop_voltage_max!="" else None,
-        "SetStopAtDelayXMin": int(stop_voltage_min_delay_sec) if stop_voltage_min_delay_sec!="" else None,
-        "SetStopAtDelayXMax": int(stop_voltage_max_delay_sec) if stop_voltage_max_delay_sec!="" else None,
+        "SetStopAtDelayXMin": int(stop_voltage_min_delay_pts) if stop_voltage_min_delay_pts!="" else None,
+        "SetStopAtDelayXMax": int(stop_voltage_max_delay_pts) if stop_voltage_max_delay_pts!="" else None,
     }
 
     for _ in range(num_repeats):
