@@ -28,9 +28,9 @@ def HiSpEC_CV(
 
     #######
     #Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
-    Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
+    #Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
+    #Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
     #scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
     cycles: int = 1,
@@ -45,6 +45,16 @@ def HiSpEC_CV(
     toggle1_duty: float = 0.5,
     toggle1_period: float = 2.0,
     toggle1_time: float = -1,
+    Vamp__V: float = 0.01,  # Amplitude value in volts
+    Finit__Hz: float = 200000,  # Initial frequency in Hz.
+    Ffinal__Hz: float = 1000,  # Final frequency in Hz.
+    FrequencyNumber: int = 60,
+    Duration__s: float = 0,  # Duration in seconds.
+    AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+    SweepMode: str = "log",
+    Repeats: int = 10,
+    DelayFraction: float = 0.1,
+    
     # toggle2_source: str = "spec_trig",
     # toggle2_init_delay: float = 0.0,
     # toggle2_duty: float = 0.5,
@@ -130,6 +140,29 @@ def HiSpEC_CV(
                 "SampleRate":0.01,
             }
                 )
+        
+        epm.add_experiment(
+            "HiSPEC_sub_PEIS",
+            {
+                #"Vinit_vsRHE": Vinit_vsRHE,
+                #"Vapex1_vsRHE": Vapex1_vsRHE,
+                "Vamp__V": Vamp__V,
+                "Finit__Hz": Finit__Hz,
+                "Ffinal__Hz": Ffinal__Hz,
+                "FrequencyNumber": FrequencyNumber,
+                "Duration__s": Duration__s,
+                "AcqInterval__s": AcqInterval__s,
+                "SweepMode": SweepMode,
+                "Repeats": Repeats,
+                "DelayFraction": DelayFraction,
+                "gamrychannelwait": gamrychannelwait,
+                "gamrychannelsend": gamrychannelsend,
+                "IRange": IRange,
+                "ERange": ERange,
+                "Bandwidth": Bandwidth,
+                "solution_ph": solution_ph,
+                "ref_vs_nhe": ref_vs_nhe,
+            }, from_globalexp_params={"HiSpEC_OCV": "Vinit__V" })
 
         epm.add_experiment(
             "HISPEC_sub_SpEC",
@@ -151,7 +184,7 @@ def HiSpEC_CV(
                 "toggle1_source": toggle1_source,
                 "toggle1_init_delay": toggle1_init_delay,
                 "toggle1_duty": toggle1_duty,
-            }, from_globalexp_params={"HiSpEC_OCV": "Vinit_vsRHE", "HiSpEC_OCV":"Vapex1_vsRHE","HiSpEC_OCV":"Vfinal_vsRHE" })
+            }, from_globalexp_params={"HiSpEC_OCV": "Vinit_vsRHE", "HiSpEC_OCV":"Vapex2_vsRHE","HiSpEC_OCV":"Vfinal_vsRHE" })
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
@@ -191,10 +224,10 @@ def HiSpEC_EIS_only(
     reservoir_liquid_sample_no: int = 1, # @Dan -- what is this? -- this is the liquid sample number in the liquid sample database, you will need to 'create' a liquid sample for the electrolyte you're using, so that the cell is filled with a liquid sample that inherits the reservoir attributes
     solution_bubble_gas: str = "None",
     solution_ph: float = 0,
-    Vinit__V: float = 0.0,  # Initial value in volts or amps.
+    #Vinit__V: float = 0.0,  # Initial value in volts or amps.
     Vamp__V: float = 0.01,  # Amplitude value in volts
-    Finit__Hz: float = 1,  # Initial frequency in Hz.
-    Ffinal__Hz: float = 2000000,  # Final frequency in Hz.
+    Finit__Hz: float = 200000,  # Initial frequency in Hz.
+    Ffinal__Hz: float = 1000,  # Final frequency in Hz.
     FrequencyNumber: int = 60,
     Duration__s: float = 0,  # Duration in seconds.
     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
