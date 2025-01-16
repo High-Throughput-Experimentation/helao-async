@@ -2014,11 +2014,11 @@ def ADSS_PA_CV_TRI(
 
     #Ref Pt measurement CVs
     ref_CV_cycles: List[int] = [8],
-    ref_Vinit_vsRHE: List[float] = 0.05,  # Initial value in volts or amps.
-    ref_Vapex1_vsRHE: List[float] = 1.3,  # Apex 1 value in volts or amps.
-    ref_Vapex2_vsRHE: List[float] = 0.05,  # Apex 2 value in volts or amps.
-    ref_Vfinal_vsRHE: List[float] = 0.05,  # Final value in volts or amps.
-    ref_CV_scanrate_voltsec: List[float] = 0.1,  # scan rate in volts/second or amps/second.
+    ref_Vinit_vsRHE: List[float] = [0.05],  # Initial value in volts or amps.
+    ref_Vapex1_vsRHE: List[float] = [1.3],  # Apex 1 value in volts or amps.
+    ref_Vapex2_vsRHE: List[float] = [0.05],  # Apex 2 value in volts or amps.
+    ref_Vfinal_vsRHE: List[float] = [0.05],  # Final value in volts or amps.
+    ref_CV_scanrate_voltsec: List[float] = [0.1],  # scan rate in volts/second or amps/second.
     ref_CV_samplerate_sec: float = 0.01,
 
     #cleaning CVs 
@@ -3215,11 +3215,11 @@ def ADSS_PA_CV_TRI_new(
 
     #Ref Pt measurement CVs
     ref_CV_cycles: List[int] = [8],
-    ref_Vinit_vsRHE: List[float] = 0.05,  # Initial value in volts or amps.
-    ref_Vapex1_vsRHE: List[float] = 1.3,  # Apex 1 value in volts or amps.
-    ref_Vapex2_vsRHE: List[float] = 0.05,  # Apex 2 value in volts or amps.
-    ref_Vfinal_vsRHE: List[float] = 0.05,  # Final value in volts or amps.
-    ref_CV_scanrate_voltsec: List[float] = 0.1,  # scan rate in volts/second or amps/second.
+    ref_Vinit_vsRHE: List[float] = [0.05],  # Initial value in volts or amps.
+    ref_Vapex1_vsRHE: List[float] = [1.3],  # Apex 1 value in volts or amps.
+    ref_Vapex2_vsRHE: List[float] = [0.05],  # Apex 2 value in volts or amps.
+    ref_Vfinal_vsRHE: List[float] = [0.05],  # Final value in volts or amps.
+    ref_CV_scanrate_voltsec: List[float] = [0.1],  # scan rate in volts/second or amps/second.
     ref_CV_samplerate_sec: float = 0.01,
 
     #cleaning CVs 
@@ -3740,6 +3740,8 @@ def ADSS_PA_CV_TRI_new(
                         "ref_type": ref_type,
                         "ref_offset__V": ref_offset__V,
                         "aliquot_insitu": False,
+                        "PAL_Injector":PAL_Injector,
+                        "PAL_Injector_id":PAL_Injector_id,
                         "aliquot_pre": firstaliquot,
                         "aliquot_volume_ul": aliquot_volume_ul,
                         "washmod_in": washmod,
@@ -3776,6 +3778,8 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "PAL_Injector":PAL_Injector,
+                    "PAL_Injector_id":PAL_Injector_id,
                     "aliquot_post": postaliquot,
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "washmod_in": washmod,
@@ -3806,6 +3810,8 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "PAL_Injector":PAL_Injector,
+                    "PAL_Injector_id":PAL_Injector_id,
                     "aliquot_post": postaliquot,
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "washmod_in": washmod,
@@ -3857,6 +3863,8 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "PAL_Injector":PAL_Injector,
+                    "PAL_Injector_id":PAL_Injector_id,
                     "aliquot_post": postaliquot,
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "washmod_in": washmod,
@@ -3926,6 +3934,8 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "PAL_Injector":PAL_Injector,
+                    "PAL_Injector_id":PAL_Injector_id,
                     "aliquot_post": postaliquot,
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "washmod_in": washmod,
@@ -3982,6 +3992,8 @@ def ADSS_PA_CV_TRI_new(
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
                     "aliquot_insitu": False,
+                    "PAL_Injector":PAL_Injector,
+                    "PAL_Injector_id":PAL_Injector_id,
                     "aliquot_post": postaliquot,
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "washmod_in": washmod,
