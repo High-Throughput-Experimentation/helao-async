@@ -61,10 +61,10 @@ def CP_loop(
             "alert_above": alert_above,
             "alert_sleep_sec": alert_sleep_sec,
             "alert_thresh_Ewe_V": alert_thresh_Ewe_V,
-            "step_stop_voltage_min": stop_voltage_min,
-            "step_stop_voltage_max": stop_voltage_max,
-            "step_stop_voltage_min_delay_sec": stop_voltage_min_delay_sec,
-            "step_stop_voltage_max_delay_sec": stop_voltage_max_delay_sec,
+            "stop_voltage_min": stop_voltage_min,
+            "stop_voltage_max": stop_voltage_max,
+            "stop_voltage_min_delay_sec": stop_voltage_min_delay_sec,
+            "stop_voltage_max_delay_sec": stop_voltage_max_delay_sec,
         },
     )
 
