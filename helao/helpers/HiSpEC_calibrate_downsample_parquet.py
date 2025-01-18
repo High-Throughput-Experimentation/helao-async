@@ -326,12 +326,13 @@ def round_10ms(time)->float:
     """
     Rounds a time to the nearest 1ms
     """
-    if type(time) is list:
+    print(type(time))
+    if isinstance(time, list):
         return [np.round(x, 3) for x in time]
-    elif type(time) is float or type(time) is int:
+    elif isinstance(time,float) or isinstance(time, int):
         return np.round(time, 3)
     else:
-        raise ValueError("Time must be a float, an int or a list of floats or ints")
+        raise ValueError(f"type time is {type(time)} Time must be a float, an int or a list of floats or ints")
     
 
 def generate_min_max_list_for_cycles(CV_data:pd.DataFrame, default_time_header:str='t_s', default_cycle_header='cycle')->dict:

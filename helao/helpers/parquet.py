@@ -160,10 +160,7 @@ def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100, HiSpEC:b
             current_idx += chunklen
 
         #print(df.head())
-        print('*******************')
-        print(df0.head())
-        print('*******************')
-        print
+       
         
         if schema is None:
             schema = table.schema

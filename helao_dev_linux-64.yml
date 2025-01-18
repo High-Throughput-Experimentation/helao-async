@@ -34,13 +34,13 @@ dependencies:
   - orjson
   - pandas
   - paramiko
-  - picologging
+# - picologging
   - pip
   - psutil
   - psycopg2
   - pyaml
   - pyarrow
-  - pybase64
+#  - pybase64
   - pydantic-core
   - pydantic-settings
   - pydantic
