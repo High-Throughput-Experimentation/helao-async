@@ -791,7 +791,7 @@ def ADSS_sub_CA(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
-                insert_electrolyte_bool=insert_electrolyte,
+                insert_electrolyte_bool=insert_electrolyte_bool,
                 insert_electrolyte_volume_ul=insert_electrolyte_volume_ul,
                 insert_electrolyte_time_sec=insert_electrolyte_time_sec,
                 electrolyte_sample_no=electrolyte_sample_no,
@@ -956,7 +956,7 @@ def ADSS_sub_CA_photo(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
-                insert_electrolyte_bool=insert_electrolyte,
+                insert_electrolyte_bool=insert_electrolyte_bool,
                 insert_electrolyte_volume_ul=insert_electrolyte_volume_ul,
                 insert_electrolyte_time_sec=insert_electrolyte_time_sec,
                 electrolyte_sample_no=electrolyte_sample_no,
@@ -1108,7 +1108,7 @@ def ADSS_sub_CV(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
-                insert_electrolyte_bool=insert_electrolyte,
+                insert_electrolyte_bool=insert_electrolyte_bool,
                 insert_electrolyte_volume_ul=insert_electrolyte_volume_ul,
                 insert_electrolyte_time_sec=insert_electrolyte_time_sec,
                 electrolyte_sample_no=electrolyte_sample_no,
@@ -2661,3 +2661,30 @@ def ADSS_sub_remove_bubble(
         )
     )
     return apm.action_list
+
+def ADSS_sub_PAL_deep_clean(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    clean_volume_ul: int = 500,
+    PAL_Injector: str = "LS 4",
+    rinse_1: int = 1,
+    rinse_2: int = 0,
+    rinse_3: int = 0,
+    rinse_4: int = 0,
+):
+    apm = ActionPlanMaker()
+
+    apm.add(
+        PAL_server,
+        "PAL_deepclean",
+        {
+            "volume_ul": clean_volume_ul,
+            "tool": PAL_Injector,
+            "wash1": rinse_1,
+            "wash2": rinse_2,
+            "wash3": rinse_3,
+            "wash4": rinse_4,
+        },
+    )
+
+    return apm.action_list  # returns complete action list to orch
