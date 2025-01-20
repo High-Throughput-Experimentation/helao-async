@@ -3212,6 +3212,7 @@ def ADSS_PA_CV_TRI_new(
     #liquid_custom_position: str = "elec_res1",
     phos_PAL_Injector: str = "LS 5",
     phos_PAL_Injector_id: str = "LS5_peek",
+    PAL_cleanvol_ul: int = 500,
 
     #Ref Pt measurement CVs
     ref_CV_cycles: List[int] = [8],
@@ -4002,6 +4003,32 @@ def ADSS_PA_CV_TRI_new(
                     "previous_liquid_injected": previous_liquid_injected,
                 }
             )
+        if Inject_PA:
+            washmod += 1
+            #determine last used rinse, then use next two  
+            remainder = washmod %4
+            washone, washtwo, washthree, washfour = (0,)*4
+            if remainder == 0:
+                washone, washtwo = 1,1
+            if remainder == 1:
+                washone, washfour= 1,1
+            if remainder == 2:
+                washthree,washfour = 1,1
+            if remainder ==3:
+                washtwo, washthree=1,1
+            washmod += 1
+
+            epm.add_experiment(
+            "ADSS_sub_PAL_deep_clean",
+            {
+                "clean_volume_ul": PAL_cleanvol_ul,
+                "PAL_Injector": phos_PAL_Injector,
+                "rinse_1": washone,
+                "rinse_2": washtwo,
+                "rinse_3": washthree,
+                "rinse_4": washfour,
+            }
+        )
 
         if keep_electrolyte_at_end:
             epm.add_experiment("ADSS_sub_unload_solid",{})
