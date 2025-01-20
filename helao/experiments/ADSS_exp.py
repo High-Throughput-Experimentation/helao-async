@@ -31,6 +31,7 @@ __all__ = [
     "ADSS_sub_shutdown",
     #    "ADSS_sub_drain",
     "ADSS_sub_clean_PALtool",
+    "ADSS_sub_PAL_deep_clean",
     "ADSS_sub_cellfill_prefilled",
     "ADSS_sub_cellfill_flush",
     "ADSS_sub_keep_electrolyte",
