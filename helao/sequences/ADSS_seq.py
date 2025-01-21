@@ -3153,7 +3153,7 @@ def ADSS_PA_CV_TRI(
 
 
 def ADSS_PA_CV_TRI_new(
-    sequence_version: int = 6, #6 new transfer syringe#5 shift aliquots to expts, bubble removal
+    sequence_version: int = 7, #7 pal deepclean #6 new transfer syringe#5 shift aliquots to expts, bubble removal
     #note: str = "need as many samples as you expect combinations of UPL and LPL",
     
     #sample info
