@@ -139,7 +139,7 @@ async def move_dir(
     src_list = glob(os.path.join(yml_dir, "*"))
 
     while (not copy_success) and copy_retries <= 60:
-        dst_list = [p.replace("RUNS_ACTIVE", "RUNS_NOSYNC" if not p.endswith(".yml") and not hobj.sync_data else dest_dir) for p in src_list]
+        dst_list = [p.replace("RUNS_ACTIVE", "RUNS_NOSYNC" if p.endswith(".hlo") and not hobj.sync_data else dest_dir) for p in src_list]
         await asyncio.gather(
             *[aioshutil.copy(src, dst) for src, dst in zip(src_list, dst_list)],
             return_exceptions=True,
