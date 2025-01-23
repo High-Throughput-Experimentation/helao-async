@@ -25,6 +25,7 @@ from glob import glob
 from zipfile import ZipFile
 import zipfile
 from tqdm import tqdm
+import re
 
 from helao.helpers.yml_tools import yml_load
 
@@ -140,7 +141,6 @@ class HelaoData:
         self.ord = ["seq", "exp", "act"]
         self.abbrd = {"seq": "sequence", "exp": "experiment", "act": "action"}
         self.target = target
-        self.nosync_files = []
         if self.target.endswith(".zip"):  # this will always be a zipped sequence
             with ZipFile(target, "r") as zf:
                 if "zflist" in kwargs:
@@ -204,10 +204,12 @@ class HelaoData:
                 self.ymlpath = target
             self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
             self.yml = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
+            runstate = re.findall("RUNS_[A-Z]+", self.ymldir)[0]
+            yml_reldir = self.ymldir.replace(runstate, "RUNS_*")
             self.seq = [
                 HelaoData(x)
                 for x in sorted(
-                    glob(os.path.join(self.ymldir, "*", "*-seq.yml")),
+                    glob(os.path.join(yml_reldir, "*", "*-seq.yml")),
                     key=lambda x: float(
                         os.path.basename(os.path.dirname(x)).split("__")[0]
                     ),
@@ -216,7 +218,7 @@ class HelaoData:
             self.exp = [
                 HelaoData(x)
                 for x in sorted(
-                    glob(os.path.join(self.ymldir, "*", "*-exp.yml")),
+                    glob(os.path.join(yml_reldir, "*", "*-exp.yml")),
                     key=lambda x: float(
                         os.path.basename(os.path.dirname(x)).split("__")[0]
                     ),
@@ -225,17 +227,18 @@ class HelaoData:
             self.act = [
                 HelaoData(x)
                 for x in sorted(
-                    glob(os.path.join(self.ymldir, "*", "*-act.yml")),
+                    glob(os.path.join(yml_reldir, "*", "*-act.yml")),
                     key=lambda x: float(
                         os.path.basename(os.path.dirname(x)).split("__")[0]
                     ),
                 )
             ]
-            self.data_files = glob(os.path.join(self.ymldir, "*.hlo"))
+            self.data_files = glob(os.path.join(yml_reldir, "*.hlo"))
             nosync_path = self.ymldir.replace("RUNS_SYNCED", "RUNS_NOSYNC")
 
         if os.path.exists(nosync_path):
-            self.nosync_files += [p for p in glob(os.path.join(nosync_path, "*.hlo"))]
+            self.nosync_files = [p for p in self.data_files if "RUNS_NOSYNC" in p]
+            self.data_files = [p for p in self.data_files if "RUNS_NOSYNC" not in p]
 
         self.name = self.yml.get(f"{self.abbrd[self.type]}_name", "NA")
         self.params = self.yml.get(f"{self.abbrd[self.type]}_params", {})

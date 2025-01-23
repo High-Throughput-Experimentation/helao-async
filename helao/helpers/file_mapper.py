@@ -72,7 +72,7 @@ class FileMapper:
         self.prestr = os.path.join(*self.inputparts[: self.runpos])
 
         # list all files at save_path level and deeper, relative to RUNS_*
-        self.states = ["ACTIVE", "FINISHED", "SYNCED", "DIAG"]
+        self.states = ["ACTIVE", "FINISHED", "SYNCED", "DIAG", "NOSYNC"]
         self.relstrs = []
         for state in self.states:
             stateparts = list(self.inputparts)
