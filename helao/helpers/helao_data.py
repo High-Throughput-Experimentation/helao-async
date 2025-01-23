@@ -185,7 +185,7 @@ class HelaoData:
             nosync_path = self.ymldir.replace("RUNS_SYNCED", "RUNS_NOSYNC")
 
         if os.path.exists(nosync_path):
-            self._nosync_files = [p for p in self.data_files if "RUNS_NOSYNC" in p]
+            self._nosync_files = [p for p in self._data_files if "RUNS_NOSYNC" in p]
 
         self.name = self.yml.get(f"{self.abbrd[self.type]}_name", "NA")
         self.params = self.yml.get(f"{self.abbrd[self.type]}_params", {})
@@ -199,14 +199,18 @@ class HelaoData:
         if self.target.endswith(".zip"):
             return self._data_files
         return [
-            FileMapper(p).locate(p) for p in self._data_files if "RUNS_NOSYNC" not in p
+            str(FileMapper(p).locate(p))
+            for p in self._data_files
+            if "RUNS_NOSYNC" not in p
         ]
 
     @property
     def nosync_files(self):
         if self.target.endswith(".zip"):
             return self._nosync_files
-        return [FileMapper(p).locate(p) for p in self._data_files if "RUNS_NOSYNC" in p]
+        return [
+            str(FileMapper(p).locate(p)) for p in self._data_files if "RUNS_NOSYNC" in p
+        ]
 
     @property
     def ls(self):
