@@ -201,6 +201,7 @@ def generate_interpolation_function(CV: pd.DataFrame,
                 default_CV_t_header: str = "t_s",
                 default_CV_U_header: str = "Ewe_V",
                 defult_CV_cycle_header: str = "cycle",
+                plotbl: bool = False,
                 
 
     ):
@@ -259,20 +260,21 @@ def generate_interpolation_function(CV: pd.DataFrame,
         y_fit = sawtooth2(x_data, amplitude_fit, period_fit, phase_fit, offset_fit)
 
         # Plot the original data and the fitted data
-        fig, ax = plt.subplots()
-        ax.plot(x_data, y_data, label="Original data")
-        ax.plot(x_data, y_fit, color="red", linestyle="--", label="Fitted data")
-        ax.set_xlabel("Time (s)")
-        ax.set_ylabel("Voltage (V)")
-        # add a title of fitted vs measured time/ voltage
-        plt.title("Interpolation function used to covert t to V")
+        if plotbl:
+            fig, ax = plt.subplots()
+            ax.plot(x_data, y_data, label="Original data")
+            ax.plot(x_data, y_fit, color="red", linestyle="--", label="Fitted data")
+            ax.set_xlabel("Time (s)")
+            ax.set_ylabel("Voltage (V)")
+            # add a title of fitted vs measured time/ voltage
+            plt.title("Interpolation function used to covert t to V")
 
-        # add ledgend and place it on outside of plot on the right
-        ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-        plt.show()
+            # add ledgend and place it on outside of plot on the right
+            ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+            plt.show()
 
-        # save the plot as interpolation.png
-        fig.savefig("interpolation.png")
+            # save the plot as interpolation.png
+            fig.savefig("interpolation.png")
 
         interpolation = (amplitude_fit, period_fit, phase_fit, offset_fit)
         interpol_write = {'amplitude': amplitude_fit, 'period': period_fit, 'phase': phase_fit, 'offset': offset_fit}
@@ -534,6 +536,7 @@ def fit_current_time_to_univariate_spline(
         smoothing_factor: float = 0.000000001,
         default_t_header: str = "t_s",
         default_J_header: str = "I_A",
+        plotbl: bool = False,
     ):
     """
     This function takes in a voltage and current array
@@ -557,16 +560,16 @@ def fit_current_time_to_univariate_spline(
     # Fit the CV to a spline function
     spl = UnivariateSpline(t_sorted, J_sorted)
     spl.set_smoothing_factor(smoothing_factor)
+    if plotbl:
+        # Plot the spline function
+        plt.plot(t_sorted, spl(t_sorted), 'r', lw=3)
 
-    # Plot the spline function
-    plt.plot(t_sorted, spl(t_sorted), 'r', lw=3)
-
-    # Plot the original data
-    plt.plot(t_sorted, J_sorted, 'b', lw=1) 
-    plt.xlabel('Voltage (E)')
-    plt.ylabel('Current (J)')
-    plt.title('CV Spline Fit')
-    # set the x range from -0.2 to 1.5
+        # Plot the original data
+        plt.plot(t_sorted, J_sorted, 'b', lw=1) 
+        plt.xlabel('Voltage (E)')
+        plt.ylabel('Current (J)')
+        plt.title('CV Spline Fit')
+        # set the x range from -0.2 to 1.5
 
     return spl
 
