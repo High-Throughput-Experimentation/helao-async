@@ -601,7 +601,8 @@ def calculate_differential_spectra(
 def fit_current_to_univariate_spline(
         U: np.ndarray,
         J: np.ndarray,
-        smoothing_factor: float = 0.000000001 
+        smoothing_factor: float = 0.000000001,
+        plotbl: bool = False 
     ):
     """
     This function takes in a voltage and current array
@@ -624,17 +625,17 @@ def fit_current_to_univariate_spline(
     # Fit the CV to a spline function
     spl = UnivariateSpline(U_sorted, J_sorted)
     spl.set_smoothing_factor(smoothing_factor)
+    if plotbl:
+        # Plot the spline function
+        plt.plot(U_sorted, spl(U_sorted), 'r', lw=1)
 
-    # Plot the spline function
-    plt.plot(U_sorted, spl(U_sorted), 'r', lw=1)
-
-    # Plot the original data
-    plt.plot(U_sorted, J_sorted, 'b', lw=1) 
-    plt.xlabel('Voltage (E)')
-    plt.ylabel('Current (J)')
-    plt.title('CV Spline Fit')
-    # set the x range from -0.2 to 1.5
-    plt.xlim(-0.2, 1.5)
+        # Plot the original data
+        plt.plot(U_sorted, J_sorted, 'b', lw=1) 
+        plt.xlabel('Voltage (E)')
+        plt.ylabel('Current (J)')
+        plt.title('CV Spline Fit')
+        # set the x range from -0.2 to 1.5
+        plt.xlim(-0.2, 1.5)
 
     return spl
 def Downsample_Potential(SpEC_scans_dataframe, voltage_resolution: float):
