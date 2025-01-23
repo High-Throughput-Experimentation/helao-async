@@ -25,7 +25,7 @@ class PostProcess(HloPostProcessor):
         processed_file_list = []
         for act_file in self.files:
             try:
-                if act_file.file_type == "helao__file":
+                if act_file.file_type == "andor_helao__file":
                     file_path = os.path.join(self.output_dir, act_file.file_name)
                     hd=HelaoData(self.exp_yml_path)
                     cv_dir=hd.act[3].ymldir
