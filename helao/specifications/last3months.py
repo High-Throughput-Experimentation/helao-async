@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from helao.helpers.specification_parser import BaseParser
 from helao.helpers.sequence_constructor import constructor
-from helao.helpers.read_hlo import HelaoData
+from helao.helpers.helao_data import HelaoData
 
 
 class SpecParser(BaseParser):
