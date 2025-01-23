@@ -127,7 +127,7 @@ servers:
     fast: andor_server
     params:
       dev_id: 0
-    hlo_postprocess_script: spec_proecess_all
+    hlo_postprocess_script: spec_process_all
     verbose: true
   VIS:
     host: hte-eche-11.htejcap.caltech.edu
