@@ -23,10 +23,8 @@ class PostProcess(HloPostProcessor):
                 if act_file.file_type == "andor_helao__file":
                     file_path = os.path.join(self.output_dir, act_file.file_name)
                     hd=HelaoData(self.exp_yml_path)
-                    cv_dir=hd.act[3].ymldir
-                    for file in os.listdir(cv_dir):
-                        if file.endswith(".hlo"):
-                            cvpath=os.path.join(cv_dir, file)
+                    cvact = hd.act[3]
+                    cvpath = cvact.data_files[0]
                     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.csv') as temp_file:
                         hlo_to_parquet(file_path, temp_file.name, HiSpEC=True)
                         df=fully_read_and_calibrate_parquet(cv_path=cvpath, spec_path=temp_file.name, write_file=False).sort_values(by='t (s)')
