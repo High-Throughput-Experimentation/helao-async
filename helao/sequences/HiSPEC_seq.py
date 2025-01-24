@@ -162,7 +162,7 @@ def HiSpEC_CV(
                 "Bandwidth": Bandwidth,
                 "solution_ph": solution_ph,
                 "ref_vs_nhe": ref_vs_nhe,
-            }, from_globalexp_params={"HiSpEC_OCV": "Vinit__V" })
+            }, from_globalexp_params={"Ewe_V__mean_final": "Vinit__V" })
 
         epm.add_experiment(
             "HISPEC_sub_SpEC",
@@ -184,7 +184,7 @@ def HiSpEC_CV(
                 "toggle1_source": toggle1_source,
                 "toggle1_init_delay": toggle1_init_delay,
                 "toggle1_duty": toggle1_duty,
-            }, from_globalexp_params={"HiSpEC_OCV": "Vinit_vsRHE", "HiSpEC_OCV":"Vapex1_vsRHE","HiSpEC_OCV":"Vfinal_vsRHE" })
+            }, from_globalexp_params={"Ewe_V__mean_final": "Vinit_vsRHE", "Ewe_V__mean_final":"Vapex1_vsRHE","Ewe_V__mean_final":"Vfinal_vsRHE" })
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
@@ -341,7 +341,7 @@ def HiSpEC_EIS_only(
                 "Bandwidth": Bandwidth,
                 "solution_ph": solution_ph,
                 "ref_vs_nhe": ref_vs_nhe,
-            }, from_globalexp_params={"HiSpEC_OCV": "Vinit__V" })
+            }, from_globalexp_params={"Ewe_V__mean_final": "Vinit__V" })
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
