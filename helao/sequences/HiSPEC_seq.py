@@ -183,7 +183,7 @@ def HiSpEC_CV(
                 "toggle1_source": toggle1_source,
                 "toggle1_init_delay": toggle1_init_delay,
                 "toggle1_duty": toggle1_duty,
-            }, from_globalexp_params={"HiSpEC_OCV": "Vinit_vsRHE", "HiSpEC_OCV":"Vapex2_vsRHE","HiSpEC_OCV":"Vfinal_vsRHE" })
+            }, from_globalexp_params={"HiSpEC_OCV": "OCV_vsRef"})
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
 

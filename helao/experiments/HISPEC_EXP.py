@@ -2,6 +2,7 @@
 Experiment library for HISPEC
 server_key must be a FastAPI action server defined in config
 """
+
 # everything is a 'machine model schema'
 __all__ = [
     "HISPEC_sub_SpEC",
@@ -15,7 +16,7 @@ __all__ = [
     "HiSPEC_sub_PEIS",
     # "HISPEC_sub_engage",
     # "HISPEC_sub_disengage",
-    # "HISPEC_analysis_stability", 
+    # "HISPEC_analysis_stability",
 ]
 
 from helao.helpers import logging
@@ -47,7 +48,9 @@ from helao.core.models.electrolyte import Electrolyte
 
 EXPERIMENTS = __all__
 # these must all be defined but you may not use any of them in the experiment
-PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname().lower()).as_dict() # get host name as local server
+PSTAT_server = MM(
+    server_name="PSTAT", machine_name=gethostname().lower()
+).as_dict()  # get host name as local server
 MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname().lower()).as_dict()
 IO_server = MM(server_name="IO", machine_name=gethostname().lower()).as_dict()
 ANDOR_server = MM(server_name="ANDOR", machine_name=gethostname().lower()).as_dict()
@@ -83,15 +86,17 @@ def HISPEC_sub_shutdown(experiment: Experiment):
 # HISPEC_sub_LoSpEC -- CA to SpEC, conditional SpEC
 # HISPEC_sub_PD_LoSpEC
 
+
 # spectral electrochemistry experiment
 def HISPEC_sub_SpEC(
     experiment: Experiment,
     experiment_version: int = 1,
-    Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
+    OCV_vsRef: float = 0.0,
+    # Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
-    scanrate_voltsec: float= 0.02,  # scan rate in volts/second or amps/second.
+    # Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
+    # Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
+    scanrate_voltsec: float = 0.02,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
     cycles: int = 1,
     # gamry_i_range: str = "auto",
@@ -118,11 +123,22 @@ def HISPEC_sub_SpEC(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    CV_duration_sec = abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec # time from initial to Vertex 1
-    CV_duration_sec += abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec # time from vertex 1 to vertex 2 (imagine for now num scans =1)
-    CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec # time from vertex to to final
+    CV_duration_sec = (
+        abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
+    )  # time from initial to Vertex 1
     CV_duration_sec += (
-        abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * 2.0 * (cycles - 1) # now, if C>1 we have c-1 triangular waveforms inserted after the first vertex 1.
+        abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
+    )  # time from vertex 1 to vertex 2 (imagine for now num scans =1)
+    CV_duration_sec += (
+        abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec
+    )  # time from vertex to to final
+    CV_duration_sec += (
+        abs(Vapex2_vsRHE - Vapex1_vsRHE)
+        / scanrate_voltsec
+        * 2.0
+        * (
+            cycles - 1
+        )  # now, if C>1 we have c-1 triangular waveforms inserted after the first vertex 1.
     )
 
     if int(round(toggle1_time)) == -1:
@@ -142,7 +158,8 @@ def HISPEC_sub_SpEC(
             "exp_time": 0.0098,
             "framerate": 98,
             "timeout": 15000,
-        },sync_data=False
+        },
+        sync_data=False,
     )
 
     apm.add(
@@ -178,10 +195,10 @@ def HISPEC_sub_SpEC(
         PSTAT_server,
         "run_CV",
         {
-            "Vinit__V": Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vinit__V": OCV_vsRef - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
             "Vapex1__V": Vapex1_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
-            "Vapex2__V": Vapex2_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
-            "Vfinal__V": Vfinal_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vapex2__V": OCV_vsRef - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vfinal__V": OCV_vsRef - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
             "ScanRate__V_s": scanrate_voltsec,
             "AcqInterval__s": samplerate_sec,
             "Cycles": cycles,
@@ -189,7 +206,7 @@ def HISPEC_sub_SpEC(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IRange": IRange,
             "ERange": ERange,
-            "Bandwidth": Bandwidth, 
+            "Bandwidth": Bandwidth,
         },
         # from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_previous,
@@ -202,7 +219,6 @@ def HISPEC_sub_SpEC(
         ],
     )
     return apm.action_list  # returns complete action list to orch
-
 
 
 def HiSPEC_sub_PEIS(
@@ -225,41 +241,41 @@ def HiSPEC_sub_PEIS(
     channel: int = 0,
     TTLwait: int = -1,
     TTLsend: int = -1,
-    TTLduration: float = 1.0):
+    TTLduration: float = 1.0,
+):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(action_server=PSTAT_server,
-             action_name="run_PEIS",
-             action_params={
-                    "Vinit__V": Vinit__V,
-                    "Vamp__V": Vamp__V,
-                    "Finit__Hz": Finit__Hz,
-                    "Ffinal__Hz": Ffinal__Hz,
-                    "FrequencyNumber": FrequencyNumber,
-                    "Duration__s": Duration__s,
-                    "AcqInterval__s": AcqInterval__s,
-                    "SweepMode": SweepMode,
-                    "Repeats": Repeats,
-                    "DelayFraction": DelayFraction,
-                    "IRange": IRange,
-                    "ERange": ERange,
-                    "Bandwidth": Bandwidth,
-                    "channel": channel,
-                    "TTLwait": TTLwait,
-                    "TTLsend": TTLsend,
-                    "TTLduration": TTLduration,
-
-             })
-
-    start_condition=ActionStartCondition.wait_for_previous,
-    technique_name="PEIS",
-    process_finish=True,
-    process_contrib=[
+    apm.add(
+        action_server=PSTAT_server,
+        action_name="run_PEIS",
+        action_params={
+            "Vinit__V": Vinit__V,
+            "Vamp__V": Vamp__V,
+            "Finit__Hz": Finit__Hz,
+            "Ffinal__Hz": Ffinal__Hz,
+            "FrequencyNumber": FrequencyNumber,
+            "Duration__s": Duration__s,
+            "AcqInterval__s": AcqInterval__s,
+            "SweepMode": SweepMode,
+            "Repeats": Repeats,
+            "DelayFraction": DelayFraction,
+            "IRange": IRange,
+            "ERange": ERange,
+            "Bandwidth": Bandwidth,
+            "channel": channel,
+            "TTLwait": TTLwait,
+            "TTLsend": TTLsend,
+            "TTLduration": TTLduration,
+        },
+        start_condition=ActionStartCondition.wait_for_previous,
+        technique_name="PEIS",
+        process_finish=True,
+        process_contrib=[
             ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
- 
+    )
     return apm.action_list  # returns complete action list to orch
 
 
