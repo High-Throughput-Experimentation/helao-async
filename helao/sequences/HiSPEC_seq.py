@@ -28,8 +28,8 @@ def HiSpEC_CV(
 
     #######
     #Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
-    #Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
+    Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
+    #Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
     #Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
     #scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
@@ -169,8 +169,8 @@ def HiSpEC_CV(
             {
                 #"Vinit_vsRHE": Vinit_vsRHE,
 
-                #"Vapex1_vsRHE": Vapex1_vsRHE,
-                "Vapex2_vsRHE": Vapex2_vsRHE,
+                "Vapex1_vsRHE": Vapex1_vsRHE,
+                #"Vapex2_vsRHE": Vapex2_vsRHE,
                 #"Vfinal_vsRHE": Vfinal_vsRHE,
                 "samplerate_sec": samplerate_sec,
                 "cycles": cycles,
@@ -184,7 +184,7 @@ def HiSpEC_CV(
                 "toggle1_source": toggle1_source,
                 "toggle1_init_delay": toggle1_init_delay,
                 "toggle1_duty": toggle1_duty,
-            }, from_globalexp_params={"HiSpEC_OCV": "Vinit_vsRHE", "HiSpEC_OCV":"Vapex2_vsRHE","HiSpEC_OCV":"Vfinal_vsRHE" })
+            }, from_globalexp_params={"HiSpEC_OCV": "Vinit_vsRHE", "HiSpEC_OCV":"Vapex1_vsRHE","HiSpEC_OCV":"Vfinal_vsRHE" })
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
