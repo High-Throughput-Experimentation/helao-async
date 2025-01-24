@@ -2856,9 +2856,29 @@ class Active:
 
                 # send globalparams
                 if action.to_globalexp_params:
-                    export_params = {
-                        k: action.action_params[k] for k in action.to_globalexp_params
-                    }
+                    export_params = {}
+                    if isinstance(action.to_globalexp_params, list):
+                        for k in action.to_globalexp_params:
+                            if k in action.action_params:
+                                LOGGER.info(f"updating {k} in orch global vars")
+                                export_params[k] = action.action_params[k]
+                            elif k in action.action_output:
+                                LOGGER.info(f"updating {k} in orch global vars")
+                                export_params[k] = action.action_output[k]
+                            else:
+                                LOGGER.info(f"key {k} not found in action output or params")
+                    elif isinstance(action.to_globalexp_params, dict):
+                        for k1, k2 in action.to_globalexp_params.items():
+                            if k1 in action.action_params:
+                                LOGGER.info(f"updating {k2} in global vars")
+                                export_params[k2] = action.action_params[k1]
+                            elif k1 in action.action_output:
+                                LOGGER.info(f"updating {k2} in global vars")
+                                export_params[k2] = action.action_output[k1]
+                            else:
+                                LOGGER.info(
+                                    f"key {k1} not found in action output or params"
+                                )
                     _, error_code = await async_private_dispatcher(
                         server_key=action.orch_key,
                         host=action.orch_host,
