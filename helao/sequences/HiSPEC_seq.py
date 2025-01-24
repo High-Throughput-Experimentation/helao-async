@@ -145,7 +145,6 @@ def HiSpEC_CV(
             "HiSPEC_sub_PEIS",
             {
                 #"Vinit_vsRHE": Vinit_vsRHE,
-                #"Vapex1_vsRHE": Vapex1_vsRHE,
                 "Vamp__V": Vamp__V,
                 "Finit__Hz": Finit__Hz,
                 "Ffinal__Hz": Ffinal__Hz,
@@ -184,7 +183,7 @@ def HiSpEC_CV(
                 "toggle1_source": toggle1_source,
                 "toggle1_init_delay": toggle1_init_delay,
                 "toggle1_duty": toggle1_duty,
-            }, from_globalexp_params={"Ewe_V__mean_final": "Vinit_vsRHE", "Ewe_V__mean_final":"Vapex1_vsRHE","Ewe_V__mean_final":"Vfinal_vsRHE" })
+            }, from_globalexp_params={"Ewe_V__mean_final": "Vinit_vsRHE", "Ewe_V__mean_final":"Vapex2_vsRHE","Ewe_V__mean_final":"Vfinal_vsRHE" })
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
