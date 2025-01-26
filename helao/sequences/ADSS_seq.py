@@ -3618,9 +3618,6 @@ def ADSS_PA_CV_TRI_new(
 ###################################################################
 
     #for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
- 
-    washmod = 0
-
     for lpl, upl, sample_no in zip(LPL_list, UPL_list, plate_sample_no_list):
         print("##########################################################\n" +
                 "Current LPL is {} Vrhe\n".format(lpl) + 
@@ -3705,7 +3702,7 @@ def ADSS_PA_CV_TRI_new(
                 }
             )
 
-        # washmod = 0
+        washmod = 0
 
         if aliquot_init: #stops gas purge, takes aliquote, starts gas purge again
             
