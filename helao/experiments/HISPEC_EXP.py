@@ -62,6 +62,12 @@ KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_
 
 toggle_triggertype = TriggerType.risingedge
 
+def HiSpEC_sub_cooldown(experiment: Experiment):
+    """ Cool the detector"""
+    apm = ActionPlanMaker()
+    apm.add(ANDOR_server, "cooldown", {})
+    return apm.action_list
+
 
 def HISPEC_sub_startup(experiment: Experiment):
     """Unload custom position."""
