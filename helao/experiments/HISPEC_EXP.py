@@ -17,6 +17,7 @@ __all__ = [
     # "HISPEC_sub_engage",
     # "HISPEC_sub_disengage",
     # "HISPEC_analysis_stability",
+    "HiSpEC_sub_cooldown"
 ]
 
 from helao.helpers import logging
