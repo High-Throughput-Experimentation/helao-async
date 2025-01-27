@@ -3153,7 +3153,7 @@ def ADSS_PA_CV_TRI(
 
 
 def ADSS_PA_CV_TRI_new(
-    sequence_version: int = 7, #7 pal deepclean #6 new transfer syringe#5 shift aliquots to expts, bubble removal
+    sequence_version: int = 8, #8 pal deepclean and empty vial xfer #6 new transfer syringe#5 shift aliquots to expts, bubble removal
     #note: str = "need as many samples as you expect combinations of UPL and LPL",
     
     #sample info
@@ -4025,6 +4025,38 @@ def ADSS_PA_CV_TRI_new(
             "ADSS_sub_PAL_deep_clean",
             {
                 "clean_volume_ul": PAL_cleanvol_ul,
+                "PAL_Injector": phos_PAL_Injector,
+                "rinse_1": washone,
+                "rinse_2": washtwo,
+                "rinse_3": washthree,
+                "rinse_4": washfour,
+            }
+        )
+
+            washmod += 1
+            #determine last used rinse, then use next two  
+            remainder = washmod %4
+            washone, washtwo, washthree, washfour = (0,)*4
+            if remainder == 0:
+                washone, washtwo = 1,1
+            if remainder == 1:
+                washone, washfour= 1,1
+            if remainder == 2:
+                washthree,washfour = 1,1
+            if remainder ==3:
+                washtwo, washthree=1,1
+            washmod += 1
+
+            epm.add_experiment(
+            "ADSS_sub_PAL_tray_to_tray",  #hard-coded source and destination vials
+            {
+                "volume_ul": PAL_cleanvol_ul,
+                "source_tray": 2,
+                "source_slot": 3,
+                "source_vial": 53,
+                "dest_tray": 2,
+                "dest_slot": 3,
+                "dest_vial": 52,
                 "PAL_Injector": phos_PAL_Injector,
                 "rinse_1": washone,
                 "rinse_2": washtwo,
