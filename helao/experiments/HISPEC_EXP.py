@@ -65,7 +65,7 @@ toggle_triggertype = TriggerType.risingedge
 def HiSpEC_sub_cooldown(experiment: Experiment):
     """ Cool the detector"""
     apm = ActionPlanMaker()
-    apm.add(ANDOR_server, "cooldown", {})
+    apm.add(ANDOR_server, "cooling", {})
     return apm.action_list
 
 
