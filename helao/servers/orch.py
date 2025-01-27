@@ -807,7 +807,11 @@ class Orch(Base):
             for k, v in self.active_sequence.from_globalexp_params.items():
                 LOGGER.info(f"{k}:{v}")
                 if k in self.global_params:
-                    self.active_sequence.sequence_params[v] = self.global_params[k]
+                    if isinstance(v, list):
+                        for vv in v:
+                            self.active_sequence.sequence_params[vv] = self.global_params[k]
+                    else:
+                        self.active_sequence.sequence_params[v] = self.global_params[k]
 
             # if experiment_plan_list is empty, unpack sequence,
             # otherwise operator already populated experiment_plan_list
@@ -903,7 +907,11 @@ class Orch(Base):
         for k, v in self.active_experiment.from_globalexp_params.items():
             LOGGER.info(f"{k}:{v}")
             if k in self.global_params:
-                self.active_experiment.experiment_params[v] = self.global_params[k]
+                if isinstance(v, list):
+                    for vv in v:
+                        self.active_experiment.experiment_params[vv] = self.global_params[k]
+                else:
+                    self.active_experiment.experiment_params[v] = self.global_params[k]
 
         LOGGER.info(
             f"new active experiment is {self.active_experiment.experiment_name}"
@@ -1139,7 +1147,11 @@ class Orch(Base):
             for k, v in A.from_globalexp_params.items():
                 LOGGER.info(f"{k}:{v}")
                 if k in self.global_params:
-                    A.action_params[v] = self.global_params[k]
+                    if isinstance(v, list):
+                        for vv in v:
+                            A.action_params[vv] = self.global_params[k]
+                    else:
+                        A.action_params[v] = self.global_params[k]
 
             actserv_exists, _ = await endpoints_available([A.url])
             if not actserv_exists:
