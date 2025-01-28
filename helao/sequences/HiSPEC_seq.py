@@ -36,9 +36,9 @@ def HiSpEC_CV(
     cycles: int = 1,
     gamrychannelwait: int = -1,
     gamrychannelsend: int = 0,
-    IRange: str = "m10",
-    ERange: str = "v10",
-    Bandwidth: str = "BW4",
+    IRange: str = "m1",
+    ERange: str = "v2_5",
+    Bandwidth: str = "BW5",
     ref_vs_nhe: float = 0,
     toggle1_source: str = "spec_trig",
     toggle1_init_delay: float = 0.0,
@@ -46,7 +46,7 @@ def HiSpEC_CV(
     toggle1_period: float = 2.0,
     toggle1_time: float = -1,
     Vamp__V: float = 0.01,  # Amplitude value in volts
-    Finit__Hz: float = 200000,  # Initial frequency in Hz.
+    Finit__Hz: float = 100000,  # Initial frequency in Hz.
     Ffinal__Hz: float = 1000,  # Final frequency in Hz.
     FrequencyNumber: int = 60,
     Duration__s: float = 0,  # Duration in seconds.
