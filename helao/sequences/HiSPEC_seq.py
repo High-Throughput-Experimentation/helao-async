@@ -46,7 +46,7 @@ def HiSpEC_CV(
     toggle1_period: float = 2.0,
     toggle1_time: float = -1,
     Vamp__V: float = 0.01,  # Amplitude value in volts
-    Finit__Hz: float = 100000,  # Initial frequency in Hz.
+    Finit__Hz: float = 40000,  # Initial frequency in Hz.
     Ffinal__Hz: float = 1000,  # Final frequency in Hz.
     FrequencyNumber: int = 60,
     Duration__s: float = 0,  # Duration in seconds.
