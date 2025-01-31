@@ -506,21 +506,26 @@ def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame, precision:float
     for cycle, frame in calibrated_spectra.groupby('cycle'):
         for scan, sub_frame in frame.groupby('direction'):
             # drop the direction collumn
-        # print(scan)
             sub_frame.drop('direction', axis=1, inplace=True)
-        # print(sub_frame)
-            print(sub_frame.columns.names)
-            voltage_grouping=sub_frame['Ewe_V']
+            try:
+
+                voltage_grouping=sub_frame['Ewe_V']
+            except Exception as e:                
+                raise ValueError('error in getting the voltage grouping')
 
             voltage_grouping=np.round(voltage_grouping / precision) * precision
-
-            sub_frame['Ewe_V']=voltage_grouping 
-
+            try:
+                sub_frame['Ewe_V']=voltage_grouping
+            except Exception as e:
+                raise ValueError('error in setting the voltage grouping')
             #sub_frame.astype(float)
-            sub_frame=sub_frame.groupby(sub_frame['Ewe_V']).mean()
-            sub_frame["Ewe_V"]=np.round(sub_frame["Ewe_V"], 3)
+            try:
+                sub_frame=sub_frame.groupby(sub_frame['Ewe_V']).mean()
 
-            sub_frame['t_s']=np.round(sub_frame['t_s'], 3)
+                
+                sub_frame['t_s']=np.round(sub_frame['t_s'], 3)
+            except Exception as e:
+                raise ValueError('error in grouping by voltage')
             # insert a collumn called 'direction' as the 4th collumn with the value of scan
             sub_frame.insert(3, 'direction', scan)
 
@@ -529,7 +534,7 @@ def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame, precision:float
 
             totaldf=pd.concat([totaldf, sub_frame])
     # reset the index
-    totaldf.reset_index(drop=True, inplace=True)
+    #totaldf.reset_index(drop=True, inplace=True)
     # rename the Ewe_V collumn U (V)
     totaldf.rename(columns={'Ewe_V': 'U (V)'}, inplace=True)
     # rename t_s to t (s)
@@ -662,8 +667,13 @@ def fully_read_and_calibrate_parquet(cv_path:str,
     
     spectra_calibrated=read_in_spectra_calibrate(calibration_df=calibration_df, spec_path=spec_path, read_hlo=False)
 
+    print(f'the calibration frame is :{calibration_df.head()}')
 
-    spectra_calibrated=downsample_to_1mV_precision(calibrated_spectra=spectra_calibrated)   
+    print(calibration_df.columns.values)
+
+    spectra_calibrated=downsample_to_1mV_precision(calibrated_spectra=spectra_calibrated) 
+
+    print(spectra_calibrated.head())  
 
     spectra_calibrated=interpolate_spectral_time_to_current(spectral_df_calib=spectra_calibrated,
                                                             CV_dataframe=CV,
