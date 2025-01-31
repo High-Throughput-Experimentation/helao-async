@@ -624,7 +624,8 @@ def fully_read_and_calibrate_parquet(cv_path:str,
                                                 spline_strength:float=0.000000001,
                                                   read_hlo:bool=False,
                                                   write_file:bool=False,
-                                                output_path:str=None)->pd.DataFrame:
+                                                output_path:str=None,
+                                                precision:float=0.001)->pd.DataFrame:
     
     calibration_df=read_spec_times_from_parquet(spec_file_path=spec_path,
                                                  default_time_header=default_time_header)
@@ -666,7 +667,7 @@ def fully_read_and_calibrate_parquet(cv_path:str,
     spectra_calibrated=read_in_spectra_calibrate(calibration_df=calibration_df, spec_path=spec_path, read_hlo=False)
 
 
-    spectra_calibrated=downsample_to_1mV_precision(calibrated_spectra=spectra_calibrated)   
+    spectra_calibrated=downsample_to_1mV_precision(calibrated_spectra=spectra_calibrated, precision=precision)   
 
     spectra_calibrated=interpolate_spectral_time_to_current(spectral_df_calib=spectra_calibrated,
                                                             CV_dataframe=CV,
