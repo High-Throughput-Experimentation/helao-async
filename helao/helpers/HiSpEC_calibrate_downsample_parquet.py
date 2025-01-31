@@ -509,10 +509,10 @@ def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame, precision:float
         # print(scan)
             sub_frame.drop('direction', axis=1, inplace=True)
         # print(sub_frame)
-        try:
-            voltage_grouping=sub_frame['Ewe_V']
-        except Exception as e:
-            raise ValueError(f"Could not find the Ewe_V collumn in the dataframe.")
+            try:
+                voltage_grouping=sub_frame['Ewe_V']
+            except Exception as e:
+                raise ValueError(f"Could not find the Ewe_V collumn in the dataframe.")
         
 
             voltage_grouping=np.round(voltage_grouping / precision) * precision
