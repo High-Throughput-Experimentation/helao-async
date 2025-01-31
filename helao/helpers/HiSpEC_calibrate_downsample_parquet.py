@@ -676,15 +676,15 @@ def fully_read_and_calibrate_parquet(cv_path:str,
                                                             default_time_header_spec='t (s)',
                                                             smoothing_weight=spline_strength)
     
-    
+    spectra_calibrated.sort_values(by='t (s)', inplace=True)
     if write_file:
         if output_path is None:
             output_path='spectra_calibrated.parquet'
         else:
             output_path=output_path+'spectra_calibrated.parquet'
-        spectra_calibrated..sort_values(by='t (s)', inplace=True).to_parquet(output_path, compression='zstd')
+        spectra_calibrated.to_parquet(output_path, compression='zstd')
 
-    return spectra_calibrated.sort_values(by='t (s)', inplace=True)
+    return spectra_calibrated
 
 if __name__ == "__main__":
     cv_path=r"/Users/benj/Documents/SpEC_Class_2/test_data/CV-3.3.0.0__0.hlo"
