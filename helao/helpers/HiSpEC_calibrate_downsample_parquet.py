@@ -522,15 +522,15 @@ def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame, precision:float
             try:
                 sub_frame=sub_frame.groupby(sub_frame['Ewe_V']).mean()
 
-                #rename E_we_V to U (V)
-                sub_frame.rename(columns={'Ewe_V': 'U (V)'}, inplace=True)
+                #rename the index E_we_V to U (V)
+                sub_frame.index.rename('U (V)', inplace=True)
 
                 
                 sub_frame['t_s']=np.round(sub_frame['t_s'], 3)
             except Exception as e:
                 raise ValueError('error in grouping by voltage')
             # insert a collumn called 'direction' as the 4th collumn with the value of scan
-            sub_frame.insert(2, 'direction', scan)
+            sub_frame.insert(1, 'direction', scan)
 
 
             #print(sub_frame.head())
@@ -610,7 +610,7 @@ def interpolate_spectral_time_to_current(spectral_df_calib:pd.DataFrame, CV_data
                                                    smoothing_factor=smoothing_weight)
 
     
-    spectral_df_calib.insert(3, 'J (A)', spl(spectral_df_calib[default_time_header_spec]))
+    spectral_df_calib.insert(1, 'J (A)', spl(spectral_df_calib[default_time_header_spec]))
  
 
     return spectral_df_calib
