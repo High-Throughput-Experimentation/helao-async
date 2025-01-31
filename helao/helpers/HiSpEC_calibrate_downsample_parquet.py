@@ -490,7 +490,7 @@ def read_in_spectra_calibrate(calibration_df:pd.DataFrame, spec_path:str, read_h
         spectra_df=read_spectra_parquet(spec_path)
     return pd.concat([calibration_df, spectra_df], axis=1)
 
-def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame)->pd.DataFrame:
+def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame, precision:float=0.001)->pd.DataFrame:
     """
     This function takes in the calibrated spectral dataframe and loops using grouby operations, first by cycle, then by direction
     On each iteration of the loop (i.e. linear sweep) the scan direction collumn is temporarily dropped. The function then groups by
@@ -510,8 +510,14 @@ def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame)->pd.DataFrame:
             sub_frame.drop('direction', axis=1, inplace=True)
         # print(sub_frame)
 
+            voltage_grouping=sub_frame['Ewe_V'].copy(deep=True)
+
+            voltage_grouping=np.round(voltage_grouping / precision) * precision
+
+            sub_frame['Ewe_V']=voltage_grouping 
+
             #sub_frame.astype(float)
-            sub_frame=sub_frame.groupby(sub_frame['Ewe_V']//0.001).mean()
+            sub_frame=sub_frame.groupby(sub_frame['Ewe_V']).mean()
             sub_frame["Ewe_V"]=np.round(sub_frame["Ewe_V"], 3)
 
             sub_frame['t_s']=np.round(sub_frame['t_s'], 3)
