@@ -509,8 +509,8 @@ def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame, precision:float
         # print(scan)
             sub_frame.drop('direction', axis=1, inplace=True)
         # print(sub_frame)
-
-            voltage_grouping=sub_frame['Ewe_V'].copy(deep=True)
+            print(sub_frame.columns.names)
+            voltage_grouping=sub_frame['Ewe_V']
 
             voltage_grouping=np.round(voltage_grouping / precision) * precision
 
