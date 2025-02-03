@@ -25,6 +25,7 @@ def HiSpEC_CV(
     reservoir_liquid_sample_no: int = 1, # @Dan -- what is this? -- this is the liquid sample number in the liquid sample database, you will need to 'create' a liquid sample for the electrolyte you're using, so that the cell is filled with a liquid sample that inherits the reservoir attributes
     solution_bubble_gas: str = "None",
     solution_ph: float = 0,
+    Flow_during_SpEC: bool = False,
 
     #######
     #Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
@@ -132,6 +133,11 @@ def HiSpEC_CV(
                     "ECHEUVIS_sub_interrupt",
                     {"reason": "Restore flow and prepare for sample measurement."},
                 )
+        
+        if Flow_during_SpEC==False:
+            epm.add_experiment("HiSPEC_sub_stop_flow", {})
+
+        
 
         epm.add_experiment(
             "ECHE_sub_OCV",
