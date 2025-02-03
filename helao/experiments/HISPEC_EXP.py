@@ -69,6 +69,22 @@ def HiSpEC_sub_cooldown(experiment: Experiment):
     apm.add(ANDOR_server, "cooling", {})
     return apm.action_list
 
+def HiSpEC_stop_flow(experiment: Experiment):
+    """ Stop the flow"""
+    apm = ActionPlanMaker()
+    for item, flow_flag in (
+        ("we_flow", False),
+        ("we_pump", False),
+        ("ce_pump", False),
+    ):
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {"do_item": item, "on": flow_flag},
+            ActionStartCondition.no_wait,
+        )
+    return apm.action_list
+
 
 def HISPEC_sub_startup(experiment: Experiment):
     """Unload custom position."""
