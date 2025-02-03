@@ -6,7 +6,7 @@ server_key must be a FastAPI action server defined in config
 # everything is a 'machine model schema'
 __all__ = [
     "HISPEC_sub_SpEC",
-    "HiSPEC_stop_flow",
+    "HiSPEC_sub_stop_flow",
     # "HISPEC_sub_CV_DOtrigger",
     # "HISPEC_sub_CA_led",
     # "HISPEC_sub_CP_led",
@@ -70,7 +70,7 @@ def HiSpEC_sub_cooldown(experiment: Experiment):
     apm.add(ANDOR_server, "cooling", {})
     return apm.action_list
 
-def HiSpEC_stop_flow(experiment: Experiment):
+def HiSPEC_sub_stop_flow(experiment: Experiment):
     """ Stop the flow"""
     apm = ActionPlanMaker()
     for item, flow_flag in (
