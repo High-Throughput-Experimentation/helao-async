@@ -6,6 +6,7 @@ server_key must be a FastAPI action server defined in config
 # everything is a 'machine model schema'
 __all__ = [
     "HISPEC_sub_SpEC",
+    "HiSPEC_stop_flow",
     # "HISPEC_sub_CV_DOtrigger",
     # "HISPEC_sub_CA_led",
     # "HISPEC_sub_CP_led",
