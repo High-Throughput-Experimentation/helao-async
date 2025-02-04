@@ -43,9 +43,9 @@ def HiSpEC_CV(
     ref_vs_nhe: float = 0,
     toggle1_source: str = "spec_trig",
     toggle1_init_delay: float = 0.0,
-    toggle1_duty: float = 0.5,
-    toggle1_period: float = 2.0,
-    toggle1_time: float = -1,
+    toggle1_duty: float = 0.01,
+    toggle1_period: float = 10,
+    toggle1_time: float = 1,
     Vamp__V: float = 0.01,  # Amplitude value in volts
     Finit__Hz: float = 40000,  # Initial frequency in Hz.
     Ffinal__Hz: float = 1000,  # Final frequency in Hz.
