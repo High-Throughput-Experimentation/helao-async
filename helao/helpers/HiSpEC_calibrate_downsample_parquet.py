@@ -328,7 +328,6 @@ def round_10ms(time)->float:
     """
     Rounds a time to the nearest 1ms
     """
-    print(type(time))
     if isinstance(time, list):
         return [np.round(x, 3) for x in time]
     elif isinstance(time,float) or isinstance(time, int):

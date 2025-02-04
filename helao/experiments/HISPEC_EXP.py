@@ -115,27 +115,27 @@ def HISPEC_sub_shutdown(experiment: Experiment):
 def HISPEC_sub_SpEC(
     experiment: Experiment,
     experiment_version: int = 1,
-    OCV_vsRef: float = 0.0,
+    OCV_vsRef: float = 0.2,
     # Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
-    Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
+    Vapex1_vsRHE: float = 1.2,  # Apex 1 value in volts or amps.
     # Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
     # Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
-    scanrate_voltsec: float = 0.02,  # scan rate in volts/second or amps/second.
+    scanrate_voltsec: float = 0.01,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
     cycles: int = 1,
     # gamry_i_range: str = "auto",
     gamrychannelwait: int = -1,
     gamrychannelsend: int = 0,
-    IRange: str = "m10",
-    ERange: str = "v10",
+    IRange: str = "m1",
+    ERange: str = "v2_5",
     Bandwidth: str = "BW4",
     solution_ph: float = 0,
     ref_vs_nhe: float = 0.0,
     toggle1_source: str = "spec_trig",
     toggle1_init_delay: float = 0.0,
-    toggle1_duty: float = 0.5,
-    toggle1_period: float = 2.0,
-    toggle1_time: float = -1,
+    toggle1_duty: float = 0.001,
+    toggle1_period: float = 10,
+    toggle1_time: float = 1,
     # toggle2_source: str = "spec_trig",
     # toggle2_init_delay: float = 0.0,
     # toggle2_duty: float = 0.5,
