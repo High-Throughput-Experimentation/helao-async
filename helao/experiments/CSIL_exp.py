@@ -1780,9 +1780,9 @@ def CCSI_sub_clean_inject(
 
 def CCSI_sub_refill_clean(
     experiment: Experiment,
-    experiment_version: int = 2,  # v2 no backlash volume
+    experiment_version: int = 3,  # v3 1ml backlash volume v2 no backlash volume
     Waterclean_volume_ul: float = 5000,
-    Syringe_rate_ulsec: float = 1000,
+    Syringe_rate_ulsec: float = 100,
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
@@ -1794,6 +1794,15 @@ def CCSI_sub_refill_clean(
         {
             "rate_uL_sec": Syringe_rate_ulsec,
             "volume_uL": Waterclean_volume_ul,
+        },
+    )
+    apm.add(ORCH_server, "wait", {"waittime": 5.25})
+    apm.add(
+        WATERCLEANPUMP_server,
+        "infuse",
+        {
+            "rate_uL_sec": Syringe_rate_ulsec,
+            "volume_uL": 1000,
         },
     )
     apm.add(ORCH_server, "wait", {"waittime": 5.25})
