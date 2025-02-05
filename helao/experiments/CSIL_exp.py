@@ -1781,8 +1781,8 @@ def CCSI_sub_clean_inject(
 def CCSI_sub_refill_clean(
     experiment: Experiment,
     experiment_version: int = 3,  # v3 1ml backlash volume v2 no backlash volume
-    Waterclean_volume_ul: float = 5000,
-    Syringe_rate_ulsec: float = 100,
+    Waterclean_volume_ul: int = 5000,
+    Syringe_rate_ulsec: int = 100,
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
