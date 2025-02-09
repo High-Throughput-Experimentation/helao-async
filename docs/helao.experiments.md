@@ -21,7 +21,7 @@ server_key must be a FastAPI action server defined in config
 Args:
 : experiment (Experiment): Experiment object provided by Orch
 
-### helao.experiments.CSIL_exp.CCSI_sub_cellfill(experiment, experiment_version=8, Solution_description='KOH', Solution_reservoir_sample_no=2, Solution_volume_ul=500, Waterclean_reservoir_sample_no=1, Waterclean_volume_ul=2500, Syringe_rate_ulsec=300, SyringePushWait_s=6, LiquidFillWait_s=15, WaterFillWait_s=15, previous_liquid=False, n2_push=False, co2_fill_after_n2push=False, co2_filltime_s=30)
+### helao.experiments.CSIL_exp.CCSI_sub_cellfill(experiment, experiment_version=8, Solution_description='KOH', Solution_reservoir_sample_no=2, Solution_volume_ul=500, Clean_reservoir_sample_no=1, Waterclean_volume_ul=2500, Syringe_rate_ulsec=300, SyringePushWait_s=6, LiquidFillWait_s=15, WaterFillWait_s=15, previous_liquid=False, n2_push=False, co2_fill_after_n2push=False, co2_filltime_s=30)
 
 ### helao.experiments.CSIL_exp.CCSI_sub_clean_inject(experiment, experiment_version=9, Waterclean_volume_ul=10000, Syringe_rate_ulsec=500, LiquidCleanWait_s=15, co2measure_duration=20, co2measure_acqrate=1, use_co2_check=True, need_fill=False, co2_ppm_thresh=41000, purge_if='below', max_repeats=5, LiquidCleanPurge_duration=60, DeltaDilute1_duration=0, drainrecirc=True, recirculation_rate_uL_min=10000)
 
@@ -53,7 +53,7 @@ Add liquid volume to cell position.
 
 ### helao.experiments.CSIL_exp.CCSI_sub_monitorcell(experiment, experiment_version=1, co2measure_duration=1200, co2measure_acqrate=1, recirculation=False, recirculation_rate_uL_min=10000)
 
-### helao.experiments.CSIL_exp.CCSI_sub_n2clean(experiment, experiment_version=10, Waterclean_reservoir_sample_no=1, waterclean_volume_ul=10000, Syringe_rate_ulsec=300, LiquidFillWait_s=15, n2_push=True, n2flowrate_sccm=50, drain_HSpurge_duration=300, drain_recirculation_duration=150, flush_HSpurge1_duration=30, flush_HSpurge_duration=60, DeltaDilute1_duration=0, Manpurge1_duration=30, Alphapurge1_duration=10, Probepurge1_duration=30, Sensorpurge1_duration=30, recirculation=True, recirculation_rate_uL_min=10000, initialization=False, co2measure_delay=120, co2measure_duration=5, co2measure_acqrate=0.5, use_co2_check=False, co2_ppm_thresh=1400, purge_if='above', max_repeats=2)
+### helao.experiments.CSIL_exp.CCSI_sub_n2clean(experiment, experiment_version=10, Clean_reservoir_sample_no=1, waterclean_volume_ul=10000, Syringe_rate_ulsec=300, LiquidFillWait_s=15, n2_push=True, n2flowrate_sccm=50, drain_HSpurge_duration=300, drain_recirculation_duration=150, flush_HSpurge1_duration=30, flush_HSpurge_duration=60, DeltaDilute1_duration=0, Manpurge1_duration=30, Alphapurge1_duration=10, Probepurge1_duration=30, Sensorpurge1_duration=30, recirculation=True, recirculation_rate_uL_min=10000, initialization=False, co2measure_delay=120, co2measure_duration=5, co2measure_acqrate=0.5, use_co2_check=False, co2_ppm_thresh=1400, purge_if='above', max_repeats=2)
 
 ### helao.experiments.CSIL_exp.CCSI_sub_n2drain(experiment, experiment_version=4, n2flowrate_sccm=10, HSpurge_duration=240, DeltaDilute1_duration=0, initialization=False, drain_recirculation=True, recirculation_duration=120, recirculation_rate_uL_min=10000)
 
@@ -61,7 +61,7 @@ Add liquid volume to cell position.
 
 ### helao.experiments.CSIL_exp.CCSI_sub_n2headspace(experiment, experiment_version=1, n2flowrate_sccm=50, HSpurge_duration=120, recirculation=True, recirculation_duration=60, recirculation_rate_uL_min=10000)
 
-### helao.experiments.CSIL_exp.CCSI_sub_n2rinse(experiment, experiment_version=2, rinse_cycles=3, Waterclean_reservoir_sample_no=1, waterclean_volume_ul=10000, Syringe_rate_ulsec=300, LiquidFillWait_s=15, rinse_agitation=False, rinse_agitation_wait=30, rinse_agitation_duration=30, n2_push=True, n2flowrate_sccm=50, drain_HSpurge_duration=300, drain_recirculation_duration=150, recirculation=False, recirculation_rate_uL_min=10000)
+### helao.experiments.CSIL_exp.CCSI_sub_n2rinse(experiment, experiment_version=2, rinse_cycles=3, Clean_reservoir_sample_no=1, waterclean_volume_ul=10000, Syringe_rate_ulsec=300, LiquidFillWait_s=15, rinse_agitation=False, rinse_agitation_wait=30, rinse_agitation_duration=30, n2_push=True, n2flowrate_sccm=50, drain_HSpurge_duration=300, drain_recirculation_duration=150, recirculation=False, recirculation_rate_uL_min=10000)
 
 ### helao.experiments.CSIL_exp.CCSI_sub_peripumpoff(experiment, experiment_version=1)
 

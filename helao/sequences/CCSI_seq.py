@@ -39,7 +39,7 @@ def CCSI_initialization(
     CO2measure_duration: float = 20,
     CO2measure_acqrate: float = 1,
     CO2threshold: float = 9000,  # value and units????
-    Waterclean_volume_ul: float = 10000,
+    Clean_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 500,
     LiquidCleanWait_s: float = 15,
     use_co2_check: bool = True,
@@ -80,7 +80,7 @@ def CCSI_initialization(
 # PRE CLEAN PROCEDURE
     if clean_injects:
         epm.add_experiment("CCSI_sub_clean_inject", {
-            "Waterclean_volume_ul": Waterclean_volume_ul,
+            "Clean_volume_ul": Clean_volume_ul,
             "Syringe_rate_ulsec": Syringe_rate_ulsec,
             "LiquidCleanWait_s": LiquidCleanWait_s,
             "use_co2_check": use_co2_check,
@@ -96,7 +96,7 @@ def CCSI_initialization(
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
             })
         epm.add_experiment("CCSI_sub_clean_inject", {
-            "Waterclean_volume_ul": Waterclean_volume_ul,
+            "Clean_volume_ul": Clean_volume_ul,
             "Syringe_rate_ulsec": Syringe_rate_ulsec,
             "LiquidCleanWait_s": LiquidCleanWait_s,
             "use_co2_check": use_co2_check,
@@ -122,7 +122,7 @@ def CCSI_validation_KOH_procedure(
     KOH_volume_ul: float = 500,
     KOH_reservoir_sample_no: int = 2,
     water_volume_ul: float = 2500,
-    Waterclean_reservoir_sample_no: int = 1,
+    Clean_reservoir_sample_no: int = 1,
     retraction_volume_ul: float =150,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
@@ -155,14 +155,14 @@ def CCSI_validation_KOH_procedure(
     })
 
     epm.add_experiment("CCSI_sub_load_liquid", {
-        "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+        "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
         "volume_ul_cell_liquid": water_volume_ul,
         "water_True_False": True,
     })
 
     epm.add_experiment("CCSI_sub_liquidfill_syringes", {
         "Solution_volume_ul": KOH_volume_ul,
-        "Waterclean_volume_ul": water_volume_ul,
+        "Clean_volume_ul": water_volume_ul,
         "Syringe_retraction_ul": retraction_volume_ul,
         "Syringe_rate_ulsec": syringe_rate_ulsec,
         "LiquidFillWait_s": LiquidFillWait_s,
@@ -173,7 +173,7 @@ def CCSI_validation_KOH_procedure(
 
  #   for _ in range(liquid_purge_cycles):
     epm.add_experiment("CCSI_sub_clean_inject", {
-    "Waterclean_volume_ul": drainclean_volume_ul,
+    "Clean_volume_ul": drainclean_volume_ul,
     "Syringe_retraction_ul": retraction_volume_ul,
     "Syringe_rate_ulsec": syringe_rate_ulsec,
     "LiquidFillWait_s": LiquidFillWait_s,
@@ -197,7 +197,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
     KOH_volume_ul: List[float] = [0,500, 50],
     KOH_reservoir_sample_no: int = 2,
     total_sample_volume_ul: float = 5000,
-    Waterclean_reservoir_sample_no: int = 1,
+    Clean_reservoir_sample_no: int = 1,
     deadspace_volume_ul: float =50,
     backlash_volume_ul: float = 50,
     Syringe_retraction_ul: float = 150,
@@ -243,7 +243,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
         watervolume = total_sample_volume_ul - KOHvolume
         if watervolume != 0:
             epm.add_experiment("CCSI_sub_load_liquid", {
-                "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+                "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
                 "volume_ul_cell_liquid": watervolume,
                 "combine_True_False": True,
                 "water_True_False": True,
@@ -251,7 +251,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
 
         epm.add_experiment("CCSI_sub_liquidfill_syringes", {
             "Solution_volume_ul": KOHvolume,
-            "Waterclean_volume_ul": watervolume,
+            "Clean_volume_ul": watervolume,
             "deadspace_volume_ul": deadspace_volume_ul,
             "backlash_volume_ul": backlash_volume_ul,
             "Syringe_retraction_ul": Syringe_retraction_ul,
@@ -264,7 +264,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
 
         for _ in range(cleanloop):
             epm.add_experiment("CCSI_sub_clean_inject", {
-                "Waterclean_volume_ul": drainclean_volume_ul,
+                "Clean_volume_ul": drainclean_volume_ul,
                 "deadspace_volume_ul": deadspace_volume_ul,
                 "backlash_volume_ul": backlash_volume_ul,
                 "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -281,7 +281,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
 
         refill_volume = watervolume + drainclean_volume_ul*cleanloop
         epm.add_experiment("CCSI_sub_refill_clean", {
-            "Waterclean_volume_ul": refill_volume ,
+            "Clean_volume_ul": refill_volume ,
             "deadspace_volume_ul": deadspace_volume_ul,
             "Syringe_rate_ulsec": 1000,
         })
@@ -300,7 +300,7 @@ def CCSI_test_KOH_testing(  #assumes initialization performed previously
     KOH_volume_ul: List[float] = [0,500, 50],
     KOH_reservoir_sample_no: int = 2,
     total_sample_volume_ul: float = 5000,
-    Waterclean_reservoir_sample_no: int = 1,
+    Clean_reservoir_sample_no: int = 1,
     deadspace_volume_ul: float =50,
     backlash_volume_ul: float = 50,
     Syringe_retraction_ul: float = 150,
@@ -347,7 +347,7 @@ def CCSI_test_KOH_testing(  #assumes initialization performed previously
         watervolume = total_sample_volume_ul - KOHvolume
         if watervolume != 0:
             epm.add_experiment("CCSI_sub_load_liquid", {
-                "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+                "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
                 "volume_ul_cell_liquid": watervolume,
                 "combine_True_False": True,
                 "water_True_False": True,
@@ -355,7 +355,7 @@ def CCSI_test_KOH_testing(  #assumes initialization performed previously
 
         epm.add_experiment("CCSI_sub_liquidfill_syringes", {
             "Solution_volume_ul": KOHvolume,
-            "Waterclean_volume_ul": watervolume,
+            "Clean_volume_ul": watervolume,
             "deadspace_volume_ul": deadspace_volume_ul,
             "backlash_volume_ul": backlash_volume_ul,
             "Syringe_retraction_ul": Syringe_retraction_ul,
@@ -370,7 +370,7 @@ def CCSI_test_KOH_testing(  #assumes initialization performed previously
         for _ in range(cleanloops):
         #cleanloops = 1
             epm.add_experiment("CCSI_sub_clean_inject", {
-                "Waterclean_volume_ul": drainclean_volume_ul,
+                "Clean_volume_ul": drainclean_volume_ul,
                 "deadspace_volume_ul": deadspace_volume_ul,
                 "backlash_volume_ul": backlash_volume_ul,
                 "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -387,7 +387,7 @@ def CCSI_test_KOH_testing(  #assumes initialization performed previously
 
         refill_volume = watervolume + drainclean_volume_ul*cleanloops
         epm.add_experiment("CCSI_sub_refill_clean", {
-            "Waterclean_volume_ul": refill_volume ,
+            "Clean_volume_ul": refill_volume ,
             "deadspace_volume_ul": deadspace_volume_ul,
             "Syringe_rate_ulsec": 1000,
         })
@@ -406,7 +406,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
     KOH_volume_ul: List[float] = [0,500, 50],
     KOH_reservoir_sample_no: int = 2,
     total_sample_volume_ul: float = 5000,
-    Waterclean_reservoir_sample_no: int = 1,
+    Clean_reservoir_sample_no: int = 1,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 20,
     co2measure_duration: float = 300,
@@ -432,7 +432,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
     epm = ExperimentPlanMaker()
     for _ in range(initcleans):
         epm.add_experiment("CCSI_sub_clean_inject", {
-            "Waterclean_volume_ul": drainclean_volume_ul,
+            "Clean_volume_ul": drainclean_volume_ul,
             "deadspace_volume_ul": deadspace_volume_ul,
             "backlash_volume_ul": backlash_volume_ul,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -449,7 +449,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
 
     refill_volume = drainclean_volume_ul*(init)
     epm.add_experiment("CCSI_sub_refill_clean", {
-        "Waterclean_volume_ul": refill_volume ,
+        "Clean_volume_ul": refill_volume ,
         "deadspace_volume_ul": deadspace_volume_ul,
         "Syringe_rate_ulsec": 1000,
     })
@@ -476,7 +476,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
         watervolume = total_sample_volume_ul - KOHvolume
         if watervolume != 0:
             epm.add_experiment("CCSI_sub_load_liquid", {
-                "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+                "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
                 "volume_ul_cell_liquid": watervolume,
                 "combine_True_False": True,
                 "water_True_False": True,
@@ -484,7 +484,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
 
         epm.add_experiment("CCSI_sub_liquidfill_syringes", {
             "Solution_volume_ul": KOHvolume,
-            "Waterclean_volume_ul": watervolume,
+            "Clean_volume_ul": watervolume,
             "deadspace_volume_ul": deadspace_volume_ul,
             "backlash_volume_ul": backlash_volume_ul,
             "Syringe_retraction_ul": Syringe_retraction_ul,
@@ -497,7 +497,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
 
         for _ in range(cleanloops):
             epm.add_experiment("CCSI_sub_clean_inject", {
-                "Waterclean_volume_ul": drainclean_volume_ul,
+                "Clean_volume_ul": drainclean_volume_ul,
                 "deadspace_volume_ul": deadspace_volume_ul,
                 "backlash_volume_ul": backlash_volume_ul,
                 "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -514,7 +514,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
 
         refill_volume = watervolume + drainclean_volume_ul*(cleanloops)
         epm.add_experiment("CCSI_sub_refill_clean", {
-            "Waterclean_volume_ul": refill_volume ,
+            "Clean_volume_ul": refill_volume ,
             "deadspace_volume_ul": deadspace_volume_ul,
             "Syringe_rate_ulsec": 1000,
         })
@@ -534,7 +534,7 @@ def CCSI_debug_liquidloads(  #assumes initialization performed previously
     KOH_volume_ul: float = 1000,
     KOH_reservoir_sample_no: int = 2,
     total_sample_volume_ul: float = 5000,
-    Waterclean_reservoir_sample_no: int = 1,
+    Clean_reservoir_sample_no: int = 1,
     
 ):
 
@@ -555,7 +555,7 @@ def CCSI_debug_liquidloads(  #assumes initialization performed previously
     watervolume = total_sample_volume_ul - KOH_volume_ul
 
     epm.add_experiment("CCSI_sub_load_liquid", {
-        "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+        "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
         "volume_ul_cell_liquid": watervolume,
         "water_True_False": True,
         "combine_True_False": True,
@@ -577,7 +577,7 @@ def CCSI_debug_liquidloads(  #assumes initialization performed previously
     watervolume = total_sample_volume_ul - KOH_volume_ul
 
     epm.add_experiment("CCSI_sub_load_liquid", {
-        "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+        "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
         "volume_ul_cell_liquid": watervolume,
         "water_True_False": True,
         "combine_True_False": True,
@@ -604,7 +604,7 @@ def CCSI_debug_liquidloads(  #assumes initialization performed previously
     watervolume = total_sample_volume_ul - KOH_volume_ul
 
     epm.add_experiment("CCSI_sub_load_liquid", {
-        "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+        "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
         "volume_ul_cell_liquid": watervolume,
         "water_True_False": True,  #dilution volume
         "combine_True_False": True,
@@ -626,7 +626,7 @@ def CCSI_debug_liquidloads(  #assumes initialization performed previously
     # watervolume = total_sample_volume_ul - KOH_volume_ul
 
     # epm.add_experiment("CCSI_sub_load_liquid", {
-    #     "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+    #     "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
     #     "volume_ul_cell_liquid": watervolume,
     #     "water_True_False": True,  #dilution volume
     #     "combine_True_False": False,
@@ -641,7 +641,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
     Solution_reservoir_sample_no: int = 2,
     Solution_name: str = "",
     total_sample_volume_ul: float = 5000,
-    Waterclean_reservoir_sample_no: int = 1,
+    Clean_reservoir_sample_no: int = 1,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 20,
     co2measure_duration: float = 300,
@@ -668,7 +668,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
     epm = ExperimentPlanMaker()
     #for _ in range(initcleans):
     epm.add_experiment("CCSI_sub_clean_inject", {
-        "Waterclean_volume_ul": drainclean_volume_ul,
+        "Clean_volume_ul": drainclean_volume_ul,
         "Syringe_rate_ulsec": syringe_rate_ulsec,
         "LiquidCleanWait_s": LiquidFillWait_s,
         "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
@@ -708,7 +708,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
         # watervolume = total_sample_volume_ul - solnvolume
         # if watervolume != 0:
         #     epm.add_experiment("CCSI_sub_load_liquid", {
-        #         "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+        #         "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
         #         "volume_ul_cell_liquid": watervolume,
         #         "combine_True_False": True,
         #         "water_True_False": True,
@@ -718,8 +718,8 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
         epm.add_experiment("CCSI_sub_cellfill", {
             "Solution_reservoir_sample_no": Solution_reservoir_sample_no,
             "Solution_volume_ul": solnvolume,
-            "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-            "Waterclean_volume_ul": watervolume,
+            "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+            "Clean_volume_ul": watervolume,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidFillWait_s": LiquidFillWait_s,
         })
@@ -735,7 +735,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
         })
 
         epm.add_experiment("CCSI_sub_clean_inject", {
-            "Waterclean_volume_ul": drainclean_volume_ul,
+            "Clean_volume_ul": drainclean_volume_ul,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidCleanWait_s": LiquidFillWait_s,
             "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
@@ -773,7 +773,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #     Solution_reservoir_sample_no: int = 2,
 #     Solution_name: str = "",
 #     total_sample_volume_ul: float = 5000,
-#     Waterclean_reservoir_sample_no: int = 1,
+#     Clean_reservoir_sample_no: int = 1,
 #     syringe_rate_ulsec: float = 300,
 #     LiquidFillWait_s: float = 20,
 #     co2measure_duration: float = 300,
@@ -803,7 +803,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #     epm = ExperimentPlanMaker()
 #     # #for _ in range(initcleans):
 #     # epm.add_experiment("CCSI_sub_clean_inject", {
-#     #     "Waterclean_volume_ul": drainclean_volume_ul,
+#     #     "Clean_volume_ul": drainclean_volume_ul,
 #     #     "Syringe_rate_ulsec": syringe_rate_ulsec,
 #     #     "LiquidCleanWait_s": LiquidFillWait_s,
 #     #     "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
@@ -842,15 +842,15 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #         watervolume = total_sample_volume_ul - solnvolume
 #         if watervolume != 0:
 #             epm.add_experiment("CCSI_sub_load_liquid", {
-#                 "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
-#                 "volume_ul_cell_liquid": watervolume,
+#                 "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
+#                 "volume_ul_cell_liquid": cleanvolume,
 #                 "combine_True_False": True,
 #                 "water_True_False": True,
 #             })
 # 
 #         epm.add_experiment("CCSI_sub_cellfill_constantcotwo", {
 #             "Solution_volume_ul": solnvolume,
-#             "Waterclean_volume_ul": watervolume,
+#             "Clean_volume_ul": cleanvolume,
 #             "Syringe_rate_ulsec": syringe_rate_ulsec,
 #             "LiquidFillWait_s": LiquidFillWait_s,
 #             "co2measure_duration": co2measure_duration,
@@ -861,7 +861,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #         epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
 # 
 #         epm.add_experiment("CCSI_sub_clean_inject", {
-#             "Waterclean_volume_ul": drainclean_volume_ul,
+#             "Clean_volume_ul": drainclean_volume_ul,
 #             "Syringe_rate_ulsec": syringe_rate_ulsec,
 #             "LiquidCleanWait_s": LiquidFillWait_s,
 #             "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
@@ -902,9 +902,15 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     total_sample_volume_ul: List[float] = [5000,5000,5000],
     total_cell_volume_ul: float = 12500,
 
-    Waterclean_reservoir_sample_no: int = 1,
-    Waterclean_syringe_rate_ulsec: float = 300,
-    Waterclean_FillWait_s: float = 15,
+    Water_injection: bool = False,
+    Water_injection_reservoir_sample_no: int = 99,
+    Water_injection_syringe_rate_ulsec: float = 10,
+    Water_injection_volume_ul: float = 50,
+    Water_injection_FillWait: float = 30,
+
+    Clean_reservoir_sample_no: int = 1,
+    Clean_syringe_rate_ulsec: float = 300,
+    Clean_FillWait_s: float = 15,
     syringe_rate_ulsec: float = 80,
     LiquidFillWait_s: float = 15,
     SyringePushWait_s: float = 60,
@@ -988,19 +994,24 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
         })
 
 
-        watervolume = total_sample_volume_ul[i] - solnvolume
+        cleanvolume = total_sample_volume_ul[i] - solnvolume
 
 
         epm.add_experiment("CCSI_sub_cellfill", {
             "Solution_description": Solution_name,
             "Solution_reservoir_sample_no": Solution_reservoir_sample_no,
             "Solution_volume_ul": solnvolume,
-            "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-            "Waterclean_volume_ul": watervolume,
+            "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+            "Clean_volume_ul": cleanvolume,
+            "Water_injection": Water_injection,
+            "Water_injection_reservoir_sample_no": Water_injection_reservoir_sample_no,
+            "Water_injection_volume_ul": Water_injection_volume_ul,
+            "Water_injection_syringe_rate_ulsec": Water_injection_syringe_rate_ulsec,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "SyringePushWait_s": SyringePushWait_s,
             "LiquidFillWait_s": LiquidFillWait_s,
-            "WaterFillWait_s": Waterclean_FillWait_s,
+            "CleanFillWait_s": Clean_FillWait_s,
+            "WaterFillWait":Water_injection_FillWait,
             "n2_push": n2_push,
             "co2_fill_after_n2push": n2_push, 
             "co2_filltime_s":co2_filltime_s,
@@ -1037,10 +1048,10 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
 
             for r in range(prerinse_cleans):
                 epm.add_experiment("CCSI_sub_n2clean", {
-                    "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-                    "waterclean_volume_ul": drainclean_volume_ul,
-                    "Syringe_rate_ulsec": Waterclean_syringe_rate_ulsec,
-                    "LiquidFillWait_s": Waterclean_FillWait_s,
+                    "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+                    "Clean_volume_ul": drainclean_volume_ul,
+                    "Syringe_rate_ulsec": Clean_syringe_rate_ulsec,
+                    "LiquidFillWait_s": Clean_FillWait_s,
                     "n2flowrate_sccm":n2flowrate_sccm,
                     "drain_HSpurge_duration": LiquidCleanPurge_duration,
                     "DeltaDilute1_duration": 0,
@@ -1061,15 +1072,15 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
 
 
         epm.add_experiment("CCSI_sub_n2rinse", {
-            "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-            "waterclean_volume_ul": drainclean_volume_ul,
-            "Syringe_rate_ulsec":Waterclean_syringe_rate_ulsec,
+            "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+            "Clean_volume_ul": drainclean_volume_ul,
+            "Syringe_rate_ulsec":Clean_syringe_rate_ulsec,
             "rinse_cycles": LiquidClean_full_rinses,
             "rinse_agitation": LiquidClean_rinse_agitation,
             "rinse_agitation_wait": LiquidClean_rinse_agitation_wait,
             "rinse_agitation_duration": LiquidClean_rinse_agitation_duration,
-            "LiquidFillWait_s": Waterclean_FillWait_s,
-            "WaterFillWait_s": Waterclean_FillWait_s,
+            "LiquidFillWait_s": Clean_FillWait_s,
+            "WaterFillWait_s": Clean_FillWait_s,
             "drain_HSpurge_duration": rinsePurge_duration,
             "recirculation":rinse_recirc,
             "drain_recirculation_duration":rinsePurge_recirc_duration, 
@@ -1098,10 +1109,10 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
         })
 
         #refill dilution volume
-        if watervolume != 0:
+        if cleanvolume != 0:
             epm.add_experiment("CCSI_sub_refill_clean", {
-                "Waterclean_volume_ul": watervolume,
-                "Syringe_rate_ulsec": Waterclean_syringe_rate_ulsec, #syringe_rate_ulsec,
+                "Clean_volume_ul": cleanvolume,
+                "Syringe_rate_ulsec": Clean_syringe_rate_ulsec, #syringe_rate_ulsec,
             })
 
         if perform_init:
@@ -1150,9 +1161,9 @@ def CCSI_cleancycles(
 
 ####
 
-    Waterclean_reservoir_sample_no: int = 1,
-    Waterclean_syringe_rate_ulsec: float = 300,
-    Waterclean_FillWait_s: float = 15,
+    Clean_reservoir_sample_no: int = 1,
+    Clean_syringe_rate_ulsec: float = 300,
+    Clean_FillWait_s: float = 15,
 
     co2measure_acqrate: float = 0.5,
 
@@ -1216,10 +1227,10 @@ def CCSI_cleancycles(
 
         for r in range(prerinse_cleans):
             epm.add_experiment("CCSI_sub_n2clean", {
-                "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-                "waterclean_volume_ul": drainclean_volume_ul,
-                "Syringe_rate_ulsec": Waterclean_syringe_rate_ulsec,
-                "LiquidFillWait_s": Waterclean_FillWait_s,
+                "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+                "Clean_volume_ul": drainclean_volume_ul,
+                "Syringe_rate_ulsec": Clean_syringe_rate_ulsec,
+                "LiquidFillWait_s": Clean_FillWait_s,
                 "n2flowrate_sccm":n2flowrate_sccm,
                 "drain_HSpurge_duration": LiquidCleanPurge_duration,
                 "DeltaDilute1_duration": 0,
@@ -1240,15 +1251,15 @@ def CCSI_cleancycles(
 
 
     epm.add_experiment("CCSI_sub_n2rinse", {
-        "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-        "waterclean_volume_ul": drainclean_volume_ul,
-        "Syringe_rate_ulsec":Waterclean_syringe_rate_ulsec,
+        "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+        "Clean_volume_ul": drainclean_volume_ul,
+        "Syringe_rate_ulsec":Clean_syringe_rate_ulsec,
         "rinse_cycles": LiquidClean_full_rinses,
         "rinse_agitation": LiquidClean_rinse_agitation,
         "rinse_agitation_wait": LiquidClean_rinse_agitation_wait,
         "rinse_agitation_duration": LiquidClean_rinse_agitation_duration,
-        "LiquidFillWait_s": Waterclean_FillWait_s,
-        "WaterFillWait_s": Waterclean_FillWait_s,
+        "LiquidFillWait_s": Clean_FillWait_s,
+        "WaterFillWait_s": Clean_FillWait_s,
         "drain_HSpurge_duration": rinsePurge_duration,
         "recirculation":rinse_recirc,
         "drain_recirculation_duration":rinsePurge_recirc_duration, 
@@ -1319,7 +1330,7 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
     Solution_reservoir_sample_no: int = 2,
     Solution_name: str = "",
     total_sample_volume_ul: float = 5000,
-    Waterclean_reservoir_sample_no: int = 1,
+    Clean_reservoir_sample_no: int = 1,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 20,
     co2measure_duration: float = 300,
@@ -1341,7 +1352,7 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
     epm = ExperimentPlanMaker()
     for _ in range(initcleans):
         epm.add_experiment("CCSI_sub_clean_inject", {
-            "Waterclean_volume_ul": drainclean_volume_ul,
+            "Clean_volume_ul": drainclean_volume_ul,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidCleanWait_s": LiquidFillWait_s,
             "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
@@ -1354,7 +1365,7 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
 
     # refill_volume = drainclean_volume_ul*(initcleans)
     # epm.add_experiment("CCSI_sub_refill_clean", {
-    #     "Waterclean_volume_ul": refill_volume ,
+    #     "Clean_volume_ul": refill_volume ,
     #     "Syringe_rate_ulsec": 1000,
     # })
 
@@ -1376,7 +1387,7 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
         watervolume = total_sample_volume_ul - solnvolume
         if watervolume != 0:
             epm.add_experiment("CCSI_sub_load_liquid", {
-                "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+                "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
                 "volume_ul_cell_liquid": watervolume,
                 "combine_True_False": True,
                 "water_True_False": True,
@@ -1384,7 +1395,7 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
 
         epm.add_experiment("CCSI_sub_liquidfill_syringes", {
             "Solution_volume_ul": solnvolume,
-            "Waterclean_volume_ul": watervolume,
+            "Clean_volume_ul": watervolume,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidFillWait_s": LiquidFillWait_s,
             "co2measure_duration": co2measure_duration,
@@ -1394,7 +1405,7 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
 
         for _ in range(cleanloops):
             epm.add_experiment("CCSI_sub_clean_inject", {
-                "Waterclean_volume_ul": drainclean_volume_ul,
+                "Clean_volume_ul": drainclean_volume_ul,
                 "Syringe_rate_ulsec": syringe_rate_ulsec,
                 "LiquidCleanWait_s": LiquidFillWait_s,
                 "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
@@ -1407,7 +1418,7 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
 
         refill_volume = watervolume + drainclean_volume_ul*(cleanloops)
         epm.add_experiment("CCSI_sub_refill_clean", {
-            "Waterclean_volume_ul": refill_volume ,
+            "Clean_volume_ul": refill_volume ,
             "Syringe_rate_ulsec": 1000,
         })
     
@@ -1424,7 +1435,7 @@ def CCSI_priming(  #assumes initialization performed previously
     Solution_reservoir_sample_no: int = 2,
     Solution_name: str = "",
     total_sample_volume_ul: float = 5000,
-    Waterclean_reservoir_sample_no: int = 1,
+    Clean_reservoir_sample_no: int = 1,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 20,
     co2measure_duration: float = 300,
@@ -1463,7 +1474,7 @@ def CCSI_priming(  #assumes initialization performed previously
         watervolume = total_sample_volume_ul - solnvolume
         if watervolume != 0:
             epm.add_experiment("CCSI_sub_load_liquid", {
-                "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+                "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
                 "volume_ul_cell_liquid": watervolume,
                 "combine_True_False": True,
                 "water_True_False": True,
@@ -1471,7 +1482,7 @@ def CCSI_priming(  #assumes initialization performed previously
 
         epm.add_experiment("CCSI_sub_liquidfill_syringes", {
             "Solution_volume_ul": solnvolume,
-            "Waterclean_volume_ul": watervolume,
+            "Clean_volume_ul": watervolume,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidFillWait_s": LiquidFillWait_s,
             "co2measure_duration": co2measure_duration,
@@ -1485,7 +1496,7 @@ def CCSI_priming(  #assumes initialization performed previously
         })
 
         epm.add_experiment("CCSI_sub_clean_inject", {
-            "Waterclean_volume_ul": drainclean_volume_ul,
+            "Clean_volume_ul": drainclean_volume_ul,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidCleanWait_s": LiquidFillWait_s,
             "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
@@ -1582,7 +1593,7 @@ def CCSI_Solution_testing_cleans(  #assumes initialization performed previously
     total_sample_volume_ul: List[float] = [5000],
     total_cell_volume_ul: float = 12500,
 
-    Waterclean_reservoir_sample_no: int = 1,
+    Clean_reservoir_sample_no: int = 1,
     syringe_rate_ulsec: float = 80,
     LiquidFillWait_s: float = 15,
     SyringePushWait_s: float = 5,
@@ -1674,7 +1685,7 @@ def CCSI_Solution_testing_cleans(  #assumes initialization performed previously
         watervolume = total_sample_volume_ul[i] - solnvolume
         # if watervolume != 0:
         #     epm.add_experiment("CCSI_sub_load_liquid", {
-        #         "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+        #         "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
         #         "volume_ul_cell_liquid": watervolume,
         #         "combine_True_False": True,
         #         "water_True_False": True,
@@ -1684,8 +1695,8 @@ def CCSI_Solution_testing_cleans(  #assumes initialization performed previously
             "Solution_description": Solution_name,
             "Solution_reservoir_sample_no": Solution_reservoir_sample_no,
             "Solution_volume_ul": solnvolume,
-            "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-            "Waterclean_volume_ul": watervolume,
+            "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+            "Clean_volume_ul": watervolume,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "SyringePushWait_s": SyringePushWait_s,
             "LiquidFillWait_s": LiquidFillWait_s,
@@ -1721,8 +1732,8 @@ def CCSI_Solution_testing_cleans(  #assumes initialization performed previously
         if prerinse_clean:
 
             epm.add_experiment("CCSI_sub_n2clean", {
-                "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-                "waterclean_volume_ul": drainclean_volume_ul,
+                "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+                "Clean_volume_ul": drainclean_volume_ul,
                 "Syringe_rate_ulsec": syringe_rate_ulsec,
                 "LiquidFillWait_s": LiquidFillWait_s,
                 "n2flowrate_sccm":n2flowrate_sccm,
@@ -1745,8 +1756,8 @@ def CCSI_Solution_testing_cleans(  #assumes initialization performed previously
 
 
         epm.add_experiment("CCSI_sub_n2rinse", {
-            "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-            "waterclean_volume_ul": drainclean_volume_ul,
+            "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+            "Clean_volume_ul": drainclean_volume_ul,
             "rinse_cycles": LiquidClean_full_rinses,
             "rinse_agitation": LiquidClean_rinse_agitation,
             "rinse_agitation_wait": LiquidClean_rinse_agitation_wait,
@@ -1780,8 +1791,8 @@ def CCSI_Solution_testing_cleans(  #assumes initialization performed previously
         })
 
         # epm.add_experiment("CCSI_sub_n2clean", {
-        #     "Waterclean_reservoir_sample_no": Waterclean_reservoir_sample_no,
-        #     "waterclean_volume_ul": drainclean_volume_ul,
+        #     "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+        #     "Clean_volume_ul": drainclean_volume_ul,
         #     "Syringe_rate_ulsec": syringe_rate_ulsec,
         #     "LiquidFillWait_s": LiquidFillWait_s,
         #     "n2flowrate_sccm":n2flowrate_sccm,
@@ -1808,7 +1819,7 @@ def CCSI_Solution_testing_cleans(  #assumes initialization performed previously
         #refill dilution volume
         if watervolume != 0:
             epm.add_experiment("CCSI_sub_refill_clean", {
-                "Waterclean_volume_ul": watervolume,
+                "Clean_volume_ul": watervolume,
                 "Syringe_rate_ulsec": 800, #syringe_rate_ulsec,
             })
 
