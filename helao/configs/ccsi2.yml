@@ -139,7 +139,7 @@ servers:
       port: COM15
       pumps:
         one:
-          address: 1
+          address: 2
           diameter: 7.58
   DOSEPUMP:
     host: hte-ccsi-02.htejcap.caltech.edu
