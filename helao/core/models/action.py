@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.run_use import RunUse
-from helao.core.models.sample import SampleUnion
+from helao.core.models.sample import SampleModel
 from helao.core.models.file import FileInfo
 from helao.core.models.machine import MachineModel
 from helao.core.version import get_hlo_version
@@ -52,8 +52,8 @@ class ActionModel(ShortActionModel):
     action_codehash: Optional[str] = None
     parent_action_uuid: Optional[UUID] = None
     child_action_uuid: Optional[UUID] = None
-    samples_in: List[SampleUnion] = Field(default=[])
-    samples_out: List[SampleUnion] = Field(default=[])
+    samples_in: List[SampleModel] = Field(default=[])
+    samples_out: List[SampleModel] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     manual_action: bool = False
     nonblocking: bool = False

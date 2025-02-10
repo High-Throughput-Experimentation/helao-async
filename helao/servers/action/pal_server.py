@@ -24,7 +24,7 @@ from helao.core.models.sample import (
     SampleType,
     LiquidSample,
     GasSample,
-    SampleUnion,
+    SampleModel,
     NoneSample,
     SolidSample,
 )
@@ -594,7 +594,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def archive_tray_load(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        load_sample_in: Union[SampleUnion, dict] = Body(
+        load_sample_in: Union[SampleModel, dict] = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
             embed=True,
         ),
@@ -663,7 +663,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def archive_tray_update_position(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        sample: SampleUnion = Body(
+        sample: SampleModel = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
             embed=True,
         ),
@@ -777,7 +777,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
         custom: dev_customitems = None,
-        load_sample_in: SampleUnion = Body(
+        load_sample_in: SampleModel = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
             embed=True,
         ),
@@ -986,7 +986,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def db_get_samples(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: List[SampleUnion] = Body(
+        fast_samples_in: List[SampleModel] = Body(
             [LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()})],
             embed=True,
         ),
@@ -1010,7 +1010,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def db_new_samples(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: List[SampleUnion] = Body(
+        fast_samples_in: List[SampleModel] = Body(
             [
                 LiquidSample(
                     **{

@@ -14,7 +14,7 @@ import numpy as np
 
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.core.models.sample import SampleUnion
+from helao.core.models.sample import SampleModel
 
 from helao.helpers import logging
 if logging.LOGGER is None:
@@ -95,7 +95,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
-        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        fast_samples_in: List[SampleModel] = Body([], embed=True),
     ):
         """Record simulated data."""
         active = await app.base.setup_and_contain_action()

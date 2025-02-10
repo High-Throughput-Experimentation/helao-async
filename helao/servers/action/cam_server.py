@@ -7,7 +7,7 @@ __all__ = ["makeApp"]
 
 from typing import Optional, List, Union
 from fastapi import Body
-from helao.core.models.sample import SampleUnion
+from helao.core.models.sample import SampleModel
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
 from helao.drivers.sensor.axiscam_driver import AxisCam, AxisCamExec
@@ -32,7 +32,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 1,
-        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        fast_samples_in: List[SampleModel] = Body([], embed=True),
     ):
         """Record image stream from webcam."""
         active = await app.base.setup_and_contain_action()
