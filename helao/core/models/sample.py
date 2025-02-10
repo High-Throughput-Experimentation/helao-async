@@ -322,7 +322,7 @@ class SampleList(BaseModel, HelaoDict):
     """a combi basemodel which can contain all possible samples
     Its also a list and we should enforce samples as being a list"""
 
-    samples: Optional[List[SampleUnion]] = Field(default=[])
+    samples: Optional[List[SampleModel]] = Field(default=[])
 
 
 SampleUnion = Union[

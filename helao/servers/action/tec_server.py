@@ -9,7 +9,7 @@ from typing import Optional, List
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
-from helao.core.models.sample import SampleUnion
+from helao.core.models.sample import SampleModel
 from helao.drivers.temperature_control.mecom_driver import MeerstetterTEC, TECMonExec, TECWaitExec
 from helao.helpers.config_loader import config_loader
 
@@ -32,7 +32,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
-        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        fast_samples_in: List[SampleModel] = Body([], embed=True),
     ):
         """Record TEC values (does not affect setpoint or control)."""
         active = await app.base.setup_and_contain_action()
