@@ -1106,11 +1106,12 @@ class OrchAPI(HelaoFastAPI):
         @self.post(f"/{server_key}/conditional_stop", tags=["action"])
         async def conditional_stop(
             action: Action = Body({}, embed=True),
-            action_version: int = 1,
+            action_version: int = 2,
             stop_parameter: Optional[str] = "",
             stop_condition: checkcond = checkcond.equals,
             stop_value: Union[str, float, int, bool] = True,
             reason: str = "conditional stop",
+            clear_queues: bool = False,
         ):
             """
             Asynchronously stops an action based on a specified condition.
@@ -1153,9 +1154,11 @@ class OrchAPI(HelaoFastAPI):
                 stop = False
 
             if stop:
-                await self.orch.clear_actions()
-                await self.orch.clear_experiments()
-                await self.orch.clear_sequences()
+                if active.action.action_params["clear_queues"]:
+                    await self.orch.clear_actions()
+                    await self.orch.clear_experiments()
+                    await self.orch.clear_sequences()
+                await self.orch.stop()
                 self.orch.current_stop_message = active.action.action_params["reason"]
                 LOGGER.warning(active.action.action_params["reason"])
                 await self.orch.update_operator(True)
