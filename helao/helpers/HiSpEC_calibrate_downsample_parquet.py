@@ -4,8 +4,6 @@ import numpy as np
 import os
 import json
 from pathlib import Path
-from typing import Tuple
-from collections import defaultdict
 import ruamel.yaml
 from typing import Union
 from scipy.optimize import curve_fit
@@ -13,6 +11,7 @@ from scipy.interpolate import UnivariateSpline
 from scipy.signal import sawtooth
 import matplotlib.pyplot as plt
 
+from helao.helpers.read_hlo import read_hlo
 
 
 
@@ -47,52 +46,7 @@ def yml_load(input: Union[str, Path]):
     return obj
 
 
-def read_hlo(path: str, keep_keys: list = [], omit_keys: list = []) -> Tuple[dict, dict]:
-    """
-    Reads a .hlo file and returns its metadata and data.
-    Args:
-        path (str): The file path to the .hlo file.
-    Returns:
-        Tuple[dict, dict]: A tuple containing two dictionaries:
-            - The first dictionary contains the metadata.
-            - The second dictionary contains the data, where each key maps to a list of values.
-    """
-    if keep_keys and omit_keys:
-        print("Both keep_keys and omit_keys are provided. keep_keys will take precedence.")
-    
-    path_to_hlo = Path(path)
-    header_lines = []
-    header_end = False
-    data = defaultdict(list)
-
-    with path_to_hlo.open() as f:
-        for line in f:
-            if line == "%%\n":
-                header_end = True
-            elif not header_end:
-                header_lines.append(line)
-            else:
-                line_dict = json.loads(line)
-                if keep_keys:
-                    for k, v in line_dict.items():
-                        if k in keep_keys:
-                            if isinstance(v, list):
-                                data[k] += v
-                            else:
-                                data[k].append(v)
-                else:
-                    for k, v in line_dict.items():
-                        if k not in omit_keys:
-                            if isinstance(v, list):
-                                data[k] += v
-                            else:
-                                data[k].append(v)
-    meta = dict(yml_load("".join(header_lines)))
-
-    return meta, data
-
-
-def read_CV_hlo(path: str,
+def read_CV_hlo(hlo_path: str,
                  default_U_header:str='Ewe_V',
                  default_t_header:str='t_s',
                  default_cycle_header:str='cycle',
@@ -118,7 +72,14 @@ def read_CV_hlo(path: str,
     else:
         headers = [default_U_header, default_t_header, default_cycle_header, default_current_header]
 
-    meta, data = read_hlo(path, keep_keys=headers)
+    if not os.path.exists(hlo_path) and 'RUNS_ACTIVE' in hlo_path:
+        hlo_path = hlo_path.replace('RUNS_ACTIVE', 'RUNS_FINISHED')
+    if not os.path.exists(hlo_path) and 'RUNS_FINISHED' in hlo_path:
+        hlo_path = hlo_path.replace('RUNS_FINISHED', 'RUNS_SYNCED')
+    if not os.path.exists(hlo_path):
+        raise FileNotFoundError(f"File {hlo_path} not found")
+        
+    meta, data = read_hlo(hlo_path, keep_keys=headers)
 
     if return_metadata:
         return  meta['column_headings'], pd.DataFrame(data)
