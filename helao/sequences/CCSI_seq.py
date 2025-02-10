@@ -1112,7 +1112,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
         if cleanvolume != 0:
             epm.add_experiment("CCSI_sub_refill_clean", {
                 "Clean_volume_ul": cleanvolume,
-                "Syringe_rate_ulsec": Clean_syringe_rate_ulsec, #syringe_rate_ulsec,
+              #  "Syringe_rate_ulsec": 100, #syringe_rate_ulsec,
             })
 
         if perform_init:
