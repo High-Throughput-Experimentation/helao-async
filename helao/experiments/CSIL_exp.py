@@ -1865,7 +1865,7 @@ def CCSI_sub_refill_clean(
         "withdraw",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
-            "volume_uL": Clean_volume_ul,
+            "volume_uL": Clean_volume_ul+1000,
         },
     )
     apm.add(ORCH_server, "wait", {"waittime": 5.25})
@@ -2394,7 +2394,7 @@ def CCSI_sub_n2clean(
         CCSI_sub_refill_clean(
             experiment=experiment,
             Clean_volume_ul=Clean_volume_ul,
-            Syringe_rate_ulsec=Syringe_rate_ulsec,
+           # Syringe_rate_ulsec=100,
         )
     )
 
@@ -2486,7 +2486,7 @@ def CCSI_sub_n2rinse(
             CCSI_sub_refill_clean(
                 experiment=experiment,
                 Clean_volume_ul=Clean_volume_ul,
-                Syringe_rate_ulsec=Syringe_rate_ulsec,
+                #Syringe_rate_ulsec=100,
             )
         )
     return apm.action_list
