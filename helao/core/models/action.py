@@ -35,7 +35,7 @@ class ActionModel(ShortActionModel):
     dummy: bool = False
     simulation: bool = False
     run_type: Optional[str] = None
-    run_use: Optional[RunUse] = "data"
+    run_use: Optional[RunUse] = RunUse.data
     experiment_uuid: Optional[UUID] = None
     experiment_timestamp: Optional[datetime] = None
     action_timestamp: Optional[datetime] = None
