@@ -33,15 +33,17 @@ VALID_DATA_STATUS = (
     HloStatus.active,
 )
 
-VALID_ACTION_NAME = (
-    "run_LSV",
-    "run_CA",
-    "run_CP",
-    "run_CV",
-    "run_EIS",
-    "run_OCV",
-    "run_RCA",
-)
+AXIS_MAP = {
+    "run_CA": ("t_s", "I_A"),
+    "run_CP": ("t_s", "Ewe_V"),
+    "run_CV": ("Ewe_V", "I_A"),
+    "run_OCV": ("t_s", "Ewe_V"),
+    "run_RCA": ("t_s", "I_A"),
+    "run_LSV": ("Ewe_V", "I_A"),
+    # "run_EIS": ("Re_Z", "Im_Z"),
+}
+
+VALID_ACTION_NAME = [k for k in AXIS_MAP.keys()]
 
 
 class C_potvis:
@@ -50,7 +52,7 @@ class C_potvis:
     def __init__(self, vis_serv: Vis, serv_key: str):
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
-        self.max_points = 500
+        self.max_points = 5000
         self.max_prev = 4
         self.update_rate = 1e-3
         self.last_update_time = time.time()
@@ -266,7 +268,7 @@ class C_potvis:
                 and data_package.action_name in VALID_ACTION_NAME
             ):
                 # only resets if axis selector or action_uuid changes
-                self.reset_plot(str(data_package.action_uuid))
+                self.reset_plot(data_package.action_uuid)
                 for _, uuid_dict in data_package.datamodel.data.items():
                     for data_label, data_val in uuid_dict.items():
                         if data_label in self.data_dict_keys:
@@ -320,24 +322,34 @@ class C_potvis:
                 legend_label=f"{i+1}",
             )
 
-    def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
+    def reset_plot(self, new_data_package=None, forceupdate: bool = False):
+        new_action_uuid = ""
+        action_name = ""
+        if new_data_package is not None:
+            new_action_uuid = str(new_data_package.action_uuid)
+            action_name = new_data_package.action_name
         if self.cur_action_uuid != new_action_uuid or forceupdate:
-            if new_action_uuid is not None:
-                LOGGER.info(" ... reseting Gamry graph")
-                self.prev_action_uuid = self.cur_action_uuid
-                if self.prev_action_uuid != "":
-                    self.prev_action_uuids.append(self.prev_action_uuid)
-                    LOGGER.info(f"previous uuids: {self.prev_action_uuids}")
-                    # copy old data to "prev" plot
-                    self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
-                        data=deepcopy(self.datasource.data)
-                    )
-                self.cur_action_uuid = new_action_uuid
-                # update prev_datasources
-                while len(self.prev_action_uuids) > self.max_prev:
-                    rp = self.prev_action_uuids.pop(0)
-                    self.prev_datasources.pop(rp)
-                self.datasource.data = {key: [] for key in self.data_dict_keys}
+            LOGGER.info(" ... reseting Gamry graph")
+            self.prev_action_uuid = self.cur_action_uuid
+            if self.prev_action_uuid != "":
+                self.prev_action_uuids.append(self.prev_action_uuid)
+                LOGGER.info(f"previous uuids: {self.prev_action_uuids}")
+                # copy old data to "prev" plot
+                self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
+                    data=deepcopy(self.datasource.data)
+                )
+            self.cur_action_uuid = new_action_uuid
+            # update prev_datasources
+            while len(self.prev_action_uuids) > self.max_prev:
+                rp = self.prev_action_uuids.pop(0)
+                self.prev_datasources.pop(rp)
+            self.datasource.data = {key: [] for key in self.data_dict_keys}
+            if action_name in AXIS_MAP:
+                xlab, ylab = AXIS_MAP[action_name]
+                self.xaxis_selector_group.update(active=self.data_dict_keys.index(xlab))
+                self.yaxis_selector_group.update(active=self.data_dict_keys.index(ylab))
+                self.xselect = self.xaxis_selector_group.active
+                self.yselect = self.yaxis_selector_group.active
             self._add_plots()
         if (self.xselect != self.xaxis_selector_group.active) or (
             self.yselect != self.yaxis_selector_group.active
