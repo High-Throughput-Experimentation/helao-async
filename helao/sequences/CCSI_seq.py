@@ -903,9 +903,9 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     total_cell_volume_ul: float = 12500,
 
     Water_injection: bool = False,
-    Water_injection_reservoir_sample_no: int = 99,
+    Water_injection_reservoir_sample_no: int = 2,
     Water_injection_syringe_rate_ulsec: float = 10,
-    Water_injection_volume_ul: float = 50,
+    Water_injection_volume_ul: List[float] = [50,50,50],
     Water_injection_FillWait: float = 30,
 
     Clean_reservoir_sample_no: int = 1,
@@ -1005,7 +1005,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "Clean_volume_ul": cleanvolume,
             "Water_injection": Water_injection,
             "Water_injection_reservoir_sample_no": Water_injection_reservoir_sample_no,
-            "Water_injection_volume_ul": Water_injection_volume_ul,
+            "Water_injection_volume_ul": Water_injection_volume_ul[i],
             "Water_injection_syringe_rate_ulsec": Water_injection_syringe_rate_ulsec,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "SyringePushWait_s": SyringePushWait_s,
