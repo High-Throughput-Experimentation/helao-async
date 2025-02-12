@@ -171,7 +171,7 @@ class C_potvis:
         self.vis.doc.add_root(Spacer(height=10))
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
-        self.reset_plot(self.cur_action_uuid, forceupdate=True)
+        self.reset_plot(forceupdate=True)
 
     def callback_stop_measure(self, event):
         LOGGER.info("stopping gamry measurement")
@@ -268,7 +268,7 @@ class C_potvis:
                 and data_package.action_name in VALID_ACTION_NAME
             ):
                 # only resets if axis selector or action_uuid changes
-                self.reset_plot(data_package.action_uuid)
+                self.reset_plot(data_package)
                 for _, uuid_dict in data_package.datamodel.data.items():
                     for data_label, data_val in uuid_dict.items():
                         if data_label in self.data_dict_keys:
