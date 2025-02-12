@@ -190,8 +190,8 @@ class C_biovis:
         self.vis.doc.add_root(Spacer(height=10))
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
-        for ch, auuid in self.channel_action_uuid.items():
-            self.reset_plot(ch, auuid, forceupdate=True)
+        for ch, _ in self.channel_action_uuid.items():
+            self.reset_plot(ch, forceupdate=True)
 
     def cleanup_session(self, session_context):
         LOGGER.info(f"'{self.potentiostat_key}' Bokeh session closed")
