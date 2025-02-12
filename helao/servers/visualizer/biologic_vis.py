@@ -321,25 +321,25 @@ class C_biovis:
         if new_data_package is not None:
             new_action_uuid = str(new_data_package.action_uuid)
             action_name = new_data_package.action_name
-        if self.channel_action_uuid[channel] != new_action_uuid or forceupdate:
-            LOGGER.info(f" ... reseting channel {channel} graph")
-            self.channel_action_uuid_prev[channel] = self.channel_action_uuid[
-                channel
-            ]
-            if self.channel_action_uuid_prev[channel] != "":
-                self.channel_datasources_prev[channel] = ColumnDataSource(
-                    data=deepcopy(self.channel_datasources[channel].data)
-                )
-            self.channel_action_uuid[channel] = new_action_uuid
-            self.channel_datasources[channel].data = {
-                key: [] for key in self.data_dict_keys
-            }
-            if action_name in AXIS_MAP:
-                xlab, ylab = AXIS_MAP[action_name]
-                self.xaxis_selector_group.update(active=self.data_dict_keys.index(xlab))
-                self.yaxis_selector_group.update(active=self.data_dict_keys.index(ylab))
-                self.xselect = self.xaxis_selector_group.active
-                self.yselect = self.yaxis_selector_group.active
+            if self.channel_action_uuid[channel] != new_action_uuid or forceupdate:
+                LOGGER.info(f" ... reseting channel {channel} graph")
+                self.channel_action_uuid_prev[channel] = self.channel_action_uuid[
+                    channel
+                ]
+                if self.channel_action_uuid_prev[channel] != "":
+                    self.channel_datasources_prev[channel] = ColumnDataSource(
+                        data=deepcopy(self.channel_datasources[channel].data)
+                    )
+                self.channel_action_uuid[channel] = new_action_uuid
+                self.channel_datasources[channel].data = {
+                    key: [] for key in self.data_dict_keys
+                }
+                if action_name in AXIS_MAP:
+                    xlab, ylab = AXIS_MAP[action_name]
+                    self.xaxis_selector_group.update(active=self.data_dict_keys.index(xlab))
+                    self.yaxis_selector_group.update(active=self.data_dict_keys.index(ylab))
+                    self.xselect = self.xaxis_selector_group.active
+                    self.yselect = self.yaxis_selector_group.active
             self._add_plots(channel)
         if (self.xselect != self.xaxis_selector_group.active) or (
             self.yselect != self.yaxis_selector_group.active
