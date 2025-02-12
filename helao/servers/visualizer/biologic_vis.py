@@ -340,7 +340,7 @@ class C_biovis:
                     self.yaxis_selector_group.update(active=self.data_dict_keys.index(ylab))
                     self.xselect = self.xaxis_selector_group.active
                     self.yselect = self.yaxis_selector_group.active
-            self._add_plots(channel)
+                self._add_plots(channel)
         if (self.xselect != self.xaxis_selector_group.active) or (
             self.yselect != self.yaxis_selector_group.active
         ):
