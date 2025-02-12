@@ -328,28 +328,29 @@ class C_potvis:
         if new_data_package is not None:
             new_action_uuid = str(new_data_package.action_uuid)
             action_name = new_data_package.action_name
-        if self.cur_action_uuid != new_action_uuid or forceupdate:
-            LOGGER.info(" ... reseting Gamry graph")
-            self.prev_action_uuid = self.cur_action_uuid
-            if self.prev_action_uuid != "":
-                self.prev_action_uuids.append(self.prev_action_uuid)
-                LOGGER.info(f"previous uuids: {self.prev_action_uuids}")
-                # copy old data to "prev" plot
-                self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
-                    data=deepcopy(self.datasource.data)
-                )
-            self.cur_action_uuid = new_action_uuid
-            # update prev_datasources
-            while len(self.prev_action_uuids) > self.max_prev:
-                rp = self.prev_action_uuids.pop(0)
-                self.prev_datasources.pop(rp)
-            self.datasource.data = {key: [] for key in self.data_dict_keys}
-            if action_name in AXIS_MAP:
-                xlab, ylab = AXIS_MAP[action_name]
-                self.xaxis_selector_group.update(active=self.data_dict_keys.index(xlab))
-                self.yaxis_selector_group.update(active=self.data_dict_keys.index(ylab))
-                self.xselect = self.xaxis_selector_group.active
-                self.yselect = self.yaxis_selector_group.active
+            if self.cur_action_uuid != new_action_uuid or forceupdate:
+                LOGGER.info(" ... reseting Gamry graph")
+                self.prev_action_uuid = self.cur_action_uuid
+                if self.prev_action_uuid != "":
+                    self.prev_action_uuids.append(self.prev_action_uuid)
+                    LOGGER.info(f"previous uuids: {self.prev_action_uuids}")
+                    # copy old data to "prev" plot
+                    self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
+                        data=deepcopy(self.datasource.data)
+                    )
+                self.cur_action_uuid = new_action_uuid
+                # update prev_datasources
+                while len(self.prev_action_uuids) > self.max_prev:
+                    rp = self.prev_action_uuids.pop(0)
+                    if rp in self.prev_datasources:
+                        self.prev_datasources.pop(rp)
+                self.datasource.data = {key: [] for key in self.data_dict_keys}
+                if action_name in AXIS_MAP:
+                    xlab, ylab = AXIS_MAP[action_name]
+                    self.xaxis_selector_group.update(active=self.data_dict_keys.index(xlab))
+                    self.yaxis_selector_group.update(active=self.data_dict_keys.index(ylab))
+                    self.xselect = self.xaxis_selector_group.active
+                    self.yselect = self.yaxis_selector_group.active
             self._add_plots()
         if (self.xselect != self.xaxis_selector_group.active) or (
             self.yselect != self.yaxis_selector_group.active
