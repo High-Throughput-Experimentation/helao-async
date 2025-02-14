@@ -200,7 +200,7 @@ class HelaoModel:
                 query_df.query(f"{helao_type}_uuid==@uuid").iloc[0].to_dict()
             )
         else:
-            self.meta_dict = self._meta_dict
+            self.meta_dict = self.json
         self.timestamp = self.meta_dict.get(
             f"{helao_type}_timestamp",
             self.meta_dict.get(f"{helao_type}_timestamp", None),
