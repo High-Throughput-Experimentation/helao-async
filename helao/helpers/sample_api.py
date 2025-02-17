@@ -37,7 +37,7 @@ from helao.core.models.sample import (
 from helao.helpers.file_in_use import file_in_use
 
 
-class SampleModelAPI:
+class _BaseSampleAPI:
     def __init__(self, sampleclass, Serv_class, extra_columns: str):
 
         self.extra_columns = extra_columns
@@ -467,7 +467,7 @@ class SampleModelAPI:
         return []
 
 
-class LiquidSampleAPI(SampleModelAPI):
+class LiquidSampleAPI(_BaseSampleAPI):
     def __init__(self, Serv_class):
         super().__init__(
             sampleclass=LiquidSample(),
@@ -497,7 +497,7 @@ class LiquidSampleAPI(SampleModelAPI):
             await self.new_samples([sample])
 
 
-class GasSampleAPI(SampleModelAPI):
+class GasSampleAPI(_BaseSampleAPI):
     def __init__(self, Serv_class):
         super().__init__(
             sampleclass=GasSample(),
@@ -513,7 +513,7 @@ class GasSampleAPI(SampleModelAPI):
         return sample
 
 
-class AssemblySampleAPI(SampleModelAPI):
+class AssemblySampleAPI(_BaseSampleAPI):
     def __init__(self, Serv_class):
         super().__init__(
             sampleclass=AssemblySample(),
@@ -523,7 +523,7 @@ class AssemblySampleAPI(SampleModelAPI):
         self._jsonkeys.append("parts")
 
 
-class SolidSampleAPI(SampleModelAPI):
+class SolidSampleAPI(_BaseSampleAPI):
     def __init__(self, Serv_class):
         super().__init__(
             sampleclass=SolidSample(),

@@ -78,6 +78,10 @@ class SampleModel(BaseModel, HelaoDict):
     global_label: Optional[str] = None  # is None for a ref sample
     sample_type: Optional[str] = None
 
+
+class _BaseSample(SampleModel):
+    """Full Sample with all helao-async relevant attributes."""
+
     # time related fields
     sample_creation_timecode: Optional[int] = None  # epoch in ns
     last_update: Optional[int] = None  # epoch in ns
@@ -180,7 +184,7 @@ class NoneSample(SampleModel):
         }
 
 
-class LiquidSample(SampleModel):
+class LiquidSample(_BaseSample):
     """base class for liquid samples"""
 
     sample_type: Literal[SampleType.liquid] = SampleType.liquid
@@ -210,7 +214,7 @@ class LiquidSample(SampleModel):
             return self.global_label
 
 
-class SolidSample(SampleModel):
+class SolidSample(_BaseSample):
     """base class for solid samples"""
 
     sample_type: Literal[SampleType.solid] = SampleType.solid
@@ -242,7 +246,7 @@ class SolidSample(SampleModel):
         return values
 
 
-class GasSample(SampleModel):
+class GasSample(_BaseSample):
     """base class for gas samples"""
 
     sample_type: Literal[SampleType.gas] = SampleType.gas
@@ -269,7 +273,7 @@ class GasSample(SampleModel):
             return self.global_label
 
 
-class AssemblySample(SampleModel):
+class AssemblySample(_BaseSample):
     sample_type: Literal[SampleType.assembly] = SampleType.assembly
     # parts: List[SampleUnion] = Field(default=[])
     parts: List[SamplePartUnion] = Field(default=[])
