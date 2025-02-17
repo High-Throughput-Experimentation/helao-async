@@ -891,9 +891,10 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # =============================================================================
 
 def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed previously
-    sequence_version: int = 17, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
+    sequence_version: int = 18, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
 #                   v 14, list for solution/total sample volumes+ extra clean 15 added rinses/16agitation
 #                   17 repeat cleans/rinses/flushes
+#                   18 water injection options
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [0,0,0],
@@ -903,6 +904,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     total_cell_volume_ul: float = 12500,
 
     Water_injection: bool = False,
+    Water_injection_before_IL: bool = False,
     Water_injection_reservoir_sample_no: int = 2,
     Water_injection_syringe_rate_ulsec: float = 10,
     Water_injection_volume_ul: List[float] = [50,50,50],
@@ -1004,6 +1006,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
             "Clean_volume_ul": cleanvolume,
             "Water_injection": Water_injection,
+            "Water_injection_before_IL": Water_injection_before_IL,
             "Water_injection_reservoir_sample_no": Water_injection_reservoir_sample_no,
             "Water_injection_volume_ul": Water_injection_volume_ul[i],
             "Water_injection_syringe_rate_ulsec": Water_injection_syringe_rate_ulsec,
