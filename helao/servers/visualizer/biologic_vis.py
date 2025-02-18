@@ -257,7 +257,7 @@ class C_biovis:
                         # only resets if axis selector or action_uuid changes
                         self.reset_plot(
                             channel=pstat_channel,
-                            new_data_package=data_package.action_uuid,
+                            new_data_package=data_package,
                         )
                         for data_label, data_val in uuid_dict.items():
                             if data_label in self.data_dict_keys:
