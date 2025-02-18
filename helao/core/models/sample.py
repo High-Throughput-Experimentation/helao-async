@@ -340,6 +340,8 @@ SamplePartUnion = Union[
 
 
 def object_to_sample(data):
+    if isinstance(data, BaseModel):
+        data = data.model_dump()
     try:
         sample = parse_obj_as(SampleUnion, data)
     except Exception as e:
