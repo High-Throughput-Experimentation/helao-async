@@ -9,7 +9,7 @@ from typing import Optional, List
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
-from helao.core.models.sample import SampleModel
+from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.drivers.sensor.cm0134_driver import CM0134, O2MonExec
 from helao.helpers.config_loader import config_loader
 
@@ -32,7 +32,8 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
-        fast_samples_in: List[SampleModel] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Body([], embed=True),
     ):
         """Record O2 ppm level."""
         active = await app.base.setup_and_contain_action()

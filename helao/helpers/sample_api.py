@@ -27,7 +27,6 @@ from helao.helpers.legacy_api import HTELegacyAPI
 from helao.core.models.sample import (
     AssemblySample,
     LiquidSample,
-    SampleModel,
     GasSample,
     SolidSample,
     NoneSample,
@@ -164,7 +163,7 @@ class SampleModelAPI:
         # commit changes
         self._con.commit()
 
-    async def _append_sample(self, sample: SampleModel) -> SampleModel:
+    async def _append_sample(self, sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
         await asyncio.sleep(0.01)
         lock = asyncio.Lock()
         async with lock:
@@ -216,7 +215,9 @@ class SampleModelAPI:
     async def _key_checks(self, sample):
         return sample
 
-    async def new_samples(self, samples: List[SampleModel] = None) -> List[SampleModel]:
+    async def new_samples(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = None) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]:
         if samples is None:
             samples = []
         while not self.ready:
@@ -274,7 +275,9 @@ class SampleModelAPI:
             self._close_db()
             return counts
 
-    async def get_samples(self, samples: List[SampleModel] = []) -> List[SampleModel]:
+    async def get_samples(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]:
         """this will only use the sample_no for local sample, or global_label for external samples
         and fills in the rest from the db and returns the list again.
         We expect to not have mixed sample types here.
@@ -324,7 +327,8 @@ class SampleModelAPI:
             self._close_db()
         return ret_samples
 
-    async def list_new_samples(self, limit: int = 10, give_only: bool = False) -> List[SampleModel]:
+    async def list_new_samples(self, limit: int = 10, give_only: bool = False) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]:
         """this will only use the sample_no for local sample, or global_label for external samples
         and fills in the rest from the db and returns the list again.
         We expect to not have mixed sample types here.
@@ -390,7 +394,8 @@ class SampleModelAPI:
                 if key != "idx":
                     LOGGER.error(f"unknown key '{key}' for updating sample")
 
-    async def update_samples(self, samples: List[SampleModel] = []):
+    async def update_samples(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []):
         while not self.ready:
             LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
@@ -458,11 +463,13 @@ class SampleModelAPI:
                 # df.to_sql(name=self._sample_type, con=self._con, if_exists="append", index=False, index_label="idx")
             self._close_db()
 
-    async def get_platemap(self, samples: List[SampleModel] = []) -> List[list]:
+    async def get_platemap(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> List[list]:
         LOGGER.error(f"not supported for {self._sample_type}")
         return []
 
-    async def get_samples_xy(self, samples: List[SampleModel] = []) -> List[Tuple[float, float]]:
+    async def get_samples_xy(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> List[Tuple[float, float]]:
         LOGGER.error(f"not supported for {self._sample_type}")
         return []
 
@@ -532,7 +539,8 @@ class SolidSampleAPI(SampleModelAPI):
         )
         self.legacyAPI = HTELegacyAPI(self._base)
 
-    async def get_platemap(self, samples: List[SampleModel] = []) -> List[list]:
+    async def get_platemap(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> List[list]:
         pmlist = []
         for sample in samples:
             pmmap = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
@@ -541,7 +549,8 @@ class SolidSampleAPI(SampleModelAPI):
             pmlist.append(pmmap)
         return pmlist
 
-    async def get_samples_xy(self, samples: List[SampleModel] = []) -> List[Tuple[float, float]]:
+    async def get_samples_xy(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> List[Tuple[float, float]]:
         xylist = []
         for sample in samples:
             pmdata = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
@@ -554,14 +563,18 @@ class SolidSampleAPI(SampleModelAPI):
                 xylist.append((platex, platey))
         return xylist
 
-    async def new_samples(self, samples: List[SampleModel] = []) -> List[SampleModel]:
+    async def new_samples(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]:
         LOGGER.error("new_sample is not supported yet for solid sample")
         await asyncio.sleep(0.01)
         ret_samples = []
 
         return ret_samples
 
-    async def get_samples(self, samples: List[SampleModel] = []) -> List[SampleModel]:
+    async def get_samples(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]:
         await asyncio.sleep(0.01)
         ret_samples = []
 
@@ -586,7 +599,9 @@ class SolidSampleAPI(SampleModelAPI):
 
         return ret_samples
 
-    async def update_samples(self, samples: List[SampleModel] = []) -> List[SampleModel]:
+    async def update_samples(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]:
         # self._base.print_message("Update is not supported yet "
         #                          "for solid sample", error=True)
         await asyncio.sleep(0.01)
@@ -780,7 +795,9 @@ class UnifiedSampleDataAPI:
         LOGGER.info("unified db initialized")
         self.ready = True
 
-    async def new_samples(self, samples: List[SampleModel] = []) -> List[SampleModel]:
+    async def new_samples(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]:
         retval = []
 
         for sample_ in samples:
@@ -804,7 +821,9 @@ class UnifiedSampleDataAPI:
 
         return retval
 
-    async def get_samples(self, samples: List[SampleModel] = []) -> List[SampleModel]:
+    async def get_samples(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]:
         """this will only use the sample_no for local sample, or global_label for external samples
         and fills in the rest from the db and returns the list again.
         We expect to not have mixed sample types here.
@@ -841,7 +860,8 @@ class UnifiedSampleDataAPI:
 
         return retval
 
-    async def list_new_samples(self, limit: int = 10) -> List[SampleModel]:
+    async def list_new_samples(self, limit: int = 10) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]:
         """this will only use the sample_no for local sample, or global_label for external samples
         and fills in the rest from the db and returns the list again.
         We expect to not have mixed sample types here.
@@ -854,7 +874,8 @@ class UnifiedSampleDataAPI:
         }
         return retdict
 
-    async def update_samples(self, samples: List[SampleModel] = []) -> None:
+    async def update_samples(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> None:
         for sample_ in samples:
             sample = object_to_sample(sample_)
             LOGGER.info(f"updating sample: {sample.global_label} of sample_type {sample.sample_type}")
@@ -873,7 +894,8 @@ class UnifiedSampleDataAPI:
             else:
                 LOGGER.error(f"validation error, type '{type(sample)}' is not a valid sample model")
 
-    async def get_samples_xy(self, samples: List[SampleModel] = []) -> None:
+    async def get_samples_xy(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> None:
         retval = []
         for sample_ in samples:
             sample = object_to_sample(sample_)
@@ -900,7 +922,8 @@ class UnifiedSampleDataAPI:
                 LOGGER.error(f"validation error, type '{type(sample)}' is not a valid sample model")
         return retval
 
-    async def get_platemap(self, samples: List[SampleModel] = []) -> None:
+    async def get_platemap(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> None:
         retval = []
         for sample_ in samples:
             sample = object_to_sample(sample_)

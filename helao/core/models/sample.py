@@ -33,7 +33,6 @@ __all__ = [
 ]
 
 SampleUnion = ForwardRef("SampleUnion")
-SamplePartUnion = ForwardRef("SamplePartUnion")
 
 
 class SampleType(str, Enum):
@@ -84,7 +83,7 @@ class SampleModel(BaseModel, HelaoDict):
     # action_timestamp: Optional[str]  # "%Y%m%d.%H%M%S%f"
 
     # labels
-    sample_no: Optional[int|str] = None
+    sample_no: Optional[int | str] = None
     machine_name: Optional[str] = None
     sample_hash: Optional[str] = None
     server_name: Optional[str] = None
@@ -215,7 +214,7 @@ class SolidSample(SampleModel):
 
     sample_type: Literal[SampleType.solid] = SampleType.solid
     machine_name: Optional[str] = "legacy"
-    plate_id: Optional[int|str] = None
+    plate_id: Optional[int | str] = None
 
     def exp_dict(self):
         exp_dict = self.create_initial_exp_dict()
@@ -272,7 +271,15 @@ class GasSample(SampleModel):
 class AssemblySample(SampleModel):
     sample_type: Literal[SampleType.assembly] = SampleType.assembly
     # parts: List[SampleUnion] = Field(default=[])
-    parts: List[SamplePartUnion] = Field(default=[])
+    parts: List[
+        Union[
+            AssemblySample,
+            LiquidSample,
+            GasSample,
+            SolidSample,
+            NoneSample,
+        ]
+    ] = Field(default=[])
     sample_position: Optional[str] = "cell1_we"  # usual default assembly position
 
     def get_global_label(self):
@@ -318,19 +325,20 @@ class SampleList(BaseModel, HelaoDict):
     """a combi basemodel which can contain all possible samples
     Its also a list and we should enforce samples as being a list"""
 
-    samples: Optional[List[SampleModel]] = Field(default=[])
+    samples: Optional[
+        List[
+            Union[
+                AssemblySample,
+                LiquidSample,
+                GasSample,
+                SolidSample,
+                NoneSample,
+            ]
+        ]
+    ] = Field(default=[])
 
 
 SampleUnion = Union[
-    AssemblySample,
-    LiquidSample,
-    GasSample,
-    SolidSample,
-    NoneSample,
-]
-
-
-SamplePartUnion = Union[
     AssemblySample,
     LiquidSample,
     GasSample,
