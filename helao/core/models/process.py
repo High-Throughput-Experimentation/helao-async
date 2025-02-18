@@ -4,7 +4,7 @@ __all__ = [
 ]
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 from uuid import UUID
 from pydantic import BaseModel, Field
 

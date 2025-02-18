@@ -17,7 +17,7 @@ import time
 from importlib import import_module
 
 from fastapi import Body, Query
-from typing import Optional, List
+from typing import Optional, List, Union
 from socket import gethostname
 
 

@@ -8,7 +8,7 @@ __all__ = ["makeApp"]
 
 
 import asyncio
-from typing import Optional, List
+from typing import Optional, List, Union
 from fastapi import Body, Query
 from glob import glob
 import pandas as pd

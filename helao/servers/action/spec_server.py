@@ -9,7 +9,7 @@ __all__ = ["makeApp"]
 
 import asyncio
 import time
-from typing import Optional, List
+from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
