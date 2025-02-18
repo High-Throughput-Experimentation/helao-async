@@ -30,7 +30,7 @@ __all__ = ["makeApp"]
 
 
 import asyncio
-from typing import Optional, List
+from typing import Optional, List, Union
 from fastapi import Body, Query
 
 from helao.servers.base_api import BaseAPI

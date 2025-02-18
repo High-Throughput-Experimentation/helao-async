@@ -1,6 +1,6 @@
 __all__ = ["unpack_samples_helper"]
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 from helao.core.models.sample import (
                             AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample,

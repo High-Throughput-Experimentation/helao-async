@@ -13,7 +13,7 @@ __all__ = ["makeApp"]
 import asyncio
 import time
 import itertools
-from typing import Optional, List
+from typing import Optional, List, Union
 from collections import defaultdict, deque
 
 import numpy as np

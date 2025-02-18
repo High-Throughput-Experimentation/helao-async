@@ -12,7 +12,7 @@ import os
 import sqlite3
 from socket import gethostname
 import pandas as pd
-from typing import List, Tuple
+from typing import List, Tuple, Union
 import aiofiles
 import shortuuid
 from uuid import UUID
