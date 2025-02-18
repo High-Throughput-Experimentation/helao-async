@@ -27,9 +27,7 @@ from helao.core.error import ErrorCodes
 from helao.core.helaodict import HelaoDict
 
 from helao.core.models.sample import (
-    SampleModel,
-    NoneSample,
-    AssemblySample,
+    AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample,
     SampleStatus,
     SampleInheritance,
     SampleType,
@@ -59,9 +57,12 @@ class _palcmd(BaseModel):
 
 class PALposition(BaseModel, HelaoDict):
     position: Optional[str] = None  # dest can be cust. or tray
-    samples_initial: List[SampleModel] = Field(default=[])
-    samples_final: List[SampleModel] = Field(default=[])
-    # sample: List[SampleModel] = Field(default=[])  # holds dest/source position
+    samples_initial: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
+    samples_final: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
+    # sample: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])  # holds dest/source position
     # will be also added to
     # sample in/out
     # depending on cam
@@ -72,12 +73,14 @@ class PALposition(BaseModel, HelaoDict):
 
 
 class PalAction(BaseModel, HelaoDict):
-    samples_in: List[SampleModel] = Field(default=[])
+    samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
     # this initially always holds
     # references which need to be
     # converted to
     # to a real sample later
-    samples_out: List[SampleModel] = Field(default=[])
+    samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
 
     # this holds the runtime list for excution of the PAL cam
     # a microcam could run 'repeat' times
@@ -121,8 +124,10 @@ class PalMicroCam(BaseModel, HelaoDict):
 
 
 class PalCam(BaseModel, HelaoDict):
-    samples_in: List[SampleModel] = Field(default=[])
-    samples_out: List[SampleModel] = Field(default=[])
+    samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
+    samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
 
     microcams: List[PalMicroCam] = Field(default=[])
 
@@ -645,7 +650,7 @@ class PAL:
         after_tray: int,
         after_slot: int,
         after_vial: int,
-    ) -> Tuple[ErrorCodes, int, int, int, SampleModel]:
+    ) -> Tuple[ErrorCodes, int, int, int, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         error = ErrorCodes.none
         tray_pos = None
         slot_pos = None
@@ -868,11 +873,15 @@ class PAL:
 
     async def _sendcommand_check_dest_tray(
         self, microcam: PalMicroCam
-    ) -> Tuple[PALposition, List[SampleModel]]:
+    ) -> Tuple[PALposition, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]]:
         """checks for a valid sample in tray destination position"""
-        samples_out_list: List[SampleModel] = []
-        dest_samples_initial: List[SampleModel] = []
-        dest_samples_final: List[SampleModel] = []
+        samples_out_list: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
+        dest_samples_initial: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
+        dest_samples_final: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
 
         dest = _positiontype.tray
         error, sample_in = await self.archive.tray_query_sample(
@@ -945,11 +954,15 @@ class PAL:
 
     async def _sendcommand_check_dest_custom(
         self, microcam: PalMicroCam
-    ) -> Tuple[PALposition, List[SampleModel]]:
+    ) -> Tuple[PALposition, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]]:
         """checks for a valid sample in custom destination position"""
-        samples_out_list: List[SampleModel] = []
-        dest_samples_initial: List[SampleModel] = []
-        dest_samples_final: List[SampleModel] = []
+        samples_out_list: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
+        dest_samples_initial: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
+        dest_samples_final: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
 
         dest = microcam.requested_dest.position
         if dest is None:
@@ -1192,11 +1205,15 @@ class PAL:
 
     async def _sendcommand_check_dest_next_empty(
         self, microcam: PalMicroCam
-    ) -> Tuple[PALposition, List[SampleModel]]:
+    ) -> Tuple[PALposition, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]]:
         """find the next empty vial in a tray"""
-        samples_out_list: List[SampleModel] = []
-        dest_samples_initial: List[SampleModel] = []
-        dest_samples_final: List[SampleModel] = []
+        samples_out_list: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
+        dest_samples_initial: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
+        dest_samples_final: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
 
         dest_tray = None
         dest_slot = None
@@ -1255,12 +1272,16 @@ class PAL:
 
     async def _sendcommand_check_dest_next_full(
         self, microcam: PalMicroCam
-    ) -> Tuple[PALposition, List[SampleModel]]:
+    ) -> Tuple[PALposition, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]]:
         """find the next full vial in a tray AFTER the requested
         destination position"""
-        samples_out_list: List[SampleModel] = []
-        dest_samples_initial: List[SampleModel] = []
-        dest_samples_final: List[SampleModel] = []
+        samples_out_list: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
+        dest_samples_initial: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
+        dest_samples_final: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
 
         dest = None
         dest_tray = None
@@ -1322,7 +1343,8 @@ class PAL:
         If no sample is found it will create a reference sample of the
         correct type."""
 
-        samples_out_list: List[SampleModel] = []
+        samples_out_list: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []
         palposition = PALposition()
 
         if microcam.cam.dest == _positiontype.tray:

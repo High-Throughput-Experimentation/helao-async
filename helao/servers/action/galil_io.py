@@ -5,7 +5,7 @@ from fastapi import Body, Query
 from helao.servers.base_api import BaseAPI
 from helao.drivers.io.galil_io_driver import Galil, TriggerType, AiMonExec
 from helao.helpers.premodels import Action
-from helao.core.models.sample import LiquidSample, SampleModel
+from helao.core.models.sample import AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
 from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
@@ -47,7 +47,8 @@ async def galil_dyn_endpoints(app=None):
                 action_version: int = 1,
                 duration: float = -1,
                 acquisition_rate: float = 0.2,
-                fast_samples_in: List[SampleModel] = Body([], embed=True),
+                fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Body([], embed=True),
             ):
                 """Record galil analog inputs (monitor_ai)."""
                 active = await app.base.setup_and_contain_action()

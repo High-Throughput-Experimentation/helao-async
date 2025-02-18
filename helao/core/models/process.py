@@ -8,7 +8,7 @@ from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field
 
-from helao.core.models.sample import SampleModel
+from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.core.models.action import ShortActionModel
 from helao.core.models.file import FileInfo
 from helao.core.models.machine import MachineModel
@@ -37,7 +37,9 @@ class ProcessModel(ShortProcessModel):
     process_group_index: Optional[int] = None
     data_request_id: Optional[UUID] = None
     action_list: List[ShortActionModel] = Field(default=[])
-    samples_in: List[SampleModel] = Field(default=[])
-    samples_out: List[SampleModel] = Field(default=[])
+    samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
+    samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     # TODO: created assembly global label, created solid...

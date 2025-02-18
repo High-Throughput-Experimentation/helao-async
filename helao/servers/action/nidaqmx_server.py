@@ -23,7 +23,7 @@ from socket import gethostname
 
 from helao.servers.base_api import BaseAPI
 from helao.drivers.io.nidaqmx_driver import cNIMAX, DevMonExec
-from helao.core.models.sample import LiquidSample, SampleModel
+from helao.core.models.sample import AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helao.core.error import ErrorCodes
@@ -317,7 +317,8 @@ def makeApp(confPrefix, server_key, helao_root):
         async def cellIV(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: List[SampleModel] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Body([], embed=True),
             Tval: float = 10.0,
             SampleRate: int = Query(1.0, ge=1),
             TTLwait: int = -1,  # -1 disables, else select TTL channel
@@ -340,7 +341,8 @@ def makeApp(confPrefix, server_key, helao_root):
             action_version: int = 1,
             duration: float = -1,
             acquisition_rate: float = 0.2,
-            fast_samples_in: List[SampleModel] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Body([], embed=True),
         ):
             """Record NIMax monitor device channels."""
             active = await app.base.setup_and_contain_action()
