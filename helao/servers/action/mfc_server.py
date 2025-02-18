@@ -95,8 +95,7 @@ async def mfc_dyn_endpoints(app=None):
             stay_open: bool = False,
             duration: float = -1,
             acquisition_rate: float = 0.2,
-            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             exec_id: Optional[str] = None,
         ):
             """Set flow rate and record."""
@@ -140,8 +139,7 @@ async def mfc_dyn_endpoints(app=None):
             stay_open: bool = False,
             duration: float = -1,
             acquisition_rate: float = 0.2,
-            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             exec_id: Optional[str] = None,
         ):
             """Set pressure and record."""

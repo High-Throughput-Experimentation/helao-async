@@ -47,8 +47,7 @@ async def galil_dyn_endpoints(app=None):
                 action_version: int = 1,
                 duration: float = -1,
                 acquisition_rate: float = 0.2,
-                fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+                fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             ):
                 """Record galil analog inputs (monitor_ai)."""
                 active = await app.base.setup_and_contain_action()

@@ -689,8 +689,7 @@ class Archive:
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         vial: Optional[int] = None,
-        sample: Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = None,
+        sample: Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = None,
         dilute: bool = False,
         *args,
         **kwargs,
@@ -783,8 +782,7 @@ class Archive:
     async def custom_update_position(
         self,
         custom: Optional[str] = None,
-        sample: Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = None,
+        sample: Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = None,
         dilute: bool = False,
         *args,
         **kwargs,
@@ -986,8 +984,7 @@ class Archive:
 
     async def _unload_custom_helper(
         self,
-        samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = None,
+        samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = None,
         destroy_liquid: bool = False,
         destroy_gas: bool = False,
         destroy_solid: bool = False,

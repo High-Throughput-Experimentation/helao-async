@@ -281,8 +281,7 @@ async def biologic_dyn_endpoints(app=None):
     async def run_CA(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
@@ -321,8 +320,7 @@ async def biologic_dyn_endpoints(app=None):
     async def run_CP(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
         Ival__A: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
@@ -360,8 +358,7 @@ async def biologic_dyn_endpoints(app=None):
     async def run_CV(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
         Vapex1__V: float = 1.0,  # Apex 1 value in volts or amps.
         Vapex2__V: float = -1.0,  # Apex 2 value in volts or amps.
@@ -409,8 +406,7 @@ async def biologic_dyn_endpoints(app=None):
     async def run_OCV(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         channel: int = 0,
@@ -435,8 +431,7 @@ async def biologic_dyn_endpoints(app=None):
     async def run_PEIS(
         action: Action = Body({}, embed=True),
         action_version: int = 3,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
         Vinit__V: float = 0.00,  # Initial value in volts or amps.
         Vamp__V: float = 0.01,  # Amplitude value in volts
         Finit__Hz: float = 1000,  # Initial frequency in Hz.
@@ -476,8 +471,7 @@ async def biologic_dyn_endpoints(app=None):
     async def run_GEIS(
         action: Action = Body({}, embed=True),
         action_version: int = 3,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
         Iinit__A: float = 0.01,  # Initial value in volts or amps.
         Iamp__A: float = 0.1,  # Final value in volts or amps.
         Finit__Hz: float = 1,  # Initial frequency in Hz.
