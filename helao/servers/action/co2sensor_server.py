@@ -32,8 +32,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
     ):
         """Record CO2 ppm level."""
         active = await app.base.setup_and_contain_action()

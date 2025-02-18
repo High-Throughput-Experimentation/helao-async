@@ -48,8 +48,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def acquire_spec(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
         int_time_ms: int = 35,
         duration_sec: Optional[
             float
@@ -79,8 +78,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def acquire_spec_adv(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
         int_time_ms: int = 35,
         duration_sec: Optional[
             float
@@ -177,8 +175,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def acquire_spec_extrig(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
         edge_mode: TriggerType = TriggerType.risingedge,
         int_time: int = 35,
         n_avg: int = 1,

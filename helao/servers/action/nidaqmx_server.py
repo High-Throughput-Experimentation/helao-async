@@ -317,8 +317,7 @@ def makeApp(confPrefix, server_key, helao_root):
         async def cellIV(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             Tval: float = 10.0,
             SampleRate: int = Query(1.0, ge=1),
             TTLwait: int = -1,  # -1 disables, else select TTL channel
@@ -341,8 +340,7 @@ def makeApp(confPrefix, server_key, helao_root):
             action_version: int = 1,
             duration: float = -1,
             acquisition_rate: float = 0.2,
-            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
         ):
             """Record NIMax monitor device channels."""
             active = await app.base.setup_and_contain_action()
