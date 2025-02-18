@@ -27,7 +27,11 @@ from helao.core.error import ErrorCodes
 from helao.core.helaodict import HelaoDict
 
 from helao.core.models.sample import (
-    AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample,
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
     SampleStatus,
     SampleInheritance,
     SampleType,
@@ -57,12 +61,13 @@ class _palcmd(BaseModel):
 
 class PALposition(BaseModel, HelaoDict):
     position: Optional[str] = None  # dest can be cust. or tray
-    samples_initial: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
-    samples_final: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
-    # sample: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])  # holds dest/source position
+    samples_initial: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
+    samples_final: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
+    # sample: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Field(default=[])  # holds dest/source position
     # will be also added to
     # sample in/out
     # depending on cam
@@ -73,14 +78,16 @@ class PALposition(BaseModel, HelaoDict):
 
 
 class PalAction(BaseModel, HelaoDict):
-    samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
+    samples_in: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
     # this initially always holds
     # references which need to be
     # converted to
     # to a real sample later
-    samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
+    samples_out: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
 
     # this holds the runtime list for excution of the PAL cam
     # a microcam could run 'repeat' times
@@ -124,10 +131,12 @@ class PalMicroCam(BaseModel, HelaoDict):
 
 
 class PalCam(BaseModel, HelaoDict):
-    samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
-    samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
+    samples_in: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
+    samples_out: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
 
     microcams: List[PalMicroCam] = Field(default=[])
 
@@ -650,7 +659,13 @@ class PAL:
         after_tray: int,
         after_slot: int,
         after_vial: int,
-    ) -> Tuple[ErrorCodes, int, int, int, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> Tuple[
+        ErrorCodes,
+        int,
+        int,
+        int,
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
+    ]:
         error = ErrorCodes.none
         tray_pos = None
         slot_pos = None
@@ -714,7 +729,9 @@ class PAL:
             error = ErrorCodes.critical
 
         elif sample_in == NoneSample():
-            LOGGER.error( f"PAL_source: No sample in tray {microcam.requested_source.tray}, slot {microcam.requested_source.slot}, vial {microcam.requested_source.vial}")
+            LOGGER.error(
+                f"PAL_source: No sample in tray {microcam.requested_source.tray}, slot {microcam.requested_source.slot}, vial {microcam.requested_source.vial}"
+            )
             error = ErrorCodes.not_available
 
         return PALposition(
@@ -733,7 +750,9 @@ class PAL:
         source = microcam.requested_source.position  # custom position name
 
         if source is None:
-            LOGGER.error("PAL_source: Invalid PAL source 'NONE' for 'custom' position method.")
+            LOGGER.error(
+                "PAL_source: Invalid PAL source 'NONE' for 'custom' position method."
+            )
             return PALposition(error=ErrorCodes.not_available)
 
         error, sample_in = await self.archive.custom_query_sample(
@@ -779,7 +798,9 @@ class PAL:
             return PALposition(error=ErrorCodes.not_available)
 
         elif sample_in == NoneSample():
-            LOGGER.error("PAL_source: More then one sample in source position. This is not allowed.")
+            LOGGER.error(
+                "PAL_source: More then one sample in source position. This is not allowed."
+            )
             return PALposition(error=ErrorCodes.critical)
 
         return PALposition(
@@ -841,7 +862,9 @@ class PAL:
             and palposition.samples_initial[0] != NoneSample()
         ):
 
-            LOGGER.info(f"PAL_source: Got sample '{palposition.samples_initial[0].global_label}' in position '{palposition.position}'")
+            LOGGER.info(
+                f"PAL_source: Got sample '{palposition.samples_initial[0].global_label}' in position '{palposition.position}'"
+            )
             # done with checking source type
             # setting inheritance and status to None for all samples
             # in sample_in (will be updated when dest is decided)
@@ -857,7 +880,9 @@ class PAL:
             # this should never happen
             # else we have a bug in the source checks
             if palposition.position is not None:
-                LOGGER.error(f"BUG check PAL_source: Got sample no sample in position '{palposition.position}'")
+                LOGGER.error(
+                    f"BUG check PAL_source: Got sample no sample in position '{palposition.position}'"
+                )
 
         microcam.run.append(
             PalAction(
@@ -871,17 +896,20 @@ class PAL:
 
         return ErrorCodes.none
 
-    async def _sendcommand_check_dest_tray(
-        self, microcam: PalMicroCam
-    ) -> Tuple[PALposition, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]:
+    async def _sendcommand_check_dest_tray(self, microcam: PalMicroCam) -> Tuple[
+        PALposition,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
         """checks for a valid sample in tray destination position"""
-        samples_out_list: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
-        dest_samples_initial: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
-        dest_samples_final: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
+        samples_out_list: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_initial: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_final: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
 
         dest = _positiontype.tray
         error, sample_in = await self.archive.tray_query_sample(
@@ -897,9 +925,13 @@ class PAL:
         # check if a sample is present in destination
         if sample_in == NoneSample():
             # no sample in dest, create a new sample reference
-            LOGGER.info(f"PAL_dest: No sample in tray {microcam.requested_dest.tray}, slot {microcam.requested_dest.slot}, vial {microcam.requested_dest.vial}")
+            LOGGER.info(
+                f"PAL_dest: No sample in tray {microcam.requested_dest.tray}, slot {microcam.requested_dest.slot}, vial {microcam.requested_dest.vial}"
+            )
             if len(microcam.run[-1].samples_in) > 1:
-                LOGGER.error(f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.")
+                LOGGER.error(
+                    f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method."
+                )
                 return PALposition(error=ErrorCodes.bug), samples_out_list
 
             error, samples_out_list = await self.archive.new_ref_samples(
@@ -925,7 +957,9 @@ class PAL:
         else:
             # a sample is already present in the tray position
             # we add more sample to it, e.g. dilute it
-            LOGGER.info(f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'")
+            LOGGER.info(
+                f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
+            )
             # we can only add liquid to vials (diluite them, no assembly here)
             sample_in.inheritance = SampleInheritance.receive_only
             sample_in.status = [SampleStatus.preserved]
@@ -952,21 +986,26 @@ class PAL:
             samples_out_list,
         )
 
-    async def _sendcommand_check_dest_custom(
-        self, microcam: PalMicroCam
-    ) -> Tuple[PALposition, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]:
+    async def _sendcommand_check_dest_custom(self, microcam: PalMicroCam) -> Tuple[
+        PALposition,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
         """checks for a valid sample in custom destination position"""
-        samples_out_list: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
-        dest_samples_initial: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
-        dest_samples_final: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
+        samples_out_list: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_initial: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_final: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
 
         dest = microcam.requested_dest.position
         if dest is None:
-            LOGGER.error("PAL_dest: Invalid PAL dest 'NONE' for 'custom' position method.")
+            LOGGER.error(
+                "PAL_dest: Invalid PAL dest 'NONE' for 'custom' position method."
+            )
             return PALposition(error=ErrorCodes.critical), samples_out_list
 
         if not self.archive.custom_dest_allowed(dest):
@@ -975,17 +1014,23 @@ class PAL:
 
         error, sample_in = await self.archive.custom_query_sample(dest)
         if error != ErrorCodes.none:
-            LOGGER.error(f"PAL_dest: Invalid PAL dest '{dest}' for 'custom' position method.")
+            LOGGER.error(
+                f"PAL_dest: Invalid PAL dest '{dest}' for 'custom' position method."
+            )
             return PALposition(error=error), samples_out_list
 
         # check if a sample is already present in the custom position
         if sample_in == NoneSample():
             # no sample in custom position, create a new sample reference
-            LOGGER.info(f"PAL_dest: No sample in custom position '{dest}', creating new sample reference.")
+            LOGGER.info(
+                f"PAL_dest: No sample in custom position '{dest}', creating new sample reference."
+            )
 
             # cannot create an assembly
             if len(microcam.run[-1].samples_in) > 1:
-                LOGGER.error("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.")
+                LOGGER.error(
+                    "PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here."
+                )
                 return PALposition(error=ErrorCodes.bug), samples_out_list
 
             # this should actually never create an assembly
@@ -1022,7 +1067,9 @@ class PAL:
                 # source input should only hold a single sample
                 # but better check for sure
                 if len(microcam.run[-1].samples_in) > 1:
-                    LOGGER.error("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.")
+                    LOGGER.error(
+                        "PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here."
+                    )
                     return PALposition(error=ErrorCodes.bug), samples_out_list
 
                 test = False
@@ -1065,7 +1112,9 @@ class PAL:
                     LOGGER.info("PAL_dest: Adding new part to assembly")
                     if len(microcam.run[-1].samples_in) > 1:
                         # sample_in should only hold one sample at that point
-                        LOGGER.error(f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.")
+                        LOGGER.error(
+                            f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method."
+                        )
                         return PALposition(error=ErrorCodes.bug), samples_out_list
 
                     # first create a new sample from the source sample
@@ -1124,12 +1173,16 @@ class PAL:
                 # we now create an assembly if allowed
                 if not self.archive.custom_assembly_allowed(dest):
                     # no assembly allowed
-                    LOGGER.error(f"PAL_dest: Assembly not allowed for PAL dest '{dest}' for 'custom' position method.")
+                    LOGGER.error(
+                        f"PAL_dest: Assembly not allowed for PAL dest '{dest}' for 'custom' position method."
+                    )
                     return PALposition(error=ErrorCodes.not_allowed), samples_out_list
 
                 # cannot create an assembly from an assembly
                 if len(microcam.run[-1].samples_in) > 1:
-                    LOGGER.error("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.")
+                    LOGGER.error(
+                        "PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here."
+                    )
                     return PALposition(error=ErrorCodes.bug), samples_out_list
 
                 # dest_sample = sample_in
@@ -1168,7 +1221,9 @@ class PAL:
                 tmp_samples_in = [sample_in]
                 # and also add the newly created sample ref to it
                 tmp_samples_in.append(samples_out_list[0])
-                LOGGER.info(f"PAL_dest: Creating assembly from '{[sample.global_label for sample in tmp_samples_in]}' in position '{dest}'")
+                LOGGER.info(
+                    f"PAL_dest: Creating assembly from '{[sample.global_label for sample in tmp_samples_in]}' in position '{dest}'"
+                )
                 error, samples_out2_list = await self.archive.new_ref_samples(
                     samples_in=tmp_samples_in,
                     sample_out_type=SampleType.assembly,
@@ -1203,17 +1258,20 @@ class PAL:
             samples_out_list,
         )
 
-    async def _sendcommand_check_dest_next_empty(
-        self, microcam: PalMicroCam
-    ) -> Tuple[PALposition, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]:
+    async def _sendcommand_check_dest_next_empty(self, microcam: PalMicroCam) -> Tuple[
+        PALposition,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
         """find the next empty vial in a tray"""
-        samples_out_list: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
-        dest_samples_initial: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
-        dest_samples_final: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
+        samples_out_list: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_initial: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_final: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
 
         dest_tray = None
         dest_slot = None
@@ -1270,18 +1328,21 @@ class PAL:
             samples_out_list,
         )
 
-    async def _sendcommand_check_dest_next_full(
-        self, microcam: PalMicroCam
-    ) -> Tuple[PALposition, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]:
+    async def _sendcommand_check_dest_next_full(self, microcam: PalMicroCam) -> Tuple[
+        PALposition,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
         """find the next full vial in a tray AFTER the requested
         destination position"""
-        samples_out_list: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
-        dest_samples_initial: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
-        dest_samples_final: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
+        samples_out_list: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_initial: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_final: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
 
         dest = None
         dest_tray = None
@@ -1304,7 +1365,9 @@ class PAL:
             LOGGER.error("PAL_dest: No next full vial")
             return PALposition(error=ErrorCodes.not_available), samples_out_list
         if sample_in == NoneSample():
-            LOGGER.error("PAL_dest: More then one sample in source position. This is not allowed.")
+            LOGGER.error(
+                "PAL_dest: More then one sample in source position. This is not allowed."
+            )
             return PALposition(error=ErrorCodes.critical), samples_out_list
 
         # a sample is already present in the tray position
@@ -1343,8 +1406,9 @@ class PAL:
         If no sample is found it will create a reference sample of the
         correct type."""
 
-        samples_out_list: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
+        samples_out_list: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
         palposition = PALposition()
 
         if microcam.cam.dest == _positiontype.tray:
