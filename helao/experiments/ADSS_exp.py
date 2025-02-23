@@ -61,7 +61,7 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.core.models.action_start_condition import ActionStartCondition
-from helao.core.models.sample import SolidSample, LiquidSample
+from helao.core.models.sample import SolidSample, LiquidSample, GasSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
