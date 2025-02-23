@@ -22,7 +22,7 @@ __all__ = [
     "ADSS_sub_load_solid",
     "ADSS_sub_load_liquid",
     "ADSS_sub_add_liquid",
-    "ADSS_sub_add_gas",
+    "ADSS_sub_PAL_load_gas",
     "ADSS_sub_unload_gas",
     #    "ADSS_sub_fillfixed",
     #    "ADSS_sub_fill",
@@ -235,9 +235,10 @@ def ADSS_sub_load_liquid(
     return apm.action_list  # returns complete action list to orch
 
 ######
-def ADSS_sub_add_gas(
+def ADSS_sub_PAL_load_gas(
     experiment: Experiment,
     experiment_version: int = 1,
+    custom_position: str = "cell1_we",
     bubbled_gas: str = "N2",
     reservoir_gas_sample_no: int = 1,
     volume_ul_cell_gas: int = 1,
@@ -249,10 +250,12 @@ def ADSS_sub_add_gas(
         PAL_server,
         "archive_custom_add_gas",
         {
-            "custom": "cell1_we",
+            "custom": custom_position,
             "source_gas_in": GasSample(
-                sample_no=reservoir_gas_sample_no,
-                machine_name=gethostname()  #ORCH_HOST
+                **{
+                    "sample_no": reservoir_gas_sample_no,
+                    "machine_name": gethostname(),
+                }
             ).model_dump(),
             "volume_ml": volume_ul_cell_gas / 1000,
         },
