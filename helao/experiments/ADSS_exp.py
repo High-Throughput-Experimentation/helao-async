@@ -267,6 +267,8 @@ def ADSS_sub_PAL_load_gas(
             ProcessContrib.samples_out,
         ],
     )
+    return apm.action_list  # returns complete action list to orch
+
 def ADSS_sub_unload_gas(
     experiment: Experiment,
     experiment_version: int = 1,  # newer via keep? need testing
