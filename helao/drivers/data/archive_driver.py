@@ -1838,7 +1838,7 @@ class Archive:
             sample.inheritance = SampleInheritance.receive_only
             # need to update the parts of an assembly first
             if sample.sample_type == SampleType.assembly:
-                sample.parts = await self.unified_db.get_samples(samples=sample.parts)
+                # sample.parts = await self.unified_db.get_samples(samples=sample.parts)
                 for part in sample.parts:
                     part.status = [SampleStatus.incorporated]
                     part.inheritance = SampleInheritance.allow_both
@@ -1849,8 +1849,9 @@ class Archive:
                 # create a sourcelist from all parts
                 source = list(set([s.get_global_label() for s in sample.parts]))
                 # add the source list to the sample source
-                for s in source:
-                    sample.source.append(s)
+                sample.source = source
+                # for s in source:
+                #     sample.source.append(s)
 
         samples_out = await self.unified_db.new_samples(samples=reference_samples_in)
 
