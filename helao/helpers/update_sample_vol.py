@@ -1,4 +1,4 @@
-from helao.core.models.sample import _BaseSample
+from helao.core.models.sample import SampleModel
 from helao.helpers.print_message import print_message
 
 from helao.helpers import logging
@@ -8,12 +8,12 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-def update_vol(BS: _BaseSample, delta_vol_ml: float, dilute: bool):
+def update_vol(BS: SampleModel, delta_vol_ml: float, dilute: bool):
     """
     Updates the volume of a sample and optionally adjusts its dilution factor.
 
     Parameters:
-    BS (_BaseSample): The sample object which contains volume and dilution factor attributes.
+    BS (SampleModel): The sample object which contains volume and dilution factor attributes.
     delta_vol_ml (float): The change in volume to be applied to the sample, in milliliters.
     dilute (bool): A flag indicating whether to adjust the dilution factor based on the new volume.
 

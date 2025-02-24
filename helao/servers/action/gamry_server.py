@@ -30,11 +30,11 @@ __all__ = ["makeApp"]
 
 
 import asyncio
-from typing import Optional, List
+from typing import Optional, List, Union
 from fastapi import Body, Query
 
 from helao.servers.base_api import BaseAPI
-from helao.core.models.sample import SampleUnion
+from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.helpers.premodels import Action
 from helao.drivers.pstat.gamry_driver import gamry
 from helao.helpers.config_loader import config_loader
@@ -57,7 +57,7 @@ async def gamry_dyn_endpoints(app=None):
         async def run_LSV(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             Vinit__V: float = 0.0,  # Initial value in volts or amps.
             Vfinal__V: float = 1.0,  # Final value in volts or amps.
             ScanRate__V_s: float = 1.0,  # Scan rate in volts/sec or amps/sec.
@@ -95,7 +95,7 @@ async def gamry_dyn_endpoints(app=None):
         async def run_CA(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             Vval__V: float = 0.0,
             Tval__s: float = 10.0,
             AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
@@ -125,7 +125,7 @@ async def gamry_dyn_endpoints(app=None):
         async def run_CP(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             Ival__A: float = 0.0,
             Tval__s: float = 10.0,
             AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
@@ -154,7 +154,7 @@ async def gamry_dyn_endpoints(app=None):
         async def run_CV(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             Vinit__V: float = 0.0,  # Initial value in volts or amps.
             Vapex1__V: float = 1.0,  # Apex 1 value in volts or amps.
             Vapex2__V: float = -1.0,  # Apex 2 value in volts or amps.
@@ -188,7 +188,7 @@ async def gamry_dyn_endpoints(app=None):
         async def run_EIS(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             Vval__V: float = 0.0,
             Tval__s: float = 10.0,
             Freq: float = 1000.0,
@@ -219,7 +219,7 @@ async def gamry_dyn_endpoints(app=None):
         async def run_OCV(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             Tval__s: float = 10.0,
             AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
             TTLwait: int = Query(
@@ -246,7 +246,7 @@ async def gamry_dyn_endpoints(app=None):
         async def run_RCA(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: List[SampleUnion] = Body([], embed=True),
+            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
             Vinit__V: float = 0.0,
             Tinit__s: float = 0.5,
             Vstep__V: float = 0.5,

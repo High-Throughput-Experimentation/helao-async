@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.run_use import RunUse
-from helao.core.models.sample import SampleUnion
+from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.core.models.file import FileInfo
 from helao.core.models.machine import MachineModel
 from helao.core.version import get_hlo_version
@@ -35,7 +35,7 @@ class ActionModel(ShortActionModel):
     dummy: bool = False
     simulation: bool = False
     run_type: Optional[str] = None
-    run_use: Optional[RunUse] = "data"
+    run_use: Optional[RunUse] = RunUse.data
     experiment_uuid: Optional[UUID] = None
     experiment_timestamp: Optional[datetime] = None
     action_timestamp: Optional[datetime] = None
@@ -52,8 +52,10 @@ class ActionModel(ShortActionModel):
     action_codehash: Optional[str] = None
     parent_action_uuid: Optional[UUID] = None
     child_action_uuid: Optional[UUID] = None
-    samples_in: List[SampleUnion] = Field(default=[])
-    samples_out: List[SampleUnion] = Field(default=[])
+    samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
+    samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     manual_action: bool = False
     nonblocking: bool = False

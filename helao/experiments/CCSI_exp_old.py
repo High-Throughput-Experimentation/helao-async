@@ -449,8 +449,8 @@ def CCSI_sub_cellfill(
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
-    Waterclean_reservoir_sample_no: int = 1,
-    Waterclean_volume_ul: float = 2500,
+    Clean_reservoir_sample_no: int = 1,
+    Clean_volume_ul: float = 2500,
     Syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
     #    co2measure_duration: float = 20,
@@ -487,7 +487,7 @@ def CCSI_sub_cellfill(
         apm.add(
             NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 1}, asc.no_wait
         )
-        if Waterclean_volume_ul == 0:
+        if Clean_volume_ul == 0:
             procfinish = True
         else:
             procfinish = False
@@ -522,7 +522,7 @@ def CCSI_sub_cellfill(
 
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
-    if Waterclean_volume_ul == 0:
+    if Clean_volume_ul == 0:
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
     else:
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1})
@@ -547,7 +547,7 @@ def CCSI_sub_cellfill(
             "infuse",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
-                "volume_uL": Waterclean_volume_ul,
+                "volume_uL": Clean_volume_ul,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             technique_name="syringe_inject",
@@ -1073,7 +1073,7 @@ def CCSI_sub_flowflush(
 def CCSI_sub_clean_inject(
     experiment: Experiment,
     experiment_version: int = 7,  # ver 2 implements multivalve, ver 3 conditional, ver6 co2checktargetvolumerefills
-    Waterclean_volume_ul: float = 10000,
+    Clean_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 500,
     LiquidCleanWait_s: float = 15,
     co2measure_duration: float = 20,
@@ -1099,7 +1099,7 @@ def CCSI_sub_clean_inject(
             "withdraw",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
-                "volume_uL": Waterclean_volume_ul,
+                "volume_uL": Clean_volume_ul,
             },
         )
         apm.add(ORCH_server, "wait", {"waittime": 5.25})
@@ -1119,7 +1119,7 @@ def CCSI_sub_clean_inject(
         "infuse",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
-            "volume_uL": Waterclean_volume_ul,
+            "volume_uL": Clean_volume_ul,
         },
     )
     apm.add(
@@ -1219,7 +1219,7 @@ def CCSI_sub_clean_inject(
 def CCSI_sub_refill_clean(
     experiment: Experiment,
     experiment_version: int = 2,  # v2 no backlash volume
-    Waterclean_volume_ul: float = 5000,
+    Clean_volume_ul: float = 5000,
     Syringe_rate_ulsec: float = 1000,
 ):
     apm = ActionPlanMaker()
@@ -1231,7 +1231,7 @@ def CCSI_sub_refill_clean(
         "withdraw",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
-            "volume_uL": Waterclean_volume_ul,
+            "volume_uL": Clean_volume_ul,
         },
     )
     apm.add(ORCH_server, "wait", {"waittime": 5.25})

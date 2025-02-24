@@ -346,3 +346,5 @@ def sample_model_unit_test():
             tb,
         )
         return False
+
+    return success

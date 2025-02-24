@@ -22,6 +22,8 @@ __all__ = [
     "ADSS_sub_load_solid",
     "ADSS_sub_load_liquid",
     "ADSS_sub_add_liquid",
+    "ADSS_sub_PAL_load_gas",
+    "ADSS_sub_unload_gas",
     #    "ADSS_sub_fillfixed",
     #    "ADSS_sub_fill",
     "ADSS_sub_tray_unload",
@@ -59,7 +61,7 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.core.models.action_start_condition import ActionStartCondition
-from helao.core.models.sample import SolidSample, LiquidSample
+from helao.core.models.sample import SolidSample, LiquidSample, GasSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
@@ -232,6 +234,69 @@ def ADSS_sub_load_liquid(
     )
     return apm.action_list  # returns complete action list to orch
 
+######
+def ADSS_sub_PAL_load_gas(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    custom_position: str = "cell1_we",
+    bubbled_gas: str = "N2",
+    reservoir_gas_sample_no: int = 1,
+    volume_ul_cell_gas: int = 1,
+):
+    """Add gas volume to cell position."""
+
+    apm = ActionPlanMaker()
+    apm.add(
+        PAL_server,
+        "archive_custom_add_gas",
+        {
+            "custom": custom_position,
+            "source_gas_in": GasSample(
+                **{
+                    "sample_no": reservoir_gas_sample_no,
+                    "machine_name": gethostname(),
+                }
+            ).model_dump(),
+            "volume_ml": volume_ul_cell_gas / 1000,
+        },
+        technique_name="bubbling_gas",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_unload_gas(
+    experiment: Experiment,
+    experiment_version: int = 1,  # newer via keep? need testing
+):
+    # """Unload gas sample at 'cell1_we' position and reload solid and liquid sample."""
+
+    apm = ActionPlanMaker()
+    # apm.add(
+    #     PAL_server,
+    #     "archive_custom_unloadall",
+    #     {},
+    #     to_globalexp_params=["_unloaded_liquid"],
+    # )
+    apm.add(
+        PAL_server,
+        "archive_custom_unload",
+        {
+            "custom": "cell1_we",
+            "keep_liquid": True,
+            "keep_solid": True,
+        },
+        start_condition=ActionStartCondition.wait_for_orch,
+        # from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
+    )
+    return apm.action_list
+
+
+#######
 
 def ADSS_sub_load(
     experiment: Experiment,

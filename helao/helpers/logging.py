@@ -86,7 +86,7 @@ def make_logger(
     """
     if logger_name is not None and logger_name.endswith(".py"):
         logger_name = os.path.basename(logger_name).replace(".py", "")
-    temp_dir = tempfile.gettempdir()
+    temp_dir = tempfile.mkdtemp()
     log_dir = temp_dir if log_dir is None else log_dir
     log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
