@@ -1161,7 +1161,7 @@ class Archive:
                 sample.lot_number, source_lotnumber
             )
 
-        source = [sample.get_global_label() for sample in samples_in]
+        source = list(set([sample.get_global_label() for sample in samples_in]))
         LOGGER.info(f"source_global_label: '{source}'")
         LOGGER.info(f"source_chemical: {source_chemical}")
         LOGGER.info(f"source_partial_molarity: {source_partial_molarity}")
