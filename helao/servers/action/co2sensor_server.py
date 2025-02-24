@@ -5,11 +5,11 @@
 
 __all__ = ["makeApp"]
 
-from typing import Optional, List
+from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
-from helao.core.models.sample import SampleUnion
+from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.drivers.sensor.sprintir_driver import SprintIR, CO2MonExec
 from helao.helpers.config_loader import config_loader
 
@@ -32,7 +32,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
-        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
     ):
         """Record CO2 ppm level."""
         active = await app.base.setup_and_contain_action()

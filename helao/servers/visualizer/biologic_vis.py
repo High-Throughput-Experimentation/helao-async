@@ -33,13 +33,15 @@ VALID_DATA_STATUS = (
     HloStatus.active,
 )
 
-VALID_ACTION_NAME = (
-    "run_CA",
-    "run_CP",
-    "run_CV",
-    "run_OCV",
-    "run_PEIS",
-)
+AXIS_MAP = {
+    "run_CA": ("t_s", "I_A"),
+    "run_CP": ("t_s", "Ewe_V"),
+    "run_CV": ("Ewe_V", "I_A"),
+    "run_OCV": ("t_s", "Ewe_V"),
+    "run_PEIS": ("R_ohm", "X_ohm"),
+}
+
+VALID_ACTION_NAME = [k for k in AXIS_MAP.keys()]
 
 
 class C_biovis:
@@ -49,7 +51,7 @@ class C_biovis:
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.num_channels = self.config_dict.get("num_channels", 1)
-        self.max_points = 500
+        self.max_points = 5000
         self.update_rate = 1e-3
         self.last_update_time = time.time()
 
@@ -188,8 +190,8 @@ class C_biovis:
         self.vis.doc.add_root(Spacer(height=10))
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
-        for ch, auuid in self.channel_action_uuid.items():
-            self.reset_plot(ch, auuid, forceupdate=True)
+        for ch, _ in self.channel_action_uuid.items():
+            self.reset_plot(ch, forceupdate=True)
 
     def cleanup_session(self, session_context):
         LOGGER.info(f"'{self.potentiostat_key}' Bokeh session closed")
@@ -255,7 +257,7 @@ class C_biovis:
                         # only resets if axis selector or action_uuid changes
                         self.reset_plot(
                             channel=pstat_channel,
-                            new_action_uuid=str(data_package.action_uuid),
+                            new_data_package=data_package,
                         )
                         for data_label, data_val in uuid_dict.items():
                             if data_label in self.data_dict_keys:
@@ -313,9 +315,13 @@ class C_biovis:
             legend_label=ystr,
         )
 
-    def reset_plot(self, channel, new_action_uuid=None, forceupdate: bool = False):
-        if self.channel_action_uuid[channel] != new_action_uuid or forceupdate:
-            if new_action_uuid is not None:
+    def reset_plot(self, channel, new_data_package=None, forceupdate: bool = False):
+        new_action_uuid = ""
+        action_name = ""
+        if new_data_package is not None:
+            new_action_uuid = str(new_data_package.action_uuid)
+            action_name = new_data_package.action_name
+            if self.channel_action_uuid[channel] != new_action_uuid or forceupdate:
                 LOGGER.info(f" ... reseting channel {channel} graph")
                 self.channel_action_uuid_prev[channel] = self.channel_action_uuid[
                     channel
@@ -328,7 +334,13 @@ class C_biovis:
                 self.channel_datasources[channel].data = {
                     key: [] for key in self.data_dict_keys
                 }
-            self._add_plots(channel)
+                if action_name in AXIS_MAP:
+                    xlab, ylab = AXIS_MAP[action_name]
+                    self.xaxis_selector_group.update(active=self.data_dict_keys.index(xlab))
+                    self.yaxis_selector_group.update(active=self.data_dict_keys.index(ylab))
+                    self.xselect = self.xaxis_selector_group.active
+                    self.yselect = self.yaxis_selector_group.active
+                self._add_plots(channel)
         if (self.xselect != self.xaxis_selector_group.active) or (
             self.yselect != self.yaxis_selector_group.active
         ):

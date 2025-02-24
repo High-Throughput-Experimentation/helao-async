@@ -1,14 +1,14 @@
 __all__ = ["ExperimentTemplate", "ExperimentModel", "ShortExperimentModel"]
 
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from uuid import UUID
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 from helao.core.models.hlostatus import HloStatus
-from helao.core.models.sample import SampleUnion
+from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.core.models.action import ShortActionModel
 from helao.core.models.file import FileInfo
 from helao.core.models.machine import MachineModel
@@ -49,8 +49,10 @@ class ExperimentModel(ExperimentTemplate):
     experiment_codehash: Optional[str] = None
     experiment_label: Optional[str] = None
     action_list: List[ShortActionModel] = Field(default=[])
-    samples_in: List[SampleUnion] = Field(default=[])
-    samples_out: List[SampleUnion] = Field(default=[])
+    samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
+    samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     process_list: List[UUID] = Field(default=[])  # populated by DB yml_finisher
     process_order_groups: Dict[int, List[int]] = Field(default={})

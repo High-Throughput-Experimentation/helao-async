@@ -1,13 +1,16 @@
 __all__ = ["unpack_samples_helper"]
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 from helao.core.models.sample import (
-                            SampleUnion,
+                            AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample,
                             SampleType
                            )
 
-def unpack_samples_helper(samples: List[SampleUnion] = []) -> Tuple[List[SampleUnion],List[SampleUnion]]:
+def unpack_samples_helper(samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+] = []) -> Tuple[List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+],List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]]:
     """
     Unpacks a list of samples into separate lists based on their sample type.
 
@@ -15,12 +18,16 @@ def unpack_samples_helper(samples: List[SampleUnion] = []) -> Tuple[List[SampleU
     and recursively unpacks them into separate lists for liquid, solid, and gas samples.
 
     Args:
-        samples (List[SampleUnion]): A list of samples to be unpacked. Each sample can be of type
+        samples (List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]): A list of samples to be unpacked. Each sample can be of type
                                         liquid, solid, gas, or assembly. Assembly samples can contain
                                         other samples, including nested assemblies.
 
     Returns:
-        Tuple[List[SampleUnion], List[SampleUnion], List[SampleUnion]]: A tuple containing three lists:
+        Tuple[List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]]: A tuple containing three lists:
             - liquid_list: List of liquid samples.
             - solid_list: List of solid samples.
             - gas_list: List of gas samples.

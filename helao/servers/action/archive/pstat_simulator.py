@@ -8,14 +8,14 @@ __all__ = ["makeApp"]
 
 
 import asyncio
-from typing import Optional, List
+from typing import Optional, List, Union
 from fastapi import Body, Query
 from glob import glob
 import pandas as pd
 
 from helao.servers.base import Base
 from helao.servers.base_api import BaseAPI
-from helao.core.models.sample import LiquidSample, SampleUnion
+from helao.core.models.sample import AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 

@@ -3375,6 +3375,7 @@ def ADSS_PA_CV_TRI_new(
 
         #set initial gas to N2
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
+        epm.add_experiment("ADSS_sub_PAL_load_gas",{"bubbled_gas": "N2","reservoir_gas_sample_no":1,})
 
         # pump recirculate forward
         epm.add_experiment(
@@ -3501,6 +3502,10 @@ def ADSS_PA_CV_TRI_new(
         
         #switch from N2 to O2 and saturate
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": False,})
+    #need to remove N2 gas sample
+        epm.add_experiment("ADSS_sub_unload_gas",{})
+    #test need
+        epm.add_experiment("ADSS_sub_PAL_load_gas",{"bubbled_gas": "O2","reservoir_gas_sample_no":2,})
         epm.add_experiment("ADSS_sub_OCV", 
                     {
                         "Tval__s": purge_wait_N2_to_O2_min * 60,
@@ -3544,6 +3549,10 @@ def ADSS_PA_CV_TRI_new(
         
         #switch from O2 to N2 and saturate
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
+    #need to remove O2 gas sample
+        epm.add_experiment("ADSS_sub_unload_gas",{})
+    #test need
+        epm.add_experiment("ADSS_sub_PAL_load_gas",{"bubbled_gas": "N2","reservoir_gas_sample_no":1,})
 
         #unload sample
         epm.add_experiment("ADSS_sub_unloadall_customs",{})
@@ -3668,6 +3677,7 @@ def ADSS_PA_CV_TRI_new(
 
         #set initial gas to N2
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
+        epm.add_experiment("ADSS_sub_PAL_load_gas",{"bubbled_gas": "N2","reservoir_gas_sample_no":1,})
 
         # pump recirculate forward
         epm.add_experiment(
@@ -3825,6 +3835,11 @@ def ADSS_PA_CV_TRI_new(
         
         #switch from N2 to O2 and saturate
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": False,})
+    #need to remove N2 gas sample
+        epm.add_experiment("ADSS_sub_unload_gas",{})
+    #test need
+        epm.add_experiment("ADSS_sub_PAL_load_gas",{"bubbled_gas": "O2","reservoir_gas_sample_no":2,})
+
         epm.add_experiment("ADSS_sub_OCV", 
                     {
                         "Tval__s": purge_wait_N2_to_O2_min * 60,
@@ -3952,6 +3967,11 @@ def ADSS_PA_CV_TRI_new(
 
         #switch from O2 to N2 and saturate
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
+    #need to remove O2 gas sample
+        epm.add_experiment("ADSS_sub_unload_gas",{})
+    #test need
+        epm.add_experiment("ADSS_sub_PAL_load_gas",{"bubbled_gas": "N2","reservoir_gas_sample_no":1,})
+
         #measure OCP (default of OCV exp is to not take any aliquots)
         epm.add_experiment("ADSS_sub_OCV", 
                            {
@@ -4067,7 +4087,9 @@ def ADSS_PA_CV_TRI_new(
 
         if keep_electrolyte_at_end:
             epm.add_experiment("ADSS_sub_unload_solid",{})
-
+    #unload gas too?
+            epm.add_experiment("ADSS_sub_unload_gas",{})
+    #test need
         else:
 
             epm.add_experiment("ADSS_sub_unloadall_customs",{})
@@ -4170,6 +4192,7 @@ def ADSS_PA_CV_TRI_new(
 
         #set initial gas to N2
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": True,})
+        epm.add_experiment("ADSS_sub_PAL_load_gas",{"bubbled_gas": "N2","reservoir_gas_sample_no":1,})
 
         # pump recirculate forward
         epm.add_experiment(
@@ -4297,6 +4320,11 @@ def ADSS_PA_CV_TRI_new(
         
         #switch from N2 to O2 and saturate
         epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": False,})
+    #need to remove N2 gas sample
+        epm.add_experiment("ADSS_sub_unload_gas",{})
+    #test need
+        epm.add_experiment("ADSS_sub_PAL_load_gas",{"bubbled_gas": "O2","reservoir_gas_sample_no":2,})
+
         epm.add_experiment("ADSS_sub_OCV", 
                            {
                                "Tval__s": purge_wait_N2_to_O2_min * 60,

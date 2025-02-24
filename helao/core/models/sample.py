@@ -1,4 +1,18 @@
 from __future__ import annotations
+from socket import gethostname
+from uuid import UUID
+from enum import Enum
+
+from pydantic import BaseModel, validator, root_validator, Field
+from pydantic.tools import parse_obj_as
+
+import datetime
+from typing import List, Optional, Union, Literal
+from typing import ForwardRef
+
+from helao.core.version import get_hlo_version
+from helao.core.helaodict import HelaoDict
+
 
 """ sample.py
 Liquid, Gas, Assembly, and Solid sample type models.
@@ -18,23 +32,7 @@ __all__ = [
     "SampleStatus",
 ]
 
-from socket import gethostname
-from uuid import UUID
-from enum import Enum
-
-from pydantic import BaseModel, validator, root_validator, Field
-from pydantic.tools import parse_obj_as
-
-import datetime
-from typing import List, Optional, Union, Literal
-from typing import ForwardRef
-
-from helao.core.version import get_hlo_version
-from helao.core.helaodict import HelaoDict
-
-
 SampleUnion = ForwardRef("SampleUnion")
-SamplePartUnion = ForwardRef("SamplePartUnion")
 
 
 class SampleType(str, Enum):
@@ -79,17 +77,13 @@ class SampleModel(BaseModel, HelaoDict):
     global_label: Optional[str] = None  # is None for a ref sample
     sample_type: Optional[str] = None
 
-
-class _BaseSample(SampleModel):
-    """Full Sample with all helao-async relevant attributes."""
-
     # time related fields
     sample_creation_timecode: Optional[int] = None  # epoch in ns
     last_update: Optional[int] = None  # epoch in ns
     # action_timestamp: Optional[str]  # "%Y%m%d.%H%M%S%f"
 
     # labels
-    sample_no: Optional[int|str] = None
+    sample_no: Optional[int | str] = None
     machine_name: Optional[str] = None
     sample_hash: Optional[str] = None
     server_name: Optional[str] = None
@@ -185,7 +179,7 @@ class NoneSample(SampleModel):
         }
 
 
-class LiquidSample(_BaseSample):
+class LiquidSample(SampleModel):
     """base class for liquid samples"""
 
     sample_type: Literal[SampleType.liquid] = SampleType.liquid
@@ -215,12 +209,12 @@ class LiquidSample(_BaseSample):
             return self.global_label
 
 
-class SolidSample(_BaseSample):
+class SolidSample(SampleModel):
     """base class for solid samples"""
 
     sample_type: Literal[SampleType.solid] = SampleType.solid
     machine_name: Optional[str] = "legacy"
-    plate_id: Optional[int|str] = None
+    plate_id: Optional[int | str] = None
 
     def exp_dict(self):
         exp_dict = self.create_initial_exp_dict()
@@ -247,7 +241,7 @@ class SolidSample(_BaseSample):
         return values
 
 
-class GasSample(_BaseSample):
+class GasSample(SampleModel):
     """base class for gas samples"""
 
     sample_type: Literal[SampleType.gas] = SampleType.gas
@@ -274,10 +268,18 @@ class GasSample(_BaseSample):
             return self.global_label
 
 
-class AssemblySample(_BaseSample):
+class AssemblySample(SampleModel):
     sample_type: Literal[SampleType.assembly] = SampleType.assembly
     # parts: List[SampleUnion] = Field(default=[])
-    parts: List[SamplePartUnion] = Field(default=[])
+    parts: List[
+        Union[
+            AssemblySample,
+            LiquidSample,
+            GasSample,
+            SolidSample,
+            NoneSample,
+        ]
+    ] = Field(default=[])
     sample_position: Optional[str] = "cell1_we"  # usual default assembly position
 
     def get_global_label(self):
@@ -323,7 +325,17 @@ class SampleList(BaseModel, HelaoDict):
     """a combi basemodel which can contain all possible samples
     Its also a list and we should enforce samples as being a list"""
 
-    samples: Optional[List[SampleUnion]] = Field(default=[])
+    samples: Optional[
+        List[
+            Union[
+                AssemblySample,
+                LiquidSample,
+                GasSample,
+                SolidSample,
+                NoneSample,
+            ]
+        ]
+    ] = Field(default=[])
 
 
 SampleUnion = Union[
@@ -335,16 +347,9 @@ SampleUnion = Union[
 ]
 
 
-SamplePartUnion = Union[
-    AssemblySample,
-    LiquidSample,
-    GasSample,
-    SolidSample,
-    NoneSample,
-]
-
-
 def object_to_sample(data):
+    if isinstance(data, BaseModel):
+        data = data.model_dump()
     try:
         sample = parse_obj_as(SampleUnion, data)
     except Exception as e:

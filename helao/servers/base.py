@@ -20,7 +20,7 @@ import pathlib
 from random import randint
 from socket import gethostname
 from time import ctime, time, time_ns, sleep
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 from uuid import UUID, uuid1
 import hashlib
 from copy import deepcopy, copy
@@ -55,8 +55,7 @@ from helao.helpers.ws_publisher import WsPublisher
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import (
     SampleType,
-    SampleUnion,
-    NoneSample,
+    AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample,
     SampleInheritance,
     SampleStatus,
     object_to_sample,
@@ -1613,10 +1612,11 @@ class Active:
         write_file_nowait(self, output_str: str, file_type: str, filename: Optional[str] = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: Optional[str] = None, sample_str: Optional[str] = None, file_sample_label: Optional[str] = None, json_data_keys: Optional[str] = None, action: Optional[Action] = None):
             Writes a complete file with the given parameters without waiting.
 
-        set_sample_action_uuid(self, sample: SampleUnion, action_uuid: UUID):
+        set_sample_action_uuid(self, sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample], action_uuid: UUID):
             Sets the action UUID for the given sample.
 
-        append_sample(self, samples: List[SampleUnion], IO: str, action: Optional[Action] = None):
+        append_sample(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+], IO: str, action: Optional[Action] = None):
             Adds samples to the input or output sample list.
 
         split_and_keep_active(self):
@@ -1637,7 +1637,8 @@ class Active:
         finish(self, finish_uuid_list: Optional[List[UUID]] = None) -> Action:
             Finishes the actions in the UUID list and performs cleanup.
 
-        track_file(self, file_type: str, file_path: str, samples: List[SampleUnion], action: Optional[Action] = None):
+        track_file(self, file_type: str, file_path: str, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+], action: Optional[Action] = None):
             Adds auxiliary files to the file dictionary.
 
         relocate_files(self):
@@ -2578,12 +2579,12 @@ class Active:
         else:
             return None
 
-    def set_sample_action_uuid(self, sample: SampleUnion, action_uuid: UUID):
+    def set_sample_action_uuid(self, sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample], action_uuid: UUID):
         """
         Sets the action UUID for a given sample and its parts if the sample is of type 'assembly'.
 
         Args:
-            sample (SampleUnion): The sample object for which the action UUID is to be set.
+            sample (Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]): The sample object for which the action UUID is to be set.
             action_uuid (UUID): The action UUID to be assigned to the sample.
 
         Returns:
@@ -2595,13 +2596,15 @@ class Active:
                 self.set_sample_action_uuid(sample=part, action_uuid=action_uuid)
 
     async def append_sample(
-        self, samples: List[SampleUnion], IO: str, action: Optional[Action] = None
+        self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+], IO: str, action: Optional[Action] = None
     ):
         """
         Append samples to the specified action's input or output list.
 
         Args:
-            samples (List[SampleUnion]): A list of samples to be appended.
+            samples (List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]): A list of samples to be appended.
             IO (str): Specifies whether the samples are to be appended to the input ('in') or output ('out') list.
             action (Action, optional): The action to which the samples will be appended. If not provided, the current action is used.
 
@@ -3017,7 +3020,8 @@ class Active:
         self,
         file_type: str,
         file_path: str,
-        samples: List[SampleUnion],
+        samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+],
         action: Optional[Action] = None,
     ) -> None:
         """
@@ -3026,7 +3030,8 @@ class Active:
         Args:
             file_type (str): The type of the file being tracked.
             file_path (str): The path to the file being tracked.
-            samples (List[SampleUnion]): A list of samples associated with the file.
+            samples (List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+]): A list of samples associated with the file.
             action (Action, optional): The action associated with the file. If not provided,
                                        the current action will be used.
 

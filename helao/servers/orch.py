@@ -950,6 +950,7 @@ class Orch(Base):
         }
         exp_return = exp_func(self.active_experiment, **supplied_params)
 
+        unpacked_acts = None
         if isinstance(exp_return, list):
             unpacked_acts = exp_return
         elif isinstance(exp_return, Experiment):
