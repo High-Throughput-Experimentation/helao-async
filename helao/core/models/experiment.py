@@ -61,3 +61,4 @@ class ExperimentModel(ExperimentTemplate):
     orch_host: Optional[str] = None
     orch_port: Optional[int] = None
     sync_data: bool = True
+    campaign_name: Optional[str] = None
