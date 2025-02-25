@@ -1838,7 +1838,7 @@ class Archive:
             sample.inheritance = SampleInheritance.receive_only
             # need to update the parts of an assembly first
             if sample.sample_type == SampleType.assembly:
-                # sample.parts = await self.unified_db.get_samples(samples=sample.parts)
+                sample.parts = await self.unified_db.get_samples(samples=sample.parts)
                 for part in sample.parts:
                     part.status = [SampleStatus.incorporated]
                     part.inheritance = SampleInheritance.allow_both
