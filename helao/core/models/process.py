@@ -43,3 +43,4 @@ class ProcessModel(ShortProcessModel):
 ] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     # TODO: created assembly global label, created solid...
+    campaign_name: Optional[str] = None
