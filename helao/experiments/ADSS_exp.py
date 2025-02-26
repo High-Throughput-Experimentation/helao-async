@@ -191,7 +191,6 @@ def ADSS_sub_load_solid(
                 }
             ).model_dump(),
         },
-        start_condition=ActionStartCondition.wait_for_orch,  #
     )
     apm.add(
         PAL_server,
@@ -200,7 +199,6 @@ def ADSS_sub_load_solid(
             "custom": "cell1_we",
         },
         from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
-        start_condition=ActionStartCondition.wait_for_orch,
     )
     return apm.action_list  # returns complete action list to orch
 
