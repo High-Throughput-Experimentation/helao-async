@@ -191,6 +191,7 @@ def ADSS_sub_load_solid(
                 }
             ).model_dump(),
         },
+        start_condition=ActionStartCondition.wait_for_orch,
     )
     apm.add(
         PAL_server,
@@ -199,6 +200,7 @@ def ADSS_sub_load_solid(
             "custom": "cell1_we",
         },
         from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
+        start_condition=ActionStartCondition.wait_for_previous,
     )
     return apm.action_list  # returns complete action list to orch
 
@@ -331,7 +333,7 @@ def ADSS_sub_load(
                 }
             ).model_dump(),
         },
-        start_condition=ActionStartCondition.wait_for_orch,
+        start_condition=ActionStartCondition.wait_for_previous,
     )
     # add liquid to cell position
     if previous_liquid:
@@ -347,7 +349,7 @@ def ADSS_sub_load(
                 "_unloaded_liquid": "source_liquid_in",
                 "_unloaded_liquid_vol": "volume_ml",
             },
-            start_condition=ActionStartCondition.wait_for_orch,
+            start_condition=ActionStartCondition.wait_for_previous,
         )
     else:
         apm.add(
@@ -365,7 +367,7 @@ def ADSS_sub_load(
                 "combine_liquids": False,
                 "dilute_liquids": False,
             },
-            start_condition=ActionStartCondition.wait_for_orch,
+            start_condition=ActionStartCondition.wait_for_previous,
         )
 
     return apm.action_list
