@@ -888,8 +888,8 @@ class PAL:
             PalAction(
                 samples_in=deepcopy(palposition.samples_initial),
                 source=deepcopy(palposition),
-                dilute=[False],  # initial source is not diluted
-                dilute_type=[microcam.cam.sample_out_type],
+                dilute=[False]*len(palposition.samples_initial),  # initial source is not diluted
+                dilute_type=[microcam.cam.sample_out_type]*len(palposition.samples_initial),
                 samples_in_delta_vol_ml=[-1.0 * microcam.volume_ul / 1000.0],
             )
         )
