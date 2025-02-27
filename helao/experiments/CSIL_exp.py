@@ -1725,14 +1725,13 @@ def CCSI_sub_flowflush(
         nonblocking=True,
     )
     apm.add(
-        apm.add(
             DOSEPUMP_server,
             "run_continuous",
             {"rate_uL_min": recirculation_rate_uL_min},
             asc.no_wait,
             nonblocking=True,
-        )
     )
+    
 
     # cycles = int(co2measure_duration / 30),
     for t in range(60):
