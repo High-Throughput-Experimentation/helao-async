@@ -259,7 +259,7 @@ def ADSS_sub_load_liquid_only(
                 }
             ).model_dump(),
             "volume_ml": liquid_sample_volume_ul / 1000,
-            "combine_liquids": False,
+            "combine_liquids": combine_liquids,
             "dilute_liquids": False,
         },
         technique_name="liquid_addition",
