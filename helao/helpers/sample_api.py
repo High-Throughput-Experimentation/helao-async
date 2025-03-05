@@ -384,7 +384,7 @@ class SampleModelAPI:
                         if val is not None:
                             val = val.replace('"', '""')
                             val = val.replace("'", "''")
-                            cmd = f'''UPDATE {self._sample_type} SET {key} = "{val}" WHERE idx = {idx};'''
+                            cmd = f'''UPDATE {self._sample_type} SET {key} = '{val}' WHERE idx = {idx};'''
                         else:
                             cmd = f'''UPDATE {self._sample_type} SET {key} = NULL WHERE idx = {idx};'''
                         LOGGER.info(f"dbcommand: {cmd}")
