@@ -20,16 +20,16 @@ __all__ = [
     "ANEC_sub_cleanup",
     "ANEC_sub_CP",
     "ANEC_sub_CA",
-    "ANEC_sub_HeatCA",
+    # "ANEC_sub_HeatCA",
     "ANEC_sub_OCV",
     "ANEC_sub_liquidarchive",
     "ANEC_sub_aliquot",
     "ANEC_sub_aliquot_nomixing",
     "ANEC_sub_alloff",
-    "ANEC_sub_heatoff",
-    "ANEC_sub_setheat",
+    # "ANEC_sub_heatoff",
+    # "ANEC_sub_setheat",
     "ANEC_sub_CV",
-    "ANEC_sub_HeatCV",
+    # "ANEC_sub_HeatCV",
     "ANEC_sub_photo_CV",
     "ANEC_sub_photo_CA",
     "ANEC_sub_GCLiquid_analysis",
@@ -211,12 +211,12 @@ def ANEC_sub_alloff(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
-    apm.add(
-        TEC_server,
-        "cancel_record_tec",
-        {}
-    )
-    apm.add(TEC_server, "disable_tec", {})
+    # apm.add(
+    #     TEC_server,
+    #     "cancel_record_tec",
+    #     {}
+    # )
+    # apm.add(TEC_server, "disable_tec", {})
 
     return apm.action_list
 
