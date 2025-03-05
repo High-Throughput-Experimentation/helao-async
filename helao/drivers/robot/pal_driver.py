@@ -2841,7 +2841,7 @@ class PAL:
     async def kill_PAL_local(self) -> bool:
         pyPids = {
             p.pid: p
-            for p in psutil.process_iter(["name", "connections"])
+            for p in psutil.process_iter(["name"])
             if p.info["name"].startswith("PAL")
         }
 
