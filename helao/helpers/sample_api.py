@@ -117,8 +117,6 @@ class SampleModelAPI:
         if df.size == 0:
             return NoneSample()
         sampledict = dict(df.iloc[-1, :])
-        print("!!!")
-        print(sampledict)
 
         for key in self._jsonkeys:
             sampledict.update({key: json.loads(sampledict[key])})
