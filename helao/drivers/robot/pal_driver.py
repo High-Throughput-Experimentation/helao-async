@@ -888,8 +888,8 @@ class PAL:
             PalAction(
                 samples_in=deepcopy(palposition.samples_initial),
                 source=deepcopy(palposition),
-                dilute=[False],  # initial source is not diluted
-                dilute_type=[microcam.cam.sample_out_type],
+                dilute=[False]*len(palposition.samples_initial),  # initial source is not diluted
+                dilute_type=[microcam.cam.sample_out_type]*len(palposition.samples_initial),
                 samples_in_delta_vol_ml=[-1.0 * microcam.volume_ul / 1000.0],
             )
         )
@@ -1473,7 +1473,9 @@ class PAL:
 
         # a quick message if samples will be diluted or not
         for i, sample in enumerate(microcam.run[-1].samples_in):
-            if microcam.run[-1].dilute[i]:
+            if i >= len(microcam.run[-1].dilute):
+                LOGGER.info(f"PAL: Not diluting sample_in '{sample.global_label}' because dilute bool not specified.")
+            elif microcam.run[-1].dilute[i]:
                 LOGGER.info(f"PAL: Diluting sample_in '{sample.global_label}'.")
             else:
                 LOGGER.info(f"PAL: Not diluting sample_in '{sample.global_label}'.")
@@ -2839,7 +2841,7 @@ class PAL:
     async def kill_PAL_local(self) -> bool:
         pyPids = {
             p.pid: p
-            for p in psutil.process_iter(["name", "connections"])
+            for p in psutil.process_iter(["name"])
             if p.info["name"].startswith("PAL")
         }
 
