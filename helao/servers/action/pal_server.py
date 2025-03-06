@@ -561,7 +561,9 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         active = await app.base.setup_and_contain_action(action_abbr="query_sample")
         error_code, sample = await app.driver.archive.tray_query_sample(
-            **active.action.action_params
+            tray=active.action.action_params["tray"],
+            slot=active.action.action_params["slot"],
+            vial=active.action.action_params["vial"],
         )
         active.action.error_code = error_code
         await active.append_sample(samples=[sample], IO="in")

@@ -22,8 +22,9 @@ __all__ = [
     "ADSS_sub_load_solid",
     "ADSS_sub_load_liquid",
     "ADSS_sub_add_liquid",
+    "ADSS_sub_load_liquid_only",
     "ADSS_sub_PAL_load_gas",
-    "ADSS_sub_unload_gas",
+    "ADSS_sub_unload_gas_only",
     #    "ADSS_sub_fillfixed",
     #    "ADSS_sub_fill",
     "ADSS_sub_tray_unload",
@@ -200,7 +201,7 @@ def ADSS_sub_load_solid(
             "custom": "cell1_we",
         },
         from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
-        start_condition=ActionStartCondition.wait_for_orch,
+        start_condition=ActionStartCondition.wait_for_previous,
     )
     return apm.action_list  # returns complete action list to orch
 
@@ -233,6 +234,47 @@ def ADSS_sub_load_liquid(
         start_condition=ActionStartCondition.wait_for_orch,  #
     )
     return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_load_liquid_only(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    liquid_custom_position: str = "cell1_we",
+    liquid_sample_no: int = 1,
+    liquid_sample_volume_ul: float = 4000,
+    combine_liquids: bool = False,
+    dilute_liquids: bool = False,
+):
+    apm = ActionPlanMaker()
+
+    # add liquid to cell position
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid",
+        {
+            "custom": liquid_custom_position,
+            "source_liquid_in": LiquidSample(
+                **{
+                    "sample_no": liquid_sample_no,
+                    "machine_name": gethostname(),
+                }
+            ).model_dump(),
+            "volume_ml": liquid_sample_volume_ul / 1000,
+            "combine_liquids": combine_liquids,
+            "dilute_liquids": False,
+        },
+        technique_name="liquid_addition",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+
+        start_condition=ActionStartCondition.wait_for_orch,
+    )
+
+    return apm.action_list
+
 
 ######
 def ADSS_sub_PAL_load_gas(
@@ -269,7 +311,7 @@ def ADSS_sub_PAL_load_gas(
     )
     return apm.action_list  # returns complete action list to orch
 
-def ADSS_sub_unload_gas(
+def ADSS_sub_unload_gas_only(
     experiment: Experiment,
     experiment_version: int = 1,  # newer via keep? need testing
 ):
@@ -280,7 +322,7 @@ def ADSS_sub_unload_gas(
     #     PAL_server,
     #     "archive_custom_unloadall",
     #     {},
-    #     to_globalexp_params=["_unloaded_liquid"],
+    #     to_globalexp_params=["_unloaded_liquid", "unloaded_solid"],
     # )
     apm.add(
         PAL_server,
@@ -333,7 +375,7 @@ def ADSS_sub_load(
                 }
             ).model_dump(),
         },
-        start_condition=ActionStartCondition.wait_for_orch,
+        start_condition=ActionStartCondition.wait_for_previous,
     )
     # add liquid to cell position
     if previous_liquid:
@@ -349,7 +391,7 @@ def ADSS_sub_load(
                 "_unloaded_liquid": "source_liquid_in",
                 "_unloaded_liquid_vol": "volume_ml",
             },
-            start_condition=ActionStartCondition.wait_for_orch,
+            start_condition=ActionStartCondition.wait_for_previous,
         )
     else:
         apm.add(
@@ -367,7 +409,7 @@ def ADSS_sub_load(
                 "combine_liquids": False,
                 "dilute_liquids": False,
             },
-            start_condition=ActionStartCondition.wait_for_orch,
+            start_condition=ActionStartCondition.wait_for_previous,
         )
 
     return apm.action_list

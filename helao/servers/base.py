@@ -1926,6 +1926,7 @@ class Active:
             sample=file_sample_label,
             action_uuid=action.action_uuid,
             run_use=action.run_use,
+            nosync=True if not action.sync_data and filename.endswith(".hlo") else False
         )
 
         if header:

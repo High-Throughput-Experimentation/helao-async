@@ -161,14 +161,14 @@ servers:
       api_host: caltech-api.modelyst.com
       testing: false
     verbose: true
-  TEC:
-    host: hte-anec-03.htejcap.caltech.edu
-    port: 8008
-    group: action
-    fast: tec_server
-    params:
-      channel: 1
-      port: COM5
+  # TEC:
+  #   host: hte-anec-03.htejcap.caltech.edu
+  #   port: 8008
+  #   group: action
+  #   fast: tec_server
+  #   params:
+  #     channel: 1
+  #     port: COM5
   LIVE:
     host: hte-anec-03.htejcap.caltech.edu
     port: 5004

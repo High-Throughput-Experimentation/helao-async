@@ -120,7 +120,7 @@ class HTELegacyAPI:
             if print_key_or_keyword == "screening_print_id"
             else (print_key_or_keyword in infofiled["prints"])
         )
-        while not ("prints" in infofiled and requiredkeysthere(infofiled)):
+        while not ("prints" in infofiled and requiredkeysthere(infofiled, "screening_print_id")):
             if "lineage" not in infofiled or "," not in infofiled["lineage"]:
                 return None
             parentplateidstr = infofiled["lineage"].split(",")[-2].strip()
