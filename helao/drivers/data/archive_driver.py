@@ -1,10 +1,10 @@
 """Archive class handles local sample DB and legacy DB lookup
 
-    TODO:
-    1. consolidate tray_export_json, tray_export_csv, tray_export_icpms, and make 
-    tray_unloadall call the export function
-    2. write tray_import function to consume exported json or csv and ingest into local
-    sqlite database, import needs to check for existing global_sample_labels
+TODO:
+1. consolidate tray_export_json, tray_export_csv, tray_export_icpms, and make
+tray_unloadall call the export function
+2. write tray_import function to consume exported json or csv and ingest into local
+sqlite database, import needs to check for existing global_sample_labels
 
 """
 
@@ -25,6 +25,7 @@ from enum import Enum
 import json
 
 from helao.helpers import logging
+
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
@@ -99,14 +100,18 @@ class Archive:
         # get some empty db dicts from default config
 
         self.startup_positions = self.action_startup_config()
-        LOGGER.info(f"Config trays_dict has {len(self.startup_positions.trays_dict)} keys")
+        LOGGER.info(
+            f"Config trays_dict has {len(self.startup_positions.trays_dict)} keys"
+        )
         # compare default config to backup
 
         try:
             self.positions = self.load_config()
             LOGGER.info(f"Archive json has {len(self.positions.trays_dict)} keys")
         except IOError:
-            LOGGER.error(f"'{self.archivejson}' does not exist, writing empty global dict.")
+            LOGGER.error(
+                f"'{self.archivejson}' does not exist, writing empty global dict."
+            )
             self.write_config()
         # except Exception:
         # LOGGER.error(f"Error loading '{pidFile}', writing empty global dict.")
@@ -229,7 +234,9 @@ class Archive:
                                             positions.trays_dict[tmpi][slot_no] = VT70()
 
                                         else:
-                                            LOGGER.error(f"slot type {slot_item} not supported")
+                                            LOGGER.error(
+                                                f"slot type {slot_item} not supported"
+                                            )
                                             positions.trays_dict[tmpi][slot_no] = None
                                     else:
                                         positions.trays_dict[tmpi][slot_no] = None
@@ -281,10 +288,10 @@ class Archive:
                 continue
 
             if self.positions.customs_dict[custom].sample.sample_type is not None:
-                self.positions.customs_dict[
-                    custom
-                ].sample = await self.update_samples_from_db_helper(
-                    sample=self.positions.customs_dict[custom].sample
+                self.positions.customs_dict[custom].sample = (
+                    await self.update_samples_from_db_helper(
+                        sample=self.positions.customs_dict[custom].sample
+                    )
                 )
 
         # second update all tray samples
@@ -293,14 +300,17 @@ class Archive:
                 for slot_key, slot_item in tray_item.items():
                     if slot_item is not None:
                         for i, sample in enumerate(slot_item.samples):
-                            slot_item.samples[
-                                i
-                            ] = await self.update_samples_from_db_helper(sample=sample)
+                            slot_item.samples[i] = (
+                                await self.update_samples_from_db_helper(sample=sample)
+                            )
 
         # update all samples in tray and custom positions
         self.write_config()
 
-    async def update_samples_from_db_helper(self, sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]):
+    async def update_samples_from_db_helper(
+        self,
+        sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
+    ):
         """pulls the newest sample data from the db,
         only of global_label is not none, else sample is a ref sample"""
         if sample.sample_type is not None:
@@ -309,7 +319,9 @@ class Archive:
                 if _sample:
                     sample = _sample[0]
             else:
-                LOGGER.error(f"Bug found: reference sample was saved in archive.json file: {sample}")
+                LOGGER.error(
+                    f"Bug found: reference sample was saved in archive.json file: {sample}"
+                )
 
         return sample
 
@@ -318,11 +330,16 @@ class Archive:
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         vial: Optional[int] = None,
-        load_sample_in: Union[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-, dict] = None,
+        load_sample_in: Union[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
+            dict,
+        ] = None,
         *args,
         **kwargs,
-    ) -> Tuple[ErrorCodes, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> Tuple[
+        ErrorCodes,
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
+    ]:
         vial -= 1
         sample = NoneSample()
         error = ErrorCodes.not_available
@@ -332,9 +349,7 @@ class Archive:
 
         print("!!!load_sample_in:", load_sample_in)
         # check if sample actually exists
-        load_samples_in = await self.unified_db.get_samples(
-            samples=[load_sample_in]
-        )
+        load_samples_in = await self.unified_db.get_samples(samples=[load_sample_in])
 
         if not load_samples_in:
             LOGGER.warning("Sample does not exist in DB.")
@@ -355,17 +370,22 @@ class Archive:
                             )
                             position_found = True
         if not position_found:
-            LOGGER.info(f"could not find tray {tray}, slot {slot}, vial {vial} in defined positions or set position is already occupied.")   
-        
+            LOGGER.info(
+                f"could not find tray {tray}, slot {slot}, vial {vial} in defined positions or set position is already occupied."
+            )
+
         # update with information from db
         sample = await self._update_samples(sample)
         return error, sample
 
     async def tray_unload(
         self, tray: Optional[int] = None, slot: Optional[int] = None, *args, **kwargs
-    ) -> Tuple[bool, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], dict]:
+    ) -> Tuple[
+        bool,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        dict,
+    ]:
         samples = []
         unloaded = False
         tray_dict = {}
@@ -399,11 +419,12 @@ class Archive:
         await self.unified_db.update_samples(samples=samples_out)
         return unloaded, samples_in, samples_out, tray_dict
 
-    async def tray_unloadall(
-        self, *args, **kwargs
-    ) -> Tuple[bool, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], dict]:
+    async def tray_unloadall(self, *args, **kwargs) -> Tuple[
+        bool,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        dict,
+    ]:
         tray_dict = {}
         samples = []
         for tray_key, tray_item in self.positions.trays_dict.items():
@@ -457,7 +478,9 @@ class Archive:
                     if self.positions.trays_dict[tray][slot] is not None:
                         return self.positions.trays_dict[tray][slot].as_dict()
 
-    async def tray_export_csv(self, tray: Optional[int] = None, slot: Optional[int] = None, myactive=None):
+    async def tray_export_csv(
+        self, tray: Optional[int] = None, slot: Optional[int] = None, myactive=None
+    ):
         self.write_config()  # save backup
 
         if tray in self.positions.trays_dict:
@@ -534,9 +557,11 @@ class Archive:
                                 main_runs,
                                 rack,
                                 i + 1,
-                                dilution_factor
-                                if dilution_factor is not None
-                                else v.get_dilution_factor(),
+                                (
+                                    dilution_factor
+                                    if dilution_factor is not None
+                                    else v.get_dilution_factor()
+                                ),
                             ]
                         ]
                     )
@@ -545,7 +570,9 @@ class Archive:
             )
 
             samplelist = [v for _, v in sampletups]
-            LOGGER.info(f"Found {len(samplelist)} vials on tray {tray}, slot {slot}. Exporting csv.")
+            LOGGER.info(
+                f"Found {len(samplelist)} vials on tray {tray}, slot {slot}. Exporting csv."
+            )
 
             headerline = ";".join(
                 [
@@ -573,8 +600,14 @@ class Archive:
             LOGGER.info(f"Slot {slot} not found in positions dict. Cannot export.")
 
     async def tray_query_sample(
-        self, tray: Optional[int] = None, slot: Optional[int] = None, vial: Optional[int] = None
-    ) -> Tuple[ErrorCodes, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        self,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        vial: Optional[int] = None,
+    ) -> Tuple[
+        ErrorCodes,
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
+    ]:
         vial -= 1
         sample = NoneSample()
         error = ErrorCodes.not_available
@@ -634,11 +667,16 @@ class Archive:
                                         position
                                     ] = True
 
-            LOGGER.info(f"new vial nr. {new_vial} in slot {new_slot} in tray {new_tray}")
+            LOGGER.info(
+                f"new vial nr. {new_vial} in slot {new_slot} in tray {new_tray}"
+            )
             return {"tray": new_tray, "slot": new_slot, "vial": new_vial}
 
     async def tray_get_next_full(
-        self, after_tray: Optional[int] = None, after_slot: Optional[int] = None, after_vial: Optional[int] = None
+        self,
+        after_tray: Optional[int] = None,
+        after_slot: Optional[int] = None,
+        after_vial: Optional[int] = None,
     ):
         """Finds the next full vial after the current vial position
         defined in micropal."""
@@ -689,7 +727,9 @@ class Archive:
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         vial: Optional[int] = None,
-        sample: Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = None,
+        sample: Optional[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = None,
         dilute: bool = False,
         *args,
         **kwargs,
@@ -742,7 +782,10 @@ class Archive:
 
     async def custom_query_sample(
         self, custom: Optional[str] = None, *args, **kwargs
-    ) -> Tuple[ErrorCodes, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> Tuple[
+        ErrorCodes,
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
+    ]:
         sample = NoneSample()
         error = ErrorCodes.none
 
@@ -755,9 +798,14 @@ class Archive:
         return error, sample
 
     async def custom_replace_sample(
-        self, custom: Optional[str] = None, sample: Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = None
-    ) -> Tuple[bool, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        self,
+        custom: Optional[str] = None,
+        sample: Optional[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = None,
+    ) -> Tuple[
+        bool, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ]:
         if sample is None:
             return False, NoneSample()
         sample = object_to_sample(sample)
@@ -782,11 +830,15 @@ class Archive:
     async def custom_update_position(
         self,
         custom: Optional[str] = None,
-        sample: Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = None,
+        sample: Optional[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = None,
         dilute: bool = False,
         *args,
         **kwargs,
-    ) -> Tuple[bool, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> Tuple[
+        bool, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ]:
         if sample is None:
             return False, NoneSample()
 
@@ -812,8 +864,9 @@ class Archive:
 
     def assign_new_sample_status(
         self,
-        samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-],
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ],
         newstatus: List[str],
     ):
         if not isinstance(newstatus, list):
@@ -824,11 +877,11 @@ class Archive:
 
     def append_sample_status(
         self,
-        samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-],
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ],
         newstatus,
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]:
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         for sample in samples:
             sample.status.append(newstatus)
         return samples
@@ -844,9 +897,12 @@ class Archive:
         action: Optional[Action] = None,
         *args,
         **kwargs,
-    ) -> Tuple[bool, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], dict]:
+    ) -> Tuple[
+        bool,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        dict,
+    ]:
         samples_in = []
         samples_out = []
 
@@ -891,9 +947,12 @@ class Archive:
         action: Optional[Action] = None,
         *args,
         **kwargs,
-    ) -> Tuple[bool, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], dict]:
+    ) -> Tuple[
+        bool,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        dict,
+    ]:
         samples = []
         unloaded = False
         customs_dict = {}
@@ -984,13 +1043,16 @@ class Archive:
 
     async def _unload_custom_helper(
         self,
-        samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = None,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = None,
         destroy_liquid: bool = False,
         destroy_gas: bool = False,
         destroy_solid: bool = False,
-    ) -> Tuple[List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]:
+    ) -> Tuple[
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
         # update samlpes with most recent info from db
         for sample in samples:
             sample = await self.update_samples_from_db_helper(sample=sample)
@@ -1030,8 +1092,13 @@ class Archive:
         return samples_in, samples_out
 
     async def custom_load(
-        self, custom: Optional[str] = None, load_sample_in: Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = None, *args, **kwargs
+        self,
+        custom: Optional[str] = None,
+        load_sample_in: Optional[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = None,
+        *args,
+        **kwargs,
     ):
         sample = NoneSample()
         loaded = False
@@ -1060,11 +1127,14 @@ class Archive:
         return loaded, sample, customs_dict
 
     async def _unload_unpack_samples_helper(
-        self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
-    ) -> Tuple[List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]:
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> Tuple[
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
         ret_samples_in = []
         ret_samples_out = []
         for sample in samples:
@@ -1102,7 +1172,10 @@ class Archive:
 
         return ret_samples_in, ret_samples_out
 
-    async def _update_samples(self, sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
+    async def _update_samples(
+        self,
+        sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
+    ) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
         tmp_samples = await self.unified_db.get_samples(samples=[sample])
         if tmp_samples:
             return tmp_samples[0]
@@ -1116,8 +1189,9 @@ class Archive:
 
     async def new_ref_samples(
         self,
-        samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-],
+        samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ],
         sample_out_type: str = "",
         sample_position: str = "",
         action: Optional[Action] = None,
@@ -1125,14 +1199,17 @@ class Archive:
         # liquid sample
         combine_liquids: bool = False,
         combine_gases: bool = False,
-    ) -> Tuple[bool, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]:
+    ) -> Tuple[
+        bool,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
         """volume_ml and sample_position need to be updated after the
         function call by the function calling this."""
 
         error = ErrorCodes.none
-        samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
 
         if action is None:
             LOGGER.error("no action defined")
@@ -1198,7 +1275,9 @@ class Archive:
                 samples.append(AssemblySample(**sample_dict))
 
             else:
-                LOGGER.error(f"samples_out type {sample_out_type} is not supported yet.")
+                LOGGER.error(
+                    f"samples_out type {sample_out_type} is not supported yet."
+                )
                 error = ErrorCodes.not_available
 
         elif len(samples_in) > 1:
@@ -1237,9 +1316,11 @@ class Archive:
         combine_liquids: bool = False,
         dilute_liquids: bool = True,
         action: Optional[Action] = None,
-    ) -> Tuple[bool, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]:
+    ) -> Tuple[
+        bool,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
         """adds new liquid from a 'reservoir' to a custom position"""
 
         error = ErrorCodes.none
@@ -1298,7 +1379,9 @@ class Archive:
             else:
                 custom_sample = custom_samples_in[0]
 
-        LOGGER.info(f"sample in custom position '{custom}' is {custom_sample.exp_dict()}")
+        LOGGER.info(
+            f"sample in custom position '{custom}' is {custom_sample.exp_dict()}"
+        )
 
         # (4) create a new ref sample first for the amount we
         # take from samples_in
@@ -1347,7 +1430,9 @@ class Archive:
             )
 
             if not replaced:
-                LOGGER.error("could not replace sample with assembly when adding liquid")
+                LOGGER.error(
+                    "could not replace sample with assembly when adding liquid"
+                )
                 error = ErrorCodes.critical
 
         # (5-2)
@@ -1411,7 +1496,9 @@ class Archive:
                 custom=custom, sample=samples_out2[0]
             )
             if not replaced:
-                LOGGER.error("could not replace sample with assembly when adding liquid")
+                LOGGER.error(
+                    "could not replace sample with assembly when adding liquid"
+                )
                 return ErrorCodes.critical, [], []
 
         # (5-2b) liquid + assembly case
@@ -1470,7 +1557,9 @@ class Archive:
                 samples_out[0].status.append(SampleStatus.merged)
                 LOGGER.info("liquid recovered")
             else:
-                liquid_samples_out = await self.unified_db.new_samples(samples=ref_samples_out)
+                liquid_samples_out = await self.unified_db.new_samples(
+                    samples=ref_samples_out
+                )
                 new_assembly_parts.append(liquid_samples_out[0])
                 LOGGER.info("liquid added")
             if loaded_solid:
@@ -1519,7 +1608,9 @@ class Archive:
                 custom=custom, sample=samples_out2[0]
             )
             if not replaced:
-                LOGGER.error("could not replace sample with assembly when adding liquid")
+                LOGGER.error(
+                    "could not replace sample with assembly when adding liquid"
+                )
                 return ErrorCodes.critical, [], []
 
         # (5-3)
@@ -1570,7 +1661,9 @@ class Archive:
                 custom=custom, sample=samples_out2[0]
             )
             if not replaced:
-                LOGGER.error("could not replace sample with assembly when adding liquid")
+                LOGGER.error(
+                    "could not replace sample with assembly when adding liquid"
+                )
                 return ErrorCodes.critical, [], []
 
         else:
@@ -1594,9 +1687,11 @@ class Archive:
         combine_gases: bool = False,
         dilute_gases: bool = True,
         action: Optional[Action] = None,
-    ) -> Tuple[bool, List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]:
+    ) -> Tuple[
+        bool,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
         """adds new gas from a 'reservoir' to a custom position"""
 
         error = ErrorCodes.none
@@ -1655,7 +1750,9 @@ class Archive:
             else:
                 custom_sample = custom_samples_in[0]
 
-        LOGGER.info(f"sample in custom position '{custom}' is {custom_sample.exp_dict()}")
+        LOGGER.info(
+            f"sample in custom position '{custom}' is {custom_sample.exp_dict()}"
+        )
 
         # (4) create a new ref sample first for the amount we
         # take from samples_in
@@ -1827,7 +1924,9 @@ class Archive:
                 samples_out[0].status.append(SampleStatus.merged)
                 LOGGER.info("gas recovered")
             else:
-                gas_samples_out = await self.unified_db.new_samples(samples=ref_samples_out)
+                gas_samples_out = await self.unified_db.new_samples(
+                    samples=ref_samples_out
+                )
                 new_assembly_parts.append(gas_samples_out[0])
                 LOGGER.info("gas added")
             if loaded_solid:
@@ -1943,8 +2042,12 @@ class Archive:
 
         return error, samples_in_initial, samples_out
 
-    async def destroy_sample(self, sample: Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = None) -> bool:
+    async def destroy_sample(
+        self,
+        sample: Optional[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = None,
+    ) -> bool:
         """will mark a sample as destroyed in the sample db
         and update its parameters accordingly"""
         # first update it from the db (get the most recent info)
@@ -1962,8 +2065,7 @@ class Archive:
         destroy_liquid: bool = False,
         destroy_gas: bool = False,
         destroy_solid: bool = False,
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]:
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         ret_samples = []
         for sample in samples:
             # first update it from the db (get the most recent info)
@@ -2005,10 +2107,12 @@ class Archive:
         return ret_samples
 
     async def create_samples(
-        self, reference_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], action: Optional[Action] = None
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]:
+        self,
+        reference_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ],
+        action: Optional[Action] = None,
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """creates new samples in the db from provided refernces samples"""
         samples_out = []
 
