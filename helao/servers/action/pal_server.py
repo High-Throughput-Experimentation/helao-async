@@ -947,13 +947,15 @@ def makeApp(confPrefix, server_key, helao_root):
     @app.post(f"/{server_key}/archive_custom_add_gas", tags=["action"])
     async def archive_custom_add_gas(
         action: Action = Body({}, embed=True),
-        action_version: int = 1,
+        action_version: int = 2,
         custom: dev_customitems = None,
         source_gas_in: GasSample = Body(
             GasSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
             embed=True,
         ),
         volume_ml: float = 0.0,
+        combine_gases: bool = False,
+        dilute_gases: bool = True,
     ):
         """Adds 'volume_ml' of 'source_gas_in' to the sample 'custom'.
         Args:
@@ -974,6 +976,8 @@ def makeApp(confPrefix, server_key, helao_root):
             custom=active.action.action_params["custom"],
             source_gas_in=active.action.action_params["source_gas_in"],
             volume_ml=active.action.action_params["volume_ml"],
+            combine_gases=active.action.action_params["combine_gases"],
+            dilute_gases=active.action.action_params["dilute_gases"],
             action=active.action,
         )
         active.action.error_code = error_code
