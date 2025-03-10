@@ -307,9 +307,9 @@ def plot_DOD(
     # set the y label to f"$\Delta$A (O.D. vs {reference_potential} V)" if reference_potential is not None else f"$\Delta$A (O.D.)"
     plt.ylabel(
         (
-            f"$\Delta$A (O.D. vs {reference_potential})"
+            f"$\Delta $A (O.D. vs {reference_potential})"
             if reference_potential is not None
-            else f"$\Delta$A (O.D.)"
+            else f"$\Delta $A (O.D.)"
         ),
         fontsize=18,
     )
