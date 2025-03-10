@@ -281,6 +281,7 @@ class AssemblySample(SampleModel):
         ]
     ] = Field(default=[])
     sample_position: Optional[str] = "cell1_we"  # usual default assembly position
+    parent_assembly_label: Optional[str] = None
 
     def get_global_label(self):
         if self.global_label is None:
