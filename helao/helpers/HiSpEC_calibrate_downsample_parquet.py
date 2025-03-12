@@ -503,7 +503,7 @@ def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame, precision:float
     # rename t_s to t (s)
     totaldf.rename(columns={'t_s': 't (s)'}, inplace=True)
 
-    print(len(totaldf['U (V)']))
+    # print(len(totaldf.loc['U (V)']))
     return totaldf
 
 
