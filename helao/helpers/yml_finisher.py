@@ -140,7 +140,7 @@ async def move_dir(
 
     while (not copy_success) and copy_retries <= 60:
         dst_list = [p.replace("RUNS_ACTIVE", "RUNS_NOSYNC" if p.endswith(".hlo") and not hobj.sync_data else dest_dir) for p in src_list]
-        await asyncio.gather(
+        copy_results = await asyncio.gather(
             *[aioshutil.copy(src, dst) for src, dst in zip(src_list, dst_list)],
             return_exceptions=True,
         )
@@ -153,6 +153,7 @@ async def move_dir(
                 f"Could not copy {len(src_list)} files to FINISHED, retrying after {retry_delay} seconds"
             )
             print("\n".join(src_list))
+            print(copy_results)
             copy_retries += 1
         await asyncio.sleep(retry_delay)
 
