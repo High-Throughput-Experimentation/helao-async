@@ -43,8 +43,7 @@ class PostProcess(HloPostProcessor):
                         new_file_path = new_file_path.replace(
                             ".parquet", f"_{action_comment}.parquet"
                         )
-                    df.to_parquet(new_file_path, index=False)
-                    new_file = copy(act_file)
+                    df.to_parquet(new_file_path, index=False, partition_cols=['cycle', 'direction'])                    new_file = copy(act_file)
                     new_file.file_type = "parquet__file"
                     new_file.file_name = os.path.basename(new_file_path)
                     processed_file_list.append(new_file)
