@@ -14,3 +14,4 @@ bugreports/*
 helao/config/.ipynb_checkpoints/simulate-checkpoint.ipynb
 *-checkpoint.*
 .env
+.qodo
