@@ -16,7 +16,7 @@ from helao.helpers.HiSpEC_calibrate_downsample_parquet import (
     fully_read_and_calibrate_parquet,
 )
 import tempfile
-
+from pathlib import Path
 
 class PostProcess(HloPostProcessor):
 
@@ -44,10 +44,14 @@ class PostProcess(HloPostProcessor):
                             ".parquet", f"_{action_comment}.parquet"
                         )
                     df.to_parquet(new_file_path, index=False, partition_cols=['cycle', 'direction'])
-                    new_file = copy(act_file)
-                    new_file.file_type = "parquet__file"
-                    new_file.file_name = os.path.basename(new_file_path)
-                    processed_file_list.append(new_file)
+                    # glob through new file path to get all the parquet files to generate a list of paths
+
+                    file_list=Path(new_file_path).glob('**/*.parquet')
+                    for file in file_list:
+                        new_file = copy(act_file)
+                        new_file.file_type = "parquet__file"
+                        new_file.file_name = str(Path(file).relative_to(Path(new_file_path).parent))
+                        processed_file_list.append(file)
 
             except Exception:
                 LOGGER.error(
