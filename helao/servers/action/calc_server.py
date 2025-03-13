@@ -1,13 +1,13 @@
-""" General calculation server
+"""General calculation server
 
-Calc server is used for in-sequence data processing. 
+Calc server is used for in-sequence data processing.
 
 """
 
 __all__ = ["makeApp"]
 
 import json
-from typing import Optional, Union
+from typing import Optional, Union, List
 from fastapi import Body
 
 from helao.core.models.file import HloHeaderModel, HloFileGroup
@@ -17,10 +17,12 @@ from helao.drivers.data.calc_driver import Calc
 from helao.helpers.config_loader import config_loader
 
 from helao.helpers import logging
+
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
+
 
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
@@ -94,7 +96,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 2,
         co2_ppm_thresh: float = 95000,
         purge_if: Union[str, float] = "below",
-        present_syringe_volume_ul: float = 0,    
+        present_syringe_volume_ul: float = 0,
         repeat_experiment_name: str = "CCSI_sub_headspace_purge_and_measure",
         repeat_experiment_params: dict = {},
         repeat_experiment_kwargs: dict = {},
@@ -117,10 +119,36 @@ def makeApp(confPrefix, server_key, helao_root):
         repeat_experiment_params: dict = {},
         repeat_experiment_kwargs: dict = {},
     ):
-        active = await app.base.setup_and_contain_action(action_abbr="syringefillvolume")
+        active = await app.base.setup_and_contain_action(
+            action_abbr="syringefillvolume"
+        )
         result = await app.driver.fill_syringe_volume_check(active)
         LOGGER.info(f"result dict was: {result}")
         await active.enqueue_data_dflt(datadict=result)
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{server_key}/keep_min_ocv", tags=["action"])
+    async def keep_min_ocv(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        min_offset_ocv: float = 0,
+        new_ocv: float = 0,
+        offset_value: float = -0.2,
+    ):
+        active = await app.base.setup_and_contain_action(action_abbr="keepMinOCV")
+        result = (
+            min(
+                active.action.action_params["min_offset_ocv"]
+                + active.action.action_params["offset_value"],
+                active.action.action_params["new_ocv"],
+            )
+            - active.action.action_params["offset_value"]
+        )
+
+        LOGGER.info(f"minimum potential was: {result}")
+        await active.enqueue_data_dflt(datadict=result)
+        active.action.action_params["min_offset_ocv"] = result
         finished_action = await active.finish()
         return finished_action.as_dict()
 
