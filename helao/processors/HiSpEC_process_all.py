@@ -50,7 +50,8 @@ class PostProcess(HloPostProcessor):
                     for file in file_list:
                         new_file = copy(act_file)
                         new_file.file_type = "parquet__file"
-                        new_file.file_name = str(Path(file).relative_to(Path(new_file_path).parent))
+                        relpath = Path(file).relative_to(Path(new_file_path).parent).resolve()
+                        new_file.file_name = str(relpath)
                         processed_file_list.append(new_file)
 
             except Exception:
