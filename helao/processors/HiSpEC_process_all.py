@@ -43,7 +43,7 @@ class PostProcess(HloPostProcessor):
                         new_file_path = new_file_path.replace(
                             ".parquet", f"_{action_comment}.parquet"
                         )
-                    df.to_parquet(new_file_path, index=False, partition_cols=['cycle', 'direction'])
+                    df.to_parquet(new_file_path, index=True, partition_cols=['cycle', 'direction'])
                     # glob through new file path to get all the parquet files to generate a list of paths
 
                     file_list=Path(new_file_path).glob('**/*.parquet')
