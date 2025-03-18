@@ -3895,50 +3895,50 @@ def ADSS_PA_CV_TRI_new(
         #inject phosphoric acid
         if Inject_PA:
 ################################# temporary manual injection of phos
-            epm.add_experiment(
-                "ADSS_sub_load_liquid_only",
-                {
-                    "liquid_sample_no": phosphoric_sample_no,
-                    "liquid_custom_position": "cell1_we",
-                    "liquid_sample_volume_ul": phosphoric_quantity_ul,
-                    "combine_liquids": True,
-                }
-            )
+            # epm.add_experiment(
+            #     "ADSS_sub_load_liquid_only",
+            #     {
+            #         "liquid_sample_no": phosphoric_sample_no,
+            #         "liquid_custom_position": "cell1_we",
+            #         "liquid_sample_volume_ul": phosphoric_quantity_ul,
+            #         "combine_liquids": True,
+            #     }
+            # )
 
-            epm.add_experiment(
-                "ADSS_sub_interrupt",
-                {
-                    "reason": "Manual injection of phosphoric",
-                }
-            )
+            # epm.add_experiment(
+            #     "ADSS_sub_interrupt",
+            #     {
+            #         "reason": "Manual injection of phosphoric",
+            #     }
+            # )
 
 
 
 ############################ actual syringe injection
-        #     previous_liquid_injected = "phosphoric"
-        #     washmod += 1
-        #     washone = washmod %4 %3 %2
-        #     washtwo = (washmod + 1) %4 %3 %2
-        #     washthree = (washmod + 2) %4 %3 %2
-        #     washfour = (washmod + 3) %4 %3 %2
+            previous_liquid_injected = "phosphoric"
+            washmod += 1
+            washone = washmod %4 %3 %2
+            washtwo = (washmod + 1) %4 %3 %2
+            washthree = (washmod + 2) %4 %3 %2
+            washfour = (washmod + 3) %4 %3 %2
 
-        #     epm.add_experiment(
-        #     "ADSS_sub_transfer_liquid_in",
-        #     {
-        #         "destination": "cell1_we",
-        #         "source_tray": phosphoric_location[0],
-        #         "source_slot": phosphoric_location[1],
-        #         "source_vial": phosphoric_location[2],            
-        #         "liquid_sample_no": phosphoric_sample_no,
-        #         "aliquot_volume_ul": phosphoric_quantity_ul,
-        #         "PAL_Injector": phos_PAL_Injector,
-        #         "PAL_Injector_id": phos_PAL_Injector_id,
-        #         "rinse_1": washone,
-        #         "rinse_2": washtwo,
-        #         "rinse_3": washthree,
-        #         "rinse_4": washfour,
-        #     }
-        # )
+            epm.add_experiment(
+            "ADSS_sub_transfer_liquid_in",
+            {
+                "destination": "cell1_we",
+                "source_tray": phosphoric_location[0],
+                "source_slot": phosphoric_location[1],
+                "source_vial": phosphoric_location[2],            
+                "liquid_sample_no": phosphoric_sample_no,
+                "aliquot_volume_ul": phosphoric_quantity_ul,
+                "PAL_Injector": phos_PAL_Injector,
+                "PAL_Injector_id": phos_PAL_Injector_id,
+                "rinse_1": washone,
+                "rinse_2": washtwo,
+                "rinse_3": washthree,
+                "rinse_4": washfour,
+            }
+        )
 ###################################
             #recirculate to mix PA into electrolyte
             epm.add_experiment(
@@ -4047,66 +4047,7 @@ def ADSS_PA_CV_TRI_new(
                     "previous_liquid_injected": previous_liquid_injected,
                 }
             )
-################# extra clean of syringe used for phos injection
-        # if Inject_PA:
-        #     washmod += 1
-        #     #determine last used rinse, then use next two  
-        #     remainder = washmod %4
-        #     washone, washtwo, washthree, washfour = (0,)*4
-        #     if remainder == 0:
-        #         washone, washtwo = 1,1
-        #     if remainder == 1:
-        #         washone, washfour= 1,1
-        #     if remainder == 2:
-        #         washthree,washfour = 1,1
-        #     if remainder ==3:
-        #         washtwo, washthree=1,1
-        #     washmod += 1
 
-        #     epm.add_experiment(
-        #     "ADSS_sub_PAL_deep_clean",
-        #     {
-        #         "clean_volume_ul": PAL_cleanvol_ul,
-        #         "PAL_Injector": phos_PAL_Injector,
-        #         "rinse_1": washone,
-        #         "rinse_2": washtwo,
-        #         "rinse_3": washthree,
-        #         "rinse_4": washfour,
-        #     }
-        # )
-
-        #     washmod += 1
-        #     #determine last used rinse, then use next two  
-        #     remainder = washmod %4
-        #     washone, washtwo, washthree, washfour = (0,)*4
-        #     if remainder == 0:
-        #         washone, washtwo = 1,1
-        #     if remainder == 1:
-        #         washone, washfour= 1,1
-        #     if remainder == 2:
-        #         washthree,washfour = 1,1
-        #     if remainder ==3:
-        #         washtwo, washthree=1,1
-        #     washmod += 1
-
-        #     epm.add_experiment(
-        #     "ADSS_sub_PAL_tray_to_tray",  #hard-coded source and destination vials
-        #     {
-        #         "volume_ul": PAL_cleanvol_ul,
-        #         "source_tray": 2,
-        #         "source_slot": 3,
-        #         "source_vial": 53,
-        #         "dest_tray": 2,
-        #         "dest_slot": 3,
-        #         "dest_vial": 52,
-        #         "PAL_Injector": phos_PAL_Injector,
-        #         "rinse_1": washone,
-        #         "rinse_2": washtwo,
-        #         "rinse_3": washthree,
-        #         "rinse_4": washfour,
-        #     }
-        # )
-########################
 
         if keep_electrolyte_at_end:
             epm.add_experiment("ADSS_sub_unload_solid",{})
@@ -4177,6 +4118,66 @@ def ADSS_PA_CV_TRI_new(
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
                     }
                 )
+################# extra clean of syringe used for phos injection
+        if Inject_PA:
+            washmod += 1
+            #determine last used rinse, then use next two  
+            remainder = washmod %4
+            washone, washtwo, washthree, washfour = (0,)*4
+            if remainder == 0:
+                washone, washtwo = 1,1
+            if remainder == 1:
+                washone, washfour= 1,1
+            if remainder == 2:
+                washthree,washfour = 1,1
+            if remainder ==3:
+                washtwo, washthree=1,1
+            washmod += 1
+
+            epm.add_experiment(
+            "ADSS_sub_PAL_deep_clean",
+            {
+                "clean_volume_ul": 500,
+                "PAL_Injector": phos_PAL_Injector,
+                "rinse_1": washone,
+                "rinse_2": washtwo,
+                "rinse_3": washthree,
+                "rinse_4": washfour,
+            }
+        )
+
+            washmod += 1
+            #determine last used rinse, then use next two  
+            remainder = washmod %4
+            washone, washtwo, washthree, washfour = (0,)*4
+            if remainder == 0:
+                washone, washtwo = 1,1
+            if remainder == 1:
+                washone, washfour= 1,1
+            if remainder == 2:
+                washthree,washfour = 1,1
+            if remainder ==3:
+                washtwo, washthree=1,1
+            washmod += 1
+
+            epm.add_experiment(
+            "ADSS_sub_PAL_tray_to_tray",  #hard-coded source and destination vials
+            {
+                "volume_ul": 500,
+                "source_tray": 2,
+                "source_slot": 3,
+                "source_vial": 53,
+                "dest_tray": 2,
+                "dest_slot": 3,
+                "dest_vial": 52,
+                "PAL_Injector": phos_PAL_Injector,
+                "rinse_1": washone,
+                "rinse_2": washtwo,
+                "rinse_3": washthree,
+                "rinse_4": washfour,
+            }
+         )
+########################
 
 ###################################################################
 #REF MEASUREMENT AT END OF SEQUENCE
