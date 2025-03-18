@@ -19,7 +19,7 @@ builtin_ref_motorxy_6:
   - -32
   - -5
 experiment_libraries:
-  - ADSS_exp
+  - ADSS_xtraclean_exp
   - samples_exp
 experiment_params:
   gamrychannelwait: -1

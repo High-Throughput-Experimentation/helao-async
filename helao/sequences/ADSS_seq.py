@@ -3933,10 +3933,14 @@ def ADSS_PA_CV_TRI_new(
                 "aliquot_volume_ul": phosphoric_quantity_ul,
                 "PAL_Injector": phos_PAL_Injector,
                 "PAL_Injector_id": phos_PAL_Injector_id,
-                "rinse_1": washone,
-                "rinse_2": washtwo,
-                "rinse_3": washthree,
-                "rinse_4": washfour,
+                # "rinse_1": washone,
+                # "rinse_2": washtwo,
+                # "rinse_3": washthree,
+                # "rinse_4": washfour,
+                "rinse_1": 0,
+                "rinse_2": 0,
+                "rinse_3": 0,
+                "rinse_4": 0,
             }
         )
 ###################################
@@ -4137,12 +4141,16 @@ def ADSS_PA_CV_TRI_new(
             epm.add_experiment(
             "ADSS_sub_PAL_deep_clean",
             {
-                "clean_volume_ul": 500,
+                "clean_volume_ul": 200,
                 "PAL_Injector": phos_PAL_Injector,
-                "rinse_1": washone,
-                "rinse_2": washtwo,
-                "rinse_3": washthree,
-                "rinse_4": washfour,
+                # "rinse_1": washone,
+                # "rinse_2": washtwo,
+                # "rinse_3": washthree,
+                # "rinse_4": washfour,
+                "rinse_1": 1,
+                "rinse_2": 0,
+                "rinse_3": 1,
+                "rinse_4": 1,
             }
         )
 
@@ -4171,10 +4179,14 @@ def ADSS_PA_CV_TRI_new(
                 "dest_slot": 3,
                 "dest_vial": 52,
                 "PAL_Injector": phos_PAL_Injector,
-                "rinse_1": washone,
-                "rinse_2": washtwo,
-                "rinse_3": washthree,
-                "rinse_4": washfour,
+                # "rinse_1": washone,
+                # "rinse_2": washtwo,
+                # "rinse_3": washthree,
+                # "rinse_4": washfour,
+                "rinse_1": 0,
+                "rinse_2": 0,
+                "rinse_3": 1,
+                "rinse_4": 1,
             }
          )
 ########################
