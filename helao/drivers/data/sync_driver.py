@@ -1360,10 +1360,10 @@ class HelaoSyncer:
                         else:
                             LOGGER.info("hlo file larger than 1GB, converting to parquet.")
                             file_s3_key = (
-                                f"raw_data/{meta['action_uuid']}/{fp.name}.parquet"
+                                f"raw_data/{meta['action_uuid']}/{fp.stem}.parquet"
                             )
                             try:
-                                parquet_path = fp + ".parquet"
+                                parquet_path = str(fp).replace(".hlo", ".parquet")
                                 hlo_to_parquet(fp, parquet_path)
                                 msg = Path(parquet_path)
                             except Exception as err:
@@ -1401,9 +1401,9 @@ class HelaoSyncer:
                             ][0]
                             fileinfo = FileInfo(**meta["files"].pop(file_idx))
                             fileinfo.file_name = str(fp.relative_to(prog.yml.targetdir)).replace("\\", "/")
-                            if fileinfo.file_type == "file":  # generic file
+                            if fileinfo.file_type.endswith("helao__file"):  # generic file
                                 fileinfo.file_type = fileinfo.file_type.replace(
-                                    "file", f"{file_s3_key.split('.')[-1]}_file"
+                                    "helao__file", f"{file_s3_key.split('.')[-1]}__file"
                                 )
                             meta["files"].append(fileinfo)
                         if isinstance(msg, Path):
