@@ -994,7 +994,7 @@ class HelaoSyncer:
             self.s3 = None
             self.s3r = None
         self.bucket = self.config_dict["aws_bucket"]
-        self.api_host = self.config_dict["api_host"]
+        self.api_host = self.config_dict.get("api_host", None)
 
         # self.progress = {}
         self.sequence_objs = {}

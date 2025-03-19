@@ -352,6 +352,9 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         Returns:
             bool: True if the API push was successful, False otherwise.
         """
+        if self.api_host is None:
+            LOGGER.info("Modelyst API is not configured. Skipping to API push.")
+            return True
         req_url = f"https://{self.api_host}/analyses/"
         meta_uuid = req_model["analysis_uuid"]
         LOGGER.info(f"attempting API push for analysis: {meta_uuid}")
