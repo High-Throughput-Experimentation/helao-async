@@ -577,14 +577,24 @@ class HelaoYml:
         Returns:
             List[Path]: A list of Path objects representing the miscellaneous files.
         """
-        return [
-            x
-            for x in self.targetdir.glob("*")
-            if x.is_file()
-            and not x.suffix == ".yml"
-            and not x.suffix == ".hlo"
-            and not x.suffix == ".lock"
-        ]
+        if self.type == "action":
+            return [
+                x
+                for x in self.targetdir.rglob("*")
+                if x.is_file()
+                and not x.suffix == ".yml"
+                and not x.suffix == ".hlo"
+                and not x.suffix == ".lock"
+            ]
+        else:
+            return [
+                x
+                for x in self.targetdir.glob("*")
+                if x.is_file()
+                and not x.suffix == ".yml"
+                and not x.suffix == ".hlo"
+                and not x.suffix == ".lock"
+            ]
 
     @property
     def lock_files(self) -> List[Path]:
@@ -1365,7 +1375,7 @@ class HelaoSyncer:
                                 self.base.print_message(str_err)
                                 msg = None
                     else:
-                        file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}"
+                        file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.relative_to(prog.yml.targetdir)}"
                         msg = fp
                     LOGGER.info(f"Destination: {file_s3_key}")
                     file_success = await self.to_s3(
