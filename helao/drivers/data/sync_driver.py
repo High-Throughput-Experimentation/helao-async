@@ -1375,7 +1375,8 @@ class HelaoSyncer:
                                 self.base.print_message(str_err)
                                 msg = None
                     else:
-                        file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.relative_to(prog.yml.targetdir)}"
+                        rel_posix_path = str(fp.relative_to(prog.yml.targetdir)).replace("\\", "/")
+                        file_s3_key = f"raw_data/{meta['action_uuid']}/{rel_posix_path}"
                         msg = fp
                     LOGGER.info(f"Destination: {file_s3_key}")
                     file_success = await self.to_s3(
@@ -1396,15 +1397,16 @@ class HelaoSyncer:
                             file_idx = [
                                 i
                                 for i, x in enumerate(meta["files"])
-                                if x['file_name'] == fp.name
+                                if x['file_name'] == str(fp.relative_to(prog.yml.targetdir))
                             ][0]
                             fileinfo = FileInfo(**meta["files"].pop(file_idx))
-                            fileinfo.file_name = os.path.basename(file_s3_key)
-                            fileinfo.file_type = fileinfo.file_type.replace(
-                                "file", f"{file_s3_key.split('.')[-1]}_file"
-                            )
+                            fileinfo.file_name = str(fp.relative_to(prog.yml.targetdir)).replace("\\", "/")
+                            if fileinfo.file_type == "file":  # generic file
+                                fileinfo.file_type = fileinfo.file_type.replace(
+                                    "file", f"{file_s3_key.split('.')[-1]}_file"
+                                )
                             meta["files"].append(fileinfo)
-                        if isinstance(msg, Path) and msg.suffix == ".parquet":
+                        if isinstance(msg, Path):
                             LOGGER.info("cleaning up parquet file")
                             msg.unlink()
 
