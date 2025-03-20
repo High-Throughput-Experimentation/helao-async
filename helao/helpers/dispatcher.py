@@ -71,7 +71,8 @@ async def async_action_dispatcher(
             retry_count += 1
             retry_wait = retry_count * timeout / 2
             LOGGER.warning(
-                f"{A.action_server.server_name}/{A.action_name} encountered an error: {e}, sleeping for {retry_wait} seconds before retrying..."
+                f"{A.action_server.server_name}/{A.action_name} encountered an error, sleeping for {retry_wait} seconds before retrying...",
+                exc_info=True,
             )
             await asyncio.sleep(retry_wait)
             response = None
@@ -144,7 +145,8 @@ async def async_private_dispatcher(
             retry_count += 1
             retry_wait = retry_count * timeout / 2
             LOGGER.warning(
-                f"{server_key}/{private_action} POST request encountered an error: {e}, sleeping for {retry_wait} seconds before retrying..."
+                f"{server_key}/{private_action} POST request encountered an error, sleeping for {retry_wait} seconds before retrying...",
+                exc_info=True,
             )
             await asyncio.sleep(retry_wait)
             response = None
