@@ -66,7 +66,9 @@ async def async_action_dispatcher(
                         LOGGER.error(
                             f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}"
                         )
-                success = True
+                        success = False
+                    else:
+                        success = True
         except Exception as e:
             retry_count += 1
             retry_wait = retry_count * timeout / 2
@@ -140,7 +142,9 @@ async def async_private_dispatcher(
                         LOGGER.error(
                             f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')"
                         )
-                success = True
+                        success = False
+                    else:
+                        success = True
         except Exception as e:
             retry_count += 1
             retry_wait = retry_count * timeout / 2
