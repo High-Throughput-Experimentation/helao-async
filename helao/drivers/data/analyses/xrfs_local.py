@@ -29,9 +29,9 @@ class XrfsInputs(AnalysisInput):
         )
         self.process_params = self.xrfs.process_params
         filed = [
-            d for d in self.xrfs.json["files"] if d["file_type"] in ["xrfs_helao__file", "xrfs_helao__json_file"]
+            d for d in self.xrfs.json["files"] if d["file_type"] in ["xrfcount_helao__file"]
         ][0]
-        self.global_sample_label = [x for x in filed["sample"] if "__liquid__" in x][0]
+        self.global_sample_label = [x for x in filed["sample"] if "__solid__" in x][0]
         action_uuid = filed["action_uuid"]
         action_dir = [
             d for d in self.xrfs.json["action_list"] if d["action_uuid"] == action_uuid
@@ -48,7 +48,7 @@ class XrfsInputs(AnalysisInput):
         return self.xrfs_act.hlo
 
     def get_datamodels(self, *args, **kwargs) -> List[AnalysisDataModel]:
-        filename, filetype, datakeys = self.xrfs_act.hlo_file_tup
+        filename, filetype, datakeys = self.xrfs_act.hlo_file_tup_type("xrfcount_helao__file")
         adm = AnalysisDataModel(
             action_uuid=self.xrfs_act.action_uuid,
             run_use=self.xrfs_act.json['run_use'],
@@ -62,14 +62,14 @@ class XrfsInputs(AnalysisInput):
 
 class XrfsOutputs(BaseModel):
     element: list
-    isotope: list
-    value: list
-    fom_key: str
+    counts: list
+    nanomoles: list
+    nanomoles_per_cm2: str
     global_sample_label: str
 
 
 class XrfsAnalysis(BaseAnalysis):
-    """Dry UVIS Analysis for GCLD demonstration."""
+    """XRF quantification with calibration standards."""
     analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID
@@ -90,7 +90,7 @@ class XrfsAnalysis(BaseAnalysis):
         local_loader: LocalLoader,
         analysis_params: dict,
     ):
-        self.analysis_name = "ICPMS_Concentration"
+        self.analysis_name = "XRFS_quantification_analysis"
         self.analysis_timestamp = datetime.now()
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
         self.analysis_params.update(analysis_params)
@@ -100,7 +100,7 @@ class XrfsAnalysis(BaseAnalysis):
         # additional attrs
         self.process_timestamp = self.inputs.xrfs.process_timestamp
         self.process_name = self.inputs.xrfs.technique_name
-        self.run_type = self.inputs.xrfs.meta_dict.get("run_type", "icpm")
+        self.run_type = self.inputs.xrfs.meta_dict.get("run_type", "xrfs")
         self.technique_name = self.inputs.xrfs.technique_name
 
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)

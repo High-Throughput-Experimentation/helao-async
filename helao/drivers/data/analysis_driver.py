@@ -38,6 +38,7 @@ from helao.drivers.data.analyses.echeuvis_stability import (
 )
 from helao.drivers.data.analyses.uvis_bkgsubnorm import DryUvisAnalysis, DRYUVIS_QUERY
 from helao.drivers.data.analyses.icpms_local import IcpmsAnalysis
+from helao.drivers.data.analyses.xrfs_local import XrfsAnalysis
 
 
 class HelaoAnalysisSyncer(HelaoSyncer):
@@ -558,6 +559,35 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     local_loader,
                     params,
                     IcpmsAnalysis,
+                )
+            )
+
+    async def batch_calc_xrfs_local(
+        self,
+        sequence_zip_path: str = "",
+        params: dict = {},
+    ):
+        """
+        Asynchronously calculates XRF (X-Ray Fluorescence) calibration analysis for a batch of processes 
+        from a local sequence zip file.
+
+        Args:
+            sequence_zip_path (str): The path to the sequence zip file containing the processes.
+            params (dict): A dictionary of parameters to be used in the XRF analysis.
+
+        Returns:
+            None
+        """
+        local_loader = LocalLoader(sequence_zip_path)
+        pdf = local_loader.processes
+
+        for puuid in pdf.process_uuid:
+            await self.enqueue_calc(
+                (
+                    puuid,
+                    local_loader,
+                    params,
+                    XrfsAnalysis,
                 )
             )
 

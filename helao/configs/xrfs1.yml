@@ -1,0 +1,48 @@
+dummy: false
+simulation: false
+experiment_libraries:
+  - samples_exp
+  - XRFS_exp
+  - TEST_exp
+sequence_libraries:
+  - XRFS_seq
+  - TEST_seq
+run_type: xrfs
+root: C:\INST_hlo
+servers:
+  ORCH:
+    host: hte-xrfs-01.htejcap.caltech.edu
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params:
+      enable_op: true
+      bokeh_port: 5002
+  PAL:
+    host: hte-xrfs-01.htejcap.caltech.edu
+    port: 8007
+    group: action
+    fast: pal_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
+  DB:
+    host: hte-xrfs-01.htejcap.caltech.edu
+    port: 8010
+    group: action
+    fast: dbpack_server
+    params:
+      aws_config_path: k:/users/hte/.credentials/aws_config.ini
+      aws_profile: default
+      aws_bucket: helao.data
+      api_host: caltech-api.modelyst.com
+      testing: false
+  ANA:
+    host: hte-xrfs-01.htejcap.caltech.edu
+    port: 8014
+    group: action
+    fast: analysis_server
+    params:
+      env_file: k:/users/hte/.credentials/helao_data.env
+      local_only: false

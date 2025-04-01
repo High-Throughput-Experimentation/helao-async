@@ -437,17 +437,22 @@ class HelaoAction(HelaoModel):
         self.action_timestamp = self.timestamp
         self.action_params = self.params
 
-    @property
-    def hlo_file_tup(self):
+    def hlo_file_tup_type(self, contains: str = ""):
         """Return primary .hlo filename, filetype, and data keys for this action."""
         meta = self.json
         file_list = meta.get("files", [])
         hlo_files = [x for x in file_list if x["file_name"].endswith(".hlo")]
+        if contains:
+            hlo_files = [x for x in hlo_files if contains x["file_type"]]
         if not hlo_files:
             return "", "", []
         first_hlo = hlo_files[0]
         retkeys = ["file_name", "file_type", "data_keys"]
         return [first_hlo.get(k, "") for k in retkeys]
+
+    @property
+    def hlo_file_tup(self):
+        return self.hlo_file_tup_type()
 
     @property
     def hlo_file(self):
