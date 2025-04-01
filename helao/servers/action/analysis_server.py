@@ -120,6 +120,23 @@ def makeApp(confPrefix, server_key, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+    @app.post(f"/{server_key}/analyze_xrfs_local", tags=["action"])
+    async def analyze_xrfs_local(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        sequence_zip_path: str = "",
+        params: dict = {},
+    ):
+        """Generates XRFS calibration analyses from sequence zip path."""
+        active = await app.base.setup_and_contain_action()
+            
+        await app.driver.batch_calc_xrfs_local(
+            sequence_zip_path=active.action.action_params['sequence_zip_path'],
+            params=active.action.action_params['params'],
+        )
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
     @app.post("/list_running_tasks", tags=["private"])
     def list_current_tasks():
         return list(app.driver.running_tasks.keys())
