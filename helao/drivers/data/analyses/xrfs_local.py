@@ -1,10 +1,14 @@
+import os
+import re
 import sys
-from copy import copy
+from glob import glob
 from uuid import UUID
 from datetime import datetime
 from typing import List
 
 from pydantic import BaseModel
+import numpy as np
+import pandas as pd
 
 from helao.core.version import get_filehash
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
@@ -12,9 +16,7 @@ from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
 from .base_analysis import BaseAnalysis
 from ...data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
 
-ANALYSIS_DEFAULTS = {
-    "fom_key": "ExtCal.Concentration_ppb",
-}
+CM_SCALE = {"nm": 1e-7, "um": 1e-4, "mm": 0.1, "cm": 1}
 
 
 class XrfsInputs(AnalysisInput):
@@ -29,7 +31,9 @@ class XrfsInputs(AnalysisInput):
         )
         self.process_params = self.xrfs.process_params
         filed = [
-            d for d in self.xrfs.json["files"] if d["file_type"] in ["xrfcount_helao__file"]
+            d
+            for d in self.xrfs.json["files"]
+            if d["file_type"] in ["xrfcount_helao__file"]
         ][0]
         self.global_sample_label = [x for x in filed["sample"] if "__solid__" in x][0]
         action_uuid = filed["action_uuid"]
@@ -44,14 +48,16 @@ class XrfsInputs(AnalysisInput):
         )
 
     @property
-    def mass_spec(self):
+    def counts(self):
         return self.xrfs_act.hlo
 
     def get_datamodels(self, *args, **kwargs) -> List[AnalysisDataModel]:
-        filename, filetype, datakeys = self.xrfs_act.hlo_file_tup_type("xrfcount_helao__file")
+        filename, filetype, datakeys = self.xrfs_act.hlo_file_tup_type(
+            "xrfcount_helao__file"
+        )
         adm = AnalysisDataModel(
             action_uuid=self.xrfs_act.action_uuid,
-            run_use=self.xrfs_act.json['run_use'],
+            run_use=self.xrfs_act.json["run_use"],
             raw_data_path=f"raw_data/{self.xrfs_act.action_uuid}/{filename}",
             global_sample_label=self.global_sample_label,
             file_name=filename,
@@ -60,16 +66,21 @@ class XrfsInputs(AnalysisInput):
         )
         return [adm]
 
+
 class XrfsOutputs(BaseModel):
     element: list
+    transition: list
     counts: list
     nanomoles: list
-    nanomoles_per_cm2: str
+    nanomoles_2sig: list
+    nanomoles_per_cm2: list
+    atomic_fraction: list
     global_sample_label: str
 
 
 class XrfsAnalysis(BaseAnalysis):
     """XRF quantification with calibration standards."""
+
     analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID
@@ -79,7 +90,7 @@ class XrfsAnalysis(BaseAnalysis):
     process_name: str
     run_type: str
     technique_name: str
-    inputs: AnalysisInput
+    inputs: XrfsInputs
     outputs: XrfsOutputs
     analysis_codehash: str
     global_sample_label: str
@@ -92,8 +103,8 @@ class XrfsAnalysis(BaseAnalysis):
     ):
         self.analysis_name = "XRFS_quantification_analysis"
         self.analysis_timestamp = datetime.now()
-        self.analysis_params = copy(ANALYSIS_DEFAULTS)
-        self.analysis_params.update(analysis_params)
+        self.analysis_params = analysis_params
+        # from analysis params, need (1) list of elements to normalize, (2) calibration file path
         self.inputs = XrfsInputs(process_uuid, local_loader)
         self.process_uuid = self.inputs.xrfs.process_uuid
 
@@ -110,15 +121,100 @@ class XrfsAnalysis(BaseAnalysis):
     def calc_output(self):
         """Calculate stability FOMs and intermediate vectors."""
 
-        fom_key = self.analysis_params["fom_key"]
-        _, hlo_data = self.inputs.mass_spec
+        _, hlo_data = self.inputs.counts
+        hlo_els = hlo_data["element"]
+        hlo_counts = hlo_data["cps"]
+
+        area_str = self.inputs.process_params["spot_size"]
+        kv = self.inputs.process_params["voltage_kv"]
+        current = self.inputs.process_params["current_ma"]
+
+        diam_str, unit = re.findall(r"([0-9]+)[\s]*([a-z]+)", area_str)[0]
+        diam = float(diam_str)
+        unit = unit.strip()
+
+        area = CM_SCALE[unit] * (diam / 2) ** 2 * 3.14159
+
+        calib_prefix = f"{kv:.0f}-{current:.0f}-{diam_str.strip()}-vacu-"
+        calib_path = self.analysis_params.get("calibration_file_path", "")
+
+        norm_els = self.analysis_params.get("norm_elements", [])
+        if not norm_els:
+            seq_dir = os.path.basename(
+                os.path.dirname(
+                    os.path.dirname(self.inputs.xrfs_act.meta_dict["action_output_dir"])
+                )
+            )
+            seq_label = seq_dir.split("__")[-1]
+            norm_els = [
+                x
+                for x in re.findall("([A-Z]+[a-z]*)", seq_label)
+                if x not in ("O", "Ar", "N", "H")
+            ]
+
+        if not calib_path:
+            calib_libs = glob(
+                rf"K:\experiments\xrfs\user\calibration_libraries\{calib_prefix}*.csv"
+            )
+            latest_lib = sorted(
+                calib_libs, key=lambda x: int(x.split("__")[-1].split("-")[0])
+            )[0]
+            calib_path = latest_lib
+
+        calibd = pd.read_csv(calib_path).set_index("transition").to_dict("index")
+
+        elements = []
+        transitions = []
+        counts = []
+        nanomoles = []
+        nanomoles_2sig = []
+        nanomoles_per_cm2 = []
+
+        for trans, count in zip(hlo_els, hlo_counts):
+            elements.append(trans.split(".")[0])
+            transitions.append(trans)
+            counts.append(count)
+            if trans in calibd:
+                tdict = calibd[trans]
+                nanomoles.append(count * tdict["nmol.CPS"])
+                nanomoles_2sig.append(count * tdict["relerr_nmol.CPS"])
+                nanomoles_per_cm2.append(count * tdict["nmol.CPS"] / area)
+            else:
+                nanomoles.append(np.nan)
+                nanomoles_2sig.append(np.nan)
+                nanomoles_per_cm2.append(np.nan)
+
+        # atomic_fraction
+        norm_nmoles = []
+        norm_trans = []
+
+        for el in norm_els:
+            if len([x for x in elements if x == el]) > 1:
+                el_trans = sorted(
+                    [x for x in transitions if x.startswith(f"{el}.") and x in calibd]
+                )
+            else:
+                el_trans = [
+                    x for x in transitions if x.startswith(f"{el}.") and x in calibd
+                ]
+            norm_nmoles.append(nanomoles[transitions.index(el_trans[-1])])
+            norm_trans.append(el_trans[-1])
+
+        sum_nanomoles = sum(norm_nmoles)
+        atomic_fraction = [
+            np.nan if trans not in norm_trans else nmoles / sum_nanomoles
+            for trans, nmoles in zip(transitions, nanomoles)
+        ]
 
         # create output model
         self.outputs = XrfsOutputs(
-            element=hlo_data["element"],
-            isotope=hlo_data["isotope"],
-            value=hlo_data[fom_key],
-            fom_key=fom_key,
+            element=elements,
+            transition=transitions,
+            counts=counts,
+            nanomoles=nanomoles,
+            nanomoles_2sig=nanomoles_2sig,
+            nanomoles_per_cm2=nanomoles_per_cm2,
+            atomic_fraction=atomic_fraction,
             global_sample_label=self.global_sample_label,
         )
         return True
