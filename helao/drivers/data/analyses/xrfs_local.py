@@ -33,7 +33,12 @@ class XrfsInputs(AnalysisInput):
         filed = [
             d
             for d in self.xrfs.json["files"]
-            if d["file_type"] in ["xrfcount_helao__file"]
+            if d["file_type"]
+            in [
+                "xrfcount_helao__file",
+                "xrfcount_json__file",
+                "xrfcount_helao__json_file",
+            ]
         ][0]
         self.global_sample_label = [x for x in filed["sample"] if "__solid__" in x][0]
         action_uuid = filed["action_uuid"]
