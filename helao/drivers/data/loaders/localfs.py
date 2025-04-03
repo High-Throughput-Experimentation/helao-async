@@ -443,7 +443,7 @@ class HelaoAction(HelaoModel):
         file_list = meta.get("files", [])
         hlo_files = [x for x in file_list if x["file_name"].endswith(".hlo")]
         if contains:
-            hlo_files = [x for x in hlo_files if contains x["file_type"]]
+            hlo_files = [x for x in hlo_files if contains in x["file_type"]]
         if not hlo_files:
             return "", "", []
         first_hlo = hlo_files[0]
