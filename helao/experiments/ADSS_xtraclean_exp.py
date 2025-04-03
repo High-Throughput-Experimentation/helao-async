@@ -2310,13 +2310,14 @@ def ADSS_sub_keep_electrolyte(
 # need to move to clean spot first before beginning clean
 def ADSS_sub_clean_cell(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,   #4 introduces manual pause for water injection/circulation/drain
     Clean_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     PurgeWait_s: float = 3,
-    ReturnLineWait_s: float = 30,
-    DrainWait_s: float = 60,
-    ReturnLineReverseWait_s: float = 5,
+    ReturnLineWait_s: float = 60,
+    DrainWait_s: float = 80,
+    ReturnLineReverseWait_s: float = 15,
+    Watercleancycle: bool = True,
     lift: bool = False,
     #    ResidualWait_s: float = 15,
 ):
@@ -2378,6 +2379,27 @@ def ADSS_sub_clean_cell(
             # ResidualWait_s=ResidualWait_s,
         )
     )
+
+    if Watercleancycle:
+        apm.add(ORCH_server, "interrupt", {"reason": "Manual injection of water"})
+
+
+        apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
+        apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
+        apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+
+
+        apm.add_action_list(
+            ADSS_sub_drain_cell(
+                experiment=experiment,
+                DrainWait_s=DrainWait_s,
+                ReturnLineReverseWait_s=ReturnLineReverseWait_s,
+                # ResidualWait_s=ResidualWait_s,
+            )
+        )
+
+
     if lift:
         apm.add(MOTOR_server, "z_move", {"z_position": "load"})
 
