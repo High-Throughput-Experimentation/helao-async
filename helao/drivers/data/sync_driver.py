@@ -1423,14 +1423,23 @@ class HelaoSyncer:
                             fileinfo.file_name = str(
                                 fp.relative_to(prog.yml.targetdir)
                             ).replace("\\", "/")
+                            if "." in file_s3_key.split("/")[-1]:
+                                fileinfo.file_name = fileinfo.file_name.replace(
+                                    f"{fp.suffix}", f".{file_s3_key.split('.')[-1]}"
+                                )
+                            else:
+                                fileinfo.file_name = fileinfo.file_name.replace(
+                                    f"{fp.suffix}", ""
+                                )
                             if fileinfo.file_type.endswith(
                                 "helao__file"
                             ):  # generic file
                                 fileinfo.file_type = fileinfo.file_type.replace(
-                                    "helao__file", f"helao__{file_s3_key.split('.')[-1]}_file"
+                                    "helao__file",
+                                    f"helao__{file_s3_key.split('.')[-1]}_file",
                                 )
                             meta["files"].append(fileinfo.model_dump())
-                        if isinstance(msg, Path):
+                        if isinstance(msg, Path) and msg.suffix == ".parquet":
                             LOGGER.info("cleaning up parquet file")
                             msg.unlink()
 
