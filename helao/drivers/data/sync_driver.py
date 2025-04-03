@@ -1427,7 +1427,7 @@ class HelaoSyncer:
                                 "helao__file"
                             ):  # generic file
                                 fileinfo.file_type = fileinfo.file_type.replace(
-                                    "helao__file", f"{file_s3_key.split('.')[-1]}__file"
+                                    "helao__file", f"helao__{file_s3_key.split('.')[-1]}_file"
                                 )
                             meta["files"].append(fileinfo.model_dump())
                         if isinstance(msg, Path):
