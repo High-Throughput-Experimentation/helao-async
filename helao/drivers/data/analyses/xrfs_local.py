@@ -163,7 +163,7 @@ class XrfsAnalysis(BaseAnalysis):
             )
             latest_lib = sorted(
                 calib_libs, key=lambda x: int(x.split("__")[-1].split("-")[0])
-            )[0]
+            )[-1]
             calib_path = latest_lib
 
         calibd = pd.read_csv(calib_path).set_index("transition").to_dict("index")
