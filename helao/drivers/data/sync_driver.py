@@ -1,8 +1,8 @@
 """
 sync_driver.py
 
-This module provides classes and functions for synchronizing Helao YAML files with S3 and an API. 
-It includes functionality for converting dictionaries to JSON, moving files between directories, 
+This module provides classes and functions for synchronizing Helao YAML files with S3 and an API.
+It includes functionality for converting dictionaries to JSON, moving files between directories,
 and handling synchronization progress.
 
 Classes:
@@ -15,6 +15,7 @@ Functions:
     move_to_synced(file_path: Path): Moves a file from the RUNS_FINISHED directory to the RUNS_SYNCED directory.
     revert_to_finished(file_path: Path): Moves a file from the RUNS_SYNCED directory to the RUNS_FINISHED directory.
 """
+
 __all__ = ["HelaoYml", "Progress", "HelaoSyncer"]
 
 import os
@@ -38,6 +39,7 @@ import gzip
 # from filelock import FileLock
 
 from helao.helpers import logging
+
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
@@ -123,8 +125,8 @@ def revert_to_finished(file_path: Path):
     """
     Reverts the state of a file path from "RUNS_SYNCED" to "RUNS_FINISHED".
 
-    This function takes a file path, changes the directory name from "RUNS_SYNCED" 
-    to "RUNS_FINISHED", creates the necessary directories if they do not exist, 
+    This function takes a file path, changes the directory name from "RUNS_SYNCED"
+    to "RUNS_FINISHED", creates the necessary directories if they do not exist,
     and moves the file to the new path.
 
     Args:
@@ -161,79 +163,80 @@ class HelaoYml:
     Methods:
         __init__(self, target: Union[Path, str]):
             Initializes the HelaoYml object with the given target path.
-        
+
         parts(self):
             Returns the parts of the target path as a list.
-        
+
         check_paths(self):
             Checks if the target path exists and updates the target path if necessary.
-        
+
         exists(self):
             Checks if the target path exists.
-        
+
         __repr__(self):
             Returns a string representation of the HelaoYml object.
-        
+
         type(self):
             Returns the type of the YAML file based on its stem.
-        
+
         timestamp(self):
             Returns the timestamp of the YAML file based on its stem.
-        
+
         status(self):
             Returns the status of the YAML file based on its directory.
-        
+
         rename(self, status: str) -> str:
             Renames the target path with the given status.
-        
+
         status_idx(self):
             Returns the index of the status in the parts of the target path.
-        
+
         relative_path(self):
             Returns the relative path of the target path.
-        
+
         active_path(self):
             Returns the active path of the target path.
-        
+
         finished_path(self):
             Returns the finished path of the target path.
-        
+
         synced_path(self):
             Returns the synced path of the target path.
-        
+
         cleanup(self):
             Removes empty directories in RUNS_ACTIVE or RUNS_FINISHED.
-        
+
         list_children(self, yml_path: Path):
             Lists the children YAML files in the given path.
-        
+
         active_children(self) -> list:
             Returns the active children YAML files.
-        
+
         finished_children(self) -> list:
             Returns the finished children YAML files.
-        
+
         synced_children(self) -> list:
             Returns the synced children YAML files.
-        
+
         children(self) -> list:
             Returns all children YAML files sorted by timestamp.
-        
+
         misc_files(self) -> List[Path]:
             Returns a list of miscellaneous files in the target directory.
-        
+
         lock_files(self) -> List[Path]:
             Returns a list of lock files in the target directory.
-        
+
         hlo_files(self) -> List[Path]:
             Returns a list of HLO files in the target directory.
-        
+
         parent_path(self) -> Path:
             Returns the parent path of the target YAML file.
-        
+
         write_meta(self, meta_dict: dict):
             Writes the given metadata dictionary to the target YAML file.
     """
+
     target: Path
     targetdir: Path
 
@@ -414,8 +417,8 @@ class HelaoYml:
         """
         Determine the index of the first element in `self.parts` that matches any of the valid statuses.
 
-        The method checks each element in `self.parts` to see if it matches any of the statuses in 
-        `valid_statuses` ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED"). It returns the index of the 
+        The method checks each element in `self.parts` to see if it matches any of the statuses in
+        `valid_statuses` ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED"). It returns the index of the
         first matching element.
 
         Returns:
@@ -629,7 +632,7 @@ class HelaoYml:
         Determines the parent path based on the type of the current instance.
 
         If the type is "sequence", it returns the target path.
-        Otherwise, it searches for YAML files in the parent directories of 
+        Otherwise, it searches for YAML files in the parent directories of
         active_path, finished_path, and synced_path, and returns the first match.
 
         Returns:
@@ -681,28 +684,29 @@ class Progress:
     Methods:
         __init__(path: Union[Path, str]):
             Initializes the Progress object with the given path.
-        
+
         yml:
             Property to get the HelaoYml object from the ymlpath.
-        
+
         list_unfinished_procs():
             Returns a pair of lists with non-synced s3 and api processes.
-        
+
         read_dict():
             Reads the progress dictionary from the .prg file.
-        
+
         write_dict(new_dict: Optional[Dict] = None):
             Writes the progress dictionary to the .prg file.
-        
+
         s3_done:
             Property to check if s3 synchronization is done.
-        
+
         api_done:
             Property to check if api synchronization is done.
-        
+
         remove_prg():
             Removes the .prg file.
     """
+
     ymlpath: HelaoYml
     prg: Path
     dict: Dict
@@ -797,11 +801,11 @@ class Progress:
         """
         Returns a pair of lists with non-synced S3 and API processes.
 
-        This method checks the type of the YAML configuration. If the type is 
-        "experiment", it identifies processes that are present in the 
-        "process_groups" but not in "process_s3" and "process_api". These 
-        processes are considered unfinished and are returned as two separate 
-        lists: one for S3 and one for API. If the type is not "experiment", 
+        This method checks the type of the YAML configuration. If the type is
+        "experiment", it identifies processes that are present in the
+        "process_groups" but not in "process_s3" and "process_api". These
+        processes are considered unfinished and are returned as two separate
+        lists: one for S3 and one for API. If the type is not "experiment",
         it returns two empty lists.
 
         Returns:
@@ -837,8 +841,8 @@ class Progress:
         Writes a dictionary to a file in YAML format.
 
         Args:
-            new_dict (Optional[Dict], optional): The dictionary to write. If None, 
-                                                 the instance's dictionary (`self.dict`) 
+            new_dict (Optional[Dict], optional): The dictionary to write. If None,
+                                                 the instance's dictionary (`self.dict`)
                                                  will be written. Defaults to None.
 
         Returns:
@@ -880,7 +884,7 @@ class Progress:
 
 class HelaoSyncer:
     """
-    HelaoSyncer is a class responsible for synchronizing YAML files to S3 and an API. 
+    HelaoSyncer is a class responsible for synchronizing YAML files to S3 and an API.
     It manages tasks, handles file uploads, and ensures data consistency across different storage systems.
 
     Attributes:
@@ -952,6 +956,7 @@ class HelaoSyncer:
         unsync_dir(self, sync_dir: str):
             Reverts a synced directory back to the RUNS_FINISHED state.
     """
+
     progress: Dict[str, Progress]
     base: Base
     running_tasks: dict
@@ -1029,11 +1034,11 @@ class HelaoSyncer:
             remove_target (str): The path of the directory to be removed.
 
         Returns:
-            bool: True if the directory (and any subdirectories) were successfully removed, 
+            bool: True if the directory (and any subdirectories) were successfully removed,
                   False otherwise.
 
         Raises:
-            Exception: If an error occurs while attempting to remove the directory, 
+            Exception: If an error occurs while attempting to remove the directory,
                        an error message will be logged.
         """
         success = False
@@ -1046,7 +1051,9 @@ class HelaoSyncer:
                 tb = "".join(
                     traceback.format_exception(type(err), err, err.__traceback__)
                 )
-                LOGGER.error(f"Directory {remove_target} is empty, but could not removed. {repr(err), tb,}")
+                LOGGER.error(
+                    f"Directory {remove_target} is empty, but could not removed. {repr(err), tb,}"
+                )
         else:
             sub_dirs = [x for x in contents if os.path.isdir(x)]
             sub_success = False
@@ -1202,7 +1209,9 @@ class HelaoSyncer:
         # return self.progress[yml_path.name]
         return prog
 
-    async def enqueue_yml( self, upath: Union[Path, str], rank: int = 5, rank_limit: int = -5):
+    async def enqueue_yml(
+        self, upath: Union[Path, str], rank: int = 5, rank_limit: int = -5
+    ):
         """
         Enqueue a YAML file to the task queue with a specified rank.
 
@@ -1221,13 +1230,17 @@ class HelaoSyncer:
         """
         yml_path = Path(upath) if isinstance(upath, str) else upath
         if rank < rank_limit:
-            LOGGER.info(f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request.")
+            LOGGER.info(
+                f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request."
+            )
         # elif yml_path.name in self.task_set:
         #     self.base.print_message(
         #         f"{str(yml_path)} is already queued, skipping enqueue request."
         #     )
         elif yml_path.name in self.running_tasks:
-            LOGGER.info(f"{str(yml_path)} is already running, skipping enqueue request.")
+            LOGGER.info(
+                f"{str(yml_path)} is already running, skipping enqueue request."
+            )
         else:
             # self.task_set.add(yml_path.name)
             await self.task_queue.put((rank, yml_path))
@@ -1299,7 +1312,9 @@ class HelaoSyncer:
         # first check if child objects are registered with API (non-actions)
         if prog.yml.type != "action":
             if prog.yml.active_children:
-                LOGGER.info(f"Cannot sync {str(prog.yml.target)}, children are still 'active'.")
+                LOGGER.info(
+                    f"Cannot sync {str(prog.yml.target)}, children are still 'active'."
+                )
                 return False
             if prog.yml.finished_children:
                 # self.base.print_message(
@@ -1358,7 +1373,9 @@ class HelaoSyncer:
                                 file_data = {}
                             msg = {"meta": file_meta, "data": file_data}
                         else:
-                            LOGGER.info("hlo file larger than 1GB, converting to parquet.")
+                            LOGGER.info(
+                                "hlo file larger than 1GB, converting to parquet."
+                            )
                             file_s3_key = (
                                 f"raw_data/{meta['action_uuid']}/{fp.stem}.parquet"
                             )
@@ -1375,7 +1392,9 @@ class HelaoSyncer:
                                 self.base.print_message(str_err)
                                 msg = None
                     else:
-                        rel_posix_path = str(fp.relative_to(prog.yml.targetdir)).replace("\\", "/")
+                        rel_posix_path = str(
+                            fp.relative_to(prog.yml.targetdir)
+                        ).replace("\\", "/")
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{rel_posix_path}"
                         msg = fp
                     LOGGER.info(f"Destination: {file_s3_key}")
@@ -1397,15 +1416,20 @@ class HelaoSyncer:
                             file_idx = [
                                 i
                                 for i, x in enumerate(meta["files"])
-                                if x['file_name'] == str(fp.relative_to(prog.yml.targetdir))
+                                if x["file_name"]
+                                == str(fp.relative_to(prog.yml.targetdir))
                             ][0]
                             fileinfo = FileInfo(**meta["files"].pop(file_idx))
-                            fileinfo.file_name = str(fp.relative_to(prog.yml.targetdir)).replace("\\", "/")
-                            if fileinfo.file_type.endswith("helao__file"):  # generic file
+                            fileinfo.file_name = str(
+                                fp.relative_to(prog.yml.targetdir)
+                            ).replace("\\", "/")
+                            if fileinfo.file_type.endswith(
+                                "helao__file"
+                            ):  # generic file
                                 fileinfo.file_type = fileinfo.file_type.replace(
                                     "helao__file", f"{file_s3_key.split('.')[-1]}__file"
                                 )
-                            meta["files"].append(fileinfo)
+                            meta["files"].append(fileinfo.model_dump())
                         if isinstance(msg, Path):
                             LOGGER.info("cleaning up parquet file")
                             msg.unlink()
@@ -1422,7 +1446,9 @@ class HelaoSyncer:
                 s3_unf, api_unf = prog.list_unfinished_procs()
                 retry_count += 1
             if s3_unf or api_unf:
-                LOGGER.info(f"Processes in {str(prog.yml.target)} did not sync after 3 tries.")
+                LOGGER.info(
+                    f"Processes in {str(prog.yml.target)} did not sync after 3 tries."
+                )
                 return False
             if prog.dict["process_metas"]:
                 meta["process_list"] = [
@@ -1432,9 +1458,7 @@ class HelaoSyncer:
 
         LOGGER.info(f"Patching model for {prog.yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
-        meta = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(
-            strip_private=True
-        )
+        meta = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(strip_private=True)
 
         # patch technique lists in meta
         tech_name = meta.get("technique_name", "NA")
@@ -1690,7 +1714,7 @@ class HelaoSyncer:
 
     async def sync_process(self, exp_prog: Progress, force: bool = False):
         """
-        Synchronizes the progress of processes by checking unfinished processes and 
+        Synchronizes the progress of processes by checking unfinished processes and
         pushing their metadata to S3 or an API if certain conditions are met.
 
         Args:
@@ -1881,9 +1905,13 @@ class HelaoSyncer:
                                 api_success = True
                             elif resp.status == 400:
                                 try_create = False
-                            LOGGER.info(f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}")
+                            LOGGER.info(
+                                f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}"
+                            )
                             last_response = await resp.json()
-                            LOGGER.info(f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}")
+                            LOGGER.info(
+                                f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}"
+                            )
                             last_status = resp.status
                     except Exception as e:
                         LOGGER.info(f"[{i+1}/{retries}] an exception occurred: {e}")
@@ -1911,12 +1939,18 @@ class HelaoSyncer:
                         try:
                             async with session.post(fail_url, json=fail_model) as resp:
                                 if resp.status == 200:
-                                    LOGGER.info(f"successful debug API push for {meta_type}: {meta_uuid}")
+                                    LOGGER.info(
+                                        f"successful debug API push for {meta_type}: {meta_uuid}"
+                                    )
                                     break
-                                LOGGER.info(f"failed debug API push for {meta_type}: {meta_uuid}")
+                                LOGGER.info(
+                                    f"failed debug API push for {meta_type}: {meta_uuid}"
+                                )
                                 LOGGER.info(f"response: {await resp.json()}")
                         except TimeoutError:
-                            LOGGER.info(f"unable to post failure model for {meta_type}: {meta_uuid}")
+                            LOGGER.info(
+                                f"unable to post failure model for {meta_type}: {meta_uuid}"
+                            )
                             await asyncio.sleep(30)
         return api_success
 
@@ -2048,7 +2082,9 @@ class HelaoSyncer:
             # base_prgs = act_prgs + exp_prgs + seq_prgs
 
             if not base_prgs:
-                LOGGER.info(f"Did not find any .prg or .progress files in subdirectories of {sync_path}")
+                LOGGER.info(
+                    f"Did not find any .prg or .progress files in subdirectories of {sync_path}"
+                )
                 self.unsync_dir(sync_path)
 
             else:
@@ -2071,7 +2107,9 @@ class HelaoSyncer:
                             os.path.join(base_dir, "**", "*.lock"), recursive=True
                         )
                     ]
-                    LOGGER.info(f"Removing {len(base_prgs) + len(sub_lock)} prg and progress files in subdirectories of {base_dir}")
+                    LOGGER.info(
+                        f"Removing {len(base_prgs) + len(sub_lock)} prg and progress files in subdirectories of {base_dir}"
+                    )
                     for sp in sub_prgs + sub_lock:
                         os.remove(sp)
 
@@ -2080,9 +2118,13 @@ class HelaoSyncer:
 
             seq_zips = glob(os.path.join(sync_path, "**", "*.zip"), recursive=True)
             if not seq_zips:
-                LOGGER.info(f"Did not find any zip files in subdirectories of {sync_path}")
+                LOGGER.info(
+                    f"Did not find any zip files in subdirectories of {sync_path}"
+                )
             else:
-                LOGGER.info(f"Found {len(seq_zips)} zip files in subdirectories of {sync_path}")
+                LOGGER.info(
+                    f"Found {len(seq_zips)} zip files in subdirectories of {sync_path}"
+                )
                 for seq_zip in seq_zips:
                     self.reset_sync(seq_zip)
             return True
@@ -2095,13 +2137,13 @@ class HelaoSyncer:
     def unsync_dir(self, sync_dir: str):
         """
         Reverts the synchronization of a directory by performing the following actions:
-        
+
         1. Removes files with extensions .lock, .progress, or .prg.
         2. Moves all other files to a corresponding directory in "RUNS_FINISHED".
-        
+
         Args:
             sync_dir (str): The path to the directory to be unsynchronized.
-        
+
         Logs:
             A warning message indicating the successful reversion of the directory.
         """
