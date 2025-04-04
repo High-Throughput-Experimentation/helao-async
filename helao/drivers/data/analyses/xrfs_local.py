@@ -166,6 +166,9 @@ class XrfsAnalysis(BaseAnalysis):
             )[-1]
             calib_path = latest_lib
 
+        self.analysis_params["calibration_file_path"] = calib_path
+        self.analysis_params["norm_elements"] = norm_els
+
         calibd = pd.read_csv(calib_path).set_index("transition").to_dict("index")
 
         elements = []
