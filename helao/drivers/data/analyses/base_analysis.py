@@ -132,7 +132,6 @@ class BaseAnalysis:
                 out_model = AnalysisOutputModel(
                     analysis_output_path=S3Locator(
                         bucket=bucket,
-                        # key=f"analysis/{self.analysis_uuid}_output_{label}.json.gz",
                         key=f"analysis/{self.analysis_uuid}_output_{label}.json",
                         region=region,
                     ),
