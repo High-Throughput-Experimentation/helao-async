@@ -351,9 +351,10 @@ class Orch(Base):
             "sequence": self.last_50_sequence_uuids,
         }
 
-        while len(OBJ_MAP[obj_type]) >= 50:
-            OBJ_MAP[obj_type].pop(0)
-        OBJ_MAP[obj_type].append(obj_uuid)
+        if obj_uuid not in OBJ_MAP[obj_type]:
+            while len(OBJ_MAP[obj_type]) >= 50:
+                OBJ_MAP[obj_type].pop(0)
+            OBJ_MAP[obj_type].append(obj_uuid)
 
     def register_action_uuid(self, action_uuid):
         """
