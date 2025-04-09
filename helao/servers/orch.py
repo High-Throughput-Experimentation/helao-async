@@ -209,6 +209,8 @@ class Orch(Base):
         # holder for tracking dispatched action in status
         self.last_dispatched_action_uuid = None
         self.last_50_action_uuids = []
+        self.last_50_experiment_uuids = []
+        self.last_50_sequence_uuids = []
         self.last_action_uuid = ""
         self.last_interrupt = time.time()
         # hold schema objects
@@ -333,6 +335,26 @@ class Orch(Base):
             if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
                 self.endpoint_queues[urld["name"]] = Queue()
 
+    def register_obj_uuid(self, obj_uuid, obj_type: str):
+        """
+        Registers a new object UUID in the list of the last 50 object UUIDs.
+
+        This method ensures that the list of object UUIDs does not exceed 50 entries.
+        If the list is full, the oldest UUID is removed before adding the new one.
+
+        Args:
+            obj_uuid (str): The UUID of the object to be registered.
+        """
+        OBJ_MAP = {
+            "action": self.last_50_action_uuids,
+            "experiment": self.last_50_experiment_uuids,
+            "sequence": self.last_50_sequence_uuids,
+        }
+
+        while len(OBJ_MAP[obj_type]) >= 50:
+            OBJ_MAP[obj_type].pop(0)
+        OBJ_MAP[obj_type].append(obj_uuid)
+
     def register_action_uuid(self, action_uuid):
         """
         Registers a new action UUID in the list of the last 50 action UUIDs.
@@ -343,9 +365,7 @@ class Orch(Base):
         Args:
             action_uuid (str): The UUID of the action to be registered.
         """
-        while len(self.last_50_action_uuids) >= 50:
-            self.last_50_action_uuids.pop(0)
-        self.last_50_action_uuids.append(action_uuid)
+        self.register_obj_uuid(action_uuid, "action")
 
     def track_action_uuid(self, action_uuid):
         """
@@ -456,7 +476,10 @@ class Orch(Base):
                 self.incoming = interrupt
                 await self.globstat_q.put(interrupt.as_json())
 
-        if pending_action is not None and self.globalstatusmodel.loop_intent == LoopIntent.stop:
+        if (
+            pending_action is not None
+            and self.globalstatusmodel.loop_intent == LoopIntent.stop
+        ):
             self.action_dq.insert(0, pending_action)
             return False
         return True
@@ -634,6 +657,14 @@ class Orch(Base):
             # update GlobalStatusModel with new ActionServerModel
             # and sort the new status dict
             self.register_action_uuid(actionservermodel.last_action_uuid)
+            if self.last_sequence.sequence_uuid != self.active_sequence.sequence_uuid:
+                self.register_obj_uuid(
+                    self.active_sequence.sequence_uuid, "sequence"
+                )
+            if self.last_experiment.experiment_uuid != self.active_experiment.experiment_uuid:
+                self.register_obj_uuid(
+                    self.active_experiment.experiment_uuid, "experiment"
+                )
             recent_nonactive = self.globalstatusmodel.update_global_with_acts(
                 actionservermodel=actionservermodel
             )
@@ -809,7 +840,9 @@ class Orch(Base):
                 if k in self.global_params:
                     if isinstance(v, list):
                         for vv in v:
-                            self.active_sequence.sequence_params[vv] = self.global_params[k]
+                            self.active_sequence.sequence_params[vv] = (
+                                self.global_params[k]
+                            )
                     else:
                         self.active_sequence.sequence_params[v] = self.global_params[k]
 
@@ -909,7 +942,9 @@ class Orch(Base):
             if k in self.global_params:
                 if isinstance(v, list):
                     for vv in v:
-                        self.active_experiment.experiment_params[vv] = self.global_params[k]
+                        self.active_experiment.experiment_params[vv] = (
+                            self.global_params[k]
+                        )
                 else:
                     self.active_experiment.experiment_params[v] = self.global_params[k]
 
@@ -2567,6 +2602,8 @@ class Orch(Base):
             "last_act": self.last_action_uuid,
             "last_dispatched_act": self.last_dispatched_action_uuid,
             "last_50_act_uuids": self.last_50_action_uuids,
+            "last_50_exp_uuids": self.last_50_experiment_uuids,
+            "last_50_seq_uuids": self.last_50_sequence_uuids,
             "global_status_model": self.globalstatusmodel,
         }
         if timestamp_pck:
@@ -2632,5 +2669,7 @@ class Orch(Base):
             self.last_action_uuid = queue_dict["last_act"]
             self.last_dispatched_action_uuid = queue_dict["last_dispatched_act"]
             self.last_50_action_uuids = queue_dict["last_50_act_uuids"]
+            self.last_50_experiment_uuids = queue_dict["last_50_exp_uuids"]
+            self.last_50_sequence_uuids = queue_dict["last_50_seq_uuids"]
             self.globalstatusmodel = queue_dict["globalstatusmodel"]
         return save_path
