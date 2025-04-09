@@ -656,7 +656,8 @@ class Orch(Base):
         async with self.aiolock:
             # update GlobalStatusModel with new ActionServerModel
             # and sort the new status dict
-            self.register_action_uuid(actionservermodel.last_action_uuid)
+            if actionservermodel.last_action_uuid is not None:
+                self.register_action_uuid(actionservermodel.last_action_uuid)
             if (
                 self.last_sequence is not None
                 and self.active_sequence is not None
