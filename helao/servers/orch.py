@@ -658,22 +658,7 @@ class Orch(Base):
             # and sort the new status dict
             if actionservermodel.last_action_uuid is not None:
                 self.register_action_uuid(actionservermodel.last_action_uuid)
-            if (
-                self.last_sequence is not None
-                and self.active_sequence is not None
-                and self.last_sequence.sequence_uuid
-                != self.active_sequence.sequence_uuid
-            ):
-                self.register_obj_uuid(self.active_sequence.sequence_uuid, "sequence")
-            if (
-                self.last_experiment is not None
-                and self.active_experiment is not None
-                and self.last_experiment.experiment_uuid
-                != self.active_experiment.experiment_uuid
-            ):
-                self.register_obj_uuid(
-                    self.active_experiment.experiment_uuid, "experiment"
-                )
+
             recent_nonactive = self.globalstatusmodel.update_global_with_acts(
                 actionservermodel=actionservermodel
             )
@@ -827,6 +812,7 @@ class Orch(Base):
         if self.sequence_dq:
             LOGGER.info("getting new sequence from sequence_dq")
             self.active_sequence = self.sequence_dq.popleft()
+            self.last_50_sequence_uuids.append(self.active_sequence.sequence_uuid)
             LOGGER.info(f"new active sequence is {self.active_sequence.sequence_name}")
             await self.put_lbuf(
                 {
@@ -938,6 +924,7 @@ class Orch(Base):
         # generate uids when populating,
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
+        self.last_50_experiment_uuids.append(self.active_experiment.experiment_uuid)
         self.active_experiment.orch_key = self.orch_key
         self.active_experiment.orch_host = self.orch_host
         self.active_experiment.orch_port = self.orch_port
