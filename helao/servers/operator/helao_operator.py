@@ -44,7 +44,7 @@ class HelaoOperator:
         add_sequence(sequence: Sequence):
             Adds a sequence to the orchestrator queue.
     """
-    def __init__(self, config_arg, orch_key):
+    def __init__(self, config_arg: str, orch_key:str = "ORCH"):
         """
         Initializes the HelaoOperator instance.
 
