@@ -657,11 +657,19 @@ class Orch(Base):
             # update GlobalStatusModel with new ActionServerModel
             # and sort the new status dict
             self.register_action_uuid(actionservermodel.last_action_uuid)
-            if self.last_sequence.sequence_uuid != self.active_sequence.sequence_uuid:
-                self.register_obj_uuid(
-                    self.active_sequence.sequence_uuid, "sequence"
-                )
-            if self.last_experiment.experiment_uuid != self.active_experiment.experiment_uuid:
+            if (
+                self.last_sequence is not None
+                and self.active_sequence is not None
+                and self.last_sequence.sequence_uuid
+                != self.active_sequence.sequence_uuid
+            ):
+                self.register_obj_uuid(self.active_sequence.sequence_uuid, "sequence")
+            if (
+                self.last_experiment is not None
+                and self.active_experiment is not None
+                and self.last_experiment.experiment_uuid
+                != self.active_experiment.experiment_uuid
+            ):
                 self.register_obj_uuid(
                     self.active_experiment.experiment_uuid, "experiment"
                 )
