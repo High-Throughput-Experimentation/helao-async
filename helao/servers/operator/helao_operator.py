@@ -201,3 +201,37 @@ class HelaoOperator:
         return self.request(
             "append_sequence", json_params={"sequence": sequence.as_dict()}
         )
+
+    def get_latest_sequences(self):
+        """
+        Retrieve list of most recent sequence uuids.
+
+        This method sends a request to obtain dispatched sequence uuids.
+
+        Returns:
+            List of 50 most recently dispatched sequence uuids.
+        """
+        return self.request("latest_sequence_uuids")
+    
+    def get_latest_experiments(self):
+        """
+        Retrieve list of most recent experiment uuids.
+
+        This method sends a request to obtain dispatched experiment uuids.
+
+        Returns:
+            List of 50 most recently dispatched experiment uuids.
+        """
+        return self.request("latest_experiment_uuids")
+    
+    def get_latest_actions(self):
+        """
+        Retrieve list of most recent action uuids.
+
+        This method sends a request to obtain dispatched action uuids.
+
+        Returns:
+            List of 50 most recently dispatched action uuids.
+        """
+        return self.request("latest_action_uuids")
+    
