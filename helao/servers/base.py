@@ -370,6 +370,7 @@ class Base:
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
         self.status_logger = self.aloop.create_task(self.log_status_task())
+        self.regular_updater = self.aloop.create_task(self.regular_status_task())
 
     def dyn_endpoints_init(self):
         """
@@ -1046,6 +1047,21 @@ class Base:
             object: The live buffer associated with the given key.
         """
         return self.live_buffer[live_key]
+
+    async def regular_status_task(self, retry_limit: int = 5):
+        while True:
+            for combo_key in self.status_clients.copy():
+                client_servkey, client_host, client_port = combo_key
+                for _ in range(retry_limit):
+                    response, error_code = await self.send_statuspackage(
+                        action_name=None,
+                        client_servkey=client_servkey,
+                        client_host=client_host,
+                        client_port=client_port,
+                    )
+                    if response and error_code == ErrorCodes.none:
+                        break
+            await asyncio.sleep(10)
 
     async def log_status_task(self, retry_limit: int = 5):
         """
