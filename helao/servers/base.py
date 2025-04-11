@@ -763,8 +763,9 @@ class Base:
         # needs private dispatcher
         json_dict = {
             "actionservermodel": self.actionservermodel.get_fastapi_json(
-                action_name=action_name
-            )
+                action_name=action_name,
+            ),
+            "regular_task": True if action_name is None else False,
         }
         response, error_code = await async_private_dispatcher(
             server_key=client_servkey,
