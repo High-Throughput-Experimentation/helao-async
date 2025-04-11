@@ -55,7 +55,11 @@ from helao.helpers.ws_publisher import WsPublisher
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import (
     SampleType,
-    AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample,
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
     SampleInheritance,
     SampleStatus,
     object_to_sample,
@@ -771,7 +775,7 @@ class Base:
             host=client_host,
             port=client_port,
             private_action="update_status",
-            params_dict={"regular_task": True if action_name is None else False},
+            params_dict={"regular_task": "true" if action_name is None else "false"},
             json_dict=json_dict,
         )
         return response, error_code
@@ -1540,137 +1544,137 @@ class Base:
 
 class Active:
     """
-    The Active class represents an active action within a server. It manages the lifecycle of an action, including initialization, execution, data logging, and finalization. The class provides methods to handle various aspects of an action, such as starting executors, logging data, handling errors, and managing file connections.
+        The Active class represents an active action within a server. It manages the lifecycle of an action, including initialization, execution, data logging, and finalization. The class provides methods to handle various aspects of an action, such as starting executors, logging data, handling errors, and managing file connections.
 
-    Attributes:
-        base: The base server instance.
-        active_uuid: The unique identifier for the active action.
-        action: The current action being managed.
-        action_list: A list of all actions associated with this active instance.
-        listen_uuids: A list of UUIDs to listen for data logging.
-        num_data_queued: The number of data items queued for logging.
-        num_data_written: The number of data items written to files.
-        file_conn_dict: A dictionary mapping file connection keys to FileConn instances.
-        manual_stop: A flag indicating if the action should be manually stopped.
-        action_loop_running: A flag indicating if the action loop is currently running.
-        action_task: The asyncio task for the action loop.
+        Attributes:
+            base: The base server instance.
+            active_uuid: The unique identifier for the active action.
+            action: The current action being managed.
+            action_list: A list of all actions associated with this active instance.
+            listen_uuids: A list of UUIDs to listen for data logging.
+            num_data_queued: The number of data items queued for logging.
+            num_data_written: The number of data items written to files.
+            file_conn_dict: A dictionary mapping file connection keys to FileConn instances.
+            manual_stop: A flag indicating if the action should be manually stopped.
+            action_loop_running: A flag indicating if the action loop is currently running.
+            action_task: The asyncio task for the action loop.
 
-    Methods:
-        __init__(self, base, activeparams: ActiveParams):
-            Initializes the Active instance with the given base server and active parameters.
+        Methods:
+            __init__(self, base, activeparams: ActiveParams):
+                Initializes the Active instance with the given base server and active parameters.
 
-        executor_done_callback(self, futr):
-            Callback function to handle the completion of an executor.
+            executor_done_callback(self, futr):
+                Callback function to handle the completion of an executor.
 
-        start_executor(self, executor: Executor):
-            Starts the executor for the action.
+            start_executor(self, executor: Executor):
+                Starts the executor for the action.
 
-        oneoff_executor(self, executor: Executor):
-            Executes a one-off action using the executor.
+            oneoff_executor(self, executor: Executor):
+                Executes a one-off action using the executor.
 
-        update_act_file(self):
-            Updates the action file with the current action state.
+            update_act_file(self):
+                Updates the action file with the current action state.
 
-        myinit(self):
-            Initializes the data logger and action file.
+            myinit(self):
+                Initializes the data logger and action file.
 
-        init_datafile(self, header, file_type, json_data_keys, file_sample_label, filename, file_group: HloFileGroup, file_conn_key: Optional[str] = None, action: Optional[Action] = None):
-            Initializes a data file with the given parameters.
+            init_datafile(self, header, file_type, json_data_keys, file_sample_label, filename, file_group: HloFileGroup, file_conn_key: Optional[str] = None, action: Optional[Action] = None):
+                Initializes a data file with the given parameters.
 
-        finish_hlo_header(self, file_conn_keys: Optional[List[UUID]] = None, realtime: Optional[float] = None):
-            Adds a timestamp to the data file header.
+            finish_hlo_header(self, file_conn_keys: Optional[List[UUID]] = None, realtime: Optional[float] = None):
+                Adds a timestamp to the data file header.
 
-        add_status(self, action=None):
-            Sends the status of the most recent active action.
+            add_status(self, action=None):
+                Sends the status of the most recent active action.
 
-        set_estop(self, action: Optional[Action] = None):
-            Sets the emergency stop status for the action.
+            set_estop(self, action: Optional[Action] = None):
+                Sets the emergency stop status for the action.
 
-        set_error(self, error_code: Optional[ErrorCodes] = None, action: Optional[Action] = None):
-            Sets the error status for the action.
+            set_error(self, error_code: Optional[ErrorCodes] = None, action: Optional[Action] = None):
+                Sets the error status for the action.
 
-        get_realtime(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
-            Gets the current real-time with optional epoch and offset.
+            get_realtime(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
+                Gets the current real-time with optional epoch and offset.
 
-        get_realtime_nowait(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
-            Gets the current real-time without waiting.
+            get_realtime_nowait(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
+                Gets the current real-time without waiting.
 
-        write_live_data(self, output_str: str, file_conn_key: UUID):
-            Appends lines to the file connection.
+            write_live_data(self, output_str: str, file_conn_key: UUID):
+                Appends lines to the file connection.
 
-        enqueue_data_dflt(self, datadict: dict):
-            Enqueues data to a default file connection key.
+            enqueue_data_dflt(self, datadict: dict):
+                Enqueues data to a default file connection key.
 
-        enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
-            Enqueues data to the data queue.
+            enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
+                Enqueues data to the data queue.
 
-        enqueue_data_nowait(self, datamodel: DataModel, action: Optional[Action] = None):
-            Enqueues data to the data queue without waiting.
+            enqueue_data_nowait(self, datamodel: DataModel, action: Optional[Action] = None):
+                Enqueues data to the data queue without waiting.
 
-        assemble_data_msg(self, datamodel: DataModel, action: Optional[Action] = None) -> DataPackageModel:
-            Assembles a data message for the given data model and action.
+            assemble_data_msg(self, datamodel: DataModel, action: Optional[Action] = None) -> DataPackageModel:
+                Assembles a data message for the given data model and action.
 
-        add_new_listen_uuid(self, new_uuid: UUID):
-            Adds a new UUID to the data logger UUID list.
+            add_new_listen_uuid(self, new_uuid: UUID):
+                Adds a new UUID to the data logger UUID list.
 
-        _get_action_for_file_conn_key(self, file_conn_key: UUID):
-            Gets the action associated with the given file connection key.
+            _get_action_for_file_conn_key(self, file_conn_key: UUID):
+                Gets the action associated with the given file connection key.
 
-        log_data_set_output_file(self, file_conn_key: UUID):
-            Sets the output file for logging data.
+            log_data_set_output_file(self, file_conn_key: UUID):
+                Sets the output file for logging data.
 
-        log_data_task(self):
-            Subscribes to the data queue and writes data to the file.
+            log_data_task(self):
+                Subscribes to the data queue and writes data to the file.
 
-        write_file(self, output_str: str, file_type: str, filename: Optional[str] = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: Optional[str] = None, sample_str: Optional[str] = None, file_sample_label: Optional[str] = None, json_data_keys: Optional[str] = None, action: Optional[Action] = None):
-            Writes a complete file with the given parameters.
+            write_file(self, output_str: str, file_type: str, filename: Optional[str] = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: Optional[str] = None, sample_str: Optional[str] = None, file_sample_label: Optional[str] = None, json_data_keys: Optional[str] = None, action: Optional[Action] = None):
+                Writes a complete file with the given parameters.
 
-        write_file_nowait(self, output_str: str, file_type: str, filename: Optional[str] = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: Optional[str] = None, sample_str: Optional[str] = None, file_sample_label: Optional[str] = None, json_data_keys: Optional[str] = None, action: Optional[Action] = None):
-            Writes a complete file with the given parameters without waiting.
+            write_file_nowait(self, output_str: str, file_type: str, filename: Optional[str] = None, file_group: HloFileGroup = HloFileGroup.aux_files, header: Optional[str] = None, sample_str: Optional[str] = None, file_sample_label: Optional[str] = None, json_data_keys: Optional[str] = None, action: Optional[Action] = None):
+                Writes a complete file with the given parameters without waiting.
 
-        set_sample_action_uuid(self, sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample], action_uuid: UUID):
-            Sets the action UUID for the given sample.
+            set_sample_action_uuid(self, sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample], action_uuid: UUID):
+                Sets the action UUID for the given sample.
 
-        append_sample(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], IO: str, action: Optional[Action] = None):
-            Adds samples to the input or output sample list.
+            append_sample(self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ], IO: str, action: Optional[Action] = None):
+                Adds samples to the input or output sample list.
 
-        split_and_keep_active(self):
-            Splits the current action and keeps it active.
+            split_and_keep_active(self):
+                Splits the current action and keeps it active.
 
-        split_and_finish_prev_uuids(self):
-            Splits the current action and finishes previous UUIDs.
+            split_and_finish_prev_uuids(self):
+                Splits the current action and finishes previous UUIDs.
 
-        finish_all(self):
-            Finishes all actions.
+            finish_all(self):
+                Finishes all actions.
 
-        split(self, uuid_list: Optional[List[UUID]] = None, new_fileconnparams: Optional[FileConnParams] = None) -> List[UUID]:
-            Splits the current action and finishes previous actions in the UUID list.
+            split(self, uuid_list: Optional[List[UUID]] = None, new_fileconnparams: Optional[FileConnParams] = None) -> List[UUID]:
+                Splits the current action and finishes previous actions in the UUID list.
 
-        substitute(self):
-            Closes all file connections.
+            substitute(self):
+                Closes all file connections.
 
-        finish(self, finish_uuid_list: Optional[List[UUID]] = None) -> Action:
-            Finishes the actions in the UUID list and performs cleanup.
+            finish(self, finish_uuid_list: Optional[List[UUID]] = None) -> Action:
+                Finishes the actions in the UUID list and performs cleanup.
 
-        track_file(self, file_type: str, file_path: str, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], action: Optional[Action] = None):
-            Adds auxiliary files to the file dictionary.
+            track_file(self, file_type: str, file_path: str, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ], action: Optional[Action] = None):
+                Adds auxiliary files to the file dictionary.
 
-        relocate_files(self):
-            Copies auxiliary files to the experiment directory.
+            relocate_files(self):
+                Copies auxiliary files to the experiment directory.
 
-        finish_manual_action(self):
-            Finishes a manual action and writes the sequence and experiment meta files.
+            finish_manual_action(self):
+                Finishes a manual action and writes the sequence and experiment meta files.
 
-        send_nonblocking_status(self, retry_limit: int = 3):
-            Sends the non-blocking status to clients.
+            send_nonblocking_status(self, retry_limit: int = 3):
+                Sends the non-blocking status to clients.
 
-        action_loop_task(self, executor: Executor):
-            The main loop for executing an action.
+            action_loop_task(self, executor: Executor):
+                The main loop for executing an action.
 
-        stop_action_task(self):
-            Stops the action loop task.
+            stop_action_task(self):
+                Stops the action loop task.
     """
 
     def __init__(self, base, activeparams: ActiveParams):  # outer instance
@@ -1942,7 +1946,9 @@ class Active:
             sample=file_sample_label,
             action_uuid=action.action_uuid,
             run_use=action.run_use,
-            nosync=True if not action.sync_data and filename.endswith(".hlo") else False
+            nosync=(
+                True if not action.sync_data and filename.endswith(".hlo") else False
+            ),
         )
 
         if header:
@@ -2596,7 +2602,11 @@ class Active:
         else:
             return None
 
-    def set_sample_action_uuid(self, sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample], action_uuid: UUID):
+    def set_sample_action_uuid(
+        self,
+        sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
+        action_uuid: UUID,
+    ):
         """
         Sets the action UUID for a given sample and its parts if the sample is of type 'assembly'.
 
@@ -2613,28 +2623,32 @@ class Active:
                 self.set_sample_action_uuid(sample=part, action_uuid=action_uuid)
 
     async def append_sample(
-        self, samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], IO: str, action: Optional[Action] = None
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ],
+        IO: str,
+        action: Optional[Action] = None,
     ):
         """
-        Append samples to the specified action's input or output list.
+                Append samples to the specified action's input or output list.
 
-        Args:
-            samples (List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]): A list of samples to be appended.
-            IO (str): Specifies whether the samples are to be appended to the input ('in') or output ('out') list.
-            action (Action, optional): The action to which the samples will be appended. If not provided, the current action is used.
+                Args:
+                    samples (List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ]): A list of samples to be appended.
+                    IO (str): Specifies whether the samples are to be appended to the input ('in') or output ('out') list.
+                    action (Action, optional): The action to which the samples will be appended. If not provided, the current action is used.
 
-        Returns:
-            None
+                Returns:
+                    None
 
-        Notes:
-            - If the `samples` list is empty, the function returns immediately.
-            - Samples of type `NoneSample` are skipped.
-            - The `action_uuid` of each sample is updated to the current action's UUID.
-            - If a sample's inheritance is `None`, it is set to `SampleInheritance.allow_both`.
-            - If a sample's status is `None`, it is set to `[SampleStatus.preserved]`.
-            - The function broadcasts the status when a sample is added for operator table updates.
+                Notes:
+                    - If the `samples` list is empty, the function returns immediately.
+                    - Samples of type `NoneSample` are skipped.
+                    - The `action_uuid` of each sample is updated to the current action's UUID.
+                    - If a sample's inheritance is `None`, it is set to `SampleInheritance.allow_both`.
+                    - If a sample's status is `None`, it is set to `[SampleStatus.preserved]`.
+                    - The function broadcasts the status when a sample is added for operator table updates.
         """
         if action is None:
             action = self.action
@@ -2886,7 +2900,9 @@ class Active:
                                 LOGGER.info(f"updating {k} in orch global vars")
                                 export_params[k] = action.action_output[k]
                             else:
-                                LOGGER.info(f"key {k} not found in action output or params")
+                                LOGGER.info(
+                                    f"key {k} not found in action output or params"
+                                )
                     elif isinstance(action.to_globalexp_params, dict):
                         for k1, k2 in action.to_globalexp_params.items():
                             if k1 in action.action_params:
@@ -3037,23 +3053,24 @@ class Active:
         self,
         file_type: str,
         file_path: str,
-        samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-],
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ],
         action: Optional[Action] = None,
     ) -> None:
         """
-        Tracks a file by adding its information to the associated action.
+                Tracks a file by adding its information to the associated action.
 
-        Args:
-            file_type (str): The type of the file being tracked.
-            file_path (str): The path to the file being tracked.
-            samples (List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]): A list of samples associated with the file.
-            action (Action, optional): The action associated with the file. If not provided,
-                                       the current action will be used.
+                Args:
+                    file_type (str): The type of the file being tracked.
+                    file_path (str): The path to the file being tracked.
+                    samples (List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ]): A list of samples associated with the file.
+                    action (Action, optional): The action associated with the file. If not provided,
+                                               the current action will be used.
 
-        Returns:
-            None
+                Returns:
+                    None
         """
         if action is None:
             action = self.action
