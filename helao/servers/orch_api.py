@@ -479,7 +479,7 @@ class OrchAPI(HelaoFastAPI):
             """
             if actionservermodel is None:
                 return False
-            LOGGER.info(
+            LOGGER.debug(
                 f"orch '{self.orch.server.server_name}' got status from '{actionservermodel.action_server.server_name}': {actionservermodel.endpoints}"
             )
             return await self.orch.update_status(actionservermodel=actionservermodel)

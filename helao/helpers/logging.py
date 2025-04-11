@@ -127,9 +127,14 @@ def make_logger(
     timed_rotation.setFormatter(formatter)
 
     # set log level and attach default handlers
-    handlers = [console, timed_rotation]
+    handlers = [timed_rotation]
     for handler in handlers:
         handler.setLevel(log_level)
+        logger_instance.addHandler(handler)
+    
+    debug_handlers = [console]
+    for handler in debug_handlers:
+        handler.setLevel(10)
         logger_instance.addHandler(handler)
 
     mailhost = email_config.get("mailhost", None)

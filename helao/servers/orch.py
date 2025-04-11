@@ -648,8 +648,8 @@ class Orch(Base):
             The method assumes that `self.aiolock`, `self.globalstatusmodel`, `self.interrupt_q`, and `self.update_operator` are defined elsewhere in the class.
         """
 
-        self.print_message(
-            "received status from server:", actionservermodel.action_server.server_name
+        LOGGER.debug(
+            f"received status from server: {actionservermodel.action_server.server_name}"
         )
 
         if actionservermodel is None:
