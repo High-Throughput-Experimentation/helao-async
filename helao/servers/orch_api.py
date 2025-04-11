@@ -585,6 +585,8 @@ class OrchAPI(HelaoFastAPI):
             Returns:
                 dict: A dictionary containing the cleaned data of the active experiment.
             """
+            if self.orch.active_experiment is None:
+                return {}
             return self.orch.active_experiment.clean_dict()
 
         @self.post("/get_active_sequence", tags=["private"])
@@ -595,6 +597,8 @@ class OrchAPI(HelaoFastAPI):
             Returns:
                 dict: A dictionary representation of the active sequence.
             """
+            if self.orch.active_sequence is None:
+                return {}
             return self.orch.active_sequence.clean_dict()
 
         @self.post("/estop_orch", tags=["private"])
