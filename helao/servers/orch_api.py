@@ -466,7 +466,8 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/update_status", tags=["private"])
         async def update_status(
-            actionservermodel: ActionServerModel = Body({}, embed=True)
+            actionservermodel: ActionServerModel = Body({}, embed=True),
+            regular_task: bool = False,
         ):
             """
             Asynchronously updates the status of an action server.
@@ -479,9 +480,10 @@ class OrchAPI(HelaoFastAPI):
             """
             if actionservermodel is None:
                 return False
-            LOGGER.debug(
-                f"orch '{self.orch.server.server_name}' got status from '{actionservermodel.action_server.server_name}': {actionservermodel.endpoints}"
-            )
+            if not regular_task:
+                LOGGER.debug(
+                    f"orch '{self.orch.server.server_name}' got status from '{actionservermodel.action_server.server_name}': {actionservermodel.endpoints}"
+                )
             return await self.orch.update_status(actionservermodel=actionservermodel)
 
         @self.post("/clear_actives", tags=["private"])
