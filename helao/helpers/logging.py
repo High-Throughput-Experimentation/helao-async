@@ -107,8 +107,9 @@ def make_logger(
         style="%",
     )
 
+    logging.basicConfig(level=logging.DEBUG)
     logger_instance = logging.getLogger(logger_name)
-    logger_instance.setLevel(log_level)
+    logger_instance.setLevel(min(10, log_level))
 
     # create handlers
     console = logging.StreamHandler()
