@@ -765,14 +765,13 @@ class Base:
             "actionservermodel": self.actionservermodel.get_fastapi_json(
                 action_name=action_name,
             ),
-            "regular_task": True if action_name is None else False,
         }
         response, error_code = await async_private_dispatcher(
             server_key=client_servkey,
             host=client_host,
             port=client_port,
             private_action="update_status",
-            params_dict={},
+            params_dict={"regular_task": True if action_name is None else False},
             json_dict=json_dict,
         )
         return response, error_code
