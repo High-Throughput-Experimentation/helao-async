@@ -1086,6 +1086,8 @@ class HelaoSyncer:
         for cd in chkdirs:
             seq_dates = glob(os.path.join(self.world_config["root"], cd, "*", "*"))
             for datedir in seq_dates:
+                if not os.path.isdir(datedir):
+                    continue
                 try:
                     dateonly = datetime.strptime(os.path.basename(datedir), "%Y%m%d")
                 except ValueError:
