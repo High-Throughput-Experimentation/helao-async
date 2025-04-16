@@ -271,6 +271,8 @@ def HISPEC_sub_SpEC(
 
 
 def HiSpEC_sub_CP(
+        experiment: Experiment,
+        experiment_version: int = 1,
         Ival__A: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
