@@ -147,6 +147,19 @@ def HISPEC_sub_SpEC(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
+
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+
     CV_duration_sec = (
         abs(Vapex1_vsRHE - OCV_vsRef) / scanrate_voltsec
     )  # time from initial to Vertex 1
@@ -184,6 +197,16 @@ def HISPEC_sub_SpEC(
             "timeout": 15000,
         },
         sync_data=False,
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="CV",
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ]
     )
 
     apm.add(
@@ -195,24 +218,24 @@ def HISPEC_sub_SpEC(
         start_condition=ActionStartCondition.no_wait,
     )
 
-    # setup toggle on galil_io
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": 1,  # rising edge
-            "out_name": ["spec_trig", toggle1_source],  # TODO: parameterize outs
-            "out_name_gamry": None,
-            "toggle_init_delay": [toggle1_init_delay, toggle1_init_delay],
-            "toggle_duty": [toggle1_duty, toggle1_duty],
-            "toggle_period": [toggle1_period, toggle1_period],
-            "toggle_duration": [toggle1_time, toggle1_time],
-        },
-        start_condition=ActionStartCondition.wait_for_previous,  # orch is waiting for all action_dq to finish
-        process_finish=False,
-        process_contrib=[ProcessContrib.files, ProcessContrib.samples_out],
-    )
+    # # setup toggle on galil_io
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_cycle",
+    #     {
+    #         "trigger_name": "gamry_ttl0",
+    #         "triggertype": 1,  # rising edge
+    #         "out_name": ["spec_trig", toggle1_source],  # TODO: parameterize outs
+    #         "out_name_gamry": None,
+    #         "toggle_init_delay": [toggle1_init_delay, toggle1_init_delay],
+    #         "toggle_duty": [toggle1_duty, toggle1_duty],
+    #         "toggle_period": [toggle1_period, toggle1_period],
+    #         "toggle_duration": [toggle1_time, toggle1_time],
+    #     },
+    #     start_condition=ActionStartCondition.wait_for_previous,  # orch is waiting for all action_dq to finish
+    #     process_finish=False,
+    #     process_contrib=[ProcessContrib.files, ProcessContrib.samples_out],
+    # )
 
     # apply potential
     apm.add(
@@ -237,12 +260,62 @@ def HISPEC_sub_SpEC(
         technique_name="CV",
         process_finish=True,
         process_contrib=[
+            ProcessContrib.action_params,
             ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
     )
     return apm.action_list  # returns complete action list to orch
+
+
+def HiSpEC_sub_CP(
+        action_version: int = 2,
+        Ival__A: float = 0.0,
+        Tval__s: float = 10.0,
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        IRange: str = "AUTO",
+        ERange: str = "AUTO",
+        Bandwidth: str = "BW4",
+        channel: int = 0,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+        TTLduration: float = 1.0,
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshEwe_V: float = 0,
+):
+    
+    apm= ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(
+        action_server=PSTAT_server,
+        action_name="run_CP",
+        action_params={
+            "Ival__A": Ival__A,
+            "Tval__s": Tval__s,
+            "AcqInterval__s": AcqInterval__s,
+            "IRange": IRange,
+            "ERange": ERange,
+            "Bandwidth": Bandwidth,
+            "channel": channel,
+            "TTLwait": TTLwait,
+            "TTLsend": TTLsend,
+            "TTLduration": TTLduration,
+        },
+        start_condition=ActionStartCondition.wait_for_previous,
+        technique_name="CP",
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    return apm.action_list  
+    
+
+    
 
 
 def HiSPEC_sub_PEIS(
@@ -293,7 +366,7 @@ def HiSPEC_sub_PEIS(
         },
         start_condition=ActionStartCondition.wait_for_previous,
         technique_name="PEIS",
-        process_finish=True,
+        process_finish=False,
         process_contrib=[
             ProcessContrib.files,
             ProcessContrib.samples_in,
