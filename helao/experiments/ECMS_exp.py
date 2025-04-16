@@ -1313,7 +1313,7 @@ def ECMS_sub_CA_CO2flow(
     total_MFC_flow_rate_sccm: float = 10.0,
     flow_change_duration_sec: List[float] = [60.0,60.0,60.0],
     CO2_flow_rate_sccm: List[float] = [0.0,10.0,0.0],
-    inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
+    #inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
