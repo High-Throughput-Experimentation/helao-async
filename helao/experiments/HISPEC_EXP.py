@@ -15,6 +15,7 @@ __all__ = [
     "HISPEC_sub_startup",
     "HISPEC_sub_shutdown",
     "HiSPEC_sub_PEIS",
+    "HiSpEC_sub_CP",
     # "HISPEC_sub_engage",
     # "HISPEC_sub_disengage",
     # "HISPEC_analysis_stability",
