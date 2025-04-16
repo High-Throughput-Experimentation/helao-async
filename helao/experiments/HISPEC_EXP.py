@@ -283,10 +283,10 @@ def HiSpEC_sub_CP(
         TTLwait: int = -1,
         TTLsend: int = -1,
         TTLduration: float = 1.0,
-        alert_duration__s: float = -1,
-        alert_above: bool = True,
-        alert_sleep__s: float = -1,
-        alertThreshEwe_V: float = 0,
+        # alert_duration__s: float = -1,
+        # alert_above: bool = True,
+        # alert_sleep__s: float = -1,
+        # alertThreshEwe_V: float = 0,
 ):
     
     apm= ActionPlanMaker()  # exposes function parameters via apm.pars
