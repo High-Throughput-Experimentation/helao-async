@@ -136,17 +136,17 @@ servers:
     bokeh: action_visualizer
     params:
       doc_name: ECHE11 Visualizer
-  # DB:
-  #   host: hte-eche-11.htejcap.caltech.edu
-  #   port: 8010
-  #   group: action
-  #   fast: dbpack_server
-  #   params:
-  #     aws_config_path: k:/users/hte/.credentials/aws_config.ini
-  #     aws_profile: default
-  #     aws_bucket: helao.data
-  #     api_host: caltech-api.modelyst.com
-  #     testing: false
+  DB:
+    host: hte-eche-11.htejcap.caltech.edu
+    port: 8010
+    group: action
+    fast: dbpack_server
+    params:
+      # aws_config_path: k:/users/hte/.credentials/aws_config.ini
+      aws_profile: default
+      aws_bucket: helao.data
+      api_host: caltech-api.modelyst.com
+      testing: false
   # ANA:
   #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8014
