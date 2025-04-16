@@ -306,6 +306,7 @@ def HiSpEC_sub_CP(
             "TTLduration": TTLduration,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        to_globalexp_params={"Ewe_V__mean_final": "new_OCV"},
         start_condition=ActionStartCondition.wait_for_previous,
         technique_name="CP",
         process_finish=False,
