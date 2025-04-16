@@ -632,6 +632,8 @@ def ECMS_sub_CA(
         potential_vsRef = (
             WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
         )
+    else:
+        raise ValueError("WE_versus must be either 'ref' or 'rhe'")
     apm.add(
         PAL_server,
         "archive_custom_query_sample",
@@ -1216,6 +1218,8 @@ def ECMS_sub_CA_CO2flow(
         potential_vsRef = (
             WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
         )
+    else:
+        raise ValueError("WE_versus must be either 'ref' or 'rhe'")
     apm.add(
         PAL_server,
         "archive_custom_query_sample",
