@@ -1209,6 +1209,7 @@ def ECMS_sub_CA_CO2flow(
     pH: float = 6.8,
     MS_equilibrium_time: float = 90.0,
     CO2_flow_duration_sec: float = 60.0,
+    CO2_flow_rate_sccm: float = 0.0,
     inert_gas_flow_rate_sccm: float = 10.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -1251,24 +1252,24 @@ def ECMS_sub_CA_CO2flow(
         ORCH_server,
         "wait",
         {"waittime": CO2_flow_duration_sec},
-        ActionStartCondition=asc.no_wait,
+        start_condition=asc.no_wait,
     )
     # MFC stop CO2, hold valve closed
     apm.add(
         MFC_server,
         "set_flowrate",
         {
-            "flowrate_sccm": 0.0,
+            "flowrate_sccm": CO2_flow_rate_sccm,
             "ramp_sccm_sec": 0.0,
             "device_name": "CO2",
         },
-        asc.wait_for_orch,
+        start_condition=asc.wait_for_orch,
     )
     apm.add(
         MFC_server,
         "hold_valve_closed_action",
         {"device_name": "CO2"},
-        asc.no_wait,
+        start_condition=asc.no_wait,
     )
     # CALIBRATIONMFCSECOND for inert gas set flow rate
     apm.add(
@@ -1279,34 +1280,16 @@ def ECMS_sub_CA_CO2flow(
             "ramp_sccm_sec": 0.0,
             "device_name": "Caligassecond",
         },
-        asc.no_wait,
+        start_condition=asc.no_wait,
     )
     # CALIBRATIONMFCSECOND cancel valve hold
     apm.add(
         CALIBRATIONMFCSECOND_server,
         "cancel_hold_valve_action",
         {"device_name": "Caligassecond"},
-        asc.no_wait,
+        start_condition=asc.no_wait,
     )
-# =============================================================================
-#     apm.add(
-#         CALIBRATIONMFC_server,
-#         "set_flowrate",
-#         {
-#             "flowrate_sccm": inert_gas_flow_rate_sccm,
-#             "ramp_sccm_sec": 0.0,
-#             "device_name": "Caligas",
-#         },
-#         asc.no_wait,
-#     )
-#     apm.add(
-#         CALIBRATIONMFC_server,
-#         "cancel_hold_valve_action",
-#         {"device_name": "Caligas"},
-#         asc.no_wait,
-#     )
-# 
-# =============================================================================
+
         
     apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
     # apm.add(ORCH_server, "wait", {"waittime": 10})
