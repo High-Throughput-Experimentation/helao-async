@@ -1370,12 +1370,20 @@ def ECMS_sub_CA_CO2flow(
             },
             start_condition=asc.wait_for_orch,
         )
+# =============================================================================
+#         apm.add(
+#             MFC_server,
+#             "hold_valve_closed_action",
+#             {"device_name": "CO2"},
+#             start_condition=asc.no_wait,
+#         )
+# =============================================================================
         apm.add(
             MFC_server,
-            "hold_valve_closed_action",
+            "cancel_hold_valve_action",
             {"device_name": "CO2"},
-            start_condition=asc.no_wait,
-        )
+            start_condition=asc.no_wait,)
+            
         # CALIBRATIONMFCSECOND for inert gas set flow rate
         apm.add(
             CALIBRATIONMFCSECOND_server,
