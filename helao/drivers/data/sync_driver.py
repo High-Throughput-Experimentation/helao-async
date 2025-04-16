@@ -114,8 +114,8 @@ def move_to_synced(file_path: Path):
     target_path = Path(*parts)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        new_path = file_path.replace(target_path)
-        return new_path
+        shutil.move(str(file_path), str(target_path))
+        return Path(target_path)
     except PermissionError:
         print(f"Permission error when moving {file_path} to {target_path}")
         return False
