@@ -1309,7 +1309,7 @@ def ECMS_sub_CA_CO2flow(
     ref_offset__V: float = 0.0,
     ref_type: str = "leakless",
     pH: float = 6.8,
-    MS_equilibrium_time: float = 90.0,
+    MS_equilibrium_time: float = 10.0,
     total_MFC_flow_rate_sccm: float = 10.0,
     flow_change_duration_sec: List[float] = [60.0,60.0,60.0],
     CO2_flow_rate_sccm: List[float] = [0.0,10.0,0.0],
