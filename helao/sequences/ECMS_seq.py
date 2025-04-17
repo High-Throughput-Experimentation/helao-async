@@ -1788,22 +1788,22 @@ def ECMS_series_CA_change_gasflow(
 #     liquid_backward_time: float = 80,  
 # =============================================================================
     #vacuum_time: float = 10,   
-    CO2equilibrium_duration: float = 30,
+    CO2equilibrium_duration: float = 10,
     flowrate_sccm: float = 10.0,
     flow_ramp_sccm: float = 0,
     MS_baseline_duration_1: float = 30,
     #MS_baseline_duration_2: float = 90, 
-    WE_potential__V: List[float] = [-0.5, -1.0, -2.0],
+    WE_potential__V: List[float] = [-0.5, -1.0],
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 7.8,
-    CA_duration_sec: List[float] = [60, 60, 60],
+    CA_duration_sec: List[float] = [60, 60],
     SampleRate: float = 1,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
-    MS_equilibrium_time: float = 10.0,
-    flow_change_duration_sec: List[float] = [60.0,60.0,60.0],
-    CO2_flow_rate_sccm: List[float] = [0.0,10.0,0.0],
+    postCA_MS_equilibrium_time: float = 10.0,
+    CA_flow_change_duration_sec: List[float] = [60.0,60.0,60.0],
+    CA_CO2_flow_rate_sccm: List[float] = [0.0,10.0,0.0],
 # =============================================================================
 #     cleaning_times: int =1,
 #     liquid_fill_time: float = 7,
@@ -1812,10 +1812,10 @@ def ECMS_series_CA_change_gasflow(
 #     tube_clear_delaytime: float = 40.0,
 # =============================================================================
     #liquid_cleancell_time: float = 120,
-    CO2flowrate_sccm: List[float] = [0.0, 10.0],
-    Califlowrate2_sccm: List[float] = [10.0, 0.0],
+    PreExp_CO2flowrate_sccm: List[float] = [0.0, 10.0],
+    PreExp_Califlowrate2_sccm: List[float] = [10.0, 0.0],
     #MSsignal_quilibrium_time_initial: float = 480,
-    MSsignal_quilibrium_time: float = 100,   
+    PreExp_MSsignal_quilibrium_time: float = 100,   
 ):
 
     
@@ -1837,13 +1837,13 @@ def ECMS_series_CA_change_gasflow(
             "MS_baseline_duration": MS_baseline_duration_1
         },
     )
-    for run, (co2gas, caligas2) in enumerate(zip(CO2flowrate_sccm, Califlowrate2_sccm)):
+    for run, (co2gas, caligas2) in enumerate(zip(PreExp_CO2flowrate_sccm, PreExp_Califlowrate2_sccm)):
         epm.add_experiment(
                 "ECMS_sub_inertgascali",
                 {
                     "CO2flowrate_sccm": co2gas,
                     "Califlowrate_two_sccm": caligas2,
-                    "MSsignal_quilibrium_time": MSsignal_quilibrium_time,
+                    "MSsignal_quilibrium_time": PreExp_MSsignal_quilibrium_time,
                 },
             )     
 
@@ -1894,10 +1894,10 @@ def ECMS_series_CA_change_gasflow(
                 "CA_duration_sec": time,
                 "SampleRate": SampleRate,
                 "IErange": IErange,
-                "MS_equilibrium_time": MS_equilibrium_time,
+                "MS_equilibrium_time": postCA_MS_equilibrium_time,
                 "total_MFC_flow_rate_sccm": flowrate_sccm,
-                "flow_change_duration_sec": flow_change_duration_sec,
-                "CO2_flow_rate_sccm": CO2_flow_rate_sccm,
+                "flow_change_duration_sec": CA_flow_change_duration_sec,
+                "CO2_flow_rate_sccm": CA_CO2_flow_rate_sccm,
             },
         )
         #epm.add_experiment("ECMS_sub_electrolyte_recirculation_off", {})
@@ -1907,7 +1907,7 @@ def ECMS_series_CA_change_gasflow(
                 {
                     "CO2flowrate_sccm": flowrate_sccm,
                     "Califlowrate_two_sccm": 0.0,
-                    "MSsignal_quilibrium_time": MSsignal_quilibrium_time,
+                    "MSsignal_quilibrium_time": PreExp_MSsignal_quilibrium_time,
                 },
             )  
             
