@@ -1353,6 +1353,71 @@ def ECMS_sub_pulsecali(
 #     return apm.action_list
 # 
 # =============================================================================
+def ECMS_sub_preCA_CO2flow(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    MS_equilibrium_time: float = 10.0,
+    total_MFC_flow_rate_sccm: float = 10.0,
+    flow_change_duration_sec: List[float] = [10.0,60.0],
+    CO2_flow_rate_sccm: List[float] = [0.0,10.0],
+    #inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+
+    for cycle, (CO2_flow_duration_sec, CO2_flow_rate) in enumerate(zip(flow_change_duration_sec, CO2_flow_rate_sccm)):
+    # ORCH/wait with no wait condition for CO2 flow duration time
+        inert_gas_flow_rate_sccm= total_MFC_flow_rate_sccm-CO2_flow_rate
+        apm.add(
+            ORCH_server,
+            "wait",
+            {"waittime": CO2_flow_duration_sec},
+            start_condition=asc.no_wait,
+        )
+        # MFC stop CO2, hold valve closed
+        apm.add(
+            MFC_server,
+            "set_flowrate",
+            {
+                "flowrate_sccm": CO2_flow_rate,
+                "ramp_sccm_sec": 0.0,
+                "device_name": "CO2",
+            },
+            start_condition=asc.wait_for_orch,
+        )
+
+        apm.add(
+            MFC_server,
+            "cancel_hold_valve_action",
+            {"device_name": "CO2"},
+            start_condition=asc.no_wait,)
+            
+        # CALIBRATIONMFCSECOND for inert gas set flow rate
+        apm.add(
+            CALIBRATIONMFCSECOND_server,
+            "set_flowrate",
+            {
+                "flowrate_sccm": inert_gas_flow_rate_sccm,
+                "ramp_sccm_sec": 0.0,
+                "device_name": "Caligassecond",
+            },
+            start_condition=asc.no_wait,
+        )
+        # CALIBRATIONMFCSECOND cancel valve hold
+        apm.add(
+            CALIBRATIONMFCSECOND_server,
+            "cancel_hold_valve_action",
+            {"device_name": "Caligassecond"},
+            start_condition=asc.no_wait,
+        )
+
+        
+    apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
+    # apm.add(ORCH_server, "wait", {"waittime": 10})
+
+    return apm.action_list
+
+
 def ECMS_sub_CA_CO2flow(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -1425,14 +1490,7 @@ def ECMS_sub_CA_CO2flow(
             },
             start_condition=asc.wait_for_orch,
         )
-# =============================================================================
-#         apm.add(
-#             MFC_server,
-#             "hold_valve_closed_action",
-#             {"device_name": "CO2"},
-#             start_condition=asc.no_wait,
-#         )
-# =============================================================================
+
         apm.add(
             MFC_server,
             "cancel_hold_valve_action",
