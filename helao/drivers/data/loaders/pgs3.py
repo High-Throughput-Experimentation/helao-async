@@ -132,7 +132,7 @@ class HelaoLoader:
     def get_hlo(self, action_uuid: UUID, hlo_fn: str):
         if hlo_fn.endswith(".hlo"):
             keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}.json"
-        elif hlo_fn.endswith(".hlo.json"):
+        elif hlo_fn.endswith(".json"):
             keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}"
         else:
             print(f"{hlo_fn} is not a valid named hlo file.")
@@ -250,8 +250,8 @@ class HelaoAction(HelaoModel):
             x
             for x in file_list
             if x["file_name"].endswith(".hlo")
-            or x["file_name"].endswith(".hlo.json")
-            or x["file_type"] == "helao__json_file"
+            or x["file_name"].endswith(".json")
+            or x["file_type"] in ["helao__json_file", "json__file"]
         ]
         if not hlo_files:
             return "", "", []
