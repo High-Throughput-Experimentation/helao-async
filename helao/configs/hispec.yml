@@ -147,6 +147,15 @@ servers:
       aws_bucket: helao.data
       api_host: caltech-api.modelyst.com
       testing: false
+  CALC:
+      host: hte-eche-11.htejcap.caltech.edu
+      port: 8010
+      group: action
+      fast: calc_server
+      params: {}
+      verbose: false
+
+
   # ANA:
   #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8014
