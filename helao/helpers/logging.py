@@ -72,6 +72,7 @@ def make_logger(
     log_dir: Optional[str] = None,
     log_level: int = 20,  # 10 (DEBUG), 20 (INFO), 30 (WARNING), 40 (ERROR), 50 (CRITICAL)
     email_config: dict = {},
+    show_debug_console: bool = False,
 ):
     """
     Creates and configures a logger instance with both console and file handlers.
@@ -134,7 +135,7 @@ def make_logger(
     
     debug_handlers = [console]
     for handler in debug_handlers:
-        handler.setLevel(10)
+        handler.setLevel(10 if show_debug_console else 20)
         logger_instance.addHandler(handler)
 
     mailhost = email_config.get("mailhost", None)
