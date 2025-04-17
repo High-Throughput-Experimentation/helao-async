@@ -374,7 +374,11 @@ class Base:
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
         self.status_logger = self.aloop.create_task(self.log_status_task())
-        self.regular_updater = self.aloop.create_task(self.regular_status_task())
+        if self.server_cfg.get("regular_update", False):
+            regular_delay = self.server_cfg.get("regular_update_delay", 10)
+            self.regular_updater = self.aloop.create_task(
+                self.regular_status_task(regular_delay)
+            )
 
     def dyn_endpoints_init(self):
         """
@@ -727,7 +731,7 @@ class Base:
                 self.ntp_response = response
                 self.ntp_last_sync = response.orig_time
                 self.ntp_offset = response.offset
-                LOGGER.info(
+                LOGGER.debug(
                     f"retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}"
                 )
             except ntplib.NTPException:
@@ -735,8 +739,8 @@ class Base:
                 self.ntp_last_sync = time()
                 self.ntp_offset = 0.0
 
-            LOGGER.info(f"ntp_offset: {self.ntp_offset}")
-            LOGGER.info(f"ntp_last_sync: {self.ntp_last_sync}")
+            LOGGER.debug(f"ntp_offset: {self.ntp_offset}")
+            LOGGER.debug(f"ntp_last_sync: {self.ntp_last_sync}")
 
             if self.ntp_last_sync_file is not None:
                 while file_in_use(self.ntp_last_sync_file):
@@ -1052,7 +1056,7 @@ class Base:
         """
         return self.live_buffer[live_key]
 
-    async def regular_status_task(self, retry_limit: int = 5):
+    async def regular_status_task(self, delay: float = 10, retry_limit: int = 5):
         while True:
             for combo_key in self.status_clients.copy():
                 client_servkey, client_host, client_port = combo_key
@@ -1065,7 +1069,7 @@ class Base:
                     )
                     if response and error_code == ErrorCodes.none:
                         break
-            await asyncio.sleep(10)
+            await asyncio.sleep(delay)
 
     async def log_status_task(self, retry_limit: int = 5):
         """
