@@ -30,6 +30,7 @@ __all__ = [
     "ECMS_sub_threegascali",
     "ECMS_sub_inertgascali",
     "ECMS_sub_pulsecali",
+    "ECMS_sub_preCA_CO2flow",
     "ECMS_sub_CA_CO2flow",
 ]
 
