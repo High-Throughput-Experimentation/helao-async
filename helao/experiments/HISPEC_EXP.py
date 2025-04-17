@@ -16,6 +16,7 @@ __all__ = [
     "HISPEC_sub_shutdown",
     "HiSPEC_sub_PEIS",
     "HiSpEC_sub_CP",
+    "HiSpEC_calcaulte_lower_vertex_potential",
     # "HISPEC_sub_engage",
     # "HISPEC_sub_disengage",
     # "HISPEC_analysis_stability",
