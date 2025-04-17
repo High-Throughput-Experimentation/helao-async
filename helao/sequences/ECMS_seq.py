@@ -1813,7 +1813,6 @@ def ECMS_series_CA_change_gasflow(
 # =============================================================================
     #liquid_cleancell_time: float = 120,
     CO2flowrate_sccm: List[float] = [0.0, 10.0],
-    Califlowrate_sccm: List[float] = [0.0, 0.0],
     Califlowrate2_sccm: List[float] = [10.0, 0.0],
     MSsignal_quilibrium_time_initial: float = 480,
     MSsignal_quilibrium_time: float = 100,   
@@ -1872,12 +1871,11 @@ def ECMS_series_CA_change_gasflow(
 #             },
 #         )
 # =============================================================================
-        for run, (co2gas, caligas, caligas2) in enumerate(zip(CO2flowrate_sccm, Califlowrate_sccm, Califlowrate2_sccm)):
+        for run, (co2gas, caligas2) in enumerate(zip(CO2flowrate_sccm, Califlowrate2_sccm)):
             epm.add_experiment(
-                    "ECMS_sub_threegascali",
+                    "ECMS_sub_inertgascali",
                     {
                         "CO2flowrate_sccm": co2gas,
-                        "Califlowrate_sccm": caligas,
                         "Califlowrate_two_sccm": caligas2,
                         "MSsignal_quilibrium_time": MSsignal_quilibrium_time,
                     },
