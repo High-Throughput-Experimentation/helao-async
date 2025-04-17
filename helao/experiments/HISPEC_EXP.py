@@ -62,6 +62,7 @@ PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 # CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
 # ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
+CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.risingedge
 
@@ -101,6 +102,21 @@ def HISPEC_sub_shutdown(experiment: Experiment):
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
     return apm.action_list  # returns complete action list to orch
 
+def HiSpEC_calcaulte_lower_vertex_potential(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    min_offset_ocv: float = 0,
+    new_ocv: float = 0,
+    offset_value: float = -0.2):
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(CALC_server,
+             "keep_min_ocv",
+             {min_offset_ocv:min_offset_ocv,
+              new_ocv:new_ocv,
+              offset_value:offset_value})
+    
+    return apm.action_list  # returns complete action list to orch
 
 # implement Biologic trigger actions
 #  use easy_biologic's BiologicDevice.load_techniques() method
