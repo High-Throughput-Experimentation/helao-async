@@ -53,7 +53,9 @@ class HelaoFastAPI(FastAPI):
         self.server_params = self.server_cfg.get("params", {})
         if logging.LOGGER is None:
             logging.LOGGER = logging.make_logger(
-                logger_name=helao_srv, log_dir=os.path.join(helao_cfg["root"], "LOGS")
+                logger_name=helao_srv,
+                log_dir=os.path.join(helao_cfg["root"], "LOGS"),
+                show_debug_console=helao_cfg.get("show_debug", False),
             )
 
 
@@ -83,7 +85,9 @@ class HelaoBokehAPI:
         self.server_params = self.server_cfg.get("params", {})
         if logging.LOGGER is None:
             logging.LOGGER = logging.make_logger(
-                logger_name=helao_srv, log_dir=os.path.join(helao_cfg["root"], "LOGS")
+                logger_name=helao_srv,
+                log_dir=os.path.join(helao_cfg["root"], "LOGS"),
+                show_debug_console=helao_cfg.get("show_debug", False),
             )
         self.doc_name = self.server_params.get(
             "doc_name", f"{self.helao_srv} Bokeh App"
