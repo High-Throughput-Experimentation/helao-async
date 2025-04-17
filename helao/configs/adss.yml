@@ -160,6 +160,7 @@ servers:
     group: action
     verbose: true
     fast: pal_server
+    regular_update: true
     params:
       user: RSHS
       key: c:\helao\sshkeys\rshs_private3.ppk

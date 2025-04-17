@@ -1,5 +1,6 @@
 dummy: true
 simulation: true
+show_debug: true
 experiment_libraries:
   - TEST_exp
 sequence_libraries:

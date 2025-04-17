@@ -15,7 +15,8 @@ __all__ = [
     "ECMS_series_pulseCA", 
     "ECMS_MS_calibration_recirculation",
     "ECMS_MS_calibration",
-    "ECMS_MS_pulsecalibration"
+    "ECMS_MS_pulsecalibration",
+    "ECMS_series_CA_change_gasflow"
 ]
 
 from typing import List
@@ -1776,4 +1777,133 @@ def ECMS_MS_pulsecalibration(
         )
     return epm.experiment_plan_list
 
+def ECMS_series_CA_change_gasflow(
+    sequence_version: int = 1,
+    plate_id: int = 4534,
+    solid_sample_no: int = 1,
+# =============================================================================
+#     reservoir_liquid_sample_no: int = 2,
+#     volume_ul_cell_liquid: float = 600,
+#     #liquid_forward_time: float = 0,
+#     liquid_backward_time: float = 80,  
+# =============================================================================
+    #vacuum_time: float = 10,   
+    CO2equilibrium_duration: float = 30,
+    flowrate_sccm: float = 10.0,
+    flow_ramp_sccm: float = 0,
+    MS_baseline_duration_1: float = 30,
+    #MS_baseline_duration_2: float = 90, 
+    WE_potential__V: List[float] = [-0.5, -1.0, -2.0],
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 7.8,
+    CA_duration_sec: List[float] = [60, 60, 60],
+    SampleRate: float = 1,
+    IErange: str = "auto",
+    ref_offset__V: float = 0.0,
+    MS_equilibrium_time: float = 10.0,
+    flow_change_duration_sec: List[float] = [60.0,60.0,60.0],
+    CO2_flow_rate_sccm: List[float] = [0.0,10.0,0.0],
+# =============================================================================
+#     cleaning_times: int =1,
+#     liquid_fill_time: float = 7,
+#     liquid_drain_time: float = 60.0,
+#     tube_clear_time: float = 20,
+#     tube_clear_delaytime: float = 40.0,
+# =============================================================================
+    #liquid_cleancell_time: float = 120,
+    CO2flowrate_sccm: List[float] = [0.0, 10.0],
+    Califlowrate_sccm: List[float] = [0.0, 0.0],
+    Califlowrate2_sccm: List[float] = [10.0, 0.0],
+    MSsignal_quilibrium_time_initial: float = 480,
+    MSsignal_quilibrium_time: float = 100,   
+):
 
+    
+    epm = ExperimentPlanMaker()
+
+    # housekeeping
+    epm.add_experiment("ECMS_sub_unload_cell", {})
+    epm.add_experiment(
+        "ECMS_sub_load_solid",
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    )
+    #epm.add_experiment("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
+
+    for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
+# =============================================================================
+#         epm.add_experiment(
+#             "ECMS_sub_electrolyte_fill_recirculationreservoir",
+#             {
+#                 "liquid_fill_time": liquid_fill_time,
+#             },
+#         )
+# 
+# 
+#         epm.add_experiment(
+#             "ECMS_sub_electrolyte_fill_cell_recirculation",
+#             {
+#                 "liquid_backward_time": liquid_backward_time,
+#                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+#                 "volume_ul_cell_liquid": volume_ul_cell_liquid,
+#             },
+#         )
+# =============================================================================
+#achiving faster equilibrium time with faster CO2 flow rate
+        epm.add_experiment(
+            "ECMS_sub_headspace_purge_and_CO2baseline",
+            {
+                "CO2equilibrium_duration": CO2equilibrium_duration,
+                "flowrate_sccm": flowrate_sccm,
+                "flow_ramp_sccm": flow_ramp_sccm,
+                "MS_baseline_duration": MS_baseline_duration_1
+            },
+        )
+# =============================================================================
+#         epm.add_experiment("ECMS_sub_electrolyte_recirculation_on", {})
+# 
+#         epm.add_experiment(
+#             "ECMS_sub_headspace_purge_and_CO2baseline",
+#             {
+#                 "CO2equilibrium_duration": 1.0,
+#                 "flowrate_sccm": flowrate_sccm,
+#                 "flow_ramp_sccm": flow_ramp_sccm,
+#                 "MS_baseline_duration": MS_baseline_duration_2
+#             },
+#         )
+# =============================================================================
+        for run, (co2gas, caligas, caligas2) in enumerate(zip(CO2flowrate_sccm, Califlowrate_sccm, Califlowrate2_sccm)):
+            epm.add_experiment(
+                    "ECMS_sub_threegascali",
+                    {
+                        "CO2flowrate_sccm": co2gas,
+                        "Califlowrate_sccm": caligas,
+                        "Califlowrate_two_sccm": caligas2,
+                        "MSsignal_quilibrium_time": MSsignal_quilibrium_time,
+                    },
+                )        
+            
+        epm.add_experiment(
+            "ECMS_sub_CA_CO2flow",
+            {
+                "WE_potential__V": potential,
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "ref_offset__V": ref_offset__V,
+                "CA_duration_sec": time,
+                "SampleRate": SampleRate,
+                "IErange": IErange,
+                "MS_equilibrium_time": MS_equilibrium_time,
+                "total_MFC_flow_rate_sccm": flowrate_sccm,
+                "flow_change_duration_sec": flow_change_duration_sec,
+                "CO2_flow_rate_sccm": CO2_flow_rate_sccm,
+            },
+        )
+        #epm.add_experiment("ECMS_sub_electrolyte_recirculation_off", {})
+            
+    epm.add_experiment("ECMS_sub_normal_state",{})
+        #epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
+        #epm.add_experiment("ECMS_sub_clean_cell_recirculation", {"volume_ul_cell_liquid": volume_ul_cell_liquid, "liquid_backward_time":liquid_backward_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no, "tube_clear_time":tube_clear_time, "liquid_drain_time":liquid_drain_time, "liquid_fill_time": liquid_fill_time + 1.0, "cleaning_times": cleaning_times, "tube_clear_delaytime": tube_clear_delaytime})        
+   
+    return epm.experiment_plan_list
