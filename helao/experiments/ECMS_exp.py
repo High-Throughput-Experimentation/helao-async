@@ -28,6 +28,7 @@ __all__ = [
     "ECMS_sub_final_clean_cell",
     "ECMS_sub_cali",
     "ECMS_sub_threegascali",
+    "ECMS_sub_inertgascali",
     "ECMS_sub_pulsecali",
     "ECMS_sub_CA_CO2flow",
 ]
@@ -1163,6 +1164,60 @@ def ECMS_sub_threegascali(
 
     return apm.action_list
 
+def ECMS_sub_inertgascali(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    CO2flowrate_sccm: float = 5.0,
+    Califlowrate_two_sccm: float = 0.0,  # Ar
+    flow_ramp_sccm: float = 0,
+    MSsignal_quilibrium_time: float = 300,
+):
+    """prevacuum the cell gas phase side to make the electrolyte contact with GDE"""
+
+    apm = ActionPlanMaker()
+
+    # set CO2 flow rate
+    apm.add(
+        MFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": CO2flowrate_sccm,
+            "ramp_sccm_sec": flow_ramp_sccm,
+            "device_name": "CO2",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        MFC_server,
+        "cancel_hold_valve_action",
+        {"device_name": "CO2"},
+        asc.no_wait,
+    )
+    # set Calibration gas flow rate
+    #apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
+    # cali gas one
+
+
+    # cali gas two
+    apm.add(
+        CALIBRATIONMFCSECOND_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": Califlowrate_two_sccm,
+            "ramp_sccm_sec": flow_ramp_sccm,
+            "device_name": "Caligassecond",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        CALIBRATIONMFCSECOND_server,
+        "cancel_hold_valve_action",
+        {"device_name": "Caligassecond"},
+        asc.no_wait,
+    )
+    apm.add(ORCH_server, "wait", {"waittime": MSsignal_quilibrium_time})
+
+    return apm.action_list
 
 def ECMS_sub_pulsecali(
     experiment: Experiment,
