@@ -249,14 +249,16 @@ class HelaoAction(HelaoModel):
         hlo_files = [
             x
             for x in file_list
-            if x["file_name"].endswith(".hlo") or x["file_name"].endswith(".hlo.json")
+            if x["file_name"].endswith(".hlo")
+            or x["file_name"].endswith(".hlo.json")
+            or x["file_type"] == "helao__json_file"
         ]
         if not hlo_files:
             return "", "", []
         first_hlo = hlo_files[0]
         retkeys = ["file_name", "file_type", "data_keys"]
         return [first_hlo.get(k, "") for k in retkeys]
-    
+
     @property
     def hlo_file(self):
         """Return primary .hlo filename for this action."""
@@ -346,7 +348,7 @@ class EcheUvisLoader(HelaoLoader):
             except Exception as e:
                 print(f"!!! SQL query failed: {e}")
                 tries += 1
-                time.sleep(30*tries)
+                time.sleep(30 * tries)
                 self.reconnect()
         if data is None:
             raise Exception("!!! SQL query failed after retries.")
@@ -423,7 +425,7 @@ class EcheUvisLoader(HelaoLoader):
             except Exception as e:
                 print(f"!!! SQL query failed: {e}")
                 tries += 1
-                time.sleep(30*tries)
+                time.sleep(30 * tries)
                 self.reconnect()
         if data is None:
             raise Exception("!!! SQL query failed after retries.")
