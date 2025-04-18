@@ -139,13 +139,15 @@ def makeApp(confPrefix, server_key, helao_root):
         
 
         try:
-            glob_exp_params: dict,_= await async_private_dispatcher(host="hte-eche-11.htejcap.caltech.edu",server_key="ORCH",private_action="get_global_params",port=8001)
+            glob_exp_params = await async_private_dispatcher(host="hte-eche-11.htejcap.caltech.edu",server_key="ORCH",private_action="get_global_params",port=8001)
+            glob_exp_params = glob_exp_params[0]
              
             if "min_offset_ocv" in glob_exp_params.keys():
                 min_offset_ocv = glob_exp_params["min_offset_ocv"]
 
             else:
                 min_offset_ocv = 3
+                LOGGER.warning("min_offset_ocv not found in global params, setting to 3")
             if  "HiSpEC_OCV" in glob_exp_params:
                 new_ocv = glob_exp_params["HiSpEC_OCV"]
 
