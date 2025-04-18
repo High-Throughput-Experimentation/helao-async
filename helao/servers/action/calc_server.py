@@ -139,10 +139,9 @@ def makeApp(confPrefix, server_key, helao_root):
         
 
         try:
-            glob_exp_params = await async_private_dispatcher(host="hte-eche-11.htejcap.caltech.edu",server_key="ORCH",private_action="get_global_params",port=8001)
-            glob_exp_params = glob_exp_params[0]
+            glob_exp_params: dict, er = await async_private_dispatcher(host="hte-eche-11.htejcap.caltech.edu",server_key="ORCH",private_action="get_global_params",port=8001)
              
-            if "min_offset_ocv" in glob_exp_params.keys():
+            if "min_offset_ocv" in glob_exp_params:
                 min_offset_ocv = glob_exp_params["min_offset_ocv"]
 
             else:
