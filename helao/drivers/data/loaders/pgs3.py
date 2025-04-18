@@ -133,7 +133,11 @@ class HelaoLoader:
         if hlo_fn.endswith(".hlo"):
             keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}.json"
         elif hlo_fn.endswith(".json"):
-            keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}"
+            if not hlo_fn.endswith(".hlo.json"):
+                keystr = f"raw_data/{str(action_uuid)}/{hlo_fn.replace('.json', '.hlo.json')}"
+            else:
+                keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}"
+
         else:
             print(f"{hlo_fn} is not a valid named hlo file.")
             return {}

@@ -1426,9 +1426,7 @@ class HelaoSyncer:
                                 fp.relative_to(prog.yml.targetdir)
                             ).replace("\\", "/")
                             if "." in file_s3_key.split("/")[-1]:
-                                fileinfo.file_name = fileinfo.file_name.replace(
-                                    f"{fp.suffix}", f".{file_s3_key.split('.')[-1]}"
-                                )
+                                fileinfo.file_name = os.path.basename(file_s3_key)
                             else:
                                 fileinfo.file_name = fileinfo.file_name.replace(
                                     f"{fp.suffix}", ""
