@@ -12,7 +12,7 @@ __all__ = [
     # "HISPEC_sub_CP_led",
     # "HISPEC_sub_OCV_led",
     # "HISPEC_sub_interrupt",
-    "HISPEC_sub_startup",
+    "HiSpEC_sub_startup",
     "HISPEC_sub_shutdown",
     "HiSPEC_sub_PEIS",
     "HiSpEC_sub_CP",
@@ -20,7 +20,12 @@ __all__ = [
     # "HISPEC_sub_engage",
     # "HISPEC_sub_disengage",
     # "HISPEC_analysis_stability",
-    "HiSpEC_sub_cooldown"
+    "HiSpEC_sub_cooldown",
+    "HiSpEC_sub_load_solid",
+    "HiSpEC_sub_add_liquid",
+    "HiSpEC_sub_unloadall_customs",
+    "HiSpEC_sub_disengage"
+    
 
 ]
 
@@ -49,7 +54,9 @@ from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.machine import MachineModel as MM
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.electrolyte import Electrolyte
+from helao.core.models.sample import SolidSample, LiquidSample
 
+from helao.drivers.motion.enum import MoveModes, TransformationModes
 
 EXPERIMENTS = __all__
 # these must all be defined but you may not use any of them in the experiment
@@ -91,12 +98,199 @@ def HiSPEC_sub_stop_flow(experiment: Experiment):
     return apm.action_list
 
 
-def HISPEC_sub_startup(experiment: Experiment):
-    """Unload custom position."""
+def HiSpEC_sub_unloadall_customs(experiment: Experiment):
+    """last functionality test: -"""
+
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
+
+    apm.add(
+        PAL_server,
+        "archive_custom_unloadall",
+        {
+            "destroy_liquid": True,
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+
     return apm.action_list  # returns complete action list to orch
 
+
+def HiSpEC_sub_add_liquid(
+    experiment: Experiment,
+    experiment_version: int = 2,
+    solid_custom_position: str = "cell1_we",
+    reservoir_liquid_sample_no: int = 1,
+    solution_bubble_gas: str = "O2",
+    liquid_volume_ml: float = 1.0,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid",
+        {
+            "custom": solid_custom_position,
+            "source_liquid_in": LiquidSample(
+                **{
+                    "sample_no": reservoir_liquid_sample_no,
+                    "machine_name": gethostname().lower(),
+                }
+            ).model_dump(),
+            "volume_ml": liquid_volume_ml,
+            "reservoir_bubbler_gas": solution_bubble_gas,
+            "combine_liquids": True,
+            "dilute_liquids": True,
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+
+def HiSpEC_sub_load_solid(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    solid_custom_position: str = "cell1_we",
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+):
+    """last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    apm.add(
+        PAL_server,
+        "archive_custom_load",
+        {
+            "custom": solid_custom_position,
+            "load_sample_in": SolidSample(
+                **{
+                    "sample_no": solid_sample_no,
+                    "plate_id": solid_plate_id,
+                    "machine_name": "legacy",
+                }
+            ).model_dump(),
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+def HiSpEC_sub_interrupt(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    reason: str = "wait",
+):
+    apm = ActionPlanMaker()
+    apm.add(ORCH_server, "interrupt", {"reason": reason})
+    return apm.action_list
+
+def HiSpEC_sub_disengage(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    clear_we: bool = True,
+    clear_ce: bool = False,
+    z_height: float = 0,
+    vent_wait: float = 10.0,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    for clear_flag, items in (
+        (clear_ce, ("ce_vent", "ce_pump")),
+        (clear_we, ("we_vent", "we_pump")),
+    ):
+        for item in items:
+            apm.add(
+                IO_server,
+                "set_digital_out",
+                {"do_item": item, "on": clear_flag},
+                ActionStartCondition.no_wait,
+            )
+    apm.add(ORCH_server, "wait", {"waittime": vent_wait})
+    # lower z (disengage)
+    apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
+    for i, item in enumerate(["we_vent", "we_pump", "ce_vent", "ce_pump"]):
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {"do_item": item, "on": False},
+            (
+                ActionStartCondition.no_wait
+                if i > 0
+                else ActionStartCondition.wait_for_all
+            ),
+        )
+    return apm.action_list  # returns complete action list to orch
+
+
+
+def HiSpEC_sub_startup(
+    experiment: Experiment,
+    experiment_version: int = 2,
+    solid_custom_position: str = "cell1_we",
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    reservoir_liquid_sample_no: int = 1,
+    solution_bubble_gas: str = "N2",
+    liquid_volume_ml: float = 1.0,
+):
+    """Sub experiment
+    last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # unload all samples from custom positions
+    apm.add_action_list(HiSpEC_sub_unloadall_customs(experiment=experiment))
+
+    # load new requested solid samples
+    apm.add_action_list(
+        HiSpEC_sub_load_solid(
+            experiment=experiment,
+            solid_custom_position=solid_custom_position,
+            solid_plate_id=solid_plate_id,
+            solid_sample_no=solid_sample_no,
+        )
+    )
+
+    # add liquid to solid
+    apm.add_action_list(
+        HiSpEC_sub_add_liquid(
+            experiment=experiment,
+            solid_custom_position=solid_custom_position,
+            reservoir_liquid_sample_no=reservoir_liquid_sample_no,
+            solution_bubble_gas=solution_bubble_gas,
+            liquid_volume_ml=liquid_volume_ml,
+        )
+    )
+
+    # get sample plate coordinates
+    apm.add(
+        MOTOR_server,
+        "solid_get_samples_xy",
+        {
+            "plate_id": solid_plate_id,
+            "sample_no": solid_sample_no,
+        },
+        to_globalexp_params=[
+            "_platexy"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+
+    # move to position
+    apm.add(
+        MOTOR_server,
+        "move",
+        {
+            # "d_mm": [x_mm, y_mm],
+            "axis": ["x", "y"],
+            "mode": MoveModes.absolute,
+            "transformation": TransformationModes.platexy,
+        },
+        from_globalexp_params={"_platexy": "d_mm"},
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+
+    return apm.action_list  # returns complete action list to orch
 
 def HISPEC_sub_shutdown(experiment: Experiment):
     """Unload custom position and disable IR emitter."""
@@ -116,7 +310,8 @@ def HiSpEC_calculate_lower_vertex_potential(
              "keep_min_ocv",
              {'min_offset_ocv':min_offset_ocv,
               "new_ocv":new_ocv,
-              "offset_value":offset_value})
+              "offset_value":offset_value},
+              to_globalexp_params={"result": "new_min_OCV"})
     
     return apm.action_list  # returns complete action list to orch
 
@@ -128,6 +323,48 @@ def HiSpEC_calculate_lower_vertex_potential(
 
 # HISPEC_sub_LoSpEC -- CA to SpEC, conditional SpEC
 # HISPEC_sub_PD_LoSpEC
+
+
+def HiSpEC_sub_OCV(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Tval__s: float = 1,
+    SampleRate: float = 0.05,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+    apm.add(
+        PSTAT_server,
+        "run_OCV",
+        {
+            "Tval__s": Tval__s,
+            "SampleRate": SampleRate,
+            "TTLwait": -1,  # -1 disables, else select TTL 0-3
+            "TTLsend": -1,  # -1 disables, else select TTL 0-3
+            #"IErange": "auto",
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="OCV",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+        to_globalexp_params={"Ewe_V__mean_final": "HiSpEC_OCV"},
+    )
+    return apm.action_list  # returns complete action list to orch
 
 
 # spectral electrochemistry experiment
