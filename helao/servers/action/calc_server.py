@@ -147,7 +147,7 @@ def makeApp(confPrefix, server_key, helao_root):
         )
 
         LOGGER.info(f"minimum potential was: {result}")
-        await active.enqueue_data_dflt(datadict=result)
+        await active.enqueue_data_dflt(datadict={'result':result})
         active.action.action_params["min_offset_ocv"] = result
         finished_action = await active.finish()
         return finished_action.as_dict()
