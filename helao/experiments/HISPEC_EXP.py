@@ -24,7 +24,8 @@ __all__ = [
     "HiSpEC_sub_load_solid",
     "HiSpEC_sub_add_liquid",
     "HiSpEC_sub_unloadall_customs",
-    "HiSpEC_sub_disengage"
+    "HiSpEC_sub_disengage",
+    "HiSpEC_sub_OCV",
     
 
 ]
@@ -363,6 +364,18 @@ def HiSpEC_sub_OCV(
             ProcessContrib.samples_out,
         ],
         to_globalexp_params={"Ewe_V__mean_final": "HiSpEC_OCV"},
+    )
+
+    apm.add(
+        CALC_server,
+        "keep_min_ocv",
+        {
+            "min_offset_ocv": 0,
+            "new_ocv": 0,
+            "offset_value": -0.2,
+        },
+        from_globalexp_params={"HiSpEC_OCV": "new_ocv"},
+        to_globalexp_params={"min_offset_ocv": "min_offset_ocv"},
     )
     return apm.action_list  # returns complete action list to orch
 
