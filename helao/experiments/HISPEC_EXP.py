@@ -16,11 +16,12 @@ __all__ = [
     "HISPEC_sub_shutdown",
     "HiSPEC_sub_PEIS",
     "HiSpEC_sub_CP",
-    "HiSpEC_calcaulte_lower_vertex_potential",
+    "HiSpEC_calculate_lower_vertex_potential",
     # "HISPEC_sub_engage",
     # "HISPEC_sub_disengage",
     # "HISPEC_analysis_stability",
     "HiSpEC_sub_cooldown"
+
 ]
 
 from helao.helpers import logging
@@ -103,7 +104,7 @@ def HISPEC_sub_shutdown(experiment: Experiment):
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
     return apm.action_list  # returns complete action list to orch
 
-def HiSpEC_calcaulte_lower_vertex_potential(
+def HiSpEC_calculate_lower_vertex_potential(
     experiment: Experiment,
     experiment_version: int = 1,
     min_offset_ocv: float = 0,
