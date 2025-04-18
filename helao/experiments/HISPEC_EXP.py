@@ -113,7 +113,7 @@ def HiSpEC_calculate_lower_vertex_potential(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(CALC_server,
-             "keep_min_ocv",
+             "keepMinOCV",
              {min_offset_ocv:min_offset_ocv,
               new_ocv:new_ocv,
               offset_value:offset_value})
