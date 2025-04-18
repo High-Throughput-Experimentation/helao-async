@@ -15,7 +15,7 @@ from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
 from helao.drivers.data.calc_driver import Calc
 from helao.helpers.config_loader import config_loader
-
+from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers import logging
 
 if logging.LOGGER is None:
@@ -136,14 +136,36 @@ def makeApp(confPrefix, server_key, helao_root):
         new_ocv: float = 0,
         offset_value: float = -0.2,
     ):
+        
+
+        try:
+            glob_exp_params: dict,_= await async_private_dispatcher(host="hte-eche-11.htejcap.caltech.edu",server_key="ORCH",private_action="get_global_params",port=8001)
+             
+            if "min_offset_ocv" in glob_exp_params.keys():
+                min_offset_ocv = glob_exp_params["min_offset_ocv"]
+
+            else:
+                min_offset_ocv = 3
+            if  "HiSpEC_OCV" in glob_exp_params:
+                new_ocv = glob_exp_params["HiSpEC_OCV"]
+
+        except Exception as e:
+            LOGGER.error(f"Error getting global params: {e}")
+            print(f"Error getting global params in calc_server.py, try perhaps the host details set here are wrong: {e}")
+
+
         active = await app.base.setup_and_contain_action(action_abbr="keepMinOCV")
         result = (
-            min(
-                active.action.action_params["min_offset_ocv"]
-                + active.action.action_params["offset_value"],
-                active.action.action_params["new_ocv"],
-            )
-            - active.action.action_params["offset_value"]
+            # min(
+            #     active.action.action_params["min_offset_ocv"]
+            #     + active.action.action_params["offset_value"],
+            #     active.action.action_params["new_ocv"],
+            # )
+                min(
+                    min_offset_ocv,
+                    new_ocv
+                )
+            # - active.action.action_params["offset_value"]
         )
 
         LOGGER.info(f"minimum potential was: {result}")

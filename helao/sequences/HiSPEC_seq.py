@@ -77,7 +77,7 @@ def HiSpEC_CV(
     
     if use_z_motor:
         epm.add_experiment(
-            "ECHEUVIS_sub_disengage",
+            "HiSpEC_sub_disengage",
             {
                 "clear_we": True,
                 "clear_ce": False,
@@ -87,14 +87,14 @@ def HiSpEC_CV(
         )
     else:
         epm.add_experiment(
-            "ECHEUVIS_sub_interrupt",
+            "HiSpEC_sub_interrupt",
             {"reason": "Stop flow and prepare for xy motion to starting sample."},
         )
 
     for i, plate_sample in enumerate(plate_sample_no_list):
         if i > 0 and use_z_motor:
             epm.add_experiment(
-                "ECHEUVIS_sub_disengage",
+                "HiSpEC_sub_disengage",
                 {
                     "clear_we": True,
                     "clear_ce": False,
@@ -104,7 +104,7 @@ def HiSpEC_CV(
             )
 
         epm.add_experiment(
-            "ECHE_sub_startup",
+            "HiSpEC_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
