@@ -149,7 +149,7 @@ servers:
       testing: false
   CALC:
       host: hte-eche-11.htejcap.caltech.edu
-      port: 8010
+      port: 8012
       group: action
       fast: calc_server
       params: {}
