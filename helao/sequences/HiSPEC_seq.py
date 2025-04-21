@@ -191,7 +191,7 @@ def HiSpEC_CV(
                 "toggle1_source": toggle1_source,
                 "toggle1_init_delay": toggle1_init_delay,
                 "toggle1_duty": toggle1_duty,
-                "OCV_vsRef": Vapex2_vsRHE,
+                # "OCV_vsRef": Vapex2_vsRHE,
             # })
             }, from_globalexp_params={"min_offset_ocv": "Vapex2_vsRHE", "CP_Ewe_V__mean_final":"Vapex1_vsRHE"} ) # temporarily commented this out to test a fixed V2
 
