@@ -384,10 +384,10 @@ def HiSpEC_sub_OCV(
 def HISPEC_sub_SpEC(
     experiment: Experiment,
     experiment_version: int = 1,
-    OCV_vsRef: float = 0.2,
+    # OCV_vsRef: float = 0.2,
     # Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.2,  # Apex 1 value in volts or amps.
-    # Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
+    Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
     # Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
     scanrate_voltsec: float = 0.01,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
@@ -430,16 +430,16 @@ def HISPEC_sub_SpEC(
     )
 
     CV_duration_sec = (
-        abs(Vapex1_vsRHE - OCV_vsRef) / scanrate_voltsec
+        abs(Vapex1_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
     )  # time from initial to Vertex 1
     CV_duration_sec += (
-        abs(OCV_vsRef - OCV_vsRef) / scanrate_voltsec
+        abs(Vapex2_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
     )  # time from vertex 1 to vertex 2 (imagine for now num scans =1)
     CV_duration_sec += (
-        abs(OCV_vsRef - Vapex1_vsRHE) / scanrate_voltsec
+        abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec
     )  # time from vertex to to final
     CV_duration_sec += (
-        abs(OCV_vsRef - Vapex1_vsRHE)
+        abs(Vapex2_vsRHE - Vapex1_vsRHE)
         / scanrate_voltsec
         * 2.0
         * (
@@ -511,10 +511,10 @@ def HISPEC_sub_SpEC(
         PSTAT_server,
         "run_CV",
         {
-            "Vinit__V": OCV_vsRef - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vinit__V": Vapex2_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
             "Vapex1__V": Vapex1_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
-            "Vapex2__V": OCV_vsRef - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
-            "Vfinal__V": OCV_vsRef - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vapex2__V": Vapex2_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+            "Vfinal__V": Vapex2_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
             "ScanRate__V_s": scanrate_voltsec,
             "AcqInterval__s": samplerate_sec,
             "Cycles": cycles,
