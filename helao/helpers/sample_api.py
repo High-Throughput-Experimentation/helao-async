@@ -194,7 +194,7 @@ class SampleModelAPI:
                     dfdict[key] = str(val)
 
                 if key not in self.column_names:
-                    LOGGER.error(f"Invalid {self._sample_type} data key '{key}', skipping it.")
+                    LOGGER.warning(f"Invalid {self._sample_type} data key '{key}', skipping it.")
                     keys_to_deletes.append(key)
 
             for key in keys_to_deletes:
@@ -452,7 +452,7 @@ class SampleModelAPI:
                 keys_to_deletes = []
                 for key in dfdict.keys():
                     if key not in self.column_names:
-                        LOGGER.error(f"Invalid {self._sample_type} data key '{key}', skipping it.")
+                        LOGGER.warning(f"Invalid {self._sample_type} data key '{key}', skipping it.")
                         keys_to_deletes.append(key)
 
                 for key in keys_to_deletes:
