@@ -29,8 +29,8 @@ def HiSpEC_CV(
 
     #######
     #Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
-    Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps. # temporarily uncommented to test a fixed V2
+    # Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
+    # Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps. # temporarily uncommented to test a fixed V2
     #Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
     #scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
