@@ -167,7 +167,7 @@ def HiSpEC_CV(
                 "Bandwidth": Bandwidth,
                 "solution_ph": solution_ph,
                 "ref_vs_nhe": ref_vs_nhe,
-            }, from_globalexp_params={"HiSpEC_OCV": "Vinit__V" })
+            }, from_globalexp_params={"min_offset_ocv": "Vinit__V"})
         
         
 
@@ -176,7 +176,7 @@ def HiSpEC_CV(
             {
                 #"Vinit_vsRHE": Vinit_vsRHE,
 
-                "Vapex1_vsRHE": Vapex1_vsRHE,
+                # "Vapex1_vsRHE": Vapex1_vsRHE,
                 #"Vapex2_vsRHE": Vapex2_vsRHE,
                 #"Vfinal_vsRHE": Vfinal_vsRHE,
                 "samplerate_sec": samplerate_sec,
@@ -192,8 +192,8 @@ def HiSpEC_CV(
                 "toggle1_init_delay": toggle1_init_delay,
                 "toggle1_duty": toggle1_duty,
                 "OCV_vsRef": Vapex2_vsRHE,
-            })
-            # }, from_globalexp_params={"HiSpEC_OCV": "OCV_vsRef"}) # temporarily commented this out to test a fixed V2
+            # })
+            }, from_globalexp_params={"min_offset_ocv": "OCV_vsRef", "CP_Ewe_V__mean_final":"Vapex1_vsRHE"} ) # temporarily commented this out to test a fixed V2
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
