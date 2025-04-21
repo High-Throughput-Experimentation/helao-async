@@ -177,6 +177,63 @@ def HiSpEC_sub_load_solid(
 
     return apm.action_list  # returns complete action list to orch
 
+
+
+def HiSpEC_sub_engage(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    flow_we: bool = True,
+    flow_ce: bool = True,
+    z_height: float = 1.5,
+    fill_wait: float = 10.0,
+    # calibrate_intensity: bool = False,
+    max_integration_time: int = 150,
+    # illumination_source: str = "doric_wled",
+):
+    # raise z (engage)
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
+    # close vent valves
+    for item in ("we_vent", "ce_vent"):
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {"do_item": item, "on": False},
+            ActionStartCondition.no_wait,
+        )
+    # pull electrolyte through WE and CE chambers
+    for item, flow_flag in (
+        ("we_flow", flow_we),
+        ("we_pump", flow_we),
+        ("ce_pump", flow_ce),
+    ):
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {"do_item": item, "on": flow_flag},
+            ActionStartCondition.no_wait,
+        )
+    # wait for specified time (seconds)
+    apm.add(ORCH_server, "wait", {"waittime": fill_wait})
+    # stop high speed flow, but keep low speed flow if flow_we is True
+    for i, (item, flow_flag) in enumerate(
+        [("we_flow", flow_we), ("we_pump", False), ("ce_pump", False)]
+    ):
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {"do_item": item, "on": flow_flag},
+            (
+                ActionStartCondition.no_wait
+                if i > 0
+                else ActionStartCondition.wait_for_all
+            ),
+        )
+
+    return apm.action_list  # returns complete action list to orch
+
+
+
 def HiSpEC_sub_interrupt(
     experiment: Experiment,
     experiment_version: int = 1,
