@@ -11,7 +11,6 @@ import aioshutil
 import aiofiles
 
 from helao.helpers.yml_tools import yml_load
-from helao.helpers.print_message import print_message
 from helao.helpers.premodels import Sequence, Experiment, Action
 
 from helao.helpers import logging
@@ -35,21 +34,14 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
     """
     yp = Path(yml_path)
 
-    def print_msg(msg):
-        # if base is not None:
-        #     base.print_message(msg, info=True)
-        # else:
-        print_message(LOGGER, "yml_finisher", msg, info=True)
-
     if "host" not in db_config or "port" not in db_config:
-        # print_msg(f"DB server not defined in config, {yml_path} will not sync.")
         return False
     else:
         dbp_port = db_config["port"]
         dbp_host = db_config["host"]
 
     if not yp.exists():
-        print_msg(f"{yml_path} was not found, was it already moved?")
+        LOGGER.info(f"{yml_path} was not found, was it already moved?")
         return False
 
     ymld = yml_load(yp)
@@ -62,14 +54,14 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
             try:
                 async with session.post(req_url, params=req_params) as resp:
                     if resp.status == 200:
-                        print_msg(f"Finished {yml_type}: {yml_path}.")
+                        LOGGER.info(f"Finished {yml_type}: {yml_path}.")
                         return True
                     else:
-                        print_msg(f"Retry [{i}/{retry}] finish {yml_type} {yml_path}.")
+                        LOGGER.info(f"Retry [{i}/{retry}] finish {yml_type} {yml_path}.")
                         await asyncio.sleep(1)
             except asyncio.TimeoutError:
                 continue
-        print_msg(f"Could not finish {yml_path} after {retry} tries.")
+        LOGGER.info(f"Could not finish {yml_path} after {retry} tries.")
         return False
 
 
@@ -90,16 +82,6 @@ async def move_dir(
     Raises:
     Exception: If there are issues with directory creation, file copying, or file removal.
     """
-
-    if base is not None:
-
-        def print_msg(msg):
-            base.print_message(msg, info=True)
-
-    else:
-
-        def print_msg(msg):
-            print_message(LOGGER, "yml_finisher", msg, info=True)
 
     obj_type = hobj.__class__.__name__.lower()
     dest_dir = "RUNS_FINISHED"
@@ -124,7 +106,7 @@ async def move_dir(
             is_manual = True
     else:
         yml_dir = None
-        print_msg(
+        LOGGER.info(
             f"Invalid object {obj_type} was provided. Can only move Action, Experiment, or Sequence."
         )
         return {}
@@ -152,11 +134,11 @@ async def move_dir(
             copy_success = True
         else:
             src_list = [f for f in src_list if f not in exists_list]
-            print_msg(
+            LOGGER.info(
                 f"Could not copy {len(src_list)} files to FINISHED, retrying after {retry_delay} seconds"
             )
-            print("\n".join(src_list))
-            print(copy_results)
+            LOGGER.info(src_list)
+            LOGGER.info(copy_results)
             copy_retries += 1
         await asyncio.sleep(retry_delay)
 
@@ -191,9 +173,9 @@ async def move_dir(
                     await asyncio.gather(aiofiles.os.rmdir(seq_dir))
             else:
                 rm_list = [f for f in rm_list if f not in rm_files_done]
-                print_msg(
+                LOGGER.info(
                     f"Could not remove directory from ACTIVE, retrying after {retry_delay} seconds"
                 )
-                print("\n".join(rm_list))
+                LOGGER.info(rm_list)
                 rm_retries += 1
             await asyncio.sleep(retry_delay)
