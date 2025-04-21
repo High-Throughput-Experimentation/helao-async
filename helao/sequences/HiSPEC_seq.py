@@ -44,8 +44,8 @@ def HiSpEC_CV(
     toggle1_source: str = "spec_trig",
     toggle1_init_delay: float = 0.0,
     toggle1_duty: float = 0.01,
-    toggle1_period: float = 10,
-    toggle1_time: float = 1,
+    # toggle1_period: float = 10,
+    # toggle1_time: float = 1,
     Vamp__V: float = 0.01,  # Amplitude value in volts
     Finit__Hz: float = 40000,  # Initial frequency in Hz.
     Ffinal__Hz: float = 1000,  # Final frequency in Hz.
@@ -55,6 +55,9 @@ def HiSpEC_CV(
     SweepMode: str = "log",
     Repeats: int = 10,
     DelayFraction: float = 0.1,
+    Ival__A: float = 0.0015,
+    Tval__s: float = 0.05,
+
     
     # toggle2_source: str = "spec_trig",
     # toggle2_init_delay: float = 0.0,
@@ -140,7 +143,7 @@ def HiSpEC_CV(
         
 
         epm.add_experiment(
-            "ECHE_sub_OCV",
+            "HiSpEC_sub_OCV",
             {
                 "Tval__s": 0.1,
                 "SampleRate":0.01,
@@ -168,6 +171,13 @@ def HiSpEC_CV(
                 "solution_ph": solution_ph,
                 "ref_vs_nhe": ref_vs_nhe,
             }, from_globalexp_params={"min_offset_ocv": "Vinit__V"})
+        
+
+        epm.add_experiment(
+            "HiSpEC_sub_CP",
+            {"Ival__A" : Ival__A,
+            "Tval__s" : Tval__s,
+            "AcqInterval__s": AcqInterval__s})
         
         
 
