@@ -73,7 +73,7 @@ def HiSpEC_CV(
 ):
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment("HISPEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
+    epm.add_experiment("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
     
     if use_z_motor:
         epm.add_experiment(
@@ -260,7 +260,7 @@ def HiSpEC_EIS_only(
 ):
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment("HISPEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
+    epm.add_experiment("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
     
     if use_z_motor:
         epm.add_experiment(
@@ -734,7 +734,7 @@ def HiSpEC_EIS_only(
 #     cell_fill_wait: float = 30.0,
 # ):
 #     epm = ExperimentPlanMaker()
-#     epm.add_experiment("HISPEC_sub_startup", {})
+#     epm.add_experiment("HiSpEC_sub_startup", {})
 #     epm.add_experiment(
 #         "ECHEUVIS_sub_disengage",
 #         {
@@ -901,7 +901,7 @@ def HiSpEC_EIS_only(
 # ):
 #     epm = ExperimentPlanMaker()
 
-#     epm.add_experiment("HISPEC_sub_startup", {})
+#     epm.add_experiment("HiSpEC_sub_startup", {})
 #     # if use_z_motor:
 #     #     epm.add_experiment(
 #     #         "ECHEUVIS_sub_disengage",
