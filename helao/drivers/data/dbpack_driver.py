@@ -27,9 +27,10 @@ else:
 from helao.core.error import ErrorCodes
 from helao.servers.base import Base
 from helao.core.models.process import ProcessModel
-from helao.core.models.action import ShortActionModel, ActionModel
-from helao.core.models.experiment import ExperimentModel
-from helao.core.models.sequence import SequenceModel
+from helao.core.models.action import ShortActionModel
+from helao.helpers.premodels import Action
+from helao.helpers.premodels import Experiment
+from helao.helpers.premodels import Sequence
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
 from helao.helpers.print_message import print_message
@@ -38,9 +39,9 @@ from helao.helpers.zip_dir import zip_dir
 from helao.drivers.data.enum import YmlType
 
 modmap = {
-    "action": ActionModel,
-    "experiment": ExperimentModel,
-    "sequence": SequenceModel,
+    "action": Action,
+    "experiment": Experiment,
+    "sequence": Sequence,
     "process": ProcessModel,
 }
 plural = {

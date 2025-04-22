@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from helao.core.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
 from helao.core.models.machine import MachineModel
-from helao.core.models.action import ActionModel
+from helao.helpers.premodels import Action
 from helao.core.models.hlostatus import HloStatus
 from helao.core.helaodict import HelaoDict
 
@@ -26,11 +26,11 @@ class EndpointModel(BaseModel, HelaoDict):
     endpoint_name: str
     # status is a dict (keyed by action uuid)
     # which hold a dict of active actions
-    active_dict: Dict[UUID, ActionModel] = Field(default={})
+    active_dict: Dict[UUID, Action] = Field(default={})
 
     # holds the finished uuids
     # keyed by either main_finished_status or "finished"
-    nonactive_dict: Dict[HloStatus, Dict[UUID, ActionModel]] = Field(default={})
+    nonactive_dict: Dict[HloStatus, Dict[UUID, Action]] = Field(default={})
 
     # none is infinite
     max_uuids: Optional[int] = None
@@ -95,7 +95,7 @@ class ActionServerModel(BaseModel, HelaoDict):
             if action_name in self.endpoints:
                 json_dict = ActionServerModel(
                     action_server=self.action_server,
-                    # status_msg should be a ActionModel
+                    # status_msg should be a Action
                     endpoints={action_name: self.endpoints[action_name]},
                     last_action_uuid=self.last_action_uuid,
                 ).as_dict()
@@ -114,10 +114,10 @@ class GlobalStatusModel(BaseModel, HelaoDict):
     server_dict: Dict[Tuple, ActionServerModel] = Field(default={})
 
     # a dict of all active actions for this orch
-    active_dict: Dict[UUID, ActionModel] = Field(default={})
+    active_dict: Dict[UUID, Action] = Field(default={})
     # a dict of all finished actions
     # keyed by either main_finished_status or "finished"
-    nonactive_dict: Dict[HloStatus, Dict[UUID, ActionModel]] = Field(default={})
+    nonactive_dict: Dict[HloStatus, Dict[UUID, Action]] = Field(default={})
 
     # some control parameters for the orch
 
@@ -231,7 +231,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         recent_nonactive = self._sort_status()
         return recent_nonactive
 
-    def find_hlostatus_in_finished(self, hlostatus: HloStatus) -> Dict[UUID, ActionModel]:
+    def find_hlostatus_in_finished(self, hlostatus: HloStatus) -> Dict[UUID, Action]:
         """returns a dict of uuids for actions which contain hlostatus"""
         uuid_dict = {}
 
@@ -258,7 +258,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
     def new_experiment(self, exp_uuid: UUID):
         self.counter_dispatched_actions[exp_uuid] = 0
 
-    def finish_experiment(self, exp_uuid: UUID) -> List[ActionModel]:
+    def finish_experiment(self, exp_uuid: UUID) -> List[Action]:
         """returns all finished experiments"""
         # we don't filter by orch as this should have happened already when they
         # were added to the finished_exps

@@ -44,7 +44,7 @@ from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 
-from helao.core.models.experiment import ExperimentModel
+from helao.helpers.premodels import Experiment
 from helao.core.models.orchstatus import LoopStatus
 from helao.helpers.premodels import Sequence, Experiment
 
@@ -1346,7 +1346,7 @@ class BokehOperator:
 
         return sequence
 
-    def populate_experimentmodel(self) -> ExperimentModel:
+    def populate_experimentmodel(self) -> Experiment:
         selected_experiment = self.experiment_dropdown.value
         LOGGER.info(f"selected experiment from list: {selected_experiment}")
         experiment_params = {
@@ -1356,7 +1356,7 @@ class BokehOperator:
         for k, v in experiment_params.items():
             LOGGER.info(f"added experiment param '{k}' with value {v} and type {type(v)} ")
         self.write_params("exp", selected_experiment, experiment_params)
-        experimentmodel = ExperimentModel(
+        experimentmodel = Experiment(
             experiment_name=selected_experiment, experiment_params=experiment_params
         )
         if self.sequence is None:

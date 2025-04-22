@@ -67,7 +67,7 @@ from helao.core.models.sample import (
 from helao.core.models.data import DataModel, DataPackageModel
 from helao.core.models.machine import MachineModel
 from helao.core.models.server import ActionServerModel, EndpointModel
-from helao.core.models.action import ActionModel
+from helao.helpers.premodels import Action
 from helao.core.version import get_filehash
 from helao.helpers.active_params import ActiveParams
 from helao.core.models.file import (
@@ -149,7 +149,7 @@ class Base:
         get_active_info(self, action_uuid: UUID): Get active action information.
         get_ntp_time(self): Get the current time from the NTP server.
         send_statuspackage(self, client_servkey: str, client_host: str, client_port: int, action_name: Optional[str] = None): Send a status package to a client.
-        send_nbstatuspackage(self, client_servkey: str, client_host: str, client_port: int, actionmodel: ActionModel): Send a non-blocking status package to a client.
+        send_nbstatuspackage(self, client_servkey: str, client_host: str, client_port: int, actionmodel: Action): Send a non-blocking status package to a client.
         attach_client(self, client_servkey: str, client_host: str, client_port: int, retry_limit=5): Attach a client for status updates.
         detach_client(self, client_servkey: str, client_host: str, client_port: int): Detach a client from status updates.
         ws_status(self, websocket: WebSocket): Handle WebSocket status subscriptions.
@@ -789,7 +789,7 @@ class Base:
         client_servkey: str,
         client_host: str,
         client_port: int,
-        actionmodel: ActionModel,
+        actionmodel: Action,
     ):
         """
         Sends a non-blocking status package to a specified client.
@@ -798,7 +798,7 @@ class Base:
             client_servkey (str): The server key of the client.
             client_host (str): The host address of the client.
             client_port (int): The port number of the client.
-            actionmodel (ActionModel): The action model to be sent.
+            actionmodel (Action): The action model to be sent.
 
         Returns:
             tuple: A tuple containing the response and error code from the dispatcher.
@@ -1088,7 +1088,7 @@ class Base:
         LOGGER.info(f"{self.server.server_name} status log task created.")
 
         try:
-            # get the new ActionModel (status) from the queue
+            # get the new Action (status) from the queue
             async for status_msg in self.status_q.subscribe():
                 # add it to the correct "EndpointModel"
                 # in the "ActionServerModel"

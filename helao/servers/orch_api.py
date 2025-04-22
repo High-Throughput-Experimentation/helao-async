@@ -19,14 +19,14 @@ from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
 from helao.servers.orch import Orch
 from helao.core.models.server import ActionServerModel
-from helao.core.models.action import ActionModel
+from helao.helpers.premodels import Action
 from helao.core.models.machine import MachineModel
 from helao.core.models.orchstatus import LoopStatus
 from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes
-from helao.core.models.experiment import ExperimentModel
+from helao.helpers.premodels import Experiment
 from helao.core.models.hlostatus import HloStatus
 from starlette.types import Message
 from starlette.responses import JSONResponse, Response
@@ -518,7 +518,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/update_nonblocking", tags=["private"])
         async def update_nonblocking(
-            actionmodel: ActionModel = Body({}, embed=True),
+            actionmodel: Action = Body({}, embed=True),
             server_host: str = "",
             server_port: int = 9000,
         ):
@@ -526,7 +526,7 @@ class OrchAPI(HelaoFastAPI):
             Asynchronously updates the non-blocking status of an action.
 
             Args:
-                actionmodel (ActionModel): The model representing the action to update.
+                actionmodel (Action): The model representing the action to update.
                 server_host (str): The host of the server. Defaults to an empty string.
                 server_port (int): The port of the server. Defaults to 9000.
 
@@ -1103,7 +1103,7 @@ class OrchAPI(HelaoFastAPI):
                 dict: The finished action as a dictionary.
             """
             active = await self.orch.setup_and_contain_action()
-            experiment_model = ExperimentModel(
+            experiment_model = Experiment(
                 experiment_name=active.action.action_params[
                     "conditional_experiment_name"
                 ],
