@@ -47,7 +47,8 @@ else:
 
 from helao.servers.base import Base
 from helao.core.models.process import ProcessModel
-from helao.core.models.action import ShortAction, Action
+from helao.core.models.action import ShortActionModel
+from helao.helpers.premodels import Action
 from helao.helpers.premodels import Experiment
 from helao.helpers.premodels import Sequence
 from helao.core.models.file import FileInfo
@@ -1655,7 +1656,7 @@ class HelaoSyncer:
 
             # update experiment progress with action
             process_meta["action_list"].append(
-                ShortAction(**act_meta).clean_dict(strip_private=True)
+                ShortActionModel(**act_meta).clean_dict(strip_private=True)
             )
 
             # LOGGER.info(f"current experiment progress:\n{exp_prog.dict}")

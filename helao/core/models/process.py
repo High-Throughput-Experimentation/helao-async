@@ -9,7 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
-from helao.core.models.action import ShortAction
+from helao.core.models.action import ShortActionModel
 from helao.core.models.file import FileInfo
 from helao.core.models.machine import MachineModel
 from helao.core.version import get_hlo_version
@@ -36,7 +36,7 @@ class ProcessModel(ShortProcessModel):
     process_params: Optional[dict] = {}
     process_group_index: Optional[int] = None
     data_request_id: Optional[UUID] = None
-    action_list: List[ShortAction] = Field(default=[])
+    action_list: List[ShortActionModel] = Field(default=[])
     samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
 ] = Field(default=[])
     samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]

@@ -27,7 +27,8 @@ else:
 from helao.core.error import ErrorCodes
 from helao.servers.base import Base
 from helao.core.models.process import ProcessModel
-from helao.core.models.action import ShortAction, Action
+from helao.core.models.action import ShortActionModel
+from helao.helpers.premodels import Action
 from helao.helpers.premodels import Experiment
 from helao.helpers.premodels import Sequence
 from helao.helpers.gen_uuid import gen_uuid
@@ -372,7 +373,7 @@ class ExpYml(HelaoYml):
                 "process_group_index": group_idx,
                 "process_uuid": new_uuid,
                 "action_list": [
-                    ShortAction(**act.dict)
+                    ShortActionModel(**act.dict)
                     for act in self.grouped_actions[group_idx]
                 ],
             }
