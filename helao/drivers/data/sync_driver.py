@@ -47,9 +47,9 @@ else:
 
 from helao.servers.base import Base
 from helao.core.models.process import ProcessModel
-from helao.core.models.action import ShortActionModel, ActionModel
-from helao.core.models.experiment import ExperimentModel
-from helao.core.models.sequence import SequenceModel
+from helao.core.models.action import ShortAction, Action
+from helao.helpers.premodels import Experiment
+from helao.helpers.premodels import Sequence
 from helao.core.models.file import FileInfo
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
@@ -63,9 +63,9 @@ import aiohttp
 
 ABR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence"}
 MOD_MAP = {
-    "action": ActionModel,
-    "experiment": ExperimentModel,
-    "sequence": SequenceModel,
+    "action": Action,
+    "experiment": Experiment,
+    "sequence": Sequence,
     "process": ProcessModel,
 }
 PLURALS = {
@@ -1655,7 +1655,7 @@ class HelaoSyncer:
 
             # update experiment progress with action
             process_meta["action_list"].append(
-                ShortActionModel(**act_meta).clean_dict(strip_private=True)
+                ShortAction(**act_meta).clean_dict(strip_private=True)
             )
 
             # LOGGER.info(f"current experiment progress:\n{exp_prog.dict}")
