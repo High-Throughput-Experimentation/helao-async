@@ -20,7 +20,6 @@ import os
 from datetime import datetime
 from typing import Optional, Tuple
 from uuid import UUID
-import gzip
 
 import aiohttp
 import json

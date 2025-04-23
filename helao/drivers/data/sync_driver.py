@@ -32,7 +32,6 @@ import traceback
 from collections import defaultdict
 from copy import copy
 
-import botocore.exceptions
 import boto3
 import gzip
 
