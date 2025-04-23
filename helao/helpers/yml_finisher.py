@@ -20,6 +20,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
+
 async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
     """
     Asynchronously attempts to finish processing a YAML file by sending a request to a specified database server.
@@ -57,7 +58,9 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
                         LOGGER.info(f"Finished {yml_type}: {yml_path}.")
                         return True
                     else:
-                        LOGGER.info(f"Retry [{i}/{retry}] finish {yml_type} {yml_path}.")
+                        LOGGER.info(
+                            f"Retry [{i}/{retry}] finish {yml_type} {yml_path}."
+                        )
                         await asyncio.sleep(1)
             except asyncio.TimeoutError:
                 continue
@@ -66,7 +69,9 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
 
 
 async def move_dir(
-    hobj: Union[Sequence, Experiment, Action], base: Optional[object] = None, retry_delay: int = 5
+    hobj: Union[Sequence, Experiment, Action],
+    base: Optional[object] = None,
+    retry_delay: int = 5,
 ):
     """
     Move directory from RUNS_ACTIVE to RUNS_FINISHED or RUNS_DIAG based on the type and attributes of the provided object.
@@ -118,14 +123,24 @@ async def move_dir(
 
     copy_success = False
     copy_retries = 0
-    if obj_type=="action":
+    if obj_type == "action":
         src_list = glob(os.path.join(yml_dir, "**", "*"), recursive=True)
     else:
         src_list = glob(os.path.join(yml_dir, "*"))
     src_list = [x for x in src_list if os.path.isfile(x)]
 
     while (not copy_success) and copy_retries <= 60:
-        dst_list = [p.replace("RUNS_ACTIVE", "RUNS_NOSYNC" if p.endswith(".hlo") and not hobj.sync_data else dest_dir) for p in src_list]
+        dst_list = [
+            p.replace(
+                "RUNS_ACTIVE",
+                (
+                    "RUNS_NOSYNC"
+                    if p.endswith(".hlo") and not hobj.sync_data
+                    else dest_dir
+                ),
+            )
+            for p in src_list
+        ]
         for p in dst_list:
             os.makedirs(os.path.dirname(p), exist_ok=True)
         copy_results = await asyncio.gather(
@@ -135,6 +150,7 @@ async def move_dir(
         exists_list = [f for f in dst_list if os.path.exists(f)]
         if len(exists_list) == len(src_list):
             copy_success = True
+            LOGGER.info(f"Successfully copied {yml_dir} to FINISHED.")
         else:
             src_list = [f for f in src_list if f not in exists_list]
             LOGGER.info(
@@ -168,6 +184,7 @@ async def move_dir(
                             yml_path,
                             db_config=base.world_cfg.get("servers", {}).get("DB", {}),
                         )
+                    LOGGER.info(f"Successfully removed {yml_dir}")
                 if rm_success and obj_type == "action" and is_manual:
                     # remove active sequence and experiment dirs
                     exp_dir = os.path.dirname(yml_dir)
