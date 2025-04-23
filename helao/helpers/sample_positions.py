@@ -24,7 +24,6 @@ from helao.core.models.sample import (
     AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample,
     object_to_sample,
 )
-from helao.helpers.print_message import print_message
 from helao.core.helaodict import HelaoDict
 
 from helao.helpers import logging

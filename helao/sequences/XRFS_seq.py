@@ -2,8 +2,6 @@ __all__ = [
     "XRFS_postseq",
 ]
 
-import random
-from typing import List
 from helao.helpers.premodels import ExperimentPlanMaker
 
 

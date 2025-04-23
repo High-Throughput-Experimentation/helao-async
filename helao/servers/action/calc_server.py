@@ -7,7 +7,7 @@ Calc server is used for in-sequence data processing.
 __all__ = ["makeApp"]
 
 import json
-from typing import Optional, Union, List
+from typing import Union
 from fastapi import Body
 
 from helao.core.models.file import HloHeaderModel, HloFileGroup

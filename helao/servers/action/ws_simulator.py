@@ -8,7 +8,7 @@ __all__ = ["makeApp"]
 
 import time
 import asyncio
-from typing import Optional, List, Union
+from typing import List, Union
 from fastapi import Body
 import numpy as np
 

@@ -7,9 +7,8 @@ TODO: Return addressable space, measured, and unmeasured positions.
 __all__ = ["makeApp"]
 
 
-from typing import Optional, List, Union
+from typing import List
 from fastapi import Body
-import numpy as np
 import pandas as pd
 
 from helao.helpers import logging
@@ -20,9 +19,7 @@ else:
 
 from helao.servers.base import Base
 from helao.servers.base_api import BaseAPI
-from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
-from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
 

@@ -8,7 +8,7 @@ Loads a subset of 3 mA/cm2 CP measurement data from https://doi.org/10.1039/C8MH
 
 __all__ = ["makeApp"]
 
-from typing import List, Union
+from typing import Union
 from fastapi import Body
 
 from helao.servers.base_api import BaseAPI

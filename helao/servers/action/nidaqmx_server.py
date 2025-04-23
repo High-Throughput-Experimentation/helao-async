@@ -12,13 +12,10 @@ __all__ = ["makeApp"]
 # - test what happens if NImax broswer has nothing configured and only lists the device
 # - create tasks for action library
 # - handshake as stream with interrupt
-import time
 
-from importlib import import_module
 
 from fastapi import Body, Query
-from typing import Optional, List, Union
-from socket import gethostname
+from typing import List, Union
 
 
 from helao.servers.base_api import BaseAPI

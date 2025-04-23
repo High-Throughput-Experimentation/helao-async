@@ -43,7 +43,6 @@ from functools import partial
 from importlib import import_module
 from bokeh.server.server import Server
 import colorama
-from helao.helpers.print_message import print_message
 from helao.helpers import logging
 from helao.helpers import config_loader
 from helao.helpers.yml_tools import yml_load

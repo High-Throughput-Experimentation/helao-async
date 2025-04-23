@@ -61,7 +61,7 @@ from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.plotting import figure, Figure
 from bokeh.events import ButtonClick, DoubleTap
-from bokeh.models.widgets import FileInput, Toggle
+from bokeh.models.widgets import FileInput
 
 
 class return_sequence_lib(BaseModel):

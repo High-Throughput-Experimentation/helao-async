@@ -1,7 +1,7 @@
 __all__ = ["makeApp"]
 
 from typing import Optional, Union, List
-from fastapi import Body, Query
+from fastapi import Body
 from helao.servers.base_api import BaseAPI
 from helao.drivers.io.galil_io_driver import Galil, TriggerType, AiMonExec
 from helao.helpers.premodels import Action
