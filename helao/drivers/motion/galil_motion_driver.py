@@ -856,7 +856,6 @@ class Galil:
             else:
                 ret_status.append("invalid")
                 ret_err_code.append(ErrorCodes.not_available)
-                pass
 
         msg = {"motor_status": ret_status, "err_code": ret_err_code}
         await self.update_aligner(msg=msg)

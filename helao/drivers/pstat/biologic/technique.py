@@ -1,7 +1,7 @@
 """Dataclass and instances for Biologic potentiostat techniques."""
 
 from dataclasses import dataclass
-from typing import Optional, List, Dict
+from typing import Optional, Dict
 import easy_biologic.base_programs as blp
 from easy_biologic import BiologicProgram
 
