@@ -63,6 +63,7 @@ class GamryDriver(HelaoDriver):
         self.filterfreq_hz = 1.0 * self.config.get("filterfreq_hz", 1000.0)
         self.grounded = int(self.config.get("grounded", True))
         self.connection_raised = False
+        self.stopping = False
         self.connect()
         LOGGER.debug(
             f"connected to {self.device_name} on device_id {self.device_id}"
@@ -352,10 +353,13 @@ class GamryDriver(HelaoDriver):
     async def stop(self) -> DriverResponse:
         """General stop method to abort all active methods e.g. motion, I/O, compute."""
         try:
-            if self.dtaqsink.dtaq is not None:
-                self.dtaqsink.dtaq.Run(False)
-                self.dtaqsink.dtaq.Stop()
-                self.dtaqsink.status = "done"
+            if not self.stopping:
+                if self.dtaqsink.dtaq is not None:
+                    self.stopping = True
+                    self.dtaqsink.dtaq.Run(False)
+                    self.dtaqsink.dtaq.Stop()
+                    self.dtaqsink.status = "done"
+                    self.stopping = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
