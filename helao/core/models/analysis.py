@@ -1,7 +1,6 @@
 __all__ = ["AnalysisModel", "ShortAnalysisModel", "AnalysisDataModel", "AnalysisOutputModel"]
 
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import List, Optional, Union, Dict
 from uuid import UUID
 from pydantic import BaseModel, Field
