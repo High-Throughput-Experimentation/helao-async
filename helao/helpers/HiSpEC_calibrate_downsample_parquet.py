@@ -337,14 +337,18 @@ def return_cycle_for_time(time:float, min_max_dict:dict)->int:
         time = round_10ms(time)
         if time == 0:
             return 0
-        if time >= min_max[0] and time <= min_max[1]:
-            return cycle
-        # if the time is greater than the max time of the last cycle
-        # it is in the last cycle
-        elif cycle == sorted(min_max_dict.keys())[-1] and time > min_max[1]:
-            return cycle
-        else:
-            raise ValueError(f"Time {time} not found in any cycle")
+        if int(cycle) == 0:
+            if time <= min_max[1]:
+                return cycle
+        if int(cycle)>0:
+            if time >= min_max[0] and time <= min_max[1]:
+                return cycle
+            # if the time is greater than the max time of the last cycle
+            # it is in the last cycle
+            elif cycle == sorted(min_max_dict.keys())[-1] and time > min_max[1]:
+                return cycle
+            else:
+                raise ValueError(f"Time {time} not found in any cycle")
 
 def get_cycles_for_spec_times(calibration_df:pd.DataFrame, CV_data:pd.DataFrame, default_time_header1='t_s', default_cycle_header1='cycle')->pd.DataFrame:
     """
