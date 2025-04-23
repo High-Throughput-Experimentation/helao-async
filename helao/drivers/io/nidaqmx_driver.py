@@ -11,7 +11,6 @@ from nidaqmx.constants import AcquisitionType
 from nidaqmx.constants import TerminalConfiguration
 from nidaqmx.constants import VoltageUnits
 from nidaqmx.constants import TemperatureUnits
-from nidaqmx.constants import CJCSource
 from nidaqmx.constants import ThermocoupleType
 from nidaqmx.constants import CurrentShuntResistorLocation
 from nidaqmx.constants import UnitsPreScaled

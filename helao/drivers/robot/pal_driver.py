@@ -1778,7 +1778,6 @@ class PAL:
                 # in the last position of palaction.samples_out
                 # which should already be uptodate
                 palaction.dest.samples_final = [palaction.samples_out[-1]]
-                pass
             else:
                 palaction.dest.samples_final = (
                     await self.archive.unified_db.get_samples(

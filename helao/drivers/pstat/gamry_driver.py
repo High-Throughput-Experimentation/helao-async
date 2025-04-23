@@ -58,7 +58,6 @@ def gamry_error_decoder(e):
 class GamryCOMError(Exception):
     """definition of error handling things from gamry"""
 
-    pass
 
 
 class GamryDtaqEvents:

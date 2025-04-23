@@ -5,10 +5,8 @@
 __all__ = []
 
 import serial
-import io
 import time
 import asyncio
-from typing import Optional
 from enum import IntEnum, Enum
 
 # import traceback
