@@ -18,7 +18,7 @@ from collections import defaultdict, deque
 
 import numpy as np
 import pandas as pd
-from fastapi import Body, Query
+from fastapi import Body
 
 from helao.core.error import ErrorCodes
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
@@ -47,10 +47,8 @@ from helao.drivers.pstat.biologic.technique import (
     TECH_CV,
     TECH_GEIS,
     TECH_PEIS,
-    SweepMode,
 )
 
-import easy_biologic.lib.ec_lib as ecl
 
 global LOGGER
 if logging.LOGGER is None:

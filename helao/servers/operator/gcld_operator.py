@@ -12,7 +12,6 @@ from helao.servers.operator.helao_operator import HelaoOperator
 
 import httpx
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
-from data_request_client.models import Status
 from helao.helpers.premodels import Sequence
 from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.config_loader import config_loader

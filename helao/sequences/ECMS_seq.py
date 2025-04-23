@@ -20,7 +20,6 @@ __all__ = [
 ]
 
 from typing import List
-from typing import Optional, Union
 from helao.helpers.premodels import ExperimentPlanMaker
 
 

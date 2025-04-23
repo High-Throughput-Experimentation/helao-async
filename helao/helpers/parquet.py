@@ -5,10 +5,6 @@ from collections import defaultdict
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-import pathlib
-import os
-from pathlib import Path  
-import numpy as np  
 
 """
 This module provides helper functions to read HLO files, process their data, and convert them to Parquet format.

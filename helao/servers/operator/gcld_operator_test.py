@@ -9,7 +9,6 @@ from gcld_operator import seq_constructor, gen_ts, wait_for_orch, num_uploads
 from helao.servers.operator.helao_operator import HelaoOperator
 
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
-from data_request_client.models import Status
 from helao.helpers.config_loader import config_loader
 from helao.sequences.TEST_seq import TEST_consecutive_noblocking
 from helao.core.models.orchstatus import LoopStatus

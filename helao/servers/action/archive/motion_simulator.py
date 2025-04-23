@@ -7,9 +7,8 @@ TODO: Calculate sleep time using displacement and speed.
 __all__ = ["makeApp"]
 
 import asyncio
-from typing import Optional, List, Union
+from typing import Optional, List
 from fastapi import Body
-import numpy as np
 import pandas as pd
 
 from helao.helpers import logging
@@ -19,9 +18,7 @@ else:
     LOGGER = logging.LOGGER
 from helao.servers.base import Base
 from helao.servers.base_api import BaseAPI
-from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
-from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
 

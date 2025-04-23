@@ -1,6 +1,5 @@
 import time
 import asyncio
-from datetime import datetime
 from functools import partial
 
 from bokeh.models import (

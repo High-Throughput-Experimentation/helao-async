@@ -9,9 +9,7 @@ the hardware driver class from the action server base class.
 __all__ = ["makeApp"]
 
 
-import asyncio
 import time
-from typing import Optional, List
 
 from fastapi import Body
 

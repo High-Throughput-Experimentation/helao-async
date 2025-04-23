@@ -6,7 +6,6 @@
 __all__ = ["makeApp"]
 
 
-from typing import Optional
 from fastapi import Body
 
 from helao.drivers.pump.legato_driver import KDS100, PumpExec

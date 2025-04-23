@@ -22,7 +22,6 @@ else:
     LOGGER = logging.LOGGER
 
 from helao.core.models.hlostatus import HloStatus
-from helao.helpers.premodels import Action
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 from helao.helpers.dispatcher import async_private_dispatcher
