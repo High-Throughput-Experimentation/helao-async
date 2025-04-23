@@ -59,6 +59,7 @@ class BiologicDriver(HelaoDriver):
         self.channel_params = {i: {} for i in range(self.num_channels)}
         self.channel_technique = {i: None for i in range(self.num_channels)}
         self.connect()
+        self.stopping = False
         self.connection_ctx = None
 
     def connect(self) -> DriverResponse:
@@ -292,15 +293,18 @@ class BiologicDriver(HelaoDriver):
         """General stop method to abort all active methods e.g. motion, I/O, compute."""
         try:
             running_channels = [k for k, c in self.channels.items() if c is not None]
-            if channel is None:
-                for ch in running_channels:
-                    self.pstat.stop_channel(ch)
-            elif channel in running_channels:
-                self.pstat.stop_channel(channel)
-            elif channel not in self.channels:
-                raise ValueError(f"Channel {channel} does not exist.")
-            else:
-                raise ValueError(f"Channel {channel} is not running.")
+            if not self.stopping:
+                self.stopping = True
+                if channel is None and running_channels:
+                    for ch in running_channels:
+                        self.pstat.stop_channel(ch)
+                elif channel in running_channels:
+                    self.pstat.stop_channel(channel)
+                elif channel not in self.channels:
+                    LOGGER.warning(f"Channel {channel} does not exist.")
+                else:
+                    LOGGER.info(f"Channel {channel} is not running.")
+                self.stopping = False
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
