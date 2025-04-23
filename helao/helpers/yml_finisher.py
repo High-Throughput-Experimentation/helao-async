@@ -118,7 +118,10 @@ async def move_dir(
 
     copy_success = False
     copy_retries = 0
-    src_list = glob(os.path.join(yml_dir, "**", "*"), recursive=True)
+    if obj_type=="action":
+        src_list = glob(os.path.join(yml_dir, "**", "*"), recursive=True)
+    else:
+        src_list = glob(os.path.join(yml_dir, "*"))
     src_list = [x for x in src_list if os.path.isfile(x)]
 
     while (not copy_success) and copy_retries <= 60:
@@ -145,7 +148,7 @@ async def move_dir(
     if copy_success:
         rm_success = False
         rm_retries = 0
-        rm_list = glob(os.path.join(yml_dir, "*"))
+        rm_list = src_list
         while (not rm_success) and rm_retries <= 30:
             rm_files = [x for x in rm_list if os.path.isfile(x)]
             await asyncio.gather(
@@ -153,7 +156,7 @@ async def move_dir(
             )
             rm_files_done = [f for f in rm_files if not os.path.exists(f)]
             if len(rm_files_done) == len(rm_files):
-                await asyncio.gather(aiofiles.os.rmdir(yml_dir), return_exceptions=True)
+                await aioshutil.rmtree(yml_dir)
                 if not os.path.exists(yml_dir):
                     rm_success = True
                     timestamp = getattr(hobj, f"{obj_type}_timestamp").strftime(
@@ -168,9 +171,9 @@ async def move_dir(
                 if rm_success and obj_type == "action" and is_manual:
                     # remove active sequence and experiment dirs
                     exp_dir = os.path.dirname(yml_dir)
-                    await asyncio.gather(aiofiles.os.rmdir(exp_dir))
+                    await aioshutil.rmtree(exp_dir)
                     seq_dir = os.path.dirname(exp_dir)
-                    await asyncio.gather(aiofiles.os.rmdir(seq_dir))
+                    await aioshutil.rmtree(seq_dir)
             else:
                 rm_list = [f for f in rm_list if f not in rm_files_done]
                 LOGGER.info(
