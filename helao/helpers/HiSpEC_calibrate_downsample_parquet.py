@@ -335,8 +335,9 @@ def return_cycle_for_time(time:float, min_max_dict:dict)->int:
     """
     for cycle, min_max in min_max_dict.items():
         time = round_10ms(time)
-        if time == 0:
+        if time <= 0.02:
             return 0
+        print(cycle)
         if int(cycle) == 0:
             if time <= min_max[1]:
                 return cycle
