@@ -54,6 +54,8 @@ servers:
         1B: cDAQ1Mod1/port0/line1
         7A: cDAQ1Mod1/port0/line9
         7B: cDAQ1Mod1/port0/line10
+        10-co2supply: cDAQ1Mod1/port0/line13
+        11-n2supply: cDAQ1Mod1/port0/line16
       dev_multivalve:
         multi_CMD0: cDAQ1Mod1/port0/line28
         multi_CMD1: cDAQ1Mod1/port0/line29
@@ -101,7 +103,7 @@ servers:
     group: action
     fast: co2sensor_server
     params:
-      port: COM9
+      port: COM10
       start_margin: 0
     verbose: false
   SYRINGE0:
@@ -134,10 +136,22 @@ servers:
     params:
       devices:
         CO2:
-          port: COM7
+          port: COM9
           unit_id: A
       co2_server_name: CO2SENSOR
     verbose: false
+  N2MFC:
+    host: hte-ccsi-02.htejcap.caltech.edu
+    port: 8019
+    group: action
+    fast: mfc_server
+    params:
+      devices:
+        N2:
+          port: COM11
+          unit_id: A
+
+
   CALC:
     host: hte-ccsi-01.htejcap.caltech.edu
     port: 8011
