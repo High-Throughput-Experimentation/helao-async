@@ -54,9 +54,9 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
     # create visualizer objects for defined instruments
     vis_map = {
         "co2sensor_server": ("co2_vis", "C_co2", ["port"]),
-        "galil_io": ("pressure_vis", "C_pressure", ["monitor_ai"]),
-        "nidaqmx_server": ("temp_vis", "C_temperature", ["dev_monitor"]),
         "mfc_server": ("mfc_vis", "C_mfc", ["devices"]),
+        "nidaqmx_server": ("temp_vis", "C_temperature", ["dev_monitor"]),
+        "galil_io": ("pressure_vis", "C_pressure", ["monitor_ai"]),
         "ws_simulator": ("wssim_live_vis", "C_simlivevis", []),
         "tec_server": ("tec_vis", "C_tec", []),
         "gpsim_server": ("gpsim_live_vis", "C_gpsimlivevis", []),
