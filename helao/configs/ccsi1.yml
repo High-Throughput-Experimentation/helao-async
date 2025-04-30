@@ -141,7 +141,7 @@ servers:
       co2_server_name: CO2SENSOR
     verbose: false
   N2MFC:
-    host: hte-ccsi-02.htejcap.caltech.edu
+    host: hte-ccsi-01.htejcap.caltech.edu
     port: 8019
     group: action
     fast: mfc_server
