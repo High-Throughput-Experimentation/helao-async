@@ -26,7 +26,7 @@ def make_str_enum(name, valdict):
         str,
         Enum,
     )
-    dict = meta.__prepare__(name, bases)
+    edict = meta.__prepare__(name, bases)
     for k, v in valdict.items():
-        dict[k] = v
-    return meta(name, bases, dict)
+        edict[k] = v
+    return meta(name, bases, edict)
