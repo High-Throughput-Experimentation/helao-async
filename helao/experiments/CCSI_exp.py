@@ -1574,7 +1574,7 @@ def CCSI_sub_co2maintainconcentration(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
-    apm.add(ORCH_server, "wait", {"waittime": co2measure_duration})
+    apm.add(ORCH_server, "wait", {"waittime": co2measure_duration}, asc.no_wait)
     apm.add(
         MFC_server,
         "cancel_acquire_flowrate",
