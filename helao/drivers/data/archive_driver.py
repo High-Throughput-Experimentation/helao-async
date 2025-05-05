@@ -1538,24 +1538,30 @@ class Archive:
                     action=action,
                     combine_liquids=combine_liquids,
                 )
-                new_liquid_mixture[0].status.append(SampleStatus.merged)
-                # calculate volumes, dilutions
-                new_liquid_mixture[0].sample_position = custom
-                new_liquid_mixture[0].volume_ml = loaded_liquid[0].volume_ml
-                new_liquid_mixture[0].dilution_factor = loaded_liquid[0].dilution_factor
-                update_vol(
-                    new_liquid_mixture[0],
-                    delta_vol_ml=samples_out[0].volume_ml,
-                    dilute=dilute_liquids,
-                )
-                liquid_samples_out = await self.unified_db.new_samples(
-                    samples=new_liquid_mixture
-                )
-                new_assembly_parts.append(liquid_samples_out[0])
-                # set inheritance and status for sample transfered out of source_liquid_in
-                samples_out[0].inheritance = SampleInheritance.allow_both
-                samples_out[0].status.append(SampleStatus.merged)
-                LOGGER.info("liquid recovered")
+                if combine_liquids:  # there's only 1 liquid in new ref
+                    new_liquid_mixture[0].status.append(SampleStatus.merged)
+                    # calculate volumes, dilutions
+                    new_liquid_mixture[0].sample_position = custom
+                    new_liquid_mixture[0].volume_ml = loaded_liquid[0].volume_ml
+                    new_liquid_mixture[0].dilution_factor = loaded_liquid[0].dilution_factor
+                    update_vol(
+                        new_liquid_mixture[0],
+                        delta_vol_ml=samples_out[0].volume_ml,
+                        dilute=dilute_liquids,
+                    )
+                    liquid_samples_out = await self.unified_db.new_samples(
+                        samples=new_liquid_mixture
+                    )
+                    new_assembly_parts.append(liquid_samples_out[0])
+                    # set inheritance and status for sample transfered out of source_liquid_in
+                    samples_out[0].inheritance = SampleInheritance.allow_both
+                    samples_out[0].status.append(SampleStatus.merged)
+                    LOGGER.info("liquid recovered")
+                else:
+                    # add them separately
+                    new_assembly_parts.append(loaded_liquid[0])
+                    new_assembly_parts.append(samples_out[0])
+                    pass
             else:
                 liquid_samples_out = await self.unified_db.new_samples(
                     samples=ref_samples_out
@@ -1905,24 +1911,30 @@ class Archive:
                     action=action,
                     combine_gases=combine_gases,
                 )
-                new_gas_mixture[0].status.append(SampleStatus.merged)
-                # calculate volumes, dilutions
-                new_gas_mixture[0].sample_position = custom
-                new_gas_mixture[0].volume_ml = loaded_gas[0].volume_ml
-                new_gas_mixture[0].dilution_factor = loaded_gas[0].dilution_factor
-                update_vol(
-                    new_gas_mixture[0],
-                    delta_vol_ml=samples_out[0].volume_ml,
-                    dilute=dilute_gases,
-                )
-                gas_samples_out = await self.unified_db.new_samples(
-                    samples=new_gas_mixture
-                )
-                new_assembly_parts.append(gas_samples_out[0])
-                # set inheritance and status for sample transfered out of source_gas_in
-                samples_out[0].inheritance = SampleInheritance.allow_both
-                samples_out[0].status.append(SampleStatus.merged)
-                LOGGER.info("gas recovered")
+                if combine_gases:  # there's only 1 gas in new ref
+                    new_gas_mixture[0].status.append(SampleStatus.merged)
+                    # calculate volumes, dilutions
+                    new_gas_mixture[0].sample_position = custom
+                    new_gas_mixture[0].volume_ml = loaded_gas[0].volume_ml
+                    new_gas_mixture[0].dilution_factor = loaded_gas[0].dilution_factor
+                    update_vol(
+                        new_gas_mixture[0],
+                        delta_vol_ml=samples_out[0].volume_ml,
+                        dilute=dilute_gases,
+                    )
+                    gas_samples_out = await self.unified_db.new_samples(
+                        samples=new_gas_mixture
+                    )
+                    new_assembly_parts.append(gas_samples_out[0])
+                    # set inheritance and status for sample transfered out of source_gas_in
+                    samples_out[0].inheritance = SampleInheritance.allow_both
+                    samples_out[0].status.append(SampleStatus.merged)
+                    LOGGER.info("gas recovered")
+                else:
+                    # add them separately
+                    new_assembly_parts.append(loaded_gas[0])
+                    new_assembly_parts.append(samples_out[0])
+                    pass
             else:
                 gas_samples_out = await self.unified_db.new_samples(
                     samples=ref_samples_out

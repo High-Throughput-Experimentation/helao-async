@@ -549,9 +549,9 @@ class OrchAPI(HelaoFastAPI):
             Returns:
                 bool: True if the parameters were successfully updated, False otherwise.
             """
+            LOGGER.info(f"Updated globalexp params with {params}.")
             # if self.orch.active_experiment is not None:
             #     self.orch.active_experiment.globalexp_params.update(params)
-            #     LOGGER.info(f"Updated globalexp params with {params}.")
             #     return True
             # else:
             #     self.orch.print_message(
