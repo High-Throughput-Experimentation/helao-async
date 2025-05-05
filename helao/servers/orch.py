@@ -314,7 +314,11 @@ class Orch(Base):
 
         self.fast_urls = self.get_endpoint_urls()
         self.status_logger = self.aloop.create_task(self.log_status_task())
-        self.regular_updater = self.aloop.create_task(self.regular_status_task())
+        if self.server_cfg.get("regular_update", False):
+            regular_delay = self.server_cfg.get("regular_update_delay", 10)
+            self.regular_updater = self.aloop.create_task(
+                self.regular_status_task(regular_delay)
+            )
 
         if self.op_enabled:
             self.start_operator()
