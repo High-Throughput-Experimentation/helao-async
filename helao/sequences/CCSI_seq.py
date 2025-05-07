@@ -891,11 +891,10 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # =============================================================================
 
 def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed previously
-    sequence_version: int = 19, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
+    sequence_version: int = 18, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
 #                   v 14, list for solution/total sample volumes+ extra clean 15 added rinses/16agitation
 #                   17 repeat cleans/rinses/flushes
 #                   18 water injection options
-#                   19 co2 measurement duration now list for flexibility
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [0,0,0],
@@ -920,7 +919,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     n2_push: bool = False,  
     co2_filltime_s: float = 15,
 
-    co2measure_duration: List[float] = [1200,1800,2400],
+    co2measure_duration: float = 1200,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
     flowramp_sccm: float = 0,
@@ -1021,10 +1020,8 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "co2_filltime_s":co2_filltime_s,
         })
         
-        co2measure_duration_each = co2measure_duration[i]
-        
         epm.add_experiment("CCSI_sub_co2maintainconcentration", {
-            "co2measure_duration": co2measure_duration_each,
+            "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
             "pureco2_sample_no": pureco2_sample_no,
             "flowrate_sccm": flowrate_sccm,
