@@ -1,16 +1,9 @@
 import os
 import inspect
 import subprocess
+import sys
 
 __all__ = ["hlo_version", "get_hlo_version"]
-
-# version number, gets written into every exp/prg and hlo file
-hlo_version = "2025.04.04"
-
-
-def get_hlo_version():
-    """Return hard-coded HELAO release version."""
-    return hlo_version
 
 def get_filehash(filename: str):
     filename = os.path.abspath(filename)
@@ -23,6 +16,10 @@ def get_filehash(filename: str):
     else:
         short_hash = ''
     return short_hash
+
+def get_hlo_version():
+    """Return hard-coded HELAO release version."""
+    return get_filehash(sys._getframe().f_code.co_filename)
 
 def get_caller_filehash():
     """Return short git hash and filename of calling frame."""
@@ -37,3 +34,6 @@ def get_object_filehash(obj):
     filename = inspect.getabsfile(obj)
     short_hash = get_filehash(filename)
     return short_hash, filename
+
+# version number, gets written into every exp/prg and hlo file
+hlo_version = get_hlo_version()
