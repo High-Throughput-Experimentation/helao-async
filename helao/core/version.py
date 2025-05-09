@@ -15,7 +15,8 @@ def get_hlo_version():
 def get_filehash(filename: str):
     filename = os.path.abspath(filename)
     parent_dir = os.path.dirname(filename)
-    command = ['git', 'ls-files', '-s', filename, '--abbrev']
+    # command = ['git', 'ls-files', '-s', filename, '--abbrev']
+    command = ['git', 'show', '-s', '--format=%h']
     response = subprocess.check_output(command, cwd=parent_dir).decode('utf8').split()
     if response:
         short_hash = response[1]
