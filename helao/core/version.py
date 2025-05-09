@@ -12,7 +12,7 @@ def get_filehash(filename: str):
     command = ['git', 'show', '-s', '--format=%h']
     response = subprocess.check_output(command, cwd=parent_dir).decode('utf8').split()
     if response:
-        short_hash = response[1]
+        short_hash = response[0]
     else:
         short_hash = ''
     return short_hash
