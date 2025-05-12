@@ -4,6 +4,7 @@ channels:
   - defaults
 dependencies:
   - pip:
+    - aioboto3
     - aiodebug
     - aioshutil
     - nidaqmx
