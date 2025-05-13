@@ -421,6 +421,7 @@ async def biologic_dyn_endpoints(app=None):
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "OCV"
+        active.action.action_params["AcqInterval__V"] = 10.0
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_OCV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
