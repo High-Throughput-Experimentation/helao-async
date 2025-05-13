@@ -301,6 +301,7 @@ async def biologic_dyn_endpoints(app=None):
         (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CA"
+        active.action.action_params["AcqInterval__A"] = 10.0
         active.action.action_params["IRange"] = EC_IRange_map[
             active.action.action_params["IRange"]
         ]
@@ -339,6 +340,7 @@ async def biologic_dyn_endpoints(app=None):
         IErange depends on biologic model used (test actual limit before using)"""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CP"
+        active.action.action_params["AcqInterval__V"] = 10.0
         active.action.action_params["IRange"] = EC_IRange_map[
             active.action.action_params["IRange"]
         ]
