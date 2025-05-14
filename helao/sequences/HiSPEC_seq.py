@@ -52,7 +52,7 @@ def HiSpEC_CV(
     SweepMode: str = "log",
     Repeats: int = 10,
     DelayFraction: float = 0.1,
-    Ival__A: float = 0.0015,
+    Ival__A: float = 0.0015*0.071,
     Tval__s: float = 0.05,
 
     
@@ -142,8 +142,8 @@ def HiSpEC_CV(
         epm.add_experiment(
             "HiSpEC_sub_OCV",
             {
-                "Tval__s": 0.1,
-                "SampleRate":0.01,
+                "Tval__s": 60,
+                "SampleRate":0.5,
             }
                 )
         

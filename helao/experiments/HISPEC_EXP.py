@@ -7,6 +7,7 @@ server_key must be a FastAPI action server defined in config
 __all__ = [
     "HISPEC_sub_SpEC",
     "HiSPEC_sub_stop_flow",
+    "HiSpEC_sub_CA",
     # "HISPEC_sub_CV_DOtrigger",
     # "HISPEC_sub_CA_led",
     # "HISPEC_sub_CP_led",
@@ -381,6 +382,46 @@ def HiSpEC_calculate_lower_vertex_potential(
 
 # HISPEC_sub_LoSpEC -- CA to SpEC, conditional SpEC
 # HISPEC_sub_PD_LoSpEC
+
+def HiSpEC_sub_CA(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Ival__A: float = 0.0,
+    Tval__s: float = 10.0,
+    AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+    IRange: str = "AUTO",
+    ERange: str = "AUTO",
+    Bandwidth: str = "BW4",
+    channel: int = 0,
+    TTLwait: int = -1,
+    TTLsend: int = -1,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(
+        PSTAT_server,
+        "run_CA",
+        {
+            "Ival__A": Ival__A,
+            "Tval__s": Tval__s,
+            "AcqInterval__s": AcqInterval__s,
+            "IRange": IRange,
+            "ERange": ERange,
+            "Bandwidth": Bandwidth,
+            "channel": channel,
+            "TTLwait": TTLwait,
+            "TTLsend": TTLsend,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_previous,
+        technique_name="CA",
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    return apm.action_list  # returns complete action list to orch
 
 
 def HiSpEC_sub_OCV(
