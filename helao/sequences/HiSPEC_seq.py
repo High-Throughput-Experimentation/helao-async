@@ -48,7 +48,8 @@ def HiSpEC_CV(
     Ffinal__Hz: float = 1000,  # Final frequency in Hz.
     FrequencyNumber: int = 60,
     Duration__s: float = 0,  # Duration in seconds.
-    AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+    AcqInterval__s: float = 0.1,
+    AcqInterval_CA_CP__s:float = 0.5,  # Time between data acq in seconds.
     SweepMode: str = "log",
     Repeats: int = 10,
     DelayFraction: float = 0.1,
@@ -174,21 +175,14 @@ def HiSpEC_CV(
             "HiSpEC_sub_CP",
             {"Ival__A" : Ival__A,
             "Tval__s" : Tval__s,
-            "AcqInterval__s": AcqInterval__s})
+            "AcqInterval__s": AcqInterval_CA_CP__s})
         
 
         epm.add_experiment("HiSpEC_sub_CA",
             {
                 # "Ival__A" : Ival__A,
                 "Tval__s" : Tval__s,
-                "AcqInterval__s": AcqInterval__s,
-                "gamrychannelwait": gamrychannelwait,
-                "gamrychannelsend": gamrychannelsend,
-                "IRange": IRange,
-                "ERange": ERange,
-                "Bandwidth": Bandwidth,
-                "solution_ph": solution_ph,
-                "ref_vs_nhe": ref_vs_nhe,
+                "AcqInterval__s": AcqInterval_CA_CP__s,
             }, from_globalexp_params={"min_offset_ocv": "Vval__V"})
         
         
