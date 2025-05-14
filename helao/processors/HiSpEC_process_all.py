@@ -51,7 +51,8 @@ class PostProcess(HloPostProcessor):
                         new_file = copy(act_file)
                         new_file.file_type = "parquet__file"
                         relpath = Path(file).resolve().relative_to(Path(new_file_path).parent.resolve())
-                        new_file.file_name = str(relpath)
+                        posixpath = str(relpath).replace("\\", "/")
+                        new_file.file_name = posixpath
                         new_file.nosync = False
                         processed_file_list.append(new_file)
 
