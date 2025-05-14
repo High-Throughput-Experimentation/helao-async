@@ -272,8 +272,13 @@ class BiologicDriver(HelaoDriver):
             data.update(values)
             
             if 'modulus' in data.keys():
-                data["X_ohm"] = (-np.array(data['modulus']) * np.sin(np.array(data['phase']))).tolist()
-                data["R_ohm"] = (np.array(data['modulus']) * np.cos(np.array(data['phase']))).tolist()
+                try:
+                    data["X_ohm"] = (-np.array(data['modulus']) * np.sin(np.array(data['phase']))).tolist()
+                    data["R_ohm"] = (np.array(data['modulus']) * np.cos(np.array(data['phase']))).tolist()
+                except Exception:
+                    LOGGER.warning("Unexpected value in modulus or phase data, unable to calculate X_ohm and R_ohm.")
+                    data["X_ohm"] = [np.nan] * len(data['modulus'])
+                    data["R_ohm"] = [np.nan] * len(data['modulus'])
 
             response = DriverResponse(
                 response=DriverResponseType.success,
