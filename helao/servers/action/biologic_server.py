@@ -123,7 +123,7 @@ class BiologicExec(Executor):
             error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
             LOGGER.info("BiologicExec setup successful.")
         except Exception:
-            error = ErrorCodes.critical
+            error = ErrorCodes.critical_error
             LOGGER.error("BiologicExec pre-exec error", exc_info=True)
         return {"error": error}
 
@@ -134,13 +134,13 @@ class BiologicExec(Executor):
             resp = self.driver.start_channel(self.channel, self.ttl_params)
             self.start_time = resp.data.get("start_time", time.time())
             error = (
-                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
             )
             LOGGER.info("BiologicExec measurement started.")
             return {"error": error}
         except Exception:
             LOGGER.error("BiologicExec exec error", exc_info=True)
-            return {"error": ErrorCodes.critical}
+            return {"error": ErrorCodes.critical_error}
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
@@ -219,7 +219,7 @@ class BiologicExec(Executor):
                 self.data_buffer["channel"].extend(data_length * [self.channel])
                 resp.data.update({"channel": data_length * [self.channel]})
             error = (
-                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
             )
             status = HloStatus.active
 
@@ -231,7 +231,7 @@ class BiologicExec(Executor):
             return {"error": error, "status": status, "data": resp.data}
         except Exception:
             LOGGER.error("BiologicExec poll error", exc_info=True)
-            return {"error": ErrorCodes.critical, "status": HloStatus.errored}
+            return {"error": ErrorCodes.critical_error, "status": HloStatus.errored}
 
     async def _post_exec(self):
         LOGGER.info("BiologicExec running post_exec.")
@@ -258,7 +258,7 @@ class BiologicExec(Executor):
             )
             self.active.action.action_params["has_bubble"] = has_bubble
 
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
         return {"error": error, "data": {}}
 
     async def _manual_stop(self) -> dict:

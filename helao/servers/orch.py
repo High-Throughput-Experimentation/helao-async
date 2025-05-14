@@ -1320,7 +1320,7 @@ class Orch(Base):
                 LOGGER.error(
                     f"returned result is not a valid Action BaseModel: {repr(e), tb,}"
                 )
-                return ErrorCodes.critical
+                return ErrorCodes.critical_error
 
             if result_action.error_code is not ErrorCodes.none:
                 self.print_message(

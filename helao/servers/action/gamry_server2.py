@@ -125,7 +125,7 @@ class GamryExec(Executor):
         LOGGER.debug("starting measurement")
         resp = self.driver.measure(self.ttl_params)
         self.start_time = resp.data.get("start_time", time.time())
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
         return {"error": error}
 
     async def _poll(self) -> dict:
@@ -200,14 +200,14 @@ class GamryExec(Executor):
                                         )
                                         self.last_alert_time = poll_iter_time
             error = (
-                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
             )
             status = HloStatus.active if resp.message != "done" else HloStatus.finished
             return {"error": error, "status": status, "data": resp.data}
         except Exception:
             LOGGER.error("GamryExec poll error", exc_info=True)
             print(data_dq)
-            return {"error": ErrorCodes.critical, "status": HloStatus.errored}
+            return {"error": ErrorCodes.critical_error, "status": HloStatus.errored}
 
     async def _post_exec(self):
         resp = self.driver.cleanup(self.ttl_params)
@@ -233,7 +233,7 @@ class GamryExec(Executor):
             )
             self.active.action.action_params["has_bubble"] = has_bubble
 
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
         return {"error": error, "data": {}}
 
     async def _manual_stop(self) -> dict:

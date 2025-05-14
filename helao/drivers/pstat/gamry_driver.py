@@ -305,7 +305,7 @@ class gamry:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             # self.pstat = None
             LOGGER.error(f"Gamry error init", exc_info=True)
-            return ErrorCodes.critical
+            return ErrorCodes.critical_error
 
     def close_connection(self):
         """Close connection to Gamry"""
@@ -319,7 +319,7 @@ class gamry:
                 return ErrorCodes.not_initialized
         except Exception:
             # self.pstat = None
-            return ErrorCodes.critical
+            return ErrorCodes.critical_error
 
     def close_pstat_connection(self):
         if self.IO_measuring:
@@ -900,7 +900,7 @@ class gamry:
             except comtypes.COMError as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 LOGGER.error(f"Gamry error during measurement setup: {repr(e)} {tb}")
-                error = ErrorCodes.critical
+                error = ErrorCodes.critical_error
         else:
             LOGGER.error("measurement_setup: Gamry not initialized!")
             error = ErrorCodes.not_initialized

@@ -61,7 +61,7 @@ class AndorCooling(Executor):
         """Set SensorCooling flag and wait for stabilization."""
         LOGGER.debug(f"setting cam.SensorCooling = {self.cooldown}")
         resp = self.driver.set_cooldown(self.cooldown)
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
         return {"error": error}
 
     async def _poll(self) -> dict:
@@ -69,7 +69,7 @@ class AndorCooling(Executor):
         resp = self.driver.check_temperature()
 
         if not resp.data:
-            return {"error": ErrorCodes.critical, "status": HloStatus.errored}
+            return {"error": ErrorCodes.critical_error, "status": HloStatus.errored}
 
         sensor_temp = resp.data["temp"]
         temp_status = resp.data["status"]
@@ -77,7 +77,7 @@ class AndorCooling(Executor):
         LOGGER.info("Status: '{}'".format(temp_status))
 
         if temp_status == "Fault":
-            return {"error": ErrorCodes.critical, "status": HloStatus.errored}
+            return {"error": ErrorCodes.critical_error, "status": HloStatus.errored}
 
         status = HloStatus.active
         if temp_status == "Stabilised":
@@ -101,7 +101,7 @@ class AndorAdjustND(Executor):
         """Run ND filter adjustment routine."""
         LOGGER.debug("Running driver.adjust_ND()")
         resp = self.driver.adjust_ND()
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
         return {"error": error, "data": resp.data}
 
 
@@ -148,10 +148,10 @@ class AndorAcquire(Executor):
             LOGGER.debug("setting trigger")
             resp = self.driver.set_trigger(self.external_trigger)
             error = (
-                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
             )
         except Exception:
-            error = ErrorCodes.critical
+            error = ErrorCodes.critical_error
             LOGGER.error("Error setting trigger", exc_info=True)
         return {"error": error}
 
@@ -166,7 +166,7 @@ class AndorAcquire(Executor):
         if self.first_tick is None:
             self.first_tick = resp.data["tick_time"][0]
         latest_tick = resp.data["tick_time"][-1]
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
         if resp.status == DriverStatus.ok:
             status = HloStatus.finished
         else:
@@ -181,7 +181,7 @@ class AndorAcquire(Executor):
     async def _post_exec(self):
         resp = self.driver.cleanup()
 
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
         return {"error": error, "data": {}}
 
 
