@@ -53,7 +53,7 @@ def HiSpEC_CV(
     Repeats: int = 10,
     DelayFraction: float = 0.1,
     Ival__A: float = 0.0015*0.071,
-    Tval__s: float = 0.05,
+    Tval__s: float = 60,
 
     
     # toggle2_source: str = "spec_trig",
@@ -142,7 +142,7 @@ def HiSpEC_CV(
         epm.add_experiment(
             "HiSpEC_sub_OCV",
             {
-                "Tval__s": 60,
+                "Tval__s": Tval__s,
                 "SampleRate":0.5,
             }
                 )
@@ -175,6 +175,21 @@ def HiSpEC_CV(
             {"Ival__A" : Ival__A,
             "Tval__s" : Tval__s,
             "AcqInterval__s": AcqInterval__s})
+        
+
+        epm.add_experiment("HiSpEC_sub_CA",
+            {
+                # "Ival__A" : Ival__A,
+                "Tval__s" : Tval__s,
+                "AcqInterval__s": AcqInterval__s,
+                "gamrychannelwait": gamrychannelwait,
+                "gamrychannelsend": gamrychannelsend,
+                "IRange": IRange,
+                "ERange": ERange,
+                "Bandwidth": Bandwidth,
+                "solution_ph": solution_ph,
+                "ref_vs_nhe": ref_vs_nhe,
+            }, from_globalexp_params={"min_offset_ocv": "Vval__V"})
         
         
 
