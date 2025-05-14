@@ -419,7 +419,7 @@ class PAL:
                     # as we have not control of pal directly
                     self.active.action.error_code = error
                     LOGGER.error(f"Got error after triggerwait: '{error}'")
-                    return ErrorCodes.critical
+                    return ErrorCodes.critical_error
 
                 # after each pal trigger:
                 # as a pal action can contain many actions which modify
@@ -478,7 +478,7 @@ class PAL:
                             )
                         else:
                             LOGGER.error("Sample does not exist in db")
-                            return ErrorCodes.critical
+                            return ErrorCodes.critical_error
                     else:
                         LOGGER.error(
                             "palaction.dest.samples_initial should not contain ref samples"
@@ -726,7 +726,7 @@ class PAL:
 
         if error != ErrorCodes.none:
             LOGGER.error("PAL_source: Requested tray position does not exist.")
-            error = ErrorCodes.critical
+            error = ErrorCodes.critical_error
 
         elif sample_in == NoneSample():
             LOGGER.error(
@@ -761,7 +761,7 @@ class PAL:
 
         if error != ErrorCodes.none:
             LOGGER.error("PAL_source: Requested custom position does not exist.")
-            error = ErrorCodes.critical
+            error = ErrorCodes.critical_error
         elif sample_in == NoneSample():
             LOGGER.error(f"PAL_source: No sample in custom position '{source}'")
             error = ErrorCodes.not_available
@@ -801,7 +801,7 @@ class PAL:
             LOGGER.error(
                 "PAL_source: More then one sample in source position. This is not allowed."
             )
-            return PALposition(error=ErrorCodes.critical)
+            return PALposition(error=ErrorCodes.critical_error)
 
         return PALposition(
             position=source,
@@ -920,7 +920,7 @@ class PAL:
 
         if error != ErrorCodes.none:
             LOGGER.error("PAL_dest: Requested tray position does not exist.")
-            return PALposition(error=ErrorCodes.critical), samples_out_list
+            return PALposition(error=ErrorCodes.critical_error), samples_out_list
 
         # check if a sample is present in destination
         if sample_in == NoneSample():
@@ -1006,11 +1006,11 @@ class PAL:
             LOGGER.error(
                 "PAL_dest: Invalid PAL dest 'NONE' for 'custom' position method."
             )
-            return PALposition(error=ErrorCodes.critical), samples_out_list
+            return PALposition(error=ErrorCodes.critical_error), samples_out_list
 
         if not self.archive.custom_dest_allowed(dest):
             LOGGER.error(f"PAL_dest: custom position '{dest}' cannot be dest.")
-            return PALposition(error=ErrorCodes.critical), samples_out_list
+            return PALposition(error=ErrorCodes.critical_error), samples_out_list
 
         error, sample_in = await self.archive.custom_query_sample(dest)
         if error != ErrorCodes.none:
@@ -1368,7 +1368,7 @@ class PAL:
             LOGGER.error(
                 "PAL_dest: More then one sample in source position. This is not allowed."
             )
-            return PALposition(error=ErrorCodes.critical), samples_out_list
+            return PALposition(error=ErrorCodes.critical_error), samples_out_list
 
         # a sample is already present in the tray position
         # we add more sample to it, e.g. dilute it
@@ -2856,7 +2856,7 @@ class PAL:
                     break
             if psutil.pid_exists(p.pid):
                 LOGGER.error("Failed to terminate server PAL after 3 retries.")
-                return ErrorCodes.critical
+                return ErrorCodes.critical_error
 
         # if none is found return True
         return ErrorCodes.none

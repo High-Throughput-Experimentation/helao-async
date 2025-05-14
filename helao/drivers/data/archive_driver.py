@@ -1213,7 +1213,7 @@ class Archive:
 
         if action is None:
             LOGGER.error("no action defined")
-            error = ErrorCodes.critical
+            error = ErrorCodes.critical_error
             return error, samples
 
         if not samples_in:
@@ -1374,7 +1374,7 @@ class Archive:
             )
             if not custom_samples_in:
                 LOGGER.error("invalid sample in custom position")
-                error = ErrorCodes.critical
+                error = ErrorCodes.critical_error
                 return error, [], []
             else:
                 custom_sample = custom_samples_in[0]
@@ -1433,7 +1433,7 @@ class Archive:
                 LOGGER.error(
                     "could not replace sample with assembly when adding liquid"
                 )
-                error = ErrorCodes.critical
+                error = ErrorCodes.critical_error
 
         # (5-2)
         # we only can combine samples if dilution for the position is allowed
@@ -1486,7 +1486,7 @@ class Archive:
             if not samples_out2:
                 # reference could not be converted to a real sample
                 LOGGER.error("could not convert reference assembly to real assembly")
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
             # add new reference to samples out list
             samples_out.append(samples_out2[0])
@@ -1499,7 +1499,7 @@ class Archive:
                 LOGGER.error(
                     "could not replace sample with assembly when adding liquid"
                 )
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
         # (5-2b) liquid + assembly case
         elif (
@@ -1604,7 +1604,7 @@ class Archive:
             if not samples_out2:
                 # reference could not be converted to a real sample
                 LOGGER.error("could not convert reference assembly to real assembly")
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
             # add new reference to samples out list which already contains new liquid mixture
             samples_out.append(samples_out2[0])
@@ -1617,7 +1617,7 @@ class Archive:
                 LOGGER.error(
                     "could not replace sample with assembly when adding liquid"
                 )
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
         # (5-3)
         # custom holds a sample and we need to create an assembly
@@ -1657,7 +1657,7 @@ class Archive:
             if not samples_out2:
                 # reference could not be converted to a real sample
                 LOGGER.error("could not convert reference assembly to real assembly")
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
             # add new reference to samples out list
             samples_out.append(samples_out2[0])
@@ -1670,7 +1670,7 @@ class Archive:
                 LOGGER.error(
                     "could not replace sample with assembly when adding liquid"
                 )
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
         else:
             # nothing else possible
@@ -1751,7 +1751,7 @@ class Archive:
             )
             if not custom_samples_in:
                 LOGGER.error("invalid sample in custom position")
-                error = ErrorCodes.critical
+                error = ErrorCodes.critical_error
                 return error, [], []
             else:
                 custom_sample = custom_samples_in[0]
@@ -1808,7 +1808,7 @@ class Archive:
 
             if not replaced:
                 LOGGER.error("could not replace sample with assembly when adding gas")
-                error = ErrorCodes.critical
+                error = ErrorCodes.critical_error
 
         # (5-2)
         # we only can combine samples if dilution for the position is allowed
@@ -1861,7 +1861,7 @@ class Archive:
             if not samples_out2:
                 # reference could not be converted to a real sample
                 LOGGER.error("could not convert reference assembly to real assembly")
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
             # add new reference to samples out list
             samples_out.append(samples_out2[0])
@@ -1872,7 +1872,7 @@ class Archive:
             )
             if not replaced:
                 LOGGER.error("could not replace sample with assembly when adding gas")
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
         # (5-2b) gas + assembly case
         elif (
@@ -1977,7 +1977,7 @@ class Archive:
             if not samples_out2:
                 # reference could not be converted to a real sample
                 LOGGER.error("could not convert reference assembly to real assembly")
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
             # add new reference to samples out list which already contains new gas mixture
             samples_out.append(samples_out2[0])
@@ -1988,7 +1988,7 @@ class Archive:
             )
             if not replaced:
                 LOGGER.error("could not replace sample with assembly when adding gas")
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
         # (5-3)
         # custom holds a sample and we need to create an assembly
@@ -2028,7 +2028,7 @@ class Archive:
             if not samples_out2:
                 # reference could not be converted to a real sample
                 LOGGER.error("could not convert reference assembly to real assembly")
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
             # add new reference to samples out list
             samples_out.append(samples_out2[0])
@@ -2039,7 +2039,7 @@ class Archive:
             )
             if not replaced:
                 LOGGER.error("could not replace sample with assembly when adding gas")
-                return ErrorCodes.critical, [], []
+                return ErrorCodes.critical_error, [], []
 
         else:
             # nothing else possible

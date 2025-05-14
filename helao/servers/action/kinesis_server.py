@@ -74,7 +74,7 @@ class KinesisMotorExec(Executor):
             LOGGER.info("KinesisMotorExec starting motion.")
             resp = self.driver.move(self.axis_name, move_mode, move_value)
             error = (
-                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical
+                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
             )
             return {"error": error}
         else:

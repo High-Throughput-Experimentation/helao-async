@@ -359,7 +359,7 @@ class SM303:
                 f"Could not trigger_mode ('SpecTrigType.external'), edge_mode ({params['edge_mode']}), int_time ({params['int_time']}), or trigger_duration ({params['duration']}).",
                 error=True,
             )
-            A.error_code = ErrorCodes.critical
+            A.error_code = ErrorCodes.critical_error
             activeDict = A.as_dict()
         return activeDict
 

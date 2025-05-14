@@ -6,6 +6,7 @@ from enum import Enum
 class ErrorCodes(str, Enum):
     none = "none"
     critical = "critical"
+    critical_error = "critical_error"
     start_timeout = "start_timeout"
     continue_timeout = "continue_timeout"
     done_timeout = "done_timeout"
