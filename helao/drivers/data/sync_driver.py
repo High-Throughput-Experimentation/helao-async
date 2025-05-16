@@ -1346,8 +1346,8 @@ class HelaoSyncer:
             prog.dict["files_pending"] += [
                 str(p)
                 for p in prog.yml.hlo_files + prog.yml.misc_files
-                if p not in prog.dict["files_pending"]
-                and p not in prog.dict["files_s3"]
+                if str(p) not in prog.dict["files_pending"]
+                and str(p) not in prog.dict["files_s3"]
             ]
             # push files to S3
             while prog.dict.get("files_pending", []):
@@ -1408,8 +1408,8 @@ class HelaoSyncer:
                     if file_success:
                         LOGGER.info("Removing file from pending list.")
                         prog.dict["files_pending"].remove(sp)
-                        LOGGER.info(f"Adding file to S3 dict. {fp.name}: {file_s3_key}")
-                        prog.dict["files_s3"].update({fp.name: file_s3_key})
+                        LOGGER.info(f"Adding file to S3 dict. {str(fp)}: {file_s3_key}")
+                        prog.dict["files_s3"].update({str(fp): file_s3_key})
                         LOGGER.info(f"Updating progress: {prog.dict}")
                         prog.write_dict()
 

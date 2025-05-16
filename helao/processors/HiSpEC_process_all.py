@@ -63,7 +63,7 @@ class PostProcess(HloPostProcessor):
                     file_list=Path(new_file_path).glob('**/*.parquet')
                     for file in file_list:
                         new_file = copy(act_file)
-                        new_file.file_type = "parquet__file"
+                        new_file.file_type = "andor_spec_parquet__file"
                         relpath = Path(file).resolve().relative_to(Path(new_file_path).parent.resolve())
                         posixpath = str(relpath).replace("\\", "/")
                         new_file.file_name = posixpath
