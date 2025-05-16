@@ -95,17 +95,17 @@ async def move_dir(
     is_manual = False
 
     if obj_type == "action":
-        yml_dir = os.path.join(save_dir, hobj.get_action_dir())
+        yml_dir = os.path.normpath(os.path.join(save_dir, hobj.get_action_dir()))
         if hobj.manual_action:
             dest_dir = "RUNS_DIAG"
             is_manual = True
     elif obj_type == "experiment":
-        yml_dir = os.path.join(save_dir, hobj.get_experiment_dir())
+        yml_dir = os.path.normpath(os.path.join(save_dir, hobj.get_experiment_dir()))
         if hobj.experiment_name == "MANUAL":
             dest_dir = "RUNS_DIAG"
             is_manual = True
     elif obj_type == "sequence":
-        yml_dir = os.path.join(save_dir, hobj.get_sequence_dir())
+        yml_dir = os.path.normpath(os.path.join(save_dir, hobj.get_sequence_dir()))
         if hobj.sequence_name == "manual_seq":
             dest_dir = "RUNS_DIAG"
             is_manual = True
@@ -173,7 +173,13 @@ async def move_dir(
             rm_files_done = [f for f in rm_files if not os.path.exists(f)]
             if len(rm_files_done) == len(rm_files):
                 if os.path.exists(yml_dir):
-                    await aioshutil.rmtree(yml_dir)
+                    try:
+                        await aioshutil.rmtree(yml_dir)
+                    except FileNotFoundError:
+                        LOGGER.warning(
+                            f"Error removing {yml_dir}, perhaps removed by another operation.",
+                            exc_info=True,
+                        )
                 if not os.path.exists(yml_dir):
                     rm_success = True
                     timestamp = getattr(hobj, f"{obj_type}_timestamp").strftime(
