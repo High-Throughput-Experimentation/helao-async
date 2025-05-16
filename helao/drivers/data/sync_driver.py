@@ -1439,9 +1439,6 @@ class HelaoSyncer:
                                     f"helao__{file_s3_key.split('.')[-1]}_file",
                                 )
                             meta["files"].append(fileinfo.model_dump())
-                        if isinstance(msg, Path) and msg.suffix == ".parquet":
-                            LOGGER.info("cleaning up parquet file")
-                            msg.unlink()
 
         # if prog.yml is an experiment first check processes before pushing to API
         if prog.yml.type == "experiment":
