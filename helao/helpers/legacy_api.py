@@ -18,15 +18,10 @@ class HTELegacyAPI:
         self.base = Serv_class
 
         self.PLATEMAPFOLDERS = [
-            r"\\htejcap.caltech.edu\share\data\hte_jcap_app_proto\map",
             r"J:\hte_jcap_app_proto\map",
-            r"\\htejcap.caltech.edu\share\home\users\hte\platemaps",
-            r"ERT",
-            r"K:\users\hte\platemaps",
         ]
 
         self.PLATEFOLDERS = [
-            r"\\htejcap.caltech.edu\share\data\hte_jcap_app_proto\plate",
             r"J:\hte_jcap_app_proto\plate",
         ]
 
