@@ -20,9 +20,9 @@ class HelaoCredentials(BaseSettings):
     JUMPBOX_USER: str = ""
     JUMPBOX_KEYFILE: str = ""
 
-    def __init__(self, _env_file: str | Path, **kwargs):
-        if not isinstance(_env_file, Path):
-            env_path = Path(_env_file)
+    def __init__(self, env_path: str | Path, **kwargs):
+        if not isinstance(env_path, Path):
+            env_path = Path(env_path)
         super().__init__(_env_file=env_path, **kwargs)
     
     def set_api_port(self, port: int):
