@@ -2,6 +2,7 @@ from pydantic import SecretStr, PostgresDsn
 from pydantic_settings import BaseSettings
 from textwrap import dedent
 import urllib
+from pathlib import Path
 
 
 class HelaoCredentials(BaseSettings):
@@ -18,6 +19,9 @@ class HelaoCredentials(BaseSettings):
     JUMPBOX_HOST: str = ""
     JUMPBOX_USER: str = ""
     JUMPBOX_KEYFILE: str = ""
+
+    def __init__(self, _env_file: Path, **kwargs):
+        super().__init__(_env_file=_env_file, **kwargs)
     
     def set_api_port(self, port: int):
         self.API_PORT = port
