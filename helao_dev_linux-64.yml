@@ -24,6 +24,7 @@ dependencies:
   - colorlog
   - fastapi
   - filelock
+  - fsspec
   - git
   - httpx
   - ipykernel
@@ -59,6 +60,7 @@ dependencies:
   - pyzstd
   - requests
   - ruamel.yaml
+  - s3fs
   - scikit-learn
   - scipy
   - shortuuid

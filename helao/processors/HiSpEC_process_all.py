@@ -11,12 +11,16 @@ from copy import copy
 from helao.core.models.file import FileInfo
 from helao.helpers.hlo_postprocessor import HloPostProcessor
 from helao.helpers.helao_data import HelaoData
-from helao.helpers.parquet import hlo_to_parquet
+from helao.helpers.parquet import hlo_to_parquet, read_helao_metadata
 from helao.helpers.HiSpEC_calibrate_downsample_parquet import (
     fully_read_and_calibrate_parquet,
 )
 import tempfile
 from pathlib import Path
+import json
+
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 class PostProcess(HloPostProcessor):
 
@@ -37,21 +41,33 @@ class PostProcess(HloPostProcessor):
                             spec_path=temp_file.name,
                             write_file=False,
                         ).sort_values(by="t (s)")
+                        hlo_meta = read_helao_metadata(temp_file.name)
                     action_comment = self.action.action_params.get("comment", "")
                     new_file_path = file_path.replace(".hlo", ".parquet")
                     if action_comment:
                         new_file_path = new_file_path.replace(
                             ".parquet", f"_{action_comment}.parquet"
                         )
-                    df.to_parquet(new_file_path, index=True, partition_cols=['cycle', 'direction'])
+                    
+                    table = pa.Table.from_pandas(df)
+                    schema = table.schema
+                    existing_metadata = schema.metadata
+                    custom_metadata = json.dumps(hlo_meta).encode("utf8")
+                    metadata = {**{"helao_metadata": custom_metadata}, **existing_metadata}
+
+                    table = table.replace_schema_metadata(metadata)
+                    schema = table.schema
+                    pq.write_to_dataset(table, new_file_path, partition_cols=["cycle", "direction"], schema=schema)        
                     # glob through new file path to get all the parquet files to generate a list of paths
 
                     file_list=Path(new_file_path).glob('**/*.parquet')
                     for file in file_list:
                         new_file = copy(act_file)
-                        new_file.file_type = "parquet__file"
+                        new_file.file_type = "andor_spec_parquet__file"
                         relpath = Path(file).resolve().relative_to(Path(new_file_path).parent.resolve())
-                        new_file.file_name = str(relpath)
+                        posixpath = str(relpath).replace("\\", "/")
+                        new_file.file_name = posixpath
+                        new_file.nosync = False
                         processed_file_list.append(new_file)
 
             except Exception:
