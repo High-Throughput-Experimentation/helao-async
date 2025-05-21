@@ -336,6 +336,7 @@ def return_cycle_for_time(time:float, min_max_dict:dict)->int:
     outputs:
     cycle: the cycle number the time belongs to.
     """
+    max_cycle = max([int(x) for x in min_max_dict.keys()])
     for cycle, min_max in min_max_dict.items():
         time = round_10ms(time)
         if time <= 0.02:
@@ -348,11 +349,12 @@ def return_cycle_for_time(time:float, min_max_dict:dict)->int:
                 return cycle
             # if the time is greater than the max time of the last cycle
             # it is in the last cycle
-            elif int(cycle) == max([int(x) for x in min_max_dict.keys()]):
-                if time >= min_max[1]:
+        if int(cycle) == max_cycle:
+            if time >= min_max[1]:
+                    print(f"Time {time} is greater than the max time of cycle {cycle} which is {min_max[1]} this time was assigned to cycle {cycle} but should be removed in a later function")
                     return cycle
             else:
-                raise ValueError(f"Time {time} is outside of all bounds")
+                raise ValueError(f"Time {time} is outside of all bounds. Cycle was {cycle} and max was {min_max[1]}")
 
 def get_cycles_for_spec_times(calibration_df:pd.DataFrame, CV_data:pd.DataFrame, default_time_header1='t_s', default_cycle_header1='cycle')->pd.DataFrame:
     """
@@ -473,6 +475,10 @@ def drop_times_larger_than_CV_max_time(calibrated_spectra:pd.DataFrame, CV_data:
     calibrated_spectra: a dataframe with the times larger than the max time of the CV data dropped
     """
     max_time=CV_data[default_time_header].max()
+    
+    times=calibrated_spectra[default_time_header]
+    cut_times=times[times>max_time]
+    print(f"Times larger than the max time of the CV data were found and cut: {cut_times}")
     return calibrated_spectra[calibrated_spectra[default_time_header] <= max_time]
 
 def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame, precision:float=0.001)->pd.DataFrame:
@@ -682,6 +688,6 @@ def fully_read_and_calibrate_parquet(cv_path:str,
 
 if __name__ == "__main__":
 
-    cv_path=r"/Users/benj/Documents/SpEC_Class_2/test_data/CV-3.3.0.0__0.hlo"
-    spec_path=r"/Users/benj/Documents/SpEC_Class_2/test_data/test.parquet"
+    cv_path=r"/Users/benj/Documents/SpEC_Class_2/test_data/newdata/CV-3.3.0.0__0.hlo"
+    spec_path=r"/Users/benj/Documents/SpEC_Class_2/test_data/newdata/test.parquet"
     fully_read_and_calibrate_parquet(cv_path=cv_path, spec_path=spec_path, write_file=True)

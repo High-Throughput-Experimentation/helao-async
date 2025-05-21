@@ -322,32 +322,32 @@ def HiSpEC_sub_startup(
     )
 
     # get sample plate coordinates
-    apm.add(
-        MOTOR_server,
-        "solid_get_samples_xy",
-        {
-            "plate_id": solid_plate_id,
-            "sample_no": solid_sample_no,
-        },
-        to_globalexp_params=[
-            "_platexy"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,
-    )
+    # apm.add(
+    #     MOTOR_server,
+    #     "solid_get_samples_xy",
+    #     {
+    #         "plate_id": solid_plate_id,
+    #         "sample_no": solid_sample_no,
+    #     },
+    #     to_globalexp_params=[
+    #         "_platexy"
+    #     ],  # save new liquid_sample_no of eche cell to globals
+    #     start_condition=ActionStartCondition.wait_for_all,
+    # )
 
-    # move to position
-    apm.add(
-        MOTOR_server,
-        "move",
-        {
-            # "d_mm": [x_mm, y_mm],
-            "axis": ["x", "y"],
-            "mode": MoveModes.absolute,
-            "transformation": TransformationModes.platexy,
-        },
-        from_globalexp_params={"_platexy": "d_mm"},
-        start_condition=ActionStartCondition.wait_for_all,
-    )
+    # # move to position
+    # apm.add(
+    #     MOTOR_server,
+    #     "move",
+    #     {
+    #         # "d_mm": [x_mm, y_mm],
+    #         "axis": ["x", "y"],
+    #         "mode": MoveModes.absolute,
+    #         "transformation": TransformationModes.platexy,
+    #     },
+    #     from_globalexp_params={"_platexy": "d_mm"},
+    #     start_condition=ActionStartCondition.wait_for_all,
+    # )
 
     return apm.action_list  # returns complete action list to orch
 
