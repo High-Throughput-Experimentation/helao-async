@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 import os
 
 __all__ = ["HelaoBokehAPI", "HelaoFastAPI"]

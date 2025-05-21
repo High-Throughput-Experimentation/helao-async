@@ -12,7 +12,7 @@ from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:

@@ -29,7 +29,7 @@ from starlette.types import Message
 from starlette.responses import JSONResponse, Response
 
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 
 global LOGGER
 if logging.LOGGER is None:

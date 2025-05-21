@@ -45,7 +45,7 @@ from helao.helpers.config_loader import config_loader
 
 import helao.tests.unit_test_sample_models
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 
 LAUNCH_LOGGER = logging.make_logger(__file__)
 

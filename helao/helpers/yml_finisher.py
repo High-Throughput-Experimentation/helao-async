@@ -13,7 +13,7 @@ import aiofiles
 from helao.helpers.yml_tools import yml_load
 from helao.helpers.premodels import Sequence, Experiment, Action
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)

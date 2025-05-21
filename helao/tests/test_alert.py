@@ -1,6 +1,6 @@
 import sys
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 from helao.helpers.yml_tools import yml_load
 
 email_config = yml_load(sys.argv[1])

@@ -11,7 +11,7 @@ from typing import List
 from fastapi import Body
 import pandas as pd
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:

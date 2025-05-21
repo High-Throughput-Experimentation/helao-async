@@ -15,7 +15,7 @@ from bokeh.models import ColumnDataSource
 from bokeh.models import Button
 from bokeh.events import ButtonClick
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:

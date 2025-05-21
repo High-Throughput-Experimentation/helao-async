@@ -31,7 +31,7 @@ __all__ = [
 
 ]
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 
 if logging.LOGGER is None:
     logger = logging.make_logger(__file__)
