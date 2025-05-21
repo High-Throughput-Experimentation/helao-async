@@ -1,4 +1,6 @@
 
+
+from helao.helpers.read_hlo import read_hlo
 import pandas as pd
 import numpy as np
 import os
@@ -10,8 +12,8 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import UnivariateSpline
 from scipy.signal import sawtooth
 import matplotlib.pyplot as plt
+from typing import Tuple
 
-from helao.helpers.read_hlo import read_hlo
 
 
 
@@ -146,11 +148,14 @@ def read_spec_times_from_parquet(spec_file_path: str, default_time_header:str='t
 def read_spectra_parquet(spec_file_path: str) -> pd.DataFrame:
     """
     This function reads the sectra parquet file generated from the ANDORSPEC.hlo file. It reads the entire file.
-    t_s is dropped from the dataframe as this is dealt with separatley. 
+    t_s is dropped from the dataframe as this is dealt with separatley by read_spec_times_from_parquet. 
     """
     data=pd.read_parquet(spec_file_path)
     data.drop(columns=['t_s'], inplace=True)
     return data
+
+
+    
 
 
 
@@ -337,7 +342,6 @@ def return_cycle_for_time(time:float, min_max_dict:dict)->int:
         time = round_10ms(time)
         if time <= 0.02:
             return 0
-        print(cycle)
         if int(cycle) == 0:
             if time <= min_max[1]:
                 return cycle
@@ -346,10 +350,11 @@ def return_cycle_for_time(time:float, min_max_dict:dict)->int:
                 return cycle
             # if the time is greater than the max time of the last cycle
             # it is in the last cycle
-            elif cycle == sorted(min_max_dict.keys())[-1] and time > min_max[1]:
-                return cycle
+            elif int(cycle) == max([int(x) for x in min_max_dict.keys()]):
+                if time >= min_max[1]:
+                    return cycle
             else:
-                raise ValueError(f"Time {time} not found in any cycle")
+                raise ValueError(f"Time {time} is outside of all bounds")
 
 def get_cycles_for_spec_times(calibration_df:pd.DataFrame, CV_data:pd.DataFrame, default_time_header1='t_s', default_cycle_header1='cycle')->pd.DataFrame:
     """
@@ -455,6 +460,22 @@ def read_in_spectra_calibrate(calibration_df:pd.DataFrame, spec_path:str, read_h
     else:
         spectra_df=read_spectra_parquet(spec_path)
     return pd.concat([calibration_df, spectra_df], axis=1)
+
+def drop_times_larger_than_CV_max_time(calibrated_spectra:pd.DataFrame, CV_data:pd.DataFrame, default_time_header:str='t_s')->pd.DataFrame:
+    """
+    This function takes in the calibrated spectral dataframe and drops all times that are larger than the max time of the CV data.
+    It does this by getting the max time from the CV data and dropping all rows in the calibrated_spectra dataframe that are greater
+    than this time.
+
+    inputs:
+    calibrated_spectra: a dataframe with t_s, Ewe_V, cycle, direction and spectral data
+    CV_data: a dataframe with the CV data
+
+    outputs:
+    calibrated_spectra: a dataframe with the times larger than the max time of the CV data dropped
+    """
+    max_time=CV_data[default_time_header].max()
+    return calibrated_spectra[calibrated_spectra[default_time_header] <= max_time]
 
 def downsample_to_1mV_precision(calibrated_spectra:pd.DataFrame, precision:float=0.001)->pd.DataFrame:
     """
@@ -639,6 +660,8 @@ def fully_read_and_calibrate_parquet(cv_path:str,
     
     spectra_calibrated=read_in_spectra_calibrate(calibration_df=calibration_df, spec_path=spec_path, read_hlo=False)
 
+    drop_times_larger_than_CV_max_time(calibrated_spectra=spectra_calibrated, CV_data=CV, default_time_header=default_time_header)
+
 
     spectra_calibrated=downsample_to_1mV_precision(calibrated_spectra=spectra_calibrated, precision=precision)   
 
@@ -660,6 +683,8 @@ def fully_read_and_calibrate_parquet(cv_path:str,
     return spectra_calibrated
 
 if __name__ == "__main__":
+    import sys 
+    sys.path.append('/Users/benj/Documents/helao-async')
     cv_path=r"/Users/benj/Documents/SpEC_Class_2/test_data/CV-3.3.0.0__0.hlo"
     spec_path=r"/Users/benj/Documents/SpEC_Class_2/test_data/test.parquet"
     fully_read_and_calibrate_parquet(cv_path=cv_path, spec_path=spec_path, write_file=True)
