@@ -1,5 +1,3 @@
-
-
 from helao.helpers.read_hlo import read_hlo
 import pandas as pd
 import numpy as np
@@ -683,8 +681,7 @@ def fully_read_and_calibrate_parquet(cv_path:str,
     return spectra_calibrated
 
 if __name__ == "__main__":
-    import sys 
-    sys.path.append('/Users/benj/Documents/helao-async')
+
     cv_path=r"/Users/benj/Documents/SpEC_Class_2/test_data/CV-3.3.0.0__0.hlo"
     spec_path=r"/Users/benj/Documents/SpEC_Class_2/test_data/test.parquet"
     fully_read_and_calibrate_parquet(cv_path=cv_path, spec_path=spec_path, write_file=True)
