@@ -38,7 +38,7 @@ import uvicorn
 import colorama
 
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
 from helao.helpers.yml_tools import yml_load
 

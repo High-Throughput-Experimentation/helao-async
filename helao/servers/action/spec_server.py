@@ -20,7 +20,7 @@ from helao.helpers.config_loader import config_loader
 
 from helao.drivers.io.enum import TriggerType
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:

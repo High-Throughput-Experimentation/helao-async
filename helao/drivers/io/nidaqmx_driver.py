@@ -28,7 +28,7 @@ from helao.helpers.active_params import ActiveParams
 from helao.core.models.data import DataModel
 from helao.core.models.hlostatus import HloStatus
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:

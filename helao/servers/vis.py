@@ -22,7 +22,7 @@ __all__ = ["Vis", "HelaoVis"]
 
 from socket import gethostname
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 
 global LOGGER
 LOGGER = logging.LOGGER

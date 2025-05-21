@@ -28,7 +28,7 @@ from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 from helao.helpers.executor import Executor
-from helao.helpers import logging  # get LOGGER from BaseAPI instance
+from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.drivers.pstat.biologic.driver import BiologicDriver
 from helao.drivers.pstat.biologic.enum import (

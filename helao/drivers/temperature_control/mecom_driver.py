@@ -2,11 +2,10 @@ __all__ = ["MeerstetterTEC", "TECMonExec", "TECWaitExec"]
 
 import time
 import asyncio
-import logging
 from mecom import MeCom, ResponseException, WrongChecksum
 from mecom.exceptions import ResponseTimeout
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:

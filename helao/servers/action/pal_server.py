@@ -33,7 +33,7 @@ from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 
-from helao.helpers import logging  # get LOGGER from BaseAPI instance
+from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
 
 global LOGGER
 if logging.LOGGER is None:

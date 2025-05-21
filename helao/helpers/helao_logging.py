@@ -2,7 +2,7 @@
 
 Usage:
 
-    from helao.helpers import logging
+    from helao.helpers import helao_logging as logging
     if logging.LOGGER is None:
         logger = logging.make_logger(__file__)
     logger = logging.LOGGER
@@ -11,10 +11,10 @@ Usage:
 
 # import picologging as logging
 # from picologging.handlers import TimedRotatingFileHandler
-import logging as helao_logging
+import logging
 
 ALERT_LEVEL = 60
-helao_logging.addLevelName(ALERT_LEVEL, "ALERT")
+logging.addLevelName(ALERT_LEVEL, "ALERT")
 
 
 def alert(self, message, *args, **kws):
@@ -23,7 +23,7 @@ def alert(self, message, *args, **kws):
         self._log(ALERT_LEVEL, message, args, **kws)
 
 
-helao_logging.Logger.alert = alert
+logging.Logger.alert = alert
 
 from queue import Queue
 from logging.handlers import (
@@ -91,7 +91,7 @@ def make_logger(
     log_dir = temp_dir if log_dir is None else log_dir
     log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
-    formatter = helao_logging.Formatter(format_string)
+    formatter = logging.Formatter(format_string)
     # for stream output
     colored_format_string = "%(log_color)s%(asctime)s | %(levelname)-8s | %(name)s %(reset)s%(white)s:: %(funcName)s @ %(filename)s:%(lineno)d - %(reset)s%(light_blue)s%(message)s"
     colored_formatter = ColoredFormatter(
@@ -108,11 +108,11 @@ def make_logger(
         style="%",
     )
 
-    logger_instance = helao_logging.getLogger(logger_name)
+    logger_instance = logging.getLogger(logger_name)
     logger_instance.setLevel(min(10, log_level))
 
     # create handlers
-    console = helao_logging.StreamHandler()
+    console = logging.StreamHandler()
     console.setFormatter(colored_formatter)
     try:
         timed_rotation = TimedRotatingFileHandler(

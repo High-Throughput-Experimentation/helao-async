@@ -23,7 +23,7 @@ from enum import StrEnum
 from datetime import datetime
 from dataclasses import dataclass, field
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)

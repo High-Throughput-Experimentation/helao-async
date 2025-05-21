@@ -22,7 +22,7 @@ from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 
 global LOGGER
 

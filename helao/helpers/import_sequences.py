@@ -8,7 +8,7 @@ from importlib.machinery import SourceFileLoader
 from helao.helpers.print_message import print_message
 from helao.core.version import get_filehash
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)

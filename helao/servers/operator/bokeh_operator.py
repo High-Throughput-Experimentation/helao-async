@@ -33,7 +33,7 @@ from pydantic import BaseModel
 import numpy as np
 from functools import partial
 
-from helao.helpers import logging
+from helao.helpers import helao_logging as logging
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
