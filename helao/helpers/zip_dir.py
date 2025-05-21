@@ -1,7 +1,13 @@
 from typing import Union
 from pathlib import Path
-import traceback
 import zipfile
+
+from helao.helpers import logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
 
 
 def rm_tree(pth):
@@ -25,7 +31,7 @@ def rm_tree(pth):
     pth.rmdir()
 
 
-def zip_dir(dir: Union[Path, str], filename: Union[Path, str]):
+def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]):
     """
     Compresses the contents of a directory into a zip file.
 
@@ -45,20 +51,20 @@ def zip_dir(dir: Union[Path, str], filename: Union[Path, str]):
     """
 
     # Convert to Path object
-    dir = Path(dir)
+    target_dir = Path(target_dir)
     success = False
 
     try:
         with zipfile.ZipFile(filename, "w", zipfile.ZIP_DEFLATED) as zip_file:
-            for entry in dir.rglob("*"):
+            for entry in target_dir.rglob("*"):
                 if entry.suffix == ".lock":
                     continue
-                zip_file.write(entry, entry.relative_to(dir))
+                if entry.is_file():
+                    zip_file.write(entry, entry.relative_to(target_dir))
         success = True
-    except Exception as e:
-        tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-        print("Error while zipping folder, cannot remove.")
-        print(tb)
+        LOGGER.info(f"Zipped {target_dir} to {filename}")
+    except Exception:
+        LOGGER.error("Error while zipping folder, cannot remove.", exc_info=True)
 
     if success:
-        rm_tree(dir)
+        rm_tree(target_dir)
