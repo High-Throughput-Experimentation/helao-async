@@ -53,7 +53,7 @@ class PostProcess(HloPostProcessor):
                     # rename t (s) to t_s
                     df.rename(columns={"t (s)": "t_s"}, inplace=True)
                     # rename J(A) to J_A
-                    df.rename(columns={"J(A)": "J_A"}, inplace=True)
+                    df.rename(columns={"J (A)": "J_A"}, inplace=True)
                     #reset the index
                     df.reset_index(drop=True, inplace=True)
                     # temporarily extract the t_s, U_V, J_A, cycle and direction columns
