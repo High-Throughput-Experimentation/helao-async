@@ -351,7 +351,7 @@ def return_cycle_for_time(time:float, min_max_dict:dict)->int:
             # it is in the last cycle
         if int(cycle) == max_cycle:
             if time >= min_max[1]:
-                    print(f"Time {time} is greater than the max time of cycle {cycle} which is {min_max[1]} this time was assigned to cycle {cycle} but should be removed in a later function")
+                    # print(f"Time {time} is greater than the max time of cycle {cycle} which is {min_max[1]} this time was assigned to cycle {cycle} but should be removed in a later function")
                     return cycle
             else:
                 raise ValueError(f"Time {time} is outside of all bounds. Cycle was {cycle} and max was {min_max[1]}")
