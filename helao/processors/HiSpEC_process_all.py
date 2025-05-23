@@ -56,22 +56,12 @@ class PostProcess(HloPostProcessor):
                     df.rename(columns={"J (A)": "J_A"}, inplace=True)
                     #reset the index
                     df.reset_index(drop=True, inplace=True)
-                    # temporarily extract the t_s, U_V, J_A, cycle and direction columns
-                    df_non_WL = df[["t_s", "U_V", "J_A", "cycle", "direction"]]
-                    # drop the t_s, U_V, J_A, cycle and direction columns from the original dataframe
-                    df= df.drop(columns=["t_s", "U_V", "J_A", "cycle", "direction"])
-                    
-                    # make a dictionary of the column names with the keys being an iterator of the form WL_i
-                    # and the values being the original column names
-                    
-                    wl_dict = {col: f"WL_{i}" for i, col in enumerate(df.columns)}
 
+                    non_WL_cols = ["t_s", "U_V", "J_A", "cycle", "direction"]
+                    WL_map = {col: f"WL_{i}" for i, col in enumerate([x for x in df.columns if x not in non_WL_cols])}
                     
-                    # rename the columns in the dataframe
-                    df.rename(columns=wl_dict, inplace=True)
-                    df.attrs["wl_dict"] = wl_dict  # Save wl_dict in DataFrame attrs
-                    # add the t_s, U_V, J_A, cycle and direction columns back to the dataframe
-                    df = pd.concat([df_non_WL, df], axis=1)
+                    df.rename(columns=WL_map, inplace=True)
+                    df.attrs["wl_dict"] = {v:k for k,v in WL_map.items()}  # Save inverse wl_dict for easy remapping
                     # write the dataframe to a parquet file
                     df.to_parquet(new_file_path, index=False, partition_cols=["cycle", "direction"])
                     
