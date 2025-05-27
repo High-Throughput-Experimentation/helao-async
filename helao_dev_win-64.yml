@@ -45,16 +45,16 @@ dependencies:
   - psycopg2
   - pyaml
   - pyarrow
-  - pydantic-core=2.16.3
-  - pydantic-settings=2.2.1
-  - pydantic=2.6.3
+  - pydantic-core
+  - pydantic-settings
+  - pydantic
   - pybase64
   - pyfiglet
   - pyftdi
   - pylablib
   - pymodbus
   - pyserial
-  - python=3.11
+  - python
   - python-dotenv
   - python-multipart
   - pyusb
