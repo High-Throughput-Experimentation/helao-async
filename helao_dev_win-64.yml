@@ -29,6 +29,8 @@ dependencies:
   - git
   - httpx
   - ipykernel
+  - ipympl
+  - ipywidgets
   - jupyterlab
   - matplotlib
   - munch
