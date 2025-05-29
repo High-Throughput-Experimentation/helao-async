@@ -3000,9 +3000,13 @@ class Active:
 
                 # call custom hlo post-processor if it exists
                 if self.base.hlo_postprocessor is not None:
-                    updated_file_list = self.base.hlo_postprocessor(
+                    loop = asyncio.get_running_loop()
+                    postprocessor = self.base.hlo_postprocessor(
                         self.action, self.base.helaodirs.save_root
-                    ).process()
+                    )
+                    updated_file_list = await loop.run_in_executor(
+                        None, postprocessor.process
+                    )
                     self.action.files = updated_file_list
 
                 l10 = self.base.actives.pop(self.active_uuid, None)
