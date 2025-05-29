@@ -53,8 +53,9 @@ def HiSpEC_CV(
     SweepMode: str = "log",
     Repeats: int = 10,
     DelayFraction: float = 0.1,
-    Ival__A: float = 0.0015*0.071,
+    Ival__A: float = 0.0015*0.02,
     Tval__s: float = 60,
+    scanrate_voltsec: float = 0.001,  # scan rate in volts/second or amps/second.
 
     
     # toggle2_source: str = "spec_trig",
@@ -64,7 +65,7 @@ def HiSpEC_CV(
     # toggle2_time: float = -1,
     comment: str = "",
     #####
-    measurement_area: float = 0.071,  # 3mm diameter droplet
+    measurement_area: float = 0.02,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     use_z_motor: bool = True,  # @Ben -- I think this should default to True
     cell_engaged_z: float = 3.5, # # units of mm.
@@ -195,6 +196,7 @@ def HiSpEC_CV(
                 # "Vapex1_vsRHE": Vapex1_vsRHE,
                 #"Vapex2_vsRHE": Vapex2_vsRHE,
                 #"Vfinal_vsRHE": Vfinal_vsRHE,
+                "scanrate_voltsec": scanrate_voltsec,
                 "samplerate_sec": samplerate_sec,
                 "cycles": cycles,
                 "gamrychannelwait": gamrychannelwait,

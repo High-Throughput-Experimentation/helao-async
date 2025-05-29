@@ -487,7 +487,7 @@ def HISPEC_sub_SpEC(
     Vapex1_vsRHE: float = 1.2,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
     # Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
-    scanrate_voltsec: float = 0.01,  # scan rate in volts/second or amps/second.
+    scanrate_voltsec: float = 0.002,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
     cycles: int = 1,
     # gamry_i_range: str = "auto",
