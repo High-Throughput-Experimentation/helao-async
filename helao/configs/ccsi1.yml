@@ -128,6 +128,17 @@ servers:
         one:
           address: 1
           diameter: 26.7
+  SYRINGE2:
+    host: hte-ccsi-01.htejcap.caltech.edu
+    port: 8015
+    group: action
+    fast: syringe_server
+    params:
+      port: COM4
+      pumps:
+        one:
+          address: 4
+          diameter: 26.7
   MFC:
     host: hte-ccsi-01.htejcap.caltech.edu
     port: 8009
