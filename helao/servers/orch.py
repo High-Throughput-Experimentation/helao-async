@@ -223,6 +223,7 @@ class Orch(Base):
         self.orch_op = None
         self.op_enabled = self.server_params.get("enable_op", False)
         self.heartbeat_interval = self.server_params.get("heartbeat_interval", 10)
+        self.ignore_heartbeats = self.server_params.get("ignore_heartbeats", [])
         # basemodel which holds all information for orch
         self.globalstatusmodel = GlobalStatusModel(orchestrator=self.server)
         self.globalstatusmodel._sort_status()
@@ -2474,20 +2475,22 @@ class Orch(Base):
         """
         while True:
             if self.globalstatusmodel.loop_state == LoopStatus.started:
-                still_alive = True
                 active_endpoints = [
                     actmod.url for actmod in self.globalstatusmodel.active_dict.values()
                 ]
                 if active_endpoints:
                     unique_endpoints = list(set(active_endpoints))
-                    still_alive, unavail = await endpoints_available(unique_endpoints)
-                    if not still_alive:
-                        bad_serves = [x.strip("/".split("/")[-2]) for x, _ in unavail]
+                    _, unavail = await endpoints_available(unique_endpoints)
+                    bad_ends = [
+                        "/".join(x.strip("/").split("/")[-2:]) for x, _ in unavail
+                    ]
+                    bad_ends = [x for x in bad_ends if x not in self.ignore_heartbeats]
+                    if bad_ends:
                         self.current_stop_message = (
-                            f"{', '.join(bad_serves)} servers are unavailable"
+                            f"{', '.join(bad_ends)} endpoints are unavailable"
                         )
                         LOGGER.warning(
-                            (f"{', '.join(bad_serves)} servers are unavailable")
+                            (f"{', '.join(bad_ends)} endpoints are unavailable")
                         )
                         await self.stop()
                         LOGGER.alert(f"ORCH STOPPED ~ {self.current_stop_message}")
