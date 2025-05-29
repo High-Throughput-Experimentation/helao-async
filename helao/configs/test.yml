@@ -24,6 +24,7 @@ servers:
     group: action
     fast: ws_simulator
     params: {}
+    hlo_postprocess_script: hlo_to_csv
   LIVE:
     host: 127.0.0.1
     port: 5002
