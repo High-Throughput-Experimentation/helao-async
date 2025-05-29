@@ -53,7 +53,7 @@ dependencies:
   - pylablib
   - pymodbus
   - pyserial
-  - python=3.11
+  - python
   - python-dotenv
   - python-multipart
   - pyusb
