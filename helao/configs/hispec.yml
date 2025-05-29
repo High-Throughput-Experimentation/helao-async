@@ -44,6 +44,8 @@ servers:
       bokeh_port: 5002
       # seqspec_parser_path: helao\specifications\last3months.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
+      ignore_heartbeats:
+        - ANDOR/acquire
     verbose: true
   MOTOR:
     host: hte-eche-11.htejcap.caltech.edu
