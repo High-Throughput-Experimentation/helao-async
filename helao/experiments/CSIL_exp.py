@@ -749,11 +749,11 @@ def CCSI_sub_cellfill(
     Solution_volume_ul: float = 500,
     Clean_reservoir_sample_no: int = 1,
     Clean_volume_ul: float = 2500,
-    Water_injection: bool = False,
-    Water_injection_before_IL: bool = False,
-    Water_injection_reservoir_sample_no: int = 99,
-    Water_injection_volume_ul: float = 50,
-    Water_injection_syringe_rate_ulsec: float = 10,
+    secondliquid_injection: bool = False,
+    secondliquid_injection_before_IL: bool = False,
+    secondliquid_injection_reservoir_sample_no: int = 99,
+    secondliquid_injection_volume_ul: float = 50,
+    secondliquid_injection_syringe_rate_ulsec: float = 10,
     Syringe_rate_ulsec: float = 300,
     SyringePushWait_s: float = 6,
     LiquidFillWait_s: float = 15,
@@ -777,8 +777,8 @@ def CCSI_sub_cellfill(
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
     else:
 #add for possible water injection before IL
-        if Water_injection_before_IL:
-            if Water_injection:
+        if secondliquid_injection_before_IL:
+            if secondliquid_injection:
 
                 apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 1})
                 apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 1}, asc.no_wait)
@@ -787,8 +787,8 @@ def CCSI_sub_cellfill(
                 apm.add_action_list(
                     CCSI_sub_load_liquid(
                         experiment=experiment,
-                        reservoir_liquid_sample_no=Water_injection_reservoir_sample_no,
-                        volume_ul_cell_liquid=Water_injection_volume_ul,
+                        reservoir_liquid_sample_no=secondliquid_injection_reservoir_sample_no,
+                        volume_ul_cell_liquid=secondliquid_injection_volume_ul,
                         water_True_False=True,
                         combine_True_False=True,
                     )
@@ -808,8 +808,8 @@ def CCSI_sub_cellfill(
                     WATERPUMP_server,
                     "infuse",
                     {
-                        "rate_uL_sec": Water_injection_syringe_rate_ulsec,
-                        "volume_uL": Water_injection_volume_ul,
+                        "rate_uL_sec": secondliquid_injection_syringe_rate_ulsec,
+                        "volume_uL": secondliquid_injection_volume_ul,
                     },
                     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
                     technique_name="syringe_inject",
@@ -959,8 +959,8 @@ def CCSI_sub_cellfill(
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
     else:
     #water injection before acetonitrile addition
-        if Water_injection:
-            if Water_injection_before_IL:
+        if secondliquid_injection:
+            if secondliquid_injection_before_IL:
                 apm.add(ORCH_server, "wait", {"waittime": 0.25})
             else:
 
@@ -971,8 +971,8 @@ def CCSI_sub_cellfill(
                 apm.add_action_list(
                     CCSI_sub_load_liquid(
                         experiment=experiment,
-                        reservoir_liquid_sample_no=Water_injection_reservoir_sample_no,
-                        volume_ul_cell_liquid=Water_injection_volume_ul,
+                        reservoir_liquid_sample_no=secondliquid_injection_reservoir_sample_no,
+                        volume_ul_cell_liquid=secondliquid_injection_volume_ul,
                         water_True_False=True,
                         combine_True_False=True,
                     )
@@ -992,8 +992,8 @@ def CCSI_sub_cellfill(
                     WATERPUMP_server,
                     "infuse",
                     {
-                        "rate_uL_sec": Water_injection_syringe_rate_ulsec,
-                        "volume_uL": Water_injection_volume_ul,
+                        "rate_uL_sec": secondliquid_injection_syringe_rate_ulsec,
+                        "volume_uL": secondliquid_injection_volume_ul,
                     },
                     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
                     technique_name="syringe_inject",
