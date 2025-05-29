@@ -896,6 +896,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
 #                   17 repeat cleans/rinses/flushes
 #                   18 water injection options
 #                   19 co2 measurement duration now list for flexibility
+#                   20 renaming water addition to secondliquid // adding secondliquid prerinse
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [0,0,0],
@@ -904,12 +905,12 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     total_sample_volume_ul: List[float] = [5000,5000,5000],
     total_cell_volume_ul: float = 12500,
 
-    Water_injection: bool = False,
-    Water_injection_before_IL: bool = False,
-    Water_injection_reservoir_sample_no: int = 2,
-    Water_injection_syringe_rate_ulsec: float = 10,
-    Water_injection_volume_ul: List[float] = [50,50,50],
-    Water_injection_FillWait: float = 30,
+    secondliquid_injection: bool = False,
+    secondliquid_injection_before_IL: bool = False,
+    secondliquid_injection_reservoir_sample_no: int = 468,
+    secondliquid_injection_syringe_rate_ulsec: float = 10,
+    secondliquid_injection_volume_ul: List[float] = [50,50,50],
+    secondliquid_injection_FillWait: float = 30,
 
     Clean_reservoir_sample_no: int = 1,
     Clean_syringe_rate_ulsec: float = 300,
@@ -949,7 +950,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     LiquidClean_rinse_agitation_duration: float = 60,
     LiquidClean_rinse_agitation_rate: int = 15000,
     rinsePurge_duration: float = 300,
-
+    secondary_prerinse_cycles: int = 0,
 
     rinse_recirc: bool = True,
     rinsePurge_recirc_duration: float = 150,
@@ -1006,16 +1007,16 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "Solution_volume_ul": solnvolume,
             "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
             "Clean_volume_ul": cleanvolume,
-            "Water_injection": Water_injection,
-            "Water_injection_before_IL": Water_injection_before_IL,
-            "Water_injection_reservoir_sample_no": Water_injection_reservoir_sample_no,
-            "Water_injection_volume_ul": Water_injection_volume_ul[i],
-            "Water_injection_syringe_rate_ulsec": Water_injection_syringe_rate_ulsec,
+            "secondliquid_injection": secondliquid_injection,
+            "secondliquid_injection_before_IL": secondliquid_injection_before_IL,
+            "secondliquid_injection_reservoir_sample_no": secondliquid_injection_reservoir_sample_no,
+            "secondliquid_injection_volume_ul": secondliquid_injection_volume_ul[i],
+            "secondliquid_injection_syringe_rate_ulsec": secondliquid_injection_syringe_rate_ulsec,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "SyringePushWait_s": SyringePushWait_s,
             "LiquidFillWait_s": LiquidFillWait_s,
             "CleanFillWait_s": Clean_FillWait_s,
-            "WaterFillWait":Water_injection_FillWait,
+            "WaterFillWait":secondliquid_injection_FillWait,
             "n2_push": n2_push,
             "co2_fill_after_n2push": n2_push, 
             "co2_filltime_s":co2_filltime_s,
@@ -1079,9 +1080,11 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
 
         epm.add_experiment("CCSI_sub_n2rinse", {
             "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
+            "secondliquid_sample_no": secondliquid_injection_reservoir_sample_no,
             "Clean_volume_ul": drainclean_volume_ul,
             "Syringe_rate_ulsec":Clean_syringe_rate_ulsec,
             "rinse_cycles": LiquidClean_full_rinses,
+            "secondary_prerinse_cycles": secondary_prerinse_cycles,
             "rinse_agitation": LiquidClean_rinse_agitation,
             "rinse_agitation_wait": LiquidClean_rinse_agitation_wait,
             "rinse_agitation_duration": LiquidClean_rinse_agitation_duration,
