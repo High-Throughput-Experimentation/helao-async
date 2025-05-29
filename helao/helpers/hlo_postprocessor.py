@@ -11,9 +11,11 @@ class HloPostProcessor(ABC):
         self.action = action
         self.output_dir = os.path.join(save_root, action.action_output_dir)
         exp_dir = os.path.dirname(self.output_dir)
-        self.exp_yml_path = glob(os.path.join(exp_dir, "*.yml"))[0]
+        exp_yml_paths = glob(os.path.join(exp_dir, "*.yml"))
+        self.exp_yml_path = exp_yml_paths[0] if exp_yml_paths else None
         seq_dir = os.path.dirname(exp_dir)
-        self.seq_yml_path = glob(os.path.join(seq_dir, "*.yml"))[0]
+        seq_yml_paths = glob(os.path.join(seq_dir, "*.yml"))
+        self.seq_yml_path = seq_yml_paths[0] if seq_yml_paths else None
         self.files = action.files
     
     @abstractmethod
