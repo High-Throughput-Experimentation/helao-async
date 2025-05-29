@@ -148,7 +148,7 @@ def makeApp(confPrefix, server_key, helao_root):
                 min_offset_ocv = 3
                 LOGGER.warning("min_offset_ocv not found in global params, setting to 3")
             if  "HiSpEC_OCV" in glob_exp_params:
-                new_ocv = glob_exp_params["HiSpEC_OCV"]
+                new_ocv = glob_exp_params["HiSpEC_OCV"]- offset_value
             else:
                 new_ocv = 3
                 LOGGER.warning("HiSpEC_OCV not found in global params! Run OCV first")
