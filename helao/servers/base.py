@@ -2856,34 +2856,16 @@ class Active:
         Raises:
             Exception: If any error occurs during the finishing process.
         """
-        try:
+        if finish_uuid_list is None:
+            finish_uuid_list = [action.action_uuid for action in self.action_list]
 
-            # default behaviour
-            # finishes all
-            # and returns the last action (the one in self.action)
-            if finish_uuid_list is None:
-                finish_uuid_list = [action.action_uuid for action in self.action_list]
+        for action in self.action_list:
+            if action.action_uuid not in finish_uuid_list:
+                continue
+            if HloStatus.finished in action.action_status:
+                continue
 
-            # # get the actions of active which should be finished
-            # # and are not finished yet (no HloStatus.finished status)
-            # finish_action_list = []
-            # for finish_uuid in finish_uuid_list:
-            #     # await asyncio.sleep(0.1)
-            #     for action in self.action_list:
-            #         if (
-            #             action.action_uuid == finish_uuid
-            #             and HloStatus.finished not in action.action_status
-            #         ):
-            #             finish_action_list.append(action)
-
-            # # now finish all the actions in the list
-            # for finish_action in finish_action_list:
-            for action in self.action_list:
-                if action.action_uuid not in finish_uuid_list:
-                    continue
-                if HloStatus.finished in action.action_status:
-                    continue
-
+            try:
                 # set status to finish
                 # (replace active with finish)
                 self.base.replace_status(
@@ -2928,28 +2910,34 @@ class Active:
                     )
                     if error_code == ErrorCodes.none:
                         LOGGER.info("Successfully updated globalexp params.")
+            except Exception:
+                LOGGER.error(
+                    f"Failed to update globalexp params for action {action.action_uuid}",
+                    exc_info=True,
+                )
 
-            # check if all actions are fininshed
-            # if yes close dataLOGGER etc
-            all_finished = True
-            for action in self.action_list:
-                if HloStatus.finished not in action.action_status:
-                    # at least one is not finished
-                    all_finished = False
-                    break
+        # check if all actions are fininshed
+        # if yes close dataLOGGER etc
+        all_finished = True
+        for action in self.action_list:
+            if HloStatus.finished not in action.action_status:
+                # at least one is not finished
+                all_finished = False
+                break
 
-            if all_finished:
-                LOGGER.info("finish active: sending finish data_stream_status package")
-                retry_counter = 0
-                while (
-                    not all(
-                        [
-                            action.data_stream_status != HloStatus.active
-                            for action in self.action_list
-                        ]
-                    )
-                    and retry_counter < 5
-                ):
+        if all_finished:
+            LOGGER.info("finish active: sending finish data_stream_status package")
+            retry_counter = 0
+            while (
+                not all(
+                    [
+                        action.data_stream_status != HloStatus.active
+                        for action in self.action_list
+                    ]
+                )
+                and retry_counter < 5
+            ):
+                try:
                     await self.enqueue_data(
                         datamodel=DataModel(
                             data={}, errors=[], status=HloStatus.finished
@@ -2959,15 +2947,21 @@ class Active:
                         f"Waiting for data_stream finished package: {[action.data_stream_status for action in self.action_list]}"
                     )
                     await asyncio.sleep(0.1)
-                    retry_counter += 1
+                except Exception:
+                    LOGGER.error(
+                        "Failed to enqueue finished data stream package",
+                        exc_info=True,
+                    )
+                retry_counter += 1
 
-                LOGGER.info("checking if all queued data has written.")
-                write_retries = 5
-                write_iter = 0
-                while (
-                    self.num_data_queued > self.num_data_written
-                    and write_iter < write_retries
-                ):
+            LOGGER.info("checking if all queued data has written.")
+            write_retries = 5
+            write_iter = 0
+            while (
+                self.num_data_queued > self.num_data_written
+                and write_iter < write_retries
+            ):
+                try:
                     LOGGER.info(
                         f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 0.1 second."
                     )
@@ -2981,9 +2975,15 @@ class Active:
                             LOGGER.info(
                                 f"Setting datastream to finished: {action.data_stream_status}"
                             )
-                    write_iter += 1
-                    await asyncio.sleep(0.1)
+                except Exception:
+                    LOGGER.error(
+                        "Failed to requeue finished data stream package",
+                        exc_info=True,
+                    )
+                write_iter += 1
+                await asyncio.sleep(0.1)
 
+            try:
                 # self.action_list[-1] is the very first action
                 if self.action_list[-1].manual_action:
                     await self.finish_manual_action()
@@ -2997,7 +2997,10 @@ class Active:
 
                 # finish the data writer
                 self.data_logger.cancel()
+            except Exception:
+                LOGGER.error("Failed to finish data logging", exc_info=True)
 
+            try:
                 # call custom hlo post-processor if it exists
                 if self.base.hlo_postprocessor is not None:
                     loop = asyncio.get_running_loop()
@@ -3008,7 +3011,9 @@ class Active:
                         None, postprocessor.process
                     )
                     self.action.files = updated_file_list
-
+            except Exception:
+                LOGGER.error("Failed to run custom HLO post-processor", exc_info=True)
+            try:
                 l10 = self.base.actives.pop(self.active_uuid, None)
                 if l10 is not None:
                     i10 = [
@@ -3021,20 +3026,44 @@ class Active:
                     if len(self.base.last_10_active) > 10:
                         self.base.last_10_active.pop(0)
                     self.base.last_10_active.append((l10.action.action_uuid, l10))
+            except Exception:
+                LOGGER.error(
+                    "Failed to remove active from base.actives or last_10_active",
+                    exc_info=True,
+                )
 
-                LOGGER.info("all active action are done, closing active")
+            LOGGER.info("all active action are done, closing active")
 
-                # DB server call to finish_yml if DB exists
-                for action in self.action_list:
+            # DB server call to finish_yml if DB exists
+            for action in self.action_list:
+                try:
                     # write final act meta file (overwrite existing one)
                     await self.base.write_act(action=action)
+                except Exception:
+                    LOGGER.error(
+                        f"Failed to write act meta file for action {action.action_uuid}",
+                        exc_info=True,
+                    )
+                try:
                     # send the last status
                     await self.add_status(action=action)
+                except Exception:
+                    LOGGER.error(
+                        f"Failed to send last status for action {action.action_uuid}",
+                        exc_info=True,
+                    )
+                try:
                     self.base.aloop.create_task(move_dir(action, base=self.base))
                     # pop from local action task queue
                     if action.action_uuid in self.base.local_action_task_queue:
                         self.base.local_action_task_queue.remove(action.action_uuid)
+                except Exception:
+                    LOGGER.error(
+                        f"Failed to move directory for action {action.action_uuid}",
+                        exc_info=True,
+                    )
 
+            try:
                 # since all sub-actions of active are finished process endpoint queue
                 if not self.base.server_params.get("allow_concurrent_actions", True):
                     if self.base.local_action_queue.qsize() > 0:
@@ -3049,11 +3078,11 @@ class Active:
                     LOGGER.info(f"running queued {action.action_name}")
                     qact.start_condition = ASC.no_wait
                     await async_action_dispatcher(self.base.world_cfg, qact, qpars)
-
-            # always returns the most recent action of active
-        except Exception as e:
-            LOGGER.error("Active.finish() failed", exc_info=True)
-            raise e
+            except Exception:
+                LOGGER.error(
+                    "Failed to process local action queue",
+                    exc_info=True,
+                )
 
         return self.action
 
