@@ -27,8 +27,6 @@ __all__ = [
     "HiSpEC_sub_unloadall_customs",
     "HiSpEC_sub_disengage",
     "HiSpEC_sub_OCV",
-    
-
 ]
 
 from helao.helpers import helao_logging as logging
@@ -77,14 +75,16 @@ CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict
 
 toggle_triggertype = TriggerType.risingedge
 
+
 def HiSpEC_sub_cooldown(experiment: Experiment):
-    """ Cool the detector"""
+    """Cool the detector"""
     apm = ActionPlanMaker()
     apm.add(ANDOR_server, "cooling", {})
     return apm.action_list
 
+
 def HiSPEC_sub_stop_flow(experiment: Experiment):
-    """ Stop the flow"""
+    """Stop the flow"""
     apm = ActionPlanMaker()
     for item, flow_flag in (
         ("we_flow", False),
@@ -179,7 +179,6 @@ def HiSpEC_sub_load_solid(
     return apm.action_list  # returns complete action list to orch
 
 
-
 def HiSpEC_sub_engage(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -237,7 +236,6 @@ def HiSpEC_sub_engage(
     return apm.action_list  # returns complete action list to orch
 
 
-
 def HiSpEC_sub_interrupt(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -246,6 +244,7 @@ def HiSpEC_sub_interrupt(
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "interrupt", {"reason": reason})
     return apm.action_list
+
 
 def HiSpEC_sub_disengage(
     experiment: Experiment,
@@ -282,7 +281,6 @@ def HiSpEC_sub_disengage(
             ),
         )
     return apm.action_list  # returns complete action list to orch
-
 
 
 def HiSpEC_sub_startup(
@@ -354,28 +352,36 @@ def HiSpEC_sub_startup(
 
     return apm.action_list  # returns complete action list to orch
 
+
 def HISPEC_sub_shutdown(experiment: Experiment):
     """Unload custom position and disable IR emitter."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
     return apm.action_list  # returns complete action list to orch
 
+
 def HiSpEC_calculate_lower_vertex_potential(
     experiment: Experiment,
     experiment_version: int = 1,
-    min_offset_ocv: float = 0,
-    new_ocv: float = 0,
-    offset_value: float = -0.2):
+    min_offset_ocv: float = 3,
+    new_ocv: float = 3,
+    offset_value: float = -0.2,
+):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(CALC_server,
-             "keep_min_ocv",
-             {'min_offset_ocv':min_offset_ocv,
-              "new_ocv":new_ocv,
-              "offset_value":offset_value},
-              to_global_params={"result": "new_min_OCV"})
-    
+    apm.add(
+        CALC_server,
+        "keep_min_ocv",
+        {
+            "min_offset_ocv": min_offset_ocv,
+            "new_ocv": new_ocv,
+            "offset_value": offset_value,
+        },
+        to_global_params={"result": "new_min_OCV"},
+    )
+
     return apm.action_list  # returns complete action list to orch
+
 
 # implement Biologic trigger actions
 #  use easy_biologic's BiologicDevice.load_techniques() method
@@ -385,6 +391,7 @@ def HiSpEC_calculate_lower_vertex_potential(
 
 # HISPEC_sub_LoSpEC -- CA to SpEC, conditional SpEC
 # HISPEC_sub_PD_LoSpEC
+
 
 def HiSpEC_sub_CA(
     experiment: Experiment,
@@ -453,7 +460,7 @@ def HiSpEC_sub_OCV(
             "SampleRate": SampleRate,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
-            #"IErange": "auto",
+            # "IErange": "auto",
         },
         from_global_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -470,12 +477,11 @@ def HiSpEC_sub_OCV(
     apm.add(
         CALC_server,
         "keep_min_ocv",
-        {
-            "min_offset_ocv": 0,
-            "new_ocv": 0,
-            "offset_value": -0.2,
+        {},
+        from_global_params={
+            "HiSpEC_OCV": "new_ocv",
+            "min_offset_ocv": "min_offset_ocv",
         },
-        from_global_params={"HiSpEC_OCV": "new_ocv"},
         to_global_params={"min_offset_ocv": "min_offset_ocv"},
     )
     return apm.action_list  # returns complete action list to orch
@@ -516,7 +522,6 @@ def HISPEC_sub_SpEC(
     """last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
 
     apm.add(
         PAL_server,
@@ -576,7 +581,7 @@ def HISPEC_sub_SpEC(
             ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
-        ]
+        ],
     )
 
     apm.add(
@@ -640,25 +645,25 @@ def HISPEC_sub_SpEC(
 
 
 def HiSpEC_sub_CP(
-        experiment: Experiment,
-        experiment_version: int = 1,
-        Ival__A: float = 0.0,
-        Tval__s: float = 10.0,
-        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        IRange: str = "AUTO",
-        ERange: str = "AUTO",
-        Bandwidth: str = "BW4",
-        channel: int = 0,
-        TTLwait: int = -1,
-        TTLsend: int = -1,
-        TTLduration: float = 1.0,
-        # alert_duration__s: float = -1,
-        # alert_above: bool = True,
-        # alert_sleep__s: float = -1,
-        # alertThreshEwe_V: float = 0,
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Ival__A: float = 0.0,
+    Tval__s: float = 10.0,
+    AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+    IRange: str = "AUTO",
+    ERange: str = "AUTO",
+    Bandwidth: str = "BW4",
+    channel: int = 0,
+    TTLwait: int = -1,
+    TTLsend: int = -1,
+    TTLduration: float = 1.0,
+    # alert_duration__s: float = -1,
+    # alert_above: bool = True,
+    # alert_sleep__s: float = -1,
+    # alertThreshEwe_V: float = 0,
 ):
-    
-    apm= ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
         action_server=PSTAT_server,
         action_name="run_CP",
@@ -684,12 +689,8 @@ def HiSpEC_sub_CP(
             ProcessContrib.samples_out,
         ],
         to_global_params={"Ewe_V__mean_final": "CP_Ewe_V__mean_final"},
-
     )
-    return apm.action_list  
-    
-
-    
+    return apm.action_list
 
 
 def HiSPEC_sub_PEIS(
