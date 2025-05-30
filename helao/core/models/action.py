@@ -9,7 +9,13 @@ from pydantic import BaseModel, Field
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.run_use import RunUse
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
 from helao.core.models.file import FileInfo
 from helao.core.models.machine import MachineModel
 from helao.core.version import get_hlo_version
@@ -48,14 +54,16 @@ class ActionModel(ShortActionModel):
     action_abbr: Optional[str] = None
     action_params: dict = Field(default={})
     action_output: dict = Field(default={})
-    action_etc: Optional[float] = None # expected time to completion
+    action_etc: Optional[float] = None  # expected time to completion
     action_codehash: Optional[str] = None
     parent_action_uuid: Optional[UUID] = None
     child_action_uuid: Optional[UUID] = None
-    samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
-    samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
+    samples_in: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
+    samples_out: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     manual_action: bool = False
     nonblocking: bool = False

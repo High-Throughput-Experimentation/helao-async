@@ -1293,8 +1293,12 @@ class Base:
         """
         if action.save_act:
             act_dict = action.get_actmodel().clean_dict()
+            if action.manual_action:
+                save_root = str(self.helaodirs.save_root).replace("ACTIVE", "DIAG")
+            else:
+                save_root = self.helaodirs.save_root
             output_path = os.path.join(
-                self.helaodirs.save_root, action.action_output_dir
+                save_root, action.action_output_dir
             )
             output_file = os.path.join(
                 output_path,
@@ -1303,8 +1307,7 @@ class Base:
 
             LOGGER.info(f"writing to act meta file: {output_path}")
 
-            if not os.path.exists(output_path):
-                os.makedirs(output_path, exist_ok=True)
+            os.makedirs(output_path, exist_ok=True)
 
             output_dict = {"file_type": "action"}
             output_dict.update(act_dict)
