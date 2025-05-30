@@ -67,7 +67,6 @@ from helao.core.models.sample import (
 from helao.core.models.data import DataModel, DataPackageModel
 from helao.core.models.machine import MachineModel
 from helao.core.models.server import ActionServerModel, EndpointModel
-from helao.helpers.premodels import Action
 from helao.core.version import get_filehash
 from helao.helpers.active_params import ActiveParams
 from helao.core.models.file import (
@@ -1869,11 +1868,24 @@ class Active:
             )
             await self.update_act_file()
 
-            # if self.action.manual_action:
-            #     # create and write seq file for manual action
-            #     await self.base.write_seq(self.action)
-            #     # create and write exp file for manual action
-            #     await self.base.write_exp(self.action)
+            if self.action.manual_action:
+                exp = deepcopy(self.action_list[-1])
+                exp.experiment_status = [HloStatus.active]
+                exp.sequence_status = [HloStatus.active]
+                exp.samples_in = []
+                exp.samples_out = []
+                exp.files = []
+
+                # add actions to experiment
+                for action in self.action_list:
+                    exp.actionmodel_list.append(self.action.get_actmodel())
+
+                # add experiment to sequence
+                exp.experimentmodel_list.append(self.action.get_exp())
+                # create and write seq file for manual action
+                await self.base.write_seq(self.action, manual=True)
+                # create and write exp file for manual action
+                await self.base.write_exp(self.action, manual=True)
 
         LOGGER.info("init active: sending active data_stream_status package")
 
