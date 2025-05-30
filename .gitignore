@@ -16,3 +16,4 @@ helao/config/.ipynb_checkpoints/simulate-checkpoint.ipynb
 .env
 .qodo
 *.parquet
+pyrightconfig.json
