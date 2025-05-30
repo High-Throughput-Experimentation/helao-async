@@ -9,6 +9,8 @@ class HloPostProcessor(ABC):
     
     def __init__(self, action: Action, save_root: str):
         self.action = action
+        if action.manual_action:
+            save_root = str(save_root).replace("RUNS_ACTIVE", "RUNS_DIAG")
         self.output_dir = os.path.join(save_root, action.action_output_dir)
         exp_dir = os.path.dirname(self.output_dir)
         exp_yml_paths = glob(os.path.join(exp_dir, "*.yml"))

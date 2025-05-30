@@ -108,6 +108,8 @@ class BaseAPI(HelaoFastAPI):
             Endpoint to handle emergency stop (estop) actions.
     """
     base: Base
+    root_dir: str
+    fault_dir: str
 
     def __init__(
         self,
