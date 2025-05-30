@@ -1344,8 +1344,7 @@ class Base:
         if not output_str.endswith("\n"):
             output_str += "\n"
 
-        if not os.path.exists(output_path):
-            os.makedirs(output_path, exist_ok=True)
+        os.makedirs(output_path, exist_ok=True)
 
         async with aiofiles.open(output_file, mode="w+") as f:
             await f.write(output_str)
@@ -1382,8 +1381,7 @@ class Base:
         if not output_str.endswith("\n"):
             output_str += "\n"
 
-        if not os.path.exists(output_path):
-            os.makedirs(output_path, exist_ok=True)
+        os.makedirs(output_path, exist_ok=True)
 
         async with aiofiles.open(output_file, mode="w+") as f:
             await f.write(output_str)
@@ -1860,12 +1858,14 @@ class Active:
         """
         self.data_logger = self.base.aloop.create_task(self.log_data_task())
         if self.action.save_act:
-            os.makedirs(
-                os.path.join(
-                    self.base.helaodirs.save_root, self.action.action_output_dir
-                ),
-                exist_ok=True,
-            )
+            full_action_output_path = os.path.join(
+                    self.base.helaodirs.save_root, self.action.action_output_dir,
+                )
+            if self.action.manual_action:
+                full_action_output_path = str(full_action_output_path).replace(
+                    "ACTIVE", "DIAG",
+                )
+            os.makedirs(full_action_output_path, exist_ok=True)
             await self.update_act_file()
 
             if self.action.manual_action:

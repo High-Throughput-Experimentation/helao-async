@@ -4,7 +4,7 @@
   "executionEnvironments": [
     {
       "python": "/home/dan/miniforge3/envs/helao/bin/python",
-      "extraPaths": ["../helao-core", "../helao-async"]
+      "extraPaths": ["../helao-async"]
     }
   ]
 }
