@@ -1293,13 +1293,10 @@ class Base:
         """
         if action.save_act:
             act_dict = action.get_actmodel().clean_dict()
+            save_root = str(self.helaodirs.save_root)
             if action.manual_action:
-                save_root = str(self.helaodirs.save_root).replace("ACTIVE", "DIAG")
-            else:
-                save_root = self.helaodirs.save_root
-            output_path = os.path.join(
-                save_root, action.action_output_dir
-            )
+                save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+            output_path = os.path.join(save_root, action.action_output_dir)
             output_file = os.path.join(
                 output_path,
                 f"{action.action_timestamp.strftime('%Y%m%d.%H%M%S%f')}-act.yml",
@@ -1330,10 +1327,9 @@ class Base:
             A YAML file containing the experiment data to the specified directory.
         """
         exp_dict = experiment.get_exp().clean_dict()
+        save_root = str(self.helaodirs.save_root)
         if manual:
-            save_root = str(self.helaodirs.save_root).replace("ACTIVE", "DIAG")
-        else:
-            save_root = self.helaodirs.save_root
+            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
         output_path = os.path.join(save_root, experiment.get_experiment_dir())
         output_file = os.path.join(
             output_path,
@@ -1367,10 +1363,9 @@ class Base:
         """
         seq_dict = sequence.get_seq().clean_dict()
         sequence_dir = sequence.get_sequence_dir()
+        save_root = str(self.helaodirs.save_root)
         if manual:
-            save_root = str(self.helaodirs.save_root).replace("ACTIVE", "DIAG")
-        else:
-            save_root = self.helaodirs.save_root
+            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
         output_path = os.path.join(save_root, sequence_dir)
         output_file = os.path.join(
             output_path,
@@ -1862,11 +1857,13 @@ class Active:
         self.data_logger = self.base.aloop.create_task(self.log_data_task())
         if self.action.save_act:
             full_action_output_path = os.path.join(
-                    self.base.helaodirs.save_root, self.action.action_output_dir,
-                )
+                str(self.base.helaodirs.save_root),
+                self.action.action_output_dir,
+            )
             if self.action.manual_action:
-                full_action_output_path = str(full_action_output_path).replace(
-                    "ACTIVE", "DIAG",
+                full_action_output_path = full_action_output_path.replace(
+                    "ACTIVE",
+                    "DIAG",
                 )
             os.makedirs(full_action_output_path, exist_ok=True)
             await self.update_act_file()
@@ -2309,14 +2306,13 @@ class Active:
         )
         output_action.files.append(file_info)
         filename = file_info.file_name
-
-        output_path = os.path.join(
-            self.base.helaodirs.save_root, output_action.action_output_dir
-        )
+        save_root = str(self.base.helaodirs.save_root)
+        if self.action.manual_action:
+            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+        output_path = os.path.join(save_root, output_action.action_output_dir)
         output_file = os.path.join(output_path, filename)
 
-        if not os.path.exists(output_path):
-            os.makedirs(output_path, exist_ok=True)
+        os.makedirs(output_path, exist_ok=True)
 
         LOGGER.info(f"writing data to: {output_file}")
         # create output file and set connection
@@ -2524,10 +2520,10 @@ class Active:
                 file_group=file_group,
             )
             action.files.append(file_info)
-            output_path = os.path.join(
-                self.base.helaodirs.save_root,
-                action.action_output_dir,
-            )
+            save_root = str(self.base.helaodirs.save_root)
+            if action.manual_action:
+                save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+            output_path = os.path.join(save_root, action.action_output_dir)
             output_file = os.path.join(output_path, file_info.file_name)
             if os.name == "nt":
                 output_file = str(pathlib.PureWindowsPath(output_file))
@@ -2538,8 +2534,7 @@ class Active:
             else:
                 LOGGER.info("could not detect OS, path seps may be mixed")
 
-            if not os.path.exists(output_path):
-                os.makedirs(output_path, exist_ok=True)
+            os.makedirs(output_path, exist_ok=True)
 
             LOGGER.info(f"writing non stream data to: {output_file}")
 
@@ -2593,11 +2588,10 @@ class Active:
                 filename=filename,
                 file_group=file_group,
             )
-
-            output_path = os.path.join(
-                self.base.helaodirs.save_root,
-                action.action_output_dir,
-            )
+            save_root = str(self.base.helaodirs.save_root)
+            if action.manual_action:
+                save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+            output_path = os.path.join(save_root, action.action_output_dir)
             output_file = os.path.join(output_path, file_info.file_name)
             if os.name == "nt":
                 output_file = str(pathlib.PureWindowsPath(output_file))
@@ -2608,8 +2602,7 @@ class Active:
             else:
                 LOGGER.info("could not detect OS, path seps may be mixed")
 
-            if not os.path.exists(output_path):
-                os.makedirs(output_path, exist_ok=True)
+            os.makedirs(output_path, exist_ok=True)
             LOGGER.info(f"writing non stream data to: {output_file}")
             with open(output_file, mode="a+") as f:
                 if header:
