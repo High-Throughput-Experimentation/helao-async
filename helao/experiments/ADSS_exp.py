@@ -126,13 +126,13 @@ def ADSS_sub_unload_liquid(
             "custom": "cell1_we",
         },
         start_condition=ActionStartCondition.wait_for_orch,
-        # to_globalexp_params=["_unloaded_solid"],
+        # to_global_params=["_unloaded_solid"],
     )
     # apm.add(
     #     PAL_server,
     #     "archive_custom_load",
     #     {"custom": "cell1_we"},
-    #     from_globalexp_params={"_unloaded_solid": "load_sample_in"},
+    #     from_global_params={"_unloaded_solid": "load_sample_in"},
     # )
     return apm.action_list
 
@@ -148,7 +148,7 @@ def ADSS_sub_unload_solid(
     #     PAL_server,
     #     "archive_custom_unloadall",
     #     {},
-    #     to_globalexp_params=["_unloaded_liquid"],
+    #     to_global_params=["_unloaded_liquid"],
     # )
     apm.add(
         PAL_server,
@@ -158,7 +158,7 @@ def ADSS_sub_unload_solid(
             "keep_liquid": True,
         },
         start_condition=ActionStartCondition.wait_for_orch,
-        # from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
+        # from_global_params={"_unloaded_liquid": "load_sample_in"},
     )
     return apm.action_list
 
@@ -177,7 +177,7 @@ def ADSS_sub_load_solid(
         PAL_server,
         "archive_custom_unloadall",
         {},
-        to_globalexp_params=["_unloaded_liquid"],
+        to_global_params=["_unloaded_liquid"],
     )
     apm.add(
         PAL_server,
@@ -200,7 +200,7 @@ def ADSS_sub_load_solid(
         {
             "custom": "cell1_we",
         },
-        from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
+        from_global_params={"_unloaded_liquid": "load_sample_in"},
         start_condition=ActionStartCondition.wait_for_previous,
     )
     return apm.action_list  # returns complete action list to orch
@@ -322,7 +322,7 @@ def ADSS_sub_unload_gas_only(
     #     PAL_server,
     #     "archive_custom_unloadall",
     #     {},
-    #     to_globalexp_params=["_unloaded_liquid", "unloaded_solid"],
+    #     to_global_params=["_unloaded_liquid", "unloaded_solid"],
     # )
     apm.add(
         PAL_server,
@@ -333,7 +333,7 @@ def ADSS_sub_unload_gas_only(
             "keep_solid": True,
         },
         start_condition=ActionStartCondition.wait_for_orch,
-        # from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
+        # from_global_params={"_unloaded_liquid": "load_sample_in"},
     )
     return apm.action_list
 
@@ -359,7 +359,7 @@ def ADSS_sub_load(
         "archive_custom_unloadall",
         {},
         start_condition=ActionStartCondition.wait_for_orch,
-        to_globalexp_params=["_unloaded_liquid", "_unloaded_liquid_vol"],
+        to_global_params=["_unloaded_liquid", "_unloaded_liquid_vol"],
     )
     # load solid into cell position
     apm.add(
@@ -387,7 +387,7 @@ def ADSS_sub_load(
                 "combine_liquids": False,
                 "dilute_liquids": False,
             },
-            from_globalexp_params={
+            from_global_params={
                 "_unloaded_liquid": "source_liquid_in",
                 "_unloaded_liquid_vol": "volume_ml",
             },
@@ -459,7 +459,7 @@ def ADSS_sub_move_to_sample(
             "plate_id": solid_plate_id,
             "sample_no": solid_sample_no,
         },
-        to_globalexp_params=[
+        to_global_params=[
             "_platexy"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,
@@ -473,7 +473,7 @@ def ADSS_sub_move_to_sample(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_globalexp_params={"_platexy": "d_mm"},
+        from_global_params={"_platexy": "d_mm"},
         save_act=debug_save_act,
         save_data=debug_save_data,
         start_condition=ActionStartCondition.wait_for_all,
@@ -555,7 +555,7 @@ def ADSS_sub_sample_start(
             "plate_id": solid_plate_id,
             "sample_no": solid_sample_no,
         },
-        to_globalexp_params=[
+        to_global_params=[
             "_platexy"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,
@@ -569,7 +569,7 @@ def ADSS_sub_sample_start(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_globalexp_params={"_platexy": "d_mm"},
+        from_global_params={"_platexy": "d_mm"},
         save_act=debug_save_act,
         save_data=debug_save_data,
         start_condition=ActionStartCondition.wait_for_all,
@@ -823,7 +823,7 @@ def ADSS_sub_CA(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        to_global_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -877,7 +877,7 @@ def ADSS_sub_CA(
             "AcqInterval__s": samplerate_sec,
             "IErange": gamry_i_range,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CA",
         process_finish=True,
@@ -987,7 +987,7 @@ def ADSS_sub_CA_photo(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        to_global_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1042,7 +1042,7 @@ def ADSS_sub_CA_photo(
             "AcqInterval__s": samplerate_sec,
             "IErange": gamry_i_range,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CA_photo",
         process_finish=True,
@@ -1145,7 +1145,7 @@ def ADSS_sub_CV(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        to_global_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1198,7 +1198,7 @@ def ADSS_sub_CV(
             "Cycles": cycles,
             "IErange": gamry_i_range,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
         run_use=run_use,
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CV",
@@ -1296,7 +1296,7 @@ def ADSS_sub_OCV(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        to_global_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1337,8 +1337,8 @@ def ADSS_sub_OCV(
             "amplitude_threshold": amplitude_threshold,
 
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        to_globalexp_params=["has_bubble"],
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        to_global_params=["has_bubble"],
         run_use=run_use,
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="OCV",
@@ -1391,7 +1391,7 @@ def ADSS_sub_OCV(
                     }
                     
             },
-            from_globalexp_params={"has_bubble": "has_bubble"},
+            from_global_params={"has_bubble": "has_bubble"},
         )
 
     if aliquot_post:
@@ -1454,7 +1454,7 @@ def ADSS_sub_OCV_photo(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        to_global_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1492,7 +1492,7 @@ def ADSS_sub_OCV_photo(
             "AcqInterval__s": samplerate_sec,
             "IErange": gamry_i_range,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="OCV_photo",
         process_finish=True,
@@ -1898,7 +1898,7 @@ def ADSS_sub_z_move(
             "mode": MoveModes.relative,
             "transformation": TransformationModes.platexy,
         },
-        #            "from_globalexp_params": {"_platexy": "d_mm"},
+        #            "from_global_params": {"_platexy": "d_mm"},
         start_condition=ActionStartCondition.wait_for_all,
     )
 
@@ -1927,7 +1927,7 @@ def ADSS_sub_rel_move(
             "mode": MoveModes.relative,
             "transformation": TransformationModes.platexy,
         },
-        #            "from_globalexp_params": {"_platexy": "d_mm"},
+        #            "from_global_params": {"_platexy": "d_mm"},
         start_condition=ActionStartCondition.wait_for_all,
     )
 
@@ -1957,7 +1957,7 @@ def ADSS_sub_abs_move(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        #            "from_globalexp_params": {"_platexy": "d_mm"},
+        #            "from_global_params": {"_platexy": "d_mm"},
         start_condition=ActionStartCondition.wait_for_all,
     )
 
@@ -2052,7 +2052,7 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
             "rate_uL_sec": Syringe_rate_ulsec,
             "volume_uL": Solution_volume_ul,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="cell_fill",
         process_finish=True,
         process_contrib=[
@@ -2107,7 +2107,7 @@ def ADSS_sub_cellfill_prefilled(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        to_global_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals,
         start_condition=ActionStartCondition.no_wait,
@@ -2135,7 +2135,7 @@ def ADSS_sub_cellfill_prefilled(
             "rate_uL_sec": Syringe_rate_ulsec,
             "volume_uL": Solution_volume_ul,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="cell_fill",
         process_finish=True,
         process_contrib=[
@@ -2370,7 +2370,7 @@ def ADSS_sub_move_to_clean_cell(
         MOTOR_server,
         "solid_get_builtin_specref",
         {"ref_name": "builtin_ref_motorxy"},
-        to_globalexp_params=["_refxy"],
+        to_global_params=["_refxy"],
     )
     apm.add(
         MOTOR_server,
@@ -2380,7 +2380,7 @@ def ADSS_sub_move_to_clean_cell(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_globalexp_params={"_refxy": "d_mm"},
+        from_global_params={"_refxy": "d_mm"},
     )
 
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
@@ -2399,7 +2399,7 @@ def ADSS_sub_move_to_ref_measurement(
         MOTOR_server,
         "solid_get_builtin_specref",
         {"ref_position_name": reference_position_name},
-        to_globalexp_params=["_refxy"],
+        to_global_params=["_refxy"],
     )
     if (
         reference_position_name == "builtin_ref_motorxy"
@@ -2412,7 +2412,7 @@ def ADSS_sub_move_to_ref_measurement(
                 "mode": MoveModes.absolute,
                 "transformation": TransformationModes.platexy,
             },
-            from_globalexp_params={"_refxy": "d_mm"},
+            from_global_params={"_refxy": "d_mm"},
         )
     else:
         apm.add(
@@ -2423,7 +2423,7 @@ def ADSS_sub_move_to_ref_measurement(
                 "mode": MoveModes.absolute,
                 "transformation": TransformationModes.motorxy,
             },
-            from_globalexp_params={"_refxy": "d_mm"},
+            from_global_params={"_refxy": "d_mm"},
         )
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
 
@@ -2498,7 +2498,7 @@ def ADSS_sub_sample_aliquot(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        to_global_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
     )

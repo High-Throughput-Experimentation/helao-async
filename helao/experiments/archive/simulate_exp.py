@@ -54,33 +54,33 @@ def SIM_measure_CP(
         PAL_server,
         "query_plate",
         {"elements": elements, "ph": solution_ph},
-        to_globalexp_params=["_plate_id"],
+        to_global_params=["_plate_id"],
     )
     # load plate
     apm.add(
         PAL_server,
         "load_space",
         {},
-        from_globalexp_params={"_plate_id": "plate_id"},
-        to_globalexp_params=["_ph", "_elements"],
+        from_global_params={"_plate_id": "plate_id"},
+        to_global_params=["_ph", "_elements"],
     )
     # find sample matching element fracs
     apm.add(
         PAL_server,
         "acquire",
         {"element_fracs": element_fracs},
-        to_globalexp_params=["_acq_sample_no"],
+        to_global_params=["_acq_sample_no"],
     )
     # find plate x,y coordinates from sample_no
     apm.add(
         MOTOR_server,
         "solid_get_samples_xy",
         {},
-        from_globalexp_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
-        to_globalexp_params=["_platexy"],
+        from_global_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
+        to_global_params=["_platexy"],
     )
     # move stage motors to sample x,y
-    apm.add(MOTOR_server, "move", {}, from_globalexp_params={"_platexy": "d_mm"})
+    apm.add(MOTOR_server, "move", {}, from_global_params={"_platexy": "d_mm"})
     # measure CP at 3mA/cm2 for 15 seconds
     apm.add(PSTAT_server, "run_CP", {"Ival": 3e-5, "Tval__s": 15.0})
     # calculate CP fom
@@ -88,7 +88,7 @@ def SIM_measure_CP(
         ANA_server,
         "calc_cpfom",
         {"ph": solution_ph, "jmacm2": 3},
-        from_globalexp_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
+        from_global_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
     )
     # measure CP at 10mA/cm2 for 15 seconds
     apm.add(PSTAT_server, "run_CP", {"Ival": 1e-4, "Tval__s": 15.0})
@@ -97,7 +97,7 @@ def SIM_measure_CP(
         ANA_server,
         "calc_cpfom",
         {"ph": solution_ph, "jmacm2": 10},
-        from_globalexp_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
+        from_global_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
     )
 
     return apm.action_list

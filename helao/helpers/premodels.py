@@ -41,7 +41,7 @@ class Sequence(SequenceModel):
     # not in SequenceModel:
     experimentmodel_list: List[ExperimentModel] = []  # running tally of completed experiments
     # allow sequences to inherit parameters from global dict
-    from_globalexp_params: dict = {}
+    from_global_params: dict = {}
 
     def __repr__(self):
         return f"<sequence_name:{self.sequence_name}>"
@@ -96,7 +96,7 @@ class Experiment(Sequence, ExperimentModel):
     actionmodel_list: List[ActionModel] = []
     # not in ExperimentModel, action_plan is a list of Actions to be executed:
     action_plan: list = []
-    from_globalexp_params: dict = {}
+    from_global_params: dict = {}
 
     def __repr__(self):
         return f"<experiment_name:{self.experiment_name}>"
@@ -227,8 +227,8 @@ class Action(Experiment, ActionModel):
     # moved to ActionModel
     # error_code: Optional[ErrorCodes] = ErrorCodes.none
 
-    from_globalexp_params: Optional[dict] = {}
-    to_globalexp_params: Optional[Union[list, dict]] = []
+    from_global_params: Optional[dict] = {}
+    to_global_params: Optional[Union[list, dict]] = []
 
     # internal
     file_conn_keys: List[UUID] = Field(default=[])

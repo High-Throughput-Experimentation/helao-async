@@ -25,7 +25,7 @@ def TEST_consecutive_noblocking(
         if i==0:
             epm.add_experiment("TEST_sub_noblocking", {"wait_time": wait_time})
         else:
-            epm.add_experiment("TEST_sub_noblocking", {"wait_time": wait_time}, from_globalexp_params={"test_wait": "dummy_param"})
+            epm.add_experiment("TEST_sub_noblocking", {"wait_time": wait_time}, from_global_params={"test_wait": "dummy_param"})
         for i, l in enumerate(dummy_list):
             print(f"dummy_list index {i}:  {l} has types {[type(x) for x in l]}")
 
