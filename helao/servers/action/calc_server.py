@@ -134,7 +134,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 2,
         min_offset_ocv: float = 0,
         new_ocv: float = 0,
-        offset_value: float = -0.2,
+        offset_value: float = 0.2,
     ):
         
 
