@@ -2875,10 +2875,10 @@ class Active:
                 )
 
                 # send globalparams
-                if action.to_globalexp_params:
+                if action.to_global_params:
                     export_params = {}
-                    if isinstance(action.to_globalexp_params, list):
-                        for k in action.to_globalexp_params:
+                    if isinstance(action.to_global_params, list):
+                        for k in action.to_global_params:
                             if k in action.action_params:
                                 LOGGER.info(f"updating {k} in orch global vars")
                                 export_params[k] = action.action_params[k]
@@ -2889,8 +2889,8 @@ class Active:
                                 LOGGER.info(
                                     f"key {k} not found in action output or params"
                                 )
-                    elif isinstance(action.to_globalexp_params, dict):
-                        for k1, k2 in action.to_globalexp_params.items():
+                    elif isinstance(action.to_global_params, dict):
+                        for k1, k2 in action.to_global_params.items():
                             if k1 in action.action_params:
                                 LOGGER.info(f"updating {k2} in global vars")
                                 export_params[k2] = action.action_params[k1]

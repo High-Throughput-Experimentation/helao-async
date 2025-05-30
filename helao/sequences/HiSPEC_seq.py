@@ -169,7 +169,7 @@ def HiSpEC_CV(
                 "Bandwidth": Bandwidth,
                 "solution_ph": solution_ph,
                 "ref_vs_nhe": ref_vs_nhe,
-            }, from_globalexp_params={"min_offset_ocv": "Vinit__V"})
+            }, from_global_params={"min_offset_ocv": "Vinit__V"})
         
 
         epm.add_experiment(
@@ -184,7 +184,7 @@ def HiSpEC_CV(
                 # "Ival__A" : Ival__A,
                 "Tval__s" : Tval__s,
                 "AcqInterval__s": AcqInterval_CA_CP__s,
-            }, from_globalexp_params={"min_offset_ocv": "Vval__V"})
+            }, from_global_params={"min_offset_ocv": "Vval__V"})
         
         
 
@@ -211,7 +211,7 @@ def HiSpEC_CV(
                 "toggle1_duty": toggle1_duty,
                 # "OCV_vsRef": Vapex2_vsRHE,
             # })
-            }, from_globalexp_params={"min_offset_ocv": "Vapex2_vsRHE", "CP_Ewe_V__mean_final":"Vapex1_vsRHE"} ) # temporarily commented this out to test a fixed V2
+            }, from_global_params={"min_offset_ocv": "Vapex2_vsRHE", "CP_Ewe_V__mean_final":"Vapex1_vsRHE"} ) # temporarily commented this out to test a fixed V2
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
@@ -368,7 +368,7 @@ def HiSpEC_EIS_only(
                 "Bandwidth": Bandwidth,
                 "solution_ph": solution_ph,
                 "ref_vs_nhe": ref_vs_nhe,
-            }, from_globalexp_params={"Ewe_V__mean_final": "Vinit__V" })
+            }, from_global_params={"Ewe_V__mean_final": "Vinit__V" })
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
@@ -817,7 +817,7 @@ def HiSpEC_EIS_only(
 #             "spec_n_avg": 3,
 #             "spec_technique": "T_UVVIS",
 #         },
-#         from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
+#         from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
 #     )
 #     # CV1
 #     epm.add_experiment(
@@ -859,7 +859,7 @@ def HiSpEC_EIS_only(
 #             "spec_n_avg": spec_n_avg,
 #             "spec_technique": "T_UVVIS",
 #         },
-#         from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
+#         from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
 #     )
 #     # leave cell sealed w/solution for storage
 #     epm.add_experiment(
@@ -1105,7 +1105,7 @@ def HiSpEC_EIS_only(
 #                     "spec_n_avg": spec_n_avg,
 #                     "spec_technique": spec_technique,
 #                 },
-#                 from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
+#                 from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
 #             )
 #             # CA1
 #             epm.add_experiment(
@@ -1143,7 +1143,7 @@ def HiSpEC_EIS_only(
 #                     "spec_n_avg": spec_n_avg,
 #                     "spec_technique": spec_technique,
 #                 },
-#                 from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
+#                 from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
 #             )
 
 #     epm.add_experiment("ECHE_sub_unloadall_customs", {})

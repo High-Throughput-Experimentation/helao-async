@@ -175,8 +175,8 @@ class BaseAPI(HelaoFastAPI):
                                 if k in [
                                     "action_version",
                                     "start_condition",
-                                    "from_globalexp_params",
-                                    "to_globalexp_params",
+                                    "from_global_params",
+                                    "to_global_params",
                                 ]:
                                     extra_params[k] = eval_val(v)
                         action.action_name = request.url.path.strip("/").split("/")[-1]
@@ -212,8 +212,8 @@ class BaseAPI(HelaoFastAPI):
                             if k in [
                                 "action_version",
                                 "start_condition",
-                                "from_globalexp_params",
-                                "to_globalexp_params",
+                                "from_global_params",
+                                "to_global_params",
                             ]:
                                 extra_params[k] = eval_val(v)
                     action.action_name = request.url.path.strip("/").split("/")[-1]

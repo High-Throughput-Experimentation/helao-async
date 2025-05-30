@@ -1138,7 +1138,7 @@ def ECHEUVIS_diagnostic_CV(
             "spec_n_avg": 3,
             "spec_technique": "T_UVVIS",
         },
-        from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
+        from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
     )
     # CV1
     epm.add_experiment(
@@ -1180,7 +1180,7 @@ def ECHEUVIS_diagnostic_CV(
             "spec_n_avg": spec_n_avg,
             "spec_technique": "T_UVVIS",
         },
-        from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
+        from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
     )
     # leave cell sealed w/solution for storage
     epm.add_experiment(
@@ -1426,7 +1426,7 @@ def ECHEUVIS_multiCA_led(
                     "spec_n_avg": spec_n_avg,
                     "spec_technique": spec_technique,
                 },
-                from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
+                from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
             )
             # CA1
             epm.add_experiment(
@@ -1464,7 +1464,7 @@ def ECHEUVIS_multiCA_led(
                     "spec_n_avg": spec_n_avg,
                     "spec_technique": spec_technique,
                 },
-                from_globalexp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
+                from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
             )
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})

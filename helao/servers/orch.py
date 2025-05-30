@@ -837,7 +837,7 @@ class Orch(Base):
             self.active_sequence.orchestrator = self.server
 
             # from global params
-            for k, v in self.active_sequence.from_globalexp_params.items():
+            for k, v in self.active_sequence.from_global_params.items():
                 LOGGER.info(f"{k}:{v}")
                 if k in self.global_params:
                     if isinstance(v, list):
@@ -940,7 +940,7 @@ class Orch(Base):
 
         # LOGGER.info("copying global vars to experiment")
         # copy requested global param to experiment params
-        for k, v in self.active_experiment.from_globalexp_params.items():
+        for k, v in self.active_experiment.from_global_params.items():
             LOGGER.info(f"{k}:{v}")
             if k in self.global_params:
                 if isinstance(v, list):
@@ -1183,7 +1183,7 @@ class Orch(Base):
 
             # LOGGER.info("copying global vars to action")
             # copy requested global param to action params
-            for k, v in A.from_globalexp_params.items():
+            for k, v in A.from_global_params.items():
                 LOGGER.info(f"{k}:{v}")
                 if k in self.global_params:
                     if isinstance(v, list):
@@ -1337,16 +1337,16 @@ class Orch(Base):
                 return result_action.error_code
 
             if (
-                result_action.to_globalexp_params
+                result_action.to_global_params
                 and result_action.orch_key == self.orch_key
                 and result_action.orch_host == self.orch_host
                 and int(result_action.orch_port) == int(self.orch_port)
             ):
-                if isinstance(result_action.to_globalexp_params, list):
+                if isinstance(result_action.to_global_params, list):
                     # self.print_message(
-                    #     f"copying global vars {', '.join(result_action.to_globalexp_params)} back to experiment"
+                    #     f"copying global vars {', '.join(result_action.to_global_params)} back to experiment"
                     # )
-                    for k in result_action.to_globalexp_params:
+                    for k in result_action.to_global_params:
                         if k in result_action.action_params:
                             LOGGER.info(f"updating {k} in global vars")
                             self.global_params[k] = result_action.action_params[k]
@@ -1355,11 +1355,11 @@ class Orch(Base):
                             self.global_params[k] = result_action.action_output[k]
                         else:
                             LOGGER.info(f"key {k} not found in action output or params")
-                elif isinstance(result_action.to_globalexp_params, dict):
+                elif isinstance(result_action.to_global_params, dict):
                     # self.print_message(
-                    #     f"copying global vars {', '.join(result_action.to_globalexp_params.keys())} back to experiment"
+                    #     f"copying global vars {', '.join(result_action.to_global_params.keys())} back to experiment"
                     # )
-                    for k1, k2 in result_action.to_globalexp_params.items():
+                    for k1, k2 in result_action.to_global_params.items():
                         if k1 in result_action.action_params:
                             LOGGER.info(f"updating {k2} in global vars")
                             self.global_params[k2] = result_action.action_params[k1]

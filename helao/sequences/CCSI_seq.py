@@ -1035,7 +1035,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "refill_freq_sec": maintain_fill_freq_s,
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
         },
-        from_globalexp_params={"mean_co2_ppm": "target_co2_ppm"},
+        from_global_params={"mean_co2_ppm": "target_co2_ppm"},
         
         )
         # epm.add_experiment("CCSI_sub_load_gas", {

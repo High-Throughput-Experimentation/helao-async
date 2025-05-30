@@ -1280,7 +1280,7 @@ class OrchAPI(HelaoFastAPI):
                 ]
             }
             active.action.action_params.update(pdict)
-            # active.action.to_globalexp_params = list(pdict.keys())
+            # active.action.to_global_params = list(pdict.keys())
             self.orch.global_params.update(pdict)
             finished_action = await active.finish()
             return finished_action.as_dict()

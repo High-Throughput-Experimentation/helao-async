@@ -34,7 +34,7 @@ def OERSIM_sub_load_plate(
     apm = ActionPlanMaker()
     apm.add(CPSIM_server, "change_plate", {"plate_id": plate_id})
     apm.add(
-        CPSIM_server, "get_loaded_plate", {}, to_globalexp_params=["_loaded_plate_id"]
+        CPSIM_server, "get_loaded_plate", {}, to_global_params=["_loaded_plate_id"]
     )
     apm.add(
         GPSIM_server,
@@ -43,7 +43,7 @@ def OERSIM_sub_load_plate(
             "num_random_points": init_random_points,
             "reinitialize": False,
         },
-        from_globalexp_params={"_loaded_plate_id": "plate_id"},
+        from_global_params={"_loaded_plate_id": "plate_id"},
     )
 
 
@@ -54,23 +54,23 @@ def OERSIM_sub_measure_CP(
 ):
     apm = ActionPlanMaker()
     apm.add(
-        CPSIM_server, "get_loaded_plate", {}, to_globalexp_params=["_loaded_plate_id"]
+        CPSIM_server, "get_loaded_plate", {}, to_global_params=["_loaded_plate_id"]
     )
     apm.add(
         GPSIM_server,
         "acquire_point",
         {},
-        from_globalexp_params={"_loaded_plate_id": "plate_id"},
-        to_globalexp_params=["_feature"]
+        from_global_params={"_loaded_plate_id": "plate_id"},
+        to_global_params=["_feature"]
     )
     apm.add(
-        CPSIM_server, "measure_cp", {}, from_globalexp_params={"_feature": "comp_vec"}
+        CPSIM_server, "measure_cp", {}, from_global_params={"_feature": "comp_vec"}
     )
     apm.add(
         GPSIM_server,
         "update_model",
         {},
-        from_globalexp_params={"_loaded_plate_id": "plate_id"},
+        from_global_params={"_loaded_plate_id": "plate_id"},
     )
     return apm.action_list
 
@@ -89,7 +89,7 @@ def OERSIM_sub_decision(
         CPSIM_server,
         "get_loaded_plate",
         {},
-        to_globalexp_params=[
+        to_global_params=[
             "_loaded_plate_id",
             "_orch_key",
             "_orch_host",
@@ -106,7 +106,7 @@ def OERSIM_sub_decision(
             "repeat_experiment_params": repeat_experiment_params,
             "repeat_experiment_kwargs": repeat_experiment_kwargs,
         },
-        from_globalexp_params={
+        from_global_params={
             "_loaded_plate_id": "plate_id",
             "_orch_key": "orch_key",
             "_orch_host": "orch_host",

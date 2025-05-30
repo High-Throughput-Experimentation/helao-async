@@ -318,7 +318,7 @@ def create_and_load_liquid_sample(
                 )
             ],
         },
-        to_globalexp_params=["_fast_sample_out"]
+        to_global_params=["_fast_sample_out"]
     )
 
     
@@ -330,7 +330,7 @@ def create_and_load_liquid_sample(
             "slot": slot,
             "vial": vial
         },
-        from_globalexp_params={"_fast_sample_out": "load_sample_in"}
+        from_global_params={"_fast_sample_out": "load_sample_in"}
     )
 
     return apm.action_list  # returns complete action list to orch
