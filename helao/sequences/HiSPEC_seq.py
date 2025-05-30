@@ -24,12 +24,6 @@ def HiSpEC_CV(
     solution_ph: float = 0,
     Flow_during_SpEC: bool = False,
 
-    #######
-    #Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
-    # Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
-    # Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps. # temporarily uncommented to test a fixed V2
-    #Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
-    #scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
     cycles: int = 1,
     gamrychannelwait: int = -1,
@@ -56,15 +50,7 @@ def HiSpEC_CV(
     Ival__A: float = 0.0015*0.02,
     Tval__s: float = 60,
     scanrate_voltsec: float = 0.001,  # scan rate in volts/second or amps/second.
-
-    
-    # toggle2_source: str = "spec_trig",
-    # toggle2_init_delay: float = 0.0,
-    # toggle2_duty: float = 0.5,
-    # toggle2_period: float = 2.0,
-    # toggle2_time: float = -1,
     comment: str = "",
-    #####
     measurement_area: float = 0.02,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     use_z_motor: bool = True,  # @Ben -- I think this should default to True
@@ -72,7 +58,14 @@ def HiSpEC_CV(
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
     cell_fill_wait: float = 60.0,
-):
+
+    #######
+    #Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
+    # Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
+    # Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps. # temporarily uncommented to test a fixed V2
+    #Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
+    #scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
+    ):
     epm = ExperimentPlanMaker()
 
     epm.add_experiment("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
