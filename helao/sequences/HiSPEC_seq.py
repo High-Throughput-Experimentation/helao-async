@@ -67,6 +67,7 @@ def HiSpEC_CV(
     #scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
     ):
     epm = ExperimentPlanMaker()
+    epm.add_experiment("HiSpEC_sub_unloadall_customs", {})
     epm.add_experiment(
             "HiSpEC_sub_disengage",
             {
@@ -78,7 +79,7 @@ def HiSpEC_CV(
         )
 
 
-    epm.add_experiment("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
+    # epm.add_experiment("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
     
     # if use_z_motor:
     #     epm.add_experiment(
@@ -94,7 +95,7 @@ def HiSpEC_CV(
     #     epm.add_experiment(
     #         "HiSpEC_sub_interrupt",
     #         {"reason": "Stop flow and prepare for xy motion to starting sample."},
-    #     )
+    #    ) 
 
     for i, plate_sample in enumerate(plate_sample_no_list):
         if i > 0 and use_z_motor:
