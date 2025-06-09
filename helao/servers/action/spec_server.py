@@ -38,6 +38,7 @@ def makeApp(confPrefix, server_key, helao_root):
         version=0.1,
         driver_class=SM303,
     )
+    app.base.server_params["allow_concurrent_actions"] = False
 
     @app.post("/get_wl", tags=["private"])
     def get_wl():

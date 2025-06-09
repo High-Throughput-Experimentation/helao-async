@@ -272,6 +272,7 @@ def makeApp(confPrefix, server_key, helao_root):
         driver_class=AndorDriver,
         dyn_endpoints=andor_dyn_endpoints,
     )
+    app.base.server_params["allow_concurrent_actions"] = False
 
     @app.post("/stop_private", tags=["private"])
     def stop_private():
