@@ -328,18 +328,18 @@ class Orch(Base):
         self.heartbeat_monitor = asyncio.create_task(self.active_action_monitor())
         self.driver_monitor = asyncio.create_task(self.action_server_monitor())
 
-    def endpoint_queues_init(self):
-        """
-        Initializes endpoint queues for the server.
+    # def endpoint_queues_init(self):
+    #     """
+    #     Initializes endpoint queues for the server.
 
-        This method iterates over the list of fast URLs and checks if the path
-        starts with the server's name. For each matching URL, it creates a new
-        queue and assigns it to the endpoint_queues dictionary with the URL's
-        name as the key.
-        """
-        for urld in self.fast_urls:
-            if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
-                self.endpoint_queues[urld["name"]] = zdeque([])
+    #     This method iterates over the list of fast URLs and checks if the path
+    #     starts with the server's name. For each matching URL, it creates a new
+    #     queue and assigns it to the endpoint_queues dictionary with the URL's
+    #     name as the key.
+    #     """
+    #     for urld in self.fast_urls:
+    #         if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
+    #             self.endpoint_queues[urld["name"]] = zdeque([])
 
     def register_obj_uuid(self, obj_uuid, obj_type: str):
         """
