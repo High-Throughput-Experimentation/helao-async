@@ -525,6 +525,7 @@ def makeApp(confPrefix, server_key, helao_root):
         driver_class=GamryDriver,
         dyn_endpoints=gamry_dyn_endpoints,
     )
+    app.base.server_params["allow_concurrent_actions"] = False
 
     @app.post(f"/{server_key}/get_meas_status", tags=["action"])
     async def get_meas_status(action: Action = Body({}, embed=True)):
