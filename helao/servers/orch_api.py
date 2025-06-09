@@ -154,7 +154,7 @@ class OrchAPI(HelaoFastAPI):
                         action_dict["action_params"] = action_dict.get(
                             "action_params", {}
                         )
-                        action_dict["action_params"]["delayed_on_actserv"] = True
+                        action_dict["action_params"]["queued_on_actserv"] = True
                         extra_params = {}
                         action = Action(**action_dict)
                         for d in (
@@ -193,7 +193,7 @@ class OrchAPI(HelaoFastAPI):
                     == 0
                     or start_cond == ASC.no_wait
                     or action_dict.get("action_params", {}).get(
-                        "delayed_on_actserv", False
+                        "queued_on_actserv", False
                     )
                 ):
                     LOGGER.debug("action endpoint is available")
@@ -201,7 +201,7 @@ class OrchAPI(HelaoFastAPI):
                 else:  # collision between two base requests for one resource, queue
                     LOGGER.info("action endpoint is busy, queuing")
                     action_dict["action_params"] = action_dict.get("action_params", {})
-                    action_dict["action_params"]["delayed_on_actserv"] = True
+                    action_dict["action_params"]["queued_on_actserv"] = True
                     extra_params = {}
                     action = Action(**action_dict)
                     for d in (
