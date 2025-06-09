@@ -1,5 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-""" A FastAPI service definition for a potentiostat device server, e.g. Biologic.
+"""A FastAPI service definition for a potentiostat device server, e.g. Biologic.
 
 biologic_server uses the Executor model with helao.drivers.pstat.biologic.driver which decouples
 the hardware driver class from the action server base class.
@@ -21,7 +21,13 @@ import pandas as pd
 from fastapi import Body
 
 from helao.core.error import ErrorCodes
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
 from helao.core.models.hlostatus import HloStatus
 
 from helao.servers.base_api import BaseAPI
@@ -134,7 +140,9 @@ class BiologicExec(Executor):
             resp = self.driver.start_channel(self.channel, self.ttl_params)
             self.start_time = resp.data.get("start_time", time.time())
             error = (
-                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+                ErrorCodes.none
+                if resp.response == "success"
+                else ErrorCodes.critical_error
             )
             LOGGER.info("BiologicExec measurement started.")
             return {"error": error}
@@ -219,7 +227,9 @@ class BiologicExec(Executor):
                 self.data_buffer["channel"].extend(data_length * [self.channel])
                 resp.data.update({"channel": data_length * [self.channel]})
             error = (
-                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+                ErrorCodes.none
+                if resp.response == "success"
+                else ErrorCodes.critical_error
             )
             status = HloStatus.active
 
@@ -258,7 +268,9 @@ class BiologicExec(Executor):
             )
             self.active.action.action_params["has_bubble"] = has_bubble
 
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        error = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
         return {"error": error, "data": {}}
 
     async def _manual_stop(self) -> dict:
@@ -279,7 +291,9 @@ async def biologic_dyn_endpoints(app=None):
     async def run_CA(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
@@ -319,7 +333,9 @@ async def biologic_dyn_endpoints(app=None):
     async def run_CP(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Ival__A: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
@@ -358,7 +374,9 @@ async def biologic_dyn_endpoints(app=None):
     async def run_CV(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
         Vapex1__V: float = 1.0,  # Apex 1 value in volts or amps.
         Vapex2__V: float = -1.0,  # Apex 2 value in volts or amps.
@@ -406,7 +424,9 @@ async def biologic_dyn_endpoints(app=None):
     async def run_OCV(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         channel: int = 0,
@@ -432,7 +452,9 @@ async def biologic_dyn_endpoints(app=None):
     async def run_PEIS(
         action: Action = Body({}, embed=True),
         action_version: int = 3,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Vinit__V: float = 0.00,  # Initial value in volts or amps.
         Vamp__V: float = 0.01,  # Amplitude value in volts
         Finit__Hz: float = 1000,  # Initial frequency in Hz.
@@ -472,7 +494,9 @@ async def biologic_dyn_endpoints(app=None):
     async def run_GEIS(
         action: Action = Body({}, embed=True),
         action_version: int = 3,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Iinit__A: float = 0.01,  # Initial value in volts or amps.
         Iamp__A: float = 0.1,  # Final value in volts or amps.
         Finit__Hz: float = 1,  # Initial frequency in Hz.
