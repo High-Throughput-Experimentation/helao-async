@@ -1200,10 +1200,7 @@ class Base:
                     ]
                     for endpoint, endmod in self.actionservermodel.endpoints.items()
                 }
-                print(active_nonqueued)
                 active_nq = [x for y in active_nonqueued.values() for x in y]
-                print(active_nq)
-                print(status_msg.action_name)
 
                 if not self.server_params.get("allow_concurrent_actions", True):
                     if len(self.local_action_queue) > 0 and not active_nq:
