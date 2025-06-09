@@ -1078,8 +1078,8 @@ class Base:
             LOGGER.info(f"{qact.action_name} was previously queued")
             LOGGER.info(f"running queued {qact.action_name}")
             qact.start_condition = ASC.no_wait
-            qact.action_params["delayed_on_actserv"] = True
-            qpars.update({"delayed_on_actserv": True})
+            qact.action_params["queued_launch"] = True
+            qpars.update({"queued_launch": True})
             await async_action_dispatcher(self.world_cfg, qact, qpars)
         except Exception:
             LOGGER.error(
@@ -1103,8 +1103,8 @@ class Base:
             LOGGER.info(f"{status_msg.action_name} was previously queued")
             LOGGER.info(f"running queued {status_msg.action_name}")
             qact.start_condition = ASC.no_wait
-            qact.action_params["delayed_on_actserv"] = True
-            qpars.update({"delayed_on_actserv": True})
+            qact.action_params["queued_launch"] = True
+            qpars.update({"queued_launch": True})
             await async_action_dispatcher(self.world_cfg, qact, qpars)
         except Exception:
             LOGGER.error(
@@ -1197,13 +1197,15 @@ class Base:
                     endpoint: [
                         auuid
                         for auuid, act in endmod.active_dict.items()
-                        if act.action_params.get("delayed_on_actserv", False)
+                        if not act.action_params.get("queued_on_actserv", False)
+                        or act.action_params.get("queued_launch", False)
                     ]
                     for endpoint, endmod in self.actionservermodel.endpoints.items()
                 }
                 print(active_nonqueued)
                 active_nq = [x for y in active_nonqueued.values() for x in y]
                 print(active_nq)
+                print(status_msg.action_name)
 
                 if not self.server_params.get("allow_concurrent_actions", True):
                     if len(self.local_action_queue) > 0 and not active_nq:
