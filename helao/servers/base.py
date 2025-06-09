@@ -1078,6 +1078,8 @@ class Base:
             LOGGER.info(f"{qact.action_name} was previously queued")
             LOGGER.info(f"running queued {qact.action_name}")
             qact.start_condition = ASC.no_wait
+            qact.action_params["delayed_on_actserv"] = True
+            qpars.update({"delayed_on_actserv": True}) 
             await async_action_dispatcher(self.world_cfg, qact, qpars)
         except Exception:
             LOGGER.error(
@@ -1101,6 +1103,8 @@ class Base:
             LOGGER.info(f"{status_msg.action_name} was previously queued")
             LOGGER.info(f"running queued {status_msg.action_name}")
             qact.start_condition = ASC.no_wait
+            qact.action_params["delayed_on_actserv"] = True
+            qpars.update({"delayed_on_actserv": True}) 
             await async_action_dispatcher(self.world_cfg, qact, qpars)
         except Exception:
             LOGGER.error(
