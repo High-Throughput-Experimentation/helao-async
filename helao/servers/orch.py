@@ -339,7 +339,7 @@ class Orch(Base):
         """
         for urld in self.fast_urls:
             if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
-                self.endpoint_queues[urld["name"]] = Queue()
+                self.endpoint_queues[urld["name"]] = zdeque([])
 
     def register_obj_uuid(self, obj_uuid, obj_type: str):
         """
