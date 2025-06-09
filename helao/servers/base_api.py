@@ -107,6 +107,7 @@ class BaseAPI(HelaoFastAPI):
         estop(action: Action, switch: bool):
             Endpoint to handle emergency stop (estop) actions.
     """
+
     base: Base
     root_dir: str
     fault_dir: str
@@ -133,7 +134,7 @@ class BaseAPI(HelaoFastAPI):
             driver_class (type, optional): Class of the driver to be used. Defaults to None.
             dyn_endpoints (list, optional): List of dynamic endpoints. Defaults to None.
             poller_class (type, optional): Class of the poller to be used. Defaults to None.
-        
+
         """
         super().__init__(
             helao_cfg=config,
@@ -162,10 +163,16 @@ class BaseAPI(HelaoFastAPI):
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
                 action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
                 if not self.base.server_params.get("allow_concurrent_actions", True):
-                    active_endpoints = [ep for ep,em in self.base.actionservermodel.endpoints.items() if em.active_dict]
+                    active_endpoints = [
+                        ep
+                        for ep, em in self.base.actionservermodel.endpoints.items()
+                        if em.active_dict
+                    ]
                     if len(active_endpoints) > 0:
                         LOGGER.info("action endpoint is busy, queuing")
-                        action_dict["action_params"] = action_dict.get("action_params", {})
+                        action_dict["action_params"] = action_dict.get(
+                            "action_params", {}
+                        )
                         action_dict["action_params"]["delayed_on_actserv"] = True
                         extra_params = {}
                         action = Action(**action_dict)
@@ -188,8 +195,15 @@ class BaseAPI(HelaoFastAPI):
                         # send active status but don't create active object
                         await self.base.status_q.put(action.get_actmodel())
                         response = JSONResponse(action.as_dict())
-                        LOGGER.info(f"action request for {action.action_name} received, but server does not allow concurrency, queuing action {action.action_uuid}")
-                        self.base.local_action_queue.put((action, {},))
+                        LOGGER.info(
+                            f"action request for {action.action_name} received, but server does not allow concurrency, queuing action {action.action_uuid}"
+                        )
+                        self.base.local_action_queue.append(
+                            (
+                                action,
+                                {},
+                            )
+                        )
                     else:
                         LOGGER.debug("action endpoint is available")
                         response = await call_next(request)
@@ -225,8 +239,10 @@ class BaseAPI(HelaoFastAPI):
                     # send active status but don't create active object
                     await self.base.status_q.put(action.get_actmodel())
                     response = JSONResponse(action.as_dict())
-                    LOGGER.info(f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}")
-                    self.base.endpoint_queues[endpoint].put(
+                    LOGGER.info(
+                        f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
+                    )
+                    self.base.endpoint_queues[endpoint].append(
                         (
                             action,
                             {},
@@ -305,8 +321,8 @@ class BaseAPI(HelaoFastAPI):
 
             This method iterates through the server's routes and checks if a route
             is an instance of `APIRoute` and supports the POST method. For each such
-            route, it creates a new route that supports only the HEAD method and 
-            appends it to the server's routes. The new HEAD route is not included 
+            route, it creates a new route that supports only the HEAD method and
+            appends it to the server's routes. The new HEAD route is not included
             in the schema.
 
             Returns:
@@ -348,8 +364,8 @@ class BaseAPI(HelaoFastAPI):
             """
             Handles websocket data connection and broadcasting.
 
-            This asynchronous function manages the connection of a websocket to the 
-            data publisher, handles broadcasting of data, and ensures proper 
+            This asynchronous function manages the connection of a websocket to the
+            data publisher, handles broadcasting of data, and ensures proper
             disconnection in case of websocket disconnection or closure.
 
             Args:
@@ -423,7 +439,7 @@ class BaseAPI(HelaoFastAPI):
             elif isinstance(self.driver, HelaoDriver):
                 resp = self.driver.get_status()
                 driver_status = resp.status
-            status_dict['_driver_status'] = driver_status
+            status_dict["_driver_status"] = driver_status
             return status_dict
 
         @self.post("/attach_client", tags=["private"])
@@ -493,11 +509,11 @@ class BaseAPI(HelaoFastAPI):
             """
             Raises a test exception for error recovery debugging purposes.
 
-            This function is used to simulate an exception to test the error 
+            This function is used to simulate an exception to test the error
             handling and recovery mechanisms in the application.
 
             Raises:
-                Exception: Always raises an exception with the message 
+                Exception: Always raises an exception with the message
                 "test exception for error recovery debugging".
             """
             raise Exception("test exception for error recovery debugging")
@@ -514,6 +530,7 @@ class BaseAPI(HelaoFastAPI):
             Returns:
                 bool: Always returns True after scheduling the task.
             """
+
             async def sleep_then_error():
                 print(f"Start time: {time.time()}")
                 await asyncio.sleep(10)
@@ -598,14 +615,14 @@ class BaseAPI(HelaoFastAPI):
             """
             Emergency stop (estop) action handler.
 
-            This asynchronous function handles the emergency stop action. It sets up 
-            and contains the action, checks if the driver has an estop function, and 
-            either calls it or sets the estop switch accordingly. It also updates the 
+            This asynchronous function handles the emergency stop action. It sets up
+            and contains the action, checks if the driver has an estop function, and
+            either calls it or sets the estop switch accordingly. It also updates the
             action status and stops all executors.
 
             Args:
                 action (Action): The action object containing parameters for the estop action.
-                switch (bool): A flag indicating whether to switch the estop on or off. 
+                switch (bool): A flag indicating whether to switch the estop on or off.
                        Defaults to True.
 
             Returns:
