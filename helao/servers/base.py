@@ -26,7 +26,7 @@ import hashlib
 from copy import deepcopy, copy
 import inspect
 import traceback
-from queue import Queue
+from collections import deque
 
 import aiodebug.hang_inspection
 import aiodebug.log_slow_callbacks
@@ -49,7 +49,7 @@ from helao.helpers.print_message import print_message
 from helao.helpers import async_copy
 from helao.helpers.yml_tools import yml_dumps
 from helao.helpers.yml_finisher import move_dir
-from helao.helpers.premodels import Action
+from helao.helpers.premodels import Action, ActionModel
 from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.ws_publisher import WsPublisher
 from helao.core.models.hlostatus import HloStatus
@@ -119,7 +119,7 @@ class Base:
         ntp_last_sync (float, optional): Last NTP sync time.
         aiolock (asyncio.Lock): Asyncio lock.
         endpoint_queues (dict): Endpoint queues.
-        local_action_queue (Queue): Local action queue.
+        local_action_queue (deque): Local action queue.
         fast_urls (list): FastAPI URLs.
         ntp_last_sync_file (str, optional): NTP last sync file path.
         ntplockpath (str, optional): NTP lock file path.
@@ -256,7 +256,7 @@ class Base:
         self.ntp_last_sync = None
         self.aiolock = asyncio.Lock()
         self.endpoint_queues = {}
-        self.local_action_queue = Queue()
+        self.local_action_queue = deque()
         self.fast_urls = []
 
         self.hlo_postprocess_script = self.server_cfg.get("hlo_postprocess_script", "")
@@ -406,7 +406,7 @@ class Base:
         for urld in self.fast_urls:
             if urld.get("path", "").strip("/").startswith(self.server.server_name):
                 endpoint_name = urld["path"].strip("/").split("/")[-1]
-                self.endpoint_queues[endpoint_name] = Queue()
+                self.endpoint_queues[endpoint_name] = deque()
 
     def print_message(self, *args, **kwargs):
         """
@@ -1070,6 +1070,52 @@ class Base:
                         break
             await asyncio.sleep(delay)
 
+    async def process_unified_queue(self):
+        qact, qpars = None, {}
+        try:
+            # unified local queue, separate endpoints cannot be concurrent
+            qact, qpars = self.local_action_queue.popleft()
+            LOGGER.info(f"{qact.action_name} was previously queued")
+            LOGGER.info(f"running queued {qact.action_name}")
+            qact.start_condition = ASC.no_wait
+            await async_action_dispatcher(self.world_cfg, qact, qpars)
+        except Exception:
+            LOGGER.error(
+                "Failed to process local unified queue",
+                exc_info=True,
+            )
+            if qact is not None:
+                LOGGER.info(f"re-queing {qact.action_name}")
+                self.local_action_queue.appendleft(
+                    (
+                        qact,
+                        qpars,
+                    )
+                )
+
+    async def process_endpoint_queue(self, status_msg: ActionModel):
+        qact, qpars = None, None
+        try:
+            # process individiual endpoint queues, can be concurrent
+            qact, qpars = self.endpoint_queues[status_msg.action_name].popleft()
+            LOGGER.info(f"{status_msg.action_name} was previously queued")
+            LOGGER.info(f"running queued {status_msg.action_name}")
+            qact.start_condition = ASC.no_wait
+            await async_action_dispatcher(self.world_cfg, qact, qpars)
+        except Exception:
+            LOGGER.error(
+                "Failed to process local endpoint queue",
+                exc_info=True,
+            )
+            if qact is not None:
+                LOGGER.info(f"re-queing {status_msg.action_name}")
+                self.endpoint_queues[status_msg.action_name].appendleft(
+                    (
+                        qact,
+                        qpars,
+                    )
+                )
+
     async def log_status_task(self, retry_limit: int = 5):
         """
         Asynchronous task to log and send status updates to clients.
@@ -1141,8 +1187,28 @@ class Base:
                 self.actionservermodel.endpoints[
                     status_msg.action_name
                 ].clear_finished()
-                # TODO:write to log if save_root exists
                 LOGGER.info("all log_status_task messages send.")
+
+                active_nonqueued = {
+                    endpoint: [
+                        auuid
+                        for auuid, act in endmod.active_dict.items()
+                        if act.action_params.get("delayed_on_actserv", False)
+                    ]
+                    for endpoint, endmod in self.actionservermodel.endpoints.items()
+                }
+                active_nq = [x for y in active_nonqueued.values() for x in y]
+
+                if not self.server_params.get("allow_concurrent_actions", True):
+                    if self.local_action_queue.qsize() > 0 and not active_nq:
+                        await self.process_unified_queue()
+                else:
+                    if self.endpoint_queues[
+                        status_msg.action_name
+                    ].qsize() > 0 and not active_nonqueued.get(
+                        status_msg.action_name, []
+                    ):
+                        await self.process_endpoint_queue(status_msg)
 
             LOGGER.info("log_status_task done.")
 
@@ -3070,27 +3136,6 @@ class Active:
                         f"Failed to move directory for action {action.action_uuid}",
                         exc_info=True,
                     )
-
-            try:
-                # since all sub-actions of active are finished process endpoint queue
-                if not self.base.server_params.get("allow_concurrent_actions", True):
-                    if self.base.local_action_queue.qsize() > 0:
-                        qact, qpars = self.base.local_action_queue.get()
-                        LOGGER.info(f"{qact.action_name} was previously queued")
-                        LOGGER.info(f"running queued {qact.action_name}")
-                        qact.start_condition = ASC.no_wait
-                        await async_action_dispatcher(self.base.world_cfg, qact, qpars)
-                elif self.base.endpoint_queues[action.action_name].qsize() > 0:
-                    LOGGER.info(f"{action.action_name} was previously queued")
-                    qact, qpars = self.base.endpoint_queues[action.action_name].get()
-                    LOGGER.info(f"running queued {action.action_name}")
-                    qact.start_condition = ASC.no_wait
-                    await async_action_dispatcher(self.base.world_cfg, qact, qpars)
-            except Exception:
-                LOGGER.error(
-                    "Failed to process local action queue",
-                    exc_info=True,
-                )
 
         return self.action
 
