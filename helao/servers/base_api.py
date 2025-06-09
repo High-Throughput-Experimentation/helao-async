@@ -201,7 +201,7 @@ class BaseAPI(HelaoFastAPI):
                         self.base.local_action_queue.append(
                             (
                                 action,
-                                {},
+                                extra_params,
                             )
                         )
                     else:
@@ -248,7 +248,7 @@ class BaseAPI(HelaoFastAPI):
                     self.base.endpoint_queues[endpoint].append(
                         (
                             action,
-                            {},
+                            extra_params,
                         )
                     )
             else:
