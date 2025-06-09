@@ -1079,7 +1079,7 @@ class Base:
             LOGGER.info(f"running queued {qact.action_name}")
             qact.start_condition = ASC.no_wait
             qact.action_params["delayed_on_actserv"] = True
-            qpars.update({"delayed_on_actserv": True}) 
+            qpars.update({"delayed_on_actserv": True})
             await async_action_dispatcher(self.world_cfg, qact, qpars)
         except Exception:
             LOGGER.error(
@@ -1104,7 +1104,7 @@ class Base:
             LOGGER.info(f"running queued {status_msg.action_name}")
             qact.start_condition = ASC.no_wait
             qact.action_params["delayed_on_actserv"] = True
-            qpars.update({"delayed_on_actserv": True}) 
+            qpars.update({"delayed_on_actserv": True})
             await async_action_dispatcher(self.world_cfg, qact, qpars)
         except Exception:
             LOGGER.error(
@@ -1204,14 +1204,12 @@ class Base:
                 active_nq = [x for y in active_nonqueued.values() for x in y]
 
                 if not self.server_params.get("allow_concurrent_actions", True):
-                    if self.local_action_queue.qsize() > 0 and not active_nq:
+                    if len(self.local_action_queue) > 0 and not active_nq:
                         await self.process_unified_queue()
                 else:
-                    if self.endpoint_queues[
-                        status_msg.action_name
-                    ].qsize() > 0 and not active_nonqueued.get(
-                        status_msg.action_name, []
-                    ):
+                    if len(
+                        self.endpoint_queues[status_msg.action_name]
+                    ) > 0 and not active_nonqueued.get(status_msg.action_name, []):
                         await self.process_endpoint_queue(status_msg)
 
             LOGGER.info("log_status_task done.")
