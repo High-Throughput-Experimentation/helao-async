@@ -26,7 +26,6 @@ import hashlib
 from copy import deepcopy, copy
 import inspect
 import traceback
-from collections import deque
 
 import aiodebug.hang_inspection
 import aiodebug.log_slow_callbacks
@@ -69,6 +68,7 @@ from helao.core.models.machine import MachineModel
 from helao.core.models.server import ActionServerModel, EndpointModel
 from helao.core.version import get_filehash
 from helao.helpers.active_params import ActiveParams
+from helao.helpers.zdeque import zdeque
 from helao.core.models.file import (
     FileConn,
     FileConnParams,
@@ -256,7 +256,7 @@ class Base:
         self.ntp_last_sync = None
         self.aiolock = asyncio.Lock()
         self.endpoint_queues = {}
-        self.local_action_queue = deque()
+        self.local_action_queue = zdeque([])
         self.fast_urls = []
 
         self.hlo_postprocess_script = self.server_cfg.get("hlo_postprocess_script", "")
@@ -406,7 +406,7 @@ class Base:
         for urld in self.fast_urls:
             if urld.get("path", "").strip("/").startswith(self.server.server_name):
                 endpoint_name = urld["path"].strip("/").split("/")[-1]
-                self.endpoint_queues[endpoint_name] = deque()
+                self.endpoint_queues[endpoint_name] = zdeque([])
 
     def print_message(self, *args, **kwargs):
         """
