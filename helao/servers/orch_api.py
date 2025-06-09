@@ -147,6 +147,9 @@ class OrchAPI(HelaoFastAPI):
                     len(self.orch.actionservermodel.endpoints[endpoint].active_dict)
                     == 0
                     or start_cond == ASC.no_wait
+                    or action_dict.get("action_params", {}).get(
+                        "delayed_on_actserv", True
+                    )
                 ):
                     LOGGER.debug("action endpoint is available")
                     response = await call_next(request)
