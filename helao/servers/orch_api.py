@@ -143,7 +143,52 @@ class OrchAPI(HelaoFastAPI):
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
                 action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
-                if (
+                if not self.orch.server_params.get("allow_concurrent_actions", True):
+                    active_endpoints = [
+                        ep
+                        for ep, em in self.orch.actionservermodel.endpoints.items()
+                        if em.active_dict
+                    ]
+                    if len(active_endpoints) > 0:
+                        LOGGER.info("action endpoint is busy, queuing")
+                        action_dict["action_params"] = action_dict.get(
+                            "action_params", {}
+                        )
+                        action_dict["action_params"]["delayed_on_actserv"] = True
+                        extra_params = {}
+                        action = Action(**action_dict)
+                        for d in (
+                            request.query_params,
+                            request.path_params,
+                        ):
+                            for k, v in d.items():
+                                if k in [
+                                    "action_version",
+                                    "start_condition",
+                                    "from_global_params",
+                                    "to_global_params",
+                                ]:
+                                    extra_params[k] = eval_val(v)
+                        action.action_name = request.url.path.strip("/").split("/")[-1]
+                        action.action_server = MachineModel(
+                            server_name=server_key, machine_name=gethostname().lower()
+                        )
+                        # send active status but don't create active object
+                        await self.orch.status_q.put(action.get_actmodel())
+                        response = JSONResponse(action.as_dict())
+                        LOGGER.info(
+                            f"action request for {action.action_name} received, but server does not allow concurrency, queuing action {action.action_uuid}"
+                        )
+                        self.orch.local_action_queue.append(
+                            (
+                                action,
+                                extra_params,
+                            )
+                        )
+                    else:
+                        LOGGER.debug("action endpoint is available")
+                        response = await call_next(request)
+                elif (
                     len(self.orch.actionservermodel.endpoints[endpoint].active_dict)
                     == 0
                     or start_cond == ASC.no_wait
@@ -158,13 +203,19 @@ class OrchAPI(HelaoFastAPI):
                     action_dict["action_params"] = action_dict.get("action_params", {})
                     action_dict["action_params"]["delayed_on_actserv"] = True
                     extra_params = {}
+                    action = Action(**action_dict)
                     for d in (
                         request.query_params,
                         request.path_params,
                     ):
                         for k, v in d.items():
-                            extra_params[k] = eval_val(v)
-                    action = Action(**action_dict)
+                            if k in [
+                                "action_version",
+                                "start_condition",
+                                "from_global_params",
+                                "to_global_params",
+                            ]:
+                                extra_params[k] = eval_val(v)
                     action.action_name = request.url.path.strip("/").split("/")[-1]
                     action.action_server = MachineModel(
                         server_name=server_key, machine_name=gethostname().lower()
@@ -175,7 +226,7 @@ class OrchAPI(HelaoFastAPI):
                     LOGGER.info(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )
-                    self.orch.endpoint_queues[endpoint].put(
+                    self.orch.endpoint_queues[endpoint].append(
                         (
                             action,
                             extra_params,
