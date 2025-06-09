@@ -1079,7 +1079,6 @@ class Base:
             LOGGER.info(f"running queued {qact.action_name}")
             qact.start_condition = ASC.no_wait
             qact.action_params["queued_launch"] = True
-            qpars.update({"queued_launch": True})
             await async_action_dispatcher(self.world_cfg, qact, qpars)
         except Exception:
             LOGGER.error(
@@ -1104,7 +1103,6 @@ class Base:
             LOGGER.info(f"running queued {status_msg.action_name}")
             qact.start_condition = ASC.no_wait
             qact.action_params["queued_launch"] = True
-            qpars.update({"queued_launch": True})
             await async_action_dispatcher(self.world_cfg, qact, qpars)
         except Exception:
             LOGGER.error(
