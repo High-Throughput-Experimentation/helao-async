@@ -212,7 +212,7 @@ class BaseAPI(HelaoFastAPI):
                     == 0
                     or start_cond == ASC.no_wait
                     or action_dict.get("action_params", {}).get(
-                        "delayed_on_actserv", True
+                        "delayed_on_actserv", False
                     )
                 ):
                     LOGGER.debug("action endpoint is available")
