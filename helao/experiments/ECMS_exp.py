@@ -17,6 +17,7 @@ __all__ = [
     "ECMS_sub_electrolyte_fill_cell_recirculation",
     "ECMS_sub_prevacuum_cell",
     "ECMS_sub_headspace_purge_and_CO2baseline",
+    "ECMS_sub_headspace_purge_and_Arbaseline",
     "ECMS_sub_electrolyte_recirculation_on",
     "ECMS_sub_electrolyte_recirculation_off",
     "ECMS_sub_CA",
@@ -577,6 +578,47 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     apm.add(ORCH_server, "wait", {"waittime": MS_baseline_duration})
     return apm.action_list
 
+def ECMS_sub_headspace_purge_and_Arbaseline(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Arequilibrium_duration: float = 30,
+    flowrate_sccm: float = 5.0,
+    flow_ramp_sccm: float = 0,
+    MS_baseline_duration: float = 100,
+    # flow_duration: float = -1,
+    # co2measure_acqrate: float = 0.5
+):
+    """prevacuum the cell gas phase side to make the electrolyte contact with GDE"""
+
+    apm = ActionPlanMaker()
+
+    # Fill cell with liquid
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 1})   
+    apm.add(
+        CALIBRATIONMFCSECOND_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": flowrate_sccm,
+            "ramp_sccm_sec": flow_ramp_sccm,
+            "device_name": "Caligassecond",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        CALIBRATIONMFCSECOND_server,
+        "cancel_hold_valve_action",
+        {"device_name": "Caligassecond"},
+        asc.no_wait,
+    )
+    
+    apm.add(ORCH_server, "wait", {"waittime": Arequilibrium_duration})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": MS_baseline_duration})
+    return apm.action_list
 
 def ECMS_sub_electrolyte_recirculation_on(
     experiment: Experiment,
