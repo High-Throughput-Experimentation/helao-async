@@ -617,11 +617,11 @@ class SolidSampleAPI(SampleModelAPI):
                 LOGGER.warning(
                     f"get_xy: invalid sample no '{sample.sample_no}' on plate {sample.plate_id}"
                 )
-                xylist.append((None, None))
+                xylist.append([None, None])
             else:
                 platex = pmdata[sample.sample_no - 1]["x"]
                 platey = pmdata[sample.sample_no - 1]["y"]
-                xylist.append((platex, platey))
+                xylist.append([platex, platey])
         return xylist
 
     async def new_samples(
