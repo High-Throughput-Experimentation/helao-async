@@ -937,7 +937,7 @@ class Orch(Base):
                         f"Error uploading initial active sequence json to s3: {e}"
                     )
 
-            if self.verify_plates:
+            if self.verify_plates and LEGACY_API.has_access:
                 plate_found = self.verify_plate_in_params(self.active_sequence.sequence_params)
                 if not plate_found:
                     stop_message = "sequence contains a plate_id parameter but plate_id could not be found"
@@ -1113,7 +1113,7 @@ class Orch(Base):
                     f"Error uploading initial active experiment json to s3: {e}"
                 )
 
-        if self.verify_plates:
+        if self.verify_plates and LEGACY_API.has_access:
             plate_found = self.verify_plate_in_params(self.active_experiment.experiment_params)
             if not plate_found:
                 stop_message = "experiment contains a plate_id parameter but plate_id could not be found"
