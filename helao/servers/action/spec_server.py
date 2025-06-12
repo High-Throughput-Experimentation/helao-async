@@ -1,5 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-""" Spectrometer server
+"""Spectrometer server
 
 Spec server handles setup and configuration for spectrometer devices. Hardware triggers
 are the preferred method for synchronizing spectral capture with illumination source.
@@ -13,7 +13,13 @@ from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
 from helao.core.models.file import HloHeaderModel
 from helao.drivers.spec.spectral_products_driver import SM303
 from helao.helpers.config_loader import config_loader
@@ -21,35 +27,29 @@ from helao.helpers.config_loader import config_loader
 from helao.drivers.io.enum import TriggerType
 
 from helao.helpers import helao_logging as logging
+
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
 
-def makeApp(confPrefix, server_key, helao_root):
-    config = config_loader(confPrefix, helao_root)
-
-    app = BaseAPI(
-        config=config,
-        server_key=server_key,
-        server_title=server_key,
-        description="Spectrometer server",
-        version=0.1,
-        driver_class=SM303,
-    )
+async def sm303_dyn_endpoints(app=None):
+    server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
 
     @app.post("/get_wl", tags=["private"])
     def get_wl():
         """Return spectrometer wavelength array; shape = (num_pixels)"""
-        return app.driver.pxwl # type: ignore
+        return app.driver.pxwl  # type: ignore
 
     @app.post(f"/{server_key}/acquire_spec", tags=["action"])
     async def acquire_spec(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         int_time_ms: int = 35,
         duration_sec: Optional[
             float
@@ -57,14 +57,14 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Acquire one or more spectrum if duration is positive."""
         LOGGER.info("!!! Starting acquire_spec action.")
-        spec_header = {"wl": app.driver.pxwl} # type: ignore
+        spec_header = {"wl": app.driver.pxwl}  # type: ignore
         active = await app.base.setup_and_contain_action(
             action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
         )
         LOGGER.info("!!! acquire_spec action is active.")
         starttime = time.time()
         # acquire at least 1 spectrum
-        specdict = app.driver.acquire_spec_adv(**active.action.action_params) # type: ignore
+        specdict = app.driver.acquire_spec_adv(**active.action.action_params)  # type: ignore
         await active.enqueue_data_dflt(datadict=specdict)
         # duration loop
         while time.time() - starttime < active.action.action_params["duration_sec"]:
@@ -79,7 +79,9 @@ def makeApp(confPrefix, server_key, helao_root):
     async def acquire_spec_adv(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         int_time_ms: int = 35,
         duration_sec: Optional[
             float
@@ -122,7 +124,7 @@ def makeApp(confPrefix, server_key, helao_root):
         target_peak_min: Optional[float] = 30000,
         target_peak_max: Optional[float] = 32000,
         max_iters: int = 5,
-        max_integration_time: int = 150
+        max_integration_time: int = 150,
     ):
         """Calibrate integration time to achieve peak intensity window."""
         spec_header = {"wl": app.driver.pxwl}
@@ -141,8 +143,10 @@ def makeApp(confPrefix, server_key, helao_root):
         adjust_count = 0
         max_reached = False
         while (
-            ((peak_int < active.action.action_params["target_peak_min"])
-            or (peak_int > active.action.action_params["target_peak_max"]))
+            (
+                (peak_int < active.action.action_params["target_peak_min"])
+                or (peak_int > active.action.action_params["target_peak_max"])
+            )
             and adjust_count < active.action.action_params["max_iters"]
             and not max_reached
         ):
@@ -150,9 +154,9 @@ def makeApp(confPrefix, server_key, helao_root):
                 current_int_time = int(current_int_time * target_avg / peak_int)
             else:
                 current_int_time = int(current_int_time * peak_int / target_avg)
-            
-            if current_int_time > active.action.action_params['max_integration_time']:
-                current_int_time = active.action.action_params['max_integration_time']
+
+            if current_int_time > active.action.action_params["max_integration_time"]:
+                current_int_time = active.action.action_params["max_integration_time"]
                 max_reached = True
             app.base.print_message(
                 f"Adjusting integration time to: {current_int_time} ms", info=True
@@ -176,7 +180,9 @@ def makeApp(confPrefix, server_key, helao_root):
     async def acquire_spec_extrig(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         edge_mode: TriggerType = TriggerType.risingedge,
         int_time: int = 35,
         n_avg: int = 1,
@@ -199,8 +205,22 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Acquire spectra based on external trigger."""
         active = await app.base.setup_and_contain_action()
-        await app.driver.stop(delay=active.action.action_params["delay"]) # type: ignore
-        finished_action = await active.finish() # type: ignore
+        await app.driver.stop(delay=active.action.action_params["delay"])  # type: ignore
+        finished_action = await active.finish()  # type: ignore
         return finished_action.as_dict()
+
+
+def makeApp(confPrefix, server_key, helao_root):
+    config = config_loader(confPrefix, helao_root)
+
+    app = BaseAPI(
+        config=config,
+        server_key=server_key,
+        server_title=server_key,
+        description="Spectrometer server",
+        version=0.1,
+        driver_class=SM303,
+        dyn_endpoints=sm303_dyn_endpoints,
+    )
 
     return app

@@ -282,6 +282,7 @@ class BiologicExec(Executor):
 
 async def biologic_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
+    app.base.server_params["allow_concurrent_actions"] = False
 
     while not app.driver.ready:
         LOGGER.info("waiting for biologic init")
@@ -546,8 +547,6 @@ def makeApp(confPrefix, server_key, helao_root):
         driver_class=BiologicDriver,
         dyn_endpoints=biologic_dyn_endpoints,
     )
-    # prevent concurrent actions on different endpoints
-    app.base.server_params["allow_concurrent_actions"] = False
 
     @app.post(f"/{server_key}/get_meas_status", tags=["action"])
     async def get_meas_status(action: Action = Body({}, embed=True)):
