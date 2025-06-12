@@ -52,11 +52,15 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.servers.base import Base, Active
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.zdeque import zdeque
+from helao.helpers.legacy_api import HTELegacyAPI
 from helao.drivers.data.sync_driver import HelaoSyncer
 
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
+
+
+LEGACY_API = HTELegacyAPI()
 
 
 class Orch(Base):
@@ -224,6 +228,7 @@ class Orch(Base):
         self.op_enabled = self.server_params.get("enable_op", False)
         self.heartbeat_interval = self.server_params.get("heartbeat_interval", 10)
         self.ignore_heartbeats = self.server_params.get("ignore_heartbeats", [])
+        self.verify_plates = self.server_params.get("verify_plates", True)
         # basemodel which holds all information for orch
         self.globalstatusmodel = GlobalStatusModel(orchestrator=self.server)
         self.globalstatusmodel._sort_status()
@@ -799,6 +804,42 @@ class Orch(Base):
             if i == 0:
                 self.globalstatusmodel.loop_state = LoopStatus.started
 
+    def verify_plate_in_params(self, paramd: dict) -> bool:
+        """
+        Checks parameter dict if plate_id parameter has a valid screening print.
+
+        Args:
+            paramd (dict): parameter dictionary
+
+        Returns:
+            bool: True when parameter dict contains plate_id with a valid screening print
+        """
+        plate_found = False
+        if (
+            "solid_plate_id" in paramd
+            or "plate_id" in paramd
+        ):
+            # check for valid plate if solid_plate_id or plate_id is a sequence parameter
+            if LEGACY_API.has_access:
+                for pid_key in ["solid_plate_id", "plate_id"]:
+                    pid_val = paramd.get(
+                        pid_key, None
+                    )
+                    if pid_val is not None:
+                        platemap = LEGACY_API.get_platemap_plateid(pid_val)
+                        if platemap:
+                            plate_found = True
+                            LOGGER.info(
+                                f"plate_id {pid_val} was found with a valid platemap"
+                            )
+                            break
+            else:
+                LOGGER.warning(
+                    "plate_id is a sequence parameter but there is no access to info and map file locations."
+                )
+        return plate_found
+        
+
     async def loop_task_dispatch_sequence(self) -> ErrorCodes:
         """
         Asynchronously dispatches a sequence from the sequence queue and initializes it.
@@ -819,6 +860,18 @@ class Orch(Base):
         if self.sequence_dq:
             LOGGER.info("getting new sequence from sequence_dq")
             self.active_sequence = self.sequence_dq.popleft()
+
+            if self.verify_plates:
+                plate_found = self.verify_plate_in_params(self.active_sequence.sequence_params)
+                if not plate_found:
+                    stop_message = "sequence contains a plate_id parameter but plate_id could not be found"
+                    self.current_stop_message = stop_message
+                    LOGGER.warning(stop_message)
+                    await self.stop()
+                    self.globalstatusmodel.loop_state = LoopStatus.stopped
+                    await self.intend_none()
+                    return ErrorCodes.not_available
+
             self.last_50_sequence_uuids.append(self.active_sequence.sequence_uuid)
             LOGGER.info(f"new active sequence is {self.active_sequence.sequence_name}")
             await self.put_lbuf(
@@ -896,7 +949,9 @@ class Orch(Base):
                     )
 
             self.aloop.create_task(self.seq_unpacker())
-            await asyncio.sleep(1)
+            LOGGER.info("waiting for experiment queue to populate")
+            while len(self.experiment_dq) == 0:
+                await asyncio.sleep(0.1)
 
         else:
             LOGGER.info("sequence queue is empty, cannot start orch loop")
@@ -931,6 +986,18 @@ class Orch(Base):
         # generate uids when populating,
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
+
+        if self.verify_plates:
+            plate_found = self.verify_plate_in_params(self.active_experiment.experiment_params)
+            if not plate_found:
+                stop_message = "experiment contains a plate_id parameter but plate_id could not be found"
+                self.current_stop_message = stop_message
+                LOGGER.warning(stop_message)
+                await self.stop()
+                self.globalstatusmodel.loop_state = LoopStatus.stopped
+                await self.intend_none()
+                return ErrorCodes.not_available
+        
         self.last_50_experiment_uuids.append(self.active_experiment.experiment_uuid)
         self.active_experiment.orch_key = self.orch_key
         self.active_experiment.orch_host = self.orch_host
@@ -1427,6 +1494,7 @@ class Orch(Base):
             while self.globalstatusmodel.loop_state == LoopStatus.started and (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):
+                error_code = ErrorCodes.unspecified
                 LOGGER.info(
                     f"current content of action_dq: {[self.action_dq[i] for i in range(min(len(self.action_dq), 5))]}... ({len(self.action_dq)})"
                 )
@@ -1466,7 +1534,7 @@ class Orch(Base):
                     self.globalstatusmodel.loop_state == LoopStatus.estopped
                     or self.globalstatusmodel.loop_intent == LoopIntent.estop
                 ):
-                    await self.estop_loop()
+                    await self.stop_loop()
                 elif self.action_dq:
                     LOGGER.info("!!!dispatching next action")
                     error_code = await self.loop_task_dispatch_action()
@@ -1525,7 +1593,7 @@ class Orch(Base):
                 # check error responses from dispatching this loop iter
                 if error_code is not ErrorCodes.none:
                     LOGGER.error(f"stopping orch with error code: {error_code}")
-                    await self.intend_estop()
+                    await self.intend_stop()
                 await self.update_operator(True)
 
             # finish the last exp
