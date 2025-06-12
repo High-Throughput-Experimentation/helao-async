@@ -861,17 +861,6 @@ class Orch(Base):
             LOGGER.info("getting new sequence from sequence_dq")
             self.active_sequence = self.sequence_dq.popleft()
 
-            if self.verify_plates:
-                plate_found = self.verify_plate_in_params(self.active_sequence.sequence_params)
-                if not plate_found:
-                    stop_message = "sequence contains a plate_id parameter but plate_id could not be found"
-                    self.current_stop_message = stop_message
-                    LOGGER.warning(stop_message)
-                    await self.stop()
-                    self.globalstatusmodel.loop_state = LoopStatus.stopped
-                    await self.intend_none()
-                    return ErrorCodes.not_available
-
             self.last_50_sequence_uuids.append(self.active_sequence.sequence_uuid)
             LOGGER.info(f"new active sequence is {self.active_sequence.sequence_name}")
             await self.put_lbuf(
@@ -934,6 +923,7 @@ class Orch(Base):
 
             self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
+
             if self.use_db:
                 try:
                     meta_s3_key = f"sequence/{self.seq_model.sequence_uuid}.json"
@@ -947,6 +937,17 @@ class Orch(Base):
                     LOGGER.error(
                         f"Error uploading initial active sequence json to s3: {e}"
                     )
+
+            if self.verify_plates:
+                plate_found = self.verify_plate_in_params(self.active_sequence.sequence_params)
+                if not plate_found:
+                    stop_message = "sequence contains a plate_id parameter but plate_id could not be found"
+                    self.current_stop_message = stop_message
+                    LOGGER.warning(stop_message)
+                    await self.stop()
+                    self.globalstatusmodel.loop_state = LoopStatus.stopped
+                    await self.intend_none()
+                    return ErrorCodes.not_available
 
             self.aloop.create_task(self.seq_unpacker())
             LOGGER.info("waiting for experiment queue to populate")
@@ -987,17 +988,6 @@ class Orch(Base):
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
 
-        if self.verify_plates:
-            plate_found = self.verify_plate_in_params(self.active_experiment.experiment_params)
-            if not plate_found:
-                stop_message = "experiment contains a plate_id parameter but plate_id could not be found"
-                self.current_stop_message = stop_message
-                LOGGER.warning(stop_message)
-                await self.stop()
-                self.globalstatusmodel.loop_state = LoopStatus.stopped
-                await self.intend_none()
-                return ErrorCodes.not_available
-        
         self.last_50_experiment_uuids.append(self.active_experiment.experiment_uuid)
         self.active_experiment.orch_key = self.orch_key
         self.active_experiment.orch_host = self.orch_host
@@ -1076,6 +1066,7 @@ class Orch(Base):
         # LOGGER.info("setting action order")
 
         ## actions are not instantiated until experiment is unpacked
+        staged_acts = []
         for i, act in enumerate(unpacked_acts):
             # init uuid now for tracking later
             act.action_uuid = gen_uuid()
@@ -1097,15 +1088,13 @@ class Orch(Base):
             actserv_cfg = self.world_cfg["servers"][act.action_server.server_name]
             act.action_server.hostname = actserv_cfg["host"]
             act.action_server.port = actserv_cfg["port"]
-            self.action_dq.append(act)
+            staged_acts.append(act)
         if process_order_groups:
             self.active_experiment.process_order_groups = process_order_groups
             process_list = init_process_uuids[: len(process_order_groups)]
             self.active_experiment.process_list = process_list
-        # loop through actions again
 
-        # LOGGER.info("adding unpacked actions to action_dq")
-        LOGGER.info(f"got: {self.action_dq}")
+        LOGGER.info(f"got: {staged_acts}")
         LOGGER.info(f"optional params: {self.active_experiment.experiment_params}")
 
         # write a temporary exp
@@ -1124,6 +1113,22 @@ class Orch(Base):
                 LOGGER.error(
                     f"Error uploading initial active experiment json to s3: {e}"
                 )
+
+        if self.verify_plates:
+            plate_found = self.verify_plate_in_params(self.active_experiment.experiment_params)
+            if not plate_found:
+                stop_message = "experiment contains a plate_id parameter but plate_id could not be found"
+                self.current_stop_message = stop_message
+                LOGGER.warning(stop_message)
+                await self.stop()
+                self.globalstatusmodel.loop_state = LoopStatus.stopped
+                await self.intend_none()
+                return ErrorCodes.not_available
+
+        LOGGER.info("adding unpacked actions to action_dq")
+        for act in staged_acts:
+            self.action_dq.append(act)
+
         return ErrorCodes.none
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
