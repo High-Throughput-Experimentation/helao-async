@@ -836,6 +836,9 @@ class Orch(Base):
                 LOGGER.warning(
                     "plate_id is a sequence parameter but there is no access to info and map file locations."
                 )
+        else:
+            # no plate parameter, so act like it's fine
+            plate_found = True
         return plate_found
         
 
