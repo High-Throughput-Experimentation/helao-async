@@ -18,19 +18,18 @@ Vis:
         __init__(bokehapp: HelaoBokehAPI):
         print_message(*args, **kwargs):
 """
+
 __all__ = ["Vis", "HelaoVis"]
 
 from socket import gethostname
-
 from helao.helpers import helao_logging as logging
-
-global LOGGER
-LOGGER = logging.LOGGER
-
 from helao.helpers.server_api import HelaoBokehAPI
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.print_message import print_message
 from helao.core.models.machine import MachineModel
+
+global LOGGER
+LOGGER = logging.LOGGER
 
 
 # TODO: HelaoVis will return doc to replace makeBokehApp func
