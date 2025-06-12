@@ -110,7 +110,7 @@ class HTEdata:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
 
-        self.dataAPI = HTELegacyAPI(self.base)
+        self.dataAPI = HTELegacyAPI()
 
     def get_platexycalibration(self, plateid: int, *args, **kwargs):
         return None

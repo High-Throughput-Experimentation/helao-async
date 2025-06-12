@@ -588,7 +588,7 @@ class SolidSampleAPI(SampleModelAPI):
             Serv_class=Serv_class,
             extra_columns="plate_id INTEGER NOT NULL",
         )
-        self.legacyAPI = HTELegacyAPI(self._base)
+        self.legacyAPI = HTELegacyAPI()
 
     async def get_platemap(
         self,
