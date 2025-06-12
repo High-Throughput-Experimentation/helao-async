@@ -2949,6 +2949,10 @@ class Active:
                     new_status=HloStatus.finished,
                 )
 
+                if action.error_code != ErrorCodes.none:
+                    if HloStatus.errored not in action.action_status:
+                        action.action_status.append(HloStatus.errored)
+
                 # send globalparams
                 if action.to_global_params:
                     export_params = {}
