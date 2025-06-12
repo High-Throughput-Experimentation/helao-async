@@ -187,6 +187,7 @@ class AndorAcquire(Executor):
 
 async def andor_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
+    app.base.server_params["allow_concurrent_actions"] = False
 
     @app.post(f"/{server_key}/acquire", tags=["action"])
     async def acquire(
@@ -272,7 +273,6 @@ def makeApp(confPrefix, server_key, helao_root):
         driver_class=AndorDriver,
         dyn_endpoints=andor_dyn_endpoints,
     )
-    app.base.server_params["allow_concurrent_actions"] = False
 
     @app.post("/stop_private", tags=["private"])
     def stop_private():
