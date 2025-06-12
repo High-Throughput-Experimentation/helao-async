@@ -90,7 +90,7 @@ class BokehOperator:
     def __init__(self, vis_serv: Vis, orch):
         self.vis = vis_serv
         self.orch = orch
-        self.dataAPI = HTELegacyAPI(self.vis)
+        self.dataAPI = HTELegacyAPI()
 
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.loaded_config_path = self.vis.world_cfg.get("loaded_config_path", "")

@@ -45,7 +45,7 @@ class Aligner:
         self.vis = vis_serv
         self.motor = motor
         self.config_dict = self.vis.server_cfg.get("params", {})
-        self.dataAPI = HTELegacyAPI(self.vis)
+        self.dataAPI = HTELegacyAPI()
         self.motorpos_q = asyncio.Queue()
 
         # flag to check if we actual should align

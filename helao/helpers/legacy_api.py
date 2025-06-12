@@ -8,14 +8,15 @@ from typing import Optional
 import numpy
 
 from helao.helpers import helao_logging as logging
+
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
 
+
 class HTELegacyAPI:
-    def __init__(self, Serv_class):
-        self.base = Serv_class
+    def __init__(self):
 
         self.PLATEMAPFOLDERS = [
             r"J:\hte_jcap_app_proto\map",
@@ -31,6 +32,12 @@ class HTELegacyAPI:
         self.pmpath_pid_cache = {}
         self.els_cache = {}
 
+    @property
+    def has_access(self):
+        return any([os.path.exists(mp) for mp in self.PLATEMAPFOLDERS]) and any(
+            [os.path.exists(pp) for pp in self.PLATEFOLDERS]
+        )
+
     def get_rcp_plateid(self, plateid: int):
         LOGGER.info(f" ... get rcp for plateid: {plateid}")
         return None
@@ -39,7 +46,6 @@ class HTELegacyAPI:
         infod = self.importinfo(plateid)
         # 1. checks that the plate_id (info file) exists
         if infod is not None:
-            # self.base.print_message(infod)
 
             # 2. gets the elements from the screening print in the info file (see getelements_plateid()) and presents them to user
             elements = self.get_elements_plateid(plateid)
@@ -108,14 +114,14 @@ class HTELegacyAPI:
                 return None
             if plateid in self.els_cache.keys():
                 return self.els_cache[plateid]
-        requiredkeysthere = (
-            lambda infofiled, print_key_or_keyword: (
-                "screening_print_id" in infofiled
-            )
+        requiredkeysthere = lambda infofiled, print_key_or_keyword: (
+            ("screening_print_id" in infofiled)
             if print_key_or_keyword == "screening_print_id"
             else (print_key_or_keyword in infofiled["prints"])
         )
-        while not ("prints" in infofiled and requiredkeysthere(infofiled, "screening_print_id")):
+        while not (
+            "prints" in infofiled and requiredkeysthere(infofiled, "screening_print_id")
+        ):
             if "lineage" not in infofiled or "," not in infofiled["lineage"]:
                 return None
             parentplateidstr = infofiled["lineage"].split(",")[-2].strip()
@@ -240,7 +246,9 @@ class HTELegacyAPI:
                 if infop is None:
                     LOGGER.info("getinfopath_plateid returned None")
                     if erroruifcn is not None:
-                        p = erroruifcn("", self.tryprependpath(self.PLATEMAPFOLDERS, ""))
+                        p = erroruifcn(
+                            "", self.tryprependpath(self.PLATEMAPFOLDERS, "")
+                        )
                     return (p, pmidstr) if return_pmidstr else p
                 LOGGER.info(f"reading {infop}")
                 with open(infop, mode="r") as f:
@@ -248,7 +256,9 @@ class HTELegacyAPI:
                 if pmfold == "" or (infokey not in s and "prints" not in s):
                     LOGGER.info("PM folder is '' or info has no print.")
                     if erroruifcn is not None:
-                        p = erroruifcn("", self.tryprependpath(self.PLATEMAPFOLDERS, ""))
+                        p = erroruifcn(
+                            "", self.tryprependpath(self.PLATEMAPFOLDERS, "")
+                        )
                     return (p, pmidstr) if return_pmidstr else p
                 pmidstr = s.partition(infokey)[2].partition("\n")[0].strip()
                 if pmidstr == "" and "prints" in s:
@@ -468,8 +478,10 @@ class HTELegacyAPI:
             if (
                 "," not in s[s.find("(") : s.find(")")]
             ):  # needed because sometimes x,y in fiducials is comma delim and sometimes not
-                LOGGER.warning("WARNING: commas inserted into fiducials line to adhere to format.")
-                self.base.print_message(s)
+                LOGGER.warning(
+                    "WARNING: commas inserted into fiducials line to adhere to format."
+                )
+                LOGGER.info(s)
                 s = (
                     s.replace(
                         "(   ",
@@ -516,7 +528,7 @@ class HTELegacyAPI:
                         ",",
                     )
                 )
-                self.base.print_message(s)
+                LOGGER.info(s)
             fid = eval("[%s]" % s)
             # fid = numpy.array(fid)
 
