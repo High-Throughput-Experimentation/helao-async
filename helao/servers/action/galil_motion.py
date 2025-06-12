@@ -357,11 +357,8 @@ async def galil_dyn_endpoints(app=None):
             datadict = await app.driver.solid_get_samples_xy(
                 **active.action.action_params
             )
-            platexys = datadict.get("platexy", [])
-            if platexys:
-                platexy = platexys[0] 
-            else:
-                platexy = [None, None]
+            platexy = datadict.get("platexy", [(None, None,)])[0]
+            if platexy[0] is None or platexy[1] is None:
                 active.action.error_code = ErrorCodes.not_available
             active.action.action_params.update({"_platexy": platexy})
             await active.enqueue_data_dflt(datadict=datadict)
