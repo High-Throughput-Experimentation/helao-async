@@ -23,7 +23,6 @@ from typing import Optional
 import time
 from functools import partial
 from collections import defaultdict
-from queue import Queue
 
 import aiohttp
 import colorama
