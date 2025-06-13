@@ -29,4 +29,10 @@ def make_str_enum(name, valdict):
     edict = meta.__prepare__(name, bases)
     for k, v in valdict.items():
         edict[k] = v
+
+    dummy_counter = 0
+    while len(edict) < 2:
+        val = f"__dummy{dummy_counter}__"
+        edict[val] = val
+        dummy_counter += 1
     return meta(name, bases, edict)
