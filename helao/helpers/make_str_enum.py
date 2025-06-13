@@ -27,15 +27,16 @@ def make_str_enum(name, valdict):
         Enum,
     )
 
+    tempd = {k: v for k, v in valdict.items()}
 
     dummy_counter = 0
-    while len(valdict) < 2:
+    while len(tempd) < 2:
         val = f"__NOVALUE{dummy_counter}__"
-        valdict[val] = val
+        tempd[val] = val
         dummy_counter += 1
 
     edict = meta.__prepare__(name, bases)
-    for k, v in valdict.items():
+    for k, v in tempd.items():
         edict[k] = v
 
     return meta(name, bases, edict)
