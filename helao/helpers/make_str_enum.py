@@ -32,7 +32,7 @@ def make_str_enum(name, valdict):
 
     dummy_counter = 0
     while len(edict) < 2:
-        val = f"__dummy{dummy_counter}__"
+        val = f"NOVALUE{dummy_counter}"
         edict[val] = val
         dummy_counter += 1
     return meta(name, bases, edict)
