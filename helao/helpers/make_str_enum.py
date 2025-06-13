@@ -1,9 +1,25 @@
 __all__ = ["make_str_enum"]
 
-from enum import Enum
+from enum import StrEnum
+from pydantic_core import CoreSchema
+
+from pydantic import GetJsonSchemaHandler
+from pydantic.json_schema import JsonSchemaValue
 
 
-def make_str_enum(name, valdict):
+@classmethod
+def __get_pydantic_json_schema__(
+    cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler
+) -> JsonSchemaValue:
+    json_schema = handler(core_schema)
+    json_schema = handler.resolve_ref_schema(json_schema)
+    json_schema.pop("const")
+    json_schema["enum"] = [x.value for x in cls]
+
+    return json_schema
+
+
+def make_str_enum(enum_name, valdict):
     """
     Dynamically creates a string-based enumeration.
 
@@ -21,22 +37,9 @@ def make_str_enum(name, valdict):
         >>> Colors.RED.value
         'red'
     """
-    meta = type(Enum)
-    bases = (
-        str,
-        Enum,
-    )
+    variants = [(k, v) for k, v in valdict.items()]
+    enum_out = StrEnum(enum_name, variants)
+    if len(enum_out) == 1:
+        setattr(enum_out, "__get_pydantic_json_schema__", __get_pydantic_json_schema__)
 
-    tempd = {k: v for k, v in valdict.items()}
-
-    dummy_counter = 0
-    while len(tempd) < 2:
-        val = f"__NOVALUE{dummy_counter}__"
-        tempd[val] = val
-        dummy_counter += 1
-
-    edict = meta.__prepare__(name, bases)
-    for k, v in tempd.items():
-        edict[k] = v
-
-    return meta(name, bases, edict)
+    return enum_out
