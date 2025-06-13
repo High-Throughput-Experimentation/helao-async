@@ -73,6 +73,7 @@ servers:
         '9': cDAQ1Mod1/port0/line12
       dev_pump:
         RecirculatingPeriPump1: cDAQ1Mod1/port0/line12
+        recircpump: cDAQ1Mod1/port0/line12
   PAL:
     host: hte-ccsi-01.htejcap.caltech.edu
     port: 8007
