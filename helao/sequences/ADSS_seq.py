@@ -3903,45 +3903,45 @@ def ADSS_PA_CV_TRI_new(
                 }
             )
 
+            # epm.add_experiment(
+            #     "ADSS_sub_interrupt",
+            #     {
+            #         "reason": "Manual injection of phosphoric",
+            #     }
+            # )
+
+
+
+########################### actual syringe injection
+            previous_liquid_injected = "phosphoric"
+            washmod += 1
+            washone = washmod %4 %3 %2
+            washtwo = (washmod + 1) %4 %3 %2
+            washthree = (washmod + 2) %4 %3 %2
+            washfour = (washmod + 3) %4 %3 %2
+
             epm.add_experiment(
-                "ADSS_sub_interrupt",
-                {
-                    "reason": "Manual injection of phosphoric",
-                }
-            )
-
-
-
-############################ actual syringe injection
-        #     previous_liquid_injected = "phosphoric"
-        #     washmod += 1
-        #     washone = washmod %4 %3 %2
-        #     washtwo = (washmod + 1) %4 %3 %2
-        #     washthree = (washmod + 2) %4 %3 %2
-        #     washfour = (washmod + 3) %4 %3 %2
-
-        #     epm.add_experiment(
-        #     "ADSS_sub_transfer_liquid_in",
-        #     {
-        #         "destination": "cell1_we",
-        #         "source_tray": phosphoric_location[0],
-        #         "source_slot": phosphoric_location[1],
-        #         "source_vial": phosphoric_location[2],            
-        #         "liquid_sample_no": phosphoric_sample_no,
-        #         "aliquot_volume_ul": phosphoric_quantity_ul,
-        #         "PAL_Injector": phos_PAL_Injector,
-        #         "PAL_Injector_id": phos_PAL_Injector_id,
-        #         # "rinse_1": washone,
-        #         # "rinse_2": washtwo,
-        #         # "rinse_3": washthree,
-        #         # "rinse_4": washfour,
-        #         "rinse_1": 0,
-        #         "rinse_2": 0,
-        #         "rinse_3": 0,
-        #         "rinse_4": 0,
-        #     }
-        # )
-###################################
+            "ADSS_sub_transfer_liquid_in",
+            {
+                "destination": "cell1_we",
+                "source_tray": phosphoric_location[0],
+                "source_slot": phosphoric_location[1],
+                "source_vial": phosphoric_location[2],            
+                "liquid_sample_no": phosphoric_sample_no,
+                "aliquot_volume_ul": phosphoric_quantity_ul,
+                "PAL_Injector": phos_PAL_Injector,
+                "PAL_Injector_id": phos_PAL_Injector_id,
+                # "rinse_1": washone,
+                # "rinse_2": washtwo,
+                # "rinse_3": washthree,
+                # "rinse_4": washfour,
+                "rinse_1": 0,
+                "rinse_2": 0,
+                "rinse_3": 1,  #was 0
+                "rinse_4": 0,
+            }
+        )
+##################################
             #recirculate to mix PA into electrolyte
             epm.add_experiment(
                 "ADSS_sub_recirculate",
