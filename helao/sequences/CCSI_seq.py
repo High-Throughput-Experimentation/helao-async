@@ -891,12 +891,12 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # =============================================================================
 
 def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed previously
-    sequence_version: int = 19, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
+    sequence_version: int = 21, #9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
 #                   v 14, list for solution/total sample volumes+ extra clean 15 added rinses/16agitation
 #                   17 repeat cleans/rinses/flushes
 #                   18 water injection options
 #                   19 co2 measurement duration now list for flexibility
-#                   20 renaming water addition to secondliquid // adding secondliquid prerinse
+#                   20 renaming water addition to secondliquid // adding secondliquid prerinse #21 second liquid rinse volume
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
     Solution_volume_ul: List[float] = [0,0,0],
@@ -951,6 +951,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     LiquidClean_rinse_agitation_rate: int = 15000,
     rinsePurge_duration: float = 300,
     secondary_prerinse_cycles: int = 0,
+    secondary_prerinse_volume: float = 5000,
 
     rinse_recirc: bool = True,
     rinsePurge_recirc_duration: float = 150,
@@ -1085,6 +1086,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "Syringe_rate_ulsec":Clean_syringe_rate_ulsec,
             "rinse_cycles": LiquidClean_full_rinses,
             "secondary_prerinse_cycles": secondary_prerinse_cycles,
+            "secondliquid_volume": secondary_prerinse_volume,
             "rinse_agitation": LiquidClean_rinse_agitation,
             "rinse_agitation_wait": LiquidClean_rinse_agitation_wait,
             "rinse_agitation_duration": LiquidClean_rinse_agitation_duration,
