@@ -2489,7 +2489,7 @@ def CCSI_sub_n2rinse(
                     Clean_reservoir_sample_no=Clean_reservoir_sample_no,
                     Clean_volume_ul=0,
                     secondliquid_injection_reservoir_sample_no=secondliquid_sample_no,
-                    secondliquid_injection_volume_ul=Clean_volume_ul,
+                    secondliquid_injection_volume_ul=Clean_volume_ul/2,
                     secondliquid_injection_syringe_rate_ulsec=Syringe_rate_ulsec,
                     LiquidFillWait_s=LiquidFillWait_s,
                     Syringe_rate_ulsec=Syringe_rate_ulsec,
