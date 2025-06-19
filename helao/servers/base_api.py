@@ -294,7 +294,7 @@ class BaseAPI(HelaoFastAPI):
             - If the driver class is not a subclass of HelaoDriver, it initializes the driver with the base instance.
             - Initializes dynamic endpoints for the base instance.
             """
-            self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
+            self.base = Base(app=self, dyn_endpoints=dyn_endpoints)
 
             self.root_dir = self.base.world_cfg.get("root", None)
             if self.root_dir is not None:

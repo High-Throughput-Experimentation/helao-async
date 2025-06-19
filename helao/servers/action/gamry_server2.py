@@ -62,7 +62,7 @@ class GamryExec(Executor):
 
             # link attrs for convenience
             self.action_params = self.active.action.action_params
-            self.driver = self.active.base.fastapp.driver
+            self.driver = self.active.driver
 
             # no external timer, event sink signals end of measurement
             self.duration = -1

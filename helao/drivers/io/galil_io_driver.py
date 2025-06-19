@@ -502,7 +502,7 @@ class AiMonExec(Executor):
         """Read analog inputs from live buffer."""
         data_dict = {}
         times = []
-        for ai_name in self.active.base.fastapp.driver.monitor_ai.keys():
+        for ai_name in self.active.driver.monitor_ai.keys():
             val, epoch_s = self.active.base.get_lbuf(ai_name)
             data_dict[ai_name] = val
             times.append(epoch_s)

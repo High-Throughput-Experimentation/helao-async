@@ -369,7 +369,7 @@ class RunExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # current plan is 1 pump per COM
-        self.driver = self.active.base.fastapp.driver
+        self.driver = self.active.driver
         LOGGER.info("RunExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params["duration_sec"]
@@ -421,12 +421,12 @@ class RunExec(Executor):
 
 #     async def _post_exec(self):
 #         LOGGER.info("PumpExec running cleanup methods.")
-#         clearvol_resp = self.active.base.fastapp.driver.clear_volume(
+#         clearvol_resp = self.active.driver.clear_volume(
 #             pump_name=self.pump_name,
 #             direction=self.direction,
 #         )
 #         LOGGER.info(f"clear_volume returned: {clearvol_resp}")
-#         cleartar_resp = self.active.base.fastapp.driver.clear_target_volume(
+#         cleartar_resp = self.active.driver.clear_target_volume(
 #             pump_name=self.pump_name,
 #         )
 #         LOGGER.info(f"clear_target_volume returned: {cleartar_resp}")

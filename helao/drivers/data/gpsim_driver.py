@@ -453,14 +453,14 @@ class GPSimExec(Executor):
         self.orch_str = self.active.action.action_params["orch_str"]
 
     async def _exec(self):
-        await self.active.base.fastapp.driver.fit_model(self.plate_id, self.orch_str)
+        await self.active.driver.fit_model(self.plate_id, self.orch_str)
         return {
             "error": ErrorCodes.none,
             "status": HloStatus.active,
         }
 
     async def _post_exec(self):
-        data = self.active.base.fastapp.driver.progress[self.plate_id]
+        data = self.active.driver.progress[self.plate_id]
         return {
             "data": data,
             "error": ErrorCodes.none,
