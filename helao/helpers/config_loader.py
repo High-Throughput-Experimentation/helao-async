@@ -98,7 +98,9 @@ def load_global_config(confArg: str, set_global: bool = False):
     config_dict = read_config(confArg, helao_repo_root)
     if set_global:
         global CONFIG
-        CONFIG = config_dict
+        CONFIG = HelaoConfig(**config_dict).model_dump(
+            exclude_unset=True, exclude_none=True
+        )
     return config_dict
 
 
@@ -115,7 +117,7 @@ class ServerConfig(BaseModel):
     group: str
     fast: Optional[str] = None
     bokeh: Optional[str] = None
-    params: Optional[dict | OrchServerParams] = {}
+    params: Optional[dict | OrchServerParams] = None
     verbose: Optional[bool] = False
 
 
@@ -124,10 +126,10 @@ class HelaoConfig(BaseModel):
     root: str
     dummy: Optional[bool] = True
     simulation: Optional[bool] = True
-    experiment_libraries: Optional[List[str]] = []
-    experiment_params: Optional[dict] = {}
-    sequence_libraries: Optional[List[str]] = []
-    sequence_params: Optional[dict] = {}
-    servers: Optional[dict] = {}
+    experiment_libraries: Optional[List[str]] = None
+    experiment_params: Optional[dict] = None
+    sequence_libraries: Optional[List[str]] = None
+    sequence_params: Optional[dict] = None
+    servers: Optional[dict] = None
     alert_config_path: Optional[str] = None
     builtin_ref_motorxy: Optional[List[float]] = None
