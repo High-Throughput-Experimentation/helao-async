@@ -105,10 +105,10 @@ def load_global_config(confArg: str, set_global: bool = False):
 
 
 class OrchServerParams(BaseModel):
-    enable_op: bool = False
-    heartbeat_interval: float = 10.0
-    ignore_heartbeats: List[str] = []
-    verify_plates: bool = True
+    enable_op: Optional[bool] = True
+    heartbeat_interval: Optional[float] = 10.0
+    ignore_heartbeats: Optional[List[str]] = None
+    verify_plates: Optional[bool] = True
 
 
 class ServerConfig(BaseModel):
@@ -130,6 +130,6 @@ class HelaoConfig(BaseModel):
     experiment_params: Optional[dict] = None
     sequence_libraries: Optional[List[str]] = None
     sequence_params: Optional[dict] = None
-    servers: Optional[dict] = None
+    servers: Optional[Dict[str, ServerConfig]] = None
     alert_config_path: Optional[str] = None
     builtin_ref_motorxy: Optional[List[float]] = None
