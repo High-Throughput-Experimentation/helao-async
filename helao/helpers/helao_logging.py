@@ -9,9 +9,21 @@ Usage:
 
 """
 
-# import picologging as logging
-# from picologging.handlers import TimedRotatingFileHandler
+import tempfile
+import os
+import subprocess
 import logging
+from queue import Queue
+from logging.handlers import (
+    TimedRotatingFileHandler,
+    SMTPHandler,
+    QueueHandler,
+    QueueListener,
+)
+from typing import Optional
+from pathlib import Path
+
+from colorlog import ColoredFormatter
 
 ALERT_LEVEL = 60
 logging.addLevelName(ALERT_LEVEL, "ALERT")
@@ -23,22 +35,8 @@ def alert(self, message, *args, **kws):
         self._log(ALERT_LEVEL, message, args, **kws)
 
 
-logging.Logger.alert = alert
-
-from queue import Queue
-from logging.handlers import (
-    TimedRotatingFileHandler,
-    SMTPHandler,
-    QueueHandler,
-    QueueListener,
-)
-from colorlog import ColoredFormatter
-import tempfile
-import os
-import subprocess
-
-from typing import Optional
-from pathlib import Path
+# logging.Logger.alert = alert
+setattr(logging.Logger, "alert", alert)
 
 LOGGER = None
 
@@ -132,7 +130,7 @@ def make_logger(
     for handler in handlers:
         handler.setLevel(log_level)
         logger_instance.addHandler(handler)
-    
+
     debug_handlers = [console]
     for handler in debug_handlers:
         handler.setLevel(10 if show_debug_console else 20)
