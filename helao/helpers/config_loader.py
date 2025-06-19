@@ -98,7 +98,7 @@ def load_global_config(confArg: str, set_global: bool = False):
     config_dict = read_config(confArg, helao_repo_root)
     if set_global:
         global CONFIG
-        CONFIG = HelaoConfig(**config_dict).model_dump()
+        CONFIG = config_dict
     return config_dict
 
 
@@ -129,5 +129,5 @@ class HelaoConfig(BaseModel):
     sequence_libraries: Optional[List[str]] = []
     sequence_params: Optional[dict] = {}
     servers: Optional[dict] = {}
-    alert_config_path: Optional[str]
-    builtin_ref_motorxy: Optional[List[float]]
+    alert_config_path: Optional[str] = None
+    builtin_ref_motorxy: Optional[List[float]] = None
