@@ -43,7 +43,7 @@ class AnalysisOutputModel(BaseModel, HelaoDict):
 
 
 class AnalysisModel(ShortAnalysisModel):
-    access: Optional[str] = "hte"
+    access: str = "hte"
     dummy: bool = False
     simulation: bool = False
     analysis_name: str

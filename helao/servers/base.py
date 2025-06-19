@@ -1359,7 +1359,7 @@ class Base:
             OSError: If there is an issue creating the directory or writing the file.
         """
         if action.save_act:
-            act_dict = action.get_actmodel().clean_dict()
+            act_dict = action.get_act().clean_dict()
             save_root = str(self.helaodirs.save_root)
             if action.manual_action:
                 save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
@@ -1946,7 +1946,7 @@ class Active:
 
                 # add actions to experiment
                 for action in self.action_list:
-                    exp.actionmodel_list.append(self.action.get_actmodel())
+                    exp.actionmodel_list.append(self.action.get_act())
 
                 # add experiment to sequence
                 exp.experimentmodel_list.append(self.action.get_exp())
@@ -2100,7 +2100,7 @@ class Active:
         )
 
         if not action.nonblocking:
-            await self.base.status_q.put(action.get_actmodel())
+            await self.base.status_q.put(action.get_act())
 
     def set_estop(self, action: Optional[Action] = None):
         """
@@ -3234,7 +3234,7 @@ class Active:
 
             # add actions to experiment
             for action in self.action_list:
-                exp.actionmodel_list.append(action.get_actmodel())
+                exp.actionmodel_list.append(action.get_act())
 
             # add experiment to sequence
             exp.experimentmodel_list.append(action.get_exp())
@@ -3273,7 +3273,7 @@ class Active:
                     client_servkey=client_servkey,
                     client_host=client_host,
                     client_port=client_port,
-                    actionmodel=self.action.get_actmodel(),
+                    actionmodel=self.action.get_act(),
                 )
 
                 if response.get("success", False) and error_code == ErrorCodes.none:
