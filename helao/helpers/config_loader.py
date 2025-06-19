@@ -113,21 +113,21 @@ class ServerConfig(BaseModel):
     host: str
     port: int
     group: str
-    fast: Optional[str]
-    bokeh: Optional[str]
-    params: dict | OrchServerParams
-    verbose: bool
+    fast: Optional[str] = None
+    bokeh: Optional[str] = None
+    params: Optional[dict | OrchServerParams] = {}
+    verbose: Optional[bool] = False
 
 
 class HelaoConfig(BaseModel):
     run_type: str
     root: str
-    dummy: bool = True
-    simulation: bool = True
-    experiment_libraries: List[str] = []
-    experiment_params: dict = {}
-    sequence_libraries: List[str] = []
-    sequence_params: dict = {}
-    servers: Dict[str, ServerConfig]
-    alert_config_path: str
-    builtin_ref_motorxy: List[float]
+    dummy: Optional[bool] = True
+    simulation: Optional[bool] = True
+    experiment_libraries: Optional[List[str]] = []
+    experiment_params: Optional[dict] = {}
+    sequence_libraries: Optional[List[str]] = []
+    sequence_params: Optional[dict] = {}
+    servers: Optional[dict] = {}
+    alert_config_path: Optional[str]
+    builtin_ref_motorxy: Optional[List[float]]
