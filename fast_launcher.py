@@ -42,20 +42,17 @@ from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
 from helao.helpers.yml_tools import yml_load
 
-global LOGGER
-global CONFIG
-
 
 if __name__ == "__main__":
     log_root = "."
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
-    helao_root = os.path.dirname(os.path.realpath(__file__))
+    helao_repo_root = os.path.dirname(os.path.realpath(__file__))
     server_key = sys.argv[2]
     confArg = sys.argv[1]
     if config_loader.CONFIG is None:
-        config_loader.CONFIG = config_loader.config_loader(confArg, helao_root)
+        config_loader.CONFIG = config_loader.load_global_config(confArg, True)
     CONFIG = config_loader.CONFIG
-        
+
     all_servers_config = CONFIG["servers"]
     server_config = all_servers_config[server_key]
     log_root = os.path.join(CONFIG["root"], "LOGS") if "root" in CONFIG else None
@@ -76,7 +73,7 @@ if __name__ == "__main__":
     makeApp = import_module(
         f"helao.servers.{server_config['group']}.{server_config['fast']}"
     ).makeApp
-    app = makeApp(confArg, server_key, helao_root)
+    app = makeApp(server_key)
     root = CONFIG.get("root", None)
     if root is not None:
         log_root = os.path.join(root, "LOGS")

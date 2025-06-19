@@ -69,13 +69,13 @@ data must be pd.Dataframe with t, and E column
 
 ## helao.helpers.config_loader module
 
-### helao.helpers.config_loader.config_loader(confArg, helao_root)
+### helao.helpers.config_loader.read_config(confArg, helao_repo_root)
 
 Loads a configuration file in either Python (.py) or YAML (.yml) format.
 
 Args:
 : confArg (str): The path to the configuration file or a prefix for the configuration file.
-  helao_root (str): The root directory for the helao project.
+  helao_repo_root (str): The root directory for the helao project.
 
 Returns:
 : dict: The loaded configuration dictionary with an additional key ‘loaded_config_path’ 

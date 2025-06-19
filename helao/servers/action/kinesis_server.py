@@ -23,7 +23,7 @@ from helao.drivers.motion.kinesis_driver import (
     MoveModes,
     MOTION_STATES,
 )
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 from helao.core.error import ErrorCodes
 from helao.helpers.executor import Executor
@@ -183,8 +183,8 @@ async def kinesis_dyn_endpoints(app=None):
             return "stop_polling: ok"
 
 
-def makeApp(confPrefix, server_key, helao_root):
-    config = config_loader(confPrefix, helao_root)
+def makeApp(server_key):
+    config = CONFIG
 
     # current plan is 1 mfc per COM
 

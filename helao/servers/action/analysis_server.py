@@ -14,11 +14,11 @@ from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
 from helao.drivers.data.analysis_driver import HelaoAnalysisSyncer
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 
-def makeApp(confPrefix, server_key, helao_root):
-    config = config_loader(confPrefix, helao_root)
+def makeApp(server_key):
+    config = CONFIG
 
     app = BaseAPI(
         config=config,

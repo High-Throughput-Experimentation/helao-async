@@ -24,12 +24,12 @@ from helao.core.models.sample import AssemblySample, LiquidSample, GasSample, So
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helao.core.error import ErrorCodes
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 
-def makeApp(confPrefix, server_key, helao_root):
+def makeApp(server_key):
 
-    config = config_loader(confPrefix, helao_root)
+    config = CONFIG
 
     app = BaseAPI(
         config=config,

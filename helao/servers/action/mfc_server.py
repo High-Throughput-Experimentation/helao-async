@@ -17,7 +17,7 @@ from helao.drivers.mfc.alicat_driver import (
     MfcConstConcExec,
     MfcConstPresExec,
 )
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 from helao.helpers import helao_logging as logging
 if logging.LOGGER is None:
@@ -363,8 +363,8 @@ async def mfc_dyn_endpoints(app=None):
         ):
             return app.driver._send(device_name, command)
 
-def makeApp(confPrefix, server_key, helao_root):
-    config = config_loader(confPrefix, helao_root)
+def makeApp(server_key):
+    config = CONFIG
 
     # current plan is 1 mfc per COM
 

@@ -11,11 +11,11 @@ from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,Sol
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
 from helao.drivers.sensor.axiscam_driver import AxisCam, AxisCamExec
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 
-def makeApp(confPrefix, server_key, helao_root):
-    config = config_loader(confPrefix, helao_root)
+def makeApp(server_key):
+    config = CONFIG
 
     app = BaseAPI(
         config=config,

@@ -3,7 +3,7 @@ import os
 from helao.core.error import ErrorCodes
 from helao.helpers.premodels import Sequence, Experiment
 from helao.helpers.dispatcher import private_dispatcher
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 
 class HelaoOperator:
@@ -62,10 +62,10 @@ class HelaoOperator:
             orch_host (str): The host address of the orchestrator server.
             orch_port (int): The port number of the orchestrator server.
         """
-        helao_root = os.path.dirname(os.path.realpath(__file__))
-        while "helao.py" not in os.listdir(helao_root):
-            helao_root = os.path.dirname(helao_root)
-        self.helao_config = config_loader(config_arg, helao_root)
+        helao_repo_root = os.path.dirname(os.path.realpath(__file__))
+        while "helao.py" not in os.listdir(helao_repo_root):
+            helao_repo_root = os.path.dirname(helao_repo_root)
+        self.helao_config = read_config(config_arg, helao_repo_root)
         self.orch_key = orch_key
         orch_config = self.helao_config.get("servers", {}).get(self.orch_key, {})
         if not orch_config:

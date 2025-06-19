@@ -13,12 +13,12 @@ from fastapi import Body
 
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 from helao.drivers.pstat.cpsim_driver import CPSim, CPSimExec
 
 
-def makeApp(confPrefix, server_key, helao_root):
-    config = config_loader(confPrefix, helao_root)
+def makeApp(server_key):
+    config = CONFIG
 
     app = BaseAPI(
         config=config,

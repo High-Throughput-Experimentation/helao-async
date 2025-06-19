@@ -26,7 +26,7 @@ from helao.core.models.hlostatus import HloStatus
 
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
@@ -513,9 +513,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     #     return active_action_dict
 
 
-def makeApp(confPrefix, server_key, helao_root):
+def makeApp(server_key):
 
-    config = config_loader(confPrefix, helao_root)
+    config = CONFIG
 
     app = BaseAPI(
         config=config,

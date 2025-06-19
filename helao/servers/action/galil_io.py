@@ -7,7 +7,7 @@ from helao.drivers.io.galil_io_driver import Galil, TriggerType, AiMonExec
 from helao.helpers.premodels import Action
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
 from helao.core.error import ErrorCodes
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 from helao.helpers import helao_logging as logging
 if logging.LOGGER is None:
@@ -244,9 +244,9 @@ async def galil_dyn_endpoints(app=None):
             return finished_action.as_dict()
 
 
-def makeApp(confPrefix, server_key, helao_root):
+def makeApp(server_key):
 
-    config = config_loader(confPrefix, helao_root)
+    config = CONFIG
 
     app = BaseAPI(
         config=config,

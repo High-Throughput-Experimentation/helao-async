@@ -3,9 +3,9 @@ This module provides functionality for managing and launching HELAO servers.
 Classes:
     Pidd: Manages process IDs (PIDs) for HELAO servers, including loading, storing, and terminating processes.
 Functions:
-    validateConfig(PIDD, confDict, helao_root): Validates the configuration dictionary for HELAO servers.
+    validateConfig(PIDD, confDict, helao_repo_root): Validates the configuration dictionary for HELAO servers.
     wait_key(): Waits for a key press on the console and returns it.
-    launcher(confArg, confDict, helao_root, extraopt=""): Launches HELAO servers based on the provided configuration.
+    launcher(confArg, confDict, helao_repo_root, extraopt=""): Launches HELAO servers based on the provided configuration.
     main(): Main entry point for the HELAO launcher script.
 Usage:
     This script is intended to be run as a standalone launcher for HELAO servers. It validates the configuration,
@@ -41,7 +41,7 @@ import colorama
 
 from helao.core.version import get_hlo_version
 from helao.helpers.helao_dirs import helao_dirs
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 import helao.tests.unit_test_sample_models
 
@@ -337,14 +337,14 @@ class Pidd:
         os.remove(self.pidFilePath)
 
 
-def validateConfig(PIDD, confDict, helao_root):
+def validateConfig(PIDD, confDict, helao_repo_root):
     """
     Validates the configuration dictionary for the servers.
 
     Args:
         PIDD (object): An object containing required keys (`reqKeys`) and code keys (`codeKeys`).
         confDict (dict): Configuration dictionary containing server details.
-        helao_root (str): Root directory path for the helao project.
+        helao_repo_root (str): Root directory path for the helao project.
 
     Returns:
         bool: True if the configuration is valid, False otherwise.
@@ -402,7 +402,7 @@ def validateConfig(PIDD, confDict, helao_root):
                 serverDict["group"],
                 serverDict[hasCode[0]] + ".py",
             )
-            if not os.path.exists(os.path.join(helao_root, launchPath)):
+            if not os.path.exists(os.path.join(helao_repo_root, launchPath)):
                 LAUNCH_LOGGER.info(
                     f"{server} server code helao/servers/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist."
                 )
@@ -437,13 +437,13 @@ def wait_key():
     return keypress
 
 
-def launcher(confArg, confDict, helao_root, extraopt=""):
+def launcher(confArg, confDict, helao_repo_root, extraopt=""):
     """
     Launches the Helao servers based on the provided configuration.
     Args:
         confArg (str): Path to the configuration file.
         confDict (dict): Dictionary containing the configuration details.
-        helao_root (str): Root directory of the Helao project.
+        helao_repo_root (str): Root directory of the Helao project.
         extraopt (str, optional): Additional options for launching. Defaults to "".
     Raises:
         Exception: If the configuration is invalid.
@@ -461,7 +461,7 @@ def launcher(confArg, confDict, helao_root, extraopt=""):
     pidd = Pidd(
         pidFile=f"pids_{confPrefix}_{extraopt}.pck", pidPath=helaodirs.states_root
     )
-    if not validateConfig(PIDD=pidd, confDict=confDict, helao_root=helao_root):
+    if not validateConfig(PIDD=pidd, confDict=confDict, helao_repo_root=helao_repo_root):
         LAUNCH_LOGGER.error(f"Configuration for '{confPrefix}' is invalid.")
         raise Exception(f"Configuration for '{confPrefix}' is invalid.")
     else:
@@ -516,7 +516,7 @@ def launcher(confArg, confDict, helao_root, extraopt=""):
                         if group == "orchestrator":
                             pidd.orchServs.append(server)
                         cmd = ["python", "fast_launcher.py", confArg, server]
-                        p = subprocess.Popen(cmd, cwd=helao_root)
+                        p = subprocess.Popen(cmd, cwd=helao_repo_root)
                         ppid = p.pid
                     elif codeKey == "bokeh":
                         if (
@@ -525,7 +525,7 @@ def launcher(confArg, confDict, helao_root, extraopt=""):
                         ):
                             continue
                         cmd = ["python", "bokeh_launcher.py", confArg, server]
-                        p = subprocess.Popen(cmd, cwd=helao_root)
+                        p = subprocess.Popen(cmd, cwd=helao_repo_root)
                         try:
                             time.sleep(5)
                             ppid = pidd.find_bokeh(servHost, servPort)
@@ -597,9 +597,9 @@ def main():
             for x in python_paths
         }
         print(branches)
-    helao_root = os.path.dirname(os.path.realpath(__file__))
+    helao_repo_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
-    config = config_loader(confArg, helao_root)
+    config = read_config(confArg, helao_repo_root)
     if len(sys.argv) > 2:
         extraopt = sys.argv[2]
     else:
@@ -682,7 +682,7 @@ def main():
                 LAUNCH_LOGGER.error(f"Error compressing log: {old_log}", exc_info=True)
 
     pidd = launcher(
-        confArg=confArg, confDict=config, helao_root=helao_root, extraopt=extraopt
+        confArg=confArg, confDict=config, helao_repo_root=helao_repo_root, extraopt=extraopt
     )
 
     def hotkey_msg():
@@ -772,7 +772,7 @@ def main():
                             pidd.kill_server(sn)
                             LAUNCH_LOGGER.info(f"Successfully closed {sn} process.")
                             cmd = ["python", f"{codeKey}_launcher.py", confArg, sn]
-                            p = subprocess.Popen(cmd, cwd=helao_root)
+                            p = subprocess.Popen(cmd, cwd=helao_repo_root)
                             ppid = p.pid
                             pidd.store_pid(sn, S["host"], S["port"], ppid)
                             if sg == "action":
