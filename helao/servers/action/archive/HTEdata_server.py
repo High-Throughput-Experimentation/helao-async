@@ -38,7 +38,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="HTE data management server",
         version=2.0,
-        driver_class=HTEdata,
+        driver_classes=[HTEdata],
     )
 
     @app.post(f"/{server_key}/get_elements_plateid", tags=["action"])

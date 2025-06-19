@@ -26,7 +26,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Analysis server",
         version=0.1,
-        driver_class=HelaoAnalysisSyncer,
+        driver_classes=[HelaoAnalysisSyncer],
     )
 
     @app.post("/batch_calc_echeuvis", tags=["private"])

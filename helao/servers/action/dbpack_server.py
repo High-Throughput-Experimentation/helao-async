@@ -21,7 +21,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Data packaging server",
         version=0.1,
-        driver_class=HelaoSyncer,
+        driver_classes=[HelaoSyncer],
     )
 
     @app.post("/finish_yml", tags=["private"])

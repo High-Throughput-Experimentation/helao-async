@@ -86,7 +86,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Websocket simulator",
         version=1.0,
-        driver_class=WsSim,
+        driver_classes=[WsSim],
     )
 
     @app.post(f"/{server_key}/acquire_data", tags=["action"])

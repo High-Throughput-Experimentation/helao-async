@@ -72,7 +72,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="PSTAT simulator",
         version=2.0,
-        driver_class=PstatSim,
+        driver_classes=[PstatSim],
     )
 
     @app.post(f"/{server_key}/run_CP", tags=["action"])

@@ -37,7 +37,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="NIdaqmx server",
         version=2.0,
-        driver_class=cNIMAX,
+        driver_classes=[cNIMAX],
     )
     dev_monitor = app.server_params.get("dev_monitor", {})
     dev_monitoritems = make_str_enum("dev_monitor", {key: key for key in dev_monitor})

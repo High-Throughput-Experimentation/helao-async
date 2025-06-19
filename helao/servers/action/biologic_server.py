@@ -544,7 +544,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Biologic instrument/action server",
         version=3.0,
-        driver_class=BiologicDriver,
+        driver_classes=[BiologicDriver],
         dyn_endpoints=biologic_dyn_endpoints,
     )
 

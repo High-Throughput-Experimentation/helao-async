@@ -498,7 +498,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Galil motion server",
         version=2.0,
-        driver_class=Galil,
+        driver_classes=[Galil],
         dyn_endpoints=galil_dyn_endpoints,
     )
 
