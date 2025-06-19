@@ -14,6 +14,7 @@ from bokeh.models import ColumnDataSource
 from bokeh.models import DataTable, TableColumn
 
 from helao.helpers import helao_logging as logging
+
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
@@ -262,11 +263,9 @@ class C_palvis:
                     await ws.close()
                     self.IOloop_data_run = False
             except Exception:
-                self.vis.print_message(
-                    f"failed to subscribe to "
-                    f"{self.data_url}"
-                    "trying again in 1sec",
-                    info=True,
+                LOGGER.error(
+                    f"failed to subscribe to {self.data_url} trying again in 1sec",
+                    exc_info=True,
                 )
                 await asyncio.sleep(1)
             if not self.IOloop_data_run:

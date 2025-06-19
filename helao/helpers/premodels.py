@@ -1,4 +1,4 @@
-""" schema.py
+"""schema.py
 Standard classes for experiment queue objects.
 
 """
@@ -39,7 +39,9 @@ class Sequence(SequenceModel):
     "Experiment grouping class."
 
     # not in SequenceModel:
-    experimentmodel_list: List[ExperimentModel] = []  # running tally of completed experiments
+    experimentmodel_list: List[ExperimentModel] = (
+        []
+    )  # running tally of completed experiments
     # allow sequences to inherit parameters from global dict
     from_global_params: dict = {}
 
@@ -52,7 +54,8 @@ class Sequence(SequenceModel):
     def get_seq(self):
         seq = Sequence(**self.model_dump())
         seq.experiment_list = [
-            ShortExperimentModel(**exp.model_dump()) for exp in self.experimentmodel_list
+            ShortExperimentModel(**exp.model_dump())
+            for exp in self.experimentmodel_list
         ]
         # either we have a plan at the beginning or not
         # don't add it later from the experimentmodel_list
@@ -142,12 +145,8 @@ class Experiment(Sequence, ExperimentModel):
             self.actionmodel_list = []
 
         for actm in self.actionmodel_list:
-            print_message(
-                LOGGER,
-                "experiment",
-                f"updating exp with act {actm.action_name} on "
-                f"{actm.action_server.disp_name()}, uuid:{actm.action_uuid}",
-                info=True,
+            LOGGER.info(
+                f"updating exp with act {actm.action_name} on {actm.action_server.disp_name()}, uuid:{actm.action_uuid}"
             )
 
             exp.action_list.append(ShortActionModel(**actm.model_dump()))
@@ -218,6 +217,7 @@ class Experiment(Sequence, ExperimentModel):
 
 class Action(Experiment, ActionModel):
     "Sample-action identifier class."
+
     # not in ActionModel:
     start_condition: ActionStartCondition = ActionStartCondition.wait_for_all
     save_act: bool = True  # default should be true
@@ -302,23 +302,13 @@ class ActionPlanMaker:
             argparam = _locals.get(arg, None)
             if isinstance(argparam, Experiment):
                 if self._experiment is None:
-                    print_message(
-                        LOGGER,
-                        "actionplanmaker",
-                        f"{self.expname}: found Experiment BaseModel under "
-                        f"parameter '{arg}'",
-                        info=True,
+                    LOGGER.info(
+                        f"{self.expname}: found Experiment BaseModel under parameter '{arg}'"
                     )
                     self._experiment = deepcopy(argparam)
                 else:
-                    print_message(
-                        LOGGER,
-                        "actionplanmaker",
-                        f"{self.expname}: critical error: "
-                        f"found another Experiment BaseModel"
-                        f" under parameter '{arg}',"
-                        f" skipping it",
-                        error=True,
+                    LOGGER.error(
+                        f"{self.expname}: critical error: found another Experiment BaseModel under parameter '{arg}', skipping it"
                     )
             else:
                 exp_paramdict.update({arg: argparam})
@@ -326,18 +316,14 @@ class ActionPlanMaker:
 
         # check if an Experiment was detected
         if self._experiment is None:
-            print_message(
-                LOGGER,
-                "actionplanmaker",
-                f"{self.expname}: warning: "
-                f"no Experiment BaseModel was found "
-                f"by ActionPlanMaker, "
-                f"using blank Experiment.",
-                warning=True,
+            LOGGER.warning(
+                f"{self.expname}: warning: no Experiment BaseModel was found by ActionPlanMaker, using blank Experiment."
             )
             self._experiment = Experiment()
 
-        LOGGER.debug(f"experiment.experiment_params {self._experiment.experiment_params}")
+        LOGGER.debug(
+            f"experiment.experiment_params {self._experiment.experiment_params}"
+        )
 
         # add all experiment_params under self.pars
         if self._experiment.experiment_params is not None:
@@ -354,13 +340,8 @@ class ActionPlanMaker:
         # for key, val in _locals.items():
         for key, val in exp_paramdict.items():
             if key not in self._experiment.experiment_params.keys():
-                print_message(
-                    LOGGER,
-                    "ActionPlanMaker",
-                    f"{self.expname}: local var '{key}'"
-                    f" not found in Experiment, "
-                    f"adding it to self.pars",
-                    info=True,
+                LOGGER.info(
+                    f"{self.expname}: local var '{key}' not found in Experiment, adding it to self.pars"
                 )
                 if isinstance(val, str):
                     if val.lower() == "true":
@@ -369,11 +350,8 @@ class ActionPlanMaker:
                         val = False
                 setattr(self.pars, key, val)
 
-        print_message(
-            LOGGER,
-            "ActionPlanMaker",
+        LOGGER.info(
             f"{self.expname}: params in self.pars are:" f" {vars(self.pars)}",
-            info=True,
         )
 
     class _C:

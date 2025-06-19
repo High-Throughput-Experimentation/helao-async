@@ -16,6 +16,7 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
 from helao.helpers import helao_logging as logging
+
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
@@ -232,8 +233,8 @@ class C_mfc:
                         )
                     else:
                         data_dict[f"{mvar}_mean"] = data_dict[mvar]
-                except Exception as e:
-                    self.vis.print_message(e)
+                except Exception:
+                    LOGGER.error(f"Error processing {mvar}", exc_info=True)
                     LOGGER.info(f"datasource {self.datasource.data[mvar]}")
                     LOGGER.info(f"data_dict {self.data_dict[mvar]}")
                     data_dict[f"{mvar}_mean"] = data_dict[mvar]
@@ -262,7 +263,9 @@ class C_mfc:
             self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        LOGGER.info(f" ... Mass flow controller visualizer subscribing to: {self.data_url}")
+        LOGGER.info(
+            f" ... Mass flow controller visualizer subscribing to: {self.data_url}"
+        )
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()

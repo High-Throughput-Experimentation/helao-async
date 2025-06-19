@@ -43,6 +43,4 @@ def update_vol(BS: SampleModel, delta_vol_ml: float, dilute: bool):
                 else:
                     new_df = tot_vol / (old_vol / old_df)
                 BS.dilution_factor = new_df
-                print_message(
-                    LOGGER, "model", f"updated sample dilution-factor: {BS.dilution_factor}", info=True
-                )
+                LOGGER.info(f"updated sample dilution-factor: {BS.dilution_factor}")

@@ -76,7 +76,7 @@ class C_specvis:
             params_dict={},
             json_dict={},
         )[0]
-        self.vis.print_message(self.wl)
+        LOGGER.info(self.wl)
         self.ev = [1239.8 / x for x in self.wl]
         self.IOloop_data_run = False
         self.IOloop_stat_run = False

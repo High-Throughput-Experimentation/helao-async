@@ -637,7 +637,7 @@ class Archive:
         await asyncio.sleep(0.01)
         lock = asyncio.Lock()
         async with lock:
-            self.base.print_message(self.positions.trays_dict)
+            LOGGER.info(self.positions.trays_dict)
             new_tray = None
             new_slot = None
             new_vial = None
@@ -988,10 +988,8 @@ class Archive:
 
         # we keep at least one sample
         if keep_samples:
-            self.base.print_message(
-                f"trying to keep samples: "
-                f"{[s.get_global_label() for s in keep_samples]}",
-                info=True,
+            LOGGER.info(
+                f"trying to keep samples: {[s.get_global_label() for s in keep_samples]}"
             )
             tmp_sample = None
             tmp_loaded = False
@@ -1008,10 +1006,8 @@ class Archive:
                     action=action,
                 )
                 if error != ErrorCodes.none:
-                    self.base.print_message(
-                        "no action provided to generate "
-                        "assembly in order to keep samples",
-                        error=True,
+                    LOGGER.error(
+                        "no action provided to generate assembly in order to keep samples"
                     )
                 else:
                     new_samples = await self.create_samples(
@@ -1029,11 +1025,8 @@ class Archive:
                         if tmp_loaded:
                             tmp_sample.status.append(SampleStatus.created)
                     else:
-                        self.base.print_message(
-                            "could not convert reference"
-                            "to real sample during "
-                            "custom_unload",
-                            error=True,
+                        LOGGER.error(
+                            "could not convert reference to real sample during custom_unload"
                         )
             # if a new sample has been loaded, add it to samples_out
             if tmp_loaded and tmp_sample is not None:
@@ -1543,7 +1536,9 @@ class Archive:
                     # calculate volumes, dilutions
                     new_liquid_mixture[0].sample_position = custom
                     new_liquid_mixture[0].volume_ml = loaded_liquid[0].volume_ml
-                    new_liquid_mixture[0].dilution_factor = loaded_liquid[0].dilution_factor
+                    new_liquid_mixture[0].dilution_factor = loaded_liquid[
+                        0
+                    ].dilution_factor
                     update_vol(
                         new_liquid_mixture[0],
                         delta_vol_ml=samples_out[0].volume_ml,
@@ -2106,10 +2101,8 @@ class Archive:
             elif sample.sample_type is None:
                 LOGGER.info("got None sample")
             else:
-                self.base.print_message(
-                    f"validation error, type '{type(sample)}' "
-                    "is not a valid sample model",
-                    error=True,
+                LOGGER.error(
+                    f"validation error, type '{type(sample)}' is not a valid sample model"
                 )
 
         # now write all samples back to the db

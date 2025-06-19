@@ -27,9 +27,7 @@ def import_sequences(
     sequence_codehash_lib = {}
 
     def get_seqs(seq_path, seq_file):
-        print_message(
-            LOGGER,
-            server_name,
+        LOGGER.info(
             f"importing sequences from '{seq_file}' from '{seq_path}'",
         )
         tempd = (
@@ -42,17 +40,10 @@ def import_sequences(
             if func in tempd:
                 sequence_lib.update({func: tempd[func]})
                 sequence_codehash_lib.update({func: sequence_file_hash})
-                print_message(
-                    LOGGER,
-                    server_name,
-                    f"added seq '{func}' to sequence library",
-                )
+                LOGGER.info( f"added seq '{func}' to sequence library")
             else:
-                print_message(
-                    LOGGER,
-                    server_name,
+                LOGGER.error(
                     f"!!! Could not find sequence function '{func}' in '{seq_file}'",
-                    error=True,
                 )
 
     if sequence_path is None:
@@ -60,9 +51,7 @@ def import_sequences(
             "sequence_path", os.path.join("helao", "sequences")
         )
     if not os.path.isdir(sequence_path):
-        print_message(
-            LOGGER,
-            server_name,
+        LOGGER.error(
             f"sequence path {sequence_path} was specified but is not a valid directory",
         )
         return sequence_lib
@@ -79,16 +68,12 @@ def import_sequences(
         ]
         for userfile in userfiles:
             get_seqs(seq_path=user_sequence_path, seq_file=userfile)
-            print_message(
-                LOGGER,
-                server_name,
+            LOGGER.info(
                 f"Pausing for 3 seconds to notify: custom sequences were imported from {os.path.join(user_sequence_path, userfile)}",
             )
             time.sleep(3)
 
-    print_message(
-        LOGGER,
-        server_name,
+    LOGGER.info(
         f"imported {len(seqlibs)} sequences specified by config.",
     )
     return sequence_lib, sequence_codehash_lib

@@ -296,9 +296,8 @@ class SM303:
             # validate samples_in
             samples_in = await self.unified_db.get_samples(A.samples_in)
             if not samples_in and not self.allow_no_sample:
-                self.base.print_message(
+                LOGGER.error(
                     "Spec server got no valid sample, cannot start measurement!",
-                    error=True,
                 )
                 A.samples_in = []
                 A.error_code = ErrorCodes.no_sample
@@ -355,9 +354,8 @@ class SM303:
 
                 activeDict = self.active.action.as_dict()
         else:
-            self.base.print_message(
+            LOGGER.error(
                 f"Could not trigger_mode ('SpecTrigType.external'), edge_mode ({params['edge_mode']}), int_time ({params['int_time']}), or trigger_duration ({params['duration']}).",
-                error=True,
             )
             A.error_code = ErrorCodes.critical_error
             activeDict = A.as_dict()

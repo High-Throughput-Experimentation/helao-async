@@ -81,7 +81,7 @@ async def mfc_dyn_endpoints(app=None):
 
     else:
         LOGGER.info(f"server_name {co2_sensor_key} was not found in config.")
-        app.base.print_message(app.helao_cfg["servers"])
+        LOGGER.info(app.helao_cfg["servers"])
 
     if devices:
 

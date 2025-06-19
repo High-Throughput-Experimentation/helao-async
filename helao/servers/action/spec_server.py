@@ -158,9 +158,7 @@ async def sm303_dyn_endpoints(app=None):
             if current_int_time > active.action.action_params["max_integration_time"]:
                 current_int_time = active.action.action_params["max_integration_time"]
                 max_reached = True
-            app.base.print_message(
-                f"Adjusting integration time to: {current_int_time} ms", info=True
-            )
+            LOGGER.info(f"Adjusting integration time to: {current_int_time} ms")
             spec_params = active.action.action_params
             spec_params.update({"int_time_ms": current_int_time})
             specdict = app.driver.acquire_spec_adv(**spec_params)
