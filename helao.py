@@ -41,7 +41,7 @@ import colorama
 
 from helao.core.version import get_hlo_version
 from helao.helpers.helao_dirs import helao_dirs
-from helao.helpers.config_loader import CONFIG
+from helao.helpers.config_loader import read_config
 
 import helao.tests.unit_test_sample_models
 
