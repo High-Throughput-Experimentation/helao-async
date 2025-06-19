@@ -49,7 +49,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_key,
         "Orchestrator",
         version=3.0,
-        driver_class=None,
+        driver_classes=None,
     )
 
     return app

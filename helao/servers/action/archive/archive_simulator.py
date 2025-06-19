@@ -150,7 +150,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Archive simulator",
         version=2.0,
-        driver_class=ArchiveSim,
+        driver_classes=[ArchiveSim],
     )
 
     # PRIVATE ENDPOINTS (not managed by Orch)

@@ -26,7 +26,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="OER CP simulator",
         version=1.0,
-        driver_class=CPSim,
+        driver_classes=[CPSim],
     )
 
     @app.post(f"/{server_key}/measure_cp", tags=["action"])

@@ -23,7 +23,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Sensor server",
         version=0.1,
-        driver_class=MeerstetterTEC,
+        driver_classes=[MeerstetterTEC],
     )
 
     @app.post(f"/{server_key}/record_tec", tags=["action"])

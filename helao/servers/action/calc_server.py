@@ -32,7 +32,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Calculation server",
         version=0.1,
-        driver_class=Calc,
+        driver_classes=[Calc],
     )
 
     @app.post(f"/{server_key}/calc_uvis_abs", tags=["action"])

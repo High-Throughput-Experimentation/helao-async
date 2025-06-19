@@ -194,7 +194,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Kinesis motor server",
         version=0.2,
-        driver_class=KinesisMotor,
+        driver_classes=[KinesisMotor],
         poller_class=KinesisPoller,
         dyn_endpoints=kinesis_dyn_endpoints,
     )

@@ -24,7 +24,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Diaphragm pump server",
         version=1.0,
-        driver_class=SIMDOS,
+        driver_classes=[SIMDOS],
     )
 
     @app.post("/start_polling", tags=["private"])

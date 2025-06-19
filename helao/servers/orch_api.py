@@ -5,6 +5,7 @@ from copy import copy
 from enum import Enum
 from socket import gethostname
 from typing import Union, Optional, List
+from collections import namedtuple
 
 from fastapi import Body, WebSocket, Request
 from fastapi.routing import APIRoute
@@ -46,7 +47,7 @@ class OrchAPI(HelaoFastAPI):
         server_title,
         description,
         version,
-        driver_class=None,
+        driver_classes=None,
         poller_class=None,
     ):
         """
@@ -67,7 +68,9 @@ class OrchAPI(HelaoFastAPI):
             description=description,
             version=str(version),
         )
+        self.drivers = tuple()
         self.driver = None
+        self.poller = None
 
         async def set_body(request: Request, body: bytes):
             """
@@ -283,15 +286,22 @@ class OrchAPI(HelaoFastAPI):
             self.orch = Orch(fastapp=self)
 
             self.orch.myinit()
-            if driver_class is not None:
-                if issubclass(driver_class, HelaoDriver):
-                    self.driver = driver_class(config=self.server_params)
-                    if poller_class is not None:
-                        self.poller = poller_class(
-                            self.driver, self.server_cfg.get("polling_time", 0.05)
-                        )
-                else:
-                    self.driver = driver_class(self.orch)
+            if driver_classes is not None:
+                Drivers = namedtuple("Drivers", [d.__name__ for d in driver_classes])
+                driver_dict = {}
+                for i, driver_class in enumerate(driver_classes):
+                    if issubclass(driver_class, HelaoDriver):
+                        driver_inst = driver_class(config=self.server_params)
+                        if i==0 and poller_class is not None:
+                            self.poller = poller_class(
+                                driver_inst, self.server_cfg.get("polling_time", 0.1)
+                            )
+                            self.poller._base_hook = self.base
+                    else:
+                        driver_inst = driver_class(self.base)
+                    driver_dict[driver_class.__name__] = driver_inst
+                self.drivers = Drivers(**driver_dict)
+                self.driver = self.drivers[0]
             self.orch.endpoint_queues_init()
 
         @self.on_event("startup")

@@ -23,7 +23,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Webcam server",
         version=0.1,
-        driver_class=AxisCam,
+        driver_classes=[AxisCam],
     )
 
     @app.post(f"/{server_key}/acquire_image", tags=["action"])

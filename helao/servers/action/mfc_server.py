@@ -374,7 +374,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="MFC server",
         version=0.1,
-        driver_class=AliCatMFC,
+        driver_classes=[AliCatMFC],
         dyn_endpoints=mfc_dyn_endpoints,
     )
 

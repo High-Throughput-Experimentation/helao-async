@@ -523,7 +523,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Gamry instrument/action server",
         version=3.0,
-        driver_class=GamryDriver,
+        driver_classes=[GamryDriver],
         dyn_endpoints=gamry_dyn_endpoints,
     )
 

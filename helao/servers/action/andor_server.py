@@ -270,7 +270,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Andor camera/action server",
         version=0.1,
-        driver_class=AndorDriver,
+        driver_classes=[AndorDriver],
         dyn_endpoints=andor_dyn_endpoints,
     )
 

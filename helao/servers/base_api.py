@@ -5,6 +5,7 @@ import asyncio
 import faulthandler
 from copy import copy
 from socket import gethostname
+from collections import namedtuple
 
 from helao.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
 from helao.helpers.gen_uuid import gen_uuid
@@ -44,7 +45,7 @@ class BaseAPI(HelaoFastAPI):
         poller (Optional[DriverPoller]): An optional poller instance.
 
     Methods:
-        __init__(config, server_key, server_title, description, version, driver_class=None, dyn_endpoints=None, poller_class=None):
+        __init__(config, server_key, server_title, description, version, driver_classes=None, dyn_endpoints=None, poller_class=None):
             Initializes the BaseAPI instance with the given configuration and parameters.
 
         app_entry(request: Request, call_next):
@@ -111,6 +112,7 @@ class BaseAPI(HelaoFastAPI):
     base: Base
     root_dir: str
     fault_dir: str
+    drivers: tuple
 
     def __init__(
         self,
@@ -119,7 +121,7 @@ class BaseAPI(HelaoFastAPI):
         server_title,
         description,
         version,
-        driver_class=None,
+        driver_classes=None,
         dyn_endpoints=None,
         poller_class=None,
     ):
@@ -143,6 +145,7 @@ class BaseAPI(HelaoFastAPI):
             description=description,
             version=str(version),
         )
+        self.drivers = tuple()
         self.driver = None
         self.poller = None
 
@@ -305,16 +308,22 @@ class BaseAPI(HelaoFastAPI):
                 faulthandler.enable(self.fault_file)
 
             self.base.myinit()
-            if driver_class is not None:
-                if issubclass(driver_class, HelaoDriver):
-                    self.driver = driver_class(config=self.server_params)
-                    if poller_class is not None:
-                        self.poller = poller_class(
-                            self.driver, self.server_cfg.get("polling_time", 0.1)
-                        )
-                        self.poller._base_hook = self.base
-                else:
-                    self.driver = driver_class(self.base)
+            if driver_classes is not None:
+                Drivers = namedtuple("Drivers", [d.__name__ for d in driver_classes])
+                driver_dict = {}
+                for i, driver_class in enumerate(driver_classes):
+                    if issubclass(driver_class, HelaoDriver):
+                        driver_inst = driver_class(config=self.server_params)
+                        if i==0 and poller_class is not None:
+                            self.poller = poller_class(
+                                driver_inst, self.server_cfg.get("polling_time", 0.1)
+                            )
+                            self.poller._base_hook = self.base
+                    else:
+                        driver_inst = driver_class(self.base)
+                    driver_dict[driver_class.__name__] = driver_inst
+                self.drivers = Drivers(**driver_dict)
+                self.driver = self.drivers[0]
             self.base.dyn_endpoints_init()
 
         @self.on_event("startup")

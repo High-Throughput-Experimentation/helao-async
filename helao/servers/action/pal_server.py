@@ -51,7 +51,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_key,
         "PAL Autosampler Server",
         version=2.0,
-        driver_class=PAL,
+        driver_classes=[PAL],
     )
 
     _cams = app.server_params.get("cams", {})
