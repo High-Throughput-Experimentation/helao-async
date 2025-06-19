@@ -756,7 +756,7 @@ Sample-action identifier class.
 
 #### get_action_dir()
 
-#### get_actmodel()
+#### get_act()
 
 #### init_act(time_offset=0, force=False)
 

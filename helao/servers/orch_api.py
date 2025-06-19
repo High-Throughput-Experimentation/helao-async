@@ -175,7 +175,7 @@ class OrchAPI(HelaoFastAPI):
                             server_name=server_key, machine_name=gethostname().lower()
                         )
                         # send active status but don't create active object
-                        await self.orch.status_q.put(action.get_actmodel())
+                        await self.orch.status_q.put(action.get_act())
                         response = JSONResponse(action.as_dict())
                         LOGGER.info(
                             f"action request for {action.action_name} received, but server does not allow concurrency, queuing action {action.action_uuid}"
@@ -222,7 +222,7 @@ class OrchAPI(HelaoFastAPI):
                         server_name=server_key, machine_name=gethostname().lower()
                     )
                     # send active status but don't create active object
-                    await self.orch.status_q.put(action.get_actmodel())
+                    await self.orch.status_q.put(action.get_act())
                     response = JSONResponse(action.as_dict())
                     LOGGER.info(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"

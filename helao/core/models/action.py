@@ -37,7 +37,7 @@ class ShortActionModel(BaseModel, HelaoDict):
 
 class ActionModel(ShortActionModel):
     orchestrator: MachineModel = MachineModel()
-    access: Optional[str] = "hte"
+    access: str = "hte"
     dummy: bool = False
     simulation: bool = False
     run_type: Optional[str] = None

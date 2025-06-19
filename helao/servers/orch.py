@@ -2173,7 +2173,7 @@ class Orch(Base):
             list: A list of action models from the action queue, up to the specified limit.
         """
         return [
-            self.action_dq[i].get_actmodel()
+            self.action_dq[i].get_act()
             for i in range(min(len(self.action_dq), limit))
         ]
 

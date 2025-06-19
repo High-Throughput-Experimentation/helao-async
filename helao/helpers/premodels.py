@@ -50,7 +50,7 @@ class Sequence(SequenceModel):
         return f"sequence_name:{self.sequence_name}"
 
     def get_seq(self):
-        seq = SequenceModel(**self.model_dump())
+        seq = Sequence(**self.model_dump())
         seq.experiment_list = [
             ShortExperimentModel(**exp.model_dump()) for exp in self.experimentmodel_list
         ]
@@ -126,7 +126,7 @@ class Experiment(Sequence, ExperimentModel):
         ).replace(r"\\", "/")
 
     def get_exp(self):
-        exp = ExperimentModel(**self.model_dump())
+        exp = Experiment(**self.model_dump())
         # now add all actions
         self._experiment_update_from_actlist(exp=exp)
         return exp
@@ -227,7 +227,6 @@ class Action(Experiment, ActionModel):
     # moved to ActionModel
     # error_code: Optional[ErrorCodes] = ErrorCodes.none
 
-    from_global_params: Optional[dict] = {}
     to_global_params: Optional[Union[list, dict]] = []
 
     # internal
@@ -245,8 +244,8 @@ class Action(Experiment, ActionModel):
     def __str__(self):
         return f"action_name:{self.action_name}"
 
-    def get_actmodel(self):
-        return ActionModel(**self.model_dump())
+    def get_act(self):
+        return Action(**self.model_dump())
 
     def init_act(self, time_offset: float = 0, force: Optional[bool] = False):
         if self.sequence_timestamp is None or self.experiment_timestamp is None:

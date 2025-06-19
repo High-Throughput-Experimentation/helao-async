@@ -26,7 +26,7 @@ class ProcessModel(ShortProcessModel):
     sequence_uuid: Optional[UUID] = None
     experiment_uuid: Optional[UUID] = None
     orchestrator: MachineModel = MachineModel()
-    access: Optional[str] = "hte"
+    access: str = "hte"
     dummy: bool = False
     simulation: bool = False
     technique_name: Optional[str] = None
