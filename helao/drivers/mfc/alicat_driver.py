@@ -371,7 +371,7 @@ class MfcExec(Executor):
         self.flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
         self.ramp_sccm_sec = self.active.action.action_params.get("ramp_sccm_sec", 0)
         if self.flowrate_sccm is not None:
-            rate_resp = await self.active.base.fastapp.driver.set_flowrate(
+            rate_resp = await self.active.driver.set_flowrate(
                 device_name=self.device_name,
                 flowrate_sccm=self.flowrate_sccm,
                 ramp_sccm_sec=self.ramp_sccm_sec,
@@ -386,7 +386,7 @@ class MfcExec(Executor):
         self.last_acq_flow = 0
         self.total_scc = 0
         if self.flowrate_sccm is not None:
-            openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
+            openvlv_resp = await self.active.driver.hold_cancel(
                 device_name=self.device_name,
             )
             LOGGER.info(f"hold_cancel returned: {openvlv_resp}")
@@ -420,7 +420,7 @@ class MfcExec(Executor):
         LOGGER.info("MfcExec running cleanup methods.")
         self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
-            closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
+            closevlv_resp = await self.active.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
             LOGGER.info(f"hold_valve_closed returned: {closevlv_resp}")
@@ -436,7 +436,7 @@ class PfcExec(MfcExec):
         self.pressure_psia = self.active.action.action_params.get("pressure_psia", None)
         self.ramp_psi_sec = self.active.action.action_params.get("ramp_psi_sec", 0)
         if self.pressure_psia is not None:
-            rate_resp = await self.active.base.fastapp.driver.set_pressure(
+            rate_resp = await self.active.driver.set_pressure(
                 device_name=self.device_name,
                 pressure_psia=self.pressure_psia,
                 ramp_psi_sec=self.ramp_psi_sec,
@@ -451,7 +451,7 @@ class PfcExec(MfcExec):
         self.last_acq_flow = 0
         self.total_scc = 0
         if self.pressure_psia is not None:
-            openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
+            openvlv_resp = await self.active.driver.hold_cancel(
                 device_name=self.device_name,
             )
             LOGGER.info(f"hold_cancel returned: {openvlv_resp}")
@@ -482,7 +482,7 @@ class MfcConstPresExec(MfcExec):
     async def _pre_exec(self):
         "Set flow rate."
         LOGGER.info("MfcConstPresExec running setup methods.")
-        rate_resp = await self.active.base.fastapp.driver.set_flowrate(
+        rate_resp = await self.active.driver.set_flowrate(
             device_name=self.device_name,
             flowrate_sccm=self.flowrate_sccm,
             ramp_sccm_sec=self.ramp_sccm_sec,
@@ -518,14 +518,14 @@ class MfcConstPresExec(MfcExec):
         ):
             LOGGER.info(f"pressure below {self.target_pressure}, filling {fill_scc} scc over {fill_time} seconds")
             self.filling = True
-            openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
+            openvlv_resp = await self.active.driver.hold_cancel(
                 device_name=self.device_name,
             )
             LOGGER.info(f"hold_cancel returned: {openvlv_resp}")
             self.fill_end = iter_time + fill_time
         elif self.filling and iter_time >= self.fill_end:
             LOGGER.info("target volume filled, closing mfc valve")
-            closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
+            closevlv_resp = await self.active.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
             LOGGER.info(f"hold_valve_closed returned: {closevlv_resp}")
@@ -547,7 +547,7 @@ class MfcConstPresExec(MfcExec):
         LOGGER.info("MfcConstPresExec running cleanup methods.")
         self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
-            closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
+            closevlv_resp = await self.active.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
             LOGGER.info(f"hold_valve_closed returned: {closevlv_resp}")
@@ -615,7 +615,7 @@ class MfcConstConcExec(MfcExec):
     async def _pre_exec(self):
         "Set flow rate."
         LOGGER.info("MfcConstConcExec running setup methods.")
-        rate_resp = await self.active.base.fastapp.driver.set_flowrate(
+        rate_resp = await self.active.driver.set_flowrate(
             device_name=self.device_name,
             flowrate_sccm=self.flowrate_sccm,
             ramp_sccm_sec=self.ramp_sccm_sec,
@@ -652,14 +652,14 @@ class MfcConstConcExec(MfcExec):
         ):
             LOGGER.info(f"filling {fill_scc} scc over {fill_time} seconds")
             self.filling = True
-            openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
+            openvlv_resp = await self.active.driver.hold_cancel(
                 device_name=self.device_name,
             )
             LOGGER.info(f"hold_cancel returned: {openvlv_resp}")
             self.fill_end = iter_time + fill_time
         elif self.filling and iter_time >= self.fill_end:
             LOGGER.info("target volume filled, closing mfc valve")
-            closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
+            closevlv_resp = await self.active.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
             LOGGER.info(f"hold_valve_closed returned: {closevlv_resp}")
@@ -681,7 +681,7 @@ class MfcConstConcExec(MfcExec):
         LOGGER.info("MfcConstConcExec running cleanup methods.")
         self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
-            closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
+            closevlv_resp = await self.active.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
             LOGGER.info(f"hold_valve_closed returned: {closevlv_resp}")

@@ -83,7 +83,7 @@ class Calc:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.yaml = YAML(typ="safe")
-        self.world_config = self.base.fastapp.helao_cfg
+        self.world_config = self.base.app.helao_cfg
 
     def gather_seq_data(self, seq_reldir: str, action_name: str):
         """Get all files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""

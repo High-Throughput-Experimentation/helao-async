@@ -35,8 +35,8 @@ class KinesisMotorExec(Executor):
         super().__init__(*args, **kwargs)
         # shortcut attribs
         self.base = self.active.base
-        self.driver = self.base.fastapp.driver
-        self.live_dict = self.base.fastapp.poller.live_dict
+        self.driver = self.base.app.driver
+        self.live_dict = self.base.app.poller.live_dict
 
         # action params and axis config
         self.action_params = self.active.action.action_params

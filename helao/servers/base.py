@@ -90,7 +90,7 @@ class Base:
 
     Attributes:
         server (MachineModel): The server machine model.
-        fastapp (FastAPI): The FastAPI application instance.
+        app (FastAPI): The FastAPI application instance.
         dyn_endpoints (callable, optional): Dynamic endpoints initializer.
         server_cfg (dict): Server configuration.
         server_params (dict): Server parameters.
@@ -133,7 +133,7 @@ class Base:
         status_logger (asyncio.Task, optional): Status logger task.
 
     Methods:
-        __init__(self, fastapp, dyn_endpoints=None): Initialize the Base class.
+        __init__(self, app, dyn_endpoints=None): Initialize the Base class.
         exception_handler(self, loop, context): Handle exceptions in the event loop.
         myinit(self): Initialize the event loop and tasks.
         dyn_endpoints_init(self): Initialize dynamic endpoints.
@@ -177,7 +177,7 @@ class Base:
     """
 
     # TODO: add world_cfg: dict parameter for BaseAPI to pass config instead of fastapp
-    def __init__(self, fastapp: HelaoFastAPI, dyn_endpoints=None):
+    def __init__(self, app: HelaoFastAPI, dyn_endpoints=None):
         """
         Initialize the server object.
 
@@ -189,18 +189,18 @@ class Base:
             ValueError: If the root directory is not defined or 'run_type' is missing in the configuration.
         """
         self.server = MachineModel(
-            server_name=fastapp.helao_srv, machine_name=gethostname().lower()
+            server_name=app.helao_srv, machine_name=gethostname().lower()
         )
 
-        self.fastapp = fastapp
+        self.app = app
         self.dyn_endpoints = dyn_endpoints
-        self.server_cfg = self.fastapp.helao_cfg["servers"][self.server.server_name]
-        self.server_params = self.fastapp.helao_cfg["servers"][
+        self.server_cfg = self.app.helao_cfg["servers"][self.server.server_name]
+        self.server_params = self.app.helao_cfg["servers"][
             self.server.server_name
         ].get("params", {})
         self.server.hostname = self.server_cfg["host"]
         self.server.port = self.server_cfg["port"]
-        self.world_cfg = self.fastapp.helao_cfg
+        self.world_cfg = self.app.helao_cfg
         orch_keys = [
             k
             for k, d in self.world_cfg.get("servers", {}).items()
@@ -447,8 +447,8 @@ class Base:
                                                 instance as an argument. Default is None.
         """
         if callable(dyn_endpoints):
-            await dyn_endpoints(app=self.fastapp)
-        for route in self.fastapp.routes:
+            await dyn_endpoints(app=self.app)
+        for route in self.app.routes:
             # print(route.path)
             if route.path.startswith(f"/{self.server.server_name}"):
                 self.actionservermodel.endpoints.update(
@@ -465,7 +465,7 @@ class Base:
         """
         Return a list of all endpoints on this server.
 
-        This method iterates over all routes in the FastAPI application (`self.fastapp.routes`)
+        This method iterates over all routes in the FastAPI application (`self.app.routes`)
         and constructs a list of dictionaries, each representing an endpoint. Each dictionary
         contains the following keys:
 
@@ -483,7 +483,7 @@ class Base:
                   and parameters.
         """
         url_list = []
-        for route in self.fastapp.routes:
+        for route in self.app.routes:
             routeD = {"path": route.path, "name": route.name}
             if "dependant" in dir(route):
                 flatParams = get_flat_params(route.dependant)
@@ -572,7 +572,7 @@ class Base:
         # )
         # TODO: build calname: urlname dict mapping during init_endpoint_status
         # fastapi url for caller function
-        urlname = self.fastapp.url_path_for(calname)
+        urlname = self.app.url_path_for(calname)
 
         # action name should be the last one
         action_name = urlname.strip("/").split("/")[-1]
@@ -1776,6 +1776,7 @@ class Active:
             - Prints messages indicating the save flags for the action.
         """
         self.base = base
+        self.driver = self.base.app.driver
         self.active_uuid = activeparams.action.action_uuid
         self.action = activeparams.action
         # a list of all actions for this active

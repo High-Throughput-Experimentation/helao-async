@@ -841,7 +841,7 @@ class DevMonExec(Executor):
         """Read analog inputs from live buffer."""
         data_dict = {}
         times = []
-        for monitor_name in self.active.base.fastapp.driver.task_monitor_keys:
+        for monitor_name in self.active.driver.task_monitor_keys:
             val, epoch_s = self.active.base.get_lbuf(monitor_name)
             data_dict[monitor_name] = val
             times.append(epoch_s)

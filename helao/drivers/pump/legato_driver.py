@@ -414,13 +414,13 @@ class PumpExec(Executor):
     async def _pre_exec(self):
         "Set rate and volume params, then run."
         LOGGER.info("PumpExec running setup methods.")
-        rate_resp = await self.active.base.fastapp.driver.set_rate(
+        rate_resp = await self.active.driver.set_rate(
             pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
             direction=self.direction,
         )
         LOGGER.info(f"set_rate returned: {rate_resp}")
-        vol_resp = await self.active.base.fastapp.driver.set_target_volume(
+        vol_resp = await self.active.driver.set_target_volume(
             pump_name=self.pump_name,
             vol_val=self.active.action.action_params["volume_uL"],
         )
@@ -428,7 +428,7 @@ class PumpExec(Executor):
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
-        start_resp = await self.active.base.fastapp.driver.start_pump(
+        start_resp = await self.active.driver.start_pump(
             pump_name=self.pump_name,
             direction=self.direction,
         )
@@ -448,18 +448,18 @@ class PumpExec(Executor):
             return {"error": ErrorCodes.none, "status": HloStatus.finished}
 
     async def _manual_stop(self):
-        stop_resp = await self.active.base.fastapp.driver.stop_pump(self.pump_name)
+        stop_resp = await self.active.driver.stop_pump(self.pump_name)
         LOGGER.info(f"stop_pump returned: {stop_resp}")
         return {"error": ErrorCodes.none}
 
     async def _post_exec(self):
         LOGGER.info("PumpExec running cleanup methods.")
-        clearvol_resp = await self.active.base.fastapp.driver.clear_volume(
+        clearvol_resp = await self.active.driver.clear_volume(
             pump_name=self.pump_name,
             direction=self.direction,
         )
         LOGGER.info(f"clear_volume returned: {clearvol_resp}")
-        cleartar_resp = await self.active.base.fastapp.driver.clear_target_volume(
+        cleartar_resp = await self.active.driver.clear_target_volume(
             pump_name=self.pump_name,
         )
         LOGGER.info(f"clear_target_volume returned: {cleartar_resp}")

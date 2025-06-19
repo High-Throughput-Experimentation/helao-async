@@ -81,7 +81,7 @@ class BiologicExec(Executor):
                 for k, v in self.active.action.action_params.items()
                 if not (k.startswith("TTL")) and not (k.startswith("alert"))
             }
-            self.driver = self.active.base.fastapp.driver
+            self.driver = self.active.driver
             self.channel = self.action_params["channel"]
 
             # no external timer, event sink signals end of measurement

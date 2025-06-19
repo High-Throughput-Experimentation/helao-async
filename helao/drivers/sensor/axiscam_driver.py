@@ -81,7 +81,7 @@ class AxisCamExec(Executor):
         # self.active.base.print_message(
         #     f"Image acquisition started at {self.start_time}"
         # )
-        img = self.active.base.fastapp.driver.acquire_image()
+        img = self.active.driver.acquire_image()
         # LOGGER.info("image acquired")
         live_dict = await self.write_image(img, self.start_time)
         return {"error": ErrorCodes.none, "data": live_dict}
@@ -89,7 +89,7 @@ class AxisCamExec(Executor):
     async def _poll(self):
         """Acquire subsequent images."""
         iter_time = time.time()
-        img = self.active.base.fastapp.driver.acquire_image()
+        img = self.active.driver.acquire_image()
         live_dict = await self.write_image(img, iter_time)
         elapsed_time = iter_time - self.start_time
         if (self.duration < 0) or (elapsed_time < self.duration):

@@ -44,7 +44,7 @@ class AndorCooling(Executor):
 
             # link attrs for convenience
             self.action_params = self.active.action.action_params
-            self.driver = self.active.base.fastapp.driver
+            self.driver = self.active.driver
             self.cam = self.driver.cam
 
             # no external timer, event sink signals end of measurement
@@ -120,7 +120,7 @@ class AndorAcquire(Executor):
             self.action_params = self.active.action.action_params
             self.active.action.action_params['action_path']=str(self.active.action.action_output_dir)
 
-            self.driver = self.active.base.fastapp.driver
+            self.driver = self.active.driver
 
             self.external_trigger = self.action_params["external_trigger"]
             self.duration = self.action_params["duration"]
