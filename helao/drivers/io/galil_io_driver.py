@@ -47,7 +47,7 @@ driver_path = os.path.dirname(os.path.realpath(__file__))
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
 import gclib
 
-# pathlib.Path(os.path.join(helao_root, 'visualizer\styles.css')).read_text()
+# pathlib.Path(os.path.join(helao_repo_root, 'visualizer\styles.css')).read_text()
 
 
 class cmd_exception(ValueError):

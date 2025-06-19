@@ -14,7 +14,7 @@ import httpx
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
 from helao.helpers.premodels import Sequence
 from helao.helpers.dispatcher import private_dispatcher
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 from helao.helpers.gen_uuid import gen_uuid
 from helao.sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 from helao.sequences.ECHEUVIS_seq import (
@@ -284,12 +284,12 @@ def main():
         base_url=os.environ["BASE_URL"], api_key=os.environ["API_KEY"]
     )
 
-    helao_root = os.path.dirname(os.path.realpath(__file__))
-    while "helao.py" not in os.listdir(helao_root):
-        helao_root = os.path.dirname(helao_root)
+    helao_repo_root = os.path.dirname(os.path.realpath(__file__))
+    while "helao.py" not in os.listdir(helao_repo_root):
+        helao_repo_root = os.path.dirname(helao_repo_root)
     operator = HelaoOperator(inst_config, "ORCH")
 
-    world_cfg = config_loader(inst_config, helao_root)
+    world_cfg = read_config(inst_config, helao_repo_root)
     db_cfg = world_cfg["servers"]["DB"]
     test_idx = 0
     resumed = False

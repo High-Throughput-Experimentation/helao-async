@@ -6,12 +6,12 @@ from typing import Optional
 from fastapi import Body
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 
-def makeApp(confPrefix, server_key, helao_root):
+def makeApp(server_key):
 
-    config = config_loader(confPrefix, helao_root)
+    config = CONFIG
     C = config["servers"]
     S = C[server_key]
 

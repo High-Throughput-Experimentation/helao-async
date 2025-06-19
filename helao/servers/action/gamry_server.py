@@ -37,7 +37,7 @@ from helao.servers.base_api import BaseAPI
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.helpers.premodels import Action
 from helao.drivers.pstat.gamry_driver import gamry
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 
 async def gamry_dyn_endpoints(app=None):
@@ -269,9 +269,9 @@ async def gamry_dyn_endpoints(app=None):
             active_dict = await app.driver.technique_RCA(A)
             return active_dict
 
-def makeApp(confPrefix, server_key, helao_root):
+def makeApp(server_key):
 
-    config = config_loader(confPrefix, helao_root)
+    config = CONFIG
 
     app = BaseAPI(
         config=config,

@@ -11,11 +11,11 @@ from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.drivers.sensor.cm0134_driver import CM0134, O2MonExec
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 
-def makeApp(confPrefix, server_key, helao_root):
-    config = config_loader(confPrefix, helao_root)
+def makeApp(server_key):
+    config = CONFIG
 
     app = BaseAPI(
         config=config,

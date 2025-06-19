@@ -9,7 +9,7 @@ from bokeh.layouts import layout, Spacer
 
 from helao.servers.vis import HelaoVis
 from helao.servers.vis import Vis
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:
@@ -24,8 +24,8 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
     return server_names
 
 
-def makeBokehApp(doc, confPrefix, server_key, helao_root):
-    config = config_loader(confPrefix, helao_root)
+def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
+    config = CONFIG
     config_filename = os.path.basename(config["loaded_config_path"])
 
     app = HelaoVis(

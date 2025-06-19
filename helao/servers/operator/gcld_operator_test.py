@@ -9,7 +9,7 @@ from gcld_operator import seq_constructor, gen_ts, wait_for_orch, num_uploads
 from helao.servers.operator.helao_operator import HelaoOperator
 
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 from helao.sequences.TEST_seq import TEST_consecutive_noblocking
 from helao.core.models.orchstatus import LoopStatus
 
@@ -32,12 +32,12 @@ TEST_defaults = {
 
 
 def main():
-    helao_root = os.path.dirname(os.path.realpath(__file__))
-    while "helao.py" not in os.listdir(helao_root):
-        helao_root = os.path.dirname(helao_root)
+    helao_repo_root = os.path.dirname(os.path.realpath(__file__))
+    while "helao.py" not in os.listdir(helao_repo_root):
+        helao_repo_root = os.path.dirname(helao_repo_root)
     operator = HelaoOperator(inst_config, "ORCH")
 
-    world_cfg = config_loader(inst_config, helao_root)
+    world_cfg = read_config(inst_config, helao_repo_root)
     db_cfg = world_cfg["servers"]["DB"]
 
     while True:

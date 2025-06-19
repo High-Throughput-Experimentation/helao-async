@@ -4,7 +4,7 @@
 
 ## helao.servers.visualizer.action_visualizer module
 
-### helao.servers.visualizer.action_visualizer.makeBokehApp(doc, confPrefix, server_key, helao_root)
+### helao.servers.visualizer.action_visualizer.makeBokehApp(doc, confPrefix, server_key, helao_repo_root)
 
 ## helao.servers.visualizer.biologic_vis module
 
@@ -116,7 +116,7 @@ callback for input_update_rate
 
 ## helao.servers.visualizer.live_visualizer module
 
-### helao.servers.visualizer.live_visualizer.makeBokehApp(doc, confPrefix, server_key, helao_root)
+### helao.servers.visualizer.live_visualizer.makeBokehApp(doc, confPrefix, server_key, helao_repo_root)
 
 ## helao.servers.visualizer.mfc_vis module
 

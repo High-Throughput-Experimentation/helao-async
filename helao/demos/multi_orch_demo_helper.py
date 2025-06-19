@@ -15,9 +15,9 @@ from helao.helpers.premodels import Sequence
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.dispatcher import private_dispatcher
 from helao.sequences.OERSIM_seq import OERSIM_activelearn
-from helao.helpers.config_loader import config_loader
+from helao.helpers.config_loader import CONFIG
 
-cfgd = {f"demo{i}": config_loader(f"demo{i}", async_root) for i in range(2)}
+cfgd = {f"demo{i}": read_config(f"demo{i}", async_root) for i in range(2)}
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
