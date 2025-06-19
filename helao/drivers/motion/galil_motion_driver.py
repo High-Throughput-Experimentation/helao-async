@@ -135,7 +135,7 @@ class Galil:
         try:
             if galil_ip:
                 self.g.GOpen("%s --direct -s ALL" % (galil_ip))
-                self.base.print_message(self.g.GInfo())
+                LOGGER.info(self.g.GInfo())
                 self.galilcmd = self.g.GCommand  # alias the command callable
                 # The SH commands tells the controller to use the current
                 # motor position as the command position and to enable servo control here.
@@ -170,14 +170,8 @@ class Galil:
             else:
                 LOGGER.error("no Galil IP configured")
                 self.galil_enabled = False
-        except Exception as e:
-            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"severe Galil error ... "
-                f"please power cycle Galil and try again: "
-                f"{repr(e), tb,}",
-                error=True,
-            )
+        except Exception:
+            LOGGER.error("Galil connection error", exc_info=True)
             self.galil_enabled = False
 
         # block gamry
@@ -576,9 +570,9 @@ class Galil:
             if ax in self.axis_id:
                 axl = self.axis_id[ax]
             else:
-                self.base.print_message(
+                LOGGER.error(
                     f"motor setup error: '{ax}' is not in '{self.axis_id}'",
-                    error=True,
+                    exc_info=True,
                 )
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
@@ -1043,9 +1037,9 @@ class Galil:
 
     def update_plate_transfermatrix(self, newtransfermatrix):
         if newtransfermatrix.shape != self.dflt_matrix.shape:
-            self.base.print_message(
+            LOGGER.error(
                 f"matrix \n'{newtransfermatrix}' has wrong shape, using dflt.",
-                error=True,
+                exc_info=True,
             )
             matrix = self.dflt_matrix
         else:

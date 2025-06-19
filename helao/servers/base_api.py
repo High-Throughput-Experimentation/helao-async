@@ -25,8 +25,6 @@ from websockets.exceptions import ConnectionClosedOK
 
 from helao.helpers import helao_logging as logging
 
-global LOGGER
-
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:

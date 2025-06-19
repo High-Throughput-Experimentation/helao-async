@@ -934,10 +934,7 @@ class gamry:
                 self.pstat.SetSignal(self.IO_sigramp)
                 LOGGER.info("signal ramp set")
             except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.info("gamry error in signal")
-                self.base.print_message(gamry_error_decoder(e))
-                self.base.print_message(tb)
+                LOGGER.error(gamry_error_decoder(e), exc_info=True)
                 self.pstat.SetCell(self.GamryCOM.CellOff)
                 return {"measure": "signal_error"}
 
@@ -1008,10 +1005,7 @@ class gamry:
                 LOGGER.info("running dtaq")
                 self.IO_measuring = True
             except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.info("gamry error run")
-                self.base.print_message(gamry_error_decoder(e))
-                self.base.print_message(tb)
+                LOGGER.error(gamry_error_decoder(e), exc_info=True)
                 self.close_pstat_connection()
                 return {"measure": "run_error"}
 

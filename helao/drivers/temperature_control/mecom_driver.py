@@ -223,7 +223,7 @@ class TECWaitExec(Executor):
             status = HloStatus.active
             if epoch_s - self.last_check > 5:
                 stab_msg = STABLE_ID_MAP.get(stable_id, "temperature state is unknown")
-                self.active.base.print_message(stab_msg)
+                LOGGER.info(stab_msg)
                 self.last_check = epoch_s
         else:
             status = HloStatus.finished

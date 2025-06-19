@@ -16,6 +16,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
+
 def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
     """
     Initializes and verifies the directory structure for the Helao application based on the provided configuration.
@@ -30,13 +31,11 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
     Raises:
         Exception: If there is an error compressing old log files.
     """
+
     def check_dir(path):
         if not os.path.isdir(path):
-            print_message(
-                LOGGER,
-                "DIR",
+            LOGGER.warning(
                 f"Warning: directory '{path}' does not exist. Creating it.",
-                warning=True,
             )
             os.makedirs(path)
 
@@ -86,9 +85,9 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
                         for line in f:
                             if line.replace("error_[", "[").strip().startswith("["):
                                 timestamp_found = True
-                                timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line)[
-                                    0
-                                ].replace(":", "")
+                                timestamp = re.findall(
+                                    "[0-9]{2}:[0-9]{2}:[0-9]{2}", line
+                                )[0].replace(":", "")
                                 zipname = old_log.replace(".txt", f"{timestamp}.zip")
                                 arcname = os.path.basename(old_log).replace(
                                     ".txt", f"{timestamp}.txt"

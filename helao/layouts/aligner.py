@@ -1305,7 +1305,7 @@ class Aligner:
 
         self.plate_transfermatrix = self.cutoffdigits(M, self.cutoff)
         LOGGER.info("new TransferMatrix:")
-        self.vis.print_message(M)
+        LOGGER.info(M)
 
         self.vis.doc.add_next_tick_callback(partial(self.update_TranferMatrixdisplay))
         self.vis.doc.add_next_tick_callback(

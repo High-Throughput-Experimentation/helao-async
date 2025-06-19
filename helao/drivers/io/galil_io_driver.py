@@ -94,7 +94,7 @@ class Galil:
         try:
             if galil_ip:
                 self.g.GOpen("%s --direct -s ALL" % (galil_ip))
-                self.base.print_message(self.g.GInfo())
+                LOGGER.info(self.g.GInfo())
                 self.galilcmd = self.g.GCommand  # alias the command callable
                 # downloads a DMC program to galil
                 self.galilprgdownload = self.g.GProgramDownload
@@ -102,13 +102,8 @@ class Galil:
             else:
                 LOGGER.error("no Galil IP configured")
                 self.galil_enabled = False
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"severe Galil error ... please power cycle Galil "
-                f"and try again {repr(e), tb,}",
-                error=True,
-            )
+        except Exception:
+            LOGGER.error("could not connect to Galil controller", exc_info=True)
             self.galil_enabled = False
 
         self.cycle_lights = False

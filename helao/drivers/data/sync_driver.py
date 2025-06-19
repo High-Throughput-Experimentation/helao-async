@@ -1328,7 +1328,7 @@ class HelaoSyncer:
                 for child in prog.yml.finished_children:
                     if child.target.name not in self.running_tasks:
                         await self.enqueue_yml(child.target, rank - 1)
-                        self.base.print_message(str(child.target))
+                        LOGGER.info(str(child.target))
                 # self.base.print_message(
                 #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
                 # )
@@ -1364,13 +1364,11 @@ class HelaoSyncer:
                             LOGGER.info("Parsing hlo dicts.")
                             try:
                                 file_meta, file_data = read_hlo(sp)
-                            except Exception as err:
-                                str_err = "".join(
-                                    traceback.format_exception(
-                                        type(err), err, err.__traceback__
-                                    )
+                            except Exception:
+                                LOGGER.error(
+                                    f"Failed to read hlo file {fp}, skipping upload.",
+                                    exc_info=True,
                                 )
-                                self.base.print_message(str_err)
                                 file_meta = {}
                                 file_data = {}
                             msg = {"meta": file_meta, "data": file_data}
@@ -1385,13 +1383,11 @@ class HelaoSyncer:
                                 parquet_path = str(fp).replace(".hlo", ".parquet")
                                 hlo_to_parquet(fp, parquet_path)
                                 msg = Path(parquet_path)
-                            except Exception as err:
-                                str_err = "".join(
-                                    traceback.format_exception(
-                                        type(err), err, err.__traceback__
-                                    )
+                            except Exception:
+                                LOGGER.error(
+                                    f"Failed to convert hlo file {fp} to parquet, skipping upload.",
+                                    exc_info=True,
                                 )
-                                self.base.print_message(str_err)
                                 msg = None
                     else:
                         rel_posix_path = str(
@@ -1849,11 +1845,11 @@ class HelaoSyncer:
                 try:
                     uploader(uploadee, self.bucket, target)
                     return True
-                except Exception as err:
-                    _ = "".join(
-                        traceback.format_exception(type(err), err, err.__traceback__)
+                except Exception:
+                    LOGGER.error(
+                        f"Failed to upload {target} to S3, retrying in 30 seconds",
+                        exc_info=True,
                     )
-                    self.base.print_message(err)
                     await asyncio.sleep(30)
             LOGGER.info(f"Did not upload {target} after {retries} tries.")
             return False

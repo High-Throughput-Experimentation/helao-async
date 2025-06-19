@@ -547,13 +547,10 @@ class Orch(Base):
                         if response is not None and error_code == ErrorCodes.none:
                             success = True
                             break
-                    except aiohttp.client_exceptions.ClientConnectorError as err:
-                        self.print_message(
-                            f"failed to subscribe to "
-                            f"{serv_key} at "
-                            f"{serv_addr}:{serv_port}, {err}"
-                            "trying again in 2 seconds",
-                            info=True,
+                    except aiohttp.client_exceptions.ClientConnectorError:
+                        LOGGER.error(
+                            f"failed to subscribe to {serv_key} at {serv_addr}:{serv_port}, trying again in 2 seconds",
+                            exc_info=True,
                         )
                         await asyncio.sleep(2)
 
@@ -814,16 +811,11 @@ class Orch(Base):
             bool: True when parameter dict contains plate_id with a valid screening print
         """
         plate_found = False
-        if (
-            "solid_plate_id" in paramd
-            or "plate_id" in paramd
-        ):
+        if "solid_plate_id" in paramd or "plate_id" in paramd:
             # check for valid plate if solid_plate_id or plate_id is a sequence parameter
             if LEGACY_API.has_access:
                 for pid_key in ["solid_plate_id", "plate_id"]:
-                    pid_val = paramd.get(
-                        pid_key, None
-                    )
+                    pid_val = paramd.get(pid_key, None)
                     if pid_val is not None:
                         platemap = LEGACY_API.get_platemap_plateid(pid_val)
                         if platemap:
@@ -840,7 +832,6 @@ class Orch(Base):
             # no plate parameter, so act like it's fine
             plate_found = True
         return plate_found
-        
 
     async def loop_task_dispatch_sequence(self) -> ErrorCodes:
         """
@@ -941,7 +932,9 @@ class Orch(Base):
                     )
 
             if self.verify_plates and LEGACY_API.has_access:
-                plate_found = self.verify_plate_in_params(self.active_sequence.sequence_params)
+                plate_found = self.verify_plate_in_params(
+                    self.active_sequence.sequence_params
+                )
                 if not plate_found:
                     stop_message = "sequence contains a plate_id parameter but plate_id could not be found"
                     self.current_stop_message = stop_message
@@ -1117,7 +1110,9 @@ class Orch(Base):
                 )
 
         if self.verify_plates and LEGACY_API.has_access:
-            plate_found = self.verify_plate_in_params(self.active_experiment.experiment_params)
+            plate_found = self.verify_plate_in_params(
+                self.active_experiment.experiment_params
+            )
             if not plate_found:
                 stop_message = "experiment contains a plate_id parameter but plate_id could not be found"
                 self.current_stop_message = stop_message
@@ -1398,13 +1393,8 @@ class Orch(Base):
                 return ErrorCodes.critical_error
 
             if result_action.error_code is not ErrorCodes.none:
-                self.print_message(
-                    f"Action result for "
-                    f"'{result_action.action_name}' on "
-                    f"'{result_action.action_server.disp_name()}' "
-                    f"has error code: "
-                    f"{result_action.error_code}",
-                    error=True,
+                LOGGER.error(
+                    f"Action result for '{result_action.action_name}' on '{result_action.action_server.disp_name()}' has error code: {result_action.error_code}"
                 )
                 stop_reason = f"{result_action.action_name} on {result_action.action_server.disp_name()} returned an error"
                 await self.estop_loop(stop_reason)
@@ -2173,8 +2163,7 @@ class Orch(Base):
             list: A list of action models from the action queue, up to the specified limit.
         """
         return [
-            self.action_dq[i].get_act()
-            for i in range(min(len(self.action_dq), limit))
+            self.action_dq[i].get_act() for i in range(min(len(self.action_dq), limit))
         ]
 
     def supplement_error_action(self, check_uuid: UUID, sup_action: Action):

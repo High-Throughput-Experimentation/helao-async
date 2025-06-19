@@ -4,7 +4,6 @@ import os
 import time
 from typing import Optional
 from importlib.machinery import SourceFileLoader
-from helao.helpers.print_message import print_message
 from helao.core.version import get_filehash
 
 from helao.helpers import helao_logging as logging
@@ -13,6 +12,7 @@ if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
+
 
 def import_experiments(
     world_config_dict: dict,
@@ -26,9 +26,7 @@ def import_experiments(
     experiment_codehash_lib = {}
 
     def get_exps(exp_path, exp_file):
-        print_message(
-            LOGGER,
-            server_name,
+        LOGGER.info(
             f"importing exeriments from '{exp_file}' from '{exp_path}'",
         )
         tempd = (
@@ -41,17 +39,12 @@ def import_experiments(
             if func in tempd:
                 experiment_lib.update({func: tempd[func]})
                 experiment_codehash_lib.update({func: experiment_file_hash})
-                print_message(
-                    LOGGER,
-                    server_name,
+                LOGGER.info(
                     f"added exp '{func}' to experiment library",
                 )
             else:
-                print_message(
-                    LOGGER,
-                    server_name,
+                LOGGER.error(
                     f"!!! Could not find experiment function '{func}' in '{exp_file}'",
-                    error=True,
                 )
 
     if experiment_path is None:
@@ -59,9 +52,7 @@ def import_experiments(
             "experiment_path", os.path.join("helao", "experiments")
         )
     if not os.path.isdir(experiment_path):
-        print_message(
-            LOGGER,
-            server_name,
+        LOGGER.error(
             f"experiment path {experiment_path} was specified but is not a valid directory",
         )
         return experiment_lib  # False
@@ -78,16 +69,10 @@ def import_experiments(
         ]
         for userfile in userfiles:
             get_exps(exp_path=user_experiment_path, exp_file=userfile)
-            print_message(
-                LOGGER,
-                server_name,
+            LOGGER.info(
                 f"Pausing for 3 seconds to notify: custom experiments were imported from {os.path.join(user_experiment_path, userfile)}",
             )
             time.sleep(3)
 
-    print_message(
-        LOGGER,
-        server_name,
-        f"imported {len(explibs)} experiments specified by config.",
-    )
+    LOGGER.info( f"imported {len(explibs)} experiments specified by config.")
     return experiment_lib, experiment_codehash_lib
