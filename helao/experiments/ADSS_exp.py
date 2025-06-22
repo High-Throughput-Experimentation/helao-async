@@ -36,6 +36,7 @@ __all__ = [
     "ADSS_sub_clean_PALtool",
     "ADSS_sub_PAL_deep_clean",
     "ADSS_sub_PAL_tray_to_tray",
+    "ADSS_sub_PAL_export_icpms",
     "ADSS_sub_cellfill_prefilled",
     "ADSS_sub_cellfill_flush",
     "ADSS_sub_keep_electrolyte",
@@ -2836,6 +2837,36 @@ def ADSS_sub_PAL_tray_to_tray(
             "wash2": rinse_2,
             "wash3": rinse_3,
             "wash4": rinse_4,
+        },
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+
+
+def ADSS_sub_PAL_export_icpms(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    tray: int = 2,
+    slot: int = 1,
+    survey_runs: int = 1,
+    main_runs: int = 3,
+    rack: int = 2,
+    dilution_factor: float = 10
+
+):
+    apm = ActionPlanMaker()
+
+    apm.add(
+        PAL_server,
+        "archive_tray_export_icpms",
+        {
+            "tray": tray,
+            "slot": slot,
+            "survey_runs": survey_runs,
+            "main_runs": main_runs,
+            "rack": rack,
+            "dilution_factor": dilution_factor,
         },
     )
 
