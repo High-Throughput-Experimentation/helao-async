@@ -155,7 +155,7 @@ async def async_private_dispatcher(
             await asyncio.sleep(retry_wait)
             response = None
         finally:
-            conn.close()
+            await conn.close()
     if not success:
         LOGGER.error(
             f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{response}')",
