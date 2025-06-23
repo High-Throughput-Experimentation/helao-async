@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from helao.core.models.hlostatus import HloStatus
-from helao.core.models.experiment import ShortExperimentModel, ExperimentTemplate
+from helao.core.models.experiment import ShortExperimentModel, ExperimentTemplate, ExperimentModel
 from helao.core.models.machine import MachineModel
 
 from helao.core.version import get_hlo_version
@@ -39,3 +39,9 @@ class SequenceModel(SequenceTemplate):
     sync_data: bool = True
     campaign_name: Optional[str] = None
     manual_action: bool = False
+    # not in SequenceModel:
+    experimentmodel_list: List[ExperimentModel] = (
+        []
+    )  # running tally of completed experiments
+    # allow sequences to inherit parameters from global dict
+    from_global_params: dict = {}
