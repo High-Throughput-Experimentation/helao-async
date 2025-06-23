@@ -95,23 +95,24 @@ async def move_dir(
     is_manual = False
 
     yml_dir = None
-    if obj_type not in ["action", "experiment", "sequence"]:
-        LOGGER.info(
-            f"Invalid object {obj_type} was provided. Can only move Action, Experiment, or Sequence."
-        )
-        return {}
 
     if hobj.manual_action:
         dest_dir = "RUNS_DIAG"
         is_manual = True
-        match obj_type:
-            case "action":
-                target_subdir = hobj.get_action_dir()
-            case "experiment":
-                target_subdir = hobj.get_experiment_dir()
-            case "sequence":
-                target_subdir = hobj.get_sequence_dir()
-        yml_dir = os.path.normpath(os.path.join(save_dir, target_subdir))
+    match obj_type:
+        case "action":
+            target_subdir = hobj.get_action_dir()
+        case "experiment":
+            target_subdir = hobj.get_experiment_dir()
+        case "sequence":
+            target_subdir = hobj.get_sequence_dir()
+        case _:
+            LOGGER.info(
+                f"Invalid object {obj_type} was provided. Can only move Action, Experiment, or Sequence."
+            )
+            return {}
+            
+    yml_dir = os.path.normpath(os.path.join(save_dir, target_subdir))
 
     new_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", dest_dir))
     nosync_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", "RUNS_NOSYNC"))
