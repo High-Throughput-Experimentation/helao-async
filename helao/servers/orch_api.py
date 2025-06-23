@@ -600,8 +600,8 @@ class OrchAPI(HelaoFastAPI):
             )
             return result_dict
 
-        @self.post("/update_globalexp_params", tags=["private"])
-        async def update_globalexp_params(params: dict):
+        @self.post("/update_global_params", tags=["private"])
+        async def update_global_params(params: dict):
             """
             Updates the global parameters for the active experiment.
 
@@ -611,13 +611,13 @@ class OrchAPI(HelaoFastAPI):
             Returns:
                 bool: True if the parameters were successfully updated, False otherwise.
             """
-            LOGGER.info(f"Updated globalexp params with {params}.")
+            LOGGER.info(f"Updated global params with {params}.")
             # if self.orch.active_experiment is not None:
-            #     self.orch.active_experiment.globalexp_params.update(params)
+            #     self.orch.active_experiment.global_params.update(params)
             #     return True
             # else:
             #     self.orch.print_message(
-            #         "No active experiment, could not update globalexp params."
+            #         "No active experiment, could not update global params."
             #     )
             #     return False
             self.orch.global_params.update(params)
@@ -1318,10 +1318,10 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @self.post(f"/{server_key}/add_globalexp_param", tags=["action"])
-        async def add_globalexp_param(
+        @self.post(f"/{server_key}/add_global_param", tags=["action"])
+        async def add_global_param(
             action: Action = Body({}, embed=True),
-            param_name: str = "globalexp_param_test",
+            param_name: str = "global_param_test",
             param_value: Union[str, float, int, bool] = True,
         ):
             """
@@ -1329,7 +1329,7 @@ class OrchAPI(HelaoFastAPI):
 
             Args:
                 action (Action, optional): The action object containing parameters. Defaults to an empty Action object.
-                param_name (str, optional): The name of the parameter to add. Defaults to "globalexp_param_test".
+                param_name (str, optional): The name of the parameter to add. Defaults to "global_param_test".
                 param_value (Union[str, float, int, bool], optional): The value of the parameter to add. Defaults to True.
 
             Returns:
