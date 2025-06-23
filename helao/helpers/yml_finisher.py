@@ -176,7 +176,7 @@ async def move_dir(
                     except FileNotFoundError:
                         LOGGER.warning(
                             f"Error removing {yml_dir}, perhaps removed by another operation.",
-                            exc_info=True,
+                            exc_info=False,
                         )
                 if not os.path.exists(yml_dir):
                     rm_success = True
