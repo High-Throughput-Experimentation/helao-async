@@ -3138,15 +3138,20 @@ class Active:
                         f"Failed to send last status for action {action.action_uuid}",
                         exc_info=True,
                     )
-                try:
-                    self.base.aloop.create_task(move_dir(action, base=self.base))
-                    # pop from local action task queue
-                    if action.action_uuid in self.base.local_action_task_queue:
-                        self.base.local_action_task_queue.remove(action.action_uuid)
-                except Exception:
-                    LOGGER.error(
-                        f"Failed to move directory for action {action.action_uuid}",
-                        exc_info=True,
+                if not self.action.manual_action:
+                    try:
+                        self.base.aloop.create_task(move_dir(action, base=self.base))
+                        # pop from local action task queue
+                        if action.action_uuid in self.base.local_action_task_queue:
+                            self.base.local_action_task_queue.remove(action.action_uuid)
+                    except Exception:
+                        LOGGER.error(
+                            f"Failed to move directory for action {action.action_uuid}",
+                            exc_info=True,
+                        )
+                else:
+                    LOGGER.info(
+                        f"Action {action.action_uuid} is a manual action, skipping directory move."
                     )
 
         return self.action
