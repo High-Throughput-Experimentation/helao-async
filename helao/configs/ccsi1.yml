@@ -103,7 +103,7 @@ servers:
     group: action
     fast: co2sensor_server
     params:
-      port: COM10
+      port: COM12
       start_margin: 0
     verbose: false
   SYRINGE0:
