@@ -90,31 +90,28 @@ async def move_dir(
 
     obj_type = hobj.__class__.__name__.lower()
     dest_dir = "RUNS_FINISHED"
-    save_dir = base.helaodirs.save_root.__str__()
+    save_dir = str(base.helaodirs.save_root)
 
     is_manual = False
 
-    if obj_type == "action":
-        yml_dir = os.path.normpath(os.path.join(save_dir, hobj.get_action_dir()))
-        if hobj.manual_action:
-            dest_dir = "RUNS_DIAG"
-            is_manual = True
-    elif obj_type == "experiment":
-        yml_dir = os.path.normpath(os.path.join(save_dir, hobj.get_experiment_dir()))
-        if hobj.experiment_name == "MANUAL":
-            dest_dir = "RUNS_DIAG"
-            is_manual = True
-    elif obj_type == "sequence":
-        yml_dir = os.path.normpath(os.path.join(save_dir, hobj.get_sequence_dir()))
-        if hobj.sequence_name == "manual_seq":
-            dest_dir = "RUNS_DIAG"
-            is_manual = True
-    else:
-        yml_dir = None
+    yml_dir = None
+    if obj_type not in ["action", "experiment", "sequence"]:
         LOGGER.info(
             f"Invalid object {obj_type} was provided. Can only move Action, Experiment, or Sequence."
         )
         return {}
+
+    if hobj.manual_action:
+        dest_dir = "RUNS_DIAG"
+        is_manual = True
+        match obj_type:
+            case "action":
+                target_subdir = hobj.get_action_dir()
+            case "experiment":
+                target_subdir = hobj.get_experiment_dir()
+            case "sequence":
+                target_subdir = hobj.get_sequence_dir()
+        yml_dir = os.path.normpath(os.path.join(save_dir, target_subdir))
 
     new_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", dest_dir))
     nosync_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", "RUNS_NOSYNC"))
