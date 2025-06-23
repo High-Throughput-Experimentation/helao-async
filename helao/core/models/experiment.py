@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
-from helao.core.models.action import ShortActionModel
+from helao.core.models.action import ShortActionModel, ActionModel
 from helao.core.models.file import FileInfo
 from helao.core.models.machine import MachineModel
 
@@ -62,3 +62,8 @@ class ExperimentModel(ExperimentTemplate):
     orch_port: Optional[int] = None
     sync_data: bool = True
     campaign_name: Optional[str] = None
+    # not in ExperimentModel, actionmodel_list is a list of completed ActionModels:
+    actionmodel_list: List[ActionModel] = []
+    # not in ExperimentModel, action_plan is a list of Actions to be executed:
+    action_plan: list = []
+    from_global_params: dict = {}

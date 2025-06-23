@@ -21,6 +21,7 @@ from helao.core.models.machine import MachineModel
 from helao.core.version import get_hlo_version
 from helao.core.helaodict import HelaoDict
 from helao.core.error import ErrorCodes
+from helao.core.models.action_start_condition import ActionStartCondition
 
 
 class ShortActionModel(BaseModel, HelaoDict):
@@ -77,6 +78,26 @@ class ActionModel(ShortActionModel):
     # process_group_index: Optional[int] = 0 # unnecessary if we rely on process_finish as group terminator
     sync_data: bool = True
     campaign_name: Optional[str] = None
+    # not in ActionModel:
+    start_condition: ActionStartCondition = ActionStartCondition.wait_for_all
+    save_act: bool = True  # default should be true
+    save_data: bool = True  # default should be true
+    AUX_file_paths: List[Path] = Field(default=[])
+
+    # moved to ActionModel
+    # error_code: Optional[ErrorCodes] = ErrorCodes.none
+
+    to_global_params: Optional[Union[list, dict]] = []
+
+    # internal
+    file_conn_keys: List[UUID] = Field(default=[])
+
+    # flag for dataLOGGER
+    # None will signal default behaviour as before
+    # will be updated by data LOGGER only if it finds the status
+    # in the data stream
+    data_stream_status: Optional[HloStatus] = None
+
 
     @property
     def url(self):

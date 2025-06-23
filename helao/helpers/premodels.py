@@ -38,13 +38,6 @@ else:
 class Sequence(SequenceModel):
     "Experiment grouping class."
 
-    # not in SequenceModel:
-    experimentmodel_list: List[ExperimentModel] = (
-        []
-    )  # running tally of completed experiments
-    # allow sequences to inherit parameters from global dict
-    from_global_params: dict = {}
-
     def __repr__(self):
         return f"<sequence_name:{self.sequence_name}>"
 
@@ -94,12 +87,6 @@ class Sequence(SequenceModel):
 
 class Experiment(Sequence, ExperimentModel):
     "Sample-action grouping class."
-
-    # not in ExperimentModel, actionmodel_list is a list of completed ActionModels:
-    actionmodel_list: List[ActionModel] = []
-    # not in ExperimentModel, action_plan is a list of Actions to be executed:
-    action_plan: list = []
-    from_global_params: dict = {}
 
     def __repr__(self):
         return f"<experiment_name:{self.experiment_name}>"
@@ -217,26 +204,6 @@ class Experiment(Sequence, ExperimentModel):
 
 class Action(Experiment, ActionModel):
     "Sample-action identifier class."
-
-    # not in ActionModel:
-    start_condition: ActionStartCondition = ActionStartCondition.wait_for_all
-    save_act: bool = True  # default should be true
-    save_data: bool = True  # default should be true
-    AUX_file_paths: List[Path] = Field(default=[])
-
-    # moved to ActionModel
-    # error_code: Optional[ErrorCodes] = ErrorCodes.none
-
-    to_global_params: Optional[Union[list, dict]] = []
-
-    # internal
-    file_conn_keys: List[UUID] = Field(default=[])
-
-    # flag for dataLOGGER
-    # None will signal default behaviour as before
-    # will be updated by data LOGGER only if it finds the status
-    # in the data stream
-    data_stream_status: Optional[HloStatus] = None
 
     def __repr__(self):
         return f"<action_name:{self.action_name}>"
