@@ -44,4 +44,4 @@ class SequenceModel(SequenceTemplate):
         []
     )  # running tally of completed experiments
     # allow sequences to inherit parameters from global dict
-    from_global_params: dict = {}
+    from_global_params: Optional[dict] = Field(default={})
