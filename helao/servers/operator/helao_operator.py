@@ -3,7 +3,7 @@ import os
 from helao.core.error import ErrorCodes
 from helao.helpers.premodels import Sequence, Experiment
 from helao.helpers.dispatcher import private_dispatcher
-from helao.helpers.config_loader import CONFIG
+from helao.helpers.config_loader import CONFIG, read_config
 
 
 class HelaoOperator:
