@@ -585,17 +585,16 @@ class Archive:
                 ]
             )
             csv_filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d-%H%M%S%f')}_ICPMS.csv"
-            csv_dir = os.path.join(
-                self.base.helaodirs.save_root.__str__(),
-                myactive.action.get_action_dir(),
+            
+            await myactive.write_file(
+                file_type="pal_icpms_file",
+                filename=csv_filename,
+                file_sample_label=[v.get_global_label() for v in samplelist],
+                output_str=tmp_output_str,
+                header=headerline,
+                sample_str=None,
             )
-            csv_path = os.path.join(csv_dir, csv_filename)
-            with open(csv_path, "w") as f:
-                f.write("\n".join([headerline, tmp_output_str]))
-
-            await myactive.track_file(
-                file_type="pal_icpms_file", file_path=csv_path, samples=samplelist
-            )
+            
         else:
             LOGGER.info(f"Slot {slot} not found in positions dict. Cannot export.")
 
