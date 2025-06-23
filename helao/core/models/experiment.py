@@ -66,4 +66,4 @@ class ExperimentModel(ExperimentTemplate):
     actionmodel_list: List[ActionModel] = []
     # not in ExperimentModel, action_plan is a list of Actions to be executed:
     action_plan: list = []
-    from_global_params: dict = {}
+    from_global_params: Optional[dict] = Field(default={})

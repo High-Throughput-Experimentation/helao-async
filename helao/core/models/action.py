@@ -87,6 +87,7 @@ class ActionModel(ShortActionModel):
     # moved to ActionModel
     # error_code: Optional[ErrorCodes] = ErrorCodes.none
 
+    from_global_params: Optional[dict] = Field(default={})
     to_global_params: Optional[Union[list, dict]] = []
 
     # internal
