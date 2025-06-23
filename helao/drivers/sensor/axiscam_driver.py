@@ -1,6 +1,4 @@
-""" A device class for the Axis M1103 webcam.
-
-"""
+"""A device class for the Axis M1103 webcam."""
 
 __all__ = ["AxisCam", "AxisCamExec"]
 
@@ -10,6 +8,7 @@ import asyncio
 import requests
 import aiofiles
 from helao.helpers import helao_logging as logging
+
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
@@ -50,9 +49,10 @@ class AxisCamExec(Executor):
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
         self.counter = 0
-        self.output_dir = os.path.join(
-            self.active.base.helaodirs.save_root, self.active.action.action_output_dir
-        )
+        save_root = str(self.active.base.helaodirs.save_root)
+        if self.active.action.manual_action:
+            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+        self.output_dir = os.path.join(save_root, self.active.action.action_output_dir)
 
     async def _pre_exec(self):
         "Set flow rate."

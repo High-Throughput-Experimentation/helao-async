@@ -165,8 +165,8 @@ class Base:
         sync_ntp_task(self, resync_time: int = 1800): Task to regularly sync with the NTP server.
         shutdown(self): Shutdown the server and tasks.
         write_act(self, action): Write action metadata to a file.
-        write_exp(self, experiment, manual=False): Write experiment metadata to a file.
-        write_seq(self, sequence, manual=False): Write sequence metadata to a file.
+        write_exp(self, experiment): Write experiment metadata to a file.
+        write_seq(self, sequence): Write sequence metadata to a file.
         append_exp_to_seq(self, exp, seq): Append experiment metadata to a sequence file.
         new_file_conn_key(self, key: str) -> UUID: Generate a new file connection key.
         dflt_file_conn_key(self): Get the default file connection key.
@@ -195,9 +195,9 @@ class Base:
         self.app = app
         self.dyn_endpoints = dyn_endpoints
         self.server_cfg = self.app.helao_cfg["servers"][self.server.server_name]
-        self.server_params = self.app.helao_cfg["servers"][
-            self.server.server_name
-        ].get("params", {})
+        self.server_params = self.app.helao_cfg["servers"][self.server.server_name].get(
+            "params", {}
+        )
         self.server.hostname = self.server_cfg["host"]
         self.server.port = self.server_cfg["port"]
         self.world_cfg = self.app.helao_cfg
@@ -1382,7 +1382,7 @@ class Base:
                 f"writing meta file for action '{action.action_name}' is disabled."
             )
 
-    async def write_exp(self, experiment, manual=False):
+    async def write_exp(self, experiment):
         """
         Asynchronously writes the experiment data to a YAML file.
 
@@ -1395,7 +1395,7 @@ class Base:
         """
         exp_dict = experiment.get_exp().clean_dict()
         save_root = str(self.helaodirs.save_root)
-        if manual:
+        if experiment.manual_action:
             save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
         output_path = os.path.join(save_root, experiment.get_experiment_dir())
         output_file = os.path.join(
@@ -1415,7 +1415,7 @@ class Base:
         async with aiofiles.open(output_file, mode="w+") as f:
             await f.write(output_str)
 
-    async def write_seq(self, sequence, manual=False):
+    async def write_seq(self, sequence):
         """
         Asynchronously writes a sequence to a YAML file.
 
@@ -1431,7 +1431,7 @@ class Base:
         seq_dict = sequence.get_seq().clean_dict()
         sequence_dir = sequence.get_sequence_dir()
         save_root = str(self.helaodirs.save_root)
-        if manual:
+        if sequence.manual_action:
             save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
         output_path = os.path.join(save_root, sequence_dir)
         output_file = os.path.join(
@@ -1476,7 +1476,9 @@ class Base:
         }
         append_str = yml_dumps([append_dict])
         sequence_dir = seq.get_sequence_dir()
-        save_root = self.helaodirs.save_root
+        save_root = str(self.helaodirs.save_root)
+        if seq.manual_action:
+            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
         output_path = os.path.join(save_root, sequence_dir)
         output_file = os.path.join(
             output_path,
@@ -1923,9 +1925,12 @@ class Active:
             None
         """
         self.data_logger = self.base.aloop.create_task(self.log_data_task())
+        save_root = str(self.base.helaodirs.save_root)
+        if self.action.manual_action:
+            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
         if self.action.save_act:
             full_action_output_path = os.path.join(
-                str(self.base.helaodirs.save_root),
+                save_root,
                 self.action.action_output_dir,
             )
             if self.action.manual_action:
@@ -1951,9 +1956,9 @@ class Active:
                 # add experiment to sequence
                 exp.experimentmodel_list.append(self.action.get_exp())
                 # create and write seq file for manual action
-                await self.base.write_seq(self.action, manual=True)
+                await self.base.write_seq(self.action)
                 # create and write exp file for manual action
-                await self.base.write_exp(self.action, manual=True)
+                await self.base.write_exp(self.action)
 
         LOGGER.info("init active: sending active data_stream_status package")
 
@@ -2535,7 +2540,7 @@ class Active:
         file_group: HloFileGroup = HloFileGroup.aux_files,
         header: Optional[str] = None,
         sample_str: Optional[str] = None,
-        file_sample_label: Optional[str] = None,
+        file_sample_label: Optional[List[str] | str] = None,
         json_data_keys: Optional[str] = None,
         action: Optional[Action] = None,
     ):
@@ -2623,7 +2628,7 @@ class Active:
         file_group: HloFileGroup = HloFileGroup.aux_files,
         header: Optional[str] = None,
         sample_str: Optional[str] = None,
-        file_sample_label: Optional[str] = None,
+        file_sample_label: Optional[List[str] | str] = None,
         json_data_keys: Optional[str] = None,
         action: Optional[Action] = None,
     ):
@@ -3080,13 +3085,14 @@ class Active:
             except Exception:
                 LOGGER.error("Failed to finish data logging", exc_info=True)
 
+            save_root = str(self.base.helaodirs.save_root)
+            if self.action.manual_action:
+                save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
             try:
                 # call custom hlo post-processor if it exists
                 if self.base.hlo_postprocessor is not None:
                     loop = asyncio.get_running_loop()
-                    postprocessor = self.base.hlo_postprocessor(
-                        self.action, self.base.helaodirs.save_root
-                    )
+                    postprocessor = self.base.hlo_postprocessor(self.action, save_root)
                     updated_file_list = await loop.run_in_executor(
                         None, postprocessor.process
                     )
@@ -3170,8 +3176,11 @@ class Active:
         """
         if action is None:
             action = self.action
+        save_root = str(self.base.helaodirs.save_root)
+        if action.manual_action:
+            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
         if os.path.dirname(file_path) != os.path.join(
-            self.base.helaodirs.save_root, action.action_output_dir
+            save_root, action.action_output_dir
         ):
             action.AUX_file_paths.append(file_path)
 
@@ -3199,9 +3208,12 @@ class Active:
         Returns:
             None
         """
+        save_root = str(self.base.helaodirs.save_root)
+        if self.action.manual_action:
+            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
         for x in self.action.AUX_file_paths:
             new_path = os.path.join(
-                self.base.helaodirs.save_root,
+                save_root,
                 self.action.action_output_dir,
                 os.path.basename(x),
             )
@@ -3243,9 +3255,9 @@ class Active:
             # sequence and experiment meta files for
             # manual operation
             # create and write exp file for manual action
-            await self.base.write_exp(exp, manual=True)
+            await self.base.write_exp(exp)
             # create and write seq file for manual action
-            await self.base.write_seq(exp, manual=True)
+            await self.base.write_seq(exp)
 
     async def send_nonblocking_status(self, retry_limit: int = 3):
         """
