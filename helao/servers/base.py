@@ -2990,14 +2990,14 @@ class Active:
                         server_key=action.orch_key,
                         host=action.orch_host,
                         port=action.orch_port,
-                        private_action="update_globalexp_params",
+                        private_action="update_global_params",
                         json_dict=export_params,
                     )
                     if error_code == ErrorCodes.none:
-                        LOGGER.info("Successfully updated globalexp params.")
+                        LOGGER.info("Successfully updated global params.")
             except Exception:
                 LOGGER.error(
-                    f"Failed to update globalexp params for action {action.action_uuid}",
+                    f"Failed to update global params for action {action.action_uuid}",
                     exc_info=True,
                 )
 

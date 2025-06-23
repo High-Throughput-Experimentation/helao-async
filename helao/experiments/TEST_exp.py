@@ -47,14 +47,14 @@ def TEST_sub_conditional_stop(
     apm = ActionPlanMaker()
     apm.add(
         ORCH_server,
-        "add_globalexp_param",
-        {"param_name": "globalexp_test", "param_value": True},
+        "add_global_param",
+        {"param_name": "global_test", "param_value": True},
     )
     apm.add(
         ORCH_server,
         "conditional_stop",
-        {"stop_parameter": "globalexp_test", "stop_value": True},
-        from_global_params={"globalexp_test": "globalexp_test"},
+        {"stop_parameter": "global_test", "stop_value": True},
+        from_global_params={"global_test": "global_test"},
     )
     apm.add(ORCH_server, "wait", {"waittime": 1})
     apm.add(ORCH_server, "wait", {"waittime": 1})
