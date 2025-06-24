@@ -25,7 +25,7 @@ def makeApp(server_key):
         server_title=server_key,
         description="Syringe pump server",
         version=2.0,
-        driver_class=KDS100,
+        driver_classes=[KDS100],
     )
 
     @app.post("/start_polling", tags=["private"])

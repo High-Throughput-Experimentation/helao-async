@@ -63,7 +63,7 @@ def makeApp(server_key):
         server_title=server_key,
         description="Motion simulator",
         version=2.0,
-        driver_class=MotionSim
+        driver_classes=[MotionSim]
     )
 
     @app.post(f"/{server_key}/solid_get_samples_xy", tags=["action"])

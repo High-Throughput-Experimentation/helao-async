@@ -217,7 +217,7 @@ def makeApp(server_key):
         server_title=server_key,
         description="Spectrometer server",
         version=0.1,
-        driver_class=SM303,
+        driver_classes=[SM303],
         dyn_endpoints=sm303_dyn_endpoints,
     )
 
