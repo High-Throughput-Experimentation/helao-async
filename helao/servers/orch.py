@@ -882,13 +882,13 @@ class Orch(Base):
                             )
                     else:
                         self.active_sequence.sequence_params[v] = self.global_params[k]
-                LOGGER.info(
-                    f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
-                )
-            else:
-                LOGGER.info(
-                    f"global parameter {k} not found in global_params, skipping"
-                )
+                    LOGGER.info(
+                        f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
+                    )
+                else:
+                    LOGGER.info(
+                        f"global parameter {k} not found in global_params, skipping"
+                    )
 
             # if planned_experiments is empty, unpack sequence,
             # otherwise operator already populated planned_experiments
@@ -1280,6 +1280,7 @@ class Orch(Base):
                 else:
                     LOGGER.info(
                         f"global parameter {k} not found in global_params, skipping"
+                    )
 
             actserv_exists, _ = await endpoints_available([A.url])
             if not actserv_exists:
