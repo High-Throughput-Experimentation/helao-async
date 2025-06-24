@@ -335,7 +335,7 @@ def ADSS_CA_cell_1potential(
 
         # epm.add_experiment("ADSS_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 def ADSS_PA_CVs_CAs_cell(
     sequence_version: int = 5, 
@@ -600,7 +600,7 @@ def ADSS_PA_CVs_CAs_cell(
 
         # epm.add_experiment("ADSS_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 def ADSS_PA_CVs_CAs_CVs_cell_simple(
     sequence_version: int = 8, #make sample list 
@@ -917,7 +917,7 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
                                 "DrainWait_s": Clean_drain_s,
                             })
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 
@@ -1207,7 +1207,7 @@ def ADSS_CA_cell_multipotential(
 
         # epm.add_experiment("ADSS_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 
@@ -1580,7 +1580,7 @@ def ADSS_PA_CVs_testing(
             
 
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     sequence_version: int = 1, 
@@ -1948,7 +1948,7 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
             )
 
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 
@@ -3147,7 +3147,7 @@ def ADSS_PA_CV_TRI(
                     }
                 )       
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def ADSS_PA_CV_TRI_new(
@@ -4473,4 +4473,4 @@ def ADSS_PA_CV_TRI_new(
     epm.add_experiment("ADSS_sub_gasvalve_N2flow",{"open": False,})
  
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list

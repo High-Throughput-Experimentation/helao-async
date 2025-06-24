@@ -32,16 +32,16 @@ def constructor(
     for k, v in params.items():
         if k in seq_params:
             seq_params[k] = v
-    experiment_list = sequence_function(**seq_params)
+    unpacked_experiments = sequence_function(**seq_params)
     seq = Sequence(
         sequence_name=sequence_function.__name__,
         sequence_label=sequence_label,
         sequence_params=seq_params,
         sequence_uuid=seq_uuid,
         data_request_id=data_request_id,
-        experiment_list=[],
-        experiment_plan_list=experiment_list,
-        experimentmodel_list=[],
+        planned_experiments=unpacked_experiments,
+        completed_experiments=[],
+        completed_experiments_abbr=[],
     )
     seq.sequence_uuid = seq_uuid
     return seq

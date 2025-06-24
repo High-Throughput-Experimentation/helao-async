@@ -1951,10 +1951,10 @@ class Active:
 
                 # add actions to experiment
                 for action in self.action_list:
-                    exp.actionmodel_list.append(self.action.get_act())
+                    exp.completed_actions.append(self.action.get_act())
 
                 # add experiment to sequence
-                exp.experimentmodel_list.append(self.action.get_exp())
+                exp.completed_experiments.append(self.action.get_exp())
                 # create and write seq file for manual action
                 await self.base.write_seq(self.action)
                 # create and write exp file for manual action
@@ -3187,7 +3187,7 @@ class Active:
         if os.path.dirname(file_path) != os.path.join(
             save_root, action.action_output_dir
         ):
-            action.AUX_file_paths.append(file_path)
+            action.aux_file_paths.append(file_path)
 
         file_info = FileInfo(
             file_type=file_type,
@@ -3205,7 +3205,7 @@ class Active:
         """
         Asynchronously relocates files from their current locations to new paths.
 
-        This method iterates over the file paths listed in `self.action.AUX_file_paths`
+        This method iterates over the file paths listed in `self.action.aux_file_paths`
         and moves each file to a new directory specified by combining `self.base.helaodirs.save_root`
         and `self.action.action_output_dir`. If the source path and the new path are different,
         the file is copied to the new location using `async_copy`.
@@ -3216,7 +3216,7 @@ class Active:
         save_root = str(self.base.helaodirs.save_root)
         if self.action.manual_action:
             save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
-        for x in self.action.AUX_file_paths:
+        for x in self.action.aux_file_paths:
             new_path = os.path.join(
                 save_root,
                 self.action.action_output_dir,
@@ -3251,10 +3251,10 @@ class Active:
 
             # add actions to experiment
             for action in self.action_list:
-                exp.actionmodel_list.append(action.get_act())
+                exp.completed_actions.append(action.get_act())
 
             # add experiment to sequence
-            exp.experimentmodel_list.append(action.get_exp())
+            exp.completed_experiments.append(action.get_exp())
 
             # this will write the correct
             # sequence and experiment meta files for

@@ -89,7 +89,7 @@ def ECMS_initiation(
 
     epm.add_experiment("ECMS_sub_normal_state",{})
     epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})   
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ECMS_initiation_recirculation(
     sequence_version: int = 2,
@@ -161,7 +161,7 @@ def ECMS_initiation_recirculation(
 
     epm.add_experiment("ECMS_sub_normal_state",{})
     epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ECMS_initiation_recirculation_mixedreactant(
     sequence_version: int = 2,
@@ -233,7 +233,7 @@ def ECMS_initiation_recirculation_mixedreactant(
 
     epm.add_experiment("ECMS_sub_normal_state",{})
     epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ECMS_repeat_CV(
@@ -364,7 +364,7 @@ def ECMS_repeat_CV(
         #epm.add_experiment("ECMS_sub_electrolyte_clean_cell", {"liquid_backward_time": liquid_cleancell_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no})
     
     #epm.add_experiment("ECMS_sub_alloff", {})
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 # =============================================================================
 def ECMS_repeat_CV_recirculation(
@@ -502,7 +502,7 @@ def ECMS_repeat_CV_recirculation(
         #epm.add_experiment("ECMS_sub_electrolyte_clean_cell", {"liquid_backward_time": liquid_cleancell_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no})
     
     #epm.add_experiment("ECMS_sub_alloff", {})
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 # def ECMS_repeat_CV_recirculation(
 #     sequence_version: int = 1,
 #     plate_id: int = 4534,
@@ -624,7 +624,7 @@ def ECMS_repeat_CV_recirculation(
 #         #epm.add_experiment("ECMS_sub_electrolyte_clean_cell", {"liquid_backward_time": liquid_cleancell_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no})
 #     
 #     #epm.add_experiment("ECMS_sub_alloff", {})
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 # =============================================================================
 
 def ECMS_repeat_CV_recirculation_mixedreactant(
@@ -764,7 +764,7 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
         #epm.add_experiment("ECMS_sub_electrolyte_clean_cell", {"liquid_backward_time": liquid_cleancell_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no})
     
     #epm.add_experiment("ECMS_sub_alloff", {})
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ECMS_CV_recirculation_mixedreactant(
     sequence_version: int = 3,
@@ -881,7 +881,7 @@ def ECMS_CV_recirculation_mixedreactant(
         #epm.add_experiment("ECMS_sub_electrolyte_clean_cell", {"liquid_backward_time": liquid_cleancell_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no})
     
     #epm.add_experiment("ECMS_sub_alloff", {})
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ECMS_series_CA(
     sequence_version: int = 2,
@@ -980,7 +980,7 @@ def ECMS_series_CA(
             
         epm.add_experiment("ECMS_sub_normal_state",{})
         epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})       
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 # =============================================================================
 # def ECMS_series_CA_recirculation(
@@ -1073,7 +1073,7 @@ def ECMS_series_CA(
 #             
 #         epm.add_experiment("ECMS_sub_normal_state",{})
 #         epm.add_experiment("ECMS_sub_drain_recirculation", {"liquid_drain_time": liquid_drain_time})       
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 # =============================================================================
 def ECMS_series_CA_recirculation(
     sequence_version: int = 3,
@@ -1178,7 +1178,7 @@ def ECMS_series_CA_recirculation(
         epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
         epm.add_experiment("ECMS_sub_clean_cell_recirculation", {"volume_ul_cell_liquid": volume_ul_cell_liquid, "liquid_backward_time":liquid_backward_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no, "tube_clear_time":tube_clear_time, "liquid_drain_time":liquid_drain_time, "liquid_fill_time": liquid_fill_time + 1.0, "cleaning_times": cleaning_times, "tube_clear_delaytime": tube_clear_delaytime})        
    
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ECMS_series_CA_recirculation_mixedreactant(
     sequence_version: int = 3,
@@ -1283,7 +1283,7 @@ def ECMS_series_CA_recirculation_mixedreactant(
         epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
         epm.add_experiment("ECMS_sub_clean_cell_recirculation", {"volume_ul_cell_liquid": volume_ul_cell_liquid, "liquid_backward_time":liquid_backward_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no, "tube_clear_time":tube_clear_time, "liquid_drain_time":liquid_drain_time, "liquid_fill_time": liquid_fill_time + 1.0, "cleaning_times": cleaning_times, "tube_clear_delaytime": tube_clear_delaytime})        
    
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ECMS_series_CA_recirculation_mixedthreereactant(
@@ -1392,7 +1392,7 @@ def ECMS_series_CA_recirculation_mixedthreereactant(
             epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
             epm.add_experiment("ECMS_sub_clean_cell_recirculation", {"volume_ul_cell_liquid": volume_ul_cell_liquid, "liquid_backward_time":liquid_backward_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no, "tube_clear_time":tube_clear_time, "liquid_drain_time":liquid_drain_time, "liquid_fill_time": liquid_fill_time + 1.0, "cleaning_times": cleaning_times, "tube_clear_delaytime": tube_clear_delaytime})        
        
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ECMS_series_pulseCA(
     sequence_version: int = 2,
@@ -1482,7 +1482,7 @@ def ECMS_series_pulseCA(
         )  
         epm.add_experiment("ECMS_sub_normal_state",{})
         epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})          
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ECMS_MS_calibration_recirculation(
     sequence_version: int = 2,
@@ -1568,7 +1568,7 @@ def ECMS_MS_calibration_recirculation(
     epm.add_experiment("ECMS_sub_normal_state",{})   
     epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 # =============================================================================
 # def ECMS_MS_calibration_recirculation(
 #     sequence_version: int = 1,
@@ -1646,7 +1646,7 @@ def ECMS_MS_calibration_recirculation(
 #     epm.add_experiment("ECMS_sub_normal_state",{})   
 #     epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})   
 # 
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 # =============================================================================
 
 
@@ -1713,7 +1713,7 @@ def ECMS_MS_calibration(
     epm.add_experiment("ECMS_sub_normal_state",{})   
     epm.add_experiment("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})   
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ECMS_MS_pulsecalibration(
     sequence_version: int = 1,
@@ -1774,7 +1774,7 @@ def ECMS_MS_pulsecalibration(
                 "MSsignal_quilibrium_time": MSsignal_quilibrium_time,
             },
         )
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ECMS_series_CA_change_gasflow(
     sequence_version: int = 1,
@@ -1914,4 +1914,4 @@ def ECMS_series_CA_change_gasflow(
         #epm.add_experiment("ECMS_sub_drain_recirculation", {"tube_clear_time": tube_clear_time, "liquid_drain_time":liquid_drain_time}) 
         #epm.add_experiment("ECMS_sub_clean_cell_recirculation", {"volume_ul_cell_liquid": volume_ul_cell_liquid, "liquid_backward_time":liquid_backward_time, "reservoir_liquid_sample_no":reservoir_liquid_sample_no, "tube_clear_time":tube_clear_time, "liquid_drain_time":liquid_drain_time, "liquid_fill_time": liquid_fill_time + 1.0, "cleaning_times": cleaning_times, "tube_clear_delaytime": tube_clear_delaytime})        
    
-    return epm.experiment_plan_list
+    return epm.planned_experiments

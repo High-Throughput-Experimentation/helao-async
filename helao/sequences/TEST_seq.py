@@ -29,4 +29,4 @@ def TEST_consecutive_noblocking(
         for i, l in enumerate(dummy_list):
             print(f"dummy_list index {i}:  {l} has types {[type(x) for x in l]}")
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list

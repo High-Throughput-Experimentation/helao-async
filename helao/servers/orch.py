@@ -788,7 +788,7 @@ class Orch(Base):
         Returns:
             None
         """
-        for i, experimentmodel in enumerate(self.active_sequence.experiment_plan_list):
+        for i, experimentmodel in enumerate(self.active_sequence.planned_experiments):
             # self.print_message(
             #     f"unpack experiment {experimentmodel.experiment_name}"
             # )
@@ -882,36 +882,43 @@ class Orch(Base):
                             )
                     else:
                         self.active_sequence.sequence_params[v] = self.global_params[k]
+                LOGGER.info(
+                    f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
+                )
+            else:
+                LOGGER.info(
+                    f"global parameter {k} not found in global_params, skipping"
+                )
 
-            # if experiment_plan_list is empty, unpack sequence,
-            # otherwise operator already populated experiment_plan_list
+            # if planned_experiments is empty, unpack sequence,
+            # otherwise operator already populated planned_experiments
             if self.active_sequence.sequence_name in self.sequence_lib:
-                experiment_plan_list = self.unpack_sequence(
+                planned_experiments = self.unpack_sequence(
                     self.active_sequence.sequence_name,
                     self.active_sequence.sequence_params,
                 )
-                if not self.active_sequence.experiment_plan_list:
-                    self.active_sequence.experiment_plan_list = experiment_plan_list
-                elif len(self.active_sequence.experiment_plan_list) >= len(
-                    experiment_plan_list
+                if not self.active_sequence.planned_experiments:
+                    self.active_sequence.planned_experiments = planned_experiments
+                elif len(self.active_sequence.planned_experiments) >= len(
+                    planned_experiments
                 ):
-                    new_experiment_plan_list = []
-                    for exp_model in self.active_sequence.experiment_plan_list:
-                        if not experiment_plan_list:
-                            new_experiment_plan_list.append(exp_model)
+                    new_planned_experiments = []
+                    for exp_model in self.active_sequence.planned_experiments:
+                        if not planned_experiments:
+                            new_planned_experiments.append(exp_model)
                         else:
-                            exp = experiment_plan_list.pop(0)
+                            exp = planned_experiments.pop(0)
                             if exp.experiment_name == exp_model.experiment_name:
                                 for k, v in vars(exp_model).items():
                                     setattr(exp, k, v)
-                                new_experiment_plan_list.append(exp)
+                                new_planned_experiments.append(exp)
                             else:
                                 break
-                    if len(self.active_sequence.experiment_plan_list) == len(
-                        new_experiment_plan_list
+                    if len(self.active_sequence.planned_experiments) == len(
+                        new_planned_experiments
                     ):
-                        self.active_sequence.experiment_plan_list = (
-                            new_experiment_plan_list
+                        self.active_sequence.planned_experiments = (
+                            new_planned_experiments
                         )
 
             self.seq_model = self.active_sequence.get_seq()
@@ -1002,6 +1009,13 @@ class Orch(Base):
                         )
                 else:
                     self.active_experiment.experiment_params[v] = self.global_params[k]
+                LOGGER.info(
+                    f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
+                )
+            else:
+                LOGGER.info(
+                    f"global parameter {k} not found in global_params, skipping"
+                )
 
         LOGGER.info(
             f"new active experiment is {self.active_experiment.experiment_name}"
@@ -1045,7 +1059,7 @@ class Orch(Base):
             unpacked_acts = exp_return
         elif isinstance(exp_return, Experiment):
             self.active_experiment = exp_return
-            unpacked_acts = self.active_experiment.action_plan
+            unpacked_acts = self.active_experiment.planned_actions
 
         self.active_experiment.experiment_codehash = self.experiment_codehash_lib[
             self.active_experiment.experiment_name
@@ -1260,6 +1274,12 @@ class Orch(Base):
                             A.action_params[vv] = self.global_params[k]
                     else:
                         A.action_params[v] = self.global_params[k]
+                    LOGGER.info(
+                        f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
+                    )
+                else:
+                    LOGGER.info(
+                        f"global parameter {k} not found in global_params, skipping"
 
             actserv_exists, _ = await endpoints_available([A.url])
             if not actserv_exists:
@@ -2373,10 +2393,10 @@ class Orch(Base):
                 }
             )
 
-            self.active_experiment.actionmodel_list = []
+            self.active_experiment.completed_actions = []
 
             # TODO use exp uuid to filter actions?
-            self.active_experiment.actionmodel_list = (
+            self.active_experiment.completed_actions = (
                 self.globalstatusmodel.finish_experiment(
                     exp_uuid=self.active_experiment.experiment_uuid
                 )
@@ -2389,9 +2409,8 @@ class Orch(Base):
             )
 
             # add finished exp to seq
-            # !!! add to experimentmodel_list
-            # not to experiment_list !!!!
-            self.active_sequence.experimentmodel_list.append(
+            # !!! add to completed_experiments
+            self.active_sequence.completed_experiments.append(
                 deepcopy(self.active_experiment.get_exp())
             )
 

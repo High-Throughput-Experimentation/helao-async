@@ -82,23 +82,9 @@ class ActionModel(ShortActionModel):
     start_condition: ActionStartCondition = ActionStartCondition.wait_for_all
     save_act: bool = True  # default should be true
     save_data: bool = True  # default should be true
-    AUX_file_paths: List[Path] = Field(default=[])
-
-    # moved to ActionModel
-    # error_code: Optional[ErrorCodes] = ErrorCodes.none
-
+    aux_file_paths: List[Path] = Field(default=[])
     from_global_params: Optional[dict] = Field(default={})
     to_global_params: Optional[Union[list, dict]] = []
-
-    # internal
-    file_conn_keys: List[UUID] = Field(default=[])
-
-    # flag for dataLOGGER
-    # None will signal default behaviour as before
-    # will be updated by data LOGGER only if it finds the status
-    # in the data stream
-    data_stream_status: Optional[HloStatus] = None
-
 
     @property
     def url(self):

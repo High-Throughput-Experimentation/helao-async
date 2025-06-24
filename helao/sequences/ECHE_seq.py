@@ -45,7 +45,7 @@ def ECHE_movetosample(
 
     epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def ECHE_move(
@@ -66,7 +66,7 @@ def ECHE_move(
 
     epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def ECHE_4CA_led_1CV_led(
@@ -341,7 +341,7 @@ def ECHE_4CA_led_1CV_led(
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def ECHE_CV_CA_CV(
@@ -492,7 +492,7 @@ def ECHE_CV_CA_CV(
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def ECHE_CV(
@@ -572,7 +572,7 @@ def ECHE_CV(
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def ECHE_CA(
@@ -641,7 +641,7 @@ def ECHE_CA(
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def ECHE_CA_led(
@@ -736,7 +736,7 @@ def ECHE_CA_led(
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def ECHE_CV_led(
@@ -843,7 +843,7 @@ def ECHE_CV_led(
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def ECHE_CP(
@@ -904,7 +904,7 @@ def ECHE_CP(
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def ECHE_CP_led(
@@ -991,7 +991,7 @@ def ECHE_CP_led(
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 def ECHE_CVs_CAs(
     sequence_version: int = 1,
@@ -1186,7 +1186,7 @@ def ECHE_CVs_CAs(
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 def ECHE_cleanCVs_regCVs_CAs(
     sequence_version: int = 1,
@@ -1411,4 +1411,4 @@ def ECHE_cleanCVs_regCVs_CAs(
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list

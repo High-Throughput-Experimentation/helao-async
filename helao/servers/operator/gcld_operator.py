@@ -152,16 +152,16 @@ def seq_constructor(
     seq_params.update(
         {k: v for k, v in zip(seq_args, seq_defaults) if k not in seq_params}
     )
-    experiment_list = seq_func(**seq_params)
+    unpacked_experiments = seq_func(**seq_params)
     seq = Sequence(
         sequence_name=seq_name,
         sequence_label=seq_label,
         sequence_params=seq_params,
         sequence_uuid=seq_uuid,
         data_request_id=data_request_id,
-        experiment_list=[],
-        experiment_plan_list=experiment_list,
-        experimentmodel_list=[],
+        planned_experiments=unpacked_experiments,
+        completed_experiments=[],
+        completed_experiments_abbr=[],
         dummy=TEST,
     )
     return seq
@@ -188,16 +188,16 @@ def ana_constructor(
         {k: v for k, v in zip(seq_args, seq_defaults) if k not in seq_params}
     )
     seq_params.update({"analysis_seq_uuid": sequence_uuid})
-    experiment_list = seq_func(**seq_params)
+    unpacked_experiments = seq_func(**seq_params)
     seq = Sequence(
         sequence_name=seq_name,
         sequence_label=seq_label,
         sequence_params=seq_params,
         sequence_uuid=seq_uuid,
         data_request_id=data_request_id,
-        experiment_list=[],
-        experiment_plan_list=experiment_list,
-        experimentmodel_list=[],
+        planned_experiments=unpacked_experiments,
+        completed_experiments=[],
+        completed_experiments_abbr=[],
         dummy=TEST,
     )
     return seq
@@ -224,16 +224,16 @@ def qc_constructor(
     seq_params.update(
         {k: v for k, v in zip(seq_args, seq_defaults) if k not in seq_params}
     )
-    experiment_list = seq_func(**seq_params)
+    unpacked_experiments = seq_func(**seq_params)
     seq = Sequence(
         sequence_name=seq_name,
         sequence_label=seq_label,
         sequence_params=seq_params,
         sequence_uuid=seq_uuid,
         data_request_id=data_request_id,
-        experiment_list=[],
-        experiment_plan_list=experiment_list,
-        experimentmodel_list=[],
+        planned_experiments=unpacked_experiments,
+        completed_experiments=[],
+        completed_experiments_abbr=[],
         dummy=TEST,
     )
     return seq
