@@ -279,6 +279,4 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         if exp_uuid in self.counter_dispatched_actions:
             del self.counter_dispatched_actions[exp_uuid]
 
-        print(f"Finished actions for experiment {exp_uuid}: {finished_acts}")
-
         return finished_acts

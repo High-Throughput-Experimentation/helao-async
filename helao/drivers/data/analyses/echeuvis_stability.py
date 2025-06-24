@@ -94,9 +94,12 @@ def parse_spechlo(hlod: dict):
             .drop([x for x in hlod["data"].keys() if not x.startswith("ch_")], axis=1)
             .to_numpy()
         )
-    except Exception as err:
-        str_err = "".join(traceback.format_exception(type(err), err, err.__traceback__))
-        print(str_err)
+    except Exception:
+        LOGGER.error(
+            "Failed to parse spectrometer hlo: %s",
+            hlod.get("meta", {}).get("optional", {}).get("name", "unknown"),
+            exc_info=True,
+        )
         return False
     return wl, epochs, specarr
 

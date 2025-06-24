@@ -117,7 +117,7 @@ def move_to_synced(file_path: Path):
         shutil.move(str(file_path), str(target_path))
         return Path(target_path)
     except PermissionError:
-        print(f"Permission error when moving {file_path} to {target_path}")
+        LOGGER.info(f"Permission error when moving {file_path} to {target_path}")
         return False
 
 
@@ -148,7 +148,7 @@ def revert_to_finished(file_path: Path):
         new_path = file_path.replace(target_path)
         return new_path
     except PermissionError:
-        print(f"Permission error when moving {file_path} to {target_path}")
+        LOGGER.info(f"Permission error when moving {file_path} to {target_path}")
         return False
 
 
@@ -304,7 +304,7 @@ class HelaoYml:
                 if self.exists:
                     break
             if not self.exists:
-                print(f"{self.target} does not exist")
+                LOGGER.info(f"{self.target} does not exist")
         if self.target.is_dir():
             self.targetdir = self.target
             possible_ymls = [
@@ -497,8 +497,8 @@ class HelaoYml:
             check_dir = Path(os.path.join(*tempparts[:-i]))
             contents = [x for x in check_dir.glob("*") if x != check_dir]
             if contents:
-                print(f"{str(check_dir)} is not empty")
-                print(contents)
+                LOGGER.info(f"{str(check_dir)} is not empty")
+                LOGGER.info(contents)
                 return "failed"
             try:
                 check_dir.rmdir()
