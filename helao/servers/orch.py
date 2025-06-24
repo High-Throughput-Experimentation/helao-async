@@ -873,7 +873,7 @@ class Orch(Base):
 
             # from global params
             for k, v in self.active_sequence.from_global_params.items():
-                LOGGER.info(f"{k}:{v}")
+                LOGGER.info(f"mapping from global params to sequence {k}:{v}")
                 if k in self.global_params:
                     if isinstance(v, list):
                         for vv in v:
@@ -993,7 +993,7 @@ class Orch(Base):
         # LOGGER.info("copying global vars to experiment")
         # copy requested global param to experiment params
         for k, v in self.active_experiment.from_global_params.items():
-            LOGGER.info(f"{k}:{v}")
+            LOGGER.info(f"mapping from global params to experiment -- {k}:{v}")
             if k in self.global_params:
                 if isinstance(v, list):
                     for vv in v:
@@ -1253,7 +1253,7 @@ class Orch(Base):
             # LOGGER.info("copying global vars to action")
             # copy requested global param to action params
             for k, v in A.from_global_params.items():
-                LOGGER.info(f"{k}:{v}")
+                LOGGER.info(f"mapping from global params to action {k}:{v}")
                 if k in self.global_params:
                     if isinstance(v, list):
                         for vv in v:
