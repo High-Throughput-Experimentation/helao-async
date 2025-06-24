@@ -263,10 +263,12 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         # we don't filter by orch as this should have happened already when they
         # were added to the finished_exps
         finished_acts = []
-        for hlostatus, status_dict in self.nonactive_dict.items():
-            for uuid, statusmodel in status_dict.items():
-                if exp_uuid == uuid:
+        finished_uuids = []
+        for _, status_dict in self.nonactive_dict.items():
+            for action_uuid, statusmodel in status_dict.items():
+                if exp_uuid == statusmodel.experiment_uuid and action_uuid not in finished_uuids:
                     finished_acts.append(statusmodel)
+                    finished_uuids.append(action_uuid)
         # TODO: properly clear actions from endpointstatusmodel only for exp_uuid
 
         # if self.active_dict:
