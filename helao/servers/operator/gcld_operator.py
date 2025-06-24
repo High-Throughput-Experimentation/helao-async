@@ -160,8 +160,8 @@ def seq_constructor(
         sequence_uuid=seq_uuid,
         data_request_id=data_request_id,
         planned_experiments=unpacked_experiments,
-        completed_experiments=[],
-        completed_experiments_abbr=[],
+        dispatched_experiments=[],
+        dispatched_experiments_abbr=[],
         dummy=TEST,
     )
     return seq
@@ -196,8 +196,8 @@ def ana_constructor(
         sequence_uuid=seq_uuid,
         data_request_id=data_request_id,
         planned_experiments=unpacked_experiments,
-        completed_experiments=[],
-        completed_experiments_abbr=[],
+        dispatched_experiments=[],
+        dispatched_experiments_abbr=[],
         dummy=TEST,
     )
     return seq
@@ -232,8 +232,8 @@ def qc_constructor(
         sequence_uuid=seq_uuid,
         data_request_id=data_request_id,
         planned_experiments=unpacked_experiments,
-        completed_experiments=[],
-        completed_experiments_abbr=[],
+        dispatched_experiments=[],
+        dispatched_experiments_abbr=[],
         dummy=TEST,
     )
     return seq

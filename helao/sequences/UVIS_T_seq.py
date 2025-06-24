@@ -32,10 +32,10 @@ def UVIS_T(
     cell_disengaged_z: float = 0,
 ):
     epm = ExperimentPlanMaker()
-    epm.add_experiment("UVIS_sub_unloadall_customs", {})
+    epm.add("UVIS_sub_unloadall_customs", {})
     if use_z_motor:
-        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": True, "z_height": cell_disengaged_z})
-    epm.add_experiment(
+        epm.add("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": True, "z_height": cell_disengaged_z})
+    epm.add(
         "UVIS_sub_setup_ref",
         {
             "reference_mode": reference_mode,
@@ -46,9 +46,9 @@ def UVIS_T(
         },
     )
     if use_z_motor:
-        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
+        epm.add("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
     # dark ref
-    epm.add_experiment(
+    epm.add(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
@@ -67,7 +67,7 @@ def UVIS_T(
         },
     )
     # light ref
-    epm.add_experiment(
+    epm.add(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
@@ -87,10 +87,10 @@ def UVIS_T(
     )
 
     if use_z_motor:
-        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
+        epm.add("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
     for plate_sample in plate_sample_no_list:
-        epm.add_experiment("UVIS_sub_unloadall_customs", {})
-        epm.add_experiment(
+        epm.add("UVIS_sub_unloadall_customs", {})
+        epm.add(
             "UVIS_sub_startup",  # move to solid sample, assign to cell position
             {
                 "solid_custom_position": custom_position,
@@ -99,9 +99,9 @@ def UVIS_T(
             },
         )
         if use_z_motor:
-            epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
+            epm.add("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
         # perform transmission spec
-        epm.add_experiment(
+        epm.add(
             "UVIS_sub_measure",
             {
                 "spec_type": "T",
@@ -120,10 +120,10 @@ def UVIS_T(
             },
         )
         if use_z_motor:
-            epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
+            epm.add("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
 
-    epm.add_experiment("UVIS_sub_unloadall_customs", {})
-    epm.add_experiment(
+    epm.add("UVIS_sub_unloadall_customs", {})
+    epm.add(
         "UVIS_sub_setup_ref",
         {
             "reference_mode": reference_mode,
@@ -134,9 +134,9 @@ def UVIS_T(
         },
 )
     if use_z_motor:
-        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
+        epm.add("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
     # dark ref
-    epm.add_experiment(
+    epm.add(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
@@ -155,7 +155,7 @@ def UVIS_T(
         },
     )
     # light ref
-    epm.add_experiment(
+    epm.add(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
@@ -175,8 +175,8 @@ def UVIS_T(
     )
 
     if use_z_motor:
-        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
-    epm.add_experiment("UVIS_sub_shutdown", {})
+        epm.add("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
+    epm.add("UVIS_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -188,7 +188,7 @@ def UVIS_T_postseq(
     recent: bool = False,
 ):
     epm = ExperimentPlanMaker()
-    epm.add_experiment(
+    epm.add(
         "UVIS_analysis_dry",
         {
             "sequence_uuid": analysis_seq_uuid,

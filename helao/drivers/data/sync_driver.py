@@ -1641,13 +1641,13 @@ class HelaoSyncer:
                 )
                 process_meta["process_uuid"] = process_uuid
                 process_meta["process_group_index"] = pidx
-                process_meta["action_list"] = []
+                process_meta["dispatched_actions_abbr"] = []
 
             else:
                 process_meta = exp_prog.dict["process_metas"][pidx]
 
             # update experiment progress with action
-            process_meta["action_list"].append(
+            process_meta["dispatched_actions_abbr"].append(
                 ShortActionModel(**act_meta).clean_dict(strip_private=True)
             )
 
@@ -1677,7 +1677,7 @@ class HelaoSyncer:
                 if new_name in ["samples_in", "samples_out"]:
                     actuuid_order = {
                         x["action_uuid"]: x["orch_submit_order"]
-                        for x in process_meta["action_list"]
+                        for x in process_meta["dispatched_actions_abbr"]
                     }
                     sample_list = process_meta[new_name]
                     dedupe_dict = defaultdict(list)

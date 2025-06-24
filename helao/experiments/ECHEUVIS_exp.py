@@ -68,7 +68,7 @@ def ECHEUVIS_sub_startup(experiment: Experiment):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
     apm.add(IO_server, "set_digital_out", {"do_item": "ir_emitter", "on": True})
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_shutdown(experiment: Experiment):
@@ -76,7 +76,7 @@ def ECHEUVIS_sub_shutdown(experiment: Experiment):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
     apm.add(IO_server, "set_digital_out", {"do_item": "ir_emitter", "on": False})
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_CV_led(
@@ -269,7 +269,7 @@ def ECHEUVIS_sub_CV_led(
     #     },
     # )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_CA_led(
@@ -448,7 +448,7 @@ def ECHEUVIS_sub_CA_led(
     #     },
     # )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_CP_led(
@@ -623,7 +623,7 @@ def ECHEUVIS_sub_CP_led(
     #     },
     # )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_interrupt(
@@ -633,7 +633,7 @@ def ECHEUVIS_sub_interrupt(
 ):
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "interrupt", {"reason": reason})
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ECHEUVIS_sub_OCV_led(
@@ -806,7 +806,7 @@ def ECHEUVIS_sub_OCV_led(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_disengage(
@@ -843,7 +843,7 @@ def ECHEUVIS_sub_disengage(
                 else ActionStartCondition.wait_for_all
             ),
         )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_engage(
@@ -921,7 +921,7 @@ def ECHEUVIS_sub_engage(
                 "on": False,
             },
         )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHEUVIS_analysis_stability(
@@ -943,4 +943,4 @@ def ECHEUVIS_analysis_stability(
             "params": params,
         },
     )
-    return apm.action_list
+    return apm.planned_actions

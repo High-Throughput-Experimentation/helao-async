@@ -109,7 +109,7 @@ def ADSS_sub_unloadall_customs(experiment: Experiment):
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_unload_liquid(
@@ -135,7 +135,7 @@ def ADSS_sub_unload_liquid(
     #     {"custom": "cell1_we"},
     #     from_global_params={"_unloaded_solid": "load_sample_in"},
     # )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ADSS_sub_unload_solid(
@@ -161,7 +161,7 @@ def ADSS_sub_unload_solid(
         start_condition=ActionStartCondition.wait_for_orch,
         # from_global_params={"_unloaded_liquid": "load_sample_in"},
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ADSS_sub_load_solid(
@@ -204,7 +204,7 @@ def ADSS_sub_load_solid(
         from_global_params={"_unloaded_liquid": "load_sample_in"},
         start_condition=ActionStartCondition.wait_for_previous,
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_load_liquid(
@@ -234,7 +234,7 @@ def ADSS_sub_load_liquid(
         },
         start_condition=ActionStartCondition.wait_for_orch,  #
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 def ADSS_sub_load_liquid_only(
     experiment: Experiment,
@@ -274,7 +274,7 @@ def ADSS_sub_load_liquid_only(
         start_condition=ActionStartCondition.wait_for_orch,
     )
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 ######
@@ -310,7 +310,7 @@ def ADSS_sub_PAL_load_gas(
             ProcessContrib.samples_out,
         ],
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 def ADSS_sub_unload_gas_only(
     experiment: Experiment,
@@ -336,7 +336,7 @@ def ADSS_sub_unload_gas_only(
         start_condition=ActionStartCondition.wait_for_orch,
         # from_global_params={"_unloaded_liquid": "load_sample_in"},
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 #######
@@ -413,7 +413,7 @@ def ADSS_sub_load(
             start_condition=ActionStartCondition.wait_for_previous,
         )
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ADSS_sub_move_to_sample(
@@ -483,7 +483,7 @@ def ADSS_sub_move_to_sample(
     # seal cell
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_sample_start(
@@ -510,7 +510,7 @@ def ADSS_sub_sample_start(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    apm.add_action_list(
+    apm.add_actions(
         ADSS_sub_load(
             experiment=experiment,
             solid_custom_position=solid_custom_position,
@@ -579,7 +579,7 @@ def ADSS_sub_sample_start(
     # seal cell
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_shutdown(experiment: Experiment):
@@ -594,7 +594,7 @@ def ADSS_sub_shutdown(experiment: Experiment):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # deep clean
-    apm.add_action_list(
+    apm.add_actions(
         ADSS_sub_clean_PALtool(experiment, clean_tool=PALtools.LS3, clean_volume_ul=500)
     )
 
@@ -620,7 +620,7 @@ def ADSS_sub_shutdown(experiment: Experiment):
     )
 
     # drain, TODO
-    # apm.add_action_list(ADSS_sub_drain(experiment))
+    # apm.add_actions(ADSS_sub_drain(experiment))
 
     # turn pump off
     apm.add(
@@ -646,9 +646,9 @@ def ADSS_sub_shutdown(experiment: Experiment):
 
     # move z to home
     # cannot do this without proper drain for now
-    # apm.add_action_list(ADSS_sub_disengage(experiment))
+    # apm.add_actions(ADSS_sub_disengage(experiment))
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_drain(experiment: Experiment):
@@ -657,7 +657,7 @@ def ADSS_sub_drain(experiment: Experiment):
     last functionality test: 11/29/2021"""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # TODO
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_clean_PALtool(
@@ -684,7 +684,7 @@ def ADSS_sub_clean_PALtool(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_fillfixed(
@@ -745,7 +745,7 @@ def ADSS_sub_fillfixed(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_fill(
@@ -773,7 +773,7 @@ def ADSS_sub_fill(
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_CA(
@@ -853,7 +853,7 @@ def ADSS_sub_CA(
         washthree = (washmod + 2) %4 %3 %2
         washfour = (washmod + 3) %4 %3 %2
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
@@ -897,7 +897,7 @@ def ADSS_sub_CA(
     """
     if aliquot_insitu or insert_electrolyte_bool:
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
@@ -920,7 +920,7 @@ def ADSS_sub_CA(
         washthree = (washmod + 2) %4 %3 %2
         washfour = (washmod + 3) %4 %3 %2
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
@@ -935,7 +935,7 @@ def ADSS_sub_CA(
         )
 
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_CA_photo(
@@ -1001,7 +1001,7 @@ def ADSS_sub_CA_photo(
         washthree = (washmod + 2) %4 %3 %2
         washfour = (washmod + 3) %4 %3 %2
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
@@ -1062,7 +1062,7 @@ def ADSS_sub_CA_photo(
     """
     if aliquot_insitu or insert_electrolyte_bool:
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
@@ -1087,7 +1087,7 @@ def ADSS_sub_CA_photo(
         washthree = (washmod + 2) %4 %3 %2
         washfour = (washmod + 3) %4 %3 %2
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
@@ -1101,7 +1101,7 @@ def ADSS_sub_CA_photo(
             )
         )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_CV(
@@ -1159,7 +1159,7 @@ def ADSS_sub_CV(
         washthree = (washmod + 2) %4 %3 %2
         washfour = (washmod + 3) %4 %3 %2
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
@@ -1214,7 +1214,7 @@ def ADSS_sub_CV(
     )
     if aliquot_insitu or insert_electrolyte_bool:
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
@@ -1237,7 +1237,7 @@ def ADSS_sub_CV(
         washthree = (washmod + 2) %4 %3 %2
         washfour = (washmod + 3) %4 %3 %2
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
@@ -1252,7 +1252,7 @@ def ADSS_sub_CV(
         )
 
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_OCV(
@@ -1310,7 +1310,7 @@ def ADSS_sub_OCV(
         washthree = (washmod + 2) %4 %3 %2
         washfour = (washmod + 3) %4 %3 %2
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
@@ -1354,7 +1354,7 @@ def ADSS_sub_OCV(
     )
     if aliquot_insitu:
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
@@ -1402,7 +1402,7 @@ def ADSS_sub_OCV(
         washthree = (washmod + 2) %4 %3 %2
         washfour = (washmod + 3) %4 %3 %2
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
@@ -1416,7 +1416,7 @@ def ADSS_sub_OCV(
             )
         )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_OCV_photo(
@@ -1468,7 +1468,7 @@ def ADSS_sub_OCV_photo(
         washthree = (washmod + 2) %4 %3 %2
         washfour = (washmod + 3) %4 %3 %2
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
@@ -1507,7 +1507,7 @@ def ADSS_sub_OCV_photo(
     )
     if aliquot_insitu:
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_insitu_actions(
                 experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
@@ -1528,7 +1528,7 @@ def ADSS_sub_OCV_photo(
         washthree = (washmod + 2) %4 %3 %2
         washfour = (washmod + 3) %4 %3 %2
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
@@ -1542,7 +1542,7 @@ def ADSS_sub_OCV_photo(
             )
         )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_insitu_actions(
@@ -1659,7 +1659,7 @@ def ADSS_sub_insitu_actions(
                 )
             elif mtup[0] == "electrolyte":
                 #                if insert_electrolyte_bool:
-                # apm.add_action_list(
+                # apm.add_actions(
                 #     ADSS_sub_load_liquid(
                 #         experiment=experiment,
                 #         liquid_custom_position="cell1_we",
@@ -1691,7 +1691,7 @@ def ADSS_sub_insitu_actions(
                     },
                     ActionStartCondition.wait_for_orch,
                 )
-                apm.add_action_list(
+                apm.add_actions(
                     ADSS_sub_cellfill_prefilled(
                         experiment=experiment,
                         Solution_volume_ul=insert_electrolyte_volume_ul,
@@ -1724,7 +1724,7 @@ def ADSS_sub_insitu_actions(
             },
             ActionStartCondition.wait_for_orch,
         )
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_cellfill_prefilled(
                 experiment=experiment,
                 Solution_volume_ul=insert_electrolyte_volume_ul,
@@ -1739,7 +1739,7 @@ def ADSS_sub_insitu_actions(
             ActionStartCondition.wait_for_orch,
         )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_add_liquid(
@@ -1770,7 +1770,7 @@ def ADSS_sub_add_liquid(
         ActionStartCondition.wait_for_orch,
     )
     if not virtual_add:
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_cellfill_prefilled(
                 experiment=experiment,
                 Solution_volume_ul=added_liquid_volume_ul,
@@ -1778,7 +1778,7 @@ def ADSS_sub_add_liquid(
             )
         )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_tray_unload(
@@ -1847,7 +1847,7 @@ def ADSS_sub_tray_unload(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_tray_icpms_export(
@@ -1876,7 +1876,7 @@ def ADSS_sub_tray_icpms_export(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_z_move(
@@ -1903,7 +1903,7 @@ def ADSS_sub_z_move(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_rel_move(
@@ -1932,7 +1932,7 @@ def ADSS_sub_rel_move(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_abs_move(
@@ -1962,7 +1962,7 @@ def ADSS_sub_abs_move(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_heat(
@@ -1997,7 +1997,7 @@ def ADSS_sub_heat(
             ProcessContrib.files,
         ],
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_stopheat(
@@ -2017,7 +2017,7 @@ def ADSS_sub_stopheat(
         "monloopstop",
         {},
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 def ADSS_sub_cellfill_prefilled_nosampleload(
     experiment: Experiment,
@@ -2090,7 +2090,7 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
 
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
 
-    return apm.action_list
+    return apm.planned_actions
 
 def ADSS_sub_cellfill_prefilled(
     experiment: Experiment,
@@ -2173,7 +2173,7 @@ def ADSS_sub_cellfill_prefilled(
 
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ADSS_sub_cellfill_flush(
@@ -2213,7 +2213,7 @@ def ADSS_sub_cellfill_flush(
 
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ADSS_sub_drain_cell(
@@ -2245,7 +2245,7 @@ def ADSS_sub_drain_cell(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V4", "on": 0})
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 0})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ADSS_sub_keep_electrolyte(
@@ -2264,7 +2264,7 @@ def ADSS_sub_keep_electrolyte(
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 # def ADSS_sub_empty_cell(
@@ -2281,7 +2281,7 @@ def ADSS_sub_keep_electrolyte(
 #     apm.add(ORCH_server, "wait", {"waittime": ReversePurgeWait_s})
 #     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
-#     return apm.action_list
+#     return apm.planned_actions
 
 
 # need to move to clean spot first before beginning clean
@@ -2319,7 +2319,7 @@ def ADSS_sub_clean_cell(
         apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
         apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
-        apm.add_action_list(
+        apm.add_actions(
             ADSS_sub_drain_cell(
                 experiment=experiment,
                 DrainWait_s=40,
@@ -2347,7 +2347,7 @@ def ADSS_sub_clean_cell(
     apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
-    apm.add_action_list(
+    apm.add_actions(
         ADSS_sub_drain_cell(
             experiment=experiment,
             DrainWait_s=DrainWait_s,
@@ -2358,7 +2358,7 @@ def ADSS_sub_clean_cell(
     if lift:
         apm.add(MOTOR_server, "z_move", {"z_position": "load"})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ADSS_sub_move_to_clean_cell(
@@ -2386,7 +2386,7 @@ def ADSS_sub_move_to_clean_cell(
 
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ADSS_sub_move_to_ref_measurement(
@@ -2428,7 +2428,7 @@ def ADSS_sub_move_to_ref_measurement(
         )
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 # def ADSS_sub_refill_syringes(
@@ -2477,7 +2477,7 @@ def ADSS_sub_move_to_ref_measurement(
 #         apm.add(ORCH_server, "wait", {"waittime": 10})
 #         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
 
-#     return apm.action_list
+#     return apm.planned_actions
 
 
 def ADSS_sub_sample_aliquot(
@@ -2536,7 +2536,7 @@ def ADSS_sub_sample_aliquot(
     )
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_recirculate(
@@ -2554,7 +2554,7 @@ def ADSS_sub_recirculate(
     apm.add(NI_server, "pump", {"pump": "direction", "on": dir})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": wait_time_s})
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_cell_illumination(
@@ -2587,7 +2587,7 @@ def ADSS_sub_cell_illumination(
             ],
         )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_interrupt(
@@ -2597,7 +2597,7 @@ def ADSS_sub_interrupt(
 ):
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "interrupt", {"reason": reason})
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ADSS_sub_refill_syringe(
@@ -2637,7 +2637,7 @@ def ADSS_sub_refill_syringe(
         apm.add(ORCH_server, "wait", {"waittime": 10})
         apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ADSS_sub_gasvalve_toggle(
@@ -2649,7 +2649,7 @@ def ADSS_sub_gasvalve_toggle(
     apm = ActionPlanMaker()
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": open})
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_gasvalve_N2flow(
@@ -2661,7 +2661,7 @@ def ADSS_sub_gasvalve_N2flow(
     apm = ActionPlanMaker()
     apm.add(NI_server, "gasvalve", {"gasvalve": "O2N2toggle", "on": open})
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_transfer_liquid_in(
@@ -2722,7 +2722,7 @@ def ADSS_sub_transfer_liquid_in(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_remove_bubble(
@@ -2750,7 +2750,7 @@ def ADSS_sub_remove_bubble(
     apm.add(ORCH_server, "wait", {"waittime": pump_reverse_time_s})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": pump_forward_time_s})
-    apm.add_action_list(
+    apm.add_actions(
         ADSS_sub_OCV(
             experiment=experiment,
             Tval__s=Tval__s,
@@ -2770,7 +2770,7 @@ def ADSS_sub_remove_bubble(
 
         )
     )
-    return apm.action_list
+    return apm.planned_actions
 
 def ADSS_sub_PAL_deep_clean(
     experiment: Experiment,
@@ -2797,7 +2797,7 @@ def ADSS_sub_PAL_deep_clean(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_PAL_tray_to_tray(
@@ -2840,7 +2840,7 @@ def ADSS_sub_PAL_tray_to_tray(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 
@@ -2870,4 +2870,4 @@ def ADSS_sub_PAL_export_icpms(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch

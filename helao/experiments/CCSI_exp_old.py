@@ -74,7 +74,7 @@ def CCSI_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
 
     apm = ActionPlanMaker()
     apm.add(PAL_server, "archive_custom_unloadall", {})
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_load_solid(
@@ -100,7 +100,7 @@ def CCSI_sub_load_solid(
         },
     )
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_load_liquid(
@@ -132,7 +132,7 @@ def CCSI_sub_load_liquid(
             "dilute_liquids": water_True_False,
         },
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_load_gas(
@@ -155,7 +155,7 @@ def CCSI_sub_load_gas(
             "volume_ml": volume_ul_cell_gas / 1000,
         },
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_alloff(
@@ -191,7 +191,7 @@ def CCSI_sub_alloff(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "9", "on": 0}, asc.no_wait)
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_headspace_purge_and_measure(
@@ -256,7 +256,7 @@ def CCSI_sub_headspace_purge_and_measure(
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_drain(
@@ -305,7 +305,7 @@ def CCSI_sub_drain(
     if initialization:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 
@@ -334,7 +334,7 @@ def CCSI_sub_initialization_end_state(
     # apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     # apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
     #   apm.add(MFC---stuff Flow ON)
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_peripumpoff(
@@ -352,7 +352,7 @@ def CCSI_sub_peripumpoff(
     # apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     # apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_initialization_firstpart(
@@ -438,7 +438,7 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0}, asc.no_wait)
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_cellfill(
@@ -572,7 +572,7 @@ def CCSI_sub_cellfill(
     apm.add(ORCH_server, "wait", {"waittime": 1.75})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_co2monitoring(
@@ -606,7 +606,7 @@ def CCSI_sub_co2monitoring(
     apm.add(ORCH_server, "wait", {"waittime": co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_co2monitoring_mfcmasscotwo(
@@ -668,7 +668,7 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
     #    apm.add(ORCH_server, "wait", {"waittime": co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_co2topup_mfcmassdose(
@@ -717,7 +717,7 @@ def CCSI_sub_co2topup_mfcmassdose(
     )
     apm.add(MFC_server, "cancel_acquire_flowrate", {})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_co2constantpressure(
@@ -771,7 +771,7 @@ def CCSI_sub_co2constantpressure(
     #    apm.add(ORCH_server, "wait", {"waittime": co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_co2mass_temp(
@@ -845,7 +845,7 @@ def CCSI_sub_co2mass_temp(
     #    apm.add(ORCH_server, "wait", {"waittime": co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_co2massdose(
@@ -922,7 +922,7 @@ def CCSI_sub_co2massdose(
         {},
     )
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_co2maintainconcentration(
@@ -1008,7 +1008,7 @@ def CCSI_sub_co2maintainconcentration(
         {},
     )
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_flowflush(
@@ -1064,7 +1064,7 @@ def CCSI_sub_flowflush(
         apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
 
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
-    return apm.action_list
+    return apm.planned_actions
 
 #
 # PRE CL
@@ -1205,7 +1205,7 @@ def CCSI_sub_clean_inject(
 
 #
 # LIQUID DRAIN
-    apm.add_action_list(
+    apm.add_actions(
         CCSI_sub_drain(
             experiment=experiment,
             HSpurge_duration=LiquidCleanPurge_duration,
@@ -1213,7 +1213,7 @@ def CCSI_sub_clean_inject(
         )
     )
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_refill_clean(
@@ -1237,7 +1237,7 @@ def CCSI_sub_refill_clean(
     apm.add(ORCH_server, "wait", {"waittime": 5.25})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 # def CCSI_sub_set_syringe_start(
@@ -1252,7 +1252,7 @@ def CCSI_sub_refill_clean(
 #     if syringe == "solution1":
 #         apm.add(SOLUTIONPUMP_server, "set_present_volume", {"volume_uL": Starting_volume_ul})
 #     # if more syringes can add more names here
-#     return apm.action_list
+#     return apm.planned_actions
 
 
 def CCSI_sub_full_fill_syringe(
@@ -1284,7 +1284,7 @@ def CCSI_sub_full_fill_syringe(
         from_global_params={"_present_volume_ul": "present_volume_ul"},
     )
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_sub_fill_syringe(
@@ -1323,7 +1323,7 @@ def CCSI_sub_fill_syringe(
         apm.add(ORCH_server, "wait", {"waittime": 5.25})
         # would need a valve for refill of this syringe, then copy steps from watersyringe
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_debug_co2purge(
@@ -1362,7 +1362,7 @@ def CCSI_debug_co2purge(
             },
         },
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def CCSI_leaktest_co2(
@@ -1387,4 +1387,4 @@ def CCSI_leaktest_co2(
             NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait
         )
 
-    return apm.action_list
+    return apm.planned_actions

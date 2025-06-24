@@ -54,7 +54,7 @@ def DEMO_sub_CP(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def DEMO_sub_CA(
@@ -93,7 +93,7 @@ def DEMO_sub_CA(
         },
     )
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def DEMO_sub_OCV(
@@ -115,4 +115,4 @@ def DEMO_sub_OCV(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch

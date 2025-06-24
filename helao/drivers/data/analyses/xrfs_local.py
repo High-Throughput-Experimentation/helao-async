@@ -43,7 +43,7 @@ class XrfsInputs(AnalysisInput):
         self.global_sample_label = [x for x in filed["sample"] if "__solid__" in x][0]
         action_uuid = filed["action_uuid"]
         action_dir = [
-            d for d in self.xrfs.json["action_list"] if d["action_uuid"] == action_uuid
+            d for d in self.xrfs.json["dispatched_actions"] if d["action_uuid"] == action_uuid
         ][0]["action_output_dir"]
         action_reldir = "/".join(action_dir.split("/")[-2:])
         self.xrfs_act = local_loader.get_act(

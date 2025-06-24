@@ -58,4 +58,4 @@ def SIM_websocket_data(
         process_finish=True,
     )
 
-    return apm.action_list
+    return apm.planned_actions

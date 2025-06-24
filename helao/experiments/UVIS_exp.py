@@ -50,7 +50,7 @@ def UVIS_sub_unloadall_customs(experiment: Experiment):
     """Clear samples from measurement position."""
     apm = ActionPlanMaker()
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
-    return apm.action_list
+    return apm.planned_actions
 
 
 def UVIS_sub_load_solid(
@@ -74,7 +74,7 @@ def UVIS_sub_load_solid(
             ),
         },
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def UVIS_sub_startup(
@@ -85,7 +85,7 @@ def UVIS_sub_startup(
     solid_sample_no: int = 1,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add_action_list(UVIS_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(UVIS_sub_unloadall_customs(experiment=experiment))
 
     # load new requested solid samples
     apm.add(
@@ -123,14 +123,14 @@ def UVIS_sub_startup(
         },
         from_global_params={"_platexy": "d_mm"},
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def UVIS_sub_shutdown(experiment: Experiment):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # unload all samples from custom positions
-    apm.add_action_list(UVIS_sub_unloadall_customs(experiment=experiment))
-    return apm.action_list  # returns complete action list to orch
+    apm.add_actions(UVIS_sub_unloadall_customs(experiment=experiment))
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def UVIS_sub_movetosample(
@@ -162,7 +162,7 @@ def UVIS_sub_movetosample(
         },
         from_global_params={"_platexy": "d_mm"},
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def UVIS_sub_relmove(
@@ -182,7 +182,7 @@ def UVIS_sub_relmove(
             "transformation": TransformationModes.platexy,
         },
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def UVIS_sub_measure(
@@ -266,7 +266,7 @@ def UVIS_sub_measure(
         )
         apm.add(ORCH_server, "wait", {"waittime": 1})
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def UVIS_sub_setup_ref(
@@ -356,7 +356,7 @@ def UVIS_sub_setup_ref(
         },
         from_global_params={"_refxy": "d_mm"},
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def UVIS_calc_abs(
@@ -391,7 +391,7 @@ def UVIS_calc_abs(
             "min_limit": min_limit,
         },
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def UVIS_analysis_dry(
@@ -413,4 +413,4 @@ def UVIS_analysis_dry(
             "params": params,
         },
     )
-    return apm.action_list
+    return apm.planned_actions

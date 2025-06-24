@@ -1951,10 +1951,10 @@ class Active:
 
                 # add actions to experiment
                 for action in self.action_list:
-                    exp.completed_actions.append(self.action.get_act())
+                    exp.dispatched_actions.append(self.action.get_act())
 
                 # add experiment to sequence
-                exp.completed_experiments.append(self.action.get_exp())
+                exp.dispatched_experiments.append(self.action.get_exp())
                 # create and write seq file for manual action
                 await self.base.write_seq(self.action)
                 # create and write exp file for manual action
@@ -3251,10 +3251,10 @@ class Active:
 
             # add actions to experiment
             for action in self.action_list:
-                exp.completed_actions.append(action.get_act())
+                exp.dispatched_actions.append(action.get_act())
 
             # add experiment to sequence
-            exp.completed_experiments.append(action.get_exp())
+            exp.dispatched_experiments.append(action.get_exp())
 
             # this will write the correct
             # sequence and experiment meta files for

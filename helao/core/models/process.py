@@ -36,7 +36,7 @@ class ProcessModel(ShortProcessModel):
     process_params: Optional[dict] = {}
     process_group_index: Optional[int] = None
     data_request_id: Optional[UUID] = None
-    action_list: List[ShortActionModel] = Field(default=[])
+    dispatched_actions: List[ShortActionModel] = Field(default=[])
     samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
 ] = Field(default=[])
     samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]

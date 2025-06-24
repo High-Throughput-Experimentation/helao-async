@@ -55,7 +55,8 @@ class ExperimentModel(ExperimentTemplate):
     experiment_output_dir: Optional[Path] = None
     experiment_codehash: Optional[str] = None
     experiment_label: Optional[str] = None
-    action_list: List[ShortActionModel] = Field(default=[])
+    planned_actions: list = []
+    dispatched_actions_abbr: List[ShortActionModel] = Field(default=[])
     samples_in: List[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])

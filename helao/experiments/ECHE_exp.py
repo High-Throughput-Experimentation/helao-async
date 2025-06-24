@@ -65,7 +65,7 @@ def ECHE_sub_unloadall_customs(experiment: Experiment):
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_add_liquid(
@@ -97,7 +97,7 @@ def ECHE_sub_add_liquid(
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_load_solid(
@@ -127,7 +127,7 @@ def ECHE_sub_load_solid(
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_startup(
@@ -146,10 +146,10 @@ def ECHE_sub_startup(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_action_list(ECHE_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(ECHE_sub_unloadall_customs(experiment=experiment))
 
     # load new requested solid samples
-    apm.add_action_list(
+    apm.add_actions(
         ECHE_sub_load_solid(
             experiment=experiment,
             solid_custom_position=solid_custom_position,
@@ -159,7 +159,7 @@ def ECHE_sub_startup(
     )
 
     # add liquid to solid
-    apm.add_action_list(
+    apm.add_actions(
         ECHE_sub_add_liquid(
             experiment=experiment,
             solid_custom_position=solid_custom_position,
@@ -197,7 +197,7 @@ def ECHE_sub_startup(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_shutdown(experiment: Experiment):
@@ -208,9 +208,9 @@ def ECHE_sub_shutdown(experiment: Experiment):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_action_list(ECHE_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(ECHE_sub_unloadall_customs(experiment=experiment))
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_CA_led(
@@ -320,7 +320,7 @@ def ECHE_sub_CA_led(
     )
     apm.add(IO_server, "stop_digital_cycle", {})
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_OCV(
@@ -362,7 +362,7 @@ def ECHE_sub_OCV(
         ],
         to_global_params={"Ewe_V__mean_final": "HiSpEC_OCV"},
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_preCV(
@@ -410,7 +410,7 @@ def ECHE_sub_preCV(
         ],
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_CA(
@@ -487,7 +487,7 @@ def ECHE_sub_CA(
         ],
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_CV_led(
@@ -624,7 +624,7 @@ def ECHE_sub_CV_led(
     )
     apm.add(IO_server, "stop_digital_cycle", {})
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_CV(
@@ -703,7 +703,7 @@ def ECHE_sub_CV(
         ],
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_CP(
@@ -764,7 +764,7 @@ def ECHE_sub_CP(
         ],
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_CP_led(
@@ -860,7 +860,7 @@ def ECHE_sub_CP_led(
     )
     apm.add(IO_server, "stop_digital_cycle", {})
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_movetosample(
@@ -902,7 +902,7 @@ def ECHE_sub_movetosample(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ECHE_sub_rel_move(
@@ -930,4 +930,4 @@ def ECHE_sub_rel_move(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch

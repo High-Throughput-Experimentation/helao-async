@@ -34,7 +34,7 @@ def ECHE_movetosample(
 
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment(
+    epm.add(
         "ECHE_sub_movetosample",
         {
             #            "solid_custom_position": "cell1_we",
@@ -43,7 +43,7 @@ def ECHE_movetosample(
         },
     )
 
-    epm.add_experiment("ECHE_sub_shutdown", {})
+    epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -56,7 +56,7 @@ def ECHE_move(
 
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment(
+    epm.add(
         "ECHE_sub_rel_move",
         {
             "offset_x_mm": move_x_mm,
@@ -64,7 +64,7 @@ def ECHE_move(
         },
     )
 
-    epm.add_experiment("ECHE_sub_shutdown", {})
+    epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -126,11 +126,11 @@ def ECHE_4CA_led_1CV_led(
     epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -142,7 +142,7 @@ def ECHE_4CA_led_1CV_led(
             },
         )
         # OCV
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
@@ -150,7 +150,7 @@ def ECHE_4CA_led_1CV_led(
             },
         )
         # CA1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA_led",
             {
                 "CA_potential": CA1_potential,
@@ -182,7 +182,7 @@ def ECHE_4CA_led_1CV_led(
             },
         )
         # OCV
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
@@ -190,7 +190,7 @@ def ECHE_4CA_led_1CV_led(
             },
         )
         # CA2
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA_led",
             {
                 "CA_potential": CA2_potential,
@@ -220,7 +220,7 @@ def ECHE_4CA_led_1CV_led(
             },
         )
         # OCV
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
@@ -228,7 +228,7 @@ def ECHE_4CA_led_1CV_led(
             },
         )
         # CA3
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA_led",
             {
                 "CA_potential": CA3_potential,
@@ -258,7 +258,7 @@ def ECHE_4CA_led_1CV_led(
             },
         )
         # OCV
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
@@ -266,7 +266,7 @@ def ECHE_4CA_led_1CV_led(
             },
         )
         # CA4
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA_led",
             {
                 "CA_potential": CA4_potential,
@@ -297,7 +297,7 @@ def ECHE_4CA_led_1CV_led(
         )
 
         # CV1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV_Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
@@ -305,7 +305,7 @@ def ECHE_4CA_led_1CV_led(
                 "CA_duration_sec": preCV_duration,
             },
         )
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV_led",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
@@ -339,7 +339,7 @@ def ECHE_4CA_led_1CV_led(
             },
         )
 
-        epm.add_experiment("ECHE_sub_shutdown", {})
+        epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -381,11 +381,11 @@ def ECHE_CV_CA_CV(
     epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -398,7 +398,7 @@ def ECHE_CV_CA_CV(
             },
         )
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV1_Vinit_vsRHE
@@ -410,7 +410,7 @@ def ECHE_CV_CA_CV(
             },
         )
         # CV1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV1_Vinit_vsRHE,
@@ -432,7 +432,7 @@ def ECHE_CV_CA_CV(
         )
 
         # OCV
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
@@ -440,7 +440,7 @@ def ECHE_CV_CA_CV(
             },
         )
         # CA2
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA",
             {
                 "CA_potential": CA2_potential,
@@ -457,7 +457,7 @@ def ECHE_CV_CA_CV(
             },
         )
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV3_Vinit_vsRHE
@@ -469,7 +469,7 @@ def ECHE_CV_CA_CV(
             },
         )
         # CV3
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV3_Vinit_vsRHE,
@@ -490,7 +490,7 @@ def ECHE_CV_CA_CV(
             },
         )
 
-        epm.add_experiment("ECHE_sub_shutdown", {})
+        epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -521,11 +521,11 @@ def ECHE_CV(
     epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -537,7 +537,7 @@ def ECHE_CV(
             },
         )
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV1_Vinit_vsRHE
@@ -549,7 +549,7 @@ def ECHE_CV(
             },
         )
         # CV1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV1_Vinit_vsRHE,
@@ -570,7 +570,7 @@ def ECHE_CV(
             },
         )
 
-        epm.add_experiment("ECHE_sub_shutdown", {})
+        epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -597,11 +597,11 @@ def ECHE_CA(
     epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -614,7 +614,7 @@ def ECHE_CA(
         )
 
         # OCV
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
@@ -622,7 +622,7 @@ def ECHE_CA(
             },
         )
         # CA1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA",
             {
                 "CA_potential": CA_potential,
@@ -639,7 +639,7 @@ def ECHE_CA(
             },
         )
 
-        epm.add_experiment("ECHE_sub_shutdown", {})
+        epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -678,11 +678,11 @@ def ECHE_CA_led(
     epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -694,7 +694,7 @@ def ECHE_CA_led(
             },
         )
         # OCV
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
@@ -702,7 +702,7 @@ def ECHE_CA_led(
             },
         )
         # CA1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA_led",
             {
                 "CA_potential": CA_potential,
@@ -734,7 +734,7 @@ def ECHE_CA_led(
             },
         )
 
-        epm.add_experiment("ECHE_sub_shutdown", {})
+        epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -777,11 +777,11 @@ def ECHE_CV_led(
     epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -794,7 +794,7 @@ def ECHE_CV_led(
         )
 
         # CV1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV_Vinit_vsRHE
@@ -805,7 +805,7 @@ def ECHE_CV_led(
                 "CA_duration_sec": preCV_duration,
             },
         )
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV_led",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
@@ -841,7 +841,7 @@ def ECHE_CV_led(
             },
         )
 
-        epm.add_experiment("ECHE_sub_shutdown", {})
+        epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -867,11 +867,11 @@ def ECHE_CP(
     epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -884,7 +884,7 @@ def ECHE_CP(
         )
 
         # CP1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CP",
             {
                 "CP_current": CP_current,
@@ -902,7 +902,7 @@ def ECHE_CP(
             },
         )
 
-        epm.add_experiment("ECHE_sub_shutdown", {})
+        epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -940,11 +940,11 @@ def ECHE_CP_led(
     epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -956,7 +956,7 @@ def ECHE_CP_led(
             },
         )
         # CP1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CP_led",
             {
                 "CP_current": CP_current,
@@ -989,7 +989,7 @@ def ECHE_CP_led(
             },
         )
 
-        epm.add_experiment("ECHE_sub_shutdown", {})
+        epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -1039,11 +1039,11 @@ def ECHE_CVs_CAs(
     epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -1056,7 +1056,7 @@ def ECHE_CVs_CAs(
             },
         )
 
-        # epm.add_experiment(
+        # epm.add(
         #     "ECHE_sub_preCV",
         #     {
         #         "CA_potential": CV1_Vinit_vsRHE
@@ -1068,7 +1068,7 @@ def ECHE_CVs_CAs(
         #     },
         # )
         # CV1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV1_Vinit_vsRHE,
@@ -1088,7 +1088,7 @@ def ECHE_CVs_CAs(
                 "ref_offset__V": ref_offset__V,
             },
         )
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV2_Vinit_vsRHE,
@@ -1109,7 +1109,7 @@ def ECHE_CVs_CAs(
             },
         )
         # CV3
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV3_Vinit_vsRHE,
@@ -1129,7 +1129,7 @@ def ECHE_CVs_CAs(
                 "ref_offset__V": ref_offset__V,
             },
         )
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA",
             {
                 "CA_potential": CA1_potential,
@@ -1147,7 +1147,7 @@ def ECHE_CVs_CAs(
         )
 
         # # OCV
-        # epm.add_experiment(
+        # epm.add(
         #     "ECHE_sub_OCV",
         #     {
         #         "Tval__s": OCV_duration,
@@ -1155,7 +1155,7 @@ def ECHE_CVs_CAs(
         #     },
         # )
         # CA2
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA",
             {
                 "CA_potential": CA2_potential,
@@ -1172,7 +1172,7 @@ def ECHE_CVs_CAs(
             },
         )
 
-        # epm.add_experiment(
+        # epm.add(
         #     "ECHE_sub_preCV",
         #     {
         #         "CA_potential": CV3_Vinit_vsRHE
@@ -1184,7 +1184,7 @@ def ECHE_CVs_CAs(
         #     },
         # )
 
-        epm.add_experiment("ECHE_sub_shutdown", {})
+        epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -1241,11 +1241,11 @@ def ECHE_cleanCVs_regCVs_CAs(
     epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -1258,7 +1258,7 @@ def ECHE_cleanCVs_regCVs_CAs(
             },
         )
 
-        # epm.add_experiment(
+        # epm.add(
         #     "ECHE_sub_preCV",
         #     {
         #         "CA_potential": CV1_Vinit_vsRHE
@@ -1270,7 +1270,7 @@ def ECHE_cleanCVs_regCVs_CAs(
         #     },
         # )
         #CVcleansweepfirst
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CVcln_Vinit_vsRHE,
@@ -1293,7 +1293,7 @@ def ECHE_cleanCVs_regCVs_CAs(
 
 
         # CV1
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV1_Vinit_vsRHE,
@@ -1313,7 +1313,7 @@ def ECHE_cleanCVs_regCVs_CAs(
                 "ref_offset__V": ref_offset__V,
             },
         )
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV2_Vinit_vsRHE,
@@ -1334,7 +1334,7 @@ def ECHE_cleanCVs_regCVs_CAs(
             },
         )
         # CV3
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV3_Vinit_vsRHE,
@@ -1354,7 +1354,7 @@ def ECHE_cleanCVs_regCVs_CAs(
                 "ref_offset__V": ref_offset__V,
             },
         )
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA",
             {
                 "CA_potential": CA1_potential,
@@ -1372,7 +1372,7 @@ def ECHE_cleanCVs_regCVs_CAs(
         )
 
         # # OCV
-        # epm.add_experiment(
+        # epm.add(
         #     "ECHE_sub_OCV",
         #     {
         #         "Tval__s": OCV_duration,
@@ -1380,7 +1380,7 @@ def ECHE_cleanCVs_regCVs_CAs(
         #     },
         # )
         # CA2
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_CA",
             {
                 "CA_potential": CA2_potential,
@@ -1397,7 +1397,7 @@ def ECHE_cleanCVs_regCVs_CAs(
             },
         )
 
-        # epm.add_experiment(
+        # epm.add(
         #     "ECHE_sub_preCV",
         #     {
         #         "CA_potential": CV3_Vinit_vsRHE
@@ -1409,6 +1409,6 @@ def ECHE_cleanCVs_regCVs_CAs(
         #     },
         # )
 
-        epm.add_experiment("ECHE_sub_shutdown", {})
+        epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list

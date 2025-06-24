@@ -100,4 +100,4 @@ def SIM_measure_CP(
         from_global_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
     )
 
-    return apm.action_list
+    return apm.planned_actions

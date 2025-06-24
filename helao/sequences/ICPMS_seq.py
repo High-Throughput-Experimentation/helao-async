@@ -13,7 +13,7 @@ def ICPMS_postseq(
     sequence_zip_path: str = "",
 ):
     epm = ExperimentPlanMaker()
-    epm.add_experiment(
+    epm.add(
         "ICPMS_analysis_concentration",
         {
             "sequence_zip_path": sequence_zip_path,
