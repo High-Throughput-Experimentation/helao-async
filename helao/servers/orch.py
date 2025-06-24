@@ -871,24 +871,24 @@ class Orch(Base):
             self.active_sequence.init_seq(time_offset=self.ntp_offset)
             self.active_sequence.orchestrator = self.server
 
-            # from global params
-            for k, v in self.active_sequence.from_global_params.items():
-                LOGGER.info(f"mapping from global params to sequence {k}:{v}")
-                if k in self.global_params:
-                    if isinstance(v, list):
-                        for vv in v:
-                            self.active_sequence.sequence_params[vv] = (
-                                self.global_params[k]
-                            )
-                    else:
-                        self.active_sequence.sequence_params[v] = self.global_params[k]
-                    LOGGER.info(
-                        f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
-                    )
-                else:
-                    LOGGER.info(
-                        f"global parameter {k} not found in global_params, skipping"
-                    )
+            # # from global params
+            # for k, v in self.active_sequence.from_global_params.items():
+            #     LOGGER.info(f"mapping from global params to sequence {k}:{v}")
+            #     if k in self.global_params:
+            #         if isinstance(v, list):
+            #             for vv in v:
+            #                 self.active_sequence.sequence_params[vv] = (
+            #                     self.global_params[k]
+            #                 )
+            #         else:
+            #             self.active_sequence.sequence_params[v] = self.global_params[k]
+            #         LOGGER.info(
+            #             f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
+            #         )
+            #     else:
+            #         LOGGER.info(
+            #             f"global parameter {k} not found in global_params, skipping"
+            #         )
 
             # if planned_experiments is empty, unpack sequence,
             # otherwise operator already populated planned_experiments
