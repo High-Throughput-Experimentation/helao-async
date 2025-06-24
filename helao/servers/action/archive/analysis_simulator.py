@@ -74,7 +74,7 @@ def makeApp(server_key):
         server_title=server_key,
         description="Analysis simulator",
         version=2.0,
-        driver_class=AnalysisSim
+        driver_classes=[AnalysisSim]
     )
 
     @app.post(f"/{server_key}/calc_cpfom", tags=["action"])

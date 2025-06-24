@@ -23,7 +23,7 @@ def makeApp(server_key):
         server_title=server_key,
         description="Sensor server",
         version=0.1,
-        driver_class=CM0134,
+        driver_classes=[CM0134],
     )
 
     @app.post(f"/{server_key}/acquire_o2", tags=["action"])
