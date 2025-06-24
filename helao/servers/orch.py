@@ -1406,6 +1406,7 @@ class Orch(Base):
 
             try:
                 result_action = Action(**result_actiondict)
+                self.active_experiment.dispatched_actions.append(result_action)
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 LOGGER.error(
@@ -2394,14 +2395,14 @@ class Orch(Base):
                 }
             )
 
-            self.active_experiment.dispatched_actions = []
+            # self.active_experiment.dispatched_actions = []
 
             # TODO use exp uuid to filter actions?
-            self.active_experiment.dispatched_actions = (
-                self.globalstatusmodel.finish_experiment(
-                    exp_uuid=self.active_experiment.experiment_uuid
-                )
-            )
+            # self.active_experiment.dispatched_actions = (
+            #     self.globalstatusmodel.finish_experiment(
+            #         exp_uuid=self.active_experiment.experiment_uuid
+            #     )
+            # )
             # set exp status to finished
             self.replace_status(
                 status_list=self.active_experiment.experiment_status,
