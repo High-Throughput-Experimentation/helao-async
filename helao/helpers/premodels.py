@@ -8,14 +8,12 @@ __all__ = ["Sequence", "Experiment", "Action", "ActionPlanMaker", "ExperimentPla
 import os
 import inspect
 from copy import deepcopy
-from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 from pydantic import Field
 from typing import List
 from collections import defaultdict
 from uuid import UUID
 
-from helao.helpers.print_message import print_message
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.set_time import set_time
 from helao.core.models.action import ActionModel, ShortActionModel
@@ -37,6 +35,10 @@ else:
 
 class Sequence(SequenceModel):
     "Experiment grouping class."
+    # not in SequenceModel:
+    completed_experiments: List[ExperimentModel] = (
+        []
+    )  # running tally of completed experiments
 
     def __repr__(self):
         return f"<sequence_name:{self.sequence_name}>"
@@ -45,14 +47,14 @@ class Sequence(SequenceModel):
         return f"sequence_name:{self.sequence_name}"
 
     def get_seq(self):
-        seq = Sequence(**self.model_dump())
-        seq.experiment_list = [
+        seq = SequenceModel(**self.model_dump())
+        seq.completed_experiments_abbr = [
             ShortExperimentModel(**exp.model_dump())
-            for exp in self.experimentmodel_list
+            for exp in self.completed_experiments
         ]
         # either we have a plan at the beginning or not
-        # don't add it later from the experimentmodel_list
-        # seq.experiment_plan_list = [ExperimentTemplate(**exp.model_dump()) for exp in self.experimentmodel_list]
+        # don't add it later from the completed_experiments
+        # seq.planned_experiments = [ExperimentTemplate(**exp.model_dump()) for exp in self.completed_experiments]
         return seq
 
     def init_seq(self, time_offset: float = 0, force: Optional[bool] = False):
@@ -87,6 +89,10 @@ class Sequence(SequenceModel):
 
 class Experiment(Sequence, ExperimentModel):
     "Sample-action grouping class."
+    # not in ExperimentModel, completed_actions is a list of completed ActionModels:
+    completed_actions: List[ActionModel] = []
+    # not in ExperimentModel, planned_actions is a list of Actions to be executed:
+    planned_actions: list = []
 
     def __repr__(self):
         return f"<experiment_name:{self.experiment_name}>"
@@ -116,7 +122,7 @@ class Experiment(Sequence, ExperimentModel):
         ).replace(r"\\", "/")
 
     def get_exp(self):
-        exp = Experiment(**self.model_dump())
+        exp = ExperimentModel(**self.model_dump())
         # now add all actions
         self._experiment_update_from_actlist(exp=exp)
         return exp
@@ -128,10 +134,10 @@ class Experiment(Sequence, ExperimentModel):
         # reset file list
         exp.files = []
 
-        if self.actionmodel_list is None:
-            self.actionmodel_list = []
+        if self.completed_actions is None:
+            self.completed_actions = []
 
-        for actm in self.actionmodel_list:
+        for actm in self.completed_actions:
             LOGGER.info(
                 f"updating exp with act {actm.action_name} on {actm.action_server.disp_name()}, uuid:{actm.action_uuid}"
             )
@@ -204,6 +210,13 @@ class Experiment(Sequence, ExperimentModel):
 
 class Action(Experiment, ActionModel):
     "Sample-action identifier class."
+    # internal
+    file_conn_keys: List[UUID] = Field(default=[])
+    # flag for dataLOGGER
+    # None will signal default behaviour as before
+    # will be updated by data LOGGER only if it finds the status
+    # in the data stream
+    data_stream_status: Optional[HloStatus] = None
 
     def __repr__(self):
         return f"<action_name:{self.action_name}>"
@@ -212,7 +225,7 @@ class Action(Experiment, ActionModel):
         return f"action_name:{self.action_name}"
 
     def get_act(self):
-        return Action(**self.model_dump())
+        return ActionModel(**self.model_dump())
 
     def init_act(self, time_offset: float = 0, force: Optional[bool] = False):
         if self.sequence_timestamp is None or self.experiment_timestamp is None:
@@ -357,7 +370,7 @@ class ActionPlanMaker:
     @property
     def experiment(self):
         exp = self._experiment
-        exp.action_plan = self.action_list
+        exp.planned_actions = self.action_list
         return exp
 
 
@@ -365,10 +378,10 @@ class ExperimentPlanMaker:
     def __init__(
         self,
     ):
-        self.experiment_plan_list = []
+        self.planned_experiments = []
 
     def add_experiment(self, selected_experiment, experiment_params, **kwargs):
-        self.experiment_plan_list.append(
+        self.planned_experiments.append(
             Experiment(
                 experiment_name=selected_experiment,
                 experiment_params=experiment_params,

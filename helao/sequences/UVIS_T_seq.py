@@ -178,7 +178,7 @@ def UVIS_T(
         epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
     epm.add_experiment("UVIS_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def UVIS_T_postseq(
@@ -197,4 +197,4 @@ def UVIS_T_postseq(
         },
     )
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list

@@ -1,23 +1,24 @@
 """
 This module defines the BokehOperator class, which is responsible for managing
-the Bokeh-based user interface for the HTE (High Throughput Experimentation) 
-orchestrator. The BokehOperator class provides methods for interacting with 
-the orchestrator, including adding sequences and experiments, updating tables, 
+the Bokeh-based user interface for the HTE (High Throughput Experimentation)
+orchestrator. The BokehOperator class provides methods for interacting with
+the orchestrator, including adding sequences and experiments, updating tables,
 and handling user input.
 
 Classes:
-    return_sequence_lib: A Pydantic BaseModel class representing a sequence 
-        object with attributes such as index, sequence_name, doc, args, 
+    return_sequence_lib: A Pydantic BaseModel class representing a sequence
+        object with attributes such as index, sequence_name, doc, args,
         defaults, and argtypes.
-    return_experiment_lib: A Pydantic BaseModel class representing an 
-        experiment object with attributes such as index, experiment_name, 
+    return_experiment_lib: A Pydantic BaseModel class representing an
+        experiment object with attributes such as index, experiment_name,
         doc, args, defaults, and argtypes.
-    BokehOperator: A class that manages the Bokeh-based user interface for 
-        the HTE orchestrator. It provides methods for interacting with the 
-        orchestrator, updating tables, handling user input, and managing 
+    BokehOperator: A class that manages the Bokeh-based user interface for
+        the HTE orchestrator. It provides methods for interacting with the
+        orchestrator, updating tables, handling user input, and managing
         sequences and experiments.
 
 """
+
 import traceback
 import asyncio
 import io
@@ -34,6 +35,7 @@ import numpy as np
 from functools import partial
 
 from helao.helpers import helao_logging as logging
+
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
@@ -44,7 +46,6 @@ from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 
-from helao.helpers.premodels import Experiment
 from helao.core.models.orchstatus import LoopStatus
 from helao.helpers.premodels import Sequence, Experiment
 
@@ -1029,7 +1030,9 @@ class BokehOperator:
             self.action_server_lists["action_server"].append(server_name)
             self.action_server_lists["server_status"].append(status_str)
             self.action_server_lists["driver_status"].append(driver_str)
-            self.action_server_source.stream(self.action_server_lists, rollover=self.num_actserv)
+            self.action_server_source.stream(
+                self.action_server_lists, rollover=self.num_actserv
+            )
 
     def update_selector_layout(self, attr, old, new):
         if new == 2:
@@ -1321,7 +1324,9 @@ class BokehOperator:
             for paraminput in self.seq_param_input
         }
         for k, v in sequence_params.items():
-            LOGGER.info(f"added sequence param '{k}' with value {v} and type {type(v)} ")
+            LOGGER.info(
+                f"added sequence param '{k}' with value {v} and type {type(v)} "
+            )
 
         self.write_params("seq", selected_sequence, sequence_params)
         expplan_list = self.orch.unpack_sequence(
@@ -1354,7 +1359,9 @@ class BokehOperator:
             for paraminput in self.exp_param_input
         }
         for k, v in experiment_params.items():
-            LOGGER.info(f"added experiment param '{k}' with value {v} and type {type(v)} ")
+            LOGGER.info(
+                f"added experiment param '{k}' with value {v} and type {type(v)} "
+            )
         self.write_params("exp", selected_experiment, experiment_params)
         experimentmodel = Experiment(
             experiment_name=selected_experiment, experiment_params=experiment_params
@@ -2030,7 +2037,7 @@ class BokehOperator:
         self.update_queuecount_labels()
         for key in self.experiment_plan_lists:
             self.experiment_plan_lists[key] = []
-        
+
         plan_count = 0
         if self.sequence is not None:
             for D in self.sequence.experiment_plan_list:

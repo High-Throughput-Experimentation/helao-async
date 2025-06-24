@@ -244,7 +244,7 @@ def HiSpEC_CV(
     # )
     epm.add_experiment("HISPEC_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
 def HiSpEC_EIS_only(
@@ -390,7 +390,7 @@ def HiSpEC_EIS_only(
     
     epm.add_experiment("HISPEC_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 # def ECHEUVIS_CP_led(
 #     sequence_version: int = 5,
@@ -721,7 +721,7 @@ def HiSpEC_EIS_only(
 #     )
 #     epm.add_experiment("ECHE_sub_shutdown", {})
 
-#     return epm.experiment_plan_list  # returns complete experiment list
+#     return epm.planned_experiments  # returns complete experiment list
 
 
 # def ECHEUVIS_diagnostic_CV(
@@ -877,7 +877,7 @@ def HiSpEC_EIS_only(
 #     )
 #     epm.add_experiment("HISPEC_sub_shutdown", {})
 
-#     return epm.experiment_plan_list  # returns complete experiment list
+#     return epm.planned_experiments  # returns complete experiment list
 
 
 # def ECHEUVIS_multiCA_led(
@@ -1256,7 +1256,7 @@ def HiSpEC_EIS_only(
 #     # )
 #     epm.add_experiment("HISPEC_sub_shutdown", {})
 
-#     return epm.experiment_plan_list  # returns complete experiment list
+#     return epm.planned_experiments  # returns complete experiment list
 
 
 def ECHEUVIS_postseq(
@@ -1275,4 +1275,4 @@ def ECHEUVIS_postseq(
         },
     )
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list

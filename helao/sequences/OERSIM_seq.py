@@ -27,4 +27,4 @@ def OERSIM_activelearn(
             "thresh_value": thresh_value,
         },
     )
-    return epm.experiment_plan_list
+    return epm.planned_experiments

@@ -127,7 +127,7 @@ def ANEC_sample_ready(
 
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_series_CA(
@@ -236,7 +236,7 @@ def ANEC_series_CA(
 
     epm.add_experiment("ANEC_sub_alloff", {})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_series_CAliquidOnly(
@@ -341,7 +341,7 @@ def ANEC_series_CAliquidOnly(
 
     epm.add_experiment("ANEC_sub_alloff", {})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_OCV(
@@ -423,7 +423,7 @@ def ANEC_OCV(
     )
 
     epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_photo_CA(
@@ -554,7 +554,7 @@ def ANEC_photo_CA(
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
     if len(WE_potential__V) > 1:
         epm.add_experiment("ANEC_sub_alloff", {})
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_photo_CAgasonly(
@@ -673,7 +673,7 @@ def ANEC_photo_CAgasonly(
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
     if len(WE_potential__V) > 1:
         epm.add_experiment("ANEC_sub_alloff", {})
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_photo_CV(
@@ -782,7 +782,7 @@ def ANEC_photo_CV(
 
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_cleanup_disengage(sequence_version: int = 1):
@@ -796,7 +796,7 @@ def ANEC_cleanup_disengage(sequence_version: int = 1):
     epm.add_experiment("ANEC_sub_alloff", {})
     epm.add_experiment("ANEC_sub_disengage", {})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_CA_pretreat(
@@ -876,7 +876,7 @@ def ANEC_CA_pretreat(
 
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ANEC_CA_DOE_demo(
     sequence_version: int = 1,
@@ -961,7 +961,7 @@ def ANEC_CA_DOE_demo(
     )
     epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ANEC_CA_DOE_demo_headspace(
     sequence_version: int = 1,
@@ -1034,7 +1034,7 @@ def ANEC_CA_DOE_demo_headspace(
     )
     epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def ANEC_repeat_CA(
     sequence_version: int = 1,
@@ -1136,7 +1136,7 @@ def ANEC_repeat_CA(
         epm.add_experiment("ANEC_sub_heatoff", {})
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_repeat_TentHeatCAgasonly(
@@ -1233,7 +1233,7 @@ def ANEC_repeat_TentHeatCAgasonly(
 
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
     epm.add_experiment("ANEC_sub_heatoff", {})
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_heatOCV(
@@ -1306,7 +1306,7 @@ def ANEC_heatOCV(
 
     epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
     epm.add_experiment("ANEC_sub_heatoff", {})
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_repeat_TentHeatCA(
@@ -1415,7 +1415,7 @@ def ANEC_repeat_TentHeatCA(
 
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
     epm.add_experiment("ANEC_sub_heatoff", {})
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_repeat_HeatCA(
@@ -1520,7 +1520,7 @@ def ANEC_repeat_HeatCA(
 
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_gasonly_CA(
@@ -1611,7 +1611,7 @@ def ANEC_gasonly_CA(
 
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_repeat_CV(
@@ -1697,7 +1697,7 @@ def ANEC_repeat_CV(
 
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_ferricyanide_simpleprotocol(
@@ -1789,7 +1789,7 @@ def ANEC_ferricyanide_simpleprotocol(
             },
         )
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_ferricyanide_protocol(
@@ -1893,7 +1893,7 @@ def ANEC_ferricyanide_protocol(
     epm.add_experiment("ANEC_sub_heatoff", {})
     epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def ANEC_create_and_load_liquid_sample(
@@ -1930,7 +1930,7 @@ def ANEC_create_and_load_liquid_sample(
             },
         )
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 # =============================================================================
@@ -1956,7 +1956,7 @@ def ANEC_create_and_load_liquid_sample(
 #             {"volume_ml": volume_ml, "source": source, "partial_molarity":partial_molarity, "chemical":chemical, "ph":ph, "supplier":supplier, "lot_number":lot_number,"electrolyte_name":electrolyte_name, "prep_date":prep_date},
 #         )
 #
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 #
 # def ANEC_create_liquid_tray(
 #     sequence_version: int = 1,
@@ -1974,7 +1974,7 @@ def ANEC_create_and_load_liquid_sample(
 #             {"liquid_sample_no": sample_no, "machine_name": machine_name, "tray":2, "slot":slot, "vial":vial_no},
 #         )
 #
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 # =============================================================================
 
 
@@ -2007,7 +2007,7 @@ def GC_Archiveliquid_analysis(
             },
         )
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def HPLC_Archiveliquid_analysis(
@@ -2041,4 +2041,4 @@ def HPLC_Archiveliquid_analysis(
             },
         )
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments

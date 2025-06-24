@@ -113,7 +113,7 @@ def CCSI_initialization(
 
     epm.add_experiment("CCSI_sub_initialization_end_state", {})
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 # def CCSI_validation_KOH_procedure(
@@ -189,7 +189,7 @@ def CCSI_initialization(
 #     epm.add_experiment("CCSI_sub_peripumpoff", {})
 #     epm.add_experiment("CCSI_sub_unload_cell",{})
 
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 
 # def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
 #     sequence_version: int = 1,
@@ -292,7 +292,7 @@ def CCSI_initialization(
 #                 "DeltaDilute1_duration": DeltaDilute1_duration,
 #                 })
 
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 
 # def CCSI_test_KOH_testing(  #assumes initialization performed previously
 #     sequence_version: int = 1,
@@ -398,7 +398,7 @@ def CCSI_initialization(
 #                 "DeltaDilute1_duration": DeltaDilute1_duration,
 #                 })
 
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 
 # def CCSI_newer_KOH_testing(  #assumes initialization performed previously
 #     sequence_version: int = 2,
@@ -525,7 +525,7 @@ def CCSI_initialization(
 #                 "DeltaDilute1_duration": DeltaDilute1_duration,
 #                 })
 
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 
 
 # def CCSI_debug_liquidloads(  #assumes initialization performed previously
@@ -632,7 +632,7 @@ def CCSI_initialization(
 #     #     "combine_True_False": False,
 #     # })
 
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 
 def CCSI_Solution_testing(  #assumes initialization performed previously
     sequence_version: int = 8, #6 split of liquidfill to cellfill and co2monitoring exps v8 moves sample loads to cellfill expt
@@ -763,7 +763,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
                 "recirculation_rate_uL_min": recirculation_rate_uL_min,
                 })
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 # =============================================================================
 # def CCSI_Solution_test_constantpressure(  #assumes initialization performed previously
@@ -887,7 +887,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #                 "DeltaDilute1_duration": DeltaDilute1_duration,
 #                 })
 # 
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 # =============================================================================
 
 def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed previously
@@ -1159,7 +1159,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             })
 
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 def CCSI_cleancycles(  
     sequence_version: int = 1,
@@ -1331,7 +1331,7 @@ def CCSI_cleancycles(
             })
 
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 
 def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previously
@@ -1439,7 +1439,7 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
                 "DeltaDilute1_duration": DeltaDilute1_duration,
                 })
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 def CCSI_priming(  #assumes initialization performed previously
     sequence_version: int = 1,
     Solution_volume_ul: List[float] = [2000],
@@ -1535,7 +1535,7 @@ def CCSI_priming(  #assumes initialization performed previously
                 "recirculation_rate_uL_min": recirculation_rate_uL_min,
                 })
 
-    return epm.experiment_plan_list
+    return epm.planned_experiments
 
 # def CCSI_leaktest(
 #     sequence_version: int = 2,
@@ -1590,7 +1590,7 @@ def CCSI_priming(  #assumes initialization performed previously
 #         })
 #     epm.add_experiment("CCSI_sub_peripumpoff",{})
 
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments
 
 
 # def CCSI_Solution_testing_cleans(  #assumes initialization performed previously
@@ -1866,4 +1866,4 @@ def CCSI_priming(  #assumes initialization performed previously
 #             "recirculation_rate_uL_min": recirculation_rate_uL_min,
 #             })
 
-#     return epm.experiment_plan_list
+#     return epm.planned_experiments

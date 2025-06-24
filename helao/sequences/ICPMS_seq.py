@@ -20,5 +20,5 @@ def ICPMS_postseq(
         },
     )
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 

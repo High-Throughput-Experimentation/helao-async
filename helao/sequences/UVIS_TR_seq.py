@@ -183,4 +183,4 @@ def UVIS_TR(
     )
     epm.add_experiment("UVIS_sub_shutdown", {})
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list

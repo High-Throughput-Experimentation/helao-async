@@ -41,7 +41,7 @@ if __name__ == "__main__":
         sequence_name="OERSIM_activelearn",
         sequence_label=f"{demokey}",
         sequence_params=seq_params,
-        experiment_plan_list=exp_plan,
+        planned_experiments=exp_plan,
         sequence_uuid=gen_uuid(),
         dummy=True,
         simulation=True,

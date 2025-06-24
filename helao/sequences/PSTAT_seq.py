@@ -69,6 +69,6 @@ def CP_loop(
     )
 
 
-    return epm.experiment_plan_list  # returns complete experiment list
+    return epm.planned_experiments  # returns complete experiment list
 
 
