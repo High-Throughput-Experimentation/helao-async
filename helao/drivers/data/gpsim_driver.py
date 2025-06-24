@@ -59,7 +59,7 @@ class GPSim:
             for k, arr in self.features.items()
         }
         for k, arr in self.targets.items():
-            print(f"plate {k} has eta mean {arr.mean()}")
+            LOGGER.info(f"plate {k} has eta mean {arr.mean()}")
         # precalculated for simulation only
         self.lib_pcts = {
             k: {p: np.percentile(etas, p) for p in (1, 2, 5, 10)}
@@ -126,7 +126,7 @@ class GPSim:
             shuffle=False,
         )
         self.clear_plate(plate_id)
-        # print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
+        # LOGGER.info(f"!!! initial indices for plate {plate_id} are: {ridxs}")
         for ridx in ridxs:
             await self.acquire_point(plate_id, init_point=list(arr[ridx]))
         await self.fit_model(plate_id)
@@ -293,11 +293,11 @@ class GPSim:
         acq_inds = np.array(
             self.acquired[plate_id] + self.acq_fromglobal[plate_id]
         ).astype(int)
-        print("acquired indices:", acq_inds)
+        LOGGER.info("acquired indices:", acq_inds)
         X = self.features[plate_id][acq_inds].astype(float).round(2)
         y = self.targets[plate_id][acq_inds]
-        print(f"features {X.shape}:", X)
-        print(f"targets {y.shape}:", y)
+        LOGGER.info(f"features {X.shape}:", X)
+        LOGGER.info(f"targets {y.shape}:", y)
         opt = gpflow.optimizers.Scipy()
         kernel = self.kernel_func()
         try:
@@ -305,7 +305,7 @@ class GPSim:
                 data=(X, y), kernel=kernel, mean_function=None
             )
         except Exception as e:
-            print(e)
+            LOGGER.info(e)
         self.opt_logs[plate_id][plate_step] = opt.minimize(
             self.models[plate_id].training_loss,
             self.models[plate_id].trainable_variables,
@@ -317,9 +317,9 @@ class GPSim:
                 self.features[plate_id].astype(float).round(2)
             )
         )
-        print("prediction min:", total_pred.min())
-        print("prediction mean:", total_pred.mean())
-        print("prediction max:", total_pred.max())
+        LOGGER.info("prediction min:", total_pred.min())
+        LOGGER.info("prediction mean:", total_pred.mean())
+        LOGGER.info("prediction max:", total_pred.max())
         total_mae = mean_absolute_error(total_pred, self.targets[plate_id])
         self.total_step[plate_id][plate_step] = (
             total_mae,

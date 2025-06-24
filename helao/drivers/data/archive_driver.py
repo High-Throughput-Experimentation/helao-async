@@ -347,7 +347,7 @@ class Archive:
         if load_sample_in is None:
             return False, NoneSample(), {}
 
-        print("!!!load_sample_in:", load_sample_in)
+        LOGGER.info("!!!load_sample_in:", load_sample_in)
         # check if sample actually exists
         load_samples_in = await self.unified_db.get_samples(samples=[load_sample_in])
 

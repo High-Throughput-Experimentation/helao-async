@@ -93,9 +93,10 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         shutdown(self):
             Placeholder method for handling shutdown procedures.
     """
+
     base: Base
     running_tasks: dict
-    
+
     def __init__(self, action_serv: Base):
         """
         Initializes the AnalysisDriver instance.
@@ -163,7 +164,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         Callback function to handle the completion of an asynchronous task.
 
         This function is intended to be used as a callback for when an asyncio.Task
-        completes. It removes the task from the running_tasks dictionary and the 
+        completes. It removes the task from the running_tasks dictionary and the
         task_set set if they exist.
 
         Args:
@@ -282,7 +283,10 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             year_week = ana_ts.strftime("%y.%U")
             analysis_day = ana_ts.strftime("%Y%m%d")
             local_ana_dir = os.path.join(
-                self.local_ana_root, year_week, analysis_day, f"{HMS}__{eua.analysis_name}"
+                self.local_ana_root,
+                year_week,
+                analysis_day,
+                f"{HMS}__{eua.analysis_name}",
             )
             os.makedirs(local_ana_dir, exist_ok=True)
             with open(
@@ -296,14 +300,16 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                 LOGGER.info("uploading analysis model to S3 bucket")
                 try:
                     s3_model_success = await self.to_s3(model_dict, s3_model_target)
-                except Exception as e:
-                    tb = "".join(
-                        traceback.format_exception(type(e), e, e.__traceback__)
+                except Exception:
+                    LOGGER.error(
+                        f"Failed to upload analysis model {eua.analysis_uuid} to S3.",
+                        exc_info=True,
                     )
-                    print(tb)
             else:
                 s3_model_success = True
-                LOGGER.info("Analysis server config set to local_only, skipping S3/API push.")
+                LOGGER.info(
+                    "Analysis server config set to local_only, skipping S3/API push."
+                )
 
             outputs = model_dict.get("outputs", [])
             output_successes = []
@@ -335,14 +341,16 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                 LOGGER.info(f"Successfully synced {eua.analysis_uuid}")
                 return True
 
-        LOGGER.warning(f"Analysis {eua.analysis_uuid} sync failed for process_uuid {process_uuid}.")
+        LOGGER.warning(
+            f"Analysis {eua.analysis_uuid} sync failed for process_uuid {process_uuid}."
+        )
         self.running_tasks.pop(str(process_uuid))
         return False
 
     async def to_api(self, req_model: dict, retries: int = 3):
         """
         Asynchronously sends a request to the API to push analysis data. If the initial request fails,
-        it retries up to a specified number of times. If all retries fail, it sends a failure report 
+        it retries up to a specified number of times. If all retries fail, it sends a failure report
         to a debug endpoint.
 
         Args:
@@ -373,9 +381,13 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                                 api_success = True
                             elif resp.status == 400:
                                 try_create = False
-                            LOGGER.info(f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}")
+                            LOGGER.info(
+                                f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}"
+                            )
                             last_response = await resp.json()
-                            LOGGER.info(f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}")
+                            LOGGER.info(
+                                f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}"
+                            )
                             last_status = resp.status
                     except Exception as e:
                         LOGGER.info(f"[{i+1}/{retries}] an exception occurred: {e}")
@@ -399,9 +411,13 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     for _ in range(retries):
                         async with session.post(fail_url, json=fail_model) as resp:
                             if resp.status == 200:
-                                LOGGER.info(f"successful debug API push for analysis: {meta_uuid}")
+                                LOGGER.info(
+                                    f"successful debug API push for analysis: {meta_uuid}"
+                                )
                                 break
-                            LOGGER.info(f"failed debug API push for analysis: {meta_uuid}")
+                            LOGGER.info(
+                                f"failed debug API push for analysis: {meta_uuid}"
+                            )
                             LOGGER.info(f"response: {await resp.json()}")
         return api_success
 
@@ -426,9 +442,11 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         """
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
         # min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2024-01-01"
-        plate_filter = f"    AND (hs.sequence_params->>'plate_id')::numeric = {plate_id}"
+        plate_filter = (
+            f"    AND (hs.sequence_params->>'plate_id')::numeric = {plate_id}"
+        )
         df = pgs3.LOADER.get_sequence(
-            query=SDCUVIS_QUERY+plate_filter, sequence_uuid=str(sequence_uuid)
+            query=SDCUVIS_QUERY + plate_filter, sequence_uuid=str(sequence_uuid)
         )
 
         ## patch erroneous plate_ids here
@@ -538,7 +556,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         params: dict = {},
     ):
         """
-        Asynchronously calculates ICP-MS (Inductively Coupled Plasma Mass Spectrometry) analysis for a batch of processes 
+        Asynchronously calculates ICP-MS (Inductively Coupled Plasma Mass Spectrometry) analysis for a batch of processes
         from a local sequence zip file.
 
         Args:
@@ -567,7 +585,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         params: dict = {},
     ):
         """
-        Asynchronously calculates XRF (X-Ray Fluorescence) calibration analysis for a batch of processes 
+        Asynchronously calculates XRF (X-Ray Fluorescence) calibration analysis for a batch of processes
         from a local sequence zip file.
 
         Args:

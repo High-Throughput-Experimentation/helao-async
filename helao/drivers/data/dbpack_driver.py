@@ -153,10 +153,10 @@ class HelaoYml:
         self.parse_yml(path)
 
     def parse_yml(self, path):
-        # print(f"!!! parsing yml {path}")
+        # LOGGER.info(f"!!! parsing yml {path}")
         self.target = path if isinstance(path, HelaoPath) else HelaoPath(path)
         self.dict = yml_load(self.target)
-        # print(f"!!! successfully parsed yml {path}")
+        # LOGGER.info(f"!!! successfully parsed yml {path}")
         self.file_type = self.dict["file_type"]
         self.uuid = self.dict[f"{self.file_type}_uuid"]
         # overwrite uuid when test dict is passed by dbp server
@@ -170,7 +170,7 @@ class HelaoYml:
         if inst_idx:
             inst_idx = inst_idx[0]
         else:
-            print("!!! 'INST' directory was not found in yml path. Cannot proceed.")
+            LOGGER.warning("!!! 'INST' directory was not found in yml path. Cannot proceed.")
             return False
         self.status = self.target.parts[inst_idx + 1].replace("RUNS_", "")
         self.data_dir = self.target.parent
@@ -204,9 +204,9 @@ class HelaoYml:
         progress_parts[syncpath_offset[self.file_type]] = "RUNS_SYNCED"
         progress_parts[-1] = progress_parts[-1].replace(".yml", ".progress")
         self.progress_path = HelaoPath(os.path.join(*progress_parts))
-        # print(f"!!! Loading progress from {self.progress_path}")
+        # LOGGER.info(f"!!! Loading progress from {self.progress_path}")
         self.progress = Progress(self.yml_path)
-        # print(f"!!! Successfully loaded progress from {self.progress_path}")
+        # LOGGER.info(f"!!! Successfully loaded progress from {self.progress_path}")
         if (self.status == "FINISHED") and (self.file_type != "experiment"):
             meta_json = modmap[self.file_type](**self.dict).clean_dict()
             meta_json = wrap_sample_details(meta_json)
@@ -1130,7 +1130,7 @@ class YmlOps:
                 self.dbp.base.print_message(clean_success)
             self.yml.parse_yml(new_target)
         else:
-            print("Yml status is not ACTIVE, cannot move.")
+            LOGGER.info("Yml status is not ACTIVE, cannot move.")
 
     def to_synced(self):
         """Moves yml and data folder from FINISHED to SYNCED path. Final state."""
