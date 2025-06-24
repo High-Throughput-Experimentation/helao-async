@@ -330,7 +330,7 @@ def create_and_load_liquid_sample(
             "slot": slot,
             "vial": vial
         },
-        from_global_params={"_fast_sample_out": "load_sample_in"}
+        from_global_act_params={"_fast_sample_out": "load_sample_in"}
     )
 
     return apm.planned_actions  # returns complete action list to orch

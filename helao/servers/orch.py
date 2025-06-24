@@ -871,24 +871,24 @@ class Orch(Base):
             self.active_sequence.init_seq(time_offset=self.ntp_offset)
             self.active_sequence.orchestrator = self.server
 
-            # # from global params
-            # for k, v in self.active_sequence.from_global_params.items():
-            #     LOGGER.info(f"mapping from global params to sequence {k}:{v}")
-            #     if k in self.global_params:
-            #         if isinstance(v, list):
-            #             for vv in v:
-            #                 self.active_sequence.sequence_params[vv] = (
-            #                     self.global_params[k]
-            #                 )
-            #         else:
-            #             self.active_sequence.sequence_params[v] = self.global_params[k]
-            #         LOGGER.info(
-            #             f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
-            #         )
-            #     else:
-            #         LOGGER.info(
-            #             f"global parameter {k} not found in global_params, skipping"
-            #         )
+            # from global params
+            for k, v in self.active_sequence.from_global_seq_params.items():
+                LOGGER.info(f"mapping from global params to sequence {k}:{v}")
+                if k in self.global_params:
+                    if isinstance(v, list):
+                        for vv in v:
+                            self.active_sequence.sequence_params[vv] = (
+                                self.global_params[k]
+                            )
+                    else:
+                        self.active_sequence.sequence_params[v] = self.global_params[k]
+                    LOGGER.info(
+                        f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
+                    )
+                else:
+                    LOGGER.info(
+                        f"global parameter {k} not found in global_params, skipping"
+                    )
 
             # if planned_experiments is empty, unpack sequence,
             # otherwise operator already populated planned_experiments
@@ -999,7 +999,7 @@ class Orch(Base):
 
         # LOGGER.info("copying global vars to experiment")
         # copy requested global param to experiment params
-        for k, v in self.active_experiment.from_global_params.items():
+        for k, v in self.active_experiment.from_global_exp_params.items():
             LOGGER.info(f"mapping from global params to experiment -- {k}:{v}")
             if k in self.global_params:
                 if isinstance(v, list):
@@ -1266,7 +1266,7 @@ class Orch(Base):
 
             # LOGGER.info("copying global vars to action")
             # copy requested global param to action params
-            for k, v in A.from_global_params.items():
+            for k, v in A.from_global_act_params.items():
                 LOGGER.info(f"mapping from global params to action {k}:{v}")
                 if k in self.global_params:
                     if isinstance(v, list):

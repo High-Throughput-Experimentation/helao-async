@@ -83,7 +83,7 @@ class ActionModel(ShortActionModel):
     save_act: bool = True  # default should be true
     save_data: bool = True  # default should be true
     aux_file_paths: List[Path] = Field(default=[])
-    from_global_params: dict = {}
+    from_global_act_params: dict = {}
     to_global_params: Union[list, dict] = []
 
     @property

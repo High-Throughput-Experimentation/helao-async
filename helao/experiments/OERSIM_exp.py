@@ -43,7 +43,7 @@ def OERSIM_sub_load_plate(
             "num_random_points": init_random_points,
             "reinitialize": False,
         },
-        from_global_params={"_loaded_plate_id": "plate_id"},
+        from_global_act_params={"_loaded_plate_id": "plate_id"},
     )
 
 
@@ -60,17 +60,17 @@ def OERSIM_sub_measure_CP(
         GPSIM_server,
         "acquire_point",
         {},
-        from_global_params={"_loaded_plate_id": "plate_id"},
+        from_global_act_params={"_loaded_plate_id": "plate_id"},
         to_global_params=["_feature"]
     )
     apm.add(
-        CPSIM_server, "measure_cp", {}, from_global_params={"_feature": "comp_vec"}
+        CPSIM_server, "measure_cp", {}, from_global_act_params={"_feature": "comp_vec"}
     )
     apm.add(
         GPSIM_server,
         "update_model",
         {},
-        from_global_params={"_loaded_plate_id": "plate_id"},
+        from_global_act_params={"_loaded_plate_id": "plate_id"},
     )
     return apm.planned_actions
 
@@ -106,7 +106,7 @@ def OERSIM_sub_decision(
             "repeat_experiment_params": repeat_experiment_params,
             "repeat_experiment_kwargs": repeat_experiment_kwargs,
         },
-        from_global_params={
+        from_global_act_params={
             "_loaded_plate_id": "plate_id",
             "_orch_key": "orch_key",
             "_orch_host": "orch_host",

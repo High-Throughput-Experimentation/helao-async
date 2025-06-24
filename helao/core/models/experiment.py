@@ -37,7 +37,7 @@ class ExperimentTemplate(BaseModel, HelaoDict):
     experiment_name: Optional[str] = None
     experiment_params: dict = {}
     data_request_id: Optional[UUID] = None
-    from_global_params: dict = {}
+    from_global_exp_params: dict = {}
 
 
 class ExperimentModel(ExperimentTemplate):

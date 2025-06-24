@@ -166,7 +166,9 @@ class OrchAPI(HelaoFastAPI):
                                 if k in [
                                     "action_version",
                                     "start_condition",
-                                    "from_global_params",
+                                    "from_global_seq_params",
+                                    "from_global_exp_params",
+                                    "from_global_act_params",
                                     "to_global_params",
                                 ]:
                                     extra_params[k] = eval_val(v)
@@ -213,7 +215,9 @@ class OrchAPI(HelaoFastAPI):
                             if k in [
                                 "action_version",
                                 "start_condition",
-                                "from_global_params",
+                                "from_global_seq_params",
+                                "from_global_exp_params",
+                                "from_global_act_params",
                                 "to_global_params",
                             ]:
                                 extra_params[k] = eval_val(v)
