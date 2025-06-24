@@ -775,7 +775,7 @@ def CCSI_sub_cellfill(
                         "rate_uL_sec": secondliquid_injection_syringe_rate_ulsec,
                         "volume_uL": secondliquid_injection_volume_ul,
                     },
-                    from_global_params={"_fast_samples_in": "fast_samples_in"},
+                    from_global_act_params={"_fast_samples_in": "fast_samples_in"},
                     technique_name="syringe_inject",
                     process_finish=True,
                     process_contrib=[
@@ -840,7 +840,7 @@ def CCSI_sub_cellfill(
                 "rate_uL_sec": Syringe_rate_ulsec,
                 "volume_uL": Solution_volume_ul,
             },
-            from_global_params={"_fast_samples_in": "fast_samples_in"},
+            from_global_act_params={"_fast_samples_in": "fast_samples_in"},
             technique_name="syringe_inject",
             process_finish=True,
             process_contrib=[
@@ -953,7 +953,7 @@ def CCSI_sub_cellfill(
                     "rate_uL_sec": secondliquid_injection_syringe_rate_ulsec,
                     "volume_uL": secondliquid_injection_volume_ul,
                 },
-                from_global_params={"_fast_samples_in": "fast_samples_in"},
+                from_global_act_params={"_fast_samples_in": "fast_samples_in"},
                 technique_name="syringe_inject",
                 process_finish=True,
                 process_contrib=[
@@ -1024,7 +1024,7 @@ def CCSI_sub_cellfill(
                         "rate_uL_sec": secondliquid_injection_syringe_rate_ulsec,
                         "volume_uL": secondliquid_injection_volume_ul,
                     },
-                    from_global_params={"_fast_samples_in": "fast_samples_in"},
+                    from_global_act_params={"_fast_samples_in": "fast_samples_in"},
                     technique_name="syringe_inject",
                     process_finish=True,
                     process_contrib=[
@@ -1090,7 +1090,7 @@ def CCSI_sub_cellfill(
                 "rate_uL_sec": Syringe_rate_ulsec,
                 "volume_uL": Clean_volume_ul,
             },
-            from_global_params={"_fast_samples_in": "fast_samples_in"},
+            from_global_act_params={"_fast_samples_in": "fast_samples_in"},
             technique_name="syringe_inject",
             process_finish=True,
             process_contrib=[
@@ -1218,7 +1218,7 @@ def CCSI_sub_co2monitoring(
             "acquisition_rate": co2measure_acqrate,
         },
         # asc.no_wait,
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="Measure_recirculated_headspace",
         process_finish=True,
         process_contrib=[
@@ -1271,7 +1271,7 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
         },
         asc.no_wait,
         nonblocking=True,
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="Measure_recirculated_headspace",
         process_finish=True,
         process_contrib=[
@@ -1390,7 +1390,7 @@ def CCSI_sub_co2constantpressure(
             "acquisition_rate": co2measure_acqrate,
         },
         asc.no_wait,
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="Measure_recirculated_headspace",
         process_finish=True,
         process_contrib=[
@@ -1449,7 +1449,7 @@ def CCSI_sub_co2mass_temp(
         },
         asc.no_wait,
         nonblocking=True,
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="Measure_recirculated_headspace",
         process_finish=False,
         process_contrib=[
@@ -1542,7 +1542,7 @@ def CCSI_sub_co2massdose(
         },
         asc.no_wait,
         # nonblocking=True,
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="Measure_recirculated_headspace",
         process_finish=True,
         process_contrib=[
@@ -1636,7 +1636,7 @@ def CCSI_sub_co2maintainconcentration(
             "acquisition_rate": co2measure_acqrate,
         },
         asc.no_wait,
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_contrib=[
             ProcessContrib.files,
         ],
@@ -1659,7 +1659,7 @@ def CCSI_sub_co2maintainconcentration(
                 sample_no=pureco2_sample_no, machine_name=ORCH_HOST
             ).model_dump(),
         },
-        from_global_params={
+        from_global_act_params={
             "_fast_samples_in": "fast_samples_in",
             "total_scc": "volume_ml",
         },
@@ -1890,7 +1890,7 @@ def CCSI_sub_clean_inject(
                     if not k.startswith("experiment")
                 },
             },
-            from_global_params={"_present_volume_ul": "present_syringe_volume_ul"},
+            from_global_act_params={"_present_volume_ul": "present_syringe_volume_ul"},
         )
 
     #
@@ -1981,7 +1981,7 @@ def CCSI_sub_refill_clean(
 #                 "fill_volume_ul": 0,
 #             },
 #         },
-#         from_global_params={"_present_volume_ul": "present_volume_ul"},
+#         from_global_act_params={"_present_volume_ul": "present_volume_ul"},
 #     )
 
 #     return apm.planned_actions

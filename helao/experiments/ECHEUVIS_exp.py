@@ -205,7 +205,7 @@ def ECHEUVIS_sub_CV_led(
                 "n_avg": spec_n_avg,
                 "duration": toggle2_time,
             },
-            from_global_params={"_fast_samples_in": "fast_samples_in"},
+            from_global_act_params={"_fast_samples_in": "fast_samples_in"},
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=spec_technique,
             process_contrib=[
@@ -221,7 +221,7 @@ def ECHEUVIS_sub_CV_led(
         #         "n_avg": spec_n_avg,
         #         "duration_sec": toggle2_time,
         #     },
-        #     from_global_params={"_fast_samples_in": "fast_samples_in"},
+        #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         #     run_use="data",
         #     technique_name=spec_technique,
         #     process_finish=False,
@@ -249,7 +249,7 @@ def ECHEUVIS_sub_CV_led(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": gamry_i_range,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_server,
         technique_name="CV",
         process_finish=True,
@@ -385,7 +385,7 @@ def ECHEUVIS_sub_CA_led(
                 "n_avg": spec_n_avg,
                 "duration": toggle2_time,
             },
-            from_global_params={"_fast_samples_in": "fast_samples_in", "calibrated_int_time_ms": "int_time"},
+            from_global_act_params={"_fast_samples_in": "fast_samples_in", "calibrated_int_time_ms": "int_time"},
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=spec_technique,
             process_contrib=[
@@ -401,7 +401,7 @@ def ECHEUVIS_sub_CA_led(
         #         "n_avg": spec_n_avg,
         #         "duration_sec": toggle2_time,
         #     },
-        #     from_global_params={"_fast_samples_in": "fast_samples_in"},
+        #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         #     run_use="data",
         #     technique_name=spec_technique,
         #     process_finish=False,
@@ -428,7 +428,7 @@ def ECHEUVIS_sub_CA_led(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": gamry_i_range,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_server,
         technique_name="CA",
         process_finish=True,
@@ -564,7 +564,7 @@ def ECHEUVIS_sub_CP_led(
                 "n_avg": spec_n_avg,
                 "duration": toggle2_time,
             },
-            from_global_params={"_fast_samples_in": "fast_samples_in"},
+            from_global_act_params={"_fast_samples_in": "fast_samples_in"},
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=spec_technique,
             process_contrib=[
@@ -580,7 +580,7 @@ def ECHEUVIS_sub_CP_led(
         #         "n_avg": spec_n_avg,
         #         "duration_sec": toggle2_time,
         #     },
-        #     from_global_params={"_fast_samples_in": "fast_samples_in"},
+        #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         #     run_use="data",
         #     technique_name=spec_technique,
         #     process_finish=False,
@@ -603,7 +603,7 @@ def ECHEUVIS_sub_CP_led(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": gamry_i_range,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_server,
         technique_name="CP",
         process_finish=True,
@@ -748,7 +748,7 @@ def ECHEUVIS_sub_OCV_led(
                 "n_avg": spec_n_avg,
                 "duration": toggle2_time,
             },
-            from_global_params={"_fast_samples_in": "fast_samples_in", "calibrated_int_time_ms": "int_time"},
+            from_global_act_params={"_fast_samples_in": "fast_samples_in", "calibrated_int_time_ms": "int_time"},
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=spec_technique,
             process_contrib=[
@@ -764,7 +764,7 @@ def ECHEUVIS_sub_OCV_led(
         #         "n_avg": spec_n_avg,
         #         "duration_sec": toggle2_time,
         #     },
-        #     from_global_params={"_fast_samples_in": "fast_samples_in"},
+        #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         #     run_use="data",
         #     technique_name=spec_technique,
         #     process_finish=False,
@@ -786,7 +786,7 @@ def ECHEUVIS_sub_OCV_led(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": gamry_i_range,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_server,
         technique_name="OCV",
         process_finish=True,

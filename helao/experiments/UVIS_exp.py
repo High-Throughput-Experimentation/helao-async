@@ -121,7 +121,7 @@ def UVIS_sub_startup(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_global_params={"_platexy": "d_mm"},
+        from_global_act_params={"_platexy": "d_mm"},
     )
     return apm.planned_actions  # returns complete action list to orch
 
@@ -160,7 +160,7 @@ def UVIS_sub_movetosample(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_global_params={"_platexy": "d_mm"},
+        from_global_act_params={"_platexy": "d_mm"},
     )
     return apm.planned_actions  # returns complete action list to orch
 
@@ -236,7 +236,7 @@ def UVIS_sub_measure(
             "n_avg": spec_n_avg,
             "duration_sec": duration_sec,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         run_use=run_use,
         technique_name=technique_name,
         process_finish=True,
@@ -298,7 +298,7 @@ def UVIS_sub_setup_ref(
                 "custom": solid_custom_position,
                 "plate_id": solid_plate_id,
             },
-            from_global_params={"_refno": "sample_no"},
+            from_global_act_params={"_refno": "sample_no"},
         )
     elif reference_mode == "builtin":
         apm.add(
@@ -354,7 +354,7 @@ def UVIS_sub_setup_ref(
             if reference_mode != "builtin"
             else TransformationModes.motorxy,
         },
-        from_global_params={"_refxy": "d_mm"},
+        from_global_act_params={"_refxy": "d_mm"},
     )
     return apm.planned_actions  # returns complete action list to orch
 

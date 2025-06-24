@@ -124,7 +124,7 @@ def ANEC_sub_startup(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_global_params={"_platexy": "d_mm"},
+        from_global_act_params={"_platexy": "d_mm"},
         start_condition=ActionStartCondition.wait_for_all,
     )
 
@@ -382,7 +382,7 @@ def ANEC_sub_unload_liquid(
         PAL_server,
         "archive_custom_load",
         {"custom": "cell1_we"},
-        from_global_params={"_unloaded_solid": "load_sample_in"},
+        from_global_act_params={"_unloaded_solid": "load_sample_in"},
     )
     return apm.planned_actions
 
@@ -776,7 +776,7 @@ def ANEC_sub_CP(
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="CP",
         process_finish=True,
         process_contrib=[
@@ -827,7 +827,7 @@ def ANEC_sub_CA(
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name="CA",
         process_contrib=[
@@ -894,7 +894,7 @@ def ANEC_sub_HeatCA(
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name="CA",
         process_contrib=[
@@ -940,7 +940,7 @@ def ANEC_sub_OCV(
             "SampleRate": 0.05,
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="CP",
         process_finish=True,
         process_contrib=[
@@ -1026,7 +1026,7 @@ def ANEC_sub_photo_CA(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name="CA",
         process_contrib=[
@@ -1123,7 +1123,7 @@ def ANEC_sub_CV(
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name=["CV"],
         process_contrib=[
@@ -1231,7 +1231,7 @@ def ANEC_sub_HeatCV(
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name=["CV"],
         process_contrib=[
@@ -1381,7 +1381,7 @@ def ANEC_sub_photo_CV(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name="CV",
         process_contrib=[
@@ -1604,7 +1604,7 @@ def ANEC_sub_photo_LSV(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name=["LSV"],
         process_contrib=[
@@ -1692,7 +1692,7 @@ def ANEC_sub_photo_CP(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="CP",
         process_finish=True,
         process_contrib=[

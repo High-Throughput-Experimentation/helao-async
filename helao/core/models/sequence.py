@@ -25,8 +25,7 @@ class SequenceTemplate(BaseModel, HelaoDict):
     planned_experiments: List[ExperimentTemplate] = Field(
         default=[]
     )  # populated by operator using sequence library funcs
-    # from_global_params: dict = {}
-
+    from_global_seq_params: dict = {} 
 
 class SequenceModel(SequenceTemplate):
     hlo_version: Optional[str] = Field(default_factory=get_hlo_version)

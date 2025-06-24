@@ -693,7 +693,7 @@ def ECMS_sub_CA(
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name="CA",
         process_contrib=[
@@ -756,7 +756,7 @@ def ECMS_sub_pulseCA(
                 "IErange": IErange,
             },
             to_global_params=["Ewe_V__mean_final"],
-            from_global_params={"_fast_samples_in": "fast_samples_in"},
+            from_global_act_params={"_fast_samples_in": "fast_samples_in"},
             technique_name="OCV",
             process_finish=True,
             process_contrib=[
@@ -777,7 +777,7 @@ def ECMS_sub_pulseCA(
                 "Cycles": Cycles,
                 "AcqInterval__s": AcqInterval__s,
             },
-            from_global_params={
+            from_global_act_params={
                 "_fast_samples_in": "fast_samples_in",
                 "Ewe_V__mean_final": "Vinit__V",
             },
@@ -802,7 +802,7 @@ def ECMS_sub_pulseCA(
                 "Cycles": Cycles,
                 "AcqInterval__s": AcqInterval__s,
             },
-            from_global_params={"_fast_samples_in": "fast_samples_in"},
+            from_global_act_params={"_fast_samples_in": "fast_samples_in"},
             process_finish=True,
             technique_name="CA",
             process_contrib=[
@@ -887,7 +887,7 @@ def ECMS_sub_CV(
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name=["CV"],
         process_contrib=[
@@ -1335,7 +1335,7 @@ def ECMS_sub_pulsecali(
 #             "AcqInterval__s": SampleRate,
 #             "IErange": IErange,
 #         },
-#         from_global_params={"_fast_samples_in": "fast_samples_in"},
+#         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #         process_finish=True,
 #         technique_name="CA",
 #         process_contrib=[
@@ -1502,7 +1502,7 @@ def ECMS_sub_CA_CO2flow(
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name="CA",
         process_contrib=[

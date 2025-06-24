@@ -346,7 +346,7 @@ def HiSpEC_sub_startup(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_global_params={"_platexy": "d_mm"},
+        from_global_act_params={"_platexy": "d_mm"},
         start_condition=ActionStartCondition.wait_for_all,
     )
 
@@ -421,7 +421,7 @@ def HiSpEC_sub_CA(
             "TTLwait": TTLwait,
             "TTLsend": TTLsend,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_previous,
         technique_name="CA",
         process_finish=False,
@@ -462,7 +462,7 @@ def HiSpEC_sub_OCV(
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             # "IErange": "auto",
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="OCV",
         process_finish=True,
@@ -478,7 +478,7 @@ def HiSpEC_sub_OCV(
         CALC_server,
         "keep_min_ocv",
         {},
-        from_global_params={
+        from_global_act_params={
             "HiSpEC_OCV": "new_ocv",
             "min_offset_ocv": "min_offset_ocv",
         },
@@ -572,7 +572,7 @@ def HISPEC_sub_SpEC(
             "timeout": 15000,
         },
         sync_data=False,
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CV",
         process_finish=False,
@@ -630,7 +630,7 @@ def HISPEC_sub_SpEC(
             "ERange": ERange,
             "Bandwidth": Bandwidth,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_previous,
         technique_name="CV",
         process_finish=True,
@@ -679,7 +679,7 @@ def HiSpEC_sub_CP(
             "TTLsend": TTLsend,
             "TTLduration": TTLduration,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_previous,
         technique_name="CP",
         process_finish=False,
@@ -739,7 +739,7 @@ def HiSPEC_sub_PEIS(
             "TTLsend": TTLsend,
             "TTLduration": TTLduration,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_previous,
         technique_name="PEIS",
         process_finish=False,
@@ -828,7 +828,7 @@ def HiSPEC_sub_PEIS(
 #             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
 #             "IErange": gamry_i_range,
 #         },
-#         # from_global_params={"_fast_samples_in": "fast_samples_in"},
+#         # from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #         start_condition=ActionStartCondition.no_wait,
 #         technique_name="CV",
 #         process_finish=True,
@@ -994,7 +994,7 @@ def HiSPEC_sub_PEIS(
 #                 "n_avg": spec_n_avg,
 #                 "duration": toggle2_time,
 #             },
-#             from_global_params={"_fast_samples_in": "fast_samples_in"},
+#             from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
 #             technique_name=spec_technique,
 #             process_contrib=[
@@ -1010,7 +1010,7 @@ def HiSPEC_sub_PEIS(
 #         #         "n_avg": spec_n_avg,
 #         #         "duration_sec": toggle2_time,
 #         #     },
-#         #     from_global_params={"_fast_samples_in": "fast_samples_in"},
+#         #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #         #     run_use="data",
 #         #     technique_name=spec_technique,
 #         #     process_finish=False,
@@ -1041,7 +1041,7 @@ def HiSPEC_sub_PEIS(
 #             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
 #             "IErange": gamry_i_range,
 #         },
-#         from_global_params={"_fast_samples_in": "fast_samples_in"},
+#         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #         start_condition=ActionStartCondition.wait_for_server,
 #         technique_name="CA",
 #         process_finish=True,
@@ -1177,7 +1177,7 @@ def HiSPEC_sub_PEIS(
 #                 "n_avg": spec_n_avg,
 #                 "duration": toggle2_time,
 #             },
-#             from_global_params={"_fast_samples_in": "fast_samples_in"},
+#             from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
 #             technique_name=spec_technique,
 #             process_contrib=[
@@ -1193,7 +1193,7 @@ def HiSPEC_sub_PEIS(
 #         #         "n_avg": spec_n_avg,
 #         #         "duration_sec": toggle2_time,
 #         #     },
-#         #     from_global_params={"_fast_samples_in": "fast_samples_in"},
+#         #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #         #     run_use="data",
 #         #     technique_name=spec_technique,
 #         #     process_finish=False,
@@ -1217,7 +1217,7 @@ def HiSPEC_sub_PEIS(
 #             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
 #             "IErange": gamry_i_range,
 #         },
-#         from_global_params={"_fast_samples_in": "fast_samples_in"},
+#         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #         start_condition=ActionStartCondition.wait_for_server,
 #         technique_name="CP",
 #         process_finish=True,
@@ -1362,7 +1362,7 @@ def HiSPEC_sub_PEIS(
 #                 "n_avg": spec_n_avg,
 #                 "duration": toggle2_time,
 #             },
-#             from_global_params={"_fast_samples_in": "fast_samples_in"},
+#             from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
 #             technique_name=spec_technique,
 #             process_contrib=[
@@ -1378,7 +1378,7 @@ def HiSPEC_sub_PEIS(
 #         #         "n_avg": spec_n_avg,
 #         #         "duration_sec": toggle2_time,
 #         #     },
-#         #     from_global_params={"_fast_samples_in": "fast_samples_in"},
+#         #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #         #     run_use="data",
 #         #     technique_name=spec_technique,
 #         #     process_finish=False,
@@ -1400,7 +1400,7 @@ def HiSPEC_sub_PEIS(
 #             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
 #             "IErange": gamry_i_range,
 #         },
-#         from_global_params={"_fast_samples_in": "fast_samples_in"},
+#         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
 #         start_condition=ActionStartCondition.wait_for_server,
 #         technique_name="OCV",
 #         process_finish=True,

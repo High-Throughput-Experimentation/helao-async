@@ -32,7 +32,11 @@ def TEST_sub_noblocking(
 ):
     apm = ActionPlanMaker()
     apm.add(
-        ORCH_server, "wait", {"waittime": wait_time * 10}, nonblocking=True, to_global_params={"waittime": "test_wait"}
+        ORCH_server,
+        "wait",
+        {"waittime": wait_time * 10},
+        nonblocking=True,
+        to_global_params={"waittime": "test_wait"},
     )
     apm.add(ORCH_server, "wait", {"waittime": wait_time})
     exp = apm.experiment
@@ -54,7 +58,7 @@ def TEST_sub_conditional_stop(
         ORCH_server,
         "conditional_stop",
         {"stop_parameter": "global_test", "stop_value": True},
-        from_global_params={"global_test": "global_test"},
+        from_global_act_params={"global_test": "global_test"},
     )
     apm.add(ORCH_server, "wait", {"waittime": 1})
     apm.add(ORCH_server, "wait", {"waittime": 1})

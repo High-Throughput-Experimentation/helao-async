@@ -193,7 +193,7 @@ def ECHE_sub_startup(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_global_params={"_platexy": "d_mm"},
+        from_global_act_params={"_platexy": "d_mm"},
         start_condition=ActionStartCondition.wait_for_all,
     )
 
@@ -308,7 +308,7 @@ def ECHE_sub_CA_led(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": gamry_i_range,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CA",
         process_finish=True,
@@ -351,7 +351,7 @@ def ECHE_sub_OCV(
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             #"IErange": "auto",
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="OCV",
         process_finish=True,
@@ -399,7 +399,7 @@ def ECHE_sub_preCV(
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             "IErange": "auto",
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CA",
         process_finish=True,
@@ -476,7 +476,7 @@ def ECHE_sub_CA(
             "AcqInterval__s": samplerate_sec,
             "IErange": gamry_i_range,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CA",
         process_finish=True,
@@ -612,7 +612,7 @@ def ECHE_sub_CV_led(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": gamry_i_range,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CV",
         process_finish=True,
@@ -692,7 +692,7 @@ def ECHE_sub_CV(
             "Cycles": cycles,
             "IErange": gamry_i_range,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CV",
         process_finish=True,
@@ -753,7 +753,7 @@ def ECHE_sub_CP(
             "AcqInterval__s": samplerate_sec,
             "IErange": gamry_i_range,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CP",
         process_finish=True,
@@ -848,7 +848,7 @@ def ECHE_sub_CP_led(
             "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": gamry_i_range,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CP",
         process_finish=True,
@@ -898,7 +898,7 @@ def ECHE_sub_movetosample(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_global_params={"_platexy": "d_mm"},
+        from_global_act_params={"_platexy": "d_mm"},
         start_condition=ActionStartCondition.wait_for_all,
     )
 
@@ -926,7 +926,7 @@ def ECHE_sub_rel_move(
             "mode": MoveModes.relative,
             "transformation": TransformationModes.platexy,
         },
-        #            "from_global_params": {"_platexy": "d_mm"},
+        #            "from_global_act_params": {"_platexy": "d_mm"},
         start_condition=ActionStartCondition.wait_for_all,
     )
 
