@@ -72,7 +72,7 @@ def OERSIM_sub_measure_CP(
         {},
         from_global_params={"_loaded_plate_id": "plate_id"},
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def OERSIM_sub_decision(
@@ -113,7 +113,7 @@ def OERSIM_sub_decision(
             "_orch_port": "orch_port",
         },
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def OERSIM_sub_activelearn(
@@ -125,13 +125,13 @@ def OERSIM_sub_activelearn(
     repeat_experiment_kwargs: dict = {},
 ):
     apm = ActionPlanMaker()
-    apm.add_action_list(
+    apm.add_actions(
         OERSIM_sub_measure_CP(
             experiment=experiment,
             init_random_points=init_random_points,
         )
     )
-    apm.add_action_list(
+    apm.add_actions(
         OERSIM_sub_decision(
             experiment=experiment,
             stop_condition=stop_condition,
@@ -145,4 +145,4 @@ def OERSIM_sub_activelearn(
             repeat_experiment_kwargs=repeat_experiment_kwargs,
         )
     )
-    return apm.action_list
+    return apm.planned_actions

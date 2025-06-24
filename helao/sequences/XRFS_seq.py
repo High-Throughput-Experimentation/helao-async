@@ -13,7 +13,7 @@ def XRFS_postseq(
     sequence_zip_path: str = "",
 ):
     epm = ExperimentPlanMaker()
-    epm.add_experiment(
+    epm.add(
         "XRFS_standards_calibration",
         {
             "sequence_zip_path": sequence_zip_path,

@@ -76,7 +76,7 @@ def create_liquid_sample(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def create_gas_sample(
@@ -117,7 +117,7 @@ def create_gas_sample(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def create_assembly_sample(
@@ -151,7 +151,7 @@ def create_assembly_sample(
             f"!!! ERROR: len(solid_plate_ids) != len(solid_sample_nos): "
             f"{len(solid_plate_ids)} != {len(solid_sample_nos)}"
         )
-        return apm.action_list
+        return apm.planned_actions
 
     liquid_list = [
         LiquidSample(machine_name=gethostname().lower(), sample_no=sample_no)
@@ -199,7 +199,7 @@ def create_assembly_sample(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def sort_plate_sample_no_list(
@@ -211,7 +211,7 @@ def sort_plate_sample_no_list(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def generate_sample_no_list(
@@ -273,7 +273,7 @@ def load_liquid_sample(
         },
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 def create_and_load_liquid_sample(
     experiment: Experiment,
@@ -333,7 +333,7 @@ def create_and_load_liquid_sample(
         from_global_params={"_fast_sample_out": "load_sample_in"}
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 def orch_sub_wait(
     experiment: Experiment,
@@ -343,4 +343,4 @@ def orch_sub_wait(
     apm = ActionPlanMaker()
        
     apm.add(ORCH_server, "wait", {"waittime": wait_time_s})
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch

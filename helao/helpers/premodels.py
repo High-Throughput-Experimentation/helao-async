@@ -36,7 +36,7 @@ else:
 class Sequence(SequenceModel):
     "Experiment grouping class."
     # not in SequenceModel:
-    completed_experiments: List[ExperimentModel] = (
+    dispatched_experiments: List[ExperimentModel] = (
         []
     )  # running tally of completed experiments
 
@@ -48,13 +48,13 @@ class Sequence(SequenceModel):
 
     def get_seq(self):
         seq = SequenceModel(**self.model_dump())
-        seq.completed_experiments_abbr = [
+        seq.dispatched_experiments_abbr = [
             ShortExperimentModel(**exp.model_dump())
-            for exp in self.completed_experiments
+            for exp in self.dispatched_experiments
         ]
         # either we have a plan at the beginning or not
-        # don't add it later from the completed_experiments
-        # seq.planned_experiments = [ExperimentTemplate(**exp.model_dump()) for exp in self.completed_experiments]
+        # don't add it later from the dispatched_experiments
+        # seq.planned_experiments = [ExperimentTemplate(**exp.model_dump()) for exp in self.dispatched_experiments]
         return seq
 
     def init_seq(self, time_offset: float = 0, force: Optional[bool] = False):
@@ -89,10 +89,8 @@ class Sequence(SequenceModel):
 
 class Experiment(Sequence, ExperimentModel):
     "Sample-action grouping class."
-    # not in ExperimentModel, completed_actions is a list of completed ActionModels:
-    completed_actions: List[ActionModel] = []
-    # not in ExperimentModel, planned_actions is a list of Actions to be executed:
-    planned_actions: list = []
+    # not in ExperimentModel, dispatched_actions is a list of completed ActionModels:
+    dispatched_actions: List[ActionModel] = []
 
     def __repr__(self):
         return f"<experiment_name:{self.experiment_name}>"
@@ -134,15 +132,15 @@ class Experiment(Sequence, ExperimentModel):
         # reset file list
         exp.files = []
 
-        if self.completed_actions is None:
-            self.completed_actions = []
+        if self.dispatched_actions is None:
+            self.dispatched_actions = []
 
-        for actm in self.completed_actions:
+        for actm in self.dispatched_actions:
             LOGGER.info(
                 f"updating exp with act {actm.action_name} on {actm.action_server.disp_name()}, uuid:{actm.action_uuid}"
             )
 
-            exp.action_list.append(ShortActionModel(**actm.model_dump()))
+            exp.dispatched_actions_abbr.append(ShortActionModel(**actm.model_dump()))
             for file in actm.files:
                 if file.action_uuid is None:
                     file.action_uuid = actm.action_uuid
@@ -268,7 +266,7 @@ class ActionPlanMaker:
         _args, _varargs, _keywords, _locals = inspect.getargvalues(frame)
         self.expname = frame.f_code.co_name
         self._experiment = None
-        self.action_list = []
+        self.planned_actions = []
         self.pars = self._C()
 
         exp_paramdict = {}
@@ -337,14 +335,9 @@ class ActionPlanMaker:
     class _C:
         pass
 
-    def add_action(self, action_dict: dict):
-        new_action_dict = self._experiment.as_dict()
-        new_action_dict.update(action_dict)
-        self.action_list.append(Action(**new_action_dict))
-
-    def add_action_list(self, action_list: list):
-        for action in action_list:
-            self.action_list.append(action)
+    def add_planned_actions(self, planned_action_list: list):
+        for action in planned_action_list:
+            self.planned_actions.append(action)
 
     def add(
         self,
@@ -365,12 +358,12 @@ class ActionPlanMaker:
             }
         )
         action_dict.update(kwargs)
-        self.action_list.append(Action(**action_dict))
+        self.planned_actions.append(Action(**action_dict))
 
     @property
     def experiment(self):
         exp = self._experiment
-        exp.planned_actions = self.action_list
+        exp.planned_actions = self.planned_actions
         return exp
 
 
@@ -380,7 +373,7 @@ class ExperimentPlanMaker:
     ):
         self.planned_experiments = []
 
-    def add_experiment(self, selected_experiment, experiment_params, **kwargs):
+    def add(self, selected_experiment, experiment_params, **kwargs):
         self.planned_experiments.append(
             Experiment(
                 experiment_name=selected_experiment,

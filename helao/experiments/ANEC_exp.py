@@ -141,7 +141,7 @@ def ANEC_sub_startup(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ANEC_sub_disengage(experiment: Experiment, experiment_version: int = 1):
@@ -163,7 +163,7 @@ def ANEC_sub_disengage(experiment: Experiment, experiment_version: int = 1):
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ANEC_sub_load_solid(
@@ -189,7 +189,7 @@ def ANEC_sub_load_solid(
         },
     )
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_alloff(
@@ -218,7 +218,7 @@ def ANEC_sub_alloff(
     # )
     # apm.add(TEC_server, "disable_tec", {})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_heatoff(
@@ -240,7 +240,7 @@ def ANEC_sub_heatoff(
     )
     apm.add(TEC_server, "disable_tec", {})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_setheat(
@@ -270,7 +270,7 @@ def ANEC_sub_setheat(
     apm.add(TEC_server, "enable_tec", {})
     apm.add(TEC_server, "wait_till_stable", {})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_normal_state(
@@ -303,7 +303,7 @@ def ANEC_sub_normal_state(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_flush_fill_cell(
@@ -354,7 +354,7 @@ def ANEC_sub_flush_fill_cell(
             "dilute_liquids": True,
         },
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
@@ -362,7 +362,7 @@ def ANEC_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
 
     apm = ActionPlanMaker()
     apm.add(PAL_server, "archive_custom_unloadall", {})
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_unload_liquid(
@@ -384,7 +384,7 @@ def ANEC_sub_unload_liquid(
         {"custom": "cell1_we"},
         from_global_params={"_unloaded_solid": "load_sample_in"},
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_drain_cell(
@@ -395,11 +395,11 @@ def ANEC_sub_drain_cell(
     """Drain liquid from cell and unload liquid sample."""
 
     apm = ActionPlanMaker()
-    apm.add_action_list(ANEC_sub_normal_state(experiment))
-    apm.add_action_list(ANEC_sub_unload_liquid(experiment))
+    apm.add_actions(ANEC_sub_normal_state(experiment))
+    apm.add_actions(ANEC_sub_unload_liquid(experiment))
     apm.add(ORCH_server, "wait", {"waittime": drain_time})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_cleanup(
@@ -420,14 +420,14 @@ def ANEC_sub_cleanup(
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add_action_list(
+    apm.add_actions(
         ANEC_sub_flush_fill_cell(
             experiment=experiment,
             reservoir_liquid_sample_no=reservoir_liquid_sample_no,
         )
     )
-    apm.add_action_list(ANEC_sub_drain_cell(experiment))
-    return apm.action_list
+    apm.add_actions(ANEC_sub_drain_cell(experiment))
+    return apm.planned_actions
 
 def ANEC_sub_GC_headspacealiquot_nomixing(
     experiment: Experiment,
@@ -463,7 +463,7 @@ def ANEC_sub_GC_headspacealiquot_nomixing(
             ProcessContrib.samples_out,
         ],
     )
-    return apm.action_list
+    return apm.planned_actions
 
 def ANEC_sub_GC_preparation(
     experiment: Experiment,
@@ -507,7 +507,7 @@ def ANEC_sub_GC_preparation(
             ProcessContrib.samples_out,
         ],
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_load_solid_only(
@@ -519,7 +519,7 @@ def ANEC_sub_load_solid_only(
     """Load solid and clean cell."""
 
     apm = ActionPlanMaker()
-    apm.add_action_list(ANEC_sub_unload_cell(experiment))
+    apm.add_actions(ANEC_sub_unload_cell(experiment))
     apm.add(
         PAL_server,
         "archive_custom_load",
@@ -532,7 +532,7 @@ def ANEC_sub_load_solid_only(
             ).model_dump(),
         },
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_load_solid_and_clean_cell(
@@ -548,7 +548,7 @@ def ANEC_sub_load_solid_and_clean_cell(
     """Load solid and clean cell."""
 
     apm = ActionPlanMaker()
-    apm.add_action_list(ANEC_sub_unload_cell(experiment))
+    apm.add_actions(ANEC_sub_unload_cell(experiment))
     apm.add(
         PAL_server,
         "archive_custom_load",
@@ -561,8 +561,8 @@ def ANEC_sub_load_solid_and_clean_cell(
             ).model_dump(),
         },
     )
-    apm.add_action_list(ANEC_sub_drain_cell(experiment))
-    apm.add_action_list(
+    apm.add_actions(ANEC_sub_drain_cell(experiment))
+    apm.add_actions(
         ANEC_sub_flush_fill_cell(
             experiment=experiment,
             reservoir_liquid_sample_no=reservoir_liquid_sample_no,
@@ -588,8 +588,8 @@ def ANEC_sub_load_solid_and_clean_cell(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
-    apm.add_action_list(ANEC_sub_drain_cell(experiment))
-    return apm.action_list
+    apm.add_actions(ANEC_sub_drain_cell(experiment))
+    return apm.planned_actions
 
 
 def ANEC_sub_liquidarchive(
@@ -633,7 +633,7 @@ def ANEC_sub_liquidarchive(
     )
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_aliquot_nomixing(
@@ -682,7 +682,7 @@ def ANEC_sub_aliquot_nomixing(
     )
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
 
-    return apm.action_list
+    return apm.planned_actions
 
 def ANEC_sub_aliquot(
     experiment: Experiment,
@@ -738,7 +738,7 @@ def ANEC_sub_aliquot(
     )
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_CP(
@@ -787,7 +787,7 @@ def ANEC_sub_CP(
         ],
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ANEC_sub_CA(
@@ -840,7 +840,7 @@ def ANEC_sub_CA(
 
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_HeatCA(
@@ -907,7 +907,7 @@ def ANEC_sub_HeatCA(
     # apm.add(ORCH_server, "wait", {"waittime": 10})
     apm.add(TEC_server, "cancel_record_tec", {})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_OCV(
@@ -950,7 +950,7 @@ def ANEC_sub_OCV(
             ProcessContrib.samples_out,
         ],
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def ANEC_sub_photo_CA(
@@ -1044,7 +1044,7 @@ def ANEC_sub_photo_CA(
     # #    apm.add(NI_server, "led", {"led":"led", "on": 0})
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_CV(
@@ -1136,7 +1136,7 @@ def ANEC_sub_CV(
 
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_HeatCV(
@@ -1245,7 +1245,7 @@ def ANEC_sub_HeatCV(
     # apm.add(ORCH_server, "wait", {"waittime": 10})
     apm.add(TEC_server, "cancel_record_tec", {})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_photo_CV(
@@ -1398,7 +1398,7 @@ def ANEC_sub_photo_CV(
     )
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_GCLiquid_analysis(
@@ -1453,7 +1453,7 @@ def ANEC_sub_GCLiquid_analysis(
         ],
     )
     apm.add(ORCH_server, "wait", {"waittime": GC_analysis_time})
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_HPLCLiquid_analysis(
@@ -1508,7 +1508,7 @@ def ANEC_sub_HPLCLiquid_analysis(
         ],
     )
     apm.add(ORCH_server, "wait", {"waittime": HPLC_analysis_time})
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_photo_LSV(
@@ -1622,7 +1622,7 @@ def ANEC_sub_photo_LSV(
 
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
-    return apm.action_list
+    return apm.planned_actions
 
 
 def ANEC_sub_photo_CP(
@@ -1708,4 +1708,4 @@ def ANEC_sub_photo_CP(
         {},
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch

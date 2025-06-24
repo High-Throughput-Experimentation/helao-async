@@ -34,7 +34,7 @@ class IcpmsInputs(AnalysisInput):
         self.global_sample_label = [x for x in filed["sample"] if "__liquid__" in x][0]
         action_uuid = filed["action_uuid"]
         action_dir = [
-            d for d in self.icpms.json["action_list"] if d["action_uuid"] == action_uuid
+            d for d in self.icpms.json["dispatched_actions_abbr"] if d["action_uuid"] == action_uuid
         ][0]["action_output_dir"]
         action_reldir = "/".join(action_dir.split("/")[-2:])
         self.icpms_act = local_loader.get_act(

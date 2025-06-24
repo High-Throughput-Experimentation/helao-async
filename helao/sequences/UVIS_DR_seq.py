@@ -35,8 +35,8 @@ def UVIS_DR(
     calc_upper_wl: float = 1020.0,
 ):
     epm = ExperimentPlanMaker()
-    epm.add_experiment("UVIS_sub_unloadall_customs", {})
-    epm.add_experiment(
+    epm.add("UVIS_sub_unloadall_customs", {})
+    epm.add(
         "UVIS_sub_setup_ref",
         {
             "reference_mode": reference_mode,
@@ -47,7 +47,7 @@ def UVIS_DR(
         },
     )
     # dark ref
-    epm.add_experiment(
+    epm.add(
         "UVIS_sub_measure",
         {
             "spec_type": "R",
@@ -66,7 +66,7 @@ def UVIS_DR(
         },
     )
     # light ref
-    epm.add_experiment(
+    epm.add(
         "UVIS_sub_measure",
         {
             "spec_type": "R",
@@ -86,8 +86,8 @@ def UVIS_DR(
     )
 
     for plate_sample in plate_sample_no_list:
-        epm.add_experiment("UVIS_sub_unloadall_customs", {})
-        epm.add_experiment(
+        epm.add("UVIS_sub_unloadall_customs", {})
+        epm.add(
             "UVIS_sub_startup",  # move to solid sample, assign to cell position
             {
                 "solid_custom_position": custom_position,
@@ -96,7 +96,7 @@ def UVIS_DR(
             },
         )
         # perform transmission spec
-        epm.add_experiment(
+        epm.add(
             "UVIS_sub_measure",
             {
                 "spec_type": "R",
@@ -115,8 +115,8 @@ def UVIS_DR(
             },
         )
 
-    epm.add_experiment("UVIS_sub_unloadall_customs", {})
-    epm.add_experiment(
+    epm.add("UVIS_sub_unloadall_customs", {})
+    epm.add(
         "UVIS_sub_setup_ref",
         {
             "reference_mode": reference_mode,
@@ -127,7 +127,7 @@ def UVIS_DR(
         },
     )
     # dark ref
-    epm.add_experiment(
+    epm.add(
         "UVIS_sub_measure",
         {
             "spec_type": "R",
@@ -146,7 +146,7 @@ def UVIS_DR(
         },
     )
     # light ref
-    epm.add_experiment(
+    epm.add(
         "UVIS_sub_measure",
         {
             "spec_type": "R",
@@ -164,7 +164,7 @@ def UVIS_DR(
             "reference_mode": reference_mode,
         },
     )
-    epm.add_experiment(
+    epm.add(
         "UVIS_calc_abs",
         {
             "ev_parts": calc_ev_parts,
@@ -175,6 +175,6 @@ def UVIS_DR(
             "upper_wl": calc_upper_wl,
         },
     )
-    epm.add_experiment("UVIS_sub_shutdown", {})
+    epm.add("UVIS_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list

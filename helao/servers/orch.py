@@ -2394,10 +2394,10 @@ class Orch(Base):
                 }
             )
 
-            self.active_experiment.completed_actions = []
+            self.active_experiment.dispatched_actions = []
 
             # TODO use exp uuid to filter actions?
-            self.active_experiment.completed_actions = (
+            self.active_experiment.dispatched_actions = (
                 self.globalstatusmodel.finish_experiment(
                     exp_uuid=self.active_experiment.experiment_uuid
                 )
@@ -2410,8 +2410,8 @@ class Orch(Base):
             )
 
             # add finished exp to seq
-            # !!! add to completed_experiments
-            self.active_sequence.completed_experiments.append(
+            # !!! add to dispatched_experiments
+            self.active_sequence.dispatched_experiments.append(
                 deepcopy(self.active_experiment.get_exp())
             )
 

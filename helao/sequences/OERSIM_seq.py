@@ -19,7 +19,7 @@ def OERSIM_activelearn(
 ):
     """Active-learning sequence using EI acquisition with various stop conditions."""
     epm = ExperimentPlanMaker()
-    epm.add_experiment(
+    epm.add(
         "OERSIM_sub_activelearn",
         {
             "init_random_points": init_random_points,

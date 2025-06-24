@@ -55,7 +55,7 @@ def CCSI_initialization(
 
 #    
 # MAIN HEADSPACE PURGE, AUX PROBE PURGE, PCO2 SENSOR PURGE
-    epm.add_experiment("CCSI_sub_initialization_firstpart", {
+    epm.add("CCSI_sub_initialization_firstpart", {
         "HSpurge1_duration": HSpurge1_duration,
         "Manpurge1_duration": Manpurge1_duration,
         "Alphapurge1_duration": Alphapurge1_duration,
@@ -66,7 +66,7 @@ def CCSI_initialization(
 
 #
 # DILUTION PURGE, MAIN HEADSPACE PURGE AND HEADSPACE EVALUATION
-    epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
+    epm.add("CCSI_sub_headspace_purge_and_measure", {
         "HSpurge_duration": HSpurge_duration, 
         "DeltaDilute1_duration": DeltaDilute1_duration,
         "initialization": True,
@@ -79,7 +79,7 @@ def CCSI_initialization(
 #    
 # PRE CLEAN PROCEDURE
     if clean_injects:
-        epm.add_experiment("CCSI_sub_clean_inject", {
+        epm.add("CCSI_sub_clean_inject", {
             "Clean_volume_ul": Clean_volume_ul,
             "Syringe_rate_ulsec": Syringe_rate_ulsec,
             "LiquidCleanWait_s": LiquidCleanWait_s,
@@ -95,7 +95,7 @@ def CCSI_initialization(
             "drainrecirc": drainrecirc,
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
             })
-        epm.add_experiment("CCSI_sub_clean_inject", {
+        epm.add("CCSI_sub_clean_inject", {
             "Clean_volume_ul": Clean_volume_ul,
             "Syringe_rate_ulsec": Syringe_rate_ulsec,
             "LiquidCleanWait_s": LiquidCleanWait_s,
@@ -111,7 +111,7 @@ def CCSI_initialization(
             })
 
 
-    epm.add_experiment("CCSI_sub_initialization_end_state", {})
+    epm.add("CCSI_sub_initialization_end_state", {})
 
     return epm.planned_experiments
 
@@ -142,25 +142,25 @@ def CCSI_initialization(
 
 #     epm = ExperimentPlanMaker()
 
-#     epm.add_experiment("CCSI_sub_unload_cell",{})
-#     epm.add_experiment("CCSI_sub_load_solid", {})
+#     epm.add("CCSI_sub_unload_cell",{})
+#     epm.add("CCSI_sub_load_solid", {})
 
-# #    epm.add_experiment("CCSI_sub_load_gas", {
+# #    epm.add("CCSI_sub_load_gas", {
 # #        "reservoir_gas_sample_no": gas_sample_no,
 # #    })
-#     epm.add_experiment("CCSI_sub_load_liquid", {
+#     epm.add("CCSI_sub_load_liquid", {
 #         "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
 #         "volume_ul_cell_liquid": KOH_volume_ul,
 #         "water_True_False": False,
 #     })
 
-#     epm.add_experiment("CCSI_sub_load_liquid", {
+#     epm.add("CCSI_sub_load_liquid", {
 #         "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
 #         "volume_ul_cell_liquid": water_volume_ul,
 #         "water_True_False": True,
 #     })
 
-#     epm.add_experiment("CCSI_sub_liquidfill_syringes", {
+#     epm.add("CCSI_sub_liquidfill_syringes", {
 #         "Solution_volume_ul": KOH_volume_ul,
 #         "Clean_volume_ul": water_volume_ul,
 #         "Syringe_retraction_ul": retraction_volume_ul,
@@ -169,10 +169,10 @@ def CCSI_initialization(
 #         "co2measure_duration": co2measure_duration,
 #         "co2measure_acqrate": co2measure_acqrate,
 #     })
-#     epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
+#     epm.add("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
 
 #  #   for _ in range(liquid_purge_cycles):
-#     epm.add_experiment("CCSI_sub_clean_inject", {
+#     epm.add("CCSI_sub_clean_inject", {
 #     "Clean_volume_ul": drainclean_volume_ul,
 #     "Syringe_retraction_ul": retraction_volume_ul,
 #     "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -184,10 +184,10 @@ def CCSI_initialization(
 #     "HSpurge_duration": LiquidCleanPurge_duration,
 # })
 # #    for _ in range(headspace_purge_cycles):
-#     epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": LiquidCleanPurge_duration, "co2measure_duration": purge_co2measure_duration, "co2measure_acqrate": co2measure_acqrate, "co2_ppm_thresh": purge_co2threshhold, "purge_if": purge_if})
+#     epm.add("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": LiquidCleanPurge_duration, "co2measure_duration": purge_co2measure_duration, "co2measure_acqrate": co2measure_acqrate, "co2_ppm_thresh": purge_co2threshhold, "purge_if": purge_if})
 
-#     epm.add_experiment("CCSI_sub_peripumpoff", {})
-#     epm.add_experiment("CCSI_sub_unload_cell",{})
+#     epm.add("CCSI_sub_peripumpoff", {})
+#     epm.add("CCSI_sub_unload_cell",{})
 
 #     return epm.planned_experiments
 
@@ -227,14 +227,14 @@ def CCSI_initialization(
 #         else:
 #             cleanloop = 4
 
-#         epm.add_experiment("CCSI_sub_unload_cell",{})
+#         epm.add("CCSI_sub_unload_cell",{})
 
-#         epm.add_experiment("CCSI_sub_load_gas", {
+#         epm.add("CCSI_sub_load_gas", {
 #             "reservoir_gas_sample_no": gas_sample_no,
 #             "volume_ul_cell_gas": 5000,
 #         })
 #         if KOHvolume != 0:
-#             epm.add_experiment("CCSI_sub_load_liquid", {
+#             epm.add("CCSI_sub_load_liquid", {
 #                 "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
 #                 "volume_ul_cell_liquid": KOHvolume,
 #                 "combine_True_False": False,
@@ -242,14 +242,14 @@ def CCSI_initialization(
 #             })
 #         watervolume = total_sample_volume_ul - KOHvolume
 #         if watervolume != 0:
-#             epm.add_experiment("CCSI_sub_load_liquid", {
+#             epm.add("CCSI_sub_load_liquid", {
 #                 "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
 #                 "volume_ul_cell_liquid": watervolume,
 #                 "combine_True_False": True,
 #                 "water_True_False": True,
 #             })
 
-#         epm.add_experiment("CCSI_sub_liquidfill_syringes", {
+#         epm.add("CCSI_sub_liquidfill_syringes", {
 #             "Solution_volume_ul": KOHvolume,
 #             "Clean_volume_ul": watervolume,
 #             "deadspace_volume_ul": deadspace_volume_ul,
@@ -260,10 +260,10 @@ def CCSI_initialization(
 #             "co2measure_duration": co2measure_duration,
 #             "co2measure_acqrate": co2measure_acqrate,
 #         })
-#         epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
+#         epm.add("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
 
 #         for _ in range(cleanloop):
-#             epm.add_experiment("CCSI_sub_clean_inject", {
+#             epm.add("CCSI_sub_clean_inject", {
 #                 "Clean_volume_ul": drainclean_volume_ul,
 #                 "deadspace_volume_ul": deadspace_volume_ul,
 #                 "backlash_volume_ul": backlash_volume_ul,
@@ -277,17 +277,17 @@ def CCSI_initialization(
 #               #  "purge_if": purge_if,
 #               #  "HSpurge_duration": LiquidCleanPurge_duration,
 #             })
-#             epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
+#             epm.add("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
 
 #         refill_volume = watervolume + drainclean_volume_ul*cleanloop
-#         epm.add_experiment("CCSI_sub_refill_clean", {
+#         epm.add("CCSI_sub_refill_clean", {
 #             "Clean_volume_ul": refill_volume ,
 #             "deadspace_volume_ul": deadspace_volume_ul,
 #             "Syringe_rate_ulsec": 1000,
 #         })
     
 #         for _ in range(headspace_purge_cycles):
-#             epm.add_experiment("CCSI_sub_drain", {
+#             epm.add("CCSI_sub_drain", {
 #                 "HSpurge_duration": HSpurge_duration,
 #                 "DeltaDilute1_duration": DeltaDilute1_duration,
 #                 })
@@ -331,14 +331,14 @@ def CCSI_initialization(
 #         # else:
 #         #cleanloop = 2
 
-#         epm.add_experiment("CCSI_sub_unload_cell",{})
+#         epm.add("CCSI_sub_unload_cell",{})
 
-#         epm.add_experiment("CCSI_sub_load_gas", {
+#         epm.add("CCSI_sub_load_gas", {
 #             "reservoir_gas_sample_no": gas_sample_no,
 #             "volume_ul_cell_gas": 5000,
 #         })
 #         if KOHvolume != 0:
-#             epm.add_experiment("CCSI_sub_load_liquid", {
+#             epm.add("CCSI_sub_load_liquid", {
 #                 "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
 #                 "volume_ul_cell_liquid": KOHvolume,
 #                 "combine_True_False": False,
@@ -346,14 +346,14 @@ def CCSI_initialization(
 #             })
 #         watervolume = total_sample_volume_ul - KOHvolume
 #         if watervolume != 0:
-#             epm.add_experiment("CCSI_sub_load_liquid", {
+#             epm.add("CCSI_sub_load_liquid", {
 #                 "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
 #                 "volume_ul_cell_liquid": watervolume,
 #                 "combine_True_False": True,
 #                 "water_True_False": True,
 #             })
 
-#         epm.add_experiment("CCSI_sub_liquidfill_syringes", {
+#         epm.add("CCSI_sub_liquidfill_syringes", {
 #             "Solution_volume_ul": KOHvolume,
 #             "Clean_volume_ul": watervolume,
 #             "deadspace_volume_ul": deadspace_volume_ul,
@@ -364,12 +364,12 @@ def CCSI_initialization(
 #             "co2measure_duration": co2measure_duration,
 #             "co2measure_acqrate": co2measure_acqrate,
 #         })
-#         epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
-# #        epm.add_experiment("CCSI_sub_drain_wcirc", {"HSpurge_duration": LiquidCleanPurge_duration})
+#         epm.add("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
+# #        epm.add("CCSI_sub_drain_wcirc", {"HSpurge_duration": LiquidCleanPurge_duration})
 
 #         for _ in range(cleanloops):
 #         #cleanloops = 1
-#             epm.add_experiment("CCSI_sub_clean_inject", {
+#             epm.add("CCSI_sub_clean_inject", {
 #                 "Clean_volume_ul": drainclean_volume_ul,
 #                 "deadspace_volume_ul": deadspace_volume_ul,
 #                 "backlash_volume_ul": backlash_volume_ul,
@@ -383,17 +383,17 @@ def CCSI_initialization(
 #                 "purge_if": purge_if,
 #                 #  "HSpurge_duration": LiquidCleanPurge_duration,
 #             })
-#             #epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,})
+#             #epm.add("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,})
 
 #         refill_volume = watervolume + drainclean_volume_ul*cleanloops
-#         epm.add_experiment("CCSI_sub_refill_clean", {
+#         epm.add("CCSI_sub_refill_clean", {
 #             "Clean_volume_ul": refill_volume ,
 #             "deadspace_volume_ul": deadspace_volume_ul,
 #             "Syringe_rate_ulsec": 1000,
 #         })
     
 #         for _ in range(headspace_purge_cycles):
-#             epm.add_experiment("CCSI_sub_drain", {
+#             epm.add("CCSI_sub_drain", {
 #                 "HSpurge_duration": HSpurge_duration,
 #                 "DeltaDilute1_duration": DeltaDilute1_duration,
 #                 })
@@ -431,7 +431,7 @@ def CCSI_initialization(
 
 #     epm = ExperimentPlanMaker()
 #     for _ in range(initcleans):
-#         epm.add_experiment("CCSI_sub_clean_inject", {
+#         epm.add("CCSI_sub_clean_inject", {
 #             "Clean_volume_ul": drainclean_volume_ul,
 #             "deadspace_volume_ul": deadspace_volume_ul,
 #             "backlash_volume_ul": backlash_volume_ul,
@@ -448,7 +448,7 @@ def CCSI_initialization(
 #         })
 
 #     refill_volume = drainclean_volume_ul*(init)
-#     epm.add_experiment("CCSI_sub_refill_clean", {
+#     epm.add("CCSI_sub_refill_clean", {
 #         "Clean_volume_ul": refill_volume ,
 #         "deadspace_volume_ul": deadspace_volume_ul,
 #         "Syringe_rate_ulsec": 1000,
@@ -460,14 +460,14 @@ def CCSI_initialization(
 #         # else:
 #         #cleanloop = 2
 
-#         epm.add_experiment("CCSI_sub_unload_cell",{})
+#         epm.add("CCSI_sub_unload_cell",{})
 
-#         epm.add_experiment("CCSI_sub_load_gas", {
+#         epm.add("CCSI_sub_load_gas", {
 #             "reservoir_gas_sample_no": gas_sample_no,
 #             "volume_ul_cell_gas": 5000,
 #         })
 #         if KOHvolume != 0:
-#             epm.add_experiment("CCSI_sub_load_liquid", {
+#             epm.add("CCSI_sub_load_liquid", {
 #                 "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
 #                 "volume_ul_cell_liquid": KOHvolume,
 #                 "combine_True_False": False,
@@ -475,14 +475,14 @@ def CCSI_initialization(
 #             })
 #         watervolume = total_sample_volume_ul - KOHvolume
 #         if watervolume != 0:
-#             epm.add_experiment("CCSI_sub_load_liquid", {
+#             epm.add("CCSI_sub_load_liquid", {
 #                 "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
 #                 "volume_ul_cell_liquid": watervolume,
 #                 "combine_True_False": True,
 #                 "water_True_False": True,
 #             })
 
-#         epm.add_experiment("CCSI_sub_liquidfill_syringes", {
+#         epm.add("CCSI_sub_liquidfill_syringes", {
 #             "Solution_volume_ul": KOHvolume,
 #             "Clean_volume_ul": watervolume,
 #             "deadspace_volume_ul": deadspace_volume_ul,
@@ -493,10 +493,10 @@ def CCSI_initialization(
 #             "co2measure_duration": co2measure_duration,
 #             "co2measure_acqrate": co2measure_acqrate,
 #         })
-#         epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
+#         epm.add("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
 
 #         for _ in range(cleanloops):
-#             epm.add_experiment("CCSI_sub_clean_inject", {
+#             epm.add("CCSI_sub_clean_inject", {
 #                 "Clean_volume_ul": drainclean_volume_ul,
 #                 "deadspace_volume_ul": deadspace_volume_ul,
 #                 "backlash_volume_ul": backlash_volume_ul,
@@ -510,17 +510,17 @@ def CCSI_initialization(
 #                 "purge_if": purge_if,
 #                 #  "HSpurge_duration": LiquidCleanPurge_duration,
 #             })
-#         #epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,})
+#         #epm.add("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,})
 
 #         refill_volume = watervolume + drainclean_volume_ul*(cleanloops)
-#         epm.add_experiment("CCSI_sub_refill_clean", {
+#         epm.add("CCSI_sub_refill_clean", {
 #             "Clean_volume_ul": refill_volume ,
 #             "deadspace_volume_ul": deadspace_volume_ul,
 #             "Syringe_rate_ulsec": 1000,
 #         })
     
 #         for _ in range(headspace_purge_cycles):
-#             epm.add_experiment("CCSI_sub_drain", {
+#             epm.add("CCSI_sub_drain", {
 #                 "HSpurge_duration": HSpurge_duration,
 #                 "DeltaDilute1_duration": DeltaDilute1_duration,
 #                 })
@@ -540,13 +540,13 @@ def CCSI_initialization(
 
 #     epm = ExperimentPlanMaker()
 
-#     epm.add_experiment("CCSI_sub_unload_cell",{})
+#     epm.add("CCSI_sub_unload_cell",{})
 
-#     epm.add_experiment("CCSI_sub_load_gas", {
+#     epm.add("CCSI_sub_load_gas", {
 #         "reservoir_gas_sample_no": gas_sample_no,
 #         "volume_ul_cell_gas": 5000,
 #     })
-#     epm.add_experiment("CCSI_sub_load_liquid", {
+#     epm.add("CCSI_sub_load_liquid", {
 #         "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
 #         "volume_ul_cell_liquid": KOH_volume_ul,
 #         "water_True_False": False,
@@ -554,7 +554,7 @@ def CCSI_initialization(
 #     })
 #     watervolume = total_sample_volume_ul - KOH_volume_ul
 
-#     epm.add_experiment("CCSI_sub_load_liquid", {
+#     epm.add("CCSI_sub_load_liquid", {
 #         "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
 #         "volume_ul_cell_liquid": watervolume,
 #         "water_True_False": True,
@@ -562,13 +562,13 @@ def CCSI_initialization(
 #     })
 
 # ###############
-#     epm.add_experiment("CCSI_sub_unload_cell",{})
+#     epm.add("CCSI_sub_unload_cell",{})
 
-#     # epm.add_experiment("CCSI_sub_load_gas", {
+#     # epm.add("CCSI_sub_load_gas", {
 #     #     "reservoir_gas_sample_no": gas_sample_no,
 #     #     "volume_ul_cell_gas": 5000,
 #     # })
-#     epm.add_experiment("CCSI_sub_load_liquid", {
+#     epm.add("CCSI_sub_load_liquid", {
 #         "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
 #         "volume_ul_cell_liquid": KOH_volume_ul,
 #         "water_True_False": False,
@@ -576,34 +576,34 @@ def CCSI_initialization(
 #     })
 #     watervolume = total_sample_volume_ul - KOH_volume_ul
 
-#     epm.add_experiment("CCSI_sub_load_liquid", {
+#     epm.add("CCSI_sub_load_liquid", {
 #         "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
 #         "volume_ul_cell_liquid": watervolume,
 #         "water_True_False": True,
 #         "combine_True_False": True,
 #     })
 
-#     epm.add_experiment("CCSI_sub_load_gas", {
+#     epm.add("CCSI_sub_load_gas", {
 #         "reservoir_gas_sample_no": gas_sample_no,
 #         "volume_ul_cell_gas": 5000,
 #     })
 
 #     ###############
-#     epm.add_experiment("CCSI_sub_unload_cell",{})
+#     epm.add("CCSI_sub_unload_cell",{})
 
-#     epm.add_experiment("CCSI_sub_load_liquid", {
+#     epm.add("CCSI_sub_load_liquid", {
 #         "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
 #         "volume_ul_cell_liquid": KOH_volume_ul,
 #         "water_True_False": False,
 #         "combine_True_False": False,
 #     })
-#     epm.add_experiment("CCSI_sub_load_gas", {
+#     epm.add("CCSI_sub_load_gas", {
 #         "reservoir_gas_sample_no": gas_sample_no,
 #         "volume_ul_cell_gas": 5000,
 #     })
 #     watervolume = total_sample_volume_ul - KOH_volume_ul
 
-#     epm.add_experiment("CCSI_sub_load_liquid", {
+#     epm.add("CCSI_sub_load_liquid", {
 #         "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
 #         "volume_ul_cell_liquid": watervolume,
 #         "water_True_False": True,  #dilution volume
@@ -611,13 +611,13 @@ def CCSI_initialization(
 #     })
 
 #     # ###############
-#     # epm.add_experiment("CCSI_sub_unload_cell",{})
+#     # epm.add("CCSI_sub_unload_cell",{})
 
-#     # # epm.add_experiment("CCSI_sub_load_gas", {
+#     # # epm.add("CCSI_sub_load_gas", {
 #     # #     "reservoir_gas_sample_no": gas_sample_no,
 #     # #     "volume_ul_cell_gas": 5000,
 #     # # })
-#     # epm.add_experiment("CCSI_sub_load_liquid", {
+#     # epm.add("CCSI_sub_load_liquid", {
 #     #     "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
 #     #     "volume_ul_cell_liquid": KOH_volume_ul,
 #     #     "water_True_False": False,
@@ -625,7 +625,7 @@ def CCSI_initialization(
 #     # })
 #     # watervolume = total_sample_volume_ul - KOH_volume_ul
 
-#     # epm.add_experiment("CCSI_sub_load_liquid", {
+#     # epm.add("CCSI_sub_load_liquid", {
 #     #     "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
 #     #     "volume_ul_cell_liquid": watervolume,
 #     #     "water_True_False": True,  #dilution volume
@@ -667,7 +667,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 
     epm = ExperimentPlanMaker()
     #for _ in range(initcleans):
-    epm.add_experiment("CCSI_sub_clean_inject", {
+    epm.add("CCSI_sub_clean_inject", {
         "Clean_volume_ul": drainclean_volume_ul,
         "Syringe_rate_ulsec": syringe_rate_ulsec,
         "LiquidCleanWait_s": LiquidFillWait_s,
@@ -684,7 +684,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
         #  "HSpurge_duration": LiquidCleanPurge_duration,
     })
 
-    epm.add_experiment("CCSI_sub_full_fill_syringe", {
+    epm.add("CCSI_sub_full_fill_syringe", {
         "syringe": "waterclean",
         "target_volume_ul": 55000 ,
         "Syringe_rate_ulsec": 1000,
@@ -692,14 +692,14 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 
     for solnvolume in Solution_volume_ul:  
 
-        epm.add_experiment("CCSI_sub_unload_cell",{})
+        epm.add("CCSI_sub_unload_cell",{})
 
-        epm.add_experiment("CCSI_sub_load_gas", {
+        epm.add("CCSI_sub_load_gas", {
             "reservoir_gas_sample_no": gas_sample_no,
             "volume_ul_cell_gas": 5000,
         })
         # if solnvolume != 0:
-        #     epm.add_experiment("CCSI_sub_load_liquid", {
+        #     epm.add("CCSI_sub_load_liquid", {
         #         "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
         #         "volume_ul_cell_liquid": solnvolume,
         #         "combine_True_False": False,
@@ -707,7 +707,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
         #     })
         # watervolume = total_sample_volume_ul - solnvolume
         # if watervolume != 0:
-        #     epm.add_experiment("CCSI_sub_load_liquid", {
+        #     epm.add("CCSI_sub_load_liquid", {
         #         "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
         #         "volume_ul_cell_liquid": watervolume,
         #         "combine_True_False": True,
@@ -715,7 +715,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
         #     })
         watervolume = total_sample_volume_ul - solnvolume,
 
-        epm.add_experiment("CCSI_sub_cellfill", {
+        epm.add("CCSI_sub_cellfill", {
             "Solution_reservoir_sample_no": Solution_reservoir_sample_no,
             "Solution_volume_ul": solnvolume,
             "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
@@ -723,18 +723,18 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidFillWait_s": LiquidFillWait_s,
         })
-        epm.add_experiment("CCSI_sub_co2monitoring", {
+        epm.add("CCSI_sub_co2monitoring", {
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
         })
-        epm.add_experiment("CCSI_sub_drain", {
+        epm.add("CCSI_sub_drain", {
             "HSpurge_duration": SamplePurge_duration,
             "DeltaDilute1_duration": DeltaDilute1_duration,
             "recirculation":drainrecirc,
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
 
-        epm.add_experiment("CCSI_sub_clean_inject", {
+        epm.add("CCSI_sub_clean_inject", {
             "Clean_volume_ul": drainclean_volume_ul,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidCleanWait_s": LiquidFillWait_s,
@@ -750,14 +750,14 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
             #  "HSpurge_duration": LiquidCleanPurge_duration,
         })
 
-        epm.add_experiment("CCSI_sub_full_fill_syringe", {
+        epm.add("CCSI_sub_full_fill_syringe", {
             "syringe": "waterclean",
             "target_volume_ul": 55000 ,
             "Syringe_rate_ulsec": 1000,
         })
     
         for _ in range(headspace_purge_cycles):
-            epm.add_experiment("CCSI_sub_drain", {
+            epm.add("CCSI_sub_drain", {
                 "HSpurge_duration": HSpurge_duration,
                 "DeltaDilute1_duration": DeltaDilute1_duration,
                 "recirculation_rate_uL_min": recirculation_rate_uL_min,
@@ -802,7 +802,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # 
 #     epm = ExperimentPlanMaker()
 #     # #for _ in range(initcleans):
-#     # epm.add_experiment("CCSI_sub_clean_inject", {
+#     # epm.add("CCSI_sub_clean_inject", {
 #     #     "Clean_volume_ul": drainclean_volume_ul,
 #     #     "Syringe_rate_ulsec": syringe_rate_ulsec,
 #     #     "LiquidCleanWait_s": LiquidFillWait_s,
@@ -818,7 +818,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #     #     #  "HSpurge_duration": LiquidCleanPurge_duration,
 #     # })
 # 
-#     # epm.add_experiment("CCSI_sub_full_fill_syringe", {
+#     # epm.add("CCSI_sub_full_fill_syringe", {
 #     #     "syringe": "waterclean",
 #     #     "target_volume_ul": 55000 ,
 #     #     "Syringe_rate_ulsec": 1000,
@@ -826,14 +826,14 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 # 
 #     for solnvolume in Solution_volume_ul:  
 # 
-#         epm.add_experiment("CCSI_sub_unload_cell",{})
+#         epm.add("CCSI_sub_unload_cell",{})
 # 
-#         epm.add_experiment("CCSI_sub_load_gas", {
+#         epm.add("CCSI_sub_load_gas", {
 #             "reservoir_gas_sample_no": gas_sample_no,
 #             "volume_ul_cell_gas": 5000,
 #         })
 #         if solnvolume != 0:
-#             epm.add_experiment("CCSI_sub_load_liquid", {
+#             epm.add("CCSI_sub_load_liquid", {
 #                 "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
 #                 "volume_ul_cell_liquid": solnvolume,
 #                 "combine_True_False": False,
@@ -841,14 +841,14 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #             })
 #         watervolume = total_sample_volume_ul - solnvolume
 #         if watervolume != 0:
-#             epm.add_experiment("CCSI_sub_load_liquid", {
+#             epm.add("CCSI_sub_load_liquid", {
 #                 "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
 #                 "volume_ul_cell_liquid": cleanvolume,
 #                 "combine_True_False": True,
 #                 "water_True_False": True,
 #             })
 # 
-#         epm.add_experiment("CCSI_sub_cellfill_constantcotwo", {
+#         epm.add("CCSI_sub_cellfill_constantcotwo", {
 #             "Solution_volume_ul": solnvolume,
 #             "Clean_volume_ul": cleanvolume,
 #             "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -858,9 +858,9 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #             "atm_pressure" : atm_pressure,
 #             "pressureramp": pressureramp,
 #         })
-#         epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
+#         epm.add("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
 # 
-#         epm.add_experiment("CCSI_sub_clean_inject", {
+#         epm.add("CCSI_sub_clean_inject", {
 #             "Clean_volume_ul": drainclean_volume_ul,
 #             "Syringe_rate_ulsec": syringe_rate_ulsec,
 #             "LiquidCleanWait_s": LiquidFillWait_s,
@@ -875,14 +875,14 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #             #  "HSpurge_duration": LiquidCleanPurge_duration,
 #         })
 # 
-#         epm.add_experiment("CCSI_sub_full_fill_syringe", {
+#         epm.add("CCSI_sub_full_fill_syringe", {
 #             "syringe": "waterclean",
 #             "target_volume_ul": 55000 ,
 #             "Syringe_rate_ulsec": 1000,
 #         })
 #     
 #         for _ in range(headspace_purge_cycles):
-#             epm.add_experiment("CCSI_sub_drain", {
+#             epm.add("CCSI_sub_drain", {
 #                 "HSpurge_duration": HSpurge_duration,
 #                 "DeltaDilute1_duration": DeltaDilute1_duration,
 #                 })
@@ -983,16 +983,16 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
     epm = ExperimentPlanMaker()
     for i, solnvolume in enumerate(Solution_volume_ul):  
 
-        epm.add_experiment("CCSI_sub_unload_cell",{})
+        epm.add("CCSI_sub_unload_cell",{})
 
         gas_volume = total_cell_volume_ul - total_sample_volume_ul[i]
 
-        epm.add_experiment("CCSI_sub_load_gas", {
+        epm.add("CCSI_sub_load_gas", {
             "reservoir_gas_sample_no": initial_gas_sample_no,
             "volume_ul_cell_gas": gas_volume,
         })
 
-        epm.add_experiment("CCSI_sub_headspace_measure", {
+        epm.add("CCSI_sub_headspace_measure", {
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
             "co2measure_duration": check_co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
@@ -1002,7 +1002,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
         cleanvolume = total_sample_volume_ul[i] - solnvolume
 
 
-        epm.add_experiment("CCSI_sub_cellfill", {
+        epm.add("CCSI_sub_cellfill", {
             "Solution_description": Solution_name,
             "Solution_reservoir_sample_no": Solution_reservoir_sample_no,
             "Solution_volume_ul": solnvolume,
@@ -1025,7 +1025,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
         
         co2measure_duration_each = co2measure_duration[i]
         
-        epm.add_experiment("CCSI_sub_co2maintainconcentration", {
+        epm.add("CCSI_sub_co2maintainconcentration", {
             "co2measure_duration": co2measure_duration_each,
             "co2measure_acqrate": co2measure_acqrate,
             "pureco2_sample_no": pureco2_sample_no,
@@ -1039,12 +1039,12 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
         from_global_params={"mean_co2_ppm": "target_co2_ppm"},
         
         )
-        # epm.add_experiment("CCSI_sub_load_gas", {
+        # epm.add("CCSI_sub_load_gas", {
         #     "reservoir_gas_sample_no": pureco2_sample_no,
         #     "volume_ul_cell_gas": 1, #need calculated volume from mfc maintain concentration 
         # })        
         
-        epm.add_experiment("CCSI_sub_n2drain", {
+        epm.add("CCSI_sub_n2drain", {
             "n2flowrate_sccm":n2flowrate_sccm,
             "HSpurge_duration": SamplePurge_duration,
             "DeltaDilute1_duration": 0,
@@ -1055,7 +1055,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
         if prerinse_cleans > 0:
 
             for r in range(prerinse_cleans):
-                epm.add_experiment("CCSI_sub_n2clean", {
+                epm.add("CCSI_sub_n2clean", {
                     "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
                     "Clean_volume_ul": drainclean_volume_ul,
                     "Syringe_rate_ulsec": Clean_syringe_rate_ulsec,
@@ -1079,7 +1079,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
                 })
 
 
-        epm.add_experiment("CCSI_sub_n2rinse", {
+        epm.add("CCSI_sub_n2rinse", {
             "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
             "secondliquid_sample_no": secondliquid_injection_reservoir_sample_no,
             "Clean_volume_ul": drainclean_volume_ul,
@@ -1098,7 +1098,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
             "recirculation_rate_uL_min":LiquidClean_rinse_agitation_rate,
         })
 
-        epm.add_experiment("CCSI_sub_n2flush", {
+        epm.add("CCSI_sub_n2flush", {
             "flush_cycles":fixed_flushes,
             "n2flowrate_sccm":n2flowrate_sccm,
             "recirculation":drainrecirc,
@@ -1121,14 +1121,14 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
 
         #refill dilution volume
         if cleanvolume != 0:
-            epm.add_experiment("CCSI_sub_refill_clean", {
+            epm.add("CCSI_sub_refill_clean", {
                 "Clean_volume_ul": cleanvolume,
               #  "Syringe_rate_ulsec": 100, #syringe_rate_ulsec,
             })
 
         if perform_init:
         #initialization part
-            epm.add_experiment("CCSI_sub_initialization_firstpart", {
+            epm.add("CCSI_sub_initialization_firstpart", {
                 "HSpurge1_duration": init_HSpurge1_duration,
                 "Manpurge1_duration": init_Manpurge1_duration,
                 "Alphapurge1_duration": init_Alphapurge1_duration,
@@ -1139,7 +1139,7 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
 
         #
         # DILUTION PURGE, MAIN HEADSPACE PURGE AND HEADSPACE EVALUATION
-            epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
+            epm.add("CCSI_sub_headspace_purge_and_measure", {
                 "HSpurge_duration": init_HSpurge_duration, 
                 "DeltaDilute1_duration": init_DeltaDilute1_duration,
                 "initialization": True,
@@ -1147,11 +1147,11 @@ def CCSI_Solution_co2maintainconcentration(  #assumes initialization performed p
                 "co2measure_duration": check_co2measure_duration, 
                 "co2measure_acqrate": co2measure_acqrate, 
                 })
-            epm.add_experiment("CCSI_sub_initialization_end_state", {})
+            epm.add("CCSI_sub_initialization_end_state", {})
 
     if temp_monitor_time != 0:
 
-        epm.add_experiment("CCSI_sub_monitorcell", {
+        epm.add("CCSI_sub_monitorcell", {
             "co2measure_duration":temp_monitor_time,
             "co2measure_acqrate": co2measure_acqrate,
             "recirculation": True,
@@ -1226,7 +1226,7 @@ def CCSI_cleancycles(
     epm = ExperimentPlanMaker()
 
     if drain_first:
-        epm.add_experiment("CCSI_sub_n2drain", {
+        epm.add("CCSI_sub_n2drain", {
             "n2flowrate_sccm":n2flowrate_sccm,
             "HSpurge_duration": SamplePurge_duration,
             "DeltaDilute1_duration": 0,
@@ -1237,7 +1237,7 @@ def CCSI_cleancycles(
     if prerinse_cleans > 0:
 
         for r in range(prerinse_cleans):
-            epm.add_experiment("CCSI_sub_n2clean", {
+            epm.add("CCSI_sub_n2clean", {
                 "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
                 "Clean_volume_ul": drainclean_volume_ul,
                 "Syringe_rate_ulsec": Clean_syringe_rate_ulsec,
@@ -1261,7 +1261,7 @@ def CCSI_cleancycles(
             })
 
 
-    epm.add_experiment("CCSI_sub_n2rinse", {
+    epm.add("CCSI_sub_n2rinse", {
         "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
         "Clean_volume_ul": drainclean_volume_ul,
         "Syringe_rate_ulsec":Clean_syringe_rate_ulsec,
@@ -1277,7 +1277,7 @@ def CCSI_cleancycles(
         "recirculation_rate_uL_min":LiquidClean_rinse_agitation_rate,
     })
 
-    epm.add_experiment("CCSI_sub_n2flush", {
+    epm.add("CCSI_sub_n2flush", {
         "flush_cycles":fixed_flushes,
         "n2flowrate_sccm":n2flowrate_sccm,
         "recirculation":drainrecirc,
@@ -1300,7 +1300,7 @@ def CCSI_cleancycles(
 
     if perform_init:
     #initialization part
-        epm.add_experiment("CCSI_sub_initialization_firstpart", {
+        epm.add("CCSI_sub_initialization_firstpart", {
             "HSpurge1_duration": init_HSpurge1_duration,
             "Manpurge1_duration": init_Manpurge1_duration,
             "Alphapurge1_duration": init_Alphapurge1_duration,
@@ -1311,7 +1311,7 @@ def CCSI_cleancycles(
 
     #
     # DILUTION PURGE, MAIN HEADSPACE PURGE AND HEADSPACE EVALUATION
-        epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
+        epm.add("CCSI_sub_headspace_purge_and_measure", {
             "HSpurge_duration": init_HSpurge_duration, 
             "DeltaDilute1_duration": init_DeltaDilute1_duration,
             "initialization": True,
@@ -1319,11 +1319,11 @@ def CCSI_cleancycles(
             "co2measure_duration": check_co2measure_duration, 
             "co2measure_acqrate": co2measure_acqrate, 
             })
-        epm.add_experiment("CCSI_sub_initialization_end_state", {})
+        epm.add("CCSI_sub_initialization_end_state", {})
 
     if temp_monitor_time != 0:
 
-        epm.add_experiment("CCSI_sub_monitorcell", {
+        epm.add("CCSI_sub_monitorcell", {
             "co2measure_duration":temp_monitor_time,
             "co2measure_acqrate": co2measure_acqrate,
             "recirculation": True,
@@ -1362,7 +1362,7 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
 
     epm = ExperimentPlanMaker()
     for _ in range(initcleans):
-        epm.add_experiment("CCSI_sub_clean_inject", {
+        epm.add("CCSI_sub_clean_inject", {
             "Clean_volume_ul": drainclean_volume_ul,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidCleanWait_s": LiquidFillWait_s,
@@ -1375,21 +1375,21 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
         })
 
     # refill_volume = drainclean_volume_ul*(initcleans)
-    # epm.add_experiment("CCSI_sub_refill_clean", {
+    # epm.add("CCSI_sub_refill_clean", {
     #     "Clean_volume_ul": refill_volume ,
     #     "Syringe_rate_ulsec": 1000,
     # })
 
     for solnvolume in Solution_volume_ul:
 
-        epm.add_experiment("CCSI_sub_unload_cell",{})
+        epm.add("CCSI_sub_unload_cell",{})
 
-        epm.add_experiment("CCSI_sub_load_gas", {
+        epm.add("CCSI_sub_load_gas", {
             "reservoir_gas_sample_no": gas_sample_no,
             "volume_ul_cell_gas": 5000,
         })
         if solnvolume != 0:
-            epm.add_experiment("CCSI_sub_load_liquid", {
+            epm.add("CCSI_sub_load_liquid", {
                 "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
                 "volume_ul_cell_liquid": solnvolume,
                 "combine_True_False": False,
@@ -1397,14 +1397,14 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
             })
         watervolume = total_sample_volume_ul - solnvolume
         if watervolume != 0:
-            epm.add_experiment("CCSI_sub_load_liquid", {
+            epm.add("CCSI_sub_load_liquid", {
                 "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
                 "volume_ul_cell_liquid": watervolume,
                 "combine_True_False": True,
                 "water_True_False": True,
             })
 
-        epm.add_experiment("CCSI_sub_liquidfill_syringes", {
+        epm.add("CCSI_sub_liquidfill_syringes", {
             "Solution_volume_ul": solnvolume,
             "Clean_volume_ul": watervolume,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -1412,10 +1412,10 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
         })
-        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
+        epm.add("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
 
         for _ in range(cleanloops):
-            epm.add_experiment("CCSI_sub_clean_inject", {
+            epm.add("CCSI_sub_clean_inject", {
                 "Clean_volume_ul": drainclean_volume_ul,
                 "Syringe_rate_ulsec": syringe_rate_ulsec,
                 "LiquidCleanWait_s": LiquidFillWait_s,
@@ -1428,13 +1428,13 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
             })
 
         refill_volume = watervolume + drainclean_volume_ul*(cleanloops)
-        epm.add_experiment("CCSI_sub_refill_clean", {
+        epm.add("CCSI_sub_refill_clean", {
             "Clean_volume_ul": refill_volume ,
             "Syringe_rate_ulsec": 1000,
         })
     
         for _ in range(headspace_purge_cycles):
-            epm.add_experiment("CCSI_sub_drain", {
+            epm.add("CCSI_sub_drain", {
                 "HSpurge_duration": HSpurge_duration,
                 "DeltaDilute1_duration": DeltaDilute1_duration,
                 })
@@ -1473,10 +1473,10 @@ def CCSI_priming(  #assumes initialization performed previously
     epm = ExperimentPlanMaker()
     for solnvolume in Solution_volume_ul:  
 
-        epm.add_experiment("CCSI_sub_unload_cell",{})
+        epm.add("CCSI_sub_unload_cell",{})
 
         if solnvolume != 0:
-            epm.add_experiment("CCSI_sub_load_liquid", {
+            epm.add("CCSI_sub_load_liquid", {
                 "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
                 "volume_ul_cell_liquid": solnvolume,
                 "combine_True_False": False,
@@ -1484,14 +1484,14 @@ def CCSI_priming(  #assumes initialization performed previously
             })
         watervolume = total_sample_volume_ul - solnvolume
         if watervolume != 0:
-            epm.add_experiment("CCSI_sub_load_liquid", {
+            epm.add("CCSI_sub_load_liquid", {
                 "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
                 "volume_ul_cell_liquid": watervolume,
                 "combine_True_False": True,
                 "water_True_False": True,
             })
 
-        epm.add_experiment("CCSI_sub_liquidfill_syringes", {
+        epm.add("CCSI_sub_liquidfill_syringes", {
             "Solution_volume_ul": solnvolume,
             "Clean_volume_ul": watervolume,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -1499,14 +1499,14 @@ def CCSI_priming(  #assumes initialization performed previously
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
         })
-        epm.add_experiment("CCSI_sub_drain", {
+        epm.add("CCSI_sub_drain", {
             "HSpurge_duration": LiquidCleanPurge_duration,
             "DeltaDilute1_duration": DeltaDilute1_duration,
             "recirculation":drainrecirc,
             "recirculation_rate_uL_min": recirculation_rate_uL_min,
         })
 
-        epm.add_experiment("CCSI_sub_clean_inject", {
+        epm.add("CCSI_sub_clean_inject", {
             "Clean_volume_ul": drainclean_volume_ul,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidCleanWait_s": LiquidFillWait_s,
@@ -1522,14 +1522,14 @@ def CCSI_priming(  #assumes initialization performed previously
             #  "HSpurge_duration": LiquidCleanPurge_duration,
         })
 
-        epm.add_experiment("CCSI_sub_full_fill_syringe", {
+        epm.add("CCSI_sub_full_fill_syringe", {
             "syringe": "waterclean",
             "target_volume_ul": 55000 ,
             "Syringe_rate_ulsec": 1000,
         })
     
         for _ in range(headspace_purge_cycles):
-            epm.add_experiment("CCSI_sub_drain", {
+            epm.add("CCSI_sub_drain", {
                 "HSpurge_duration": HSpurge_duration,
                 "DeltaDilute1_duration": DeltaDilute1_duration,
                 "recirculation_rate_uL_min": recirculation_rate_uL_min,
@@ -1557,7 +1557,7 @@ def CCSI_priming(  #assumes initialization performed previously
 #     epm = ExperimentPlanMaker()
     
 #    #purges
-#     epm.add_experiment("CCSI_sub_initialization_firstpart", {
+#     epm.add("CCSI_sub_initialization_firstpart", {
 #         "HSpurge1_duration": HSpurge1_duration,
 #         "Manpurge1_duration": Manpurge1_duration,
 #         "Alphapurge1_duration": Alphapurge1_duration,
@@ -1566,13 +1566,13 @@ def CCSI_priming(  #assumes initialization performed previously
 #         "recirculation_rate_uL_min": recirculation_rate_uL_min,
 #         })
 
-#     epm.add_experiment("CCSI_sub_drain", {
+#     epm.add("CCSI_sub_drain", {
 #         "HSpurge_duration": HSpurge_duration,
 #         "DeltaDilute1_duration": DeltaDilute1_duration,
 #         "initialization": True,
 #         "recirculation_rate_uL_min": recirculation_rate_uL_min,
 #         })
-#     epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
+#     epm.add("CCSI_sub_headspace_purge_and_measure", {
 #         "HSpurge_duration": HSpurge_duration, 
 #         "DeltaDilute1_duration": DeltaDilute1_duration,
 #         "initialization": True,
@@ -1580,15 +1580,15 @@ def CCSI_priming(  #assumes initialization performed previously
 #         "co2measure_duration": CO2measure_duration, 
 #         "co2measure_acqrate": CO2measure_acqrate, 
 #         })
-#     epm.add_experiment("CCSI_sub_initialization_end_state", {})
+#     epm.add("CCSI_sub_initialization_end_state", {})
 
-#     epm.add_experiment("CCSI_leaktest_co2", {
+#     epm.add("CCSI_leaktest_co2", {
 #         "recirculate": recirculate,
 #         "co2measure_duration": CO2measure_duration, 
 #         "co2measure_acqrate": CO2measure_acqrate, 
 #         "recirculation_rate_uL_min": recirculation_rate_uL_min,
 #         })
-#     epm.add_experiment("CCSI_sub_peripumpoff",{})
+#     epm.add("CCSI_sub_peripumpoff",{})
 
 #     return epm.planned_experiments
 
@@ -1671,23 +1671,23 @@ def CCSI_priming(  #assumes initialization performed previously
 #     epm = ExperimentPlanMaker()
 #     for i, solnvolume in enumerate(Solution_volume_ul):  
 
-#         epm.add_experiment("CCSI_sub_unload_cell",{})
+#         epm.add("CCSI_sub_unload_cell",{})
 
 #         gas_volume = total_cell_volume_ul - total_sample_volume_ul[i]
 
-#         epm.add_experiment("CCSI_sub_load_gas", {
+#         epm.add("CCSI_sub_load_gas", {
 #             "reservoir_gas_sample_no": initial_gas_sample_no,
 #             "volume_ul_cell_gas": gas_volume,
 #         })
 
-#         epm.add_experiment("CCSI_sub_headspace_measure", {
+#         epm.add("CCSI_sub_headspace_measure", {
 #             "recirculation_rate_uL_min": recirculation_rate_uL_min,
 #             "co2measure_duration": check_co2measure_duration,
 #             "co2measure_acqrate": co2measure_acqrate,
 #         })
 
 #         # if solnvolume != 0:
-#         #     epm.add_experiment("CCSI_sub_load_liquid", {
+#         #     epm.add("CCSI_sub_load_liquid", {
 #         #         "reservoir_liquid_sample_no": Solution_reservoir_sample_no,
 #         #         "volume_ul_cell_liquid": solnvolume,
 #         #         "combine_True_False": False,
@@ -1695,14 +1695,14 @@ def CCSI_priming(  #assumes initialization performed previously
 #         #     })
 #         watervolume = total_sample_volume_ul[i] - solnvolume
 #         # if watervolume != 0:
-#         #     epm.add_experiment("CCSI_sub_load_liquid", {
+#         #     epm.add("CCSI_sub_load_liquid", {
 #         #         "reservoir_liquid_sample_no": Clean_reservoir_sample_no,
 #         #         "volume_ul_cell_liquid": watervolume,
 #         #         "combine_True_False": True,
 #         #         "water_True_False": True,
 #         #     })
 
-#         epm.add_experiment("CCSI_sub_cellfill", {
+#         epm.add("CCSI_sub_cellfill", {
 #             "Solution_description": Solution_name,
 #             "Solution_reservoir_sample_no": Solution_reservoir_sample_no,
 #             "Solution_volume_ul": solnvolume,
@@ -1716,7 +1716,7 @@ def CCSI_priming(  #assumes initialization performed previously
 #             "co2_filltime_s":co2_filltime_s,
 #         })
         
-#         epm.add_experiment("CCSI_sub_co2maintainconcentration", {
+#         epm.add("CCSI_sub_co2maintainconcentration", {
 #             "co2measure_duration": co2measure_duration,
 #             "co2measure_acqrate": co2measure_acqrate,
 #             "pureco2_sample_no": pureco2_sample_no,
@@ -1727,12 +1727,12 @@ def CCSI_priming(  #assumes initialization performed previously
 #             "refill_freq_sec": refill_freq_sec,
 #             "recirculation_rate_uL_min": recirculation_rate_uL_min,
 #         })
-#         # epm.add_experiment("CCSI_sub_load_gas", {
+#         # epm.add("CCSI_sub_load_gas", {
 #         #     "reservoir_gas_sample_no": pureco2_sample_no,
 #         #     "volume_ul_cell_gas": 1, #need calculated volume from mfc maintain concentration 
 #         # })        
         
-#         epm.add_experiment("CCSI_sub_n2drain", {
+#         epm.add("CCSI_sub_n2drain", {
 #             "n2flowrate_sccm":n2flowrate_sccm,
 #             "HSpurge_duration": SamplePurge_duration,
 #             "DeltaDilute1_duration": 0,
@@ -1742,7 +1742,7 @@ def CCSI_priming(  #assumes initialization performed previously
 
 #         if prerinse_clean:
 
-#             epm.add_experiment("CCSI_sub_n2clean", {
+#             epm.add("CCSI_sub_n2clean", {
 #                 "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
 #                 "Clean_volume_ul": drainclean_volume_ul,
 #                 "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -1766,7 +1766,7 @@ def CCSI_priming(  #assumes initialization performed previously
 #             })
 
 
-#         epm.add_experiment("CCSI_sub_n2rinse", {
+#         epm.add("CCSI_sub_n2rinse", {
 #             "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
 #             "Clean_volume_ul": drainclean_volume_ul,
 #             "rinse_cycles": LiquidClean_full_rinses,
@@ -1780,7 +1780,7 @@ def CCSI_priming(  #assumes initialization performed previously
 #             "recirculation_rate_uL_min":LiquidClean_rinse_agitation_rate,
 #         })
 
-#         epm.add_experiment("CCSI_sub_n2flush", {
+#         epm.add("CCSI_sub_n2flush", {
 #             "flush_cycles":fixed_flushes,
 #             "n2flowrate_sccm":n2flowrate_sccm,
 #             "recirculation":drainrecirc,
@@ -1801,7 +1801,7 @@ def CCSI_priming(  #assumes initialization performed previously
 #             "Sensorpurge1_duration": flush_Sensorpurge1_duration,
 #         })
 
-#         # epm.add_experiment("CCSI_sub_n2clean", {
+#         # epm.add("CCSI_sub_n2clean", {
 #         #     "Clean_reservoir_sample_no": Clean_reservoir_sample_no,
 #         #     "Clean_volume_ul": drainclean_volume_ul,
 #         #     "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -1829,14 +1829,14 @@ def CCSI_priming(  #assumes initialization performed previously
 
 #         #refill dilution volume
 #         if watervolume != 0:
-#             epm.add_experiment("CCSI_sub_refill_clean", {
+#             epm.add("CCSI_sub_refill_clean", {
 #                 "Clean_volume_ul": watervolume,
 #                 "Syringe_rate_ulsec": 800, #syringe_rate_ulsec,
 #             })
 
 #         if perform_init:
 #             #initialization part
-#             epm.add_experiment("CCSI_sub_initialization_firstpart", {
+#             epm.add("CCSI_sub_initialization_firstpart", {
 #                 "HSpurge1_duration": init_HSpurge1_duration,
 #                 "Manpurge1_duration": init_Manpurge1_duration,
 #                 "Alphapurge1_duration": init_Alphapurge1_duration,
@@ -1847,7 +1847,7 @@ def CCSI_priming(  #assumes initialization performed previously
 
 #         #
 #         # DILUTION PURGE, MAIN HEADSPACE PURGE AND HEADSPACE EVALUATION
-#             epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
+#             epm.add("CCSI_sub_headspace_purge_and_measure", {
 #                 "HSpurge_duration": init_HSpurge_duration, 
 #                 "DeltaDilute1_duration": init_DeltaDilute1_duration,
 #                 "initialization": True,
@@ -1855,11 +1855,11 @@ def CCSI_priming(  #assumes initialization performed previously
 #                 "co2measure_duration": check_co2measure_duration, 
 #                 "co2measure_acqrate": co2measure_acqrate, 
 #                 })
-#             epm.add_experiment("CCSI_sub_initialization_end_state", {})
+#             epm.add("CCSI_sub_initialization_end_state", {})
 
 #     if temp_monitor_time != 0:
 
-#         epm.add_experiment("CCSI_sub_monitorcell", {
+#         epm.add("CCSI_sub_monitorcell", {
 #             "co2measure_duration":temp_monitor_time,
 #             "co2measure_acqrate": co2measure_acqrate,
 #             "recirculation": True,

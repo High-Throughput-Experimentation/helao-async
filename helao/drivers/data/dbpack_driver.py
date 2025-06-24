@@ -370,7 +370,7 @@ class ExpYml(HelaoYml):
                 "process_timestamp": actions[0].time,
                 "process_group_index": group_idx,
                 "process_uuid": new_uuid,
-                "action_list": [
+                "dispatched_actions": [
                     ShortActionModel(**act.dict)
                     for act in self.grouped_actions[group_idx]
                 ],

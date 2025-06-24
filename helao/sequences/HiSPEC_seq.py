@@ -67,8 +67,8 @@ def HiSpEC_CV(
     #scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
     ):
     epm = ExperimentPlanMaker()
-    epm.add_experiment("HiSpEC_sub_unloadall_customs", {})
-    epm.add_experiment(
+    epm.add("HiSpEC_sub_unloadall_customs", {})
+    epm.add(
             "HiSpEC_sub_disengage",
             {
                 "clear_we": True,
@@ -79,10 +79,10 @@ def HiSpEC_CV(
         )
 
 
-    # epm.add_experiment("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
+    # epm.add("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
     
     # if use_z_motor:
-    #     epm.add_experiment(
+    #     epm.add(
     #         "HiSpEC_sub_disengage",
     #         {
     #             "clear_we": True,
@@ -92,14 +92,14 @@ def HiSpEC_CV(
     #         },
     #     )
     # else:
-    #     epm.add_experiment(
+    #     epm.add(
     #         "HiSpEC_sub_interrupt",
     #         {"reason": "Stop flow and prepare for xy motion to starting sample."},
     #    ) 
 
     for i, plate_sample in enumerate(plate_sample_no_list):
         if i > 0 and use_z_motor:
-            epm.add_experiment(
+            epm.add(
                 "HiSpEC_sub_disengage",
                 {
                     "clear_we": True,
@@ -109,7 +109,7 @@ def HiSpEC_CV(
                 },
             )
 
-        epm.add_experiment(
+        epm.add(
             "HiSpEC_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -122,7 +122,7 @@ def HiSpEC_CV(
         )
 
         if use_z_motor:
-            epm.add_experiment(
+            epm.add(
                 "ECHEUVIS_sub_engage",
                 {
                     "flow_we": True,
@@ -135,17 +135,17 @@ def HiSpEC_CV(
             )
         else:
             if i == 0:  # initial sample
-                epm.add_experiment(
+                epm.add(
                     "ECHEUVIS_sub_interrupt",
                     {"reason": "Restore flow and prepare for sample measurement."},
                 )
         
         if Flow_during_SpEC==False:
-            epm.add_experiment("HiSPEC_sub_stop_flow", {})
+            epm.add("HiSPEC_sub_stop_flow", {})
 
         
 
-        epm.add_experiment(
+        epm.add(
             "HiSpEC_sub_OCV",
             {
                 "Tval__s": Tval__s,
@@ -153,7 +153,7 @@ def HiSpEC_CV(
             }
                 )
         
-        epm.add_experiment(
+        epm.add(
             "HiSPEC_sub_PEIS",
             {
                 #"Vinit_vsRHE": Vinit_vsRHE,
@@ -176,14 +176,14 @@ def HiSpEC_CV(
             }, from_global_params={"min_offset_ocv": "Vinit__V"})
         
 
-        epm.add_experiment(
+        epm.add(
             "HiSpEC_sub_CP",
             {"Ival__A" : Ival__A,
             "Tval__s" : Tval__s,
             "AcqInterval__s": AcqInterval_CA_CP__s})
         
 
-        epm.add_experiment("HiSpEC_sub_CA",
+        epm.add("HiSpEC_sub_CA",
             {
                 # "Ival__A" : Ival__A,
                 "Tval__s" : Tval__s,
@@ -192,7 +192,7 @@ def HiSpEC_CV(
         
         
 
-        epm.add_experiment(
+        epm.add(
             "HISPEC_sub_SpEC",
             {
                 #"Vinit_vsRHE": Vinit_vsRHE,
@@ -217,11 +217,11 @@ def HiSpEC_CV(
             # })
             }, from_global_params={"min_offset_ocv": "Vapex2_vsRHE", "CP_Ewe_V__mean_final":"Vapex1_vsRHE"} ) # temporarily commented this out to test a fixed V2
 
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     if use_z_motor:
         # leave cell sealed w/solution for storage
-        epm.add_experiment(
+        epm.add(
             "ECHEUVIS_sub_engage",
             {
                 "flow_we": False,
@@ -230,7 +230,7 @@ def HiSpEC_CV(
                 "fill_wait": cell_fill_wait,
             },
         )
-    # epm.add_experiment(
+    # epm.add(
     #     "UVIS_calc_abs",
     #     {
     #         "ev_parts": calc_ev_parts,
@@ -242,7 +242,7 @@ def HiSpEC_CV(
     #         "skip_nspec": calc_skip_nspec,
     #     },
     # )
-    epm.add_experiment("HISPEC_sub_shutdown", {})
+    epm.add("HISPEC_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -282,10 +282,10 @@ def HiSpEC_EIS_only(
 ):
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
+    epm.add("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
     
     if use_z_motor:
-        epm.add_experiment(
+        epm.add(
             "ECHEUVIS_sub_disengage",
             {
                 "clear_we": True,
@@ -295,14 +295,14 @@ def HiSpEC_EIS_only(
             },
         )
     else:
-        epm.add_experiment(
+        epm.add(
             "ECHEUVIS_sub_interrupt",
             {"reason": "Stop flow and prepare for xy motion to starting sample."},
         )
 
     for i, plate_sample in enumerate(plate_sample_no_list):
         if i > 0 and use_z_motor:
-            epm.add_experiment(
+            epm.add(
                 "ECHEUVIS_sub_disengage",
                 {
                     "clear_we": True,
@@ -312,7 +312,7 @@ def HiSpEC_EIS_only(
                 },
             )
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -325,7 +325,7 @@ def HiSpEC_EIS_only(
         )
 
         if use_z_motor:
-            epm.add_experiment(
+            epm.add(
                 "ECHEUVIS_sub_engage",
                 {
                     "flow_we": True,
@@ -338,12 +338,12 @@ def HiSpEC_EIS_only(
             )
         else:
             if i == 0:  # initial sample
-                epm.add_experiment(
+                epm.add(
                     "ECHEUVIS_sub_interrupt",
                     {"reason": "Restore flow and prepare for sample measurement."},
                 )
 
-        epm.add_experiment(
+        epm.add(
             "ECHE_sub_OCV",
             {
                 "Tval__s": 0.1,
@@ -351,7 +351,7 @@ def HiSpEC_EIS_only(
             }
                 )
 
-        epm.add_experiment(
+        epm.add(
             "HiSPEC_sub_PEIS",
             {
                 #"Vinit_vsRHE": Vinit_vsRHE,
@@ -374,11 +374,11 @@ def HiSpEC_EIS_only(
                 "ref_vs_nhe": ref_vs_nhe,
             }, from_global_params={"Ewe_V__mean_final": "Vinit__V" })
 
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add("ECHE_sub_unloadall_customs", {})
 
     if use_z_motor:
         # leave cell sealed w/solution for storage
-        epm.add_experiment(
+        epm.add(
             "ECHEUVIS_sub_engage",
             {
                 "flow_we": False,
@@ -388,7 +388,7 @@ def HiSpEC_EIS_only(
             },
         )
     
-    epm.add_experiment("HISPEC_sub_shutdown", {})
+    epm.add("HISPEC_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
@@ -439,9 +439,9 @@ def HiSpEC_EIS_only(
 # ):
 #     epm = ExperimentPlanMaker()
 
-#     epm.add_experiment("ECHE_sub_unloadall_customs", {})
+#     epm.add("ECHE_sub_unloadall_customs", {})
 #     if use_z_motor:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_disengage",
 #             {
 #                 "clear_we": True,
@@ -451,11 +451,11 @@ def HiSpEC_EIS_only(
 #             },
 #         )
 #     else:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_interrupt",
 #             {"reason": "Stop flow and prepare for xy motion to ref location."},
 #         )
-#     epm.add_experiment(
+#     epm.add(
 #         "UVIS_sub_setup_ref",
 #         {
 #             "reference_mode": "builtin",
@@ -466,7 +466,7 @@ def HiSpEC_EIS_only(
 #         },
 #     )
 #     if use_z_motor:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_engage",
 #             {
 #                 "flow_we": True,
@@ -476,14 +476,14 @@ def HiSpEC_EIS_only(
 #             },
 #         )
 #     else:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_interrupt",
 #             {"reason": "Restore flow and prepare for reference measurement."},
 #         )
 
 #     # dark ref
 #     for st in SPEC_MAP[spec_technique]:
-#         epm.add_experiment(
+#         epm.add(
 #             "UVIS_sub_measure",
 #             {
 #                 "spec_type": st,
@@ -503,7 +503,7 @@ def HiSpEC_EIS_only(
 #         )
 #     # light ref
 #     for st in SPEC_MAP[spec_technique]:
-#         epm.add_experiment(
+#         epm.add(
 #             "UVIS_sub_measure",
 #             {
 #                 "spec_type": st,
@@ -522,7 +522,7 @@ def HiSpEC_EIS_only(
 #             },
 #         )
 #     if use_z_motor:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_disengage",
 #             {
 #                 "clear_we": True,
@@ -532,14 +532,14 @@ def HiSpEC_EIS_only(
 #             },
 #         )
 #     else:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_interrupt",
 #             {"reason": "Stop flow and prepare for xy motion to starting sample."},
 #         )
 
 #     for i, plate_sample in enumerate(plate_sample_no_list):
 #         if i > 0 and use_z_motor:
-#             epm.add_experiment(
+#             epm.add(
 #                 "ECHEUVIS_sub_disengage",
 #                 {
 #                     "clear_we": True,
@@ -549,7 +549,7 @@ def HiSpEC_EIS_only(
 #                 },
 #             )
 
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHE_sub_startup",
 #             {
 #                 "solid_custom_position": "cell1_we",
@@ -562,7 +562,7 @@ def HiSpEC_EIS_only(
 #         )
 
 #         if use_z_motor:
-#             epm.add_experiment(
+#             epm.add(
 #                 "ECHEUVIS_sub_engage",
 #                 {
 #                     "flow_we": True,
@@ -573,13 +573,13 @@ def HiSpEC_EIS_only(
 #             )
 #         else:
 #             if i == 0:  # initial sample
-#                 epm.add_experiment(
+#                 epm.add(
 #                     "ECHEUVIS_sub_interrupt",
 #                     {"reason": "Restore flow and prepare for sample measurement."},
 #                 )
 
 #         # CP1
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_CP_led",
 #             {
 #                 "CP_current": CP_current,
@@ -616,9 +616,9 @@ def HiSpEC_EIS_only(
 #             },
 #         )
 
-#     epm.add_experiment("ECHE_sub_unloadall_customs", {})
+#     epm.add("ECHE_sub_unloadall_customs", {})
 #     if use_z_motor:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_disengage",
 #             {
 #                 "clear_we": True,
@@ -628,11 +628,11 @@ def HiSpEC_EIS_only(
 #             },
 #         )
 #     else:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_interrupt",
 #             {"reason": "Stop flow and prepare for xy motion to ref location."},
 #         )
-#     epm.add_experiment(
+#     epm.add(
 #         "UVIS_sub_setup_ref",
 #         {
 #             "reference_mode": "builtin",
@@ -643,7 +643,7 @@ def HiSpEC_EIS_only(
 #         },
 #     )
 #     if use_z_motor:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_engage",
 #             {
 #                 "flow_we": True,
@@ -653,13 +653,13 @@ def HiSpEC_EIS_only(
 #             },
 #         )
 #     else:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_interrupt",
 #             {"reason": "Restore flow and prepare for reference measurement."},
 #         )
 #     # dark ref
 #     for st in SPEC_MAP[spec_technique]:
-#         epm.add_experiment(
+#         epm.add(
 #             "UVIS_sub_measure",
 #             {
 #                 "spec_type": st,
@@ -679,7 +679,7 @@ def HiSpEC_EIS_only(
 #         )
 #     # light ref
 #     for st in SPEC_MAP[spec_technique]:
-#         epm.add_experiment(
+#         epm.add(
 #             "UVIS_sub_measure",
 #             {
 #                 "spec_type": st,
@@ -699,7 +699,7 @@ def HiSpEC_EIS_only(
 #         )
 #     if use_z_motor:
 #         # leave cell sealed w/solution for storage
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_engage",
 #             {
 #                 "flow_we": False,
@@ -708,7 +708,7 @@ def HiSpEC_EIS_only(
 #                 "fill_wait": cell_fill_wait,
 #             },
 #         )
-#     epm.add_experiment(
+#     epm.add(
 #         "UVIS_calc_abs",
 #         {
 #             "ev_parts": calc_ev_parts,
@@ -719,7 +719,7 @@ def HiSpEC_EIS_only(
 #             "upper_wl": calc_upper_wl,
 #         },
 #     )
-#     epm.add_experiment("ECHE_sub_shutdown", {})
+#     epm.add("ECHE_sub_shutdown", {})
 
 #     return epm.planned_experiments  # returns complete experiment list
 
@@ -756,8 +756,8 @@ def HiSpEC_EIS_only(
 #     cell_fill_wait: float = 30.0,
 # ):
 #     epm = ExperimentPlanMaker()
-#     epm.add_experiment("HiSpEC_sub_startup", {})
-#     epm.add_experiment(
+#     epm.add("HiSpEC_sub_startup", {})
+#     epm.add(
 #         "ECHEUVIS_sub_disengage",
 #         {
 #             "clear_we": True,
@@ -766,7 +766,7 @@ def HiSpEC_EIS_only(
 #             "vent_wait": cell_vent_wait,
 #         },
 #     )
-#     epm.add_experiment(
+#     epm.add(
 #         "UVIS_sub_setup_ref",
 #         {
 #             "reference_mode": "builtin",
@@ -776,7 +776,7 @@ def HiSpEC_EIS_only(
 #             "specref_code": 1,
 #         },
 #     )
-#     epm.add_experiment(
+#     epm.add(
 #         "ECHEUVIS_sub_engage",
 #         {
 #             "flow_we": True,
@@ -786,7 +786,7 @@ def HiSpEC_EIS_only(
 #             "calibrate_intensity": True,
 #         },
 #     )
-#     epm.add_experiment(
+#     epm.add(
 #         "ECHEUVIS_sub_CA_led",
 #         {
 #             "CA_potential_vsRHE": 1.23,
@@ -824,7 +824,7 @@ def HiSpEC_EIS_only(
 #         from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
 #     )
 #     # CV1
-#     epm.add_experiment(
+#     epm.add(
 #         "ECHEUVIS_sub_CV_led",
 #         {
 #             "Vinit_vsRHE": 1.23,
@@ -866,7 +866,7 @@ def HiSpEC_EIS_only(
 #         from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
 #     )
 #     # leave cell sealed w/solution for storage
-#     epm.add_experiment(
+#     epm.add(
 #         "ECHEUVIS_sub_engage",
 #         {
 #             "flow_we": False,
@@ -875,7 +875,7 @@ def HiSpEC_EIS_only(
 #             "fill_wait": 5.0,
 #         },
 #     )
-#     epm.add_experiment("HISPEC_sub_shutdown", {})
+#     epm.add("HISPEC_sub_shutdown", {})
 
 #     return epm.planned_experiments  # returns complete experiment list
 
@@ -923,9 +923,9 @@ def HiSpEC_EIS_only(
 # ):
 #     epm = ExperimentPlanMaker()
 
-#     epm.add_experiment("HiSpEC_sub_startup", {})
+#     epm.add("HiSpEC_sub_startup", {})
 #     # if use_z_motor:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "ECHEUVIS_sub_disengage",
 #     #         {
 #     #             "clear_we": True,
@@ -935,11 +935,11 @@ def HiSpEC_EIS_only(
 #     #         },
 #     #     )
 #     # else:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "ECHEUVIS_sub_interrupt",
 #     #         {"reason": "Stop flow and prepare for xy motion to ref location."},
 #     #     )
-#     # epm.add_experiment(
+#     # epm.add(
 #     #     "UVIS_sub_setup_ref",
 #     #     {
 #     #         "reference_mode": "builtin",
@@ -950,7 +950,7 @@ def HiSpEC_EIS_only(
 #     #     },
 #     # )
 #     # if use_z_motor:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "ECHEUVIS_sub_engage",
 #     #         {
 #     #             "flow_we": True,
@@ -960,14 +960,14 @@ def HiSpEC_EIS_only(
 #     #         },
 #     #     )
 #     # else:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "ECHEUVIS_sub_interrupt",
 #     #         {"reason": "Restore flow and prepare for reference measurement."},
 #     #     )
 
 #     # # dark ref
 #     # for st in SPEC_MAP[spec_technique]:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "UVIS_sub_measure",
 #     #         {
 #     #             "spec_type": st,
@@ -987,7 +987,7 @@ def HiSpEC_EIS_only(
 #     #     )
 #     # # light ref
 #     # for st in SPEC_MAP[spec_technique]:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "UVIS_sub_measure",
 #     #         {
 #     #             "spec_type": st,
@@ -1006,7 +1006,7 @@ def HiSpEC_EIS_only(
 #     #         },
 #     #     )
 #     if use_z_motor:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_disengage",
 #             {
 #                 "clear_we": True,
@@ -1016,14 +1016,14 @@ def HiSpEC_EIS_only(
 #             },
 #         )
 #     else:
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_interrupt",
 #             {"reason": "Stop flow and prepare for xy motion to starting sample."},
 #         )
 
 #     for i, plate_sample in enumerate(plate_sample_no_list):
 #         if i > 0 and use_z_motor:
-#             epm.add_experiment(
+#             epm.add(
 #                 "ECHEUVIS_sub_disengage",
 #                 {
 #                     "clear_we": True,
@@ -1033,7 +1033,7 @@ def HiSpEC_EIS_only(
 #                 },
 #             )
 
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHE_sub_startup",
 #             {
 #                 "solid_custom_position": "cell1_we",
@@ -1046,7 +1046,7 @@ def HiSpEC_EIS_only(
 #         )
 
 #         if use_z_motor:
-#             epm.add_experiment(
+#             epm.add(
 #                 "ECHEUVIS_sub_engage",
 #                 {
 #                     "flow_we": True,
@@ -1059,7 +1059,7 @@ def HiSpEC_EIS_only(
 #             )
 #         else:
 #             if i == 0:  # initial sample
-#                 epm.add_experiment(
+#                 epm.add(
 #                     "ECHEUVIS_sub_interrupt",
 #                     {"reason": "Restore flow and prepare for sample measurement."},
 #                 )
@@ -1075,7 +1075,7 @@ def HiSpEC_EIS_only(
 #             potential_list = CA_potential_vsRHE
 #         for vrhe in potential_list:
 #             # OCV
-#             epm.add_experiment(
+#             epm.add(
 #                 "ECHEUVIS_sub_OCV_led",
 #                 {
 #                     "solution_ph": solution_ph,
@@ -1112,7 +1112,7 @@ def HiSpEC_EIS_only(
 #                 from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
 #             )
 #             # CA1
-#             epm.add_experiment(
+#             epm.add(
 #                 "ECHEUVIS_sub_CA_led",
 #                 {
 #                     "CA_potential_vsRHE": vrhe,
@@ -1150,9 +1150,9 @@ def HiSpEC_EIS_only(
 #                 from_global_params={"calibrated_int_time_ms": "spec_int_time_ms"},
 #             )
 
-#     epm.add_experiment("ECHE_sub_unloadall_customs", {})
+#     epm.add("ECHE_sub_unloadall_customs", {})
 #     # if use_z_motor:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "ECHEUVIS_sub_disengage",
 #     #         {
 #     #             "clear_we": True,
@@ -1162,11 +1162,11 @@ def HiSpEC_EIS_only(
 #     #         },
 #     #     )
 #     # else:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "ECHEUVIS_sub_interrupt",
 #     #         {"reason": "Stop flow and prepare for xy motion to ref location."},
 #     #     )
-#     # epm.add_experiment(
+#     # epm.add(
 #     #     "UVIS_sub_setup_ref",
 #     #     {
 #     #         "reference_mode": "builtin",
@@ -1177,7 +1177,7 @@ def HiSpEC_EIS_only(
 #     #     },
 #     # )
 #     # if use_z_motor:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "ECHEUVIS_sub_engage",
 #     #         {
 #     #             "flow_we": True,
@@ -1187,13 +1187,13 @@ def HiSpEC_EIS_only(
 #     #         },
 #     #     )
 #     # else:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "ECHEUVIS_sub_interrupt",
 #     #         {"reason": "Restore flow and prepare for reference measurement."},
 #     #     )
 #     # # dark ref
 #     # for st in SPEC_MAP[spec_technique]:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "UVIS_sub_measure",
 #     #         {
 #     #             "spec_type": st,
@@ -1213,7 +1213,7 @@ def HiSpEC_EIS_only(
 #     #     )
 #     # # light ref
 #     # for st in SPEC_MAP[spec_technique]:
-#     #     epm.add_experiment(
+#     #     epm.add(
 #     #         "UVIS_sub_measure",
 #     #         {
 #     #             "spec_type": st,
@@ -1233,7 +1233,7 @@ def HiSpEC_EIS_only(
 #     #     )
 #     if use_z_motor:
 #         # leave cell sealed w/solution for storage
-#         epm.add_experiment(
+#         epm.add(
 #             "ECHEUVIS_sub_engage",
 #             {
 #                 "flow_we": False,
@@ -1242,7 +1242,7 @@ def HiSpEC_EIS_only(
 #                 "fill_wait": cell_fill_wait,
 #             },
 #         )
-#     # epm.add_experiment(
+#     # epm.add(
 #     #     "UVIS_calc_abs",
 #     #     {
 #     #         "ev_parts": calc_ev_parts,
@@ -1254,7 +1254,7 @@ def HiSpEC_EIS_only(
 #     #         "skip_nspec": calc_skip_nspec,
 #     #     },
 #     # )
-#     epm.add_experiment("HISPEC_sub_shutdown", {})
+#     epm.add("HISPEC_sub_shutdown", {})
 
 #     return epm.planned_experiments  # returns complete experiment list
 
@@ -1266,7 +1266,7 @@ def ECHEUVIS_postseq(
     recent: bool = False,
 ):
     epm = ExperimentPlanMaker()
-    epm.add_experiment(
+    epm.add(
         "ECHEUVIS_analysis_stability",
         {
             "sequence_uuid": analysis_seq_uuid,

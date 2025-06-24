@@ -65,4 +65,4 @@ def PSTAT_exp_CP(
             technique_name="CP",
         )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch

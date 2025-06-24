@@ -28,4 +28,4 @@ def ICPMS_analysis_concentration(
             "params": params,
         },
     )
-    return apm.action_list
+    return apm.planned_actions

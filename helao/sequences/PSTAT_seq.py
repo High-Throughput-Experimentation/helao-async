@@ -48,7 +48,7 @@ def CP_loop(
 
 
     # CP
-    epm.add_experiment(
+    epm.add(
         "PSTAT_exp_CP",
         {
             "current": CP_current,

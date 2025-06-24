@@ -28,4 +28,4 @@ def XRFS_standards_calibration(
             "params": params,
         },
     )
-    return apm.action_list
+    return apm.planned_actions

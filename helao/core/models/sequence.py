@@ -41,9 +41,9 @@ class SequenceModel(SequenceTemplate):
     sequence_comment: Optional[str] = None
     data_request_id: Optional[UUID] = None
     orchestrator: MachineModel = MachineModel()
-    completed_experiments_abbr: List[ShortExperimentModel] = Field(
+    dispatched_experiments_abbr: List[ShortExperimentModel] = Field(
         default=[]
-    )  # list of completed experiments (abbreviated) from completed_experiments (premodels.py)
+    )  # list of completed experiments (abbreviated) from dispatched_experiments (premodels.py)
     sync_data: bool = True
     campaign_name: Optional[str] = None
     manual_action: bool = False

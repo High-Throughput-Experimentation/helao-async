@@ -80,7 +80,7 @@ def HiSpEC_sub_cooldown(experiment: Experiment):
     """Cool the detector"""
     apm = ActionPlanMaker()
     apm.add(ANDOR_server, "cooling", {})
-    return apm.action_list
+    return apm.planned_actions
 
 
 def HiSPEC_sub_stop_flow(experiment: Experiment):
@@ -97,7 +97,7 @@ def HiSPEC_sub_stop_flow(experiment: Experiment):
             {"do_item": item, "on": flow_flag},
             ActionStartCondition.no_wait,
         )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def HiSpEC_sub_unloadall_customs(experiment: Experiment):
@@ -114,7 +114,7 @@ def HiSpEC_sub_unloadall_customs(experiment: Experiment):
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def HiSpEC_sub_add_liquid(
@@ -146,7 +146,7 @@ def HiSpEC_sub_add_liquid(
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def HiSpEC_sub_load_solid(
@@ -176,7 +176,7 @@ def HiSpEC_sub_load_solid(
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def HiSpEC_sub_engage(
@@ -233,7 +233,7 @@ def HiSpEC_sub_engage(
             ),
         )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def HiSpEC_sub_interrupt(
@@ -243,7 +243,7 @@ def HiSpEC_sub_interrupt(
 ):
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "interrupt", {"reason": reason})
-    return apm.action_list
+    return apm.planned_actions
 
 
 def HiSpEC_sub_disengage(
@@ -280,7 +280,7 @@ def HiSpEC_sub_disengage(
                 else ActionStartCondition.wait_for_all
             ),
         )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def HiSpEC_sub_startup(
@@ -299,10 +299,10 @@ def HiSpEC_sub_startup(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_action_list(HiSpEC_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(HiSpEC_sub_unloadall_customs(experiment=experiment))
 
     # load new requested solid samples
-    apm.add_action_list(
+    apm.add_actions(
         HiSpEC_sub_load_solid(
             experiment=experiment,
             solid_custom_position=solid_custom_position,
@@ -312,7 +312,7 @@ def HiSpEC_sub_startup(
     )
 
     # add liquid to solid
-    apm.add_action_list(
+    apm.add_actions(
         HiSpEC_sub_add_liquid(
             experiment=experiment,
             solid_custom_position=solid_custom_position,
@@ -350,14 +350,14 @@ def HiSpEC_sub_startup(
         start_condition=ActionStartCondition.wait_for_all,
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def HISPEC_sub_shutdown(experiment: Experiment):
     """Unload custom position and disable IR emitter."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def HiSpEC_calculate_lower_vertex_potential(
@@ -380,7 +380,7 @@ def HiSpEC_calculate_lower_vertex_potential(
         to_global_params={"result": "new_min_OCV"},
     )
 
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 # implement Biologic trigger actions
@@ -431,7 +431,7 @@ def HiSpEC_sub_CA(
             ProcessContrib.samples_out,
         ],
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def HiSpEC_sub_OCV(
@@ -484,7 +484,7 @@ def HiSpEC_sub_OCV(
         },
         to_global_params={"min_offset_ocv": "min_offset_ocv"},
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 # spectral electrochemistry experiment
@@ -641,7 +641,7 @@ def HISPEC_sub_SpEC(
             ProcessContrib.samples_out,
         ],
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 def HiSpEC_sub_CP(
@@ -690,7 +690,7 @@ def HiSpEC_sub_CP(
         ],
         to_global_params={"Ewe_V__mean_final": "CP_Ewe_V__mean_final"},
     )
-    return apm.action_list
+    return apm.planned_actions
 
 
 def HiSPEC_sub_PEIS(
@@ -749,7 +749,7 @@ def HiSPEC_sub_PEIS(
             ProcessContrib.samples_out,
         ],
     )
-    return apm.action_list  # returns complete action list to orch
+    return apm.planned_actions  # returns complete action list to orch
 
 
 # def HISPEC_sub_CV_DOtrigger(
@@ -878,7 +878,7 @@ def HiSPEC_sub_PEIS(
 
 #     apm.add(IO_server, "stop_digital_cycle", {}, start_condition=ActionStartCondition.wait_for_all)
 
-#     return apm.action_list  # returns complete action list to orch
+#     return apm.planned_actions  # returns complete action list to orch
 
 
 # def HISPEC_sub_CA_led(
@@ -1061,7 +1061,7 @@ def HiSPEC_sub_PEIS(
 #     #     },
 #     # )
 
-#     return apm.action_list  # returns complete action list to orch
+#     return apm.planned_actions  # returns complete action list to orch
 
 
 # def HISPEC_sub_CP_led(
@@ -1237,7 +1237,7 @@ def HiSPEC_sub_PEIS(
 #     #     },
 #     # )
 
-#     return apm.action_list  # returns complete action list to orch
+#     return apm.planned_actions  # returns complete action list to orch
 
 
 # def HISPEC_sub_interrupt(
@@ -1247,7 +1247,7 @@ def HiSPEC_sub_PEIS(
 # ):
 #     apm = ActionPlanMaker()
 #     apm.add(ORCH_server, "interrupt", {"reason": reason})
-#     return apm.action_list
+#     return apm.planned_actions
 
 
 # def HISPEC_sub_OCV_led(
@@ -1420,7 +1420,7 @@ def HiSPEC_sub_PEIS(
 #         },
 #     )
 
-#     return apm.action_list  # returns complete action list to orch
+#     return apm.planned_actions  # returns complete action list to orch
 
 
 # def HISPEC_sub_disengage(
@@ -1457,7 +1457,7 @@ def HiSPEC_sub_PEIS(
 #             if i > 0
 #             else ActionStartCondition.wait_for_all,
 #         )
-#     return apm.action_list  # returns complete action list to orch
+#     return apm.planned_actions  # returns complete action list to orch
 
 
 # def HISPEC_sub_engage(
@@ -1507,7 +1507,7 @@ def HiSPEC_sub_PEIS(
 #             if i > 0
 #             else ActionStartCondition.wait_for_all,
 #         )
-#     return apm.action_list  # returns complete action list to orch
+#     return apm.planned_actions  # returns complete action list to orch
 
 
 # def HISPEC_analysis_stability(
@@ -1529,4 +1529,4 @@ def HiSPEC_sub_PEIS(
 #             "params": params,
 #         },
 #     )
-#     return apm.action_list
+#     return apm.planned_actions
