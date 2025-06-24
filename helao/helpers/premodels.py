@@ -335,7 +335,7 @@ class ActionPlanMaker:
     class _C:
         pass
 
-    def add_planned_actions(self, planned_action_list: list):
+    def add_actions(self, planned_action_list: list):
         for action in planned_action_list:
             self.planned_actions.append(action)
 
