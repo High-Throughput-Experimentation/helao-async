@@ -2497,11 +2497,11 @@ def CCSI_sub_n2rinse(
                     n2_push=n2_push,
                 )
             )
-            if rinse_agitation:
-                apm.add(ORCH_server, "wait", {"waittime": rinse_agitation_wait})
-                apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
-                apm.add(ORCH_server, "wait", {"waittime": rinse_agitation_duration})
-                apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
+            # if rinse_agitation:
+            #     apm.add(ORCH_server, "wait", {"waittime": rinse_agitation_wait})
+            #     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
+            #     apm.add(ORCH_server, "wait", {"waittime": rinse_agitation_duration})
+            #     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
             apm.add_action_list(
                 CCSI_sub_n2drain(
