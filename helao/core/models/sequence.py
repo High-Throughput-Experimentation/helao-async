@@ -20,12 +20,12 @@ from helao.core.helaodict import HelaoDict
 
 class SequenceTemplate(BaseModel, HelaoDict):
     sequence_name: Optional[str] = None
-    sequence_params: Optional[dict] = {}
+    sequence_params: dict = {}
     sequence_label: Optional[str] = "noLabel"
     planned_experiments: List[ExperimentTemplate] = Field(
         default=[]
     )  # populated by operator using sequence library funcs
-    from_global_params: Optional[dict] = {}
+    from_global_params: dict = {}
 
 
 class SequenceModel(SequenceTemplate):
