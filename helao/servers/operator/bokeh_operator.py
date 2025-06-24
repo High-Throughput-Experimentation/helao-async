@@ -88,6 +88,8 @@ class return_experiment_lib(BaseModel):
 
 
 class BokehOperator:
+    sequence: Sequence
+    
     def __init__(self, vis_serv: Vis, orch):
         self.vis = vis_serv
         self.orch = orch
@@ -1257,14 +1259,14 @@ class BokehOperator:
 
     def callback_prepend_seq(self, event):
         sequence = self.populate_sequence()
-        for i, D in enumerate(sequence.experiment_plan_list):
-            self.sequence.experiment_plan_list.insert(i, D)
+        for i, D in enumerate(sequence.planned_experiments):
+            self.sequence.planned_experiments.insert(i, D)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_append_seq(self, event):
         sequence = self.populate_sequence()
-        for D in sequence.experiment_plan_list:
-            self.sequence.experiment_plan_list.append(D)
+        for D in sequence.planned_experiments:
+            self.sequence.planned_experiments.append(D)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_prepend_exp(self, event):
@@ -1280,11 +1282,11 @@ class BokehOperator:
 
     def append_experiment(self):
         experimentmodel = self.populate_experimentmodel()
-        self.sequence.experiment_plan_list.append(experimentmodel)
+        self.sequence.planned_experiments.append(experimentmodel)
 
     def prepend_experiment(self):
         experimentmodel = self.populate_experimentmodel()
-        self.sequence.experiment_plan_list.insert(0, experimentmodel)
+        self.sequence.planned_experiments.insert(0, experimentmodel)
 
     def write_params(self, ptype: str, name: str, pars: dict):
         param_file_path = os.path.join(
@@ -1338,7 +1340,7 @@ class BokehOperator:
         sequence.sequence_label = self.input_sequence_label.value
         sequence.sequence_params = sequence_params
         for expplan in expplan_list:
-            sequence.experiment_plan_list.append(expplan)
+            sequence.planned_experiments.append(expplan)
 
         if self.sequence is None:
             self.sequence = Sequence()
@@ -2040,7 +2042,7 @@ class BokehOperator:
 
         plan_count = 0
         if self.sequence is not None:
-            for D in self.sequence.experiment_plan_list:
+            for D in self.sequence.planned_experiments:
                 self.experiment_plan_lists["sequence_name"].append(
                     self.sequence.sequence_name
                 )
