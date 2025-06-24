@@ -259,14 +259,14 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         self.counter_dispatched_actions[exp_uuid] = 0
 
     def finish_experiment(self, exp_uuid: UUID) -> List[Action]:
-        """returns all finished experiments"""
+        """returns all finished actions"""
         # we don't filter by orch as this should have happened already when they
         # were added to the finished_exps
-        finished_exps = []
+        finished_acts = []
         for hlostatus, status_dict in self.nonactive_dict.items():
             for uuid, statusmodel in status_dict.items():
                 if exp_uuid == uuid:
-                    finished_exps.append(statusmodel)
+                    finished_acts.append(statusmodel)
         # TODO: properly clear actions from endpointstatusmodel only for exp_uuid
 
         # if self.active_dict:
@@ -277,4 +277,4 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         if exp_uuid in self.counter_dispatched_actions:
             del self.counter_dispatched_actions[exp_uuid]
 
-        return finished_exps
+        return finished_acts
