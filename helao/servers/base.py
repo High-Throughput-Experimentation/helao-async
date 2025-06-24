@@ -48,7 +48,7 @@ from helao.helpers.print_message import print_message
 from helao.helpers import async_copy
 from helao.helpers.yml_tools import yml_dumps
 from helao.helpers.yml_finisher import move_dir
-from helao.helpers.premodels import Action, ActionModel
+from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.ws_publisher import WsPublisher
 from helao.core.models.hlostatus import HloStatus
@@ -63,6 +63,7 @@ from helao.core.models.sample import (
     SampleStatus,
     object_to_sample,
 )
+from helao.core.models.action import ActionModel
 from helao.core.models.data import DataModel, DataPackageModel
 from helao.core.models.machine import MachineModel
 from helao.core.models.server import ActionServerModel, EndpointModel
@@ -1342,7 +1343,7 @@ class Base:
         self.status_logger.cancel()
         self.ntp_syncer.cancel()
 
-    async def write_act(self, action):
+    async def write_act(self, action: Action):
         """
         Asynchronously writes action metadata to a YAML file if saving is enabled.
 
@@ -1382,7 +1383,7 @@ class Base:
                 f"writing meta file for action '{action.action_name}' is disabled."
             )
 
-    async def write_exp(self, experiment):
+    async def write_exp(self, experiment: Experiment):
         """
         Asynchronously writes the experiment data to a YAML file.
 
@@ -1415,7 +1416,7 @@ class Base:
         async with aiofiles.open(output_file, mode="w+") as f:
             await f.write(output_str)
 
-    async def write_seq(self, sequence):
+    async def write_seq(self, sequence: Sequence):
         """
         Asynchronously writes a sequence to a YAML file.
 
