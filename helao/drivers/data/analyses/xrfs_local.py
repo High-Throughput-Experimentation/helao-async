@@ -43,7 +43,9 @@ class XrfsInputs(AnalysisInput):
         self.global_sample_label = [x for x in filed["sample"] if "__solid__" in x][0]
         action_uuid = filed["action_uuid"]
         action_dir = [
-            d for d in self.xrfs.json["dispatched_actions"] if d["action_uuid"] == action_uuid
+            d
+            for d in self.xrfs.json["dispatched_actions"]
+            if d["action_uuid"] == action_uuid
         ][0]["action_output_dir"]
         action_reldir = "/".join(action_dir.split("/")[-2:])
         self.xrfs_act = local_loader.get_act(
@@ -144,13 +146,20 @@ class XrfsAnalysis(BaseAnalysis):
         calib_path = self.analysis_params.get("calibration_file_path", "")
 
         norm_els = self.analysis_params.get("norm_elements", [])
-        if not norm_els:
-            seq_dir = os.path.basename(
+        seq_dir = os.path.basename(
+            os.path.dirname(
+                os.path.dirname(self.inputs.xrfs_act.meta_dict["action_output_dir"])
+            )
+        )
+        ymd_dir = os.path.basename(
+            os.path.dirname(
                 os.path.dirname(
                     os.path.dirname(self.inputs.xrfs_act.meta_dict["action_output_dir"])
                 )
             )
-            seq_label = seq_dir.split("__")[-1]
+        )
+        seq_label = seq_dir.split("__")[-1]
+        if not norm_els:
             norm_els = [
                 x
                 for x in re.findall("([A-Z]+[a-z]*)", seq_label)
@@ -161,8 +170,13 @@ class XrfsAnalysis(BaseAnalysis):
             calib_libs = glob(
                 rf"K:\experiments\xrfs\user\calibration_libraries\{calib_prefix}*.csv"
             )
+            filtered_libs = [
+                x
+                for x in calib_libs
+                if int(x.split("__")[-1].split("-")[0]) < int(ymd_dir)
+            ]
             latest_lib = sorted(
-                calib_libs, key=lambda x: int(x.split("__")[-1].split("-")[0])
+                filtered_libs, key=lambda x: int(x.split("__")[-1].split("-")[0])
             )[-1]
             calib_path = latest_lib
 
