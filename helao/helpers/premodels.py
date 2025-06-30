@@ -74,9 +74,13 @@ class Sequence(SequenceModel):
         year_week = self.sequence_timestamp.strftime("%y.%U")
         sequence_day = self.sequence_timestamp.strftime("%Y%m%d")
         plate = self.sequence_params.get("plate_id", "")
+        smpno = self.sequence_params.get("plate_sample_no_list", [])
         if plate:
             serial = f"{plate}{str(sum([int(x) for x in str(plate)]) % 10)}"
-            append_plate = f"-{serial}"
+            if len(smpno)==1:
+                append_plate = f"-{serial}-{smpno[0]}"
+            else:
+                append_plate = f"-{serial}"
         else:
             append_plate = ""
 
