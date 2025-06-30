@@ -123,7 +123,7 @@ class BokehOperator:
             self.dev_customitems = [key for key in dev_custom.keys()]
 
         self.color_sq_param_inputs = "#F9E79F"
-        self.max_width = 1280
+        self.max_width = 1024
         # holds the page layout
         self.layout = []
         self.seq_param_layout = []
@@ -326,11 +326,11 @@ class BokehOperator:
         )
         self.button_estop_orch.on_event(ButtonClick, self.callback_estop_orch)
         self.button_add_expplan = Button(
-            label="Add exp plan", button_type="default", width_policy="fixed", width=70,
+            label="Add exp plan", button_type="default", width=100,
         )
         self.button_add_expplan.on_event(ButtonClick, self.callback_add_expplan)
         self.button_add_smpseqs = Button(
-            label="Split exp plan", button_type="default", width_policy="fixed", width=70
+            label="Split plan", button_type="default", width=100
         )
         self.button_add_smpseqs.on_event(ButtonClick, self.callback_add_sample_sequences)
         self.button_stop_orch = Button(
@@ -513,7 +513,7 @@ class BokehOperator:
             [
                 layout(
                     [
-                        Spacer(width_policy="fixed", width=20),
+                        Spacer(width=20),
                         Div(
                             text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
@@ -534,7 +534,7 @@ class BokehOperator:
                     [
                         [
                             self.sequence_dropdown,
-                            Spacer(width_policy="fixed", width=20),
+                            Spacer(width=20),
                             self.input_sequence_label,
                         ],
                         [self.input_sequence_comment],
@@ -575,7 +575,7 @@ class BokehOperator:
                     [
                         [
                             self.experiment_dropdown,
-                            Spacer(width_policy="fixed", width=20),
+                            Spacer(width=20),
                             self.input_sequence_label2,
                         ],
                         [self.input_sequence_comment2],
@@ -616,7 +616,7 @@ class BokehOperator:
                     [
                         [
                             self.seqspec_dropdown,
-                            Spacer(width_policy="fixed", width=20),
+                            Spacer(width=20),
                             self.input_sequence_label2,
                         ],
                         [self.input_sequence_comment2],
@@ -638,9 +638,9 @@ class BokehOperator:
                     [
                         [
                             self.button_enqueue_seqspec,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.button_reload_seqspec,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.button_to_seqtab,
                         ],
                     ],
@@ -657,7 +657,7 @@ class BokehOperator:
                 Spacer(height=10),
                 layout(
                     [
-                        Spacer(width_policy="fixed", width=20),
+                        Spacer(width=20),
                         self.orch_section,
                     ],
                     # background="#D6DBDF",
@@ -668,23 +668,23 @@ class BokehOperator:
                     [
                         [
                             self.button_add_expplan,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.button_add_smpseqs,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.button_start_orch,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.button_stop_orch,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.button_clear_expplan,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.orch_status_button,
                         ],
                         Spacer(height=4),
                         [
                             self.orch_stepact_button,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.orch_stepexp_button,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.orch_stepseq_button,
                         ],
                         Spacer(height=10),
@@ -696,7 +696,7 @@ class BokehOperator:
                                 style={"font-size": "100%", "color": "black"},
                             ),
                         ],
-                        [Spacer(width_policy="fixed", width=10), self.error_txt],
+                        [Spacer(width=10), self.error_txt],
                         Spacer(height=10),
                     ],
                     background="#D6DBDF",
@@ -723,25 +723,25 @@ class BokehOperator:
                         [self.queue_tabs],
                         [
                             self.button_add_expplan,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.button_add_smpseqs,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.button_start_orch,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.button_stop_orch,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.button_clear_expplan,
-                            Spacer(width_policy="fixed", width=10),
+                            Spacer(width=10),
                             self.orch_status_button,
                         ],
                         Spacer(height=10),
                         [
                             self.button_skip_exp,
-                            Spacer(width_policy="fixed", width=5),
+                            Spacer(width=5),
                             self.button_clear_seqs,
-                            Spacer(width_policy="fixed", width=5),
+                            Spacer(width=5),
                             self.button_clear_exps,
-                            Spacer(width_policy="fixed", width=5),
+                            Spacer(width=5),
                             self.button_clear_action,
                             self.button_update,
                         ],
