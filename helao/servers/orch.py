@@ -2057,7 +2057,7 @@ class Orch(Base):
                 self.sequence_dq.append(sub_sequence)
                 sub_sequence_uuids.append(sub_sequence.sequence_uuid)
             return sub_sequence_uuids
-        return self.add_sequence(sequence)
+        return await self.add_sequence(sequence)
 
     async def add_experiment(
         self,
