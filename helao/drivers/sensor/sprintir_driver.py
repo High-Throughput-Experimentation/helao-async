@@ -434,7 +434,6 @@ class CO2MonExec(Executor):
 
     async def _post_exec(self):
         "Cleanup methods, return error state."
-        self.cleanup_err = ErrorCodes.none
         if self.num_acqs > 0:
             self.active.action.action_params["mean_co2_ppm"] = self.total / self.num_acqs
-        return {"data": {}, "error": self.cleanup_err}
+        return {"data": {}, "error": ErrorCodes.none}

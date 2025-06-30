@@ -25,7 +25,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-async def mfc_dyn_endpoints(app=None):
+async def mfc_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
     co2_sensor_key = app.base.server_params.get("co2_server_name", None)
     devices = list(app.base.server_params["devices"].keys())

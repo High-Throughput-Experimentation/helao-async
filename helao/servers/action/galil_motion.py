@@ -52,7 +52,7 @@ from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import CONFIG
 
 
-async def galil_dyn_endpoints(app=None):
+async def galil_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
 
     if app.driver.galil_enabled is True:

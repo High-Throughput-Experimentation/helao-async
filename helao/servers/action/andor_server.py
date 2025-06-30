@@ -185,7 +185,7 @@ class AndorAcquire(Executor):
         return {"error": error, "data": {}}
 
 
-async def andor_dyn_endpoints(app=None):
+async def andor_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
 
