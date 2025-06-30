@@ -2027,6 +2027,38 @@ class Orch(Base):
         self.sequence_dq.append(sequence)
         return sequence.sequence_uuid
 
+    async def add_sample_sequences(self, sequence: Sequence):
+        """
+        Splits a sequence on plate_sample_no_list and adds to the sequence deque.
+
+        Args:
+            sequence (Sequence): The sequence object to be added.
+
+        Returns:
+            list: List of UUIDs of the added sequences.
+        """
+        if "plate_sample_no_list" in sequence.sequence_params:
+            plate_sample_no_list = sequence.sequence_params["plate_sample_no_list"]
+            sub_sequence_uuids = []
+            for plate_sample_no in plate_sample_no_list:
+                # create a copy of the sequence
+                sub_sequence = deepcopy(sequence)
+                # set the plate_sample_no in the params
+                sub_sequence.sequence_params["plate_sample_no_list"] = [plate_sample_no]
+                # init uuid now for tracking later
+                sub_sequence.sequence_uuid = gen_uuid()
+                if (
+                    sub_sequence.sequence_codehash is None
+                    and sub_sequence.sequence_name in self.sequence_codehash_lib
+                ):
+                    sub_sequence.sequence_codehash = self.sequence_codehash_lib[
+                        sub_sequence.sequence_name
+                    ]
+                self.sequence_dq.append(sub_sequence)
+                sub_sequence_uuids.append(sub_sequence.sequence_uuid)
+            return sub_sequence_uuids
+        return self.add_sequence(sequence)
+
     async def add_experiment(
         self,
         seq: Sequence,
