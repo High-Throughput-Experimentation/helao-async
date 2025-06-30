@@ -123,7 +123,7 @@ class BokehOperator:
             self.dev_customitems = [key for key in dev_custom.keys()]
 
         self.color_sq_param_inputs = "#F9E79F"
-        self.max_width = 1024
+        self.max_width = 1280
         # holds the page layout
         self.layout = []
         self.seq_param_layout = []
