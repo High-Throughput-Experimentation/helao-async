@@ -111,8 +111,7 @@ class Executor:
             dict: A dictionary containing the setup error code with the key "error".
         """
         LOGGER.info("generic Executor running setup methods.")
-        self.setup_err = ErrorCodes.none
-        return {"error": self.setup_err}
+        return {"error": ErrorCodes.none}
 
     def set_pre_exec(self, pre_exec_func):
         """
