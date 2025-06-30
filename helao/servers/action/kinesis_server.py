@@ -101,11 +101,10 @@ class KinesisMotorExec(Executor):
     async def _manual_stop(self):
         "Perform device manual stop, return error state."
         self.axis.stop(immediate=True, sync=True)
-        self.stop_err = ErrorCodes.none
-        return {"error": self.stop_err}
+        return {"error": ErrorCodes.none}
 
 
-async def kinesis_dyn_endpoints(app=None):
+async def kinesis_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
     motors = list(app.base.server_params["axes"].keys())
 

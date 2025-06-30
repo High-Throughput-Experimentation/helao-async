@@ -40,7 +40,7 @@ from helao.drivers.pstat.gamry_driver import gamry
 from helao.helpers.config_loader import CONFIG
 
 
-async def gamry_dyn_endpoints(app=None):
+async def gamry_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
     enable_pstat = False
 

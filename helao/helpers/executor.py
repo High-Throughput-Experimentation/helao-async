@@ -177,8 +177,7 @@ class Executor:
             dict: A dictionary with keys "data" (an empty dictionary) and "error" 
                   (the cleanup error code set to `ErrorCodes.none`).
         """
-        self.cleanup_err = ErrorCodes.none
-        return {"data": {}, "error": self.cleanup_err}
+        return {"data": {}, "error": ErrorCodes.none}
 
     def set_post_exec(self, post_exec_func):
         """
@@ -201,8 +200,7 @@ class Executor:
         Returns:
             dict: A dictionary with the key "error" and the value set to `self.stop_err`.
         """
-        self.stop_err = ErrorCodes.none
-        return {"error": self.stop_err}
+        return {"error": ErrorCodes.none}
 
     def set_manual_stop(self, manual_stop_func):
         """

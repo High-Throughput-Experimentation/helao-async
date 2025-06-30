@@ -15,7 +15,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-async def galil_dyn_endpoints(app=None):
+async def galil_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
 
     if app.driver.galil_enabled is True:

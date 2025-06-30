@@ -34,7 +34,7 @@ else:
     LOGGER = logging.LOGGER
 
 
-async def sm303_dyn_endpoints(app=None):
+async def sm303_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
 
