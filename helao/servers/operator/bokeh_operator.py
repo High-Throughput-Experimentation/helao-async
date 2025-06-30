@@ -330,7 +330,7 @@ class BokehOperator:
         )
         self.button_add_expplan.on_event(ButtonClick, self.callback_add_expplan)
         self.button_add_smpseqs = Button(
-            label="Split plan", button_type="default", width=100
+            label="Split plan", button_type="light", width=100
         )
         self.button_add_smpseqs.on_event(ButtonClick, self.callback_add_sample_sequences)
         self.button_stop_orch = Button(
