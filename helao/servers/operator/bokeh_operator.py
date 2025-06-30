@@ -513,7 +513,7 @@ class BokehOperator:
             [
                 layout(
                     [
-                        Spacer(width=20),
+                        Spacer(width_policy="fixed", width=20),
                         Div(
                             text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
@@ -534,7 +534,7 @@ class BokehOperator:
                     [
                         [
                             self.sequence_dropdown,
-                            Spacer(width=20),
+                            Spacer(width_policy="fixed", width=20),
                             self.input_sequence_label,
                         ],
                         [self.input_sequence_comment],
@@ -575,7 +575,7 @@ class BokehOperator:
                     [
                         [
                             self.experiment_dropdown,
-                            Spacer(width=20),
+                            Spacer(width_policy="fixed", width=20),
                             self.input_sequence_label2,
                         ],
                         [self.input_sequence_comment2],
@@ -616,7 +616,7 @@ class BokehOperator:
                     [
                         [
                             self.seqspec_dropdown,
-                            Spacer(width=20),
+                            Spacer(width_policy="fixed", width=20),
                             self.input_sequence_label2,
                         ],
                         [self.input_sequence_comment2],
@@ -638,9 +638,9 @@ class BokehOperator:
                     [
                         [
                             self.button_enqueue_seqspec,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.button_reload_seqspec,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.button_to_seqtab,
                         ],
                     ],
@@ -657,7 +657,7 @@ class BokehOperator:
                 Spacer(height=10),
                 layout(
                     [
-                        Spacer(width=20),
+                        Spacer(width_policy="fixed", width=20),
                         self.orch_section,
                     ],
                     # background="#D6DBDF",
@@ -668,23 +668,23 @@ class BokehOperator:
                     [
                         [
                             self.button_add_expplan,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.button_add_smpseqs,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.button_start_orch,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.button_stop_orch,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.button_clear_expplan,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.orch_status_button,
                         ],
                         Spacer(height=4),
                         [
                             self.orch_stepact_button,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.orch_stepexp_button,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.orch_stepseq_button,
                         ],
                         Spacer(height=10),
@@ -696,7 +696,7 @@ class BokehOperator:
                                 style={"font-size": "100%", "color": "black"},
                             ),
                         ],
-                        [Spacer(width=10), self.error_txt],
+                        [Spacer(width_policy="fixed", width=10), self.error_txt],
                         Spacer(height=10),
                     ],
                     background="#D6DBDF",
@@ -723,25 +723,25 @@ class BokehOperator:
                         [self.queue_tabs],
                         [
                             self.button_add_expplan,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.button_add_smpseqs,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.button_start_orch,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.button_stop_orch,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.button_clear_expplan,
-                            Spacer(width=10),
+                            Spacer(width_policy="fixed", width=10),
                             self.orch_status_button,
                         ],
                         Spacer(height=10),
                         [
                             self.button_skip_exp,
-                            Spacer(width=5),
+                            Spacer(width_policy="fixed", width=5),
                             self.button_clear_seqs,
-                            Spacer(width=5),
+                            Spacer(width_policy="fixed", width=5),
                             self.button_clear_exps,
-                            Spacer(width=5),
+                            Spacer(width_policy="fixed", width=5),
                             self.button_clear_action,
                             self.button_update,
                         ],
