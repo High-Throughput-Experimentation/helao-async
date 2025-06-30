@@ -329,6 +329,10 @@ class BokehOperator:
             label="Add exp plan", button_type="default", width=100
         )
         self.button_add_expplan.on_event(ButtonClick, self.callback_add_expplan)
+        self.button_add_smpseqs = Button(
+            label="Add sample seqs", button_type="default", width=100
+        )
+        self.button_add_smpseqs.on_event(ButtonClick, self.callback_add_sample_sequences)
         self.button_stop_orch = Button(
             label="Stop Orch", button_type="default", width=70
         )
@@ -665,6 +669,8 @@ class BokehOperator:
                         [
                             self.button_add_expplan,
                             Spacer(width=10),
+                            self.button_add_smpseqs,
+                            Spacer(width=10),
                             self.button_start_orch,
                             Spacer(width=10),
                             self.button_stop_orch,
@@ -717,6 +723,8 @@ class BokehOperator:
                         [self.queue_tabs],
                         [
                             self.button_add_expplan,
+                            Spacer(width=10),
+                            self.button_add_smpseqs,
                             Spacer(width=10),
                             self.button_start_orch,
                             Spacer(width=10),
@@ -1207,6 +1215,20 @@ class BokehOperator:
                 self.sequence.sequence_comment = self.input_sequence_comment.value
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sequence, self.sequence)
+            )
+            # clear current experiment_plan (sequence in operator)
+            self.sequence = None
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_add_sample_sequences(self, event):
+        """add experiment plan as sequences split by sample to orch sequence_dq"""
+        if self.sequence is not None:
+            sellabel = self.input_sequence_label.value
+            self.sequence.sequence_label = sellabel
+            if self.input_sequence_comment.value != "":
+                self.sequence.sequence_comment = self.input_sequence_comment.value
+            self.vis.doc.add_next_tick_callback(
+                partial(self.orch.add_sample_sequences, self.sequence)
             )
             # clear current experiment_plan (sequence in operator)
             self.sequence = None
