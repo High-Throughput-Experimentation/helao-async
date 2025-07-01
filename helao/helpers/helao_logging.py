@@ -38,7 +38,7 @@ def alert(self, message, *args, **kws):
 # logging.Logger.alert = alert
 setattr(logging.Logger, "alert", alert)
 
-LOGGER = None
+LOGGER: logging.Logger = None
 
 
 class GZipRotator:
