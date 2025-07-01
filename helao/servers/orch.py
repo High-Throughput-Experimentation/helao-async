@@ -2494,8 +2494,9 @@ class Orch(Base):
             None
         """
         if self.active_seq_exp_counter > 1:
-            active_exp = self.active_experiment.get_exp()
-            await self.append_exp_to_seq(active_exp, self.active_sequence)
+            # active_exp = self.active_experiment.get_exp()
+            # await self.append_exp_to_seq(active_exp, self.active_sequence)
+            await self.write_seq(self.active_sequence)
         else:
             await self.write_seq(self.active_sequence)
 

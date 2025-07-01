@@ -1476,6 +1476,7 @@ class Base:
             "orch_key": str(exp.orch_key),
             "orch_host": str(exp.orch_host),
             "orch_port": int(exp.orch_port),
+            "data_request_id": str(exp.data_request_id),
         }
         append_str = yml_dumps([append_dict])
         sequence_dir = seq.get_sequence_dir()
