@@ -980,6 +980,13 @@ class Orch(Base):
         Returns:
             ErrorCodes: The error code indicating the result of the operation.
         """
+
+        # check again if experiment_dq is empty
+        if not self.experiment_dq:
+            LOGGER.info("experiment_dq is empty, cannot dispatch experiments")
+            await self.intend_none()
+            return ErrorCodes.none        
+        
         LOGGER.info("action_dq is empty, getting new actions")
         # wait for all actions in last/active experiment to finish
         # LOGGER.info("finishing last active experiment first")
@@ -1180,6 +1187,12 @@ class Orch(Base):
             - If an action dispatch fails, the method stops the orchestrator and re-queues
               the action.
         """
+        # check again if action_dq is empty
+        if not self.action_dq:
+            LOGGER.info("action_dq is empty, cannot dispatch actions")
+            await self.intend_none()
+            return ErrorCodes.none
+        
         # LOGGER.info("actions in action_dq, processing them")
         if self.globalstatusmodel.loop_intent == LoopIntent.stop:
             LOGGER.info("stopping orchestrator")
