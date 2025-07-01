@@ -433,7 +433,6 @@ class Orch(Base):
             bokeh.document.Document: The modified Bokeh document with the BokehOperator attached.
         """
         app = HelaoVis(
-            config=self.world_cfg,
             server_key=self.server.server_name,
             doc=doc,
         )
