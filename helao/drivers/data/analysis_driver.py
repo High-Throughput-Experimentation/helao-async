@@ -119,7 +119,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
         self.local_ana_root = os.path.join(self.world_config["root"], "ANALYSES")
-        self.max_tasks = self.config_dict.get("max_tasks", 4)
+        self.max_tasks = self.config_dict.get("max_tasks", 8)
         # declare global loader for analysis models used by driver.batch_* methods
         self.get_loader()
         # self.api_host = self.config_dict["api_host"]
@@ -128,7 +128,10 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self.task_set = set()
         self.running_tasks = {}
 
-        self.syncer_loop = asyncio.create_task(self.syncer(), name="syncer_loop")
+        self.syncer_loops = {
+            i: asyncio.create_task(self.syncer(), name=f"syncer_loop__{i}")
+            for i in range(self.max_tasks)
+        }
 
     def get_loader(self):
         """
