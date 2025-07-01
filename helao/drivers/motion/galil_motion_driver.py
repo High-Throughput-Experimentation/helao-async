@@ -221,7 +221,6 @@ class Galil:
 
     def makeBokehApp(self, doc, motor):
         app = HelaoVis(
-            config=self.base.world_cfg,
             server_key=self.base.server.server_name,
             doc=doc,
         )
