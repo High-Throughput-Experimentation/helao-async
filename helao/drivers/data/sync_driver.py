@@ -1023,7 +1023,10 @@ class HelaoSyncer:
         # then enqueue processes, then enqueue the exp again
         # exp progress must be in memory before actions are checked
 
-        self.syncer_loop = asyncio.create_task(self.syncer(), name="syncer_loop")
+        self.syncer_loops = {
+            i: asyncio.create_task(self.syncer(), name=f"syncer_loop__{i}")
+            for i in range(self.max_tasks)
+        }
 
     def try_remove_empty(self, remove_target):
         """
