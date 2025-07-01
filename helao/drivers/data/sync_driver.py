@@ -1473,7 +1473,7 @@ class HelaoSyncer:
 
         # next push prog.yml to S3
         if not prog.s3_done or force_s3:
-            LOGGER.info(f"Pushing prog.yml->json to S3 for {prog.yml.target.name}")
+            LOGGER.debug(f"Pushing prog.yml->json to S3 for {prog.yml.target.name}")
             uuid_key = patched_meta[f"{prog.yml.type}_uuid"]
             meta_s3_key = f"{prog.yml.type}/{uuid_key}.json"
             s3_success = await self.to_s3(meta, meta_s3_key)
@@ -1483,7 +1483,7 @@ class HelaoSyncer:
 
         # next push prog.yml to API
         if not prog.api_done or force_api:
-            LOGGER.info(f"Pushing prog.yml to API for {prog.yml.target.name}")
+            LOGGER.debug(f"Pushing prog.yml to API for {prog.yml.target.name}")
             api_success = await self.to_api(meta, prog.yml.type)
             LOGGER.info(f"API push returned {api_success} for {prog.yml.target.name}")
             if api_success:
@@ -1497,14 +1497,14 @@ class HelaoSyncer:
         # move to synced
         if prog.s3_done and prog.api_done:
 
-            LOGGER.info(f"Moving files to RUNS_SYNCED for {yml_target_name}")
+            LOGGER.debug(f"Moving files to RUNS_SYNCED for {yml_target_name}")
             for lock_path in prog.yml.lock_files:
                 lock_path.unlink()
             for file_path in prog.yml.misc_files + prog.yml.hlo_files:
-                LOGGER.info(f"Moving {str(file_path)}")
+                LOGGER.debug(f"Moving {str(file_path)}")
                 move_success = move_to_synced(file_path)
                 while not move_success:
-                    LOGGER.info(f"{file_path} is in use, retrying.")
+                    LOGGER.debug(f"{file_path} is in use, retrying.")
                     sleep(1)
                     move_success = move_to_synced(file_path)
 
@@ -1514,7 +1514,7 @@ class HelaoSyncer:
             yml_success = move_to_synced(yml_path)
             if yml_success:
                 result = prog.yml.cleanup()
-                LOGGER.info(f"Cleanup {yml_target_name} {result}.")
+                LOGGER.debug(f"Cleanup {yml_target_name} {result}.")
                 if result == "success":
                     LOGGER.debug("yml_success")
                     prog = self.get_progress(Path(yml_success))
@@ -1526,7 +1526,7 @@ class HelaoSyncer:
             # pop children from progress dict
             if yml_type in ["experiment", "sequence"]:
                 children = prog.yml.children
-                LOGGER.info(f"Removing children from progress: {children}.")
+                LOGGER.debug(f"Removing children from progress: {children}.")
                 for childyml in children:
                     # LOGGER.info(f"Clearing {childprog.yml.target.name}")
                     finished_child_path = childyml.finished_path.parent
@@ -1541,7 +1541,7 @@ class HelaoSyncer:
                 self.try_remove_empty(str(prog.yml.finished_path.parent))
 
             if yml_type == "sequence":
-                LOGGER.info(f"Zipping {prog.yml.target.parent.name}.")
+                LOGGER.debug(f"Zipping {prog.yml.target.parent.name}.")
                 zip_target = prog.yml.target.parent.parent.joinpath(
                     f"{prog.yml.target.parent.name}.zip"
                 )
@@ -1553,7 +1553,7 @@ class HelaoSyncer:
                 # LOGGER.info(f"Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
 
-            LOGGER.info(f"Removing {yml_target_name} from running_tasks.")
+            LOGGER.debug(f"Removing {yml_target_name} from running_tasks.")
             self.running_tasks.pop(yml_target_name)
 
             # if action contributes processes, update processes
@@ -1890,7 +1890,7 @@ class HelaoSyncer:
         #     req_model["experiment_name"],
         # )
         meta_uuid = req_model[f"{meta_type}_uuid"]
-        LOGGER.info(f"attempting API push for {meta_type}: {meta_uuid}")
+        LOGGER.debug(f"attempting API push for {meta_type}: {meta_uuid}")
         try_create = True
         api_success = False
         last_status = 0
@@ -1910,11 +1910,11 @@ class HelaoSyncer:
                                 api_success = True
                             elif resp.status == 400:
                                 try_create = False
-                            LOGGER.info(
+                            LOGGER.debug(
                                 f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}"
                             )
                             last_response = await resp.json()
-                            LOGGER.info(
+                            LOGGER.debug(
                                 f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}"
                             )
                             last_status = resp.status
