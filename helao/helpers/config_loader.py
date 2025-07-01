@@ -1,6 +1,7 @@
 __all__ = ["read_config", "load_global_config", "CONFIG"]
 
 import os
+from munch import munchify, Munch
 from typing import List, Dict, Optional
 from pathlib import Path
 from importlib.util import spec_from_file_location
@@ -17,7 +18,7 @@ from pydantic import BaseModel
 # else:
 #     LOGGER = logging.LOGGER
 
-CONFIG = None
+CONFIG: Munch = None
 
 
 def read_config(confArg, helao_repo_root):
@@ -98,8 +99,8 @@ def load_global_config(confArg: str, set_global: bool = False):
     config_dict = read_config(confArg, helao_repo_root)
     if set_global:
         global CONFIG
-        CONFIG = HelaoConfig(**config_dict).model_dump(
-            exclude_unset=True, exclude_none=True
+        CONFIG = munchify(
+            HelaoConfig(**config_dict).model_dump(exclude_unset=True, exclude_none=True)
         )
     return config_dict
 
