@@ -279,9 +279,9 @@ class Orch(Base):
         LOGGER.error(f"Got exception from coroutine: {context}")
         exc = context.get("exception")
         LOGGER.error(f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}")
-        LOGGER.info("setting E-STOP flag on active actions")
-        for _, active in self.actives.items():
-            active.stop_action_task()
+        # LOGGER.info("setting E-STOP flag on active actions")
+        # for _, active in self.actives.items():
+        #     active.stop_action_task()
 
     def myinit(self):
         """

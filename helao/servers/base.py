@@ -331,9 +331,9 @@ class Base:
         LOGGER.error(f"Got exception from coroutine: {context}")
         exc = context.get("exception")
         LOGGER.error(f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}")
-        LOGGER.info("setting E-STOP flag on active actions")
-        for _, active in self.actives.items():
-            active.set_estop()
+        # LOGGER.info("setting E-STOP flag on active actions")
+        # for _, active in self.actives.items():
+        #     active.set_estop()
 
     def myinit(self):
         """
