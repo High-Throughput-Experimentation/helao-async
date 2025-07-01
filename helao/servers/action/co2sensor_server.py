@@ -11,14 +11,11 @@ from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.drivers.sensor.sprintir_driver import SprintIR, CO2MonExec
-from helao.helpers.config_loader import CONFIG
 
 
 def makeApp(server_key):
-    config = CONFIG
 
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="Sensor server",

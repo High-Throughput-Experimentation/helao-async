@@ -22,7 +22,6 @@ from helao.core.models.sample import (
 )
 from helao.core.models.file import HloHeaderModel
 from helao.drivers.spec.spectral_products_driver import SM303
-from helao.helpers.config_loader import CONFIG
 
 from helao.drivers.io.enum import TriggerType
 
@@ -209,10 +208,8 @@ async def sm303_dyn_endpoints(app: BaseAPI):
 
 
 def makeApp(server_key):
-    config = CONFIG
 
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="Spectrometer server",

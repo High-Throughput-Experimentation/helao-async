@@ -24,15 +24,11 @@ from helao.core.models.sample import AssemblySample, LiquidSample, GasSample, So
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helao.core.error import ErrorCodes
-from helao.helpers.config_loader import CONFIG
 
 
 def makeApp(server_key):
 
-    config = CONFIG
-
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="NIdaqmx server",

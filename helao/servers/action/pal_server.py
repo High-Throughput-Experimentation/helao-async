@@ -31,11 +31,9 @@ from helao.core.models.sample import (
 from helao.core.models.data import DataModel
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
-from helao.helpers.config_loader import CONFIG
 
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
 
-global LOGGER
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
@@ -43,10 +41,8 @@ else:
 
 
 def makeApp(server_key):
-    config = CONFIG
 
     app = BaseAPI(
-        config,
         server_key,
         server_key,
         "PAL Autosampler Server",

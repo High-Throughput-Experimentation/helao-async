@@ -53,6 +53,8 @@ from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.helpers.legacy_api import HTELegacyAPI
 from helao.drivers.data.sync_driver import HelaoSyncer
+from helao.helpers import config_loader
+CONFIG = config_loader.CONFIG
 
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected

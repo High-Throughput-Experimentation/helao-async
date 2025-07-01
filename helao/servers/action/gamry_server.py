@@ -37,7 +37,6 @@ from helao.servers.base_api import BaseAPI
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.helpers.premodels import Action
 from helao.drivers.pstat.gamry_driver import gamry
-from helao.helpers.config_loader import CONFIG
 
 
 async def gamry_dyn_endpoints(app: BaseAPI):
@@ -271,10 +270,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
 
 def makeApp(server_key):
 
-    config = CONFIG
-
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="Gamry instrument/action server",

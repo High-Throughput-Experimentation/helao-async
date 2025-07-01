@@ -8,7 +8,6 @@ from bokeh.layouts import layout, Spacer
 
 from helao.servers.vis import HelaoVis
 from helao.servers.vis import Vis
-from helao.helpers.config_loader import CONFIG
 
 from helao.helpers import helao_logging as logging
 
@@ -29,10 +28,8 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
 
 
 def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
-    config = CONFIG
 
     app = HelaoVis(
-        config=config,
         server_key=server_key,
         doc=doc,
     )

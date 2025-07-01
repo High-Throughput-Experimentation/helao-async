@@ -6,34 +6,12 @@ from typing import Optional
 from fastapi import Body
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
-from helao.helpers.config_loader import CONFIG
+from helao.drivers.data.HTEdata_legacy import HTEdata
 
 
 def makeApp(server_key):
 
-    config = CONFIG
-    C = config["servers"]
-    S = C[server_key]
-
-    # check if 'mode' setting is present
-    if not "mode" in S:
-        print('"mode" not defined, switching to legacy mode.')
-        S["mode"] = "legacy"
-
-    if S["mode"] == "legacy":
-        # print("Legacy data managament mode")
-        from helao.drivers.data.HTEdata_legacy import HTEdata
-    # elif S['mode'] == "modelyst":
-    #     pass
-    # print("Modelyst data managament mode")
-    #    from HTEdata_modelyst import HTEdata
-    # else:
-    #     pass
-    # print("Unknown data mode")
-    #    from HTEdata_dummy import HTEdata
-
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="HTE data management server",

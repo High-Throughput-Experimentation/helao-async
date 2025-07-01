@@ -14,8 +14,6 @@ from helao.core.models.file import HloHeaderModel, HloFileGroup
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
 from helao.drivers.data.calc_driver import Calc
-from helao.helpers.config_loader import CONFIG
-from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers import helao_logging as logging
 
 if logging.LOGGER is None:
@@ -25,9 +23,7 @@ else:
 
 
 def makeApp(server_key):
-    config = CONFIG
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="Calculation server",

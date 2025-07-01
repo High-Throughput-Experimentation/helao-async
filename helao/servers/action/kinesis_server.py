@@ -23,7 +23,6 @@ from helao.drivers.motion.kinesis_driver import (
     MoveModes,
     MOTION_STATES,
 )
-from helao.helpers.config_loader import CONFIG
 
 from helao.core.error import ErrorCodes
 from helao.helpers.executor import Executor
@@ -183,12 +182,10 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
 
 
 def makeApp(server_key):
-    config = CONFIG
 
     # current plan is 1 mfc per COM
 
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="Kinesis motor server",

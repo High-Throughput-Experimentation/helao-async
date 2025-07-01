@@ -1,6 +1,8 @@
+import os
 from fastapi import FastAPI
 from helao.helpers import helao_logging as logging
-import os
+from helao.helpers import config_loader
+CONFIG = config_loader.CONFIG
 
 __all__ = ["HelaoBokehAPI", "HelaoFastAPI"]
 
@@ -26,11 +28,11 @@ class HelaoFastAPI(FastAPI):
         server_params (dict): Additional parameters for the server.
 
     Methods:
-        __init__(helao_cfg: dict, helao_srv: str, *args, **kwargs):
+        __init__(helao_srv: str, *args, **kwargs):
             Initializes the HelaoFastAPI instance with the given configuration and server name.
     """
 
-    def __init__(self, helao_cfg: dict, helao_srv: str, *args, **kwargs):
+    def __init__(self, helao_srv: str, *args, **kwargs):
         """
         Initializes the server API with the given configuration.
 
@@ -47,15 +49,15 @@ class HelaoFastAPI(FastAPI):
             server_params (dict): Parameters for the server configuration.
         """
         super().__init__(*args, **kwargs, openapi_tags=TAGS)
-        self.helao_cfg = helao_cfg
+        self.helao_cfg = CONFIG
         self.helao_srv = helao_srv
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
         self.server_params = self.server_cfg.get("params", {})
         if logging.LOGGER is None:
             logging.LOGGER = logging.make_logger(
                 logger_name=helao_srv,
-                log_dir=os.path.join(helao_cfg["root"], "LOGS"),
-                show_debug_console=helao_cfg.get("show_debug", False),
+                log_dir=os.path.join(self.helao_cfg["root"], "LOGS"),
+                show_debug_console=self.helao_cfg.get("show_debug", False),
             )
 
 
@@ -65,8 +67,6 @@ class HelaoBokehAPI:
 
     Attributes:
     -----------
-    helao_cfg : dict
-        Configuration dictionary for Helao.
     helao_srv : str
         Name of the Helao server.
     doc : Document
@@ -74,20 +74,20 @@ class HelaoBokehAPI:
 
     Methods:
     --------
-    __init__(self, helao_cfg: dict, helao_srv: str, doc):
+    __init__(self, helao_srv: str, doc):
         Initializes the HelaoBokehAPI with the given configuration, server name, and Bokeh document.
     """
 
-    def __init__(self, helao_cfg: dict, helao_srv: str, doc):
+    def __init__(self, helao_srv: str, doc):
         self.helao_srv = helao_srv
-        self.helao_cfg = helao_cfg
+        self.helao_cfg = CONFIG
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
         self.server_params = self.server_cfg.get("params", {})
         if logging.LOGGER is None:
             logging.LOGGER = logging.make_logger(
                 logger_name=helao_srv,
-                log_dir=os.path.join(helao_cfg["root"], "LOGS"),
-                show_debug_console=helao_cfg.get("show_debug", False),
+                log_dir=os.path.join(self.helao_cfg["root"], "LOGS"),
+                show_debug_console=self.helao_cfg.get("show_debug", False),
             )
         self.doc_name = self.server_params.get(
             "doc_name", f"{self.helao_srv} Bokeh App"

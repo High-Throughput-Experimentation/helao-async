@@ -20,7 +20,6 @@ else:
 from helao.servers.base import Base
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
-from helao.helpers.config_loader import CONFIG
 
 
 class ArchiveSim:
@@ -142,10 +141,7 @@ class ArchiveSim:
 
 def makeApp(server_key):
 
-    config = CONFIG
-
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="Archive simulator",
