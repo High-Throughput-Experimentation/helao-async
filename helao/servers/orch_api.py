@@ -27,7 +27,6 @@ from helao.core.models.hlostatus import HloStatus
 from starlette.types import Message
 from starlette.responses import JSONResponse, Response
 
-
 from helao.helpers import helao_logging as logging
 
 global LOGGER
@@ -42,7 +41,6 @@ class OrchAPI(HelaoFastAPI):
 
     def __init__(
         self,
-        config,
         server_key,
         server_title,
         description,
@@ -62,7 +60,6 @@ class OrchAPI(HelaoFastAPI):
             poller_class (Optional[type], optional): Class for the poller. Defaults to None.
         """
         super().__init__(
-            helao_cfg=config,
             helao_srv=server_key,
             title=server_title,
             description=description,
@@ -71,7 +68,7 @@ class OrchAPI(HelaoFastAPI):
         self.drivers = tuple()
         self.driver = None
         self.poller = None
-
+        
         async def set_body(request: Request, body: bytes):
             """
             Asynchronously sets the body of the given request.

@@ -79,6 +79,8 @@ from helao.core.models.file import (
 )
 from helao.helpers.file_in_use import file_in_use
 from helao.core.error import ErrorCodes
+from helao.helpers import config_loader
+CONFIG = config_loader.CONFIG
 
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected

@@ -1,4 +1,4 @@
-""" Potentiostat simulation server
+"""Potentiostat simulation server
 
 FastAPI server host for the potentiostat simulator driver. Currently just sleeps.
 TODO: Load and stream old measurements.
@@ -15,7 +15,6 @@ import pandas as pd
 from helao.servers.base import Base
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
-from helao.helpers.config_loader import CONFIG
 
 
 class PstatSim:
@@ -64,10 +63,7 @@ class PstatSim:
 
 def makeApp(server_key):
 
-    config = CONFIG
-
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="PSTAT simulator",

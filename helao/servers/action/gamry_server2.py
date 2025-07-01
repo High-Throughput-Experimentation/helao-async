@@ -26,7 +26,6 @@ from helao.core.models.hlostatus import HloStatus
 
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
-from helao.helpers.config_loader import CONFIG
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
@@ -515,10 +514,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
 
 def makeApp(server_key):
 
-    config = CONFIG
-
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="Gamry instrument/action server",

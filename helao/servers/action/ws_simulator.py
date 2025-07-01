@@ -25,7 +25,6 @@ else:
 from helao.servers.base import Base, Executor
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
-from helao.helpers.config_loader import CONFIG
 
 
 class WsSim:
@@ -78,10 +77,8 @@ class WsExec(Executor):
         }
 
 def makeApp(server_key):
-    config = CONFIG
 
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="Websocket simulator",

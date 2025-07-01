@@ -9,14 +9,11 @@ __all__ = ["makeApp"]
 
 from helao.servers.base_api import BaseAPI
 from helao.drivers.data.sync_driver import HelaoSyncer
-from helao.helpers.config_loader import CONFIG
 
 
 def makeApp(server_key):
-    config = CONFIG
 
     app = BaseAPI(
-        config=config,
         server_key=server_key,
         server_title=server_key,
         description="Data packaging server",

@@ -28,7 +28,6 @@ from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.print_message import print_message
 from helao.core.models.machine import MachineModel
 
-global LOGGER
 LOGGER = logging.LOGGER
 
 
@@ -47,7 +46,6 @@ class HelaoVis(HelaoBokehAPI):
 
     def __init__(
         self,
-        config,
         server_key,
         doc,
     ):
@@ -59,7 +57,7 @@ class HelaoVis(HelaoBokehAPI):
             server_key (str): Unique key identifying the server.
             doc (object): Documentation object for the server.
         """
-        super().__init__(config, server_key, doc)
+        super().__init__(server_key, doc)
         self.vis = Vis(self)
 
 

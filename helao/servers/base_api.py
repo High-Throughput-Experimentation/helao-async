@@ -22,7 +22,6 @@ from helao.core.models.hlostatus import HloStatus
 from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK
-
 from helao.helpers import helao_logging as logging
 
 if logging.LOGGER is None:
@@ -114,7 +113,6 @@ class BaseAPI(HelaoFastAPI):
 
     def __init__(
         self,
-        config,
         server_key,
         server_title,
         description,
@@ -137,7 +135,6 @@ class BaseAPI(HelaoFastAPI):
 
         """
         super().__init__(
-            helao_cfg=config,
             helao_srv=server_key,
             title=server_title,
             description=description,
