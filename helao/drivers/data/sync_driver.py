@@ -109,6 +109,9 @@ def move_to_synced(file_path: Path):
         bool: False if there was a PermissionError during the move.
     """
     parts = list(file_path.parts)
+    if "RUNS_SYNCED" in parts:
+        LOGGER.info(f"File {file_path} is already synced. Skipping.")
+        return True
     state_index = parts.index("RUNS_FINISHED")
     parts[state_index] = "RUNS_SYNCED"
     target_path = Path(*parts)
@@ -1554,8 +1557,9 @@ class HelaoSyncer:
                 # LOGGER.info(f"Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
 
-            LOGGER.debug(f"Removing {yml_target_name} from running_tasks.")
-            self.running_tasks.pop(yml_target_name)
+            if yml_target_name in self.running_tasks:
+                LOGGER.debug(f"Removing {yml_target_name} from running_tasks.")
+                self.running_tasks.pop(yml_target_name)
 
             # if action contributes processes, update processes
             if yml_type == "action" and meta.get("process_contrib", False):
