@@ -9,12 +9,12 @@ __all__ = ["appender"]
 
 import os
 import sys
-from helao.helpers.config_loader import CONFIG
-
+from launch import launcher
 helao_repo_root = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(helao_repo_root, 'config'))
 sys.path.append(helao_repo_root)
-from helao import launcher
+from helao.helpers.config_loader import read_config
+
 confPrefix = sys.argv[1]
 appendPrefix = sys.argv[2]
 
