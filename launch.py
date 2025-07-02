@@ -45,11 +45,11 @@ from helao.helpers.config_loader import read_config
 
 import helao.tests.unit_test_sample_models
 
+from logging import Logger
 from helao.helpers import helao_logging as logging
 
-LAUNCH_LOGGER = logging.make_logger(__file__)
+LAUNCH_LOGGER: Logger = logging.make_logger(__file__)
 
-# from helao.tests.unit_test_sample_models import sample_model_unit_test
 
 
 class Pidd:
