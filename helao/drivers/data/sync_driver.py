@@ -1017,7 +1017,7 @@ class HelaoSyncer:
         # self.progress = {}
         self.sequence_objs = {}
         self.task_queue = asyncio.PriorityQueue()
-        # self.task_set = set()
+        self.task_set = set()
         self.running_tasks = {}
         self.aiolock = asyncio.Lock()
         # push happens via async task queue
@@ -1157,7 +1157,6 @@ class HelaoSyncer:
             if len(self.running_tasks) < self.max_tasks:
                 # LOGGER.info("Getting next yml_target from queue.")
                 rank, yml_path = await self.task_queue.get()
-                # self.task_set.remove(yml_path.name)
                 # self.base.print_message(
                 #     f"Acquired {yml_target.name} with priority {rank}."
                 # )
@@ -1241,16 +1240,16 @@ class HelaoSyncer:
             LOGGER.info(
                 f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request."
             )
-        # elif yml_path.name in self.task_set:
-        #     self.base.print_message(
-        #         f"{str(yml_path)} is already queued, skipping enqueue request."
-        #     )
+        elif yml_path.name in self.task_set:
+            self.base.print_message(
+                f"{str(yml_path)} is already queued, skipping enqueue request."
+            )
         elif yml_path.name in self.running_tasks:
             LOGGER.info(
                 f"{str(yml_path)} is already running, skipping enqueue request."
             )
         else:
-            # self.task_set.add(yml_path.name)
+            self.task_set.add(yml_path.name)
             await self.task_queue.put((rank, yml_path))
             LOGGER.info(f"Added {str(yml_path)} to syncer queue with priority {rank}.")
 
@@ -1290,6 +1289,8 @@ class HelaoSyncer:
             #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
             # )
             return True
+        if yml_path.name in self.task_set:
+            self.task_set.remove(yml_path.name)
         prog = self.get_progress(yml_path)
         if not prog:
             # self.base.print_message(
