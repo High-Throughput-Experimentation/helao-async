@@ -1335,7 +1335,8 @@ class HelaoSyncer:
                 # self.base.print_message(
                 #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
                 # )
-                self.running_tasks.pop(prog.yml.target.name)
+                if prog.yml.target.name in self.running_tasks:
+                    self.running_tasks.pop(prog.yml.target.name)
                 await self.enqueue_yml(prog.yml.target, rank)
                 LOGGER.info(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
