@@ -18,11 +18,11 @@ from importlib import import_module
 
 from colorama import init, Fore, Back, Style
 from munch import munchify
+from launch import validateConfig, Pidd
 
 helao_repo_root = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(helao_repo_root, 'config'))
 sys.path.append(helao_repo_root)
-from helao import validateConfig, Pidd
 
 init()
 
