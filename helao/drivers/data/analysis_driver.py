@@ -15,7 +15,6 @@ else:
 
 import time
 import asyncio
-import traceback
 import os
 from datetime import datetime
 from typing import Optional, Tuple
