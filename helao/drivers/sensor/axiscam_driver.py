@@ -46,8 +46,6 @@ class AxisCamExec(Executor):
         super().__init__(*args, **kwargs, exec_id="axis")
         # current plan is 1 flow controller per COM
         LOGGER.info("AxisCamExec initialized.")
-        self.start_time = time.time()
-        self.duration = self.active.action.action_params.get("duration", -1)
         self.counter = 0
         save_root = str(self.active.base.helaodirs.save_root)
         if self.active.action.manual_action:
