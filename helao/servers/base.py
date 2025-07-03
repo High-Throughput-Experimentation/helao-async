@@ -3144,8 +3144,6 @@ class Active:
                     try:
                         self.base.aloop.create_task(move_dir(action, base=self.base))
                         # pop from local action task queue
-                        if action.action_uuid in self.base.local_action_task_queue:
-                            self.base.local_action_task_queue.remove(action.action_uuid)
                     except Exception:
                         LOGGER.error(
                             f"Failed to move directory for action {action.action_uuid}",
@@ -3155,6 +3153,8 @@ class Active:
                     LOGGER.info(
                         f"Action {action.action_uuid} is a manual action, skipping directory move."
                     )
+                if action.action_uuid in self.base.local_action_task_queue:
+                    self.base.local_action_task_queue.remove(action.action_uuid)
 
         return self.action
 
