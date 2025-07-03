@@ -13,7 +13,7 @@ Usage:
     keyboard input.
 Example:
     To run the launcher, use the following command:
-    python helao.py <config_file> [extra_option]
+    python launch.py <config_file> [extra_option]
     Where <config_file> is the path to the configuration file and [extra_option] is an optional argument for additional
     launch options.
 Note:
@@ -573,7 +573,7 @@ def main():
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
     if os.environ.get("CONDA_DEFAULT_ENV") != "helao":
         LAUNCH_LOGGER.warning(
-            "helao.py launcher was not called from a 'helao' conda environment.",
+            "launch.py launcher was not called from a 'helao' conda environment.",
         )
     python_path = os.environ.get("PYTHONPATH")
     if python_path is None:
@@ -822,7 +822,7 @@ def main():
             pidd.close()
         else:
             LAUNCH_LOGGER.info(
-                f"Disconnecting action monitor. Launch 'python helao.py {confArg}' to reconnect."
+                f"Disconnecting action monitor. Launch 'python launch.py {confArg}' to reconnect."
             )
 
     x = threading.Thread(target=thread_waitforkey)
