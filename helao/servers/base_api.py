@@ -159,7 +159,6 @@ class BaseAPI(HelaoFastAPI):
                 body_dict = json.loads(body_bytes)
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
-                action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
                 if not self.base.server_params.get("allow_concurrent_actions", True):
                     active_endpoints = [
                         ep
