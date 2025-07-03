@@ -63,7 +63,7 @@ class HelaoOperator:
             orch_port (int): The port number of the orchestrator server.
         """
         helao_repo_root = os.path.dirname(os.path.realpath(__file__))
-        while "helao.py" not in os.listdir(helao_repo_root):
+        while "launch.py" not in os.listdir(helao_repo_root):
             helao_repo_root = os.path.dirname(helao_repo_root)
         self.helao_config = read_config(config_arg, helao_repo_root)
         self.orch_key = orch_key

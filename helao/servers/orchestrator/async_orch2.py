@@ -7,7 +7,7 @@ a OrchHandler class object, the core functionality of an async orchestrator.
 
     Startup:
     The orchestrator server must be started AFTER all instrument and action servers
-    within a configuration file. Creating server actions via the helao.py launch
+    within a configuration file. Creating server actions via the launch.py launch
     script enforces the required launch order.
 
     After instantiating the global OrchHandler, the object will subscribe to all action

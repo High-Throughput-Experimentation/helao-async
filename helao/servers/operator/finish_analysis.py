@@ -222,7 +222,7 @@ def num_uploads(db_cfg):
 
 def main():
     helao_repo_root = os.path.dirname(os.path.realpath(__file__))
-    while "helao.py" not in os.listdir(helao_repo_root):
+    while "launch.py" not in os.listdir(helao_repo_root):
         helao_repo_root = os.path.dirname(helao_repo_root)
     operator = HelaoOperator(inst_config, "ORCH")
 
