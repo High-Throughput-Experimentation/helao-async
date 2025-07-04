@@ -158,6 +158,7 @@ class BaseAPI(HelaoFastAPI):
                 body_bytes = await request.body()
                 body_dict = json.loads(body_bytes)
                 action_dict = body_dict.get("action", {})
+                print(action_dict)
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
                 if not self.base.server_params.get("allow_concurrent_actions", True):
                     active_endpoints = [
@@ -166,7 +167,7 @@ class BaseAPI(HelaoFastAPI):
                         if em.active_dict
                     ]
                     if len(active_endpoints) > 0:
-                        LOGGER.info("action endpoint is busy, queuing")
+                        LOGGER.info("action server is busy, queuing")
                         action_dict["action_params"] = action_dict.get(
                             "action_params", {}
                         )
@@ -205,7 +206,7 @@ class BaseAPI(HelaoFastAPI):
                             )
                         )
                     else:
-                        LOGGER.debug("action endpoint is available")
+                        LOGGER.debug("action server is available")
                         response = await call_next(request)
                 elif (
                     len(self.base.actionservermodel.endpoints[endpoint].active_dict)
