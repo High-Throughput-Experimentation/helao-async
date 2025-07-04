@@ -155,13 +155,23 @@ class BaseAPI(HelaoFastAPI):
                 and request.method == "POST"
             ):
                 LOGGER.debug("got action POST request in middleware")
+
                 body_bytes = await request.body()
                 body_dict = json.loads(body_bytes)
-                print("body_dict", body_dict)
                 action_dict = body_dict.get("action", {})
                 print("action_dict", action_dict)
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
-                if not self.base.server_params.get("allow_concurrent_actions", True):
+                if (
+                    len(self.base.actionservermodel.endpoints[endpoint].active_dict)
+                    == 0
+                    or start_cond == ASC.no_wait
+                    or action_dict.get("action_params", {}).get(
+                        "queued_launch", False
+                    )
+                ):
+                    LOGGER.debug("action endpoint is available")
+                    response = await call_next(request)
+                elif not self.base.server_params.get("allow_concurrent_actions", True):
                     active_endpoints = [
                         ep
                         for ep, em in self.base.actionservermodel.endpoints.items()
@@ -209,16 +219,6 @@ class BaseAPI(HelaoFastAPI):
                     else:
                         LOGGER.debug("action server is available")
                         response = await call_next(request)
-                elif (
-                    len(self.base.actionservermodel.endpoints[endpoint].active_dict)
-                    == 0
-                    or start_cond == ASC.no_wait
-                    or action_dict.get("action_params", {}).get(
-                        "queued_launch", False
-                    )
-                ):
-                    LOGGER.debug("action endpoint is available")
-                    response = await call_next(request)
                 else:  # collision between two base requests for one resource, queue
                     LOGGER.info("action endpoint is busy, queuing")
                     action_dict["action_params"] = action_dict.get("action_params", {})
