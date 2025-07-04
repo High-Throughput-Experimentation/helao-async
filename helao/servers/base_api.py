@@ -173,6 +173,7 @@ class BaseAPI(HelaoFastAPI):
                         action_dict["action_params"]["queued_on_actserv"] = True
                         extra_params = {}
                         action = Action(**action_dict)
+                        action.init_act()
                         for d in (
                             request.query_params,
                             request.path_params,
