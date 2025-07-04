@@ -157,8 +157,9 @@ class BaseAPI(HelaoFastAPI):
                 LOGGER.debug("got action POST request in middleware")
                 body_bytes = await request.body()
                 body_dict = json.loads(body_bytes)
+                print("body_dict", body_dict)
                 action_dict = body_dict.get("action", {})
-                print(action_dict)
+                print("action_dict", action_dict)
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
                 if not self.base.server_params.get("allow_concurrent_actions", True):
                     active_endpoints = [
