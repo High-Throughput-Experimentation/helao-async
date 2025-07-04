@@ -212,7 +212,7 @@ class BaseAPI(HelaoFastAPI):
                     == 0
                     or start_cond == ASC.no_wait
                     or action_dict.get("action_params", {}).get(
-                        "queued_on_actserv", False
+                        "queued_launch", False
                     )
                 ):
                     LOGGER.debug("action endpoint is available")
@@ -223,6 +223,7 @@ class BaseAPI(HelaoFastAPI):
                     action_dict["action_params"]["queued_on_actserv"] = True
                     extra_params = {}
                     action = Action(**action_dict)
+                    action.init_act()
                     for d in (
                         request.query_params,
                         request.path_params,
