@@ -5,7 +5,7 @@ HELAO-async is Caltech HTE group's instrument control software following [HELAO]
 ## Requirements
 
 - Windows is required for Galil (gclib) and Gamry (comtypes) drivers. (Tested with Windows 10 x64)
-- The [multi-orchestrator demo](helao/demos/multi_orch_demo.md) was tested on Windows 10 and Linux (Ubuntu 22.04), however the helao.py launch script will produce errors in Linux when attempting to close server processes before exiting.
+- The [multi-orchestrator demo](helao/demos/multi_orch_demo.md) was tested on Windows 10 and Linux (Ubuntu 22.04), however the launch.py launch script will produce errors in Linux when attempting to close server processes before exiting.
 - [miniconda](https://docs.conda.io/en/latest/miniconda.html) (Tested with Python 3.11.7)
 - [HELAO-core](https://github.com/High-Throughput-Experimentation/helao-core) (Installed by setup script)
 
@@ -25,7 +25,7 @@ From miniconda prompt or PowerShell with an active conda profile run the followi
 
 ## Usage
 
-The `helao.py` script is used to validate configuration, launch, and shutdown all servers belonging to an orchestration group. Orchestration groups are defined as in the `helao/config` folder.
+The `launch.py` script is used to validate configuration, launch, and shutdown all servers belonging to an orchestration group. Orchestration groups are defined as in the `helao/config` folder.
 
 The following example will validate and launch servers with parameters defined in `helao/config/demo0.yml`, while also writing all monitored process IDs to `pids_world.pck` in the root directory:
 ```
@@ -38,9 +38,9 @@ Exercise caution when running multiple server groups as there is currently no ch
 
 | file name | file description |
 | --- | --- |
-| helao.bat | windows batch script for activating `helao` conda environment and running `python helao.py` with args |
-| helao.sh | linux bash script for activating `helao` conda environment and running `python helao.py` with args |
-| helao.py | main launcher script, requires config prefix or config path as first argument |
+| helao.bat | windows batch script for activating `helao` conda environment and running `python launch.py` with args |
+| helao.sh | linux bash script for activating `helao` conda environment and running `python launch.py` with args |
+| launch.py | main launcher script, requires config prefix or config path as first argument |
 | setup_env.bat | windows batch script, sets PYTHONPATH environment variable for `helao` conda environment, and clones `helao-core` repo if not colocated alongside `helao-async` in parent directory |
 | setup_env.sh | linux bash script, sets PYTHONPATH environment variable for `helao` conda environment, and clones `helao-core` repo if not colocated alongside `helao-async` in parent directory |
 | switch.bat | windows batch utility script for switching `helao-core` and `helao-async` branches |
