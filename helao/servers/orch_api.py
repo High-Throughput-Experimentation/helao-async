@@ -68,7 +68,7 @@ class OrchAPI(HelaoFastAPI):
         self.drivers = tuple()
         self.driver = None
         self.poller = None
-        
+
         async def set_body(request: Request, body: bytes):
             """
             Asynchronously sets the body of the given request.
@@ -155,6 +155,7 @@ class OrchAPI(HelaoFastAPI):
                         action_dict["action_params"]["queued_on_actserv"] = True
                         extra_params = {}
                         action = Action(**action_dict)
+                        action.action_uuid = gen_uuid()
                         for d in (
                             request.query_params,
                             request.path_params,
@@ -167,6 +168,16 @@ class OrchAPI(HelaoFastAPI):
                                     "from_global_exp_params",
                                     "from_global_act_params",
                                     "to_global_params",
+                                    "manual_action",
+                                    "nonblocking",
+                                    "process_finish",
+                                    "process_contrib",
+                                    "save_act",
+                                    "save_data",
+                                    "process_uuid",
+                                    "data_request_id",
+                                    "campaign_name",
+                                    "sync_data",
                                 ]:
                                     extra_params[k] = eval_val(v)
                         action.action_name = request.url.path.strip("/").split("/")[-1]
@@ -204,6 +215,7 @@ class OrchAPI(HelaoFastAPI):
                     action_dict["action_params"]["queued_on_actserv"] = True
                     extra_params = {}
                     action = Action(**action_dict)
+                    action.action_uuid = gen_uuid()
                     for d in (
                         request.query_params,
                         request.path_params,
@@ -216,6 +228,16 @@ class OrchAPI(HelaoFastAPI):
                                 "from_global_exp_params",
                                 "from_global_act_params",
                                 "to_global_params",
+                                "manual_action",
+                                "nonblocking",
+                                "process_finish",
+                                "process_contrib",
+                                "save_act",
+                                "save_data",
+                                "process_uuid",
+                                "data_request_id",
+                                "campaign_name",
+                                "sync_data",
                             ]:
                                 extra_params[k] = eval_val(v)
                     action.action_name = request.url.path.strip("/").split("/")[-1]
@@ -293,7 +315,7 @@ class OrchAPI(HelaoFastAPI):
                 for i, driver_class in enumerate(driver_classes):
                     if issubclass(driver_class, HelaoDriver):
                         driver_inst = driver_class(config=self.server_params)
-                        if i==0 and poller_class is not None:
+                        if i == 0 and poller_class is not None:
                             self.poller = poller_class(
                                 driver_inst, self.server_cfg.get("polling_time", 0.1)
                             )
