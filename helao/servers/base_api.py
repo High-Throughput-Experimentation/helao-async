@@ -8,8 +8,8 @@ from socket import gethostname
 from collections import namedtuple
 
 from helao.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
-from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
+from helao.helpers.gen_uuid import gen_uuid
 from helao.servers.base import Base
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.premodels import Action
@@ -165,9 +165,7 @@ class BaseAPI(HelaoFastAPI):
                     len(self.base.actionservermodel.endpoints[endpoint].active_dict)
                     == 0
                     or start_cond == ASC.no_wait
-                    or action_dict.get("action_params", {}).get(
-                        "queued_launch", False
-                    )
+                    or action_dict.get("action_params", {}).get("queued_launch", False)
                 ):
                     LOGGER.debug("action endpoint is available")
                     response = await call_next(request)
@@ -185,7 +183,7 @@ class BaseAPI(HelaoFastAPI):
                         action_dict["action_params"]["queued_on_actserv"] = True
                         extra_params = {}
                         action = Action(**action_dict)
-                        action.init_act()
+                        action.action_uuid = gen_uuid()
                         for d in (
                             request.query_params,
                             request.path_params,
@@ -198,8 +196,20 @@ class BaseAPI(HelaoFastAPI):
                                     "from_global_exp_params",
                                     "from_global_act_params",
                                     "to_global_params",
+                                    "manual_action",
+                                    "nonblocking",
+                                    "process_finish",
+                                    "process_contrib",
+                                    "save_act",
+                                    "save_data",
+                                    "process_uuid",
+                                    "data_request_id",
+                                    "campaign_name",
+                                    "sync_data",
                                 ]:
                                     extra_params[k] = eval_val(v)
+                                else:
+                                    action.action_params[k] = eval_val(v)
                         action.action_name = request.url.path.strip("/").split("/")[-1]
                         action.action_server = MachineModel(
                             server_name=server_key, machine_name=gethostname().lower()
@@ -225,7 +235,7 @@ class BaseAPI(HelaoFastAPI):
                     action_dict["action_params"]["queued_on_actserv"] = True
                     extra_params = {}
                     action = Action(**action_dict)
-                    action.init_act()
+                    action.action_uuid = gen_uuid()
                     for d in (
                         request.query_params,
                         request.path_params,
@@ -238,8 +248,20 @@ class BaseAPI(HelaoFastAPI):
                                 "from_global_exp_params",
                                 "from_global_act_params",
                                 "to_global_params",
+                                "manual_action",
+                                "nonblocking",
+                                "process_finish",
+                                "process_contrib",
+                                "save_act",
+                                "save_data",
+                                "process_uuid",
+                                "data_request_id",
+                                "campaign_name",
+                                "sync_data",
                             ]:
                                 extra_params[k] = eval_val(v)
+                            else:
+                                action.action_params[k] = eval_val(v)
                     action.action_name = request.url.path.strip("/").split("/")[-1]
                     action.action_server = MachineModel(
                         server_name=server_key, machine_name=gethostname().lower()
@@ -316,7 +338,7 @@ class BaseAPI(HelaoFastAPI):
                 for i, driver_class in enumerate(driver_classes):
                     if issubclass(driver_class, HelaoDriver):
                         driver_inst = driver_class(config=self.server_params)
-                        if i==0 and poller_class is not None:
+                        if i == 0 and poller_class is not None:
                             self.poller = poller_class(
                                 driver_inst, self.server_cfg.get("polling_time", 0.1)
                             )
