@@ -159,7 +159,6 @@ class BaseAPI(HelaoFastAPI):
                 body_bytes = await request.body()
                 body_dict = json.loads(body_bytes)
                 action_dict = body_dict.get("action", {})
-                print("action_dict", action_dict)
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
                 if (
                     len(self.base.actionservermodel.endpoints[endpoint].active_dict)

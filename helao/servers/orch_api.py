@@ -24,12 +24,10 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from starlette.types import Message
 from starlette.responses import JSONResponse, Response
 
 from helao.helpers import helao_logging as logging
 
-global LOGGER
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
@@ -69,40 +67,6 @@ class OrchAPI(HelaoFastAPI):
         self.driver = None
         self.poller = None
 
-        async def set_body(request: Request, body: bytes):
-            """
-            Asynchronously sets the body of the given request.
-
-            This function modifies the request object by setting its _receive method
-            to a custom function that returns a message containing the provided body.
-
-            Args:
-                request (Request): The request object to modify.
-                body (bytes): The body content to set in the request.
-
-            Returns:
-                None
-            """
-
-            async def receive() -> Message:
-                return {"type": "http.request", "body": body}
-
-            request._receive = receive
-
-        async def get_body(request: Request) -> bytes:
-            """
-            Asynchronously retrieves the body of an HTTP request and sets it back to the request.
-
-            Args:
-                request (Request): The HTTP request object.
-
-            Returns:
-                bytes: The body of the HTTP request.
-            """
-            body = await request.body()
-            await set_body(request, body)
-            return body
-
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             """
@@ -136,19 +100,27 @@ class OrchAPI(HelaoFastAPI):
                 and request.method == "POST"
             ):
                 LOGGER.debug("got action POST request in middleware")
+
                 body_bytes = await request.body()
                 body_dict = json.loads(body_bytes)
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
-                action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
-                if not self.orch.server_params.get("allow_concurrent_actions", True):
+                if (
+                    len(self.orch.actionservermodel.endpoints[endpoint].active_dict)
+                    == 0
+                    or start_cond == ASC.no_wait
+                    or action_dict.get("action_params", {}).get("queued_launch", False)
+                ):
+                    LOGGER.debug("action endpoint is available")
+                    response = await call_next(request)
+                elif not self.orch.server_params.get("allow_concurrent_actions", True):
                     active_endpoints = [
                         ep
                         for ep, em in self.orch.actionservermodel.endpoints.items()
                         if em.active_dict
                     ]
                     if len(active_endpoints) > 0:
-                        LOGGER.info("action endpoint is busy, queuing")
+                        LOGGER.info("action server is busy, queuing")
                         action_dict["action_params"] = action_dict.get(
                             "action_params", {}
                         )
@@ -180,6 +152,8 @@ class OrchAPI(HelaoFastAPI):
                                     "sync_data",
                                 ]:
                                     extra_params[k] = eval_val(v)
+                                else:
+                                    action.action_params[k] = eval_val(v)
                         action.action_name = request.url.path.strip("/").split("/")[-1]
                         action.action_server = MachineModel(
                             server_name=server_key, machine_name=gethostname().lower()
@@ -197,18 +171,8 @@ class OrchAPI(HelaoFastAPI):
                             )
                         )
                     else:
-                        LOGGER.debug("action endpoint is available")
+                        LOGGER.debug("action server is available")
                         response = await call_next(request)
-                elif (
-                    len(self.orch.actionservermodel.endpoints[endpoint].active_dict)
-                    == 0
-                    or start_cond == ASC.no_wait
-                    or action_dict.get("action_params", {}).get(
-                        "queued_on_actserv", False
-                    )
-                ):
-                    LOGGER.debug("action endpoint is available")
-                    response = await call_next(request)
                 else:  # collision between two base requests for one resource, queue
                     LOGGER.info("action endpoint is busy, queuing")
                     action_dict["action_params"] = action_dict.get("action_params", {})
@@ -240,6 +204,8 @@ class OrchAPI(HelaoFastAPI):
                                 "sync_data",
                             ]:
                                 extra_params[k] = eval_val(v)
+                            else:
+                                action.action_params[k] = eval_val(v)
                     action.action_name = request.url.path.strip("/").split("/")[-1]
                     action.action_server = MachineModel(
                         server_name=server_key, machine_name=gethostname().lower()
