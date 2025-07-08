@@ -587,7 +587,7 @@ def main():
         )
         python_paths = [os.path.abspath(x) for x in python_paths]
         python_paths = [
-            x for x in python_paths if os.path.basename(x).startswith("helao-")
+            x for x in python_paths if os.path.basename(x).startswith("helao-async")
         ]
         print(python_paths)
         branches = {
