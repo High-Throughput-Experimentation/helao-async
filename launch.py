@@ -609,7 +609,7 @@ def main():
     print("\n\n")
     cprint(
         figlet_format(
-            f"HELAO\n{'dummy' if config['dummy'] else get_hlo_version().strip('Vv')}",
+            f"HELAO\n{get_hlo_version().strip('Vv')}",
             font="nancyj-fancy",
         ),
         "magenta" if config["dummy"] else "green",
