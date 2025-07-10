@@ -3,7 +3,7 @@ Experiment library for HISPEC
 server_key must be a FastAPI action server defined in config
 """
 
-# everything is a 'machine model schema'
+# everything is a 'machine model schema below show what is active'
 __all__ = [
     "HISPEC_sub_SpEC",
     "HiSPEC_sub_stop_flow",
