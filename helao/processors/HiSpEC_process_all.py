@@ -56,23 +56,20 @@ class PostProcess(HloPostProcessor):
                     df.reset_index(drop=True, inplace=True)
 
                     non_WL_cols = ["t_s", "U_V", "J_A", "cycle", "direction"]
-                    WL_map = {
-                        col: f"WL_{i}"
-                        for i, col in enumerate(
-                            [x for x in df.columns if x not in non_WL_cols]
-                        )
-                    }
+                    melted_df = df.melt(id_vars=non_WL_cols, value_name="intensity")
+                    melted_df.rename({"variable": "wl_nm"},axis=1, inplace=True)
+                    melted_df["wl_nm"] = melted_df.wl_nm.apply(float)
 
-                    df.rename(columns=WL_map, inplace=True)
-                    df.attrs["wl_dict"] = {
-                        v: k for k, v in WL_map.items()
-                    }  # Save inverse wl_dict for easy remapping
                     # write the dataframe to a parquet file
-                    df.to_parquet(
+                    melted_df.sort_values(["t_s", "wl_nm"]).to_parquet(
                         new_file_path,
                         index=False,
                         partition_cols=["cycle", "direction"],
                     )
+                    # to unmelt this dataframe for analysis:
+                    # df = melted_df.pivot(index=["U_V", "t_s", "J_A", "cycle", "direction"], columns="wl_nm")
+                    # df.columns = [x[-1] for x in df.columns.to_flat_index()]
+                    # df.reset_index()
 
                     file_list = Path(new_file_path).glob("**/*.parquet")
                     for file in file_list:
@@ -86,6 +83,7 @@ class PostProcess(HloPostProcessor):
                         posixpath = str(relpath).replace("\\", "/")
                         new_file.file_name = posixpath
                         new_file.nosync = False
+                        new_file.data_keys = list(melted_df.columns)
                         processed_file_list.append(new_file)
 
             except Exception:
