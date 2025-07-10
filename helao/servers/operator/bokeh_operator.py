@@ -1248,6 +1248,10 @@ class BokehOperator:
             self.sequence.sequence_label = sellabel
             if self.input_sequence_comment.value != "":
                 self.sequence.sequence_comment = self.input_sequence_comment.value
+            campaign_name = self.input_campaign_name.values
+            if campaign_name != "":
+                self.sequence.campaign_name = campaign_name
+                self.sequence.campaign_uuid = gen_uuid()
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sequence, self.sequence)
             )
