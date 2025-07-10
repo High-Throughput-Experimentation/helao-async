@@ -43,6 +43,7 @@ else:
 
 from helao.helpers.to_json import parse_bokeh_input
 from helao.helpers.unpack_samples import unpack_samples_helper
+from helao.helpers.gen_uuid import gen_uuid
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 
@@ -143,7 +144,7 @@ class BokehOperator:
         }
 
         self.sequence_lists = {
-            k: [] for k in ["sequence_name", "sequence_label", "sequence_uuid"]
+            k: [] for k in ["sequence_name", "sequence_label", "sequence_uuid", "campaign_name", "campaign_uuid"]
         }
 
         self.experiment_lists = {k: [] for k in ["experiment_name", "experiment_uuid"]}
@@ -478,6 +479,26 @@ class BokehOperator:
             "value", self.callback_copy_sequence_label2
         )
 
+        self.input_campaign_name = TextInput(
+            value="",
+            title="campaign name",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        self.input_campaign_name.on_change("value", self.callback_copy_campaign_name)
+
+        self.input_campaign_name2 = TextInput(
+            value="",
+            title="campaign name",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        self.input_campaign_name2.on_change(
+            "value", self.callback_copy_campaign_name2
+        )
+
         self.input_sequence_comment = TextAreaInput(
             value="",
             title="sequence comment",
@@ -536,6 +557,8 @@ class BokehOperator:
                             self.sequence_dropdown,
                             Spacer(width=20),
                             self.input_sequence_label,
+                            Spacer(width=20),
+                            self.input_campaign_name,
                         ],
                         [self.input_sequence_comment],
                         [
@@ -577,6 +600,8 @@ class BokehOperator:
                             self.experiment_dropdown,
                             Spacer(width=20),
                             self.input_sequence_label2,
+                            Spacer(width=20),
+                            self.input_campaign_name2,
                         ],
                         [self.input_sequence_comment2],
                         [
@@ -954,6 +979,12 @@ class BokehOperator:
             self.sequence_lists["sequence_uuid"].append(
                 seqdict.get("sequence_uuid", None)
             )
+            self.sequence_lists["campaign_name"].append(
+                seqdict.get("campaign_name", None)
+            )
+            self.sequence_lists["campaign_uuid"].append(
+                seqdict.get("campaign_uuid", None)
+            )
             sequence_count += 1
 
         # self.sequence_source.stream(self.sequence_lists, rollover=sequence_count)
@@ -1093,6 +1124,10 @@ class BokehOperator:
         seq.sequence_label = self.input_sequence_label.value
         if self.input_sequence_comment.value != "":
             seq.sequence_comment = self.input_sequence_comment.value
+        campaign_name = self.input_campaign_name.value
+        if campaign_name != "":
+            self.sequence.campaign_name = campaign_name
+            self.sequence.campaign_uuid = gen_uuid()
         self.vis.doc.add_next_tick_callback(partial(self.orch.add_sequence, seq))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -1227,6 +1262,10 @@ class BokehOperator:
             self.sequence.sequence_label = sellabel
             if self.input_sequence_comment.value != "":
                 self.sequence.sequence_comment = self.input_sequence_comment.value
+            campaign_name = self.input_campaign_name.value
+            if campaign_name != "":
+                self.sequence.campaign_name = campaign_name
+                self.sequence.campaign_uuid = gen_uuid()
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sample_sequences, self.sequence)
             )
@@ -2138,6 +2177,24 @@ class BokehOperator:
                 self.update_input_value,
                 self.input_sequence_label,
                 self.input_sequence_label2.value,
+            )
+        )
+
+    def callback_copy_campaign_name(self, attr, old, new):
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                self.update_input_value,
+                self.input_campaign_name2,
+                self.input_campaign_name.value,
+            )
+        )
+
+    def callback_copy_campaign_name2(self, attr, old, new):
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                self.update_input_value,
+                self.input_campaign_name,
+                self.input_campaign_name2.value,
             )
         )
 
