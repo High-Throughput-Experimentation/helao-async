@@ -2055,8 +2055,10 @@ class Orch(Base):
                 sub_sequence = deepcopy(sequence)
                 # set the plate_sample_no in the params
                 sub_sequence.sequence_params["plate_sample_no_list"] = [plate_sample_no]
-                # init uuid now for tracking later
+                # generate new sub_sequence uuid
                 sub_sequence.sequence_uuid = gen_uuid()
+                # clear planned experiments so it will regenerate on deque
+                sub_sequence.planned_experiments = []
                 if (
                     sub_sequence.sequence_codehash is None
                     and sub_sequence.sequence_name in self.sequence_codehash_lib
@@ -2067,7 +2069,8 @@ class Orch(Base):
                 self.sequence_dq.append(sub_sequence)
                 sub_sequence_uuids.append(sub_sequence.sequence_uuid)
             return sub_sequence_uuids
-        return await self.add_sequence(sequence)
+        else:
+            return await self.add_sequence(sequence)
 
     async def add_experiment(
         self,
