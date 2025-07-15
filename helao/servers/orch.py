@@ -2066,6 +2066,7 @@ class Orch(Base):
                     sub_sequence.sequence_codehash = self.sequence_codehash_lib[
                         sub_sequence.sequence_name
                     ]
+                sub_sequence.campaign_sequence_parameter_variable = ["plate_sample_no_list"]
                 self.sequence_dq.append(sub_sequence)
                 sub_sequence_uuids.append(sub_sequence.sequence_uuid)
             return sub_sequence_uuids
