@@ -219,11 +219,11 @@ class Orch(Base):
         self.last_action_uuid = ""
         self.last_interrupt = time.time()
         # hold schema objects
-        self.active_experiment = None
-        self.last_experiment = None
-        self.active_sequence = None
+        self.active_experiment: Experiment = None
+        self.last_experiment: Experiment = None
+        self.active_sequence: Sequence = None
         self.active_seq_exp_counter = 0
-        self.last_sequence = None
+        self.last_sequence: Sequence = None
         self.bokehapp = None
         self.orch_op = None
         self.op_enabled = self.server_params.get("enable_op", False)
