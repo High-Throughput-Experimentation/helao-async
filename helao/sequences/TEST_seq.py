@@ -18,7 +18,7 @@ def TEST_consecutive_noblocking(
     dummy_list: List[List[float]] = [[0.0, 1.0], [2.0, 3.0]],
     plate_sample_no_list: List[int] = [1, 2, 3],
     *args,
-    **kwrags,
+    **kwargs,
 ):
     epm = ExperimentPlanMaker()
 
