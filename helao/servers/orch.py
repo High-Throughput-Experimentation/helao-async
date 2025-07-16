@@ -2057,8 +2057,8 @@ class Orch(Base):
                 sub_sequence.sequence_params["plate_sample_no_list"] = [plate_sample_no]
                 # generate new sub_sequence uuid
                 sub_sequence.sequence_uuid = gen_uuid()
-                # clear planned experiments so it will regenerate on deque
-                sub_sequence.planned_experiments = []
+                # Clear planned experiments to ensure they regenerate when the sub-sequence is dequeued.
+                sub_sequence.planned_experiments.clear()
                 if (
                     sub_sequence.sequence_codehash is None
                     and sub_sequence.sequence_name in self.sequence_codehash_lib
