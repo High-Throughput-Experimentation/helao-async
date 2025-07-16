@@ -79,4 +79,5 @@ class SequenceModel(SequenceTemplate):
     )  # list of completed experiments (abbreviated) from dispatched_experiments (premodels.py)
     sync_data: bool = True
     manual_action: bool = False
+    initial_global_params: dict = Field(default={})
     finished_global_params: dict = Field(default={})

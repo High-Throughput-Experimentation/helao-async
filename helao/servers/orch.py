@@ -2390,6 +2390,7 @@ class Orch(Base):
                 old_status=HloStatus.active,
                 new_status=HloStatus.finished,
             )
+            self.active_sequence.finished_global_params = {k: v for k, v in self.global_params.items() if k != "_fast_samples_in"}
             await self.write_seq(self.active_sequence)
             self.last_sequence = deepcopy(self.active_sequence)
             await self.put_lbuf(
@@ -2466,6 +2467,7 @@ class Orch(Base):
             await self.write_active_sequence_seq()
 
             # write final exp
+            self.active_experiment.finished_global_params = {k: v for k, v in self.global_params.items() if k != "_fast_samples_in"}
             await self.write_exp(self.active_experiment)
 
             self.last_experiment = deepcopy(self.active_experiment)
@@ -2484,6 +2486,7 @@ class Orch(Base):
         Returns:
             None
         """
+        self.active_experiment.initial_global_params = {k: v for k, v in self.global_params.items() if k != "_fast_samples_in"}
         await self.write_exp(self.active_experiment)
 
     async def write_active_sequence_seq(self):
@@ -2497,12 +2500,8 @@ class Orch(Base):
         Returns:
             None
         """
-        if self.active_seq_exp_counter > 1:
-            # active_exp = self.active_experiment.get_exp()
-            # await self.append_exp_to_seq(active_exp, self.active_sequence)
-            await self.write_seq(self.active_sequence)
-        else:
-            await self.write_seq(self.active_sequence)
+        self.active_sequence.initial_global_params = {k: v for k, v in self.global_params.items() if k != "_fast_samples_in"}
+        await self.write_seq(self.active_sequence)
 
     async def shutdown(self):
         """

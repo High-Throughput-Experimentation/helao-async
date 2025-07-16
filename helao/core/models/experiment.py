@@ -124,4 +124,5 @@ class ExperimentModel(ExperimentTemplate):
     orch_port: Optional[int] = None
     sync_data: bool = True
     campaign_name: Optional[str] = None
+    initial_global_params: dict = Field(default={})
     finished_global_params: dict = Field(default={})
