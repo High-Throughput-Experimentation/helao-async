@@ -58,7 +58,7 @@ class PostProcess(HloPostProcessor):
                     non_WL_cols = ["t_s", "U_V", "J_A", "cycle", "direction"]
                     melted_df = df.melt(id_vars=non_WL_cols, value_name="intensity")
                     melted_df.rename({"variable": "wl_nm"}, axis=1, inplace=True)
-                    melted_df["wl_nm"] = melted_df.wl_nm.apply(float)
+                    melted_df["wl_nm"] = melted_df["wl_nm"].astype(float)
 
                     # write the dataframe to a parquet file
                     melted_df.sort_values(["t_s", "wl_nm"]).to_parquet(
