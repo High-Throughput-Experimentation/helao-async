@@ -38,7 +38,7 @@ class SequenceTemplate(BaseModel, HelaoDict):
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
     campaign_sequence_parameter_variable: Optional[List[str]] = None
-    from_global_seq_params: dict = {} 
+    from_global_seq_params: dict = {}
 
 class SequenceModel(SequenceTemplate):
     """
@@ -79,3 +79,4 @@ class SequenceModel(SequenceTemplate):
     )  # list of completed experiments (abbreviated) from dispatched_experiments (premodels.py)
     sync_data: bool = True
     manual_action: bool = False
+    finished_global_params: dict = Field(default={})
