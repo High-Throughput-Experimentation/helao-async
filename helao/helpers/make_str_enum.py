@@ -13,7 +13,8 @@ def __get_pydantic_json_schema__(
 ) -> JsonSchemaValue:
     json_schema = handler(core_schema)
     json_schema = handler.resolve_ref_schema(json_schema)
-    json_schema.pop("const")
+    if "const" in json_schema:
+        json_schema.pop("const")
     json_schema["enum"] = [x.value for x in cls]
 
     return json_schema
