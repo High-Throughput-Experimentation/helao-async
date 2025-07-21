@@ -1,5 +1,6 @@
 import io
 import json
+from uuid import UUID
 
 import boto3
 import sshtunnel
