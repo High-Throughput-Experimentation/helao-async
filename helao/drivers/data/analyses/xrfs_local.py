@@ -44,7 +44,7 @@ class XrfsInputs(AnalysisInput):
         action_uuid = filed["action_uuid"]
         action_dir = [
             d
-            for d in self.xrfs.json["dispatched_actions"]
+            for d in self.xrfs.json["dispatched_actions_abbr"]
             if d["action_uuid"] == action_uuid
         ][0]["action_output_dir"]
         action_reldir = "/".join(action_dir.split("/")[-2:])
