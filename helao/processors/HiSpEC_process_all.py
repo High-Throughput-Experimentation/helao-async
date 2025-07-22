@@ -34,9 +34,7 @@ class PostProcess(HloPostProcessor):
                     ) as temp_file:
                         hlo_to_parquet(file_path, temp_file.name, HiSpEC=True)
                         df = fully_read_and_calibrate_parquet(
-                            cv_path=cvact.data_files[
-                                0
-                            ],  # .data_files is now a property func that evaluates at call time, calling it here will get the freshest path since hlo_to_parquet might take some time
+                            cv_dataframe=cvact.data,
                             spec_path=temp_file.name,
                             write_file=False,
                         ).sort_values(by="t (s)")
