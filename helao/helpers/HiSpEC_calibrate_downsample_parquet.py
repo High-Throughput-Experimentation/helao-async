@@ -10,7 +10,6 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import UnivariateSpline
 from scipy.signal import sawtooth
 import matplotlib.pyplot as plt
-from typing import Tuple
 
 
 def yml_load(input: Union[str, Path]):
@@ -682,7 +681,7 @@ def interpolate_spectral_time_to_current(
 
 
 def fully_read_and_calibrate_parquet(
-    cv_dataframe: pd.DataFrame,
+    cv_dataframe: pd.DataFrame | str,
     spec_path: str,
     default_time_header: str = "t_s",
     default_U_header: str = "Ewe_V",
@@ -703,7 +702,17 @@ def fully_read_and_calibrate_parquet(
         spec_file_path=spec_path, default_time_header=default_time_header
     )
 
-    CV = cv_dataframe
+    if isinstance(cv_dataframe, pd.DataFrame):
+        CV = cv_dataframe
+    else:
+        CV = read_CV_hlo(
+            cv_dataframe,
+            default_t_header=default_time_header,
+            default_U_header=default_U_header,
+            default_cycle_header=default_cycle_header,
+            default_current_header=default_current_header,
+            return_metadata=False,
+        )
 
     interp = generate_interpolation_function(
         CV,
@@ -778,5 +787,5 @@ if __name__ == "__main__":
     cv_path = r"/Users/benj/Documents/SpEC_Class_2/test_data/newdata/CV-3.3.0.0__0.hlo"
     spec_path = r"/Users/benj/Documents/SpEC_Class_2/test_data/newdata/test.parquet"
     fully_read_and_calibrate_parquet(
-        cv_path=cv_path, spec_path=spec_path, write_file=True
+        cv_dataframe=cv_path, spec_path=spec_path, write_file=True
     )
