@@ -1,3 +1,4 @@
+from locale import str
 from helao.helpers import helao_logging as logging
 
 if logging.LOGGER is None:
@@ -187,22 +188,36 @@ class HelaoData:
         if os.path.exists(nosync_path):
             self._nosync_files = [p for p in self._data_files if "RUNS_NOSYNC" in p]
 
-        self.name = self.yml.get(f"{self.abbrd[self.type]}_name", "NA")
-        self.params = self.yml.get(f"{self.abbrd[self.type]}_params", {})
-        self.uuid = self.yml[f"{self.abbrd[self.type]}_uuid"]
-        self.timestamp = self.yml[f"{self.abbrd[self.type]}_timestamp"]
-        self.samples_in = self.yml.get("samples_in", [])
         self.children = self.seq + self.exp + self.act
 
     @property
-    def yml(self)-> dict:
+    def yml(self) -> dict:
         if self.target.endswith(".zip"):  # this will always be a zipped sequence
             with ZipFile(self.target, "r") as zf:
                 yml_dict = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
         else:
             yml_dict = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
         return yml_dict
-            
+
+    @property
+    def name(self) -> str:
+        return self.yml.get(f"{self.abbrd[self.type]}_name", "NA")
+
+    @property
+    def params(self) -> dict:
+        return self.yml.get(f"{self.abbrd[self.type]}_params", {})
+
+    @property
+    def uuid(self) -> str:
+        return self.yml[f"{self.abbrd[self.type]}_uuid"]
+
+    @property
+    def timestamp(self) -> str:
+        return self.yml[f"{self.abbrd[self.type]}_timestamp"]
+
+    @property
+    def samples_in(self) -> list:
+        return self.yml.get("samples_in", [])
 
     @property
     def data_files(self):
