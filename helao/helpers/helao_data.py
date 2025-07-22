@@ -99,7 +99,7 @@ class HelaoData:
                     self.ymlpath = [p for p in self.zflist if p.endswith("-seq.yml")][0]
                 self.ymldir = os.path.dirname(self.ymlpath)
                 self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
-                self.yml = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
+                # self.yml = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
             self.seq = []
             self.exp = []
             self.act = []
@@ -151,7 +151,7 @@ class HelaoData:
                 self.ymldir = os.path.dirname(self.target)
                 self.ymlpath = target
             self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
-            self.yml = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
+            # self.yml = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
             runstate = re.findall("RUNS_[A-Z]+", self.ymldir)[0]
             yml_reldir = self.ymldir.replace(runstate, "RUNS_*")
             self.seq = [
@@ -193,6 +193,16 @@ class HelaoData:
         self.timestamp = self.yml[f"{self.abbrd[self.type]}_timestamp"]
         self.samples_in = self.yml.get("samples_in", [])
         self.children = self.seq + self.exp + self.act
+
+    @property
+    def yml(self)-> dict:
+        if self.target.endswith(".zip"):  # this will always be a zipped sequence
+            with ZipFile(self.target, "r") as zf:
+                yml_dict = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
+        else:
+            yml_dict = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
+        return yml_dict
+            
 
     @property
     def data_files(self):
