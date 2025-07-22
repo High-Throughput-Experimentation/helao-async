@@ -1,4 +1,3 @@
-from locale import str
 from helao.helpers import helao_logging as logging
 
 if logging.LOGGER is None:
@@ -87,108 +86,114 @@ class HelaoData:
         """
         self.ord = ["seq", "exp", "act"]
         self.abbrd = {"seq": "sequence", "exp": "experiment", "act": "action"}
-        self.target = target
-        if self.target.endswith(".zip"):  # this will always be a zipped sequence
-            with ZipFile(target, "r") as zf:
-                if "zflist" in kwargs:
-                    self.zflist = kwargs["zflist"]
-                else:
-                    self.zflist = [p for p in zf.namelist() if not p.endswith("/")]
-                if "ztarget" in kwargs:
-                    self.ymlpath = kwargs["ztarget"]
-                else:
-                    self.ymlpath = [p for p in self.zflist if p.endswith("-seq.yml")][0]
-                self.ymldir = os.path.dirname(self.ymlpath)
-                self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
-                # self.yml = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
-            self.seq = []
-            self.exp = []
-            self.act = []
-            if self.type == "seq":
-                sub_exps = [
+        if isinstance(target, str):
+            self.target = target
+            if self.target.endswith(".zip"):  # this will always be a zipped sequence
+                with ZipFile(target, "r") as zf:
+                    if "zflist" in kwargs:
+                        self.zflist = kwargs["zflist"]
+                    else:
+                        self.zflist = [p for p in zf.namelist() if not p.endswith("/")]
+                    if "ztarget" in kwargs:
+                        self.ymlpath = kwargs["ztarget"]
+                    else:
+                        self.ymlpath = [
+                            p for p in self.zflist if p.endswith("-seq.yml")
+                        ][0]
+                    self.ymldir = os.path.dirname(self.ymlpath)
+                    self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
+                    # self.yml = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
+                self.seq = []
+                self.exp = []
+                self.act = []
+                if self.type == "seq":
+                    sub_exps = [
+                        p
+                        for p in self.zflist
+                        if p.endswith("-exp.yml") and p.startswith(self.ymldir)
+                    ]
+                    self.exp = [
+                        HelaoData(self.target, zflist=self.zflist, ztarget=p)
+                        for p in sorted(
+                            sub_exps,
+                            key=lambda x: float(
+                                os.path.basename(os.path.dirname(x)).split("__")[0]
+                            ),
+                        )
+                    ]
+                elif self.type == "exp":
+                    sub_acts = [
+                        p
+                        for p in self.zflist
+                        if p.endswith("-act.yml") and p.startswith(self.ymldir)
+                    ]
+                    self.act = [
+                        HelaoData(self.target, zflist=self.zflist, ztarget=p)
+                        for p in sorted(
+                            sub_acts,
+                            key=lambda x: float(
+                                os.path.basename(os.path.dirname(x)).split("__")[0]
+                            ),
+                        )
+                    ]
+                self._data_files = [
                     p
                     for p in self.zflist
-                    if p.endswith("-exp.yml") and p.startswith(self.ymldir)
+                    if p.endswith(".hlo")
+                    and p.startswith(self.ymldir)
+                    and os.path.dirname(p) == self.ymldir
+                ]
+                nosync_path = os.path.dirname(self.target).replace(
+                    "RUNS_SYNCED", "RUNS_NOSYNC"
+                )
+            else:
+                if os.path.isdir(self.target):
+                    self.ymldir = self.target
+                    self.ymlpath = glob(os.path.join(self.target, "*.yml"))[0]
+                elif target.endswith(".yml"):
+                    self.ymldir = os.path.dirname(self.target)
+                    self.ymlpath = target
+                self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
+                # self.yml = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
+                runstate = re.findall("RUNS_[A-Z]+", self.ymldir)[0]
+                yml_reldir = self.ymldir.replace(runstate, "RUNS_*")
+                self.seq = [
+                    HelaoData(x)
+                    for x in sorted(
+                        glob(os.path.join(yml_reldir, "*", "*-seq.yml")),
+                        key=lambda x: float(
+                            os.path.basename(os.path.dirname(x)).split("__")[0]
+                        ),
+                    )
                 ]
                 self.exp = [
-                    HelaoData(self.target, zflist=self.zflist, ztarget=p)
-                    for p in sorted(
-                        sub_exps,
+                    HelaoData(x)
+                    for x in sorted(
+                        glob(os.path.join(yml_reldir, "*", "*-exp.yml")),
                         key=lambda x: float(
                             os.path.basename(os.path.dirname(x)).split("__")[0]
                         ),
                     )
-                ]
-            elif self.type == "exp":
-                sub_acts = [
-                    p
-                    for p in self.zflist
-                    if p.endswith("-act.yml") and p.startswith(self.ymldir)
                 ]
                 self.act = [
-                    HelaoData(self.target, zflist=self.zflist, ztarget=p)
-                    for p in sorted(
-                        sub_acts,
+                    HelaoData(x)
+                    for x in sorted(
+                        glob(os.path.join(yml_reldir, "*", "*-act.yml")),
                         key=lambda x: float(
                             os.path.basename(os.path.dirname(x)).split("__")[0]
                         ),
                     )
                 ]
-            self._data_files = [
-                p
-                for p in self.zflist
-                if p.endswith(".hlo")
-                and p.startswith(self.ymldir)
-                and os.path.dirname(p) == self.ymldir
-            ]
-            nosync_path = os.path.dirname(self.target).replace(
-                "RUNS_SYNCED", "RUNS_NOSYNC"
-            )
+                self._data_files = glob(os.path.join(yml_reldir, "*.hlo"))
+                nosync_path = self.ymldir.replace("RUNS_SYNCED", "RUNS_NOSYNC")
+
+            if os.path.exists(nosync_path):
+                self._nosync_files = [p for p in self._data_files if "RUNS_NOSYNC" in p]
+
+            self.children = self.seq + self.exp + self.act
         else:
-            if os.path.isdir(self.target):
-                self.ymldir = self.target
-                self.ymlpath = glob(os.path.join(self.target, "*.yml"))[0]
-            elif target.endswith(".yml"):
-                self.ymldir = os.path.dirname(self.target)
-                self.ymlpath = target
-            self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
-            # self.yml = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
-            runstate = re.findall("RUNS_[A-Z]+", self.ymldir)[0]
-            yml_reldir = self.ymldir.replace(runstate, "RUNS_*")
-            self.seq = [
-                HelaoData(x)
-                for x in sorted(
-                    glob(os.path.join(yml_reldir, "*", "*-seq.yml")),
-                    key=lambda x: float(
-                        os.path.basename(os.path.dirname(x)).split("__")[0]
-                    ),
-                )
-            ]
-            self.exp = [
-                HelaoData(x)
-                for x in sorted(
-                    glob(os.path.join(yml_reldir, "*", "*-exp.yml")),
-                    key=lambda x: float(
-                        os.path.basename(os.path.dirname(x)).split("__")[0]
-                    ),
-                )
-            ]
-            self.act = [
-                HelaoData(x)
-                for x in sorted(
-                    glob(os.path.join(yml_reldir, "*", "*-act.yml")),
-                    key=lambda x: float(
-                        os.path.basename(os.path.dirname(x)).split("__")[0]
-                    ),
-                )
-            ]
-            self._data_files = glob(os.path.join(yml_reldir, "*.hlo"))
-            nosync_path = self.ymldir.replace("RUNS_SYNCED", "RUNS_NOSYNC")
-
-        if os.path.exists(nosync_path):
-            self._nosync_files = [p for p in self._data_files if "RUNS_NOSYNC" in p]
-
-        self.children = self.seq + self.exp + self.act
+            for k, v in vars(target).items():
+                setattr(self, k, v)
 
     @property
     def yml(self) -> dict:
