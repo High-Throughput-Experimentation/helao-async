@@ -8,6 +8,7 @@ else:
 import os
 from typing import List
 from copy import copy
+import pandas as pd
 from helao.core.models.file import FileInfo
 from helao.helpers.hlo_postprocessor import HloPostProcessor
 from helao.helpers.helao_data import HelaoData
@@ -34,7 +35,7 @@ class PostProcess(HloPostProcessor):
                     ) as temp_file:
                         hlo_to_parquet(file_path, temp_file.name, HiSpEC=True)
                         df = fully_read_and_calibrate_parquet(
-                            cv_dataframe=cvact.data,
+                            cv_dataframe=pd.DataFrame(cvact.data[1]),
                             spec_path=temp_file.name,
                             write_file=False,
                         ).sort_values(by="t (s)")
