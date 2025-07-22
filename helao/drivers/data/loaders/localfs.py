@@ -93,10 +93,20 @@ class LocalLoader:
             yml_dir = os.path.basename(os.path.dirname(ymlp))
             if self.target.endswith(".zip"):
                 yml_dir = os.path.basename(self.target).replace(".zip", "")
-            _, seq_name, seq_lab = yml_dir.split("__")
+            seq_path_parts = yml_dir.split("__")
+            seq_name = seq_path_parts[1]
+            seq_lab = "__".join(seq_path_parts[2:])
             plate_id = -1
-            check_serial = seq_lab.split("-")[-1]
-            if check_serial.isdigit() and len(check_serial) > 1:
+            serial_parts = seq_lab.split("-")
+            check_serial = None
+            sample_no = None
+            if serial_parts[-2].isdigit() and len(serial_parts) > 2:
+                check_serial = serial_parts[-2]
+                if serial_parts[-1].isdigit():
+                    sample_no = int(serial_parts[-1])
+            elif serial_parts[-1].isdigit() and len(serial_parts) > 1:
+                check_serial = serial_parts[-1]
+            if check_serial is not None:
                 plate_str = check_serial[:-1]
                 checksum = check_serial[-1]
                 if sum([int(x) for x in plate_str]) % 10 == int(checksum):
@@ -104,7 +114,7 @@ class LocalLoader:
                     seq_lab = seq_lab.split("-")[0]
             yml_file = os.path.basename(ymlp)
             timestamp = datetime.strptime(yml_file.split("-")[0], "%Y%m%d.%H%M%S%f")
-            seq_parts.append((timestamp, seq_name, seq_lab, plate_id, yml_dir, ymlp))
+            seq_parts.append((timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp))
         self.sequences = pd.DataFrame(
             seq_parts,
             columns=[
@@ -112,6 +122,7 @@ class LocalLoader:
                 "sequence_name",
                 "sequence_label",
                 "plate_id",
+                "sample_no",
                 "sequence_dir",
                 "sequence_localpath",
             ],
