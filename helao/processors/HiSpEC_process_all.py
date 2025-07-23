@@ -8,6 +8,8 @@ else:
 import os
 from typing import List
 from copy import copy
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pandas as pd
 from helao.core.models.file import FileInfo
 from helao.helpers.hlo_postprocessor import HloPostProcessor
@@ -59,11 +61,13 @@ class PostProcess(HloPostProcessor):
                     melted_df.rename({"variable": "wl_nm"}, axis=1, inplace=True)
                     melted_df["wl_nm"] = melted_df["wl_nm"].astype(float)
 
+                    smelted_df = melted_df.sort_values(["t_s", "wl_nm"])
                     # write the dataframe to a parquet file
-                    melted_df.sort_values(["t_s", "wl_nm"]).to_parquet(
-                        new_file_path,
-                        index=False,
+                    pq.write_to_dataset(
+                        pa.Table.from_pandas(smelted_df),
+                        root_path=new_file_path,
                         partition_cols=["cycle", "direction"],
+                        basename_template="part-{i}.parquet",
                     )
                     # to unmelt this dataframe for analysis:
                     # df = melted_df.pivot(index=["U_V", "t_s", "J_A", "cycle", "direction"], columns="wl_nm")
@@ -72,6 +76,8 @@ class PostProcess(HloPostProcessor):
 
                     file_list = Path(new_file_path).glob("**/*.parquet")
                     for file in file_list:
+                        if not file.is_file():
+                            continue
                         new_file = copy(act_file)
                         new_file.file_type = "andor_spec_parquet__file"
                         relpath = (
