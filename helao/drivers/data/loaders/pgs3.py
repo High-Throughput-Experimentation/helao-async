@@ -94,7 +94,7 @@ class HelaoDataModel(HelaoModel):
     @property
     def hlo(self):
         """Retrieve json data from S3 via HelaoLoader."""
-        if not hlo_file:
+        if not self.hlo_file:
             return {}
         return LOADER.get_hlo(self.hlo_file['action_uuid'], self.hlo_file['file_name'])
 
