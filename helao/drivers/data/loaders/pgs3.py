@@ -64,7 +64,42 @@ class HelaoModel:
         return LOADER.get_sql(self.helao_type, self.uuid)
 
 
-class HelaoAction(HelaoModel):
+class HelaoDataModel(HelaoModel):
+    @property
+    def data_files(self):
+        """Return list of data file dicts for this action."""
+        meta = self.json
+        file_list = meta.get("files", [])
+        hlo_files = [
+            x
+            for x in file_list
+            if x["file_name"].endswith(".hlo")
+            or x["file_name"].endswith(".json")
+            or x["file_type"] in ["helao__json_file", "json__file"]
+        ]
+        return hlo_files
+    
+    @property
+    def hlo_file(self):
+        """Return primary .hlo filename for this action."""
+        return self.data_files[0]
+    
+    @property
+    def hlo_file_tup(self):
+        """Return primary .hlo filename, filetype, and data keys for this action."""
+        first_hlo = self.hlo_file
+        retkeys = ["file_name", "file_type", "data_keys"]
+        return [first_hlo.get(k, "") for k in retkeys]
+
+    @property
+    def hlo(self):
+        """Retrieve json data from S3 via HelaoLoader."""
+        if not hlo_file:
+            return {}
+        return LOADER.get_hlo(self.hlo_file['action_uuid'], self.hlo_file['file_name'])
+
+
+class HelaoAction(HelaoDataModel):
     action_name: str
     action_uuid: UUID
     action_timestamp: datetime
@@ -76,37 +111,6 @@ class HelaoAction(HelaoModel):
         self.action_uuid = self.uuid
         self.action_timestamp = self.timestamp
         self.action_params = self.params
-
-    @property
-    def hlo_file_tup(self):
-        """Return primary .hlo filename, filetype, and data keys for this action."""
-        meta = self.json
-        file_list = meta.get("files", [])
-        hlo_files = [
-            x
-            for x in file_list
-            if x["file_name"].endswith(".hlo")
-            or x["file_name"].endswith(".json")
-            or x["file_type"] in ["helao__json_file", "json__file"]
-        ]
-        if not hlo_files:
-            return "", "", []
-        first_hlo = hlo_files[0]
-        retkeys = ["file_name", "file_type", "data_keys"]
-        return [first_hlo.get(k, "") for k in retkeys]
-
-    @property
-    def hlo_file(self):
-        """Return primary .hlo filename for this action."""
-        return self.hlo_file_tup[0]
-
-    @property
-    def hlo(self):
-        """Retrieve json data from S3 via HelaoLoader."""
-        hlo_file = self.hlo_file
-        if not hlo_file:
-            return {}
-        return LOADER.get_hlo(self.action_uuid, hlo_file)
 
 
 class HelaoExperiment(HelaoModel):
@@ -137,7 +141,7 @@ class HelaoSequence(HelaoModel):
         self.sequence_params = self.params
 
 
-class HelaoProcess(HelaoModel):
+class HelaoProcess(HelaoDataModel):
     process_name: str
     process_uuid: UUID
     process_timestamp: datetime
