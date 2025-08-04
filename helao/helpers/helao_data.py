@@ -84,6 +84,7 @@ class HelaoData:
         samples_in (list): List of input samples.
         children (list): List of child HelaoData objects (sequences, experiments, actions).
         """
+        self._yml_cache = {}
         self.ord = ["seq", "exp", "act"]
         self.abbrd = {"seq": "sequence", "exp": "experiment", "act": "action"}
         if isinstance(target, str):
@@ -197,11 +198,14 @@ class HelaoData:
 
     @property
     def yml(self) -> dict:
+        if self._yml_cache:
+            return self._yml_cache
         if self.target.endswith(".zip"):  # this will always be a zipped sequence
             with ZipFile(self.target, "r") as zf:
                 yml_dict = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
         else:
             yml_dict = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
+        self._yml_cache = yml_dict
         return yml_dict
 
     @property
