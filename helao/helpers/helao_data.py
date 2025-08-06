@@ -11,11 +11,12 @@ from collections import defaultdict
 import os
 import builtins
 from glob import glob
-from zipfile import ZipFile
+from tempfile import TemporaryDirectory
 import zipfile
 import re
 
 import orjson
+import pandas as pd
 from helao.helpers.yml_tools import yml_load
 from helao.helpers.read_hlo import read_hlo
 from helao.helpers.file_mapper import FileMapper
@@ -87,10 +88,11 @@ class HelaoData:
         self._yml_cache = {}
         self.ord = ["seq", "exp", "act"]
         self.abbrd = {"seq": "sequence", "exp": "experiment", "act": "action"}
+        skip_exts = ["yml", "prg"]
         if isinstance(target, str):
             self.target = target
             if self.target.endswith(".zip"):  # this will always be a zipped sequence
-                with ZipFile(target, "r") as zf:
+                with zipfile.ZipFile(target, "r") as zf:
                     if "zflist" in kwargs:
                         self.zflist = kwargs["zflist"]
                     else:
@@ -140,9 +142,8 @@ class HelaoData:
                 self._data_files = [
                     p
                     for p in self.zflist
-                    if p.endswith(".hlo")
-                    and p.startswith(self.ymldir)
-                    and os.path.dirname(p) == self.ymldir
+                    if p.split(".")[-1] not in skip_exts and p.startswith(self.ymldir)
+                    # and os.path.dirname(p) == self.ymldir
                 ]
                 nosync_path = os.path.dirname(self.target).replace(
                     "RUNS_SYNCED", "RUNS_NOSYNC"
@@ -185,7 +186,11 @@ class HelaoData:
                         ),
                     )
                 ]
-                self._data_files = glob(os.path.join(yml_reldir, "*.hlo"))
+                self._data_files = [
+                    x
+                    for x in glob(os.path.join(yml_reldir, "**", "*"), recursive=True)
+                    if not x.split(".")[-1] not in skip_exts
+                ]
                 nosync_path = self.ymldir.replace("RUNS_SYNCED", "RUNS_NOSYNC")
 
             if os.path.exists(nosync_path):
@@ -201,7 +206,7 @@ class HelaoData:
         if self._yml_cache:
             return self._yml_cache
         if self.target.endswith(".zip"):  # this will always be a zipped sequence
-            with ZipFile(self.target, "r") as zf:
+            with zipfile.ZipFile(self.target, "r") as zf:
                 yml_dict = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
         else:
             yml_dict = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
@@ -290,7 +295,7 @@ class HelaoData:
             header_end = False
             data = defaultdict(list)
 
-            with ZipFile(self.target, "r") as zf:
+            with zipfile.ZipFile(self.target, "r") as zf:
                 for line in zf.open(hlotarget):
                     if header_end:
                         line_dict = orjson.loads(line)
@@ -313,6 +318,30 @@ class HelaoData:
         else:
             return read_hlo(hlotarget)
 
+    def read_parquet(
+        self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
+    ) -> Tuple[dict, pd.DataFrame]:
+        if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
+            with TemporaryDirectory() as tmpdir:
+                with zipfile.ZipFile(self.target, "r") as zf:
+                    parquet_path = zf.extract(hlotarget, tmpdir)
+                    parquet_df = pd.read_parquet(parquet_path)
+        else:
+            parquet_df = pd.read_parquet(hlotarget)
+
+        return {}, parquet_df.to_dict(orient="list")
+
+    def read_json(
+        self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
+    ) -> Tuple[dict, dict]:
+        if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
+            json_dict = orjson.loads(self.read_file(hlotarget))
+        else:
+            with open(hlotarget, "rb") as f:
+                json_dict = orjson.loads(f.read())
+
+        return {}, json_dict
+
     def read_file(self, hlotarget):
         """
         Reads the contents of a file within a zip archive.
@@ -326,23 +355,32 @@ class HelaoData:
         bytes = zipfile.Path(self.target, hlotarget).read_bytes()
         return bytes
 
-    @property
-    def data(self):
-        """
-        Reads the first data file in the `data_files` list using the `read_hlo` method.
+    def read_data_file(self, target_data_file: str):
+        if target_data_file.endswith(".hlo"):
+            return self.read_hlo(target_data_file)
+        elif target_data_file.endswith(".json"):
+            return self.read_json(target_data_file)
+        elif target_data_file.endswith(".parquet"):
+            return self.read_parquet(target_data_file)
+        else:
+            LOGGER.warn("File not found or type unsupported.")
+            return {}, {}
 
-        Returns:
-            The data read from the first file in the `data_files` list.
-        """
+    def read_data_index(self, idx: int = 0):
         try:
             if self.data_files:
-                return self.read_hlo(self.data_files[0])
+                target_data_file = self.data_files[idx]
             elif self.nosync_files:
-                return self.read_hlo(self.nosync_files[0])
+                target_data_file = self.nosync_files[idx]
             else:
                 return {}, {}
+            return self.read_data_file(target_data_file)
         except Exception:
             LOGGER.error("Error reading data.", exc_info=True)
+
+    @property
+    def data(self):
+        return self.read_data_index(0)
 
     def __repr__(self):
         return f"{self.abbrd[self.type]}: {self.name} @ {self.timestamp} CONTAINING {len(self.children)} children"
