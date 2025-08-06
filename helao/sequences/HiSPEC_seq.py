@@ -123,14 +123,12 @@ def HiSpEC_CV(
 
         if use_z_motor:
             epm.add(
-                "ECHEUVIS_sub_engage",
+                "HiSpEC_sub_engage",
                 {
                     "flow_we": True,
                     "flow_ce": True,
                     "z_height": cell_engaged_z,
                     "fill_wait": cell_fill_wait,
-                    "calibrate_intensity": False, #@Dan - kept this action but turned this flag to false to prevent it trying to access doric WLED - not sure if this will work... -- it should work because the references to doric_wled aren't going to be used
-                    "max_integration_time": int(10)
                 },
             )
         else:
@@ -140,7 +138,7 @@ def HiSpEC_CV(
                     {"reason": "Restore flow and prepare for sample measurement."},
                 )
         
-        if Flow_during_SpEC==False:
+        if not Flow_during_SpEC:
             epm.add("HiSPEC_sub_stop_flow", {})
 
         
