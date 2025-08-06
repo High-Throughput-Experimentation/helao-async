@@ -79,8 +79,8 @@ servers:
         x: A
         y: B
       axis_zero:
-        A: 127
-        B: 72.5
+        A: 127.5
+        B: 76.6
       timeout: 600
   IO:
     host: hte-uvis-04.htejcap.caltech.edu
