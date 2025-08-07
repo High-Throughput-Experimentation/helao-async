@@ -9,8 +9,8 @@ sequence_libraries:
 sequence_params:
   toggle_is_shutter: true
 builtin_ref_motorxy:
-  - 100
-  - 6
+  - 113.956
+  - -29.042
 run_type: uvis
 root: C:\INST_hlo
 servers:
@@ -22,16 +22,6 @@ servers:
     params:
       enable_op: true
       bokeh_port: 5002
-  SPEC_T:
-    host: hte-uvis-04.htejcap.caltech.edu
-    port: 8004
-    group: action
-    fast: spec_server
-    params:
-      dev_num: 1
-      lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll
-      n_pixels: 1024
-      start_margin: 5
   SPEC_R:
     host: hte-uvis-04.htejcap.caltech.edu
     port: 8008
@@ -88,16 +78,8 @@ servers:
     fast: galil_io
     params:
       galil_ip_str: 192.168.200.218
-      dev_ai: {}
-      dev_ao: {}
-      dev_di:
-        gamry_ttl0: 1
       dev_do:
-        gamry_aux: 4
-        doric_wled: 1
         wl_source: 1
-        spec_trig: 2
-        spec_trig2: 3
   PAL:
     host: hte-uvis-04.htejcap.caltech.edu
     port: 8007
