@@ -5,8 +5,7 @@ experiment_libraries:
 experiment_params:
   toggle_is_shutter: true
 sequence_libraries:
-  - UVIS_T_seq
-  - UVIS_TR_seq
+  - UVIS_R_seq
 sequence_params:
   toggle_is_shutter: true
 builtin_ref_motorxy:
@@ -115,13 +114,6 @@ servers:
     bokeh: action_visualizer
     params:
       doc_name: UVIS Visualizer
-  LIVE:
-    host: hte-uvis-04.htejcap.caltech.edu
-    port: 5004
-    group: visualizer
-    bokeh: live_visualizer
-    params:
-      doc_name: Sensor Visualizer
   DB:
     host: hte-uvis-04.htejcap.caltech.edu
     port: 8010
