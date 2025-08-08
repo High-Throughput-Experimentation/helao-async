@@ -82,7 +82,7 @@ servers:
     params:
       galil_ip_str: 192.168.200.218
       dev_do:
-        wl_source: 1
+        lamp_shutter: 1
   PAL:
     host: hte-uvis-04.htejcap.caltech.edu
     port: 8007
