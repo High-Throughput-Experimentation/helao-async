@@ -11,7 +11,7 @@ sequence_params:
 builtin_ref_motorxy:
   - 113.956
   - -29.042
-builtin_ref_motorxy_2:
+builtin_green_motorxy:
   - 113.956
   - 38
 run_type: uvis
