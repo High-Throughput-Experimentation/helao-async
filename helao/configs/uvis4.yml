@@ -9,8 +9,11 @@ sequence_libraries:
 sequence_params:
   toggle_is_shutter: true
 builtin_ref_motorxy:
-  - 113.956
-  - -29.042
+  - 115
+  - -27
+builtin_ref_motorxy_2:
+  - 115
+  - 40
 run_type: uvis
 root: C:\INST_hlo
 servers:
