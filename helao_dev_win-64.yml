@@ -31,6 +31,7 @@ dependencies:
   - ipykernel
   - ipympl
   - ipywidgets
+  - joblib
   - jupyterlab
   - matplotlib
   - munch
@@ -39,7 +40,6 @@ dependencies:
   - orjson
   - pandas
   - paramiko
-  - picologging
   - pip
   - psutil
   - psycopg2
@@ -67,8 +67,6 @@ dependencies:
   - scikit-learn
   - scipy
   - shortuuid
-  - sphinx-autodoc-typehints
-  - sphinx-markdown-builder
   - sqlalchemy
   - sshtunnel
   - starlette
