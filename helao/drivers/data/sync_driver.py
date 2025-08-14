@@ -1126,12 +1126,10 @@ class HelaoSyncer:
         if task_name in self.running_tasks:
             # LOGGER.info(f"Removing {task_name} from running_tasks.")
             self.running_tasks.pop(task_name)
-        if task_name in self.task_set:
-            self.task_set.remove(task_name)
-        # else:
-        #     self.base.print_message(
-        #         f"{task_name} was already removed from running_tasks."
-        #     )
+            try:
+                self.task_set.remove(task_name)
+            except KeyError:
+                pass
 
     async def syncer(self):
         """
@@ -1290,17 +1288,35 @@ class HelaoSyncer:
         Returns:
             dict: A dictionary containing the progress information, excluding 'process_metas'.
         """
+        def untrack_and_return(retval):
+            """
+            Untrack the task and return the result.
+
+            Args:
+                retval (dict): The result to return.
+
+            Returns:
+                dict: The result after untracking.
+            """
+            if yml_path.name in self.running_tasks:
+                self.running_tasks.pop(yml_path.name)
+            try:
+                self.task_set.remove(yml_path.name)
+            except KeyError:
+                pass
+            return retval
+        
         if not yml_path.exists():
             # self.base.print_message(
             #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
             # )
-            return True
+            untrack_and_return(True)
         prog = self.get_progress(yml_path)
         if not prog:
             # self.base.print_message(
             #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
             # )
-            return True
+            untrack_and_return(True)
 
         meta = copy(prog.yml.meta)
 
@@ -1308,7 +1324,7 @@ class HelaoSyncer:
             # self.base.print_message(
             #     f"Cannot sync {str(prog.yml.target)}, status is already 'synced'."
             # )
-            return True
+            untrack_and_return(True)
 
         # self.base.print_message(
         #     f"{str(prog.yml.target)} status is not synced, checking for finished."
@@ -1318,7 +1334,7 @@ class HelaoSyncer:
             # self.base.print_message(
             #     f"Cannot sync {str(prog.yml.target)}, status is not 'finished'."
             # )
-            return False
+            untrack_and_return(False)
 
         # LOGGER.info(f"{str(prog.yml.target)} status is finished, proceeding.")
 
@@ -1328,7 +1344,7 @@ class HelaoSyncer:
                 LOGGER.info(
                     f"Cannot sync {str(prog.yml.target)}, children are still 'active'."
                 )
-                return False
+                untrack_and_return(False)
             if prog.yml.finished_children:
                 # self.base.print_message(
                 #     f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
@@ -1347,7 +1363,7 @@ class HelaoSyncer:
                     self.running_tasks.pop(prog.yml.target.name)
                 await self.enqueue_yml(prog.yml.target, rank)
                 LOGGER.info(f"{str(prog.yml.target)} re-queued, exiting.")
-                return False
+                untrack_and_return(False)
 
         # LOGGER.info(f"{str(prog.yml.target)} children are synced, proceeding.")
 
@@ -1463,7 +1479,7 @@ class HelaoSyncer:
                 LOGGER.info(
                     f"Processes in {str(prog.yml.target)} did not sync after 3 tries."
                 )
-                return False
+                untrack_and_return(False)
             if prog.dict["process_metas"]:
                 meta["process_list"] = [
                     d["process_uuid"]
@@ -1572,7 +1588,7 @@ class HelaoSyncer:
                 await self.sync_process(exp_prog)
 
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
-        return return_dict
+        untrack_and_return(return_dict)
 
     def update_process(self, act_yml: HelaoYml, act_meta: Dict):
         """
