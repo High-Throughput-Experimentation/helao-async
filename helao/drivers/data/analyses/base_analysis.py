@@ -1,11 +1,11 @@
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel
 from helao.core.models.analysis import (
     AnalysisOutputModel,
     AnalysisModel,
-    AnalysisInput
+    AnalysisInput,
+    AnalysisOutput
 )
 from helao.core.models.s3locator import S3Locator
 from helao.core.models.run_use import RunUse
@@ -45,7 +45,7 @@ class BaseAnalysis:
     run_type: str
     technique_name: str
     inputs: AnalysisInput
-    outputs: BaseModel
+    outputs: AnalysisOutput
     analysis_codehash: str
     
     def gen_uuid(self, global_sample_label: Optional[str] = None):
@@ -137,6 +137,7 @@ class BaseAnalysis:
                     ),
                     content_type="application/json",
                     # content_encoding="gzip",
+                    output_type=self.outputs.output_type,
                     output_keys=output_keys,
                     output_name=label,
                     output={
