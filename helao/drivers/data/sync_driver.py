@@ -1343,8 +1343,14 @@ class HelaoSyncer:
                 #     "Adding 'finished' children to sync queue with highest priority."
                 # )
                 for child in prog.yml.finished_children:
-                    if child.target.name not in self.running_tasks:
-                        await self.enqueue_yml(child.target, rank - 1)
+                    if (
+                        child.target.name not in self.running_tasks
+                        and child.target.name not in self.task_set
+                    ):
+                        await self.enqueue_yml(
+                            child.target,
+                            rank - (1 if prog.yml.type == "experiment" else 2),
+                        )
                         LOGGER.info(str(child.target))
                 # self.base.print_message(
                 #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
