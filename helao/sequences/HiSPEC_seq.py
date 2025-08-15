@@ -156,7 +156,7 @@ def HiSpEC_CV(
         epm.add(
             "HiSpEC_sub_CP",
             {"Ival__A" : Ival__A,
-            "Tval__s" : Tval__s,
+            "Tval__s" : CP_Tval__s,
             "AcqInterval__s": AcqInterval_CA_CP__s})
         
 
