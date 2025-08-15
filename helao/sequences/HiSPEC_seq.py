@@ -22,6 +22,8 @@ def HiSpEC_CV(
     Ival__A: float = 0.0015*0.045,
     scanrate_voltsec: float = 0.01,
     cell_fill_wait: float = 60.0,
+    Tval__s: float = 60,
+    CP_Tval__s: float = 60,
     reservoir_electrolyte: Electrolyte = Electrolyte.hispeca,  # @Ben -- this is an enum for a common abbreviation we give to our electrolytes used in our screening protocols, they typically have an integer pH at the end, see helao.core.models.electrolyte and add one there if needed
     reservoir_liquid_sample_no: int = 1,# @Dan -- what is this? -- this is the liquid sample number in the liquid sample database, you will need to 'create' a liquid sample for the electrolyte you're using, so that the cell is filled with a liquid sample that inherits the reservoir attributes
     solution_bubble_gas: str = "None",
@@ -47,7 +49,6 @@ def HiSpEC_CV(
     SweepMode: str = "log",
     Repeats: int = 10,
     DelayFraction: float = 0.1,
-    Tval__s: float = 60,
     comment: str = "",
     measurement_area: float = 0.045,  # 2.4 mm diameter droplet
     liquid_volume_ml: float = 1.0,
