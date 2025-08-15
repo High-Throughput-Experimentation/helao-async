@@ -1124,8 +1124,11 @@ class HelaoSyncer:
         """
         task_name = task.get_name()
         if task_name in self.running_tasks:
-            # LOGGER.info(f"Removing {task_name} from running_tasks.")
+            LOGGER.info(f"Removing {task_name} from running_tasks.")
             self.running_tasks.pop(task_name)
+        if task_name in self.task_set:
+            LOGGER.info(f"Removing {task_name} from task_set.")
+            self.task_set.remove(task_name)
         # else:
         #     self.base.print_message(
         #         f"{task_name} was already removed from running_tasks."
@@ -1295,9 +1298,9 @@ class HelaoSyncer:
             #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
             # )
             return True
-        if yml_path.name in self.task_set:
-            async with self.aiolock:
-                self.task_set.remove(yml_path.name)
+        # if yml_path.name in self.task_set:
+        #     async with self.aiolock:
+        #         self.task_set.remove(yml_path.name)
         prog = self.get_progress(yml_path)
         if not prog:
             # self.base.print_message(
