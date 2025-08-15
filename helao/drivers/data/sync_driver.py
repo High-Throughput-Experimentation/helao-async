@@ -1168,13 +1168,14 @@ class HelaoSyncer:
                     # self.base.print_message(
                     #     f"Creating sync task for {yml_target.name}."
                     # )
-                    self.running_tasks[yml_path.name] = asyncio.create_task(
-                        self.sync_yml(yml_path=yml_path, rank=rank),
-                        name=yml_path.name,
-                    )
-                    self.running_tasks[yml_path.name].add_done_callback(
-                        self.sync_exit_callback
-                    )
+                    async with self.aiolock:
+                        self.running_tasks[yml_path.name] = asyncio.create_task(
+                            self.sync_yml(yml_path=yml_path, rank=rank),
+                            name=yml_path.name,
+                        )
+                        self.running_tasks[yml_path.name].add_done_callback(
+                            self.sync_exit_callback
+                        )
                 # else:
                 #     print_message(f"{yml_target} sync is already in progress.")
             await asyncio.sleep(0.1)
@@ -1248,13 +1249,14 @@ class HelaoSyncer:
             self.base.print_message(
                 f"{str(yml_path)} is already queued, skipping enqueue request."
             )
-        elif yml_path.name in self.running_tasks:
+        elif yml_path.name in self.running_tasks.keys():
             LOGGER.info(
                 f"{str(yml_path)} is already running, skipping enqueue request."
             )
         else:
-            self.task_set.add(yml_path.name)
-            await self.task_queue.put((rank, yml_path))
+            async with self.aiolock:
+                self.task_set.add(yml_path.name)
+                await self.task_queue.put((rank, yml_path))
             LOGGER.info(f"Added {str(yml_path)} to syncer queue with priority {rank}.")
 
     async def sync_yml(
@@ -1294,7 +1296,8 @@ class HelaoSyncer:
             # )
             return True
         if yml_path.name in self.task_set:
-            self.task_set.remove(yml_path.name)
+            async with self.aiolock:
+                self.task_set.remove(yml_path.name)
         prog = self.get_progress(yml_path)
         if not prog:
             # self.base.print_message(
@@ -1344,7 +1347,8 @@ class HelaoSyncer:
                 #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
                 # )
                 if prog.yml.target.name in self.running_tasks:
-                    self.running_tasks.pop(prog.yml.target.name)
+                    async with self.aiolock:
+                        self.running_tasks.pop(prog.yml.target.name)
                 await self.enqueue_yml(prog.yml.target, rank)
                 LOGGER.info(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
@@ -1564,7 +1568,8 @@ class HelaoSyncer:
 
             if yml_target_name in self.running_tasks:
                 LOGGER.debug(f"Removing {yml_target_name} from running_tasks.")
-                self.running_tasks.pop(yml_target_name)
+                async with self.aiolock:
+                    self.running_tasks.pop(yml_target_name)
 
             # if action contributes processes, update processes
             if yml_type == "action" and meta.get("process_contrib", False):
