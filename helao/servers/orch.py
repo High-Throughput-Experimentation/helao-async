@@ -178,6 +178,11 @@ class Orch(Base):
     """
 
     bokehapp: Server
+    loop_task: asyncio.Task
+    status_subscriber: asyncio.Task
+    globstat_broadcaster: asyncio.Task
+    heartbeat_monitor: asyncio.Task
+    driver_monitor: asyncio.Task
 
     def __init__(self, fastapp: HelaoFastAPI):
         """
@@ -243,6 +248,10 @@ class Orch(Base):
 
         # pointer to dispatch_loop_task
         self.loop_task = None
+        self.status_subscriber = None
+        self.globstat_broadcaster = None
+        self.heartbeat_monitor = None
+        self.driver_monitor = None
 
         # pointer to wait_task
         self.wait_task = None
@@ -460,25 +469,9 @@ class Orch(Base):
             None
         """
 
-        # we wait for at least one status message
-        # and then (if it contains more)
-        # empty it and then return
-
-        # get at least one status
-        # try:
-        if 1:
-            # interrupt = await asyncio.wait_for(self.interrupt_q.get(), 0.5)
-            interrupt = await self.interrupt_q.get()
-            if isinstance(interrupt, GlobalStatusModel):
-                self.incoming = interrupt
-        # except asyncio.TimeoutError:
-        #     if time.time() - self.last_interrupt > 10.0:
-        #         self.print_message(
-        #             "No interrupt, returning to while loop to check condition."
-        #         )
-        #         LOGGER.info("This message will print again after 10 seconds.")
-        #         self.last_interrupt = time.time()
-        #     return None
+        interrupt = await self.interrupt_q.get()
+        if isinstance(interrupt, GlobalStatusModel):
+            self.incoming = interrupt
 
         self.last_interrupt = time.time()
         # if not empty clear it

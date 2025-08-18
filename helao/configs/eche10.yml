@@ -70,8 +70,8 @@ servers:
             - 0
             - 1
       count_to_mm:
-        A: 0.00015634502846261243
-        B: 0.00015624414084471834
+        A: 0.00015625
+        B: 0.00015625
       galil_ip_str: 192.168.200.234
       def_speed_count_sec: 10000
       max_speed_count_sec: 25000
