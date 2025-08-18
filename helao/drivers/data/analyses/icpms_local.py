@@ -7,7 +7,7 @@ from typing import List
 from pydantic import BaseModel
 
 from helao.core.version import get_filehash
-from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
+from helao.core.models.analysis import AnalysisDataModel, AnalysisInput, AnalysisOutput
 
 from .base_analysis import BaseAnalysis
 from ...data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
@@ -60,7 +60,7 @@ class IcpmsInputs(AnalysisInput):
         )
         return [adm]
 
-class IcpmsOutputs(BaseModel):
+class IcpmsOutputs(AnalysisOutput):
     element: list
     isotope: list
     value: list
@@ -70,18 +70,8 @@ class IcpmsOutputs(BaseModel):
 
 class IcpmsAnalysis(BaseAnalysis):
     """Dry UVIS Analysis for GCLD demonstration."""
-    analysis_name: str
-    analysis_timestamp: datetime
-    analysis_uuid: UUID
-    analysis_params: dict
-    process_uuid: UUID
-    process_timestamp: datetime
-    process_name: str
-    run_type: str
-    technique_name: str
     inputs: IcpmsInputs
     outputs: IcpmsOutputs
-    analysis_codehash: str
     global_sample_label: str
 
     def __init__(
@@ -120,5 +110,6 @@ class IcpmsAnalysis(BaseAnalysis):
             value=hlo_data[fom_key],
             fom_key=fom_key,
             global_sample_label=self.global_sample_label,
+            output_type="composition.icpms_concentration"
         )
         return True
