@@ -67,4 +67,16 @@ class AnalysisInput(ABC):
         return NotImplemented
 
 class AnalysisOutput(BaseModel):
+    """
+    Base class for analysis output models in the analysis framework.
+
+    This class serves as a template for defining the structure of analysis outputs.
+    It should be extended by specific output models to include additional fields
+    relevant to the analysis results. The `output_type` attribute specifies the
+    type of output produced by the analysis.
+
+    Usage:
+        Subclass this base class to define custom analysis output models
+        with additional attributes as needed for your analysis workflow.
+    """
     output_type: str
