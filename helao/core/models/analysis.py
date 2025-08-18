@@ -37,6 +37,7 @@ class AnalysisOutputModel(BaseModel, HelaoDict):
     analysis_output_path: S3Locator
     content_type: str
     content_encoding: Optional[str] = None
+    output_type: str
     output_keys: Optional[List[str]] = None
     output_name: Optional[str] = None
     output: Optional[Dict[str, Union[float, str, bool, int, None]]] = None
@@ -64,3 +65,18 @@ class AnalysisInput(ABC):
     @abstractmethod
     def get_datamodels(self, *args, **kwargs) -> List[AnalysisDataModel]:
         return NotImplemented
+
+class AnalysisOutput(BaseModel):
+    """
+    Base class for analysis output models in the analysis framework.
+
+    This class serves as a template for defining the structure of analysis outputs.
+    It should be extended by specific output models to include additional fields
+    relevant to the analysis results. The `output_type` attribute specifies the
+    type of output produced by the analysis.
+
+    Usage:
+        Subclass this base class to define custom analysis output models
+        with additional attributes as needed for your analysis workflow.
+    """
+    output_type: str

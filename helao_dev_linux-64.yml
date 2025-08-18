@@ -30,6 +30,7 @@ dependencies:
   - ipykernel
   - ipympl
   - ipywidgets
+  - joblib
   - jupyterlab
   - matplotlib
   - munch
@@ -37,14 +38,13 @@ dependencies:
   - numpy=1
   - orjson
   - pandas
-  - paramiko
-# - picologging
+  - paramiko=3
   - pip
   - psutil
   - psycopg2
   - pyaml
   - pyarrow
-#  - pybase64
+  - pybase64
   - pydantic-core
   - pydantic-settings
   - pydantic
@@ -66,8 +66,6 @@ dependencies:
   - scikit-learn
   - scipy
   - shortuuid
-  - sphinx-autodoc-typehints
-  - sphinx-markdown-builder
   - sqlalchemy
   - sshtunnel
   - starlette
