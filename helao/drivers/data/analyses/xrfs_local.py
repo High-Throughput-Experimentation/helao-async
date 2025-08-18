@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from helao.core.version import get_filehash
-from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
+from helao.core.models.analysis import AnalysisDataModel, AnalysisInput, AnalysisOutput
 
 from .base_analysis import BaseAnalysis
 from ...data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
@@ -74,7 +74,7 @@ class XrfsInputs(AnalysisInput):
         return [adm]
 
 
-class XrfsOutputs(BaseModel):
+class XrfsOutputs(AnalysisOutput):
     element: list
     transition: list
     counts: list
@@ -87,19 +87,8 @@ class XrfsOutputs(BaseModel):
 
 class XrfsAnalysis(BaseAnalysis):
     """XRF quantification with calibration standards."""
-
-    analysis_name: str
-    analysis_timestamp: datetime
-    analysis_uuid: UUID
-    analysis_params: dict
-    process_uuid: UUID
-    process_timestamp: datetime
-    process_name: str
-    run_type: str
-    technique_name: str
     inputs: XrfsInputs
     outputs: XrfsOutputs
-    analysis_codehash: str
     global_sample_label: str
 
     def __init__(
@@ -238,5 +227,6 @@ class XrfsAnalysis(BaseAnalysis):
             nanomoles_per_cm2=nanomoles_per_cm2,
             atomic_fraction=atomic_fraction,
             global_sample_label=self.global_sample_label,
+            output_type="composition.xrfs_quantification"
         )
         return True
