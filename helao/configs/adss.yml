@@ -163,8 +163,8 @@ servers:
     regular_update: true
     params:
       user: RSHS
-      key: c:\helao\sshkeys\rshs_private3.ppk
-      host: 10.231.100.169
+      key: c:\helao\sshkeys\adss_private_newff.pem
+      host: 10.231.100.128
       timeout: 1800
       dev_trigger: NImax
       trigger:

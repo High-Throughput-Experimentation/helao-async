@@ -31,6 +31,7 @@ dependencies:
   - ipykernel
   - ipympl
   - ipywidgets
+  - joblib
   - jupyterlab
   - matplotlib
   - munch
@@ -38,7 +39,7 @@ dependencies:
   - numpy=1
   - orjson
   - pandas
-  - paramiko
+  - paramiko=3
   - pip
   - psutil
   - psycopg2
