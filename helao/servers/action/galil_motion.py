@@ -1,5 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-""" A FastAPI service definition for a motion/IO server, e.g. Galil.
+"""A FastAPI service definition for a motion/IO server, e.g. Galil.
 
 The motion/IO service defines RESTful methods for sending commmands and retrieving data
 from a motion controller driver class such as 'galil_driver' using
@@ -9,8 +9,8 @@ calls to 'motion.*' are not device-specific. Currently inherits configuration fr
 driver code, and hard-coded to use 'galil' class (see "__main__").
 
 Motor calibration procedure for new instrument alignment:
-Place alignment plate onto stage. 
-In c:\inst_hlo\database\plate_calib, delete the instrument_calib.json 
+Place alignment plate onto stage.
+In c:\inst_hlo\database\plate_calib, delete the instrument_calib.json
 ---
 Open the MOTOR bokeh
 ----
@@ -78,9 +78,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 return finished_action.as_dict()
 
         @app.post(f"/{server_key}/reset_plate_alignment", tags=["action"])
-        async def reset_plate_alignment(
-            action: Action = Body({}, embed=True)
-        ):
+        async def reset_plate_alignment(action: Action = Body({}, embed=True)):
             active = await app.base.setup_and_contain_action()
             app.driver.reset_plate_transfermatrix()
             finished_action = await active.finish()
@@ -107,7 +105,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             plateid: int = 6353,  # None
         ):
             """starts the plate aligning process, matrix is return when fully done"""
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             active_dict = await app.driver.run_aligner(A)
             return active_dict
 
@@ -223,6 +221,38 @@ async def galil_dyn_endpoints(app: BaseAPI):
                     datadict.get("err_code", ErrorCodes.unspecified)
                 )
                 await active.enqueue_data_dflt(datadict=datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+            @app.post(f"/{server_key}/easymove_to_solid", tags=["action"])
+            async def easymove_to_solid(
+                action: Action = Body({}, embed=True),
+                action_version: int = 1,
+                plate_id: Optional[int] = None,
+                sample_no: Optional[int] = None,
+                speed: Optional[int] = None,
+            ):
+                active = await app.base.setup_and_contain_action()
+                datadict0 = await app.driver.solid_get_samples_xy(
+                    **active.action.action_params
+                )
+                platexy = datadict0.get("platexy", [[None, None]])[0]
+                if platexy[0] is None or platexy[1] is None:
+                    active.action.error_code = ErrorCodes.not_available
+                else:
+                    active.action.action_params.update(
+                        {
+                            "d_mm": platexy,
+                            "axis": ["x", "y"],
+                            "mode": MoveModes.absolute,
+                            "transformation": TransformationModes.platexy,
+                        }
+                    )
+                    datadict1 = await app.driver.motor_move(active)
+                    active.action.error_code = app.base.get_main_error(
+                        datadict1.get("err_code", ErrorCodes.unspecified)
+                    )
+                    await active.enqueue_data_dflt(datadict=datadict1)
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
@@ -369,7 +399,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             specref_code: int = 1,
-            ref_position_name: str = "builtin_ref_motorxy"
+            ref_position_name: str = "builtin_ref_motorxy",
         ):
             active = await app.base.setup_and_contain_action()
             refxy = app.base.world_cfg[active.action.action_params["ref_position_name"]]
