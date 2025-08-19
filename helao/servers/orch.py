@@ -1285,16 +1285,16 @@ class Orch(Base):
                         f"global parameter {k} not found in global_params, skipping"
                     )
 
-            actserv_exists, _ = await endpoints_available([A.url])
-            if not actserv_exists:
-                stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
-                self.current_stop_message = stop_message
-                LOGGER.warning(stop_message)
-                await self.stop()
-                LOGGER.alert(f"ORCH STOPPED ~ {stop_message}")
-                self.action_dq.insert(0, A)
-                await self.update_operator(True)
-                return ErrorCodes.none
+            # actserv_exists, _ = await endpoints_available([A.url])
+            # if not actserv_exists:
+            #     stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
+            #     self.current_stop_message = stop_message
+            #     LOGGER.warning(stop_message)
+            #     await self.stop()
+            #     LOGGER.alert(f"ORCH STOPPED ~ {stop_message}")
+            #     self.action_dq.insert(0, A)
+            #     await self.update_operator(True)
+            #     return ErrorCodes.none
 
             LOGGER.info(
                 f"dispatching action {A.action_name} on server {A.action_server.server_name}"
