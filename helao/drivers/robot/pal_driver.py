@@ -22,7 +22,7 @@ import subprocess
 import psutil
 
 from helao.helpers.premodels import Action
-from helao.servers.base import Base
+from helao.servers.base import Base, Active
 from helao.core.error import ErrorCodes
 from helao.core.helaodict import HelaoDict
 
@@ -187,8 +187,8 @@ class PAL:
             self.triggers = True
 
         # for passing action object from technique method to measure loop
-        self.action = None
-        self.active = None
+        self.action: Action = None
+        self.active: Active = None
 
         # for global IOloop
         self.IO_do_meas = False
@@ -888,8 +888,10 @@ class PAL:
             PalAction(
                 samples_in=deepcopy(palposition.samples_initial),
                 source=deepcopy(palposition),
-                dilute=[False]*len(palposition.samples_initial),  # initial source is not diluted
-                dilute_type=[microcam.cam.sample_out_type]*len(palposition.samples_initial),
+                dilute=[False]
+                * len(palposition.samples_initial),  # initial source is not diluted
+                dilute_type=[microcam.cam.sample_out_type]
+                * len(palposition.samples_initial),
                 samples_in_delta_vol_ml=[-1.0 * microcam.volume_ul / 1000.0],
             )
         )
@@ -1474,7 +1476,9 @@ class PAL:
         # a quick message if samples will be diluted or not
         for i, sample in enumerate(microcam.run[-1].samples_in):
             if i >= len(microcam.run[-1].dilute):
-                LOGGER.info(f"PAL: Not diluting sample_in '{sample.global_label}' because dilute bool not specified.")
+                LOGGER.info(
+                    f"PAL: Not diluting sample_in '{sample.global_label}' because dilute bool not specified."
+                )
             elif microcam.run[-1].dilute[i]:
                 LOGGER.info(f"PAL: Diluting sample_in '{sample.global_label}'.")
             else:
