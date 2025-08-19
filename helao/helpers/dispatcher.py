@@ -71,7 +71,7 @@ async def async_action_dispatcher(
                         success = False
                     else:
                         success = True
-        except Exception as e:
+        except Exception:
             retry_count += 1
             retry_wait = retry_count * timeout / 2
             LOGGER.warning(
@@ -147,7 +147,7 @@ async def async_private_dispatcher(
                         success = False
                     else:
                         success = True
-        except Exception as e:
+        except Exception:
             retry_count += 1
             retry_wait = retry_count * timeout / 2
             LOGGER.warning(
@@ -197,21 +197,19 @@ def private_dispatcher(
             params=params_dict,
             json=json_dict,
         ) as resp:
-            error_code = ErrorCodes.none
+            error_code = ErrorCodes.http
             try:
-                try:
-                    response = resp.json()
-                except:
-                    response = str(resp)
-                if resp.status_code != 200:
-                    error_code = ErrorCodes.http
+                response = resp.json()
+                if resp.status_code == 200:
+                    error_code = ErrorCodes.none
+                else:
                     LOGGER.error(
                         f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}')"
                     )
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            except Exception:
                 LOGGER.error(
-                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), {tb}"
+                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}')",
+                    exc_info=True,
                 )
                 response = None
             return response, error_code

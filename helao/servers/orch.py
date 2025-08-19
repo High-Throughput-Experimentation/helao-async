@@ -54,6 +54,7 @@ from helao.helpers.zdeque import zdeque
 from helao.helpers.legacy_api import HTELegacyAPI
 from helao.drivers.data.sync_driver import HelaoSyncer
 from helao.helpers import config_loader
+
 CONFIG = config_loader.CONFIG
 
 # ANSI color codes converted to the Windows versions
@@ -977,8 +978,8 @@ class Orch(Base):
         if not self.experiment_dq:
             LOGGER.info("experiment_dq is empty, cannot dispatch experiments")
             await self.intend_none()
-            return ErrorCodes.none        
-        
+            return ErrorCodes.none
+
         LOGGER.info("action_dq is empty, getting new actions")
         # wait for all actions in last/active experiment to finish
         # LOGGER.info("finishing last active experiment first")
@@ -1182,7 +1183,7 @@ class Orch(Base):
             LOGGER.info("action_dq is empty, cannot dispatch actions")
             await self.intend_none()
             return ErrorCodes.none
-        
+
         # LOGGER.info("actions in action_dq, processing them")
         if self.globalstatusmodel.loop_intent == LoopIntent.stop:
             LOGGER.info("stopping orchestrator")
@@ -2059,7 +2060,9 @@ class Orch(Base):
                     sub_sequence.sequence_codehash = self.sequence_codehash_lib[
                         sub_sequence.sequence_name
                     ]
-                sub_sequence.campaign_sequence_parameter_variable = ["plate_sample_no_list"]
+                sub_sequence.campaign_sequence_parameter_variable = [
+                    "plate_sample_no_list"
+                ]
                 self.sequence_dq.append(sub_sequence)
                 sub_sequence_uuids.append(sub_sequence.sequence_uuid)
             return sub_sequence_uuids
@@ -2383,7 +2386,9 @@ class Orch(Base):
                 old_status=HloStatus.active,
                 new_status=HloStatus.finished,
             )
-            self.active_sequence.finished_global_params = {k: v for k, v in self.global_params.items() if k != "_fast_samples_in"}
+            self.active_sequence.finished_global_params = {
+                k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
+            }
             await self.write_seq(self.active_sequence)
             self.last_sequence = deepcopy(self.active_sequence)
             await self.put_lbuf(
@@ -2460,7 +2465,9 @@ class Orch(Base):
             await self.write_active_sequence_seq()
 
             # write final exp
-            self.active_experiment.finished_global_params = {k: v for k, v in self.global_params.items() if k != "_fast_samples_in"}
+            self.active_experiment.finished_global_params = {
+                k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
+            }
             await self.write_exp(self.active_experiment)
 
             self.last_experiment = deepcopy(self.active_experiment)
@@ -2479,7 +2486,9 @@ class Orch(Base):
         Returns:
             None
         """
-        self.active_experiment.initial_global_params = {k: v for k, v in self.global_params.items() if k != "_fast_samples_in"}
+        self.active_experiment.initial_global_params = {
+            k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
+        }
         await self.write_exp(self.active_experiment)
 
     async def write_active_sequence_seq(self):
@@ -2493,7 +2502,9 @@ class Orch(Base):
         Returns:
             None
         """
-        self.active_sequence.initial_global_params = {k: v for k, v in self.global_params.items() if k != "_fast_samples_in"}
+        self.active_sequence.initial_global_params = {
+            k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
+        }
         await self.write_seq(self.active_sequence)
 
     async def shutdown(self):
