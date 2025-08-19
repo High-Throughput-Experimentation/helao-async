@@ -17,7 +17,6 @@ __all__ = [
 ]
 
 
-from typing import Optional
 from socket import gethostname
 
 from helao.core.models.sample import SolidSample
@@ -188,7 +187,7 @@ def UVIS_sub_relmove(
 def UVIS_sub_measure(
     experiment: Experiment,
     experiment_version: int = 1,
-    spec_type: SpecType = "T",
+    spec_type: SpecType = SpecType.T,
     spec_n_avg: int = 1,
     spec_int_time_ms: int = 10,
     duration_sec: float = -1,
@@ -200,7 +199,7 @@ def UVIS_sub_measure(
     illumination_side: str = "front",
     reference_mode: str = "internal",
     technique_name: str = "T_UVVIS",
-    run_use: RunUse = "data",
+    run_use: RunUse = RunUse.data,
     comment: str = "",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
