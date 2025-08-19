@@ -53,7 +53,9 @@ async def async_action_dispatcher(
             force_close=True, enable_cleanup_closed=True, limit=1000
         )
         try:
-            async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
+            async with aiohttp.ClientSession(
+                timeout=client_timeout, connector=conn
+            ) as session:
                 async with session.post(
                     url,
                     params=params,
@@ -85,7 +87,7 @@ async def async_action_dispatcher(
             f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{response}')",
             exc_info=True,
         )
-                
+
     await asyncio.sleep(0)
     return response, error_code
 
