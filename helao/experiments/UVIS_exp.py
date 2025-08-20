@@ -444,6 +444,7 @@ def UVIS_measure_references(
     spec_n_avg: int = 5,
     spec_int_time_ms: int = 300,
     duration_sec: float = -1,
+    spec_type: SpecType = SpecType.R,
     specref_code: int = 1,
     led_type: str = "front",
     led_date: str = "n/a",
@@ -451,6 +452,7 @@ def UVIS_measure_references(
     led_wavelengths_nm: list = [-1],
     led_intensities_mw: list = [-1],
     toggle_is_shutter: bool = True,
+    technique_name: str = "R_UVVIS",
 ) -> list:
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # 0) unregister samples from measurement location
@@ -471,7 +473,7 @@ def UVIS_measure_references(
     apm.add_actions(
         UVIS_sub_measure(
             experiment=experiment,
-            spec_type=SpecType.R,
+            spec_type=spec_type,
             spec_int_time_ms=spec_int_time_ms,
             spec_n_avg=spec_n_avg,
             duration_sec=duration_sec,
@@ -481,8 +483,8 @@ def UVIS_measure_references(
             illumination_intensity=led_intensities_mw[0],
             illumination_intensity_date=led_date,
             illumination_side=led_type,
-            technique_name="R_UVVIS",
-            run_use=RunUse.ref_dark,
+            technique_name=technique_name,
+            run_use=RunUse.ref_bkg,
             reference_mode="builtin",
         )
     )
@@ -502,7 +504,7 @@ def UVIS_measure_references(
     apm.add_actions(
         UVIS_sub_measure(
             experiment=experiment,
-            spec_type=SpecType.R,
+            spec_type=spec_type,
             spec_int_time_ms=spec_int_time_ms,
             spec_n_avg=spec_n_avg,
             duration_sec=duration_sec,
@@ -512,7 +514,7 @@ def UVIS_measure_references(
             illumination_intensity=led_intensities_mw[0],
             illumination_intensity_date=led_date,
             illumination_side=led_type,
-            technique_name="R_UVVIS",
+            technique_name=technique_name,
             run_use=RunUse.ref_light,
             reference_mode="builtin",
         )
