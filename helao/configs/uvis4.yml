@@ -64,7 +64,7 @@ servers:
         A: 0.00015634502846261243
         B: 0.00015624414084471834
       galil_ip_str: 192.168.200.218
-      def_speed_count_sec: 10000
+      def_speed_count_sec: 20000
       max_speed_count_sec: 25000
       ipstr: 192.168.200.218
       axis_id:
