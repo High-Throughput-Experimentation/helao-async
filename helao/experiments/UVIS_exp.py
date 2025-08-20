@@ -14,6 +14,7 @@ __all__ = [
     "UVIS_sub_setup_ref",
     "UVIS_calc_abs",
     "UVIS_analysis_dry",
+    "UVIS_measure_references",
 ]
 
 
