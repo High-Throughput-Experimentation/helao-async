@@ -107,9 +107,7 @@ def UVIS_sub_startup(
             "plate_id": solid_plate_id,
             "sample_no": solid_sample_no,
         },
-        to_global_params=[
-            "_platexy"
-        ],  # save new liquid_sample_no of cell to globals
+        to_global_params=["_platexy"],  # save new liquid_sample_no of cell to globals
     )
     # move to position
     apm.add(
@@ -276,6 +274,7 @@ def UVIS_sub_setup_ref(
     solid_plate_id: int = 1,
     solid_sample_no: int = 2,
     specref_code: int = 1,
+    ref_position_name: str = "builtin_ref_motorxy",
 ):
     """Determine initial and final reference measurements and move to position."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -303,7 +302,7 @@ def UVIS_sub_setup_ref(
         apm.add(
             MOTOR_server,
             "solid_get_builtin_specref",
-            {},
+            {"ref_position_name": ref_position_name},
             to_global_params=["_refxy"],
         )
         apm.add(
@@ -349,9 +348,11 @@ def UVIS_sub_setup_ref(
         {
             "axis": ["x", "y"],
             "mode": MoveModes.absolute,
-            "transformation": TransformationModes.platexy
-            if reference_mode != "builtin"
-            else TransformationModes.motorxy,
+            "transformation": (
+                TransformationModes.platexy
+                if reference_mode != "builtin"
+                else TransformationModes.motorxy
+            ),
         },
         from_global_act_params={"_refxy": "d_mm"},
     )
@@ -411,5 +412,89 @@ def UVIS_analysis_dry(
             "recent": recent,
             "params": params,
         },
+    )
+    return apm.planned_actions
+
+
+def UVIS_measure_references(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    plate_id: int = 1,
+    custom_position: str = "cell1_we",
+    spec_n_avg: int = 5,
+    spec_int_time_ms: int = 300,
+    duration_sec: float = -1,
+    specref_code: int = 1,
+    led_type: str = "front",
+    led_date: str = "n/a",
+    led_names: list = ["xenon"],
+    led_wavelengths_nm: list = [-1],
+    led_intensities_mw: list = [-1],
+    toggle_is_shutter: bool = True,
+) -> list:
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    # 0) unregister samples from measurement location
+    apm.add_actions(UVIS_sub_unloadall_customs(experiment=experiment))
+    # 1) move to zero reflectance (black) reference
+    apm.add_actions(
+        UVIS_sub_setup_ref(
+            experiment=experiment,
+            reference_mode="builtin",
+            solid_custom_position=custom_position,
+            solid_plate_id=plate_id,
+            solid_sample_no=0,
+            specref_code=specref_code,
+            ref_position_name="builtin_black_motorxy",
+        )
+    )
+    # 2) measure dark reference
+    apm.add_actions(
+        UVIS_sub_measure(
+            experiment=experiment,
+            spec_type=SpecType.R,
+            spec_int_time_ms=spec_int_time_ms,
+            spec_n_avg=spec_n_avg,
+            duration_sec=duration_sec,
+            toggle_source=led_names[0],
+            toggle_is_shutter=toggle_is_shutter,
+            illumination_wavelength=led_wavelengths_nm[0],
+            illumination_intensity=led_intensities_mw[0],
+            illumination_intensity_date=led_date,
+            illumination_side=led_type,
+            technique_name="R_UVVIS",
+            run_use=RunUse.ref_dark,
+            reference_mode="builtin",
+        )
+    )
+    # 3) move to full reflectance (white) reference
+    apm.add_actions(
+        UVIS_sub_setup_ref(
+            experiment=experiment,
+            reference_mode="builtin",
+            solid_custom_position=custom_position,
+            solid_plate_id=plate_id,
+            solid_sample_no=0,
+            specref_code=specref_code,
+            ref_position_name="builtin_ref_motorxy",
+        )
+    )
+    # 3) measure light reference
+    apm.add_actions(
+        UVIS_sub_measure(
+            experiment=experiment,
+            spec_type=SpecType.R,
+            spec_int_time_ms=spec_int_time_ms,
+            spec_n_avg=spec_n_avg,
+            duration_sec=duration_sec,
+            toggle_source=led_names[0],
+            toggle_is_shutter=toggle_is_shutter,
+            illumination_wavelength=led_wavelengths_nm[0],
+            illumination_intensity=led_intensities_mw[0],
+            illumination_intensity_date=led_date,
+            illumination_side=led_type,
+            technique_name="R_UVVIS",
+            run_use=RunUse.ref_light,
+            reference_mode="builtin",
+        )
     )
     return apm.planned_actions
