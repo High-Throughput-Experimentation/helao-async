@@ -111,3 +111,10 @@ servers:
       api_host: caltech-api.modelyst.com
       testing: false
     verbose: true
+  CAM:
+    host: hte-uvis-04.htejcap.caltech.edu
+    port: 8013
+    group: action
+    fast: cam_server
+    params:
+      axis_ip: 192.168.200.230

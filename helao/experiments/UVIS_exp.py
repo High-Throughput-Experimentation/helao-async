@@ -42,6 +42,7 @@ ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
+CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -199,6 +200,7 @@ def UVIS_sub_measure(
     reference_mode: str = "internal",
     technique_name: str = "T_UVVIS",
     run_use: RunUse = RunUse.data,
+    acquire_image: bool = False,
     comment: str = "",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -224,6 +226,23 @@ def UVIS_sub_measure(
     # wait for 1 second for shutter to actuate
     if toggle_is_shutter:
         apm.add(ORCH_server, "wait", {"waittime": 1})
+
+    # take webcam image
+    if acquire_image:
+        apm.add(
+            CAM_server,
+            "acquire_image",
+            {"duration": 0},
+            from_global_act_params={"_fast_samples_in": "fast_samples_in"},
+            run_use=run_use,
+            technique_name=technique_name,
+            process_finish=False,
+            process_contrib=[
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.run_use,
+            ],
+        )
 
     # setup spectrometer data collection
     apm.add(

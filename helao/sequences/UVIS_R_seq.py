@@ -74,6 +74,7 @@ def UVIS_R(
                 "technique_name": "R_UVVIS",
                 "run_use": "data",
                 "reference_mode": reference_mode,
+                "acquire_image": True,
             },
         )
         if plate_sample in reference_after_sample_list:
