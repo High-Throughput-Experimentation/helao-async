@@ -623,7 +623,7 @@ class Base:
         self,
         json_data_keys: List[str] = [],
         action_abbr: Optional[str] = None,
-        file_type: str = "helao__file",
+        file_type: Optional[str] = None,
         hloheader: HloHeaderModel = HloHeaderModel(),
     ):
         """
@@ -644,6 +644,8 @@ class Base:
         action = self._get_action(frame=inspect.currentframe().f_back)
         if action_abbr is not None:
             action.action_abbr = action_abbr
+        if file_type is None:
+            file_type = f"{self.server.server_name.lower()}_helao__file"
         active = await self.contain_action(
             ActiveParams(
                 action=action,
