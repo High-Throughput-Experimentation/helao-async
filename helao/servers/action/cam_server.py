@@ -1,13 +1,17 @@
 # shell: uvicorn motion_server:app --reload
-""" Webcam server
-
-"""
+"""Webcam server"""
 
 __all__ = ["makeApp"]
 
 from typing import List, Union
 from fastapi import Body
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
 from helao.drivers.sensor.axiscam_driver import AxisCam, AxisCamExec
@@ -29,14 +33,16 @@ def makeApp(server_key):
         action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 1,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
     ):
         """Record image stream from webcam."""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "acq_webcam"
         executor = AxisCamExec(
             active=active,
-            oneoff=False,
+            oneoff=False if active.action.action_params["duration"] != 0 else True,
             poll_rate=active.action.action_params["acquisition_rate"],
         )
         active_action_dict = active.start_executor(executor)

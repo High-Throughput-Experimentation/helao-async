@@ -24,6 +24,7 @@ from helao.core.models.sample import SolidSample
 from helao.core.models.machine import MachineModel as MM
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.run_use import RunUse
+from helao.core.models.action_start_condition import ActionStartCondition
 
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
@@ -186,7 +187,7 @@ def UVIS_sub_relmove(
 
 def UVIS_sub_measure(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     spec_type: SpecType = SpecType.T,
     spec_n_avg: int = 1,
     spec_int_time_ms: int = 10,
@@ -213,19 +214,20 @@ def UVIS_sub_measure(
         to_global_params=["_fast_samples_in"],
     )
 
-    # set illumination state before measurement
-    apm.add(
-        IO_server,
-        "set_digital_out",
-        {
-            "do_item": toggle_source,
-            "on": False if run_use == "ref_dark" and spec_type == SpecType.T else True,
-        },
-    )
+    if spec_type == SpecType.T:
+        # set illumination state before measurement
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {
+                "do_item": toggle_source,
+                "on": False if run_use == "ref_dark" and spec_type == SpecType.T else True,
+            },
+        )
 
-    # wait for 1 second for shutter to actuate
-    if toggle_is_shutter:
-        apm.add(ORCH_server, "wait", {"waittime": 1})
+        # wait for 1 second for shutter to actuate
+        if toggle_is_shutter:
+            apm.add(ORCH_server, "wait", {"waittime": 1})
 
     # take webcam image
     if acquire_image:
@@ -256,6 +258,7 @@ def UVIS_sub_measure(
         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         run_use=run_use,
         technique_name=technique_name,
+        start_condition=ActionStartCondition.no_wait,
         process_finish=True,
         process_contrib=[
             ProcessContrib.files,
@@ -265,15 +268,16 @@ def UVIS_sub_measure(
         ],
     )
 
-    # set illumination state after measurement
-    apm.add(
-        IO_server,
-        "set_digital_out",
-        {
-            "do_item": toggle_source,
-            "on": True if toggle_is_shutter else False,
-        },
-    )
+    if spec_type == SpecType.T:
+        # set illumination state after measurement
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {
+                "do_item": toggle_source,
+                "on": True if toggle_is_shutter else False,
+            },
+        )
 
     if reference_mode == "blank" and run_use == "ref_light":
         apm.add(
