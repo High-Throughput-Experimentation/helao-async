@@ -45,7 +45,7 @@ async def sm303_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/acquire_spec", tags=["action"])
     async def acquire_spec(
         action: Action = Body({}, embed=True),
-        action_version: int = 1,
+        action_version: int = 2,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -66,9 +66,10 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         specdict = app.driver.acquire_spec_adv(**active.action.action_params)  # type: ignore
         await active.enqueue_data_dflt(datadict=specdict)
         # duration loop
-        while time.time() - starttime < active.action.action_params["duration_sec"]:
-            specdict = app.driver.acquire_spec_adv(**active.action.action_params)
-            await active.enqueue_data_dflt(datadict=specdict)
+        if active.action.action_params["duration_sec"] > 0:
+            while time.time() - starttime < active.action.action_params["duration_sec"]:
+                specdict = app.driver.acquire_spec_adv(**active.action.action_params)
+                await active.enqueue_data_dflt(datadict=specdict)
         # wait 1 second to capture dangling data messages
         await asyncio.sleep(1)
         finished_act = await active.finish()
@@ -77,7 +78,7 @@ async def sm303_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/acquire_spec_adv", tags=["action"])
     async def acquire_spec_adv(
         action: Action = Body({}, embed=True),
-        action_version: int = 1,
+        action_version: int = 2,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -100,9 +101,10 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         specdict = app.driver.acquire_spec_adv(**active.action.action_params)
         await active.enqueue_data_dflt(datadict=specdict)
         # duration loop
-        while time.time() - starttime < active.action.action_params["duration_sec"]:
-            specdict = app.driver.acquire_spec_adv(**active.action.action_params)
-            await active.enqueue_data_dflt(datadict=specdict)
+        if active.action.action_params["duration_sec"] > 0:
+            while time.time() - starttime < active.action.action_params["duration_sec"]:
+                specdict = app.driver.acquire_spec_adv(**active.action.action_params)
+                await active.enqueue_data_dflt(datadict=specdict)
 
         active.action.action_params["peak_intensity"] = specdict.get(
             "peak_intensity", None
