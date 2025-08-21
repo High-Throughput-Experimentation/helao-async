@@ -219,7 +219,7 @@ def UVIS_sub_measure(
         "set_digital_out",
         {
             "do_item": toggle_source,
-            "on": False if run_use == "ref_dark" else True,
+            "on": False if run_use == "ref_dark" and spec_type == SpecType.T else True,
         },
     )
 
@@ -484,7 +484,7 @@ def UVIS_measure_references(
             illumination_intensity_date=led_date,
             illumination_side=led_type,
             technique_name=technique_name,
-            run_use=RunUse.ref_bkg,
+            run_use=RunUse.ref_dark,
             reference_mode="builtin",
         )
     )
