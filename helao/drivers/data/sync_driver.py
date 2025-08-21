@@ -1905,80 +1905,82 @@ class HelaoSyncer:
         if self.api_host is None:
             LOGGER.info("Modelyst API is not configured. Skipping to API push.")
             return True
-        req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
-        # LOGGER.info(f"preparing API push to {req_url}")
-        # meta_name = req_model.get(
-        #     f"{meta_type.replace('process', 'technique')}_name",
-        #     req_model["experiment_name"],
-        # )
-        meta_uuid = req_model[f"{meta_type}_uuid"]
-        LOGGER.debug(f"attempting API push for {meta_type}: {meta_uuid}")
-        try_create = True
-        api_success = False
-        last_status = 0
-        last_response = {}
-        LOGGER.debug("creating async request session")
-        async with aiohttp.ClientSession() as session:
-            for i in range(retries):
-                if not api_success:
-                    LOGGER.debug(f"session attempt {i}")
-                    req_method = session.post if try_create else session.patch
-                    api_str = f"API {'POST' if try_create else 'PATCH'}"
-                    try:
-                        LOGGER.debug("trying request")
-                        async with req_method(req_url, json=req_model) as resp:
-                            LOGGER.debug("response received")
-                            if resp.status == 200:
-                                api_success = True
-                            elif resp.status == 400:
-                                try_create = False
-                            LOGGER.debug(
-                                f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}"
-                            )
-                            last_response = await resp.json()
-                            LOGGER.debug(
-                                f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}"
-                            )
-                            last_status = resp.status
-                    except Exception as e:
-                        LOGGER.info(f"[{i+1}/{retries}] an exception occurred: {e}")
-                        await asyncio.sleep(30)
-                else:
-                    break
-            if not api_success:
-                meta_s3_key = f"{meta_type}/{meta_uuid}.json"
-                fail_model = {
-                    "endpoint": f"https://{self.api_host}/{PLURALS[meta_type]}/",
-                    "method": "POST" if try_create else "PATCH",
-                    "status_code": last_status,
-                    "detail": last_response.get("detail", ""),
-                    "data": req_model,
-                    "s3_files": [
-                        {
-                            "bucket_name": self.bucket,
-                            "key": meta_s3_key,
-                        }
-                    ],
-                }
-                fail_url = f"https://{self.api_host}/failed"
-                for _ in range(retries):
-                    try:
-                        async with aiohttp.ClientSession() as session:
-                            async with session.post(fail_url, json=fail_model) as resp:
-                                if resp.status == 200:
-                                    LOGGER.info(
-                                        f"successful debug API push for {meta_type}: {meta_uuid}"
-                                    )
-                                    break
-                                LOGGER.info(
-                                    f"failed debug API push for {meta_type}: {meta_uuid}"
-                                )
-                                LOGGER.info(f"response: {await resp.json()}")
-                    except TimeoutError:
-                        LOGGER.info(
-                            f"unable to post failure model for {meta_type}: {meta_uuid}"
-                        )
-                        await asyncio.sleep(30)
+        else:
+            return True
+        # req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
+        # # LOGGER.info(f"preparing API push to {req_url}")
+        # # meta_name = req_model.get(
+        # #     f"{meta_type.replace('process', 'technique')}_name",
+        # #     req_model["experiment_name"],
+        # # )
+        # meta_uuid = req_model[f"{meta_type}_uuid"]
+        # LOGGER.debug(f"attempting API push for {meta_type}: {meta_uuid}")
+        # try_create = True
+        # api_success = False
+        # last_status = 0
+        # last_response = {}
+        # LOGGER.debug("creating async request session")
+        # async with aiohttp.ClientSession() as session:
+        #     for i in range(retries):
+        #         if not api_success:
+        #             LOGGER.debug(f"session attempt {i}")
+        #             req_method = session.post if try_create else session.patch
+        #             api_str = f"API {'POST' if try_create else 'PATCH'}"
+        #             try:
+        #                 LOGGER.debug("trying request")
+        #                 async with req_method(req_url, json=req_model) as resp:
+        #                     LOGGER.debug("response received")
+        #                     if resp.status == 200:
+        #                         api_success = True
+        #                     elif resp.status == 400:
+        #                         try_create = False
+        #                     LOGGER.debug(
+        #                         f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}"
+        #                     )
+        #                     last_response = await resp.json()
+        #                     LOGGER.debug(
+        #                         f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}"
+        #                     )
+        #                     last_status = resp.status
+        #             except Exception as e:
+        #                 LOGGER.info(f"[{i+1}/{retries}] an exception occurred: {e}")
+        #                 await asyncio.sleep(30)
+        #         else:
+        #             break
+        #     if not api_success:
+        #         meta_s3_key = f"{meta_type}/{meta_uuid}.json"
+        #         fail_model = {
+        #             "endpoint": f"https://{self.api_host}/{PLURALS[meta_type]}/",
+        #             "method": "POST" if try_create else "PATCH",
+        #             "status_code": last_status,
+        #             "detail": last_response.get("detail", ""),
+        #             "data": req_model,
+        #             "s3_files": [
+        #                 {
+        #                     "bucket_name": self.bucket,
+        #                     "key": meta_s3_key,
+        #                 }
+        #             ],
+        #         }
+        #         fail_url = f"https://{self.api_host}/failed"
+        #         for _ in range(retries):
+        #             try:
+        #                 async with aiohttp.ClientSession() as session:
+        #                     async with session.post(fail_url, json=fail_model) as resp:
+        #                         if resp.status == 200:
+        #                             LOGGER.info(
+        #                                 f"successful debug API push for {meta_type}: {meta_uuid}"
+        #                             )
+        #                             break
+        #                         LOGGER.info(
+        #                             f"failed debug API push for {meta_type}: {meta_uuid}"
+        #                         )
+        #                         LOGGER.info(f"response: {await resp.json()}")
+        #             except TimeoutError:
+        #                 LOGGER.info(
+        #                     f"unable to post failure model for {meta_type}: {meta_uuid}"
+        #                 )
+        #                 await asyncio.sleep(30)
         return api_success
 
     def list_pending(self, omit_manual_exps: bool = True):
