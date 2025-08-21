@@ -1981,7 +1981,7 @@ class HelaoSyncer:
         #                     f"unable to post failure model for {meta_type}: {meta_uuid}"
         #                 )
         #                 await asyncio.sleep(30)
-        return api_success
+        # return api_success
 
     def list_pending(self, omit_manual_exps: bool = True):
         """
