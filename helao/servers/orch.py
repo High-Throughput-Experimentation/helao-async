@@ -2044,27 +2044,42 @@ class Orch(Base):
         if "plate_sample_no_list" in sequence.sequence_params:
             plate_sample_no_list = sequence.sequence_params["plate_sample_no_list"]
             sub_sequence_uuids = []
-            for plate_sample_no in plate_sample_no_list:
-                # create a copy of the sequence
-                sub_sequence = deepcopy(sequence)
-                # set the plate_sample_no in the params
-                sub_sequence.sequence_params["plate_sample_no_list"] = [plate_sample_no]
-                # generate new sub_sequence uuid
-                sub_sequence.sequence_uuid = gen_uuid()
-                # Clear planned experiments to ensure they regenerate when the sub-sequence is dequeued.
-                sub_sequence.planned_experiments.clear()
+            if "reference_after_sample_list" in sequence.sequence_params:
+                reference_list = sequence.sequence_params["reference_after_sample_list"]
+                campaign_seq_param = "reference_after_sample_list"
+            else:
+                reference_list = plate_sample_no_list
+                campaign_seq_param = "plate_sample_no_list"
+            sub_sequence_samples = []
+            for i, plate_sample_no in enumerate(plate_sample_no_list):
+                sub_sequence_samples.append(plate_sample_no)
                 if (
-                    sub_sequence.sequence_codehash is None
-                    and sub_sequence.sequence_name in self.sequence_codehash_lib
+                    plate_sample_no in reference_list
+                    or i == len(plate_sample_no_list) - 1
                 ):
-                    sub_sequence.sequence_codehash = self.sequence_codehash_lib[
-                        sub_sequence.sequence_name
+                    # create a copy of the sequence
+                    sub_sequence = deepcopy(sequence)
+                    # set the plate_sample_no in the params
+                    sub_sequence.sequence_params["plate_sample_no_list"] = (
+                        sub_sequence_samples
+                    )
+                    # generate new sub_sequence uuid
+                    sub_sequence.sequence_uuid = gen_uuid()
+                    # Clear planned experiments to ensure they regenerate when the sub-sequence is dequeued.
+                    sub_sequence.planned_experiments.clear()
+                    if (
+                        sub_sequence.sequence_codehash is None
+                        and sub_sequence.sequence_name in self.sequence_codehash_lib
+                    ):
+                        sub_sequence.sequence_codehash = self.sequence_codehash_lib[
+                            sub_sequence.sequence_name
+                        ]
+                    sub_sequence.campaign_sequence_parameter_variable = [
+                        campaign_seq_param
                     ]
-                sub_sequence.campaign_sequence_parameter_variable = [
-                    "plate_sample_no_list"
-                ]
-                self.sequence_dq.append(sub_sequence)
-                sub_sequence_uuids.append(sub_sequence.sequence_uuid)
+                    self.sequence_dq.append(sub_sequence)
+                    sub_sequence_uuids.append(sub_sequence.sequence_uuid)
+                    sub_sequence_samples = []
             return sub_sequence_uuids
         else:
             return await self.add_sequence(sequence)
