@@ -4,8 +4,6 @@ from datetime import datetime
 from helao.core.models.analysis import (
     AnalysisOutputModel,
     AnalysisModel,
-    AnalysisInput,
-    AnalysisOutput
 )
 from helao.core.models.s3locator import S3Locator
 from helao.core.models.run_use import RunUse
@@ -44,8 +42,6 @@ class BaseAnalysis:
     process_name: str
     run_type: str
     technique_name: str
-    inputs: AnalysisInput
-    outputs: AnalysisOutput
     analysis_codehash: str
     
     def gen_uuid(self, global_sample_label: Optional[str] = None):
