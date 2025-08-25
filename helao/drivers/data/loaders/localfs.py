@@ -392,7 +392,7 @@ class LocalLoader:
         else:
             FM = FileMapper(yml_path)
             fpath = os.path.join(os.path.dirname(yml_path), fn)
-            fbytes = FM.read_bytes(fpath)
+            fbytes = FM.read_bytes(FM.locate(fpath))
         return fbytes
 
     def get_parquet(self, yml_path: str, par_fn: str) -> pd.DataFrame:
