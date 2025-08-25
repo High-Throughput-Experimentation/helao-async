@@ -616,9 +616,18 @@ class HelaoProcess(HelaoModel):
             for ad in self.json.get("dispatched_actions_abbr", [])
         }
         return [
-            (f"{act_map[fd['action_uuid']]}{fd['file_name']}", fd["file_type"])
+            (
+                f"{act_map[fd['action_uuid']]}{fd['file_name']}",
+                fd["file_type"],
+                fd["run_use"],
+            )
             for fd in self.json.get("files", [])
         ]
+
+    def read_file_bytes(self, relative_path: str) -> bytes:
+        return self.loader.get_bytes(
+            self.yml_path.replace("PROCESSES", "RUNS_SYNCED"), relative_path
+        )
 
 
 class EcheUvisLoader(LocalLoader):
