@@ -1371,7 +1371,7 @@ class Base:
             output_path = os.path.join(save_root, action.action_output_dir)
             output_file = os.path.join(
                 output_path,
-                f"{action.action_timestamp.strftime('%Y%m%d.%H%M%S%f')}-act.yml",
+                f"{action.action_timestamp.strftime('%y%m%d.%H%M%S%f')}-act.yml",
             )
 
             LOGGER.info(f"writing to act meta file: {output_path}")
@@ -1405,7 +1405,7 @@ class Base:
         output_path = os.path.join(save_root, experiment.get_experiment_dir())
         output_file = os.path.join(
             output_path,
-            f"{experiment.experiment_timestamp.strftime('%Y%m%d.%H%M%S%f')}-exp.yml",
+            f"{experiment.experiment_timestamp.strftime('%y%m%d.%H%M%S%f')}-exp.yml",
         )
 
         LOGGER.info(f"writing to exp meta file: {output_file}")
@@ -1441,7 +1441,7 @@ class Base:
         output_path = os.path.join(save_root, sequence_dir)
         output_file = os.path.join(
             output_path,
-            f"{sequence.sequence_timestamp.strftime('%Y%m%d.%H%M%S%f')}-seq.yml",
+            f"{sequence.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.yml",
         )
 
         LOGGER.info(f"writing to seq meta file: {output_file}")
@@ -1488,7 +1488,7 @@ class Base:
         output_path = os.path.join(save_root, sequence_dir)
         output_file = os.path.join(
             output_path,
-            f"{seq.sequence_timestamp.strftime('%Y%m%d.%H%M%S%f')}-seq.yml",
+            f"{seq.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.yml",
         )
         async with aiofiles.open(output_file, mode="a") as f:
             await f.write(append_str)

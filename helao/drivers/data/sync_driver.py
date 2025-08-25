@@ -381,12 +381,12 @@ class HelaoYml:
         Extracts and returns a timestamp from the filename of the target file.
 
         The filename is expected to have a format where the timestamp is the first part,
-        separated by a hyphen, and follows the format "%Y%m%d.%H%M%S%f".
+        separated by a hyphen, and follows the format "%y%m%d.%H%M%S%f".
 
         Returns:
             datetime: A datetime object representing the extracted timestamp.
         """
-        ts = datetime.strptime(self.target.stem.split("-")[0], "%Y%m%d.%H%M%S%f")
+        ts = datetime.strptime(self.target.stem.split("-")[0], "%y%m%d.%H%M%S%f")
         return ts
 
     @property
@@ -1077,7 +1077,7 @@ class HelaoSyncer:
         return success
 
     def cleanup_root(self):
-        today = datetime.strptime(datetime.now().strftime("%Y%m%d"), "%Y%m%d")
+        today = datetime.strptime(datetime.now().strftime("%y%m%d"), "%y%m%d")
         """
         Cleans up the root directory by removing empty directories.
 
@@ -1085,7 +1085,7 @@ class HelaoSyncer:
         within the root directory defined in `world_config`. It iterates through the directories
         and removes any empty directories that are older than the current date.
 
-        Directories are expected to be named with dates in the format "%Y%m%d" or "%Y%m%d.%H%M%S%f".
+        Directories are expected to be named with dates in the format "%y%m%d" or "%y%m%d.%H%M%S%f".
         If a directory is empty, it is removed. If the parent directory of the empty directory
         also becomes empty, it is removed as well.
 
@@ -1099,10 +1099,10 @@ class HelaoSyncer:
                 if not os.path.isdir(datedir):
                     continue
                 try:
-                    dateonly = datetime.strptime(os.path.basename(datedir), "%Y%m%d")
+                    dateonly = datetime.strptime(os.path.basename(datedir), "%y%m%d")
                 except ValueError:
                     dateonly = datetime.strptime(
-                        os.path.basename(datedir), "%Y%m%d.%H%M%S%f"
+                        os.path.basename(datedir), "%y%m%d.%H%M%S%f"
                     )
                 if dateonly <= today:
                     seq_dirs = glob(os.path.join(datedir, "*"))

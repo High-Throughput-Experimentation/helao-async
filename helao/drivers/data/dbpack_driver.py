@@ -666,16 +666,16 @@ class DBPack:
             self.task_queue.task_done()
 
     def cleanup_root(self):
-        today = datetime.strptime(datetime.now().strftime("%Y%m%d"), "%Y%m%d")
+        today = datetime.strptime(datetime.now().strftime("%y%m%d"), "%y%m%d")
         chkdirs = ["RUNS_ACTIVE", "RUNS_FINISHED"]
         for cd in chkdirs:
             seq_dates = glob(os.path.join(self.world_config["root"], cd, "*", "*"))
             for datedir in seq_dates:
                 try:
-                    dateonly = datetime.strptime(os.path.basename(datedir), "%Y%m%d")
+                    dateonly = datetime.strptime(os.path.basename(datedir), "%y%m%d")
                 except ValueError:
                     dateonly = datetime.strptime(
-                        os.path.basename(datedir), "%Y%m%d.%H%M%S%f"
+                        os.path.basename(datedir), "%y%m%d.%H%M%S%f"
                     )
                 if dateonly < today:
                     seq_dirs = glob(os.path.join(datedir, "*"))
