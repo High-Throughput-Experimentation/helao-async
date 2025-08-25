@@ -625,7 +625,7 @@ class HelaoProcess(HelaoModel):
         ]
 
     def read_file_bytes(self, relative_path: str) -> bytes:
-        return self.loader.get_bytes(self.yml_path, relative_path)
+        return self.loader.get_bytes(self.yml_path.replace("PROCESSES", "RUNS_SYNCED"), relative_path)
 
 
 class EcheUvisLoader(LocalLoader):
