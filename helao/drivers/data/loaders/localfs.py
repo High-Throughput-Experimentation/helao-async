@@ -385,6 +385,7 @@ class LocalLoader:
             return FM.read_hlo(hlo_path)
 
     def get_bytes(self, yml_path: str, fn: str) -> bytes:
+        """Get raw bytes of a file, either from a zip archive or a regular file adjacent to action yml."""
         if self.target.endswith(".zip"):
             ftarget = "/".join([os.path.dirname(yml_path), fn])
             with ZipFile(self.target, "r") as zf:
@@ -396,6 +397,7 @@ class LocalLoader:
         return fbytes
 
     def get_parquet(self, yml_path: str, par_fn: str) -> pd.DataFrame:
+        """Read parquet into dataframe, either from a zip archive or a parquet file adjacent to action yml."""
         parbytes = self.get_bytes(yml_path, par_fn)
         return pd.read_parquet(BytesIO(parbytes))
 
@@ -624,8 +626,9 @@ class HelaoProcess(HelaoModel):
             for fd in self.json.get("files", [])
         ]
 
-    def read_file_bytes(self, relative_path: str) -> bytes:
-        return self.loader.get_bytes(self.yml_path.replace("PROCESSES", "RUNS_SYNCED"), relative_path)
+    def read_action_file(self, relative_path: str) -> bytes:
+        fm = FileMapper(self.yml_path)
+        return fm.read_bytes(relative_path)
 
 
 class EcheUvisLoader(LocalLoader):
