@@ -257,7 +257,7 @@ class SM303:
                         ]
                     )
                 )
-                retdict["peak_intensity"] = float(arr_data[lower_lim:upper_lim].max())
+                retdict["peak_intensity"] = int(arr_data[lower_lim:upper_lim].max())
                 return retdict
             else:
                 LOGGER.info("No data available.")
