@@ -41,7 +41,7 @@ class PostProcess(HloPostProcessor):
 
                     non_WL_cols = ["t_s", "epoch_s", "peak_intensity"]
                     ch_cols = sorted([x for x in df.columns if x.startswith("ch_")])
-                    df.rename({x: y for x, y in zip(ch_cols, wl)}, axis="columns")
+                    df.rename({x: y for x, y in zip(ch_cols, wl)}, axis="columns", inplace=True)
                     melted_df = df.melt(id_vars=non_WL_cols, value_name="intensity")
                     melted_df.rename({"variable": "wl_nm"}, axis=1, inplace=True)
                     melted_df["wl_nm"] = melted_df["wl_nm"].astype(float)
