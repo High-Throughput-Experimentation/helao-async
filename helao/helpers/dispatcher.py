@@ -81,7 +81,7 @@ async def async_action_dispatcher(
             await asyncio.sleep(retry_wait)
             response = None
         finally:
-            conn.close()
+            await conn.close()
     if not success:
         LOGGER.error(
             f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{response}')",
