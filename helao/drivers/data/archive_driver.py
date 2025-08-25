@@ -584,7 +584,7 @@ class Archive:
                     "Dilution Factor",
                 ]
             )
-            csv_filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d-%H%M%S%f')}_ICPMS.csv"
+            csv_filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%y%m%d-%H%M%S%f')}_ICPMS.csv"
             
             await myactive.write_file(
                 file_type="pal_icpms_file",

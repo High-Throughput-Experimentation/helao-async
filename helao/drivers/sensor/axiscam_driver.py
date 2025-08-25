@@ -59,7 +59,7 @@ class AxisCamExec(Executor):
 
     async def write_image(self, imgbytes, epoch):
         """Write image to action output directory."""
-        ymdhms = time.strftime("%Y%m%d.%H%M%S", time.localtime(epoch))
+        ymdhms = time.strftime("%y%m%d.%H%M%S", time.localtime(epoch))
         filename = f"cam_{self.counter:06}_{ymdhms}.jpg"
         LOGGER.info(f"Writing image to: {os.path.join(self.output_dir, filename)}")
         async with aiofiles.open(os.path.join(self.output_dir, filename), "wb") as f:
