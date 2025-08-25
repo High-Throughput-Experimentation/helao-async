@@ -2764,7 +2764,7 @@ class Orch(Base):
             "global_status_model": self.globalstatusmodel,
         }
         if timestamp_pck:
-            pck_name = f"queues_{datetime.now().strftime('%Y%m%d.%H%M%S')}.pck"
+            pck_name = f"queues_{datetime.now().strftime('%y%m%d.%H%M%S')}.pck"
         else:
             pck_name = "queues.pck"
         save_path = os.path.join(save_dir, "STATES", pck_name)

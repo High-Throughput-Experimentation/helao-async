@@ -1022,7 +1022,7 @@ def makeApp(server_key):
                         "machine_name": gethostname().lower(),
                         "source": [],
                         "volume_ml": 0.0,
-                        "action_time": strftime("%Y%m%d.%H%M%S"),
+                        "action_time": strftime("%y%m%d.%H%M%S"),
                         "chemical": [],
                         "partial_molarity": [],
                         "supplier": [],
