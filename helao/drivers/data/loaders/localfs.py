@@ -58,12 +58,14 @@ class LocalLoader:
         states = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED", "RUNS_DIAG")
         state_dir = f"RUNS_{target_state}"
         if self.target.endswith(".zip"):
-            process_dir = self.target.replace(state_dir, "PROCESSES").replace(".zip", "")
+            process_dir = self.target.replace(state_dir, "PROCESSES").replace(
+                ".zip", ""
+            )
         else:
-            process_dir = os.path.dirname(self.target).replace(state_dir, "PROCESSES") 
-        check_dirs = [
-            f"{self.target.replace(state_dir, x)}" for x in states
-        ] + [process_dir]
+            process_dir = os.path.dirname(self.target).replace(state_dir, "PROCESSES")
+        check_dirs = [f"{self.target.replace(state_dir, x)}" for x in states] + [
+            process_dir
+        ]
         if not os.path.exists(self.target):
             raise FileNotFoundError(
                 "data_path argument is not a valid file or folder path"
@@ -73,10 +75,14 @@ class LocalLoader:
             with ZipFile(self.target, "r") as zf:
                 zip_contents = zf.namelist()
             _yml_paths = [x for x in zip_contents if x.endswith(".yml")]
-            _yml_paths += glob(os.path.join(process_dir, "**", "*-prc.yml"), recursive=True)
+            _yml_paths += glob(
+                os.path.join(process_dir, "**", "*-prc.yml"), recursive=True
+            )
         elif os.path.isdir(self.target):
             for check_dir in check_dirs:
-                _yml_paths += glob(os.path.join(check_dir, "**", "*.yml"), recursive=True)
+                _yml_paths += glob(
+                    os.path.join(check_dir, "**", "*.yml"), recursive=True
+                )
         else:
             for check_dir in check_dirs:
                 _yml_paths += glob(
@@ -115,7 +121,9 @@ class LocalLoader:
                     seq_lab = seq_lab.split("-")[0]
             yml_file = os.path.basename(ymlp)
             timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
-            seq_parts.append((timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp))
+            seq_parts.append(
+                (timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp)
+            )
         self.sequences = pd.DataFrame(
             seq_parts,
             columns=[
@@ -188,7 +196,7 @@ class LocalLoader:
                 "action_localpath",
             ],
         )
-    
+
         prc_parts = []
         for ymlp in self._yml_paths["prc"]:
             yml_dir = os.path.basename(os.path.dirname(ymlp))
@@ -222,12 +230,11 @@ class LocalLoader:
             ],
         )
 
-
     def clear_cache(self):
         """Clears all caches.
 
-            This includes the action cache, experiment cache, sequence cache, and process cache.
-            """
+        This includes the action cache, experiment cache, sequence cache, and process cache.
+        """
         self.act_cache = {}  # {uuid: json_dict}
         self.exp_cache = {}
         self.seq_cache = {}
@@ -236,15 +243,19 @@ class LocalLoader:
     def get_yml(self, path: str):
         """Load a yml file from a given path.
 
-            Args:
-                path (str): path to the yml file
+        Args:
+            path (str): path to the yml file
 
-            Returns:
-                dict: dictionary containing the yml data
-            """
+        Returns:
+            dict: dictionary containing the yml data
+        """
         if self.target.endswith(".zip") and not path.endswith("-prc.yml"):
             with ZipFile(self.target, "r") as zf:
-                metad = dict(yml_load(zf.open(path).read().replace(b'\x89', b'%').decode("utf-8")))
+                metad = dict(
+                    yml_load(
+                        zf.open(path).read().replace(b"\x89", b"%").decode("utf-8")
+                    )
+                )
         else:
             # metad = yml_load("".join(builtins.open(path, "r").readlines()))
             FM = FileMapper(path)
@@ -254,16 +265,16 @@ class LocalLoader:
     def get_act(self, index=None, path: Optional[str] = None):
         """Load an action from the local filesystem.
 
-            Args:
-                index (int, optional): Index of the action in the actions dataframe. Defaults to None.
-                path (str, optional): Path to the action yaml file. Defaults to None.
+        Args:
+            index (int, optional): Index of the action in the actions dataframe. Defaults to None.
+            path (str, optional): Path to the action yaml file. Defaults to None.
 
-            Raises:
-                IndexError: If neither index nor path are supplied.
+        Raises:
+            IndexError: If neither index nor path are supplied.
 
-            Returns:
-                HelaoAction: The loaded action.
-            """
+        Returns:
+            HelaoAction: The loaded action.
+        """
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
@@ -275,16 +286,16 @@ class LocalLoader:
     def get_exp(self, index=None, path: Optional[str] = None):
         """Load a single experiment from the local filesystem.
 
-            Args:
-                index (int, optional): Index of the experiment in the experiments dataframe. Defaults to None.
-                path (str, optional): Path to the experiment directory. Defaults to None.
+        Args:
+            index (int, optional): Index of the experiment in the experiments dataframe. Defaults to None.
+            path (str, optional): Path to the experiment directory. Defaults to None.
 
-            Raises:
-                IndexError: If neither index nor path are provided.
+        Raises:
+            IndexError: If neither index nor path are provided.
 
-            Returns:
-                HelaoExperiment: A HelaoExperiment object representing the experiment.
-            """
+        Returns:
+            HelaoExperiment: A HelaoExperiment object representing the experiment.
+        """
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
@@ -296,16 +307,16 @@ class LocalLoader:
     def get_seq(self, index=None, path: Optional[str] = None):
         """Return a HelaoSequence object.
 
-            Args:
-                index (int, optional): Index of the sequence in the sequences dataframe. Defaults to None.
-                path (str, optional): Path to the sequence directory. Defaults to None.
+        Args:
+            index (int, optional): Index of the sequence in the sequences dataframe. Defaults to None.
+            path (str, optional): Path to the sequence directory. Defaults to None.
 
-            Raises:
-                IndexError: If neither index nor path is provided.
+        Raises:
+            IndexError: If neither index nor path is provided.
 
-            Returns:
-                HelaoSequence: A HelaoSequence object representing the sequence.
-            """
+        Returns:
+            HelaoSequence: A HelaoSequence object representing the sequence.
+        """
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
@@ -317,16 +328,16 @@ class LocalLoader:
     def get_prc(self, index=None, path: Optional[str] = None):
         """Return a HelaoProcess object from a given index or path.
 
-            Args:
-                index (int, optional): Index of the process in the processes dataframe. Defaults to None.
-                path (str, optional): Path to the process yaml file. Defaults to None.
+        Args:
+            index (int, optional): Index of the process in the processes dataframe. Defaults to None.
+            path (str, optional): Path to the process yaml file. Defaults to None.
 
-            Raises:
-                IndexError: If neither index nor path is supplied.
+        Raises:
+            IndexError: If neither index nor path is supplied.
 
-            Returns:
-                HelaoProcess: A HelaoProcess object.
-            """
+        Returns:
+            HelaoProcess: A HelaoProcess object.
+        """
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
@@ -349,7 +360,7 @@ class LocalLoader:
                                Returns the output of FileMapper.read_hlo if the target is not a zip file.
         """
         if self.target.endswith(".zip"):
-            hlotarget ="/".join([os.path.dirname(yml_path), hlo_fn])
+            hlotarget = "/".join([os.path.dirname(yml_path), hlo_fn])
             with ZipFile(self.target, "r") as zf:
                 lines = zf.open(hlotarget).readlines()
 
@@ -375,7 +386,7 @@ class LocalLoader:
 
     def get_bytes(self, yml_path: str, fn: str) -> bytes:
         if self.target.endswith(".zip"):
-            ftarget ="/".join([os.path.dirname(yml_path), fn])
+            ftarget = "/".join([os.path.dirname(yml_path), fn])
             with ZipFile(self.target, "r") as zf:
                 fbytes = zf.open(ftarget).read()
         else:
@@ -386,8 +397,7 @@ class LocalLoader:
 
     def get_parquet(self, yml_path: str, par_fn: str) -> pd.DataFrame:
         parbytes = self.get_bytes(yml_path, par_fn)
-        return pd.DataFrame(BytesIO(parbytes))
-        
+        return pd.read_parquet(BytesIO(parbytes))
 
 
 ABBR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence", "prc": "process"}
@@ -412,6 +422,7 @@ class HelaoModel:
             meta_dict (dict): A dictionary containing the metadata loaded from the YAML file.
             loader (LocalLoader): The LocalLoader instance used to load the data.
     """
+
     name: str
     uuid: UUID
     helao_type: str
@@ -453,6 +464,7 @@ class HelaoAction(HelaoModel):
         meta_dict (dict): A dictionary containing metadata associated with the action.
         loader (LocalLoader): The loader used to retrieve data associated with the action.
     """
+
     action_name: str
     action_uuid: UUID
     action_timestamp: datetime
@@ -501,19 +513,20 @@ class HelaoAction(HelaoModel):
 
 class HelaoExperiment(HelaoModel):
     """
-        Represents a Helao experiment loaded from a local file system.
+    Represents a Helao experiment loaded from a local file system.
 
-        Attributes:
-            experiment_name (str): The name of the experiment.
-            experiment_uuid (UUID): The unique identifier of the experiment.
-            experiment_timestamp (datetime): The timestamp of the experiment.
-            experiment_params (dict): The parameters of the experiment.
+    Attributes:
+        experiment_name (str): The name of the experiment.
+        experiment_uuid (UUID): The unique identifier of the experiment.
+        experiment_timestamp (datetime): The timestamp of the experiment.
+        experiment_params (dict): The parameters of the experiment.
 
-        Args:
-            yml_path (str): The path to the YAML file containing the experiment definition.
-            meta_dict (dict): A dictionary containing metadata associated with the experiment.
-            loader (LocalLoader): The LocalLoader instance used to load the experiment.
+    Args:
+        yml_path (str): The path to the YAML file containing the experiment definition.
+        meta_dict (dict): A dictionary containing metadata associated with the experiment.
+        loader (LocalLoader): The LocalLoader instance used to load the experiment.
     """
+
     experiment_name: str
     experiment_uuid: UUID
     experiment_timestamp: datetime
@@ -529,23 +542,24 @@ class HelaoExperiment(HelaoModel):
 
 class HelaoSequence(HelaoModel):
     """
-        Represents a Helao sequence loaded from a local file system.
+    Represents a Helao sequence loaded from a local file system.
 
-        Inherits from HelaoModel and includes additional attributes specific to sequences,
-        such as sequence name, label, UUID, timestamp, and parameters.
+    Inherits from HelaoModel and includes additional attributes specific to sequences,
+    such as sequence name, label, UUID, timestamp, and parameters.
 
-        Attributes:
-            sequence_name (str): The name of the sequence.
-            sequence_label (str): A label associated with the sequence.
-            sequence_uuid (UUID): The unique identifier of the sequence.
-            sequence_timestamp (datetime): The timestamp of when the sequence was created or modified.
-            sequence_params (dict): A dictionary containing the parameters of the sequence.
+    Attributes:
+        sequence_name (str): The name of the sequence.
+        sequence_label (str): A label associated with the sequence.
+        sequence_uuid (UUID): The unique identifier of the sequence.
+        sequence_timestamp (datetime): The timestamp of when the sequence was created or modified.
+        sequence_params (dict): A dictionary containing the parameters of the sequence.
 
-        Args:
-            yml_path (str): The path to the YAML file containing the sequence definition.
-            meta_dict (dict): A dictionary containing metadata associated with the sequence.
-            loader (LocalLoader): The LocalLoader instance used to load the sequence.
+    Args:
+        yml_path (str): The path to the YAML file containing the sequence definition.
+        meta_dict (dict): A dictionary containing metadata associated with the sequence.
+        loader (LocalLoader): The LocalLoader instance used to load the sequence.
     """
+
     sequence_name: str
     sequence_label: str
     sequence_uuid: UUID
@@ -560,21 +574,23 @@ class HelaoSequence(HelaoModel):
         self.sequence_params = self.params
         self.sequence_label = meta_dict.get("sequence_label", "")
 
+
 class HelaoProcess(HelaoModel):
     """
-        Represents a Helao process with associated metadata and parameters.
+    Represents a Helao process with associated metadata and parameters.
 
-        Attributes:
-            technique_name (str): The name of the technique used in the process.
-            process_uuid (UUID): The unique identifier for the process, inherited from the base model.
-            process_timestamp (datetime): The timestamp of when the process was created, inherited from the base model.
-            process_params (dict): A dictionary containing the parameters used in the process, inherited from the base model.
+    Attributes:
+        technique_name (str): The name of the technique used in the process.
+        process_uuid (UUID): The unique identifier for the process, inherited from the base model.
+        process_timestamp (datetime): The timestamp of when the process was created, inherited from the base model.
+        process_params (dict): A dictionary containing the parameters used in the process, inherited from the base model.
 
-        Args:
-            yml_path (str): The path to the YAML file containing the process definition.
-            meta_dict (dict): A dictionary containing metadata associated with the process.
-            loader (LocalLoader): The loader used to load the process definition.
+    Args:
+        yml_path (str): The path to the YAML file containing the process definition.
+        meta_dict (dict): A dictionary containing metadata associated with the process.
+        loader (LocalLoader): The loader used to load the process definition.
     """
+
     technique_name: str
     process_uuid: UUID
     process_timestamp: datetime
@@ -587,19 +603,34 @@ class HelaoProcess(HelaoModel):
         self.process_params = self.params
         self.technique_name = self.name
 
+    @property
+    def experiment(self):
+        exp_dir = os.path.basename(os.path.dirname(self.yml_path))
+        exp_row = self.loader.experiments.query("experiment_dir==@exp_dir").index[0]
+        return self.loader.get_exp(exp_row)
+
+    @property
+    def files(self):
+        act_map = {
+            ad["action_uuid"]: ad["action_output_dir"]
+            for ad in self.json.get("dispatched_actions_abbr", [])
+        }
+        return [
+            (f"{act_map[fd['action_uuid']]}{fd['file_name']}", fd["file_type"])
+            for fd in self.json.get("files", [])
+        ]
+
 
 class EcheUvisLoader(LocalLoader):
     """ECHEUVIS process dataloader
 
-        This class is responsible for loading ECHEUVIS process data from a local file system.
-        It inherits from the LocalLoader class and implements methods for retrieving recent data
-        based on specified criteria such as minimum date, plate ID, and sample number.
+    This class is responsible for loading ECHEUVIS process data from a local file system.
+    It inherits from the LocalLoader class and implements methods for retrieving recent data
+    based on specified criteria such as minimum date, plate ID, and sample number.
 
-        """
-    def __init__(
-        self,
-        data_path: str
-    ):
+    """
+
+    def __init__(self, data_path: str):
         super().__init__(data_path)
 
     def get_recent(
@@ -611,20 +642,20 @@ class EcheUvisLoader(LocalLoader):
     ):
         """Retrieves recent data based on specified criteria.
 
-            This method fetches data from the database that matches the given query and falls within the specified date range,
-            optionally filtering by plate ID and sample number. It utilizes a caching mechanism to improve performance,
-            retrieving data from the cache if available and applicable.
+        This method fetches data from the database that matches the given query and falls within the specified date range,
+        optionally filtering by plate ID and sample number. It utilizes a caching mechanism to improve performance,
+        retrieving data from the cache if available and applicable.
 
-            Args:
-                query (str): The base SQL query to execute.
-                min_date (str, optional): The minimum date for the data to be retrieved, in 'YYYY-MM-DD' format.
-                Defaults to "2023-04-26".
-                plate_id (Optional[int], optional): The plate ID to filter the data by. Defaults to None.
-                sample_no (Optional[int], optional): The sample number to filter the data by. Defaults to None.
+        Args:
+            query (str): The base SQL query to execute.
+            min_date (str, optional): The minimum date for the data to be retrieved, in 'YYYY-MM-DD' format.
+            Defaults to "2023-04-26".
+            plate_id (Optional[int], optional): The plate ID to filter the data by. Defaults to None.
+            sample_no (Optional[int], optional): The sample number to filter the data by. Defaults to None.
 
-            Returns:
-                pd.DataFrame: A Pandas DataFrame containing the filtered data, sorted by process timestamp and reset index.
-            """
+        Returns:
+            pd.DataFrame: A Pandas DataFrame containing the filtered data, sorted by process timestamp and reset index.
+        """
         conditions = []
         conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
         recent_md = sorted(
@@ -652,14 +683,14 @@ class EcheUvisLoader(LocalLoader):
             # print("!!! dataframe shape:", pdf.shape)
             # print("!!! dataframe cols:", pdf.columns)
             pdf["plate_id"] = pdf.global_label.apply(
-                lambda x: int(x.split("_")[-2])
-                if "solid" in x and "None" not in x
-                else None
+                lambda x: (
+                    int(x.split("_")[-2]) if "solid" in x and "None" not in x else None
+                )
             )
             pdf["sample_no"] = pdf.global_label.apply(
-                lambda x: int(x.split("_")[-1])
-                if "solid" in x and "None" not in x
-                else None
+                lambda x: (
+                    int(x.split("_")[-1]) if "solid" in x and "None" not in x else None
+                )
             )
             # assign solid samples from sequence params
             for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
