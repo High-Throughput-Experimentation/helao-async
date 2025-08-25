@@ -617,7 +617,7 @@ class HelaoProcess(HelaoModel):
         }
         return [
             (
-                f"{act_map[fd['action_uuid']]}{fd['file_name']}",
+                f"{act_map[fd['action_uuid']]}/{fd['file_name']}",
                 fd["file_type"],
                 fd["run_use"],
             )
