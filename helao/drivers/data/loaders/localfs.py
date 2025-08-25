@@ -392,7 +392,7 @@ class LocalLoader:
         else:
             FM = FileMapper(yml_path)
             fpath = os.path.join(os.path.dirname(yml_path), fn)
-            fbytes = FM.read_bytes(FM.locate(fpath))
+            fbytes = FM.read_bytes(fpath)
         return fbytes
 
     def get_parquet(self, yml_path: str, par_fn: str) -> pd.DataFrame:
@@ -625,9 +625,7 @@ class HelaoProcess(HelaoModel):
         ]
 
     def read_file_bytes(self, relative_path: str) -> bytes:
-        return self.loader.get_bytes(
-            self.yml_path.replace("PROCESSES", "RUNS_SYNCED"), relative_path
-        )
+        return self.loader.get_bytes(self.yml_path, relative_path)
 
 
 class EcheUvisLoader(LocalLoader):
