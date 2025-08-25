@@ -21,7 +21,7 @@ from helao.core.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helao.servers.base import Base
+from helao.servers.base import Base, Active
 from helao.drivers.io.enum import TriggerType
 from helao.drivers.spec.enum import SpecTrigType
 
@@ -51,19 +51,19 @@ class SM303:
             LOGGER.error("SMdbUSBm.dll not found.")
             self.spec = None
         self.ready = False
-        self.action = None
-        self.active = None
-        self.trigmode = None
-        self.edgemode = None
+        self.action: Action = None
+        self.active: Active = None
+        self.trigmode: SpecTrigType = None
+        self.edgemode: TriggerType = None
         self.n_avg = 1
         self.fft = 0
         self.int_time = 35
         self.trigger_duration = 0
-        self.start_time = None
-        self.spec_time = None
+        self.start_time: float = None
+        self.spec_time: float = None
         self.IO_signalq = asyncio.Queue(1)
-        self.IO_do_meas = False  # signal flag for intent (start/stop)
-        self.IO_measuring = False  # status flag of measurement
+        self.IO_do_meas: bool = False  # signal flag for intent (start/stop)
+        self.IO_measuring: bool = False  # status flag of measurement
         self.event_loop = asyncio.get_event_loop()
         self.event_loop.create_task(self.IOloop())
 
@@ -78,8 +78,8 @@ class SM303:
         self.FIFO_name = ""
 
         # signals return to endpoint after active was created
-        self.IO_continue = False
-        self.IOloop_run = False
+        self.IO_continue: bool = False
+        self.IOloop_run: bool = False
 
     def set_IO_signalq_nowait(self, val: bool) -> None:
         if self.IO_signalq.full():
@@ -231,7 +231,7 @@ class SM303:
             result = self.read_data()
             if result == 1:
                 # self.data = [self._data[i] for i in range(1056)][10:1034]
-                retdict = {"epoch_s": time.time()}
+                retdict: dict[str, float | ErrorCodes] = {"epoch_s": time.time()}
                 retdict.update({f"ch_{i:04}": x for i, x in enumerate(self.data)})
                 retdict["error_code"] = ErrorCodes.none
                 arr_data = np.array(self.data)
