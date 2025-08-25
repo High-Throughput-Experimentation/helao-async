@@ -234,7 +234,8 @@ class Action(Experiment, ActionModel):
             self.manual_action = True
             self.access = "manual"
             # -- (1) -- set missing sequence parameters
-            manual_suffix = f"{self.action_server.server_name}-{self.action_name}"
+            # manual_suffix = f"{self.action_server.server_name}-{self.action_name}"
+            manual_suffix = self.action_name
             self.sequence_name = f"seq--{manual_suffix}"
             self.sequence_label = "manual"
             # if self.action_params.get("comment", ""):
