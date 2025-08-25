@@ -1,5 +1,6 @@
 import os
 import json
+from io import BytesIO
 from glob import glob
 from uuid import UUID
 from datetime import datetime
@@ -371,6 +372,22 @@ class LocalLoader:
             FM = FileMapper(yml_path)
             hlo_path = os.path.join(os.path.dirname(yml_path), hlo_fn)
             return FM.read_hlo(hlo_path)
+
+    def get_bytes(self, yml_path: str, fn: str) -> bytes:
+        if self.target.endswith(".zip"):
+            ftarget ="/".join([os.path.dirname(yml_path), fn])
+            with ZipFile(self.target, "r") as zf:
+                fbytes = zf.open(ftarget).read()
+        else:
+            FM = FileMapper(yml_path)
+            fpath = os.path.join(os.path.dirname(yml_path), fn)
+            fbytes = FM.read_bytes(fpath)
+        return fbytes
+
+    def get_parquet(self, yml_path: str, par_fn: str) -> pd.DataFrame:
+        parbytes = self.get_bytes(yml_path, par_fn)
+        return pd.DataFrame(BytesIO(parbytes))
+        
 
 
 ABBR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence", "prc": "process"}
