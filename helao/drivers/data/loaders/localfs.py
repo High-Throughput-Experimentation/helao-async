@@ -113,7 +113,7 @@ class LocalLoader:
                     plate_id = int(plate_str)
                     seq_lab = seq_lab.split("-")[0]
             yml_file = os.path.basename(ymlp)
-            timestamp = datetime.strptime(yml_file.split("-")[0], "%Y%m%d.%H%M%S%f")
+            timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
             seq_parts.append((timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp))
         self.sequences = pd.DataFrame(
             seq_parts,
@@ -133,7 +133,7 @@ class LocalLoader:
             yml_dir = os.path.basename(os.path.dirname(ymlp))
             _, exp_name = yml_dir.split("__")
             yml_file = os.path.basename(ymlp)
-            timestamp = datetime.strptime(yml_file.split("-")[0], "%Y%m%d.%H%M%S%f")
+            timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
             exp_parts.append(
                 (
                     timestamp,
@@ -163,7 +163,7 @@ class LocalLoader:
             else:
                 raise ValueError(f"could not parse action path parts: {path_parts}")
             yml_file = os.path.basename(ymlp)
-            timestamp = datetime.strptime(yml_file.split("-")[0], "%Y%m%d.%H%M%S%f")
+            timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
             act_parts.append(
                 (
                     timestamp,
@@ -196,7 +196,7 @@ class LocalLoader:
             idx, prc_uuid, techname = yml_file.replace("-prc.yml", "").split("__")
             prc_uuid = UUID(prc_uuid)
             prc_idx = int(idx)
-            exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%Y%m%d.%H%M%S%f")
+            exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%y%m%d.%H%M%S%f")
             prc_parts.append(
                 (
                     prc_idx,

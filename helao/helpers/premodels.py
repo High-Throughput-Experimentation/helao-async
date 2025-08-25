@@ -72,7 +72,7 @@ class Sequence(SequenceModel):
     def get_sequence_dir(self):
         HMS = self.sequence_timestamp.strftime("%H%M%S")
         year_week = self.sequence_timestamp.strftime("%y.%U")
-        sequence_day = self.sequence_timestamp.strftime("%Y%m%d")
+        sequence_day = self.sequence_timestamp.strftime("%m%d")
         plate = self.sequence_params.get("plate_id", "")
         smpno = self.sequence_params.get("plate_sample_no_list", [])
         if plate:
@@ -116,7 +116,7 @@ class Experiment(Sequence, ExperimentModel):
 
     def get_experiment_dir(self):
         """accepts action or experiment object"""
-        experiment_time = self.experiment_timestamp.strftime("%Y%m%d.%H%M%S")
+        experiment_time = self.experiment_timestamp.strftime("%y%m%d.%H%M%S")
         sequence_dir = self.get_sequence_dir()
         return os.path.join(
             sequence_dir,
@@ -235,12 +235,13 @@ class Action(Experiment, ActionModel):
             self.access = "manual"
             # -- (1) -- set missing sequence parameters
             manual_suffix = f"{self.action_server.server_name}-{self.action_name}"
-            self.sequence_name = f"mseq-ACT_{manual_suffix}"
-            if self.action_params.get("comment", ""):
-                self.sequence_label = self.action_params["comment"]
+            self.sequence_name = f"seq--{manual_suffix}"
+            self.sequence_label = "manual"
+            # if self.action_params.get("comment", ""):
+            #     self.sequence_label = self.action_params["comment"]
             self.init_seq(time_offset=time_offset)
             # -- (2) -- set missing experiment parameters
-            self.experiment_name = f"mexp-ACT_{manual_suffix}"
+            self.experiment_name = f"exp--{manual_suffix}"
             self.init_exp(time_offset=time_offset)
 
         if force or self.action_timestamp is None:

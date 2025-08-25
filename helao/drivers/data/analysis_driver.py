@@ -283,7 +283,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             ana_ts = datetime.strptime(ana_tsstr, "%Y-%m-%d %H:%M:%S.%f")
             HMS = ana_ts.strftime("%H%M%S")
             year_week = ana_ts.strftime("%y.%U")
-            analysis_day = ana_ts.strftime("%Y%m%d")
+            analysis_day = ana_ts.strftime("%y%m%d")
             local_ana_dir = os.path.join(
                 self.local_ana_root,
                 year_week,

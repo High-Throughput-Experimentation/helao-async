@@ -515,7 +515,7 @@ class Archive:
 
                 await myactive.write_file(
                     file_type="pal_vialtable_file",
-                    filename=f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d.%H%M%S%f')}.csv",
+                    filename=f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%y%m%d.%H%M%S%f')}.csv",
                     output_str=tmp_output_str,
                     header=",".join(["vial_no", "global_sample_label", "vol_ml"]),
                     sample_str=None,
