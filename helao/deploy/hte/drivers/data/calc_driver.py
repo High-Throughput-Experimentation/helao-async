@@ -22,7 +22,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-from ...servers.base import Base, Active
+from helao.core.servers.base import Base, Active
 from helao.helpers.premodels import Experiment
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.dispatcher import async_private_dispatcher

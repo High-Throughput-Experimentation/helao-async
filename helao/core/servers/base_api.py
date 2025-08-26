@@ -10,7 +10,7 @@ from collections import namedtuple
 from ..drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
 from helao.helpers.eval import eval_val
 from helao.helpers.gen_uuid import gen_uuid
-from ..servers.base import Base
+from helao.core.servers.base import Base
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.premodels import Action
 from helao.core.models.machine import MachineModel

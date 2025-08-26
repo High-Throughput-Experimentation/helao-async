@@ -12,8 +12,8 @@ from typing import Optional
 from fastapi import Body
 import pandas as pd
 
-from ....servers.base import Base
-from ....servers.base_api import BaseAPI
+from helao.core.servers.base import Base
+from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 
 

@@ -24,7 +24,7 @@ import aiohttp
 import json
 import pandas as pd
 
-from ...servers.base import Base
+from helao.core.servers.base import Base
 from helao.helpers.set_time import set_time
 from helao.helpers.yml_tools import yml_dumps
 from ...drivers.data.sync_driver import HelaoSyncer

@@ -12,7 +12,7 @@ else:
     LOGGER = logging.LOGGER
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from ...servers.base import Base
+from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 
 # default queries from command table below

@@ -28,7 +28,7 @@ else:
     LOGGER = logging.LOGGER
 
 from helao.helpers.premodels import Action
-from ...servers.base import Base
+from helao.core.servers.base import Base
 from helao.core.error import ErrorCodes
 from helao.core.models.sample import SampleInheritance, SampleStatus
 from helao.core.models.data import DataModel

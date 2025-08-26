@@ -20,7 +20,7 @@ else:
     LOGGER = logging.LOGGER
 
 from ...drivers.temperature_control.mecom_driver import DEFAULT_QUERIES
-from ...servers.vis import Vis
+from helao.core.servers. vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 

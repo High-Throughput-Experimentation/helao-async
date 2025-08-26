@@ -12,7 +12,7 @@ from fastapi import Body
 
 from helao.core.models.file import HloHeaderModel, HloFileGroup
 from helao.helpers.premodels import Action
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from ...drivers.data.calc_driver import Calc
 from helao.helpers import helao_logging as logging
 

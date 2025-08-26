@@ -12,7 +12,7 @@ from typing import Union
 from fastapi import Body
 
 from helao.helpers.premodels import Action
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from ...drivers.data.analysis_driver import HelaoAnalysisSyncer
 
 

@@ -17,7 +17,7 @@ else:
     LOGGER = logging.LOGGER
 
 from helao.core.error import ErrorCodes
-from ...servers.base import Base
+from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from helao.core.models.data import DataModel
 from helao.core.models.file import FileConnParams, HloHeaderModel

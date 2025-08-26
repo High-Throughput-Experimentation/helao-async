@@ -4,7 +4,7 @@ __all__ = ["makeApp"]
 # data management server for HTE
 from typing import Optional
 from fastapi import Body
-from ....servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from ....drivers.data.HTEdata_legacy import HTEdata
 

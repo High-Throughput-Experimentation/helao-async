@@ -21,7 +21,7 @@ from helao.core.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI
-from ...servers.base import Base, Active
+from helao.core.servers.base import Base, Active
 from ...drivers.io.enum import TriggerType
 from ...drivers.spec.enum import SpecTrigType
 

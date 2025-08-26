@@ -11,7 +11,7 @@ else:
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.helpers.zstd_io import unzpickle
-from ...servers.base import Base, Active
+from helao.core.servers.base import Base, Active
 from helao.helpers.executor import Executor
 from helao.helpers.premodels import Experiment
 from helao.helpers.dispatcher import async_private_dispatcher

@@ -22,7 +22,7 @@ import subprocess
 import psutil
 
 from helao.helpers.premodels import Action
-from ...servers.base import Base, Active
+from helao.core.servers.base import Base, Active
 from helao.core.error import ErrorCodes
 from helao.core.helaodict import HelaoDict
 

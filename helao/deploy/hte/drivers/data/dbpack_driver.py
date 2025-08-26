@@ -24,7 +24,7 @@ else:
     LOGGER = logging.LOGGER
 
 from helao.core.error import ErrorCodes
-from ...servers.base import Base
+from helao.core.servers.base import Base
 from helao.core.models.process import ProcessModel
 from helao.core.models.action import ShortActionModel
 from helao.helpers.premodels import Action

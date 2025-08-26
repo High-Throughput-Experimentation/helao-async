@@ -31,7 +31,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-from ...servers.base import Base, Active
+from helao.core.servers.base import Base, Active
 from helao.core.error import ErrorCodes
 
 from helao.core.models.sample import (
