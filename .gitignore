@@ -1,6 +1,7 @@
 # env and ide vars
 .env
 .qodo
+.ropeproject
 .vscode/*
 .vs/*
 pyrightconfig.json
