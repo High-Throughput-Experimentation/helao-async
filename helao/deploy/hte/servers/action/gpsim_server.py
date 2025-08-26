@@ -11,7 +11,7 @@ __all__ = ["makeApp"]
 from typing import Union
 from fastapi import Body
 
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from ...drivers.data.gpsim_driver import GPSim, GPSimExec
 

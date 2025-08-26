@@ -36,7 +36,7 @@ a OrchHandler class object, the core functionality of an async orchestrator.
 
 __all__ = ["makeApp"]
 
-from ...servers.orch_api import OrchAPI
+from helao.core.servers.orch_api import OrchAPI
 
 
 def makeApp(server_key):

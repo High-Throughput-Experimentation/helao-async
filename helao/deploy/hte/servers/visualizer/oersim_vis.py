@@ -20,7 +20,7 @@ else:
     LOGGER = logging.LOGGER
 
 from helao.core.models.hlostatus import HloStatus
-from ...servers.vis import Vis
+from helao.core.servers. vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 

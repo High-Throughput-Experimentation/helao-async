@@ -8,7 +8,7 @@ __all__ = ["makeApp"]
 from typing import List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from ...drivers.sensor.sprintir_driver import SprintIR, CO2MonExec
 

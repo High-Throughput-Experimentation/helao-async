@@ -18,7 +18,7 @@ from fastapi import Body, Query
 from typing import List, Union
 
 
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from ...drivers.io.nidaqmx_driver import cNIMAX, DevMonExec
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
 from helao.helpers.make_str_enum import make_str_enum

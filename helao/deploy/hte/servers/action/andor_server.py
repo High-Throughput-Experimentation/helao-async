@@ -17,7 +17,7 @@ from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.file import HloHeaderModel
 
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance

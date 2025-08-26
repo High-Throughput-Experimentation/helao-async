@@ -13,7 +13,7 @@ from helao.core.models.sample import (
     NoneSample,
 )
 from helao.helpers.premodels import Action
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from ...drivers.sensor.axiscam_driver import AxisCam, AxisCamExec
 
 

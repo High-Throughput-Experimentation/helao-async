@@ -16,7 +16,7 @@ import asyncio
 from typing import Optional
 from fastapi import Body
 from helao.helpers.premodels import Action
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from ...drivers.motion.kinesis_driver import (
     KinesisMotor,
     KinesisPoller,

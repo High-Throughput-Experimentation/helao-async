@@ -22,7 +22,7 @@ else:
 
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.data import DataPackageModel
-from ...servers.vis import Vis
+from helao.core.servers. vis import Vis
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.core.error import ErrorCodes
 

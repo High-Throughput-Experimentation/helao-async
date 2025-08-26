@@ -7,7 +7,7 @@ from time import strftime
 from fastapi import Body, Query
 from typing import Optional, List, Union
 
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from ...drivers.robot.pal_driver import (
     PAL,
     Spacingmethod,

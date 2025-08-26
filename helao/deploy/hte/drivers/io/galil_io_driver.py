@@ -33,7 +33,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-from ...servers.base import Base
+from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes
 from helao.helpers.make_str_enum import make_str_enum

@@ -30,7 +30,7 @@ from helao.core.models.sample import (
 )
 from helao.core.models.hlostatus import HloStatus
 
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance

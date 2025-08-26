@@ -36,7 +36,7 @@ from helao.core.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
 from helao.core.error import ErrorCodes
 
 from ..servers.operator.bokeh_operator import BokehOperator
-from ..servers.vis import HelaoVis
+from helao.core.servers. vis import HelaoVis
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
@@ -48,7 +48,7 @@ from helao.helpers.dispatcher import (
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Sequence, Experiment, Action
-from ..servers.base import Base, Active
+from helao.core.servers.base import Base, Active
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.helpers.legacy_api import HTELegacyAPI

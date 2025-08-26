@@ -17,7 +17,7 @@ from nidaqmx.constants import UnitsPreScaled
 from nidaqmx.constants import TriggerType
 
 from helao.helpers.premodels import Action
-from ...servers.base import Base
+from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes
 from helao.helpers.make_str_enum import make_str_enum

@@ -12,7 +12,7 @@ else:
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.helpers.zstd_io import unzpickle
-from ...servers.base import Base
+from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from ...drivers.data.gpsim_driver import calc_eta
 

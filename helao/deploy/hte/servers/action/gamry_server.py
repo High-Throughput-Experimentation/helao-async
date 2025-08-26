@@ -33,7 +33,7 @@ import asyncio
 from typing import Optional, List, Union
 from fastapi import Body, Query
 
-from ...servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI
 from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
 from helao.helpers.premodels import Action
 from ...drivers.pstat.gamry_driver import gamry
