@@ -10,6 +10,7 @@ from bokeh.layouts import layout, Spacer
 from helao.core.servers.vis import HelaoVis
 from helao.core.servers.vis import Vis
 from helao.helpers import helao_logging as logging
+from helao.helpers.config_loader import CONFIG
 
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
@@ -53,7 +54,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
     )
     app.vis.doc.add_root(Spacer(height=10))
 
-    vis_root = "helao.servers.visualizer"
+    vis_root = f"helao.deploy.{CONFIG['deployment']}.servers.visualizer"
     vis_classes = {}
     # create visualizer objects for defined instruments
     vis_map = {
