@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Tuple
 from collections import defaultdict
 
-from helao.helpers.yml_tools import yml_load
+from .yml_tools import yml_load
 
 
 def read_hlo(

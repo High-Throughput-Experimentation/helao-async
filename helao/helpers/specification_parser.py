@@ -2,8 +2,8 @@ import os
 import glob
 # import inspect
 
-# from helao.helpers.sequence_constructor import constructor
-from helao.helpers.premodels import Sequence
+# from .sequence_constructor import constructor
+from .premodels import Sequence
 
 class BaseParser:
     def __init__(self):

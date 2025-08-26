@@ -7,7 +7,7 @@ from uuid import UUID
 
 from helao.core.models.file import FileConnParams
 
-from helao.helpers.premodels import Action
+from .premodels import Action
 from helao.core.helaodict import HelaoDict
 
 

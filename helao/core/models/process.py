@@ -8,13 +8,13 @@ from typing import List, Optional, Union
 from uuid import UUID
 from pydantic import BaseModel, Field
 
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
-from helao.core.models.action import ShortActionModel
-from helao.core.models.file import FileInfo
-from helao.core.models.machine import MachineModel
+from .sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
+from .action import ShortActionModel
+from .file import FileInfo
+from .machine import MachineModel
 from helao.core.version import get_hlo_version
 from helao.core.helaodict import HelaoDict
-from helao.core.models.run_use import RunUse
+from .run_use import RunUse
 
 
 class ShortProcessModel(BaseModel, HelaoDict):

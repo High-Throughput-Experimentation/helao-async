@@ -5,7 +5,7 @@ import asyncio
 import aiohttp
 import requests
 
-from helao.helpers.premodels import Action
+from .premodels import Action
 from helao.core.error import ErrorCodes
 
 from helao.helpers import helao_logging as logging

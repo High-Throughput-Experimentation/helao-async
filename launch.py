@@ -43,7 +43,7 @@ from helao.core.version import get_hlo_version
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.config_loader import read_config
 
-import helao.tests.unit_test_sample_models
+from helao.deploy.hte.tests.unit_test_sample_models import sample_model_unit_test
 
 from logging import Logger
 from helao.helpers import helao_logging as logging
@@ -396,17 +396,17 @@ def validateConfig(PIDD, confDict, helao_repo_root):
             if not isinstance(serverDict[hasCode[0]], str):
                 LAUNCH_LOGGER.info(f"{server} server '{hasCode[0]}' is not a string")
                 return False
-            launchPath = os.path.join(
-                "helao",
-                "servers",
-                serverDict["group"],
-                serverDict[hasCode[0]] + ".py",
-            )
-            if not os.path.exists(os.path.join(helao_repo_root, launchPath)):
-                LAUNCH_LOGGER.info(
-                    f"{server} server code helao/servers/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist."
-                )
-                return False
+            # launchPath = os.path.join(
+            #     "helao",
+            #     "servers",
+            #     serverDict["group"],
+            #     serverDict[hasCode[0]] + ".py",
+            # )
+            # if not os.path.exists(os.path.join(helao_repo_root, launchPath)):
+            #     LAUNCH_LOGGER.info(
+            #         f"{server} server code helao/servers/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist."
+            #     )
+            #     return False
     serverAddrs = [f"{d['host']}:{d['port']}" for d in confDict["servers"].values()]
     if len(serverAddrs) != len(set(serverAddrs)):
         LAUNCH_LOGGER.info("Server host:port locations are not unique.")
@@ -568,7 +568,7 @@ def main():
     Raises:
         SystemExit: If unit tests fail or if PYTHONPATH is not defined.
     """
-    if not helao.tests.unit_test_sample_models.sample_model_unit_test():
+    if not sample_model_unit_test():
         quit()
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
     if os.environ.get("CONDA_DEFAULT_ENV") != "helao":

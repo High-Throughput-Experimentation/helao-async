@@ -8,10 +8,10 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
-from helao.core.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
-from helao.core.models.machine import MachineModel
+from .orchstatus import OrchStatus, LoopStatus, LoopIntent
+from .machine import MachineModel
 from helao.helpers.premodels import Action
-from helao.core.models.hlostatus import HloStatus
+from .hlostatus import HloStatus
 from helao.core.helaodict import HelaoDict
 
 

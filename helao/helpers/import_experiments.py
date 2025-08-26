@@ -17,7 +17,6 @@ else:
 def import_experiments(
     world_config_dict: dict,
     experiment_path: Optional[str] = None,
-    server_name: str = "",
     user_experiment_path: Optional[str] = None,
 ):
     """Import experiment functions into environment."""
@@ -49,7 +48,7 @@ def import_experiments(
 
     if experiment_path is None:
         experiment_path = world_config_dict.get(
-            "experiment_path", os.path.join("helao", "experiments")
+            "experiment_path", os.path.join("helao", "deploy", "hte", "experiments")
         )
     if not os.path.isdir(experiment_path):
         LOGGER.error(

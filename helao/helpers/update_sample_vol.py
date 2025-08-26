@@ -1,5 +1,5 @@
 from helao.core.models.sample import SampleModel
-from helao.helpers.print_message import print_message
+from .print_message import print_message
 
 from helao.helpers import helao_logging as logging
 
