@@ -5,7 +5,7 @@ import asyncio
 import aiohttp
 import requests
 
-from helao.helpers.premodels import Action
+from .premodels import Action
 from helao.core.error import ErrorCodes
 
 from helao.helpers import helao_logging as logging
@@ -53,7 +53,9 @@ async def async_action_dispatcher(
             force_close=True, enable_cleanup_closed=True, limit=1000
         )
         try:
-            async with aiohttp.ClientSession(timeout=client_timeout, connector=conn) as session:
+            async with aiohttp.ClientSession(
+                timeout=client_timeout, connector=conn
+            ) as session:
                 async with session.post(
                     url,
                     params=params,
@@ -69,7 +71,7 @@ async def async_action_dispatcher(
                         success = False
                     else:
                         success = True
-        except Exception as e:
+        except Exception:
             retry_count += 1
             retry_wait = retry_count * timeout / 2
             LOGGER.warning(
@@ -79,13 +81,13 @@ async def async_action_dispatcher(
             await asyncio.sleep(retry_wait)
             response = None
         finally:
-            conn.close()
+            await conn.close()
     if not success:
         LOGGER.error(
             f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{response}')",
             exc_info=True,
         )
-                
+
     await asyncio.sleep(0)
     return response, error_code
 
@@ -145,7 +147,7 @@ async def async_private_dispatcher(
                         success = False
                     else:
                         success = True
-        except Exception as e:
+        except Exception:
             retry_count += 1
             retry_wait = retry_count * timeout / 2
             LOGGER.warning(
@@ -195,21 +197,19 @@ def private_dispatcher(
             params=params_dict,
             json=json_dict,
         ) as resp:
-            error_code = ErrorCodes.none
+            error_code = ErrorCodes.http
             try:
-                try:
-                    response = resp.json()
-                except:
-                    response = str(resp)
-                if resp.status_code != 200:
-                    error_code = ErrorCodes.http
+                response = resp.json()
+                if resp.status_code == 200:
+                    error_code = ErrorCodes.none
+                else:
                     LOGGER.error(
                         f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}')"
                     )
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            except Exception:
                 LOGGER.error(
-                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}'), {tb}"
+                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}')",
+                    exc_info=True,
                 )
                 response = None
             return response, error_code

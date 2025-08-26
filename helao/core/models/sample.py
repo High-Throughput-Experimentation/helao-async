@@ -80,7 +80,7 @@ class SampleModel(BaseModel, HelaoDict):
     # time related fields
     sample_creation_timecode: Optional[int] = None  # epoch in ns
     last_update: Optional[int] = None  # epoch in ns
-    # action_timestamp: Optional[str]  # "%Y%m%d.%H%M%S%f"
+    # action_timestamp: Optional[str]  # "%y%m%d.%H%M%S%f"
 
     # labels
     sample_no: Optional[int | str] = None

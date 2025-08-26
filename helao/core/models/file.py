@@ -7,7 +7,7 @@ from uuid import UUID
 from copy import deepcopy
 
 from helao.core.version import get_hlo_version
-from helao.core.models.run_use import RunUse
+from .run_use import RunUse
 from helao.core.helaodict import HelaoDict
 
 

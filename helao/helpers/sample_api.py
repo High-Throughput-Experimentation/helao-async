@@ -24,7 +24,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-from helao.helpers.legacy_api import HTELegacyAPI
+from .legacy_api import HTELegacyAPI
 from helao.core.models.sample import (
     AssemblySample,
     LiquidSample,
@@ -34,7 +34,7 @@ from helao.core.models.sample import (
     object_to_sample,
     SampleType,
 )
-from helao.helpers.file_in_use import file_in_use
+from .file_in_use import file_in_use
 
 
 class SampleModelAPI:
@@ -184,7 +184,7 @@ class SampleModelAPI:
                 sample.server_name = self._base.server.server_name
             # if sample.action_timestamp is None:
             #     atime = datetime.fromtimestamp(datetime.now().timestamp() + self._base.ntp_offset)
-            #     sample.action_timestamp = atime.strftime("%Y%m%d.%H%M%S%f")
+            #     sample.action_timestamp = atime.strftime("%y%m%d.%H%M%S%f")
             if sample.sample_creation_timecode is None:
                 sample.sample_creation_timecode = self._base.get_realtime_nowait()
             if sample.last_update is None:

@@ -85,7 +85,9 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
             yield dict(chunkd), max([len(v) for v in chunkd.values()])
 
 
-def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100, HiSpEC:bool=False):
+def hlo_to_parquet(
+    input_hlo_path, output_parquet_path, chunk_size=100, HiSpEC: bool = False
+):
     """
     Converts HLO (custom format) data to Parquet format.
 
@@ -97,17 +99,17 @@ def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100, HiSpEC:b
     Returns:
     None
     """
-    writer = None
+    writer: pq.ParquetWriter = None
     schema = None
     metadata = None
     current_idx = 0
     header, data_start = read_hlo_header(input_hlo_path)
 
     if HiSpEC:
-        df_headers_no_time = header['optional']['wl']
-        df_headers_all = ([000] + df_headers_no_time)
-        df_headers_all= list(map(float, df_headers_all))
-    #print(len(df_headers_all))
+        df_headers_no_time = header["optional"]["wl"]
+        df_headers_all = [000] + df_headers_no_time
+        df_headers_all = list(map(float, df_headers_all))
+    # print(len(df_headers_all))
 
     for chunk, chunklen in read_hlo_data_chunks(
         input_hlo_path, data_start, chunk_size=chunk_size
@@ -115,49 +117,41 @@ def hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100, HiSpEC:b
         df0 = pd.DataFrame(chunk, index=range(current_idx, current_idx + chunklen))
 
         if current_idx == 0:
-            start_ticktime = df0.iloc[0, 0]     
-        
+            start_ticktime = df0.iloc[0, 0]
+
         if HiSpEC:
-     
+
             # convert from ticktime to time
-            df0.iloc[:,0] = df0.iloc[:,0].apply(lambda x: x - start_ticktime)
+            df0.iloc[:, 0] = df0.iloc[:, 0].apply(lambda x: x - start_ticktime)
 
             # rename the first collumn to Time (s)
-            #df0.rename(columns={df0.columns[0]: 'Time (s)'}, inplace=True)
-
+            # df0.rename(columns={df0.columns[0]: 'Time (s)'}, inplace=True)
 
             # rename the collumns using df_headers
-            #print(current_idx, current_idx+chunklen)
+            # print(current_idx, current_idx+chunklen)
             df0.columns = df_headers_all
-            
+
             # create a new dataframe with collumns 1:-1 of df0
             df = df0.iloc[:, 1:-1]
 
-
-
-            
-
             # downsample the data to every 1 nm
-            df=df.T.groupby(df.columns//1).mean().T
+            df = df.T.groupby(df.columns // 1).mean().T
 
             # insert the time collumn from df into df0 as collumn 0
-            df.insert(0, 't_s', df0.iloc[:,0])
+            df.insert(0, "t_s", df0.iloc[:, 0])
 
-            df.columns= df.columns.astype(str)
- 
-            
-            
+            df.columns = df.columns.astype(str)
+
             table = pa.Table.from_pandas(df)
             current_idx += chunklen
-            df=pd.DataFrame()
+            df = pd.DataFrame()
 
         else:
             table = pa.Table.from_pandas(df0)
             current_idx += chunklen
 
-        #print(df.head())
-       
-        
+        # print(df.head())
+
         if schema is None:
             schema = table.schema
             existing_metadata = schema.metadata
@@ -191,7 +185,9 @@ def read_helao_metadata(parquet_file_path):
     return metadict
 
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
     input_hlo_path = r"/Users/benj/Documents/SpEC_Class_2/test_data/newdata/ANDORSPEC-1.1.0.0__0 (1).hlo"
-    output_parquet_path = r"/Users/benj/Documents/SpEC_Class_2/test_data/newdata/test.parquet"
+    output_parquet_path = (
+        r"/Users/benj/Documents/SpEC_Class_2/test_data/newdata/test.parquet"
+    )
     hlo_to_parquet(input_hlo_path, output_parquet_path, HiSpEC=True)

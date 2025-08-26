@@ -7,12 +7,12 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from helao.core.models.hlostatus import HloStatus
-from helao.core.models.experiment import (
+from .hlostatus import HloStatus
+from .experiment import (
     ShortExperimentModel,
     ExperimentTemplate,
 )
-from helao.core.models.machine import MachineModel
+from .machine import MachineModel
 
 from helao.core.version import get_hlo_version
 from helao.core.helaodict import HelaoDict

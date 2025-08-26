@@ -10,8 +10,8 @@ import aiohttp
 import aioshutil
 import aiofiles
 
-from helao.helpers.yml_tools import yml_load
-from helao.helpers.premodels import Sequence, Experiment, Action
+from .yml_tools import yml_load
+from .premodels import Sequence, Experiment, Action
 
 from helao.helpers import helao_logging as logging
 
@@ -181,7 +181,7 @@ async def move_dir(
                 if not os.path.exists(yml_dir):
                     rm_success = True
                     timestamp = getattr(hobj, f"{obj_type}_timestamp").strftime(
-                        "%Y%m%d.%H%M%S%f"
+                        "%y%m%d.%H%M%S%f"
                     )
                     yml_path = os.path.join(new_dir, f"{timestamp}-{obj_type[:3]}.yml")
                     if not is_manual:
