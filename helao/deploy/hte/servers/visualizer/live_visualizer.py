@@ -6,8 +6,8 @@ from socket import gethostname
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 
-from helao.core.servers. vis import HelaoVis
-from helao.core.servers. vis import Vis
+from helao.core.servers.vis import HelaoVis
+from helao.core.servers.vis import Vis
 
 from helao.helpers import helao_logging as logging
 

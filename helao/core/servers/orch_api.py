@@ -11,7 +11,7 @@ from fastapi import Body, WebSocket, Request
 from fastapi.routing import APIRoute
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from ..drivers.helao_driver import HelaoDriver
+from helao.core.drivers.helao_driver import HelaoDriver
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val

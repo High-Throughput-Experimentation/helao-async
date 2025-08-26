@@ -26,7 +26,7 @@ from copy import copy
 
 import numpy as np
 
-from ....drivers.helao_driver import (
+from helao.core.drivers.helao_driver import (
     HelaoDriver,
     DriverResponse,
     DriverStatus,

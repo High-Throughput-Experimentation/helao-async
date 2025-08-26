@@ -7,7 +7,7 @@ from copy import copy
 from socket import gethostname
 from collections import namedtuple
 
-from ..drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
+from helao.core.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
 from helao.helpers.eval import eval_val
 from helao.helpers.gen_uuid import gen_uuid
 from helao.core.servers.base import Base

@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 import easy_biologic as ebl
 
-from ....drivers.helao_driver import (
+from helao.core.drivers.helao_driver import (
     HelaoDriver,
     DriverResponse,
     DriverStatus,
