@@ -8,7 +8,7 @@ Finished actions which do not contribute process information are pushed to
 __all__ = ["makeApp"]
 
 from helao.core.servers.base_api import BaseAPI
-from helao.core.data.sync_driver import HelaoSyncer
+from helao.core.drivers.data.sync_driver import HelaoSyncer
 
 
 def makeApp(server_key):

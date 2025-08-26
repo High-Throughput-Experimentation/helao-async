@@ -15,7 +15,7 @@ from helao.helpers.gen_uuid import gen_uuid
 
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
-from helao.core.data.loaders.pgs3 import HelaoProcess, HelaoAction
+from helao.core.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 from .echeuvis_stability import refadjust, parse_spechlo
 
 ANALYSIS_DEFAULTS = {

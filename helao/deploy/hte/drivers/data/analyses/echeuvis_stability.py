@@ -24,7 +24,7 @@ else:
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
 from helao.core.models.run_use import RunUse
-from helao.core.data.loaders.pgs3 import HelaoProcess, HelaoAction
+from helao.core.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],
