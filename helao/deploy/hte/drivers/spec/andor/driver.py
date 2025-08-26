@@ -17,7 +17,7 @@ else:
     LOGGER = logging.LOGGER
 
 
-from ....drivers.helao_driver import (
+from helao.core.drivers.helao_driver import (
     HelaoDriver,
     DriverResponse,
     DriverStatus,

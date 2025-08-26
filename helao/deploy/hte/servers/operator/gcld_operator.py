@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 from pprint import pprint
 
-from ...servers.operator.helao_operator import HelaoOperator
+from helao.core.servers.operator.helao_operator import HelaoOperator
 
 import httpx
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel

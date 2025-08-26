@@ -6,7 +6,7 @@ from pathlib import Path
 from pprint import pprint
 
 from gcld_operator import seq_constructor, gen_ts, wait_for_orch, num_uploads
-from ...servers.operator.helao_operator import HelaoOperator
+from helao.core.servers.operator.helao_operator import HelaoOperator
 
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
 from helao.helpers.config_loader import CONFIG

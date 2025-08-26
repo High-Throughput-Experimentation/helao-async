@@ -35,8 +35,8 @@ from helao.core.models.server import ActionServerModel, GlobalStatusModel
 from helao.core.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
 from helao.core.error import ErrorCodes
 
-from ..servers.operator.bokeh_operator import BokehOperator
-from helao.core.servers. vis import HelaoVis
+from helao.core.servers.operator.bokeh_operator import BokehOperator
+from helao.core.servers.vis import HelaoVis
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences

@@ -35,7 +35,7 @@ from helao.helpers.make_str_enum import make_str_enum
 
 from pylablib.devices import Thorlabs
 
-from ...drivers.helao_driver import (
+from helao.core.drivers.helao_driver import (
     HelaoDriver,
     DriverPoller,
     DriverResponse,

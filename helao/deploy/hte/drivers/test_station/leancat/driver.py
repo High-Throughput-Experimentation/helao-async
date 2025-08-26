@@ -24,7 +24,7 @@ else:
 import pandas as pd
 import leancat_helao.config
 
-from ....drivers.helao_driver import (
+from helao.core.drivers.helao_driver import (
     HelaoDriver,
     DriverResponse,
     DriverStatus,

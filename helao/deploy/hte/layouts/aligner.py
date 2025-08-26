@@ -32,7 +32,7 @@ if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
 else:
     LOGGER = logging.LOGGER
-from helao.core.servers. vis import Vis
+from helao.core.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 from helao.core.models.data import DataModel
 from helao.core.error import ErrorCodes

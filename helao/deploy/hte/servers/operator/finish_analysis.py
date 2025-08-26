@@ -7,7 +7,7 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from pathlib import Path
 
-from ...servers.operator.helao_operator import HelaoOperator
+from helao.core.servers.operator.helao_operator import HelaoOperator
 
 # from helao.helpers.gcld_client import DataRequestsClient
 from data_request_client.client import DataRequestsClient
