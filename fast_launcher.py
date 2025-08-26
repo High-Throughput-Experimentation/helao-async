@@ -108,6 +108,7 @@ if __name__ == "__main__":
             raise FileNotFoundError(
                 f"Could not find deployment for {server_config['fast']} in {server_config['group']}"
             )
+    CONFIG["deployment"] = deployment
 
     makeApp = import_module(
         f"helao.deploy.{deployment}.servers.{server_config['group']}.{server_config['fast']}"
