@@ -98,7 +98,9 @@ if __name__ == "__main__":
         )
         if len(possible_deployments) == 1:
             deployment = os.path.basename(
-                os.path.dirname(os.path.dirname(possible_deployments[0]))
+                os.path.dirname(
+                    os.path.dirname(os.path.dirname(possible_deployments[0]))
+                )
             )
             LOGGER.info(f"Auto-detected deployment: {deployment}")
         elif len(possible_deployments) > 1:
@@ -109,7 +111,7 @@ if __name__ == "__main__":
                 if x.startswith(os.path.dirname(os.path.dirname(config_path)))
             ][0]
             deployment = os.path.basename(
-                os.path.dirname(os.path.dirname(filter_possible))
+                os.path.dirname(os.path.dirname(os.path.dirname(filter_possible)))
             )
             LOGGER.info(f"Auto-detected deployment from multiple options: {deployment}")
         else:

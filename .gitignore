@@ -1,19 +1,23 @@
-.vscode/*
-.vs/*
-__pycache__/*
-*/__pycache__/*
-*.pyc
-*.DS_Store
-*.pck
-outputs/*
-*/.DS_Store
-.DS_Store
-ntpLastSync.txt
-data/*
-bugreports/*
-helao/config/.ipynb_checkpoints/simulate-checkpoint.ipynb
-*-checkpoint.*
+# env and ide vars
 .env
 .qodo
-*.parquet
+.vscode/*
+.vs/*
 pyrightconfig.json
+
+# cache
+__pycache__/*
+*.pyc
+*/.DS_Store
+.DS_Store
+
+# state
+ntpLastSync.txt
+*.pck
+*.parquet
+*/.ipynb_checkpoints/
+
+# external deployment
+# helao/deploy/*
+# !helao/deploy/__init__.py
+# !helao/deploy/hte/
