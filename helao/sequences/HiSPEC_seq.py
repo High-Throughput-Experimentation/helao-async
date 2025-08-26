@@ -18,14 +18,18 @@ def HiSpEC_CV(
     sequence_version: int = 1, # @Dan - what is this? -- this is a version number for the sequence, you should increment it when you modify sequence arguments and the experiment list
     plate_id: int = 1, # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [2], # @Dan - what is this? -- the sample_no is uniquely assigned to an x,y location on a material library according to its plate map which was defined at the synthesis step
+    cycles: int = 1,
+    Ival__A: float = 0.0015*0.045,
+    scanrate_voltsec: float = 0.01,
+    cell_fill_wait: float = 60.0,
+    Tval__s: float = 60,
+    CP_Tval__s: float = 60,
     reservoir_electrolyte: Electrolyte = Electrolyte.hispeca,  # @Ben -- this is an enum for a common abbreviation we give to our electrolytes used in our screening protocols, they typically have an integer pH at the end, see helao.core.models.electrolyte and add one there if needed
-    reservoir_liquid_sample_no: int = 1, # @Dan -- what is this? -- this is the liquid sample number in the liquid sample database, you will need to 'create' a liquid sample for the electrolyte you're using, so that the cell is filled with a liquid sample that inherits the reservoir attributes
+    reservoir_liquid_sample_no: int = 1,# @Dan -- what is this? -- this is the liquid sample number in the liquid sample database, you will need to 'create' a liquid sample for the electrolyte you're using, so that the cell is filled with a liquid sample that inherits the reservoir attributes
     solution_bubble_gas: str = "None",
     solution_ph: float = 0,
     Flow_during_SpEC: bool = False,
-
     samplerate_sec: float = 0.1,
-    cycles: int = 1,
     gamrychannelwait: int = -1,
     gamrychannelsend: int = 0,
     IRange: str = "m1",
@@ -35,8 +39,6 @@ def HiSpEC_CV(
     toggle1_source: str = "spec_trig",
     toggle1_init_delay: float = 0.0,
     toggle1_duty: float = 0.01,
-    # toggle1_period: float = 10,
-    # toggle1_time: float = 1,
     Vamp__V: float = 0.01,  # Amplitude value in volts
     Finit__Hz: float = 40000,  # Initial frequency in Hz.
     Ffinal__Hz: float = 1000,  # Final frequency in Hz.
@@ -47,17 +49,13 @@ def HiSpEC_CV(
     SweepMode: str = "log",
     Repeats: int = 10,
     DelayFraction: float = 0.1,
-    Ival__A: float = 0.0015*0.02,
-    Tval__s: float = 60,
-    scanrate_voltsec: float = 0.001,  # scan rate in volts/second or amps/second.
     comment: str = "",
-    measurement_area: float = 0.02,  # 3mm diameter droplet
+    measurement_area: float = 0.045,  # 2.4 mm diameter droplet
     liquid_volume_ml: float = 1.0,
     use_z_motor: bool = True,  # @Ben -- I think this should default to True
     cell_engaged_z: float = 3.5, # # units of mm.
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
-    cell_fill_wait: float = 60.0,
 
     #######
     #Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
@@ -77,25 +75,6 @@ def HiSpEC_CV(
                 "vent_wait": cell_vent_wait,
             },
         )
-
-
-    # epm.add("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
-    
-    # if use_z_motor:
-    #     epm.add(
-    #         "HiSpEC_sub_disengage",
-    #         {
-    #             "clear_we": True,
-    #             "clear_ce": False,
-    #             "z_height": cell_disengaged_z,
-    #             "vent_wait": cell_vent_wait,
-    #         },
-    #     )
-    # else:
-    #     epm.add(
-    #         "HiSpEC_sub_interrupt",
-    #         {"reason": "Stop flow and prepare for xy motion to starting sample."},
-    #    ) 
 
     for i, plate_sample in enumerate(plate_sample_no_list):
         if i > 0 and use_z_motor:
@@ -123,14 +102,12 @@ def HiSpEC_CV(
 
         if use_z_motor:
             epm.add(
-                "ECHEUVIS_sub_engage",
+                "HiSpEC_sub_engage",
                 {
                     "flow_we": True,
                     "flow_ce": True,
                     "z_height": cell_engaged_z,
                     "fill_wait": cell_fill_wait,
-                    "calibrate_intensity": False, #@Dan - kept this action but turned this flag to false to prevent it trying to access doric WLED - not sure if this will work... -- it should work because the references to doric_wled aren't going to be used
-                    "max_integration_time": int(10)
                 },
             )
         else:
@@ -140,7 +117,7 @@ def HiSpEC_CV(
                     {"reason": "Restore flow and prepare for sample measurement."},
                 )
         
-        if Flow_during_SpEC==False:
+        if not Flow_during_SpEC:
             epm.add("HiSPEC_sub_stop_flow", {})
 
         
@@ -179,7 +156,7 @@ def HiSpEC_CV(
         epm.add(
             "HiSpEC_sub_CP",
             {"Ival__A" : Ival__A,
-            "Tval__s" : Tval__s,
+            "Tval__s" : CP_Tval__s,
             "AcqInterval__s": AcqInterval_CA_CP__s})
         
 
