@@ -33,8 +33,8 @@ from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.electrolyte import Electrolyte
 from helao.helpers.ref_electrode import REF_TABLE
 
-from ..drivers.motion.enum import MoveModes, TransformationModes
-from ..drivers.io.enum import TriggerType
+from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
+from helao.deploy.hte.drivers.io.enum import TriggerType
 
 
 EXPERIMENTS = __all__

@@ -48,7 +48,7 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.helpers.spec_map import SPECSRV_MAP
-from ..drivers.io.enum import TriggerType
+from helao.deploy.hte.drivers.io.enum import TriggerType
 
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.machine import MachineModel as MM
@@ -56,7 +56,7 @@ from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.electrolyte import Electrolyte
 from helao.core.models.sample import SolidSample, LiquidSample
 
-from ..drivers.motion.enum import MoveModes, TransformationModes
+from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 
 EXPERIMENTS = __all__
 # these must all be defined but you may not use any of them in the experiment
