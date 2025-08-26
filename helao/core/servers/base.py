@@ -80,6 +80,7 @@ from helao.core.models.file import (
 from helao.helpers.file_in_use import file_in_use
 from helao.core.error import ErrorCodes
 from helao.helpers import config_loader
+
 CONFIG = config_loader.CONFIG
 
 # ANSI color codes converted to the Windows versions
@@ -283,7 +284,11 @@ class Base:
             proc_spec = spec_from_file_location(
                 "hlo_post",
                 os.path.join(
-                    "helao", "processors", f"{self.hlo_postprocess_script}.py"
+                    "helao",
+                    "deploy",
+                    CONFIG["deployment"],
+                    "processors",
+                    f"{self.hlo_postprocess_script}.py",
                 ),
             )
             proc_mod = module_from_spec(proc_spec)
