@@ -3,7 +3,7 @@ from typing import List
 from glob import glob
 from abc import ABC, abstractmethod
 from helao.core.models.file import FileInfo
-from helao.helpers.premodels import Action
+from .premodels import Action
 
 class HloPostProcessor(ABC):
     

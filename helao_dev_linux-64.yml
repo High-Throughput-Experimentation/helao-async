@@ -17,6 +17,7 @@ dependencies:
     - git+https://github.com/onepunchdan/easy-biologic
   - aiofiles
   - aiohttp
+  - asyncua
   - bokeh=2
   - boto3
   - botocore

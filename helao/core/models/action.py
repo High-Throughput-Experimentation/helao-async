@@ -6,22 +6,22 @@ from uuid import UUID
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from helao.core.models.hlostatus import HloStatus
-from helao.core.models.process_contrib import ProcessContrib
-from helao.core.models.run_use import RunUse
-from helao.core.models.sample import (
+from .hlostatus import HloStatus
+from .process_contrib import ProcessContrib
+from .run_use import RunUse
+from .sample import (
     AssemblySample,
     LiquidSample,
     GasSample,
     SolidSample,
     NoneSample,
 )
-from helao.core.models.file import FileInfo
-from helao.core.models.machine import MachineModel
+from .file import FileInfo
+from .machine import MachineModel
 from helao.core.version import get_hlo_version
 from helao.core.helaodict import HelaoDict
 from helao.core.error import ErrorCodes
-from helao.core.models.action_start_condition import ActionStartCondition
+from .action_start_condition import ActionStartCondition
 
 
 class ShortActionModel(BaseModel, HelaoDict):
