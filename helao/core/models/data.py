@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field
 
-from helao.core.models.hlostatus import HloStatus
+from .hlostatus import HloStatus
 from helao.core.helaodict import HelaoDict
 from helao.core.error import ErrorCodes
 

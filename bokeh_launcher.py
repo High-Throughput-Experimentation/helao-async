@@ -39,6 +39,7 @@ __all__ = []
 
 import sys
 import os
+from glob import glob
 from functools import partial
 from importlib import import_module
 from bokeh.server.server import Server
@@ -80,8 +81,44 @@ if __name__ == "__main__":
     servPy = server_config["bokeh"]
     launch_browser = server_config.get("params", {}).get("launch_browser", False)
 
+    config_path = CONFIG["loaded_config_path"]
+    detected_deployment = os.path.basename(
+        os.path.dirname(os.path.dirname(config_path))
+    )
+    deployment = server_config.get("deployment", detected_deployment)
+    if "deployment" not in server_config:
+        possible_deployments = glob(
+            os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(config_path))),
+                "*",
+                "servers",
+                server_config["group"],
+                f"{server_config['bokeh']}.py",
+            )
+        )
+        if len(possible_deployments) == 1:
+            deployment = os.path.basename(
+                os.path.dirname(os.path.dirname(possible_deployments[0]))
+            )
+            LOGGER.info(f"Auto-detected deployment: {deployment}")
+        elif len(possible_deployments) > 1:
+            # prefer detected deployment
+            filter_possible = [
+                x
+                for x in possible_deployments
+                if x.startswith(os.path.dirname(os.path.dirname(config_path)))
+            ][0]
+            deployment = os.path.basename(
+                os.path.dirname(os.path.dirname(filter_possible))
+            )
+            LOGGER.info(f"Auto-detected deployment from multiple options: {deployment}")
+        else:
+            raise FileNotFoundError(
+                f"Could not find deployment for {server_config['bokeh']} in {server_config['group']}"
+            )
+
     makeApp = import_module(
-        f"helao.servers.{server_config['group']}.{server_config['bokeh']}"
+        f"helao.deploy.{deployment}.servers.{server_config['group']}.{server_config['bokeh']}"
     ).makeBokehApp
     root = CONFIG.get("root", None)
     if root is not None:

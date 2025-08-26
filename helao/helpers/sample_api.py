@@ -24,7 +24,7 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
-from helao.helpers.legacy_api import HTELegacyAPI
+from .legacy_api import HTELegacyAPI
 from helao.core.models.sample import (
     AssemblySample,
     LiquidSample,
@@ -34,7 +34,7 @@ from helao.core.models.sample import (
     object_to_sample,
     SampleType,
 )
-from helao.helpers.file_in_use import file_in_use
+from .file_in_use import file_in_use
 
 
 class SampleModelAPI:

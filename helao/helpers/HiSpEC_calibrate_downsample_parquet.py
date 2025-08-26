@@ -1,4 +1,4 @@
-from helao.helpers.read_hlo import read_hlo
+from .read_hlo import read_hlo
 import pandas as pd
 import numpy as np
 import os

@@ -17,9 +17,9 @@ import re
 
 import orjson
 import pandas as pd
-from helao.helpers.yml_tools import yml_load
-from helao.helpers.read_hlo import read_hlo
-from helao.helpers.file_mapper import FileMapper
+from .yml_tools import yml_load
+from .read_hlo import read_hlo
+from .file_mapper import FileMapper
 
 
 class HelaoData:

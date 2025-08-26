@@ -32,6 +32,7 @@ __all__ = []
 
 import sys
 import os
+from glob import glob
 from importlib import import_module
 from uvicorn.config import LOGGING_CONFIG
 import uvicorn
@@ -70,8 +71,44 @@ if __name__ == "__main__":
     LOGGER = logging.LOGGER
     LOGGER.info(f"Loaded config from: {CONFIG['loaded_config_path']}")
 
+    config_path = CONFIG["loaded_config_path"]
+    detected_deployment = os.path.basename(
+        os.path.dirname(os.path.dirname(config_path))
+    )
+    deployment = server_config.get("deployment", detected_deployment)
+    if "deployment" not in server_config:
+        possible_deployments = glob(
+            os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(config_path))),
+                "*",
+                "servers",
+                server_config["group"],
+                f"{server_config['fast']}.py",
+            )
+        )
+        if len(possible_deployments) == 1:
+            deployment = os.path.basename(
+                os.path.dirname(os.path.dirname(possible_deployments[0]))
+            )
+            LOGGER.info(f"Auto-detected deployment: {deployment}")
+        elif len(possible_deployments) > 1:
+            # prefer detected deployment
+            filter_possible = [
+                x
+                for x in possible_deployments
+                if x.startswith(os.path.dirname(os.path.dirname(config_path)))
+            ][0]
+            deployment = os.path.basename(
+                os.path.dirname(os.path.dirname(filter_possible))
+            )
+            LOGGER.info(f"Auto-detected deployment from multiple options: {deployment}")
+        else:
+            raise FileNotFoundError(
+                f"Could not find deployment for {server_config['fast']} in {server_config['group']}"
+            )
+
     makeApp = import_module(
-        f"helao.servers.{server_config['group']}.{server_config['fast']}"
+        f"helao.deploy.{deployment}.servers.{server_config['group']}.{server_config['fast']}"
     ).makeApp
     app = makeApp(server_key)
     root = CONFIG.get("root", None)

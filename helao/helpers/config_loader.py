@@ -1,6 +1,7 @@
 __all__ = ["read_config", "load_global_config", "CONFIG"]
 
 import os
+from glob import glob
 from munch import munchify, Munch
 from typing import List, Dict, Optional
 from pathlib import Path
@@ -60,15 +61,22 @@ def read_config(confArg, helao_repo_root):
             "Config argument ends with .py or .yml but expected path not found."
         )
     else:
-        yml_path = os.path.join(
-            helao_repo_root, "helao", "configs", f"{confPrefix}.yml"
+        prefix_paths = glob(
+            os.path.join(
+                helao_repo_root, "helao", "deploy", "*", "configs", f"{confPrefix}.*"
+            )
         )
-        py_path = yml_path.replace(".yml", ".py")
-        if os.path.exists(yml_path):
-            full_path = yml_path
-            config = yml_load(Path(yml_path))
-        elif os.path.exists(py_path):
-            full_path = py_path
+        yml_paths = [x for x in prefix_paths if x.endswith(".yml")]
+        py_paths = [x for x in prefix_paths if x.endswith(".py")]
+        if len(yml_paths) == 1:
+            full_path = yml_paths[0]
+            config = yml_load(Path(full_path))
+        elif len(yml_paths) > 1:
+            raise Exception(
+                "Multiple .yml files found with that prefix.\n" + "\n".join(yml_paths)
+            )
+        elif len(py_paths) == 1:
+            full_path = py_paths[0]
             config = (
                 SourceFileLoader(
                     "config",
@@ -77,17 +85,14 @@ def read_config(confArg, helao_repo_root):
                 .load_module()
                 .config
             )
+        elif len(py_paths) > 1:
+            raise Exception(
+                "Multiple .py files found with that prefix.\n" + "\n".join(py_paths)
+            )
         else:
             raise FileNotFoundError(
                 "Config argument was a prefix but .py or .yml could not be found."
             )
-        # print_message(
-        #     LOGGER,
-        #     "launcher",
-        #     f"Loading config from {full_path}",
-        #     info=True,
-        # )
-        print(f"Loading config from {full_path}")
     config["loaded_config_path"] = full_path
     return config
 

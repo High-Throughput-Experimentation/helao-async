@@ -2,8 +2,8 @@ import inspect
 from typing import Optional
 from uuid import UUID
 
-from helao.helpers.premodels import Sequence
-from helao.helpers.gen_uuid import gen_uuid
+from .premodels import Sequence
+from .gen_uuid import gen_uuid
 
 
 def constructor(

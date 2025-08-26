@@ -5,7 +5,7 @@ import time
 from typing import Optional
 from importlib.machinery import SourceFileLoader
 
-from helao.helpers.print_message import print_message
+from .print_message import print_message
 from helao.core.version import get_filehash
 
 from helao.helpers import helao_logging as logging
@@ -18,7 +18,6 @@ else:
 def import_sequences(
     world_config_dict: dict,
     sequence_path: Optional[str] = None,
-    server_name: str = "",
     user_sequence_path: Optional[str] = None,
 ):
     """Import sequence functions into environment."""
@@ -48,7 +47,7 @@ def import_sequences(
 
     if sequence_path is None:
         sequence_path = world_config_dict.get(
-            "sequence_path", os.path.join("helao", "sequences")
+            "sequence_path", os.path.join("helao", "deploy", "hte", "sequences")
         )
     if not os.path.isdir(sequence_path):
         LOGGER.error(
