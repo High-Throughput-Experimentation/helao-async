@@ -16,7 +16,7 @@ experiment_libraries:
 #   gamrychannelsend: 0
 sequence_libraries:
 #   - ECHE_seq
-    - HiSPEC_seq
+    - HISPEC_seq
 #   - UVIS_T_seq
 #   - TEST_seq
 # sequence_params:
@@ -129,7 +129,7 @@ servers:
     fast: andor_server
     params:
       dev_id: 0
-    hlo_postprocess_script: HiSpEC_process_all
+    hlo_postprocess_script: HISPEC_process_all
     verbose: true
   VIS:
     host: hte-eche-11.htejcap.caltech.edu

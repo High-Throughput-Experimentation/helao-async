@@ -360,7 +360,7 @@ def ECHE_sub_OCV(
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
-        to_global_params={"Ewe_V__mean_final": "HiSpEC_OCV"},
+        to_global_params={"Ewe_V__mean_final": "HISPEC_OCV"},
     )
     return apm.planned_actions  # returns complete action list to orch
 
