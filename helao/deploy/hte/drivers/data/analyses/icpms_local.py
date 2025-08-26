@@ -9,8 +9,8 @@ from pydantic import BaseModel
 from helao.core.version import get_filehash
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput, AnalysisOutput
 
-from .base_analysis import BaseAnalysis
-from ...data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
+from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
+from helao.core.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
 
 ANALYSIS_DEFAULTS = {
     "fom_key": "ExtCal.Concentration_ppb",

@@ -13,9 +13,9 @@ from scipy.stats import binned_statistic
 from helao.core.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 
-from .base_analysis import BaseAnalysis
+from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
-from ....drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
+from helao.core.data.loaders.pgs3 import HelaoProcess, HelaoAction
 from .echeuvis_stability import refadjust, parse_spechlo
 
 ANALYSIS_DEFAULTS = {

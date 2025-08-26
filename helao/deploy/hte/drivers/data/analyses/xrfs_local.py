@@ -13,8 +13,8 @@ import pandas as pd
 from helao.core.version import get_filehash
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput, AnalysisOutput
 
-from .base_analysis import BaseAnalysis
-from ...data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
+from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
+from helao.core.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
 
 CM_SCALE = {"nm": 1e-7, "um": 1e-4, "mm": 0.1, "cm": 1}
 
