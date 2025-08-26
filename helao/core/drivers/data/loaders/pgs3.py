@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime
 
 import pandas as pd
-from helao.core.data.loaders.helao_loader import HelaoLoader
+from helao.core.drivers.data.loaders.helao_loader import HelaoLoader
 
 # initialize in driver
 LOADER: HelaoLoader = None

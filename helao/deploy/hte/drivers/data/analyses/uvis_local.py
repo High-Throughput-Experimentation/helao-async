@@ -15,7 +15,7 @@ from helao.helpers.gen_uuid import gen_uuid
 
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
-from helao.core.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
+from helao.core.drivers.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],

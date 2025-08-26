@@ -27,9 +27,9 @@ import pandas as pd
 from helao.core.servers.base import Base
 from helao.helpers.set_time import set_time
 from helao.helpers.yml_tools import yml_dumps
-from helao.core.data.sync_driver import HelaoSyncer
+from helao.core.drivers.data.sync_driver import HelaoSyncer
 from ...drivers.data.loaders import pgs3
-from helao.core.data.loaders.localfs import LocalLoader
+from helao.core.drivers.data.loaders.localfs import LocalLoader
 from ...drivers.data.analyses.echeuvis_stability import (
     EcheUvisAnalysis,
     SDCUVIS_QUERY,
