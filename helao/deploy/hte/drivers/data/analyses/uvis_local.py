@@ -13,9 +13,9 @@ from scipy.stats import binned_statistic
 from helao.core.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 
-from .base_analysis import BaseAnalysis
+from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
-from ...data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
+from helao.core.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],

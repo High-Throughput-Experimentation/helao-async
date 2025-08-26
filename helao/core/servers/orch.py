@@ -52,7 +52,7 @@ from helao.core.servers.base import Base, Active
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.helpers.legacy_api import HTELegacyAPI
-from ..drivers.data.sync_driver import HelaoSyncer
+from helao.core.data.sync_driver import HelaoSyncer
 from helao.helpers import config_loader
 
 CONFIG = config_loader.CONFIG
