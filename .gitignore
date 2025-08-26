@@ -18,6 +18,6 @@ ntpLastSync.txt
 */.ipynb_checkpoints/
 
 # external deployment
-# helao/deploy/*
-# !helao/deploy/__init__.py
-# !helao/deploy/hte/
+helao/deploy/*
+!helao/deploy/__init__.py
+!helao/deploy/hte/
