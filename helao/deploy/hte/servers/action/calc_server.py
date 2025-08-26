@@ -149,7 +149,7 @@ def makeApp(server_key):
 
             if isinstance(active.action.action_params["new_ocv"], bool):
                 new_ocv = 3
-                LOGGER.warning("HiSpEC_OCV not found in global params! Run OCV first")
+                LOGGER.warning("HISPEC_OCV not found in global params! Run OCV first")
             else:
                 new_ocv = active.action.action_params["new_ocv"] + offset_value
 

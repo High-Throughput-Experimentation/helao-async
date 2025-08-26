@@ -6,27 +6,27 @@ server_key must be a FastAPI action server defined in config
 # everything is a 'machine model schema '
 __all__ = [
     "HISPEC_sub_SpEC",
-    "HiSPEC_sub_stop_flow",
-    "HiSpEC_sub_CA",
+    "HISPEC_sub_stop_flow",
+    "HISPEC_sub_CA",
     # "HISPEC_sub_CV_DOtrigger",
     # "HISPEC_sub_CA_led",
     # "HISPEC_sub_CP_led",
     # "HISPEC_sub_OCV_led",
     # "HISPEC_sub_interrupt",
-    "HiSpEC_sub_startup",
+    "HISPEC_sub_startup",
     "HISPEC_sub_shutdown",
-    "HiSPEC_sub_PEIS",
-    "HiSpEC_sub_CP",
-    "HiSpEC_calculate_lower_vertex_potential",
-    "HiSpEC_sub_engage",
+    "HISPEC_sub_PEIS",
+    "HISPEC_sub_CP",
+    "HISPEC_calculate_lower_vertex_potential",
+    "HISPEC_sub_engage",
     # "HISPEC_sub_disengage",
     # "HISPEC_analysis_stability",
-    "HiSpEC_sub_cooldown",
-    "HiSpEC_sub_load_solid",
-    "HiSpEC_sub_add_liquid",
-    "HiSpEC_sub_unloadall_customs",
-    "HiSpEC_sub_disengage",
-    "HiSpEC_sub_OCV",
+    "HISPEC_sub_cooldown",
+    "HISPEC_sub_load_solid",
+    "HISPEC_sub_add_liquid",
+    "HISPEC_sub_unloadall_customs",
+    "HISPEC_sub_disengage",
+    "HISPEC_sub_OCV",
 ]
 
 from helao.helpers import helao_logging as logging
@@ -76,14 +76,14 @@ CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict
 toggle_triggertype = TriggerType.risingedge
 
 
-def HiSpEC_sub_cooldown(experiment: Experiment):
+def HISPEC_sub_cooldown(experiment: Experiment):
     """Cool the detector"""
     apm = ActionPlanMaker()
     apm.add(ANDOR_server, "cooling", {})
     return apm.planned_actions
 
 
-def HiSPEC_sub_stop_flow(experiment: Experiment):
+def HISPEC_sub_stop_flow(experiment: Experiment):
     """Stop the flow"""
     apm = ActionPlanMaker()
     for item, flow_flag in (
@@ -100,7 +100,7 @@ def HiSPEC_sub_stop_flow(experiment: Experiment):
     return apm.planned_actions
 
 
-def HiSpEC_sub_unloadall_customs(experiment: Experiment):
+def HISPEC_sub_unloadall_customs(experiment: Experiment):
     """last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -117,7 +117,7 @@ def HiSpEC_sub_unloadall_customs(experiment: Experiment):
     return apm.planned_actions  # returns complete action list to orch
 
 
-def HiSpEC_sub_add_liquid(
+def HISPEC_sub_add_liquid(
     experiment: Experiment,
     experiment_version: int = 2,
     solid_custom_position: str = "cell1_we",
@@ -149,7 +149,7 @@ def HiSpEC_sub_add_liquid(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def HiSpEC_sub_load_solid(
+def HISPEC_sub_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_custom_position: str = "cell1_we",
@@ -179,7 +179,7 @@ def HiSpEC_sub_load_solid(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def HiSpEC_sub_engage(
+def HISPEC_sub_engage(
     experiment: Experiment,
     experiment_version: int = 1,
     flow_we: bool = True,
@@ -236,7 +236,7 @@ def HiSpEC_sub_engage(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def HiSpEC_sub_interrupt(
+def HISPEC_sub_interrupt(
     experiment: Experiment,
     experiment_version: int = 1,
     reason: str = "wait",
@@ -246,7 +246,7 @@ def HiSpEC_sub_interrupt(
     return apm.planned_actions
 
 
-def HiSpEC_sub_disengage(
+def HISPEC_sub_disengage(
     experiment: Experiment,
     experiment_version: int = 1,
     clear_we: bool = True,
@@ -283,7 +283,7 @@ def HiSpEC_sub_disengage(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def HiSpEC_sub_startup(
+def HISPEC_sub_startup(
     experiment: Experiment,
     experiment_version: int = 2,
     solid_custom_position: str = "cell1_we",
@@ -299,11 +299,11 @@ def HiSpEC_sub_startup(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_actions(HiSpEC_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(HISPEC_sub_unloadall_customs(experiment=experiment))
 
     # load new requested solid samples
     apm.add_actions(
-        HiSpEC_sub_load_solid(
+        HISPEC_sub_load_solid(
             experiment=experiment,
             solid_custom_position=solid_custom_position,
             solid_plate_id=solid_plate_id,
@@ -313,7 +313,7 @@ def HiSpEC_sub_startup(
 
     # add liquid to solid
     apm.add_actions(
-        HiSpEC_sub_add_liquid(
+        HISPEC_sub_add_liquid(
             experiment=experiment,
             solid_custom_position=solid_custom_position,
             reservoir_liquid_sample_no=reservoir_liquid_sample_no,
@@ -360,7 +360,7 @@ def HISPEC_sub_shutdown(experiment: Experiment):
     return apm.planned_actions  # returns complete action list to orch
 
 
-def HiSpEC_calculate_lower_vertex_potential(
+def HISPEC_calculate_lower_vertex_potential(
     experiment: Experiment,
     experiment_version: int = 1,
     min_offset_ocv: float = 3,
@@ -393,7 +393,7 @@ def HiSpEC_calculate_lower_vertex_potential(
 # HISPEC_sub_PD_LoSpEC
 
 
-def HiSpEC_sub_CA(
+def HISPEC_sub_CA(
     experiment: Experiment,
     experiment_version: int = 1,
     Vval__V: float = 0.0,
@@ -434,7 +434,7 @@ def HiSpEC_sub_CA(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def HiSpEC_sub_OCV(
+def HISPEC_sub_OCV(
     experiment: Experiment,
     experiment_version: int = 1,
     Tval__s: float = 1,
@@ -471,7 +471,7 @@ def HiSpEC_sub_OCV(
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
-        to_global_params={"Ewe_V__mean_final": "HiSpEC_OCV"},
+        to_global_params={"Ewe_V__mean_final": "HISPEC_OCV"},
     )
 
     apm.add(
@@ -479,7 +479,7 @@ def HiSpEC_sub_OCV(
         "keep_min_ocv",
         {},
         from_global_act_params={
-            "HiSpEC_OCV": "new_ocv",
+            "HISPEC_OCV": "new_ocv",
             "min_offset_ocv": "min_offset_ocv",
         },
         to_global_params={"min_offset_ocv": "min_offset_ocv"},
@@ -644,7 +644,7 @@ def HISPEC_sub_SpEC(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def HiSpEC_sub_CP(
+def HISPEC_sub_CP(
     experiment: Experiment,
     experiment_version: int = 1,
     Ival__A: float = 0.0,
@@ -693,7 +693,7 @@ def HiSpEC_sub_CP(
     return apm.planned_actions
 
 
-def HiSPEC_sub_PEIS(
+def HISPEC_sub_PEIS(
     experiment: Experiment,
     experiment_version: int = 1,
     Vinit__V: float = 0.0,  # Initial value in volts or amps.

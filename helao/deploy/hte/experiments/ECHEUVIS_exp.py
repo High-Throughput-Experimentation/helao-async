@@ -58,7 +58,7 @@ ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
 TOGGLE_TRIGGERTYPE = TriggerType.risingedge
 
-# main HiSpEC sequence: OCV -> SpEC -> EIS -- top priority
+# main HISPEC sequence: OCV -> SpEC -> EIS -- top priority
 # lowspec PD -- 2
 # lowspec conditional -- 3
 # lowspec sequence: no XYZ; no pump

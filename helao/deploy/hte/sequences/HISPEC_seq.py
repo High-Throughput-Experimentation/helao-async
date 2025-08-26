@@ -1,6 +1,6 @@
 __all__ = [
-    "HiSpEC_CV",
-    "HiSpEC_EIS_only",
+    "HISPEC_CV",
+    "HISPEC_EIS_only",
     #"ECHEUVIS_CV_led",
    # "ECHEUVIS_CA_led",
     #"ECHEUVIS_CP_led",
@@ -14,7 +14,7 @@ from helao.core.models.electrolyte import Electrolyte
 SEQUENCES = __all__
 
 
-def HiSpEC_CV(
+def HISPEC_CV(
     sequence_version: int = 1, # @Dan - what is this? -- this is a version number for the sequence, you should increment it when you modify sequence arguments and the experiment list
     plate_id: int = 1, # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [2], # @Dan - what is this? -- the sample_no is uniquely assigned to an x,y location on a material library according to its plate map which was defined at the synthesis step
@@ -65,9 +65,9 @@ def HiSpEC_CV(
     #scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
     ):
     epm = ExperimentPlanMaker()
-    epm.add("HiSpEC_sub_unloadall_customs", {})
+    epm.add("HISPEC_sub_unloadall_customs", {})
     epm.add(
-            "HiSpEC_sub_disengage",
+            "HISPEC_sub_disengage",
             {
                 "clear_we": True,
                 "clear_ce": False,
@@ -79,7 +79,7 @@ def HiSpEC_CV(
     for i, plate_sample in enumerate(plate_sample_no_list):
         if i > 0 and use_z_motor:
             epm.add(
-                "HiSpEC_sub_disengage",
+                "HISPEC_sub_disengage",
                 {
                     "clear_we": True,
                     "clear_ce": False,
@@ -89,7 +89,7 @@ def HiSpEC_CV(
             )
 
         epm.add(
-            "HiSpEC_sub_startup",
+            "HISPEC_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -102,7 +102,7 @@ def HiSpEC_CV(
 
         if use_z_motor:
             epm.add(
-                "HiSpEC_sub_engage",
+                "HISPEC_sub_engage",
                 {
                     "flow_we": True,
                     "flow_ce": True,
@@ -118,12 +118,12 @@ def HiSpEC_CV(
                 )
         
         if not Flow_during_SpEC:
-            epm.add("HiSPEC_sub_stop_flow", {})
+            epm.add("HISPEC_sub_stop_flow", {})
 
         
 
         epm.add(
-            "HiSpEC_sub_OCV",
+            "HISPEC_sub_OCV",
             {
                 "Tval__s": Tval__s,
                 "SampleRate":0.5,
@@ -131,7 +131,7 @@ def HiSpEC_CV(
                 )
         
         epm.add(
-            "HiSPEC_sub_PEIS",
+            "HISPEC_sub_PEIS",
             {
                 #"Vinit_vsRHE": Vinit_vsRHE,
                 "Vamp__V": Vamp__V,
@@ -154,13 +154,13 @@ def HiSpEC_CV(
         
 
         epm.add(
-            "HiSpEC_sub_CP",
+            "HISPEC_sub_CP",
             {"Ival__A" : Ival__A,
             "Tval__s" : CP_Tval__s,
             "AcqInterval__s": AcqInterval_CA_CP__s})
         
 
-        epm.add("HiSpEC_sub_CA",
+        epm.add("HISPEC_sub_CA",
             {
                 # "Ival__A" : Ival__A,
                 "Tval__s" : Tval__s,
@@ -224,7 +224,7 @@ def HiSpEC_CV(
     return epm.planned_experiments  # returns complete experiment list
 
 
-def HiSpEC_EIS_only(
+def HISPEC_EIS_only(
     sequence_version: int = 1, # @Dan - what is this? -- this is a version number for the sequence, you should increment it when you modify sequence arguments and the experiment list
     plate_id: int = 1, # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [2], # @Dan - what is this? -- the sample_no is uniquely assigned to an x,y location on a material library according to its plate map which was defined at the synthesis step
@@ -259,7 +259,7 @@ def HiSpEC_EIS_only(
 ):
     epm = ExperimentPlanMaker()
 
-    epm.add("HiSpEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
+    epm.add("HISPEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
     
     if use_z_motor:
         epm.add(
@@ -329,7 +329,7 @@ def HiSpEC_EIS_only(
                 )
 
         epm.add(
-            "HiSPEC_sub_PEIS",
+            "HISPEC_sub_PEIS",
             {
                 #"Vinit_vsRHE": Vinit_vsRHE,
                 #"Vapex1_vsRHE": Vapex1_vsRHE,
@@ -733,7 +733,7 @@ def HiSpEC_EIS_only(
 #     cell_fill_wait: float = 30.0,
 # ):
 #     epm = ExperimentPlanMaker()
-#     epm.add("HiSpEC_sub_startup", {})
+#     epm.add("HISPEC_sub_startup", {})
 #     epm.add(
 #         "ECHEUVIS_sub_disengage",
 #         {
@@ -900,7 +900,7 @@ def HiSpEC_EIS_only(
 # ):
 #     epm = ExperimentPlanMaker()
 
-#     epm.add("HiSpEC_sub_startup", {})
+#     epm.add("HISPEC_sub_startup", {})
 #     # if use_z_motor:
 #     #     epm.add(
 #     #         "ECHEUVIS_sub_disengage",

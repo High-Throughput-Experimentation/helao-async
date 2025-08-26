@@ -279,12 +279,12 @@ prevacuum the cell gas phase side to make the electrolyte contact with GDE
 
 Unload Sample at ‘cell1_we’ position.
 
-## helao.experiments.HISPEC_EXP module
+## helao.experiments.HISPEC_exp module
 
 Experiment library for HISPEC
 server_key must be a FastAPI action server defined in config
 
-### helao.experiments.HISPEC_EXP.HISPEC_sub_SpEC(experiment, experiment_version=1, Vinit_vsRHE=0.0, Vapex1_vsRHE=1.0, Vapex2_vsRHE=-1.0, Vfinal_vsRHE=0.0, scanrate_voltsec=0.02, samplerate_sec=0.1, cycles=1, gamry_i_range='auto', gamrychannelwait=-1, gamrychannelsend=0, solution_ph=0, ref_vs_nhe=0.21, toggle1_source='spec_trig', toggle1_init_delay=0.0, toggle1_duty=0.5, toggle1_period=2.0, toggle1_time=-1, comment='')
+### helao.experiments.HISPEC_exp.HISPEC_sub_SpEC(experiment, experiment_version=1, Vinit_vsRHE=0.0, Vapex1_vsRHE=1.0, Vapex2_vsRHE=-1.0, Vfinal_vsRHE=0.0, scanrate_voltsec=0.02, samplerate_sec=0.1, cycles=1, gamry_i_range='auto', gamrychannelwait=-1, gamrychannelsend=0, solution_ph=0, ref_vs_nhe=0.21, toggle1_source='spec_trig', toggle1_init_delay=0.0, toggle1_duty=0.5, toggle1_period=2.0, toggle1_time=-1, comment='')
 
 last functionality test: -
 

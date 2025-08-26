@@ -15,7 +15,7 @@ from helao.core.models.file import FileInfo
 from helao.helpers.hlo_postprocessor import HloPostProcessor
 from helao.helpers.helao_data import HelaoData
 from helao.helpers.parquet import hlo_to_parquet
-from helao.helpers.HiSpEC_calibrate_downsample_parquet import (
+from helao.helpers.HISPEC_calibrate_downsample_parquet import (
     fully_read_and_calibrate_parquet,
 )
 import tempfile
@@ -35,7 +35,7 @@ class PostProcess(HloPostProcessor):
                     with tempfile.NamedTemporaryFile(
                         mode="w+", delete=False, suffix=".csv"
                     ) as temp_file:
-                        hlo_to_parquet(file_path, temp_file.name, HiSpEC=True)
+                        hlo_to_parquet(file_path, temp_file.name, HISPEC=True)
                         df = fully_read_and_calibrate_parquet(
                             cv_dataframe=pd.DataFrame(cvact.data[1]),
                             spec_path=temp_file.name,

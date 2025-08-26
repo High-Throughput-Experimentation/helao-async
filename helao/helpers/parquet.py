@@ -86,7 +86,7 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
 
 
 def hlo_to_parquet(
-    input_hlo_path, output_parquet_path, chunk_size=100, HiSpEC: bool = False
+    input_hlo_path, output_parquet_path, chunk_size=100, HISPEC: bool = False
 ):
     """
     Converts HLO (custom format) data to Parquet format.
@@ -105,7 +105,7 @@ def hlo_to_parquet(
     current_idx = 0
     header, data_start = read_hlo_header(input_hlo_path)
 
-    if HiSpEC:
+    if HISPEC:
         df_headers_no_time = header["optional"]["wl"]
         df_headers_all = [000] + df_headers_no_time
         df_headers_all = list(map(float, df_headers_all))
@@ -119,7 +119,7 @@ def hlo_to_parquet(
         if current_idx == 0:
             start_ticktime = df0.iloc[0, 0]
 
-        if HiSpEC:
+        if HISPEC:
 
             # convert from ticktime to time
             df0.iloc[:, 0] = df0.iloc[:, 0].apply(lambda x: x - start_ticktime)
@@ -190,4 +190,4 @@ if __name__ == "__main__":
     output_parquet_path = (
         r"/Users/benj/Documents/SpEC_Class_2/test_data/newdata/test.parquet"
     )
-    hlo_to_parquet(input_hlo_path, output_parquet_path, HiSpEC=True)
+    hlo_to_parquet(input_hlo_path, output_parquet_path, HISPEC=True)
