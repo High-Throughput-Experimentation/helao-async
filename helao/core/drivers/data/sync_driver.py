@@ -1128,7 +1128,7 @@ class HelaoSyncer:
             self.running_tasks.pop(task_name)
         try:
             LOGGER.info(f"Removing {task_name} from task_set.")
-            self.task_set.remove(task_name)
+            self.task_set.discard(task_name)
         except KeyError:
             pass
 
@@ -1356,6 +1356,7 @@ class HelaoSyncer:
                 if prog.yml.target.name in self.running_tasks:
                     async with self.aiolock:
                         self.running_tasks.pop(prog.yml.target.name)
+                self.task_set.discard(prog.yml.target.name)
                 await self.enqueue_yml(prog.yml.target, rank)
                 LOGGER.info(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
