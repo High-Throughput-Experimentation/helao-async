@@ -14,7 +14,11 @@ from helao.core.version import get_filehash
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput, AnalysisOutput
 
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
-from helao.core.drivers.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
+from helao.core.drivers.data.loaders.localfs import (
+    HelaoProcess,
+    HelaoAction,
+    LocalLoader,
+)
 
 CM_SCALE = {"nm": 1e-7, "um": 1e-4, "mm": 0.1, "cm": 1}
 
@@ -87,6 +91,7 @@ class XrfsOutputs(AnalysisOutput):
 
 class XrfsAnalysis(BaseAnalysis):
     """XRF quantification with calibration standards."""
+
     inputs: XrfsInputs
     outputs: XrfsOutputs
     global_sample_label: str
@@ -140,13 +145,25 @@ class XrfsAnalysis(BaseAnalysis):
                 os.path.dirname(self.inputs.xrfs_act.meta_dict["action_output_dir"])
             )
         )
-        ymd_dir = os.path.basename(
+        yw_dir = os.path.basename(
+            os.path.dirname(
+                os.path.dirname(
+                    os.path.dirname(
+                        os.path.dirname(
+                            self.inputs.xrfs_act.meta_dict["action_output_dir"]
+                        )
+                    )
+                )
+            )
+        )
+        md_dir = os.path.basename(
             os.path.dirname(
                 os.path.dirname(
                     os.path.dirname(self.inputs.xrfs_act.meta_dict["action_output_dir"])
                 )
             )
         )
+        ymd_dir = yw_dir.split(".")[0] + md_dir
         seq_label = seq_dir.split("__")[-1]
         if not norm_els:
             norm_els = [
@@ -227,6 +244,6 @@ class XrfsAnalysis(BaseAnalysis):
             nanomoles_per_cm2=nanomoles_per_cm2,
             atomic_fraction=atomic_fraction,
             global_sample_label=self.global_sample_label,
-            output_type="composition.xrfs_quantification"
+            output_type="composition.xrfs_quantification",
         )
         return True
