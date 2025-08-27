@@ -162,7 +162,7 @@ class XrfsAnalysis(BaseAnalysis):
             filtered_libs = [
                 x
                 for x in calib_libs
-                if int(x.split("__")[-1].split("-")[0]) < int(ymd_dir)
+                if int(x.split("__")[-1].split("-")[0][2:]) < int(ymd_dir)
             ]
             latest_lib = sorted(
                 filtered_libs, key=lambda x: int(x.split("__")[-1].split("-")[0])
