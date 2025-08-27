@@ -165,7 +165,7 @@ class XrfsAnalysis(BaseAnalysis):
                 if int(x.split("__")[-1].split("-")[0][2:]) < int(ymd_dir)
             ]
             latest_lib = sorted(
-                filtered_libs, key=lambda x: int(x.split("__")[-1].split("-")[0])
+                filtered_libs, key=lambda x: int(x.split("__")[-1].split("-")[0][2:])
             )[-1]
             calib_path = latest_lib
 
