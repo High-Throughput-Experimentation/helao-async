@@ -40,12 +40,8 @@ def import_autolibs(
             lib_path = os.path.join(
                 "helao", "deploy", "hte", f"{library_type}s", f"{lib_file}.py"
             )
-        tempd = (
-            SourceFileLoader(lib_file, os.path.join(lib_path, f"{lib_file}.py"))
-            .load_module()
-            .__dict__
-        )
-        library_file_hash = get_filehash(os.path.join(lib_path, f"{lib_file}.py"))
+        tempd = SourceFileLoader(lib_file, lib_path).load_module().__dict__
+        library_file_hash = get_filehash(lib_path)
         for func in tempd.get(f"{library_type.upper()}S", []):
             if func in tempd:
                 library_lib.update({func: tempd[func]})
