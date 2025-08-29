@@ -17,7 +17,7 @@ sequence_libraries:
   - ECHE_seq
   - ECHEUVIS_seq
   - UVIS_T_seq
-  - helao\deploy\test\experiments\TEST_seq.py
+  - helao\deploy\test\sequences\TEST_seq.py
 sequence_params:
   led_wavelengths_nm:
     - -1
