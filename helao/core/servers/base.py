@@ -263,6 +263,7 @@ class Base:
         self.local_action_queue = zdeque([])
         self.fast_urls = []
 
+        self.hlo_postprocessor = None
         self.hlo_postprocess_script = self.server_cfg.get("hlo_postprocess_script", "")
 
         if self.hlo_postprocess_script.endswith(".py") and os.path.exists(
@@ -280,22 +281,34 @@ class Base:
                 .PostProcess
             )
         elif self.hlo_postprocess_script:
-            LOGGER.info("Loading hlo post-processor from processors module")
-            proc_spec = spec_from_file_location(
-                "hlo_post",
-                os.path.join(
-                    "helao",
-                    "deploy",
-                    CONFIG["deployment"],
-                    "processors",
-                    f"{self.hlo_postprocess_script}.py",
-                ),
+            script_path = None
+            LOGGER.info("Looking for hlo post-processor in deployments")
+            deploy_script_path = os.path.join(
+                "helao",
+                "deploy",
+                CONFIG["deployment"],
+                "processors",
+                f"{self.hlo_postprocess_script}.py",
             )
-            proc_mod = module_from_spec(proc_spec)
-            proc_spec.loader.exec_module(proc_mod)
-            self.hlo_postprocessor = proc_mod.PostProcess
-        else:
-            self.hlo_postprocessor = None
+            hte_path = os.path.join(
+                "helao",
+                "deploy",
+                "hte",
+                "processors",
+                f"{self.hlo_postprocess_script}.py",
+            )
+            if os.path.exists(deploy_script_path):
+                script_path = deploy_script_path
+            elif os.path.exists(hte_path):
+                script_path = hte_path
+            if script_path is not None:
+                LOGGER.info("Loading hlo post-processor from processors module")
+                proc_spec = spec_from_file_location("hlo_post", script_path)
+                proc_mod = module_from_spec(proc_spec)
+                proc_spec.loader.exec_module(proc_mod)
+                self.hlo_postprocessor = proc_mod.PostProcess
+            else:
+                LOGGER.info("Post-processor was not found in processors module")
 
         self.ntp_last_sync_file = None
         if self.helaodirs.root is not None:

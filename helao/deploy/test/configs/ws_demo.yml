@@ -1,13 +1,12 @@
 dummy: true
 simulation: true
-show_debug: true
 experiment_libraries:
   - simulatews_exp
   - TEST_exp
 sequence_libraries:
   - TEST_seq
 run_type: simulation
-root: C:/INST_hlo
+root: c:/INST_hlo
 servers:
   ORCH:
     host: 127.0.0.1
@@ -17,18 +16,16 @@ servers:
     params:
       enable_op: true
       bokeh_port: 5001
-      launch_browser: true
   SIM:
     host: 127.0.0.1
     port: 8002
     group: action
     fast: ws_simulator
     params: {}
-    hlo_postprocess_script: hlo_to_csv
   LIVE:
     host: 127.0.0.1
-    port: 5002
+    port: 5003
     group: visualizer
-    bokeh: live_visualizer
+    bokeh: sim_visualizer
     params:
       doc_name: Websocket Live Visualizer
