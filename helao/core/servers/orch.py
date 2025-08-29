@@ -194,14 +194,14 @@ class Orch(Base):
         super().__init__(fastapp)
         self.experiment_lib, self.experiment_codehash_lib = import_autolibs(
             world_config_dict=self.world_cfg,
-            library_path=None,
-            user_library_path=self.helaodirs.user_exp,
+            library_dir=None,
+            user_library_dir=self.helaodirs.user_exp,
             library_type="experiment",
         )
         self.sequence_lib, self.sequence_codehash_lib = import_autolibs(
             world_config_dict=self.world_cfg,
-            library_path=None,
-            user_library_path=self.helaodirs.user_seq,
+            library_dir=None,
+            user_library_dir=self.helaodirs.user_seq,
             library_type="experiment",
         )
 
