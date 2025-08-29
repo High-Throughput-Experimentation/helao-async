@@ -15,7 +15,7 @@ from helao.helpers.gen_uuid import gen_uuid
 
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
-from helao.core.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
+from helao.core.drivers.data.loaders.helao_loader import HelaoProcess, HelaoAction
 from .echeuvis_stability import refadjust, parse_spechlo
 
 ANALYSIS_DEFAULTS = {
@@ -79,7 +79,6 @@ class DryUvisInputs(AnalysisInput):
     ref_dark_spec_acts: List[HelaoAction]
     ref_lights: List[HelaoProcess]
     ref_light_spec_acts: List[HelaoAction]
-    insitu_spec: HelaoProcess
     insitu_spec_act: HelaoAction
     process_params: dict
 
