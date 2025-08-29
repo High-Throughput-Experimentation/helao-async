@@ -67,8 +67,8 @@ from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
 
-from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
-from helao.deploy.hte.drivers.robot.pal_driver import Spacingmethod, PALtools
+from ..drivers.motion.galil_motion_driver import MoveModes, TransformationModes
+from ..drivers.robot.pal_driver import Spacingmethod, PALtools
 
 from helao.core.models.run_use import RunUse
 

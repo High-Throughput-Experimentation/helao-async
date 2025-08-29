@@ -14,7 +14,7 @@ from helao.core.error import ErrorCodes
 from helao.helpers.premodels import Sequence
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.dispatcher import private_dispatcher
-from helao.deploy.hte.sequences.OERSIM_seq import OERSIM_activelearn
+from ..sequences.OERSIM_seq import OERSIM_activelearn
 from helao.helpers.config_loader import CONFIG
 
 cfgd = {f"demo{i}": read_config(f"demo{i}", async_root) for i in range(2)}

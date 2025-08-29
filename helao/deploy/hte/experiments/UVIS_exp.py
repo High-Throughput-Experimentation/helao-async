@@ -28,9 +28,9 @@ from helao.core.models.action_start_condition import ActionStartCondition
 
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
-from helao.deploy.hte.drivers.io.enum import TriggerType
-from helao.deploy.hte.drivers.spec.enum import SpecType
+from ..drivers.motion.enum import MoveModes, TransformationModes
+from ..drivers.io.enum import TriggerType
+from ..drivers.spec.enum import SpecType
 
 
 EXPERIMENTS = __all__

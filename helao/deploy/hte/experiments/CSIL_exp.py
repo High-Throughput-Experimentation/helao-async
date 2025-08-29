@@ -48,7 +48,7 @@ from helao.core.models.action_start_condition import ActionStartCondition as asc
 from helao.core.models.sample import SolidSample, LiquidSample, GasSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
-from helao.deploy.hte.drivers.io.enum import TriggerType
+from ..drivers.io.enum import TriggerType
 
 # list valid experiment functions
 EXPERIMENTS = __all__
