@@ -54,7 +54,7 @@ __all__ = [
     "ADSS_sub_tray_icpms_export",
     "ADSS_sub_move_to_ref_measurement",
     "ADSS_sub_remove_bubble",
-    "ADSS_sub_cellfill_prefilled_nosampleload"
+    "ADSS_sub_cellfill_prefilled_nosampleload",
 ]
 
 
@@ -68,8 +68,11 @@ from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
 
-from ..drivers.motion.galil_motion_driver import MoveModes, TransformationModes
-from ..drivers.robot.pal_driver import Spacingmethod, PALtools
+from helao.deploy.hte.drivers.motion.galil_motion_driver import (
+    MoveModes,
+    TransformationModes,
+)
+from helao.deploy.hte.drivers.robot.pal_driver import Spacingmethod, PALtools
 
 from helao.core.models.run_use import RunUse
 
@@ -236,6 +239,7 @@ def ADSS_sub_load_liquid(
     )
     return apm.planned_actions  # returns complete action list to orch
 
+
 def ADSS_sub_load_liquid_only(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -270,7 +274,6 @@ def ADSS_sub_load_liquid_only(
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
-
         start_condition=ActionStartCondition.wait_for_orch,
     )
 
@@ -312,6 +315,7 @@ def ADSS_sub_PAL_load_gas(
     )
     return apm.planned_actions  # returns complete action list to orch
 
+
 def ADSS_sub_unload_gas_only(
     experiment: Experiment,
     experiment_version: int = 1,  # newer via keep? need testing
@@ -340,6 +344,7 @@ def ADSS_sub_unload_gas_only(
 
 
 #######
+
 
 def ADSS_sub_load(
     experiment: Experiment,
@@ -791,7 +796,7 @@ def ADSS_sub_CA(
     insert_electrolyte_volume_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
-    bubbler_gas: str ="",
+    bubbler_gas: str = "",
     previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
@@ -848,25 +853,24 @@ def ADSS_sub_CA(
 
     if aliquot_pre:
         washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        washone = washmod % 4 % 3 % 2
+        washtwo = (washmod + 1) % 4 % 3 % 2
+        washthree = (washmod + 2) % 4 % 3 % 2
+        washfour = (washmod + 3) % 4 % 3 % 2
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
-                EquilibrationTime_s= 0,
+                EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
                 PAL_Injector_id=PAL_Injector_id,
-                rinse_1 = washone,
-                rinse_2= washtwo,
-                rinse_3= washthree,
-                rinse_4= washfour,
+                rinse_1=washone,
+                rinse_2=washtwo,
+                rinse_3=washthree,
+                rinse_4=washfour,
             )
         )
-
 
     # apply potential
     apm.add(
@@ -915,32 +919,31 @@ def ADSS_sub_CA(
 
     if aliquot_post:
         washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        washone = washmod % 4 % 3 % 2
+        washtwo = (washmod + 1) % 4 % 3 % 2
+        washthree = (washmod + 2) % 4 % 3 % 2
+        washfour = (washmod + 3) % 4 % 3 % 2
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
-                EquilibrationTime_s= 0,
+                EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
                 PAL_Injector_id=PAL_Injector_id,
-                rinse_1 = washone,
-                rinse_2= washtwo,
-                rinse_3= washthree,
-                rinse_4= washfour,
+                rinse_1=washone,
+                rinse_2=washtwo,
+                rinse_3=washthree,
+                rinse_4=washfour,
             )
         )
-
 
     return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_CA_photo(
     experiment: Experiment,
-    experiment_version: int = 8,  #8all aliquots v4 add electrolyte add v6 insitu sub, 7 bubbler/injected flags
+    experiment_version: int = 8,  # 8all aliquots v4 add electrolyte add v6 insitu sub, 7 bubbler/injected flags
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -955,7 +958,7 @@ def ADSS_sub_CA_photo(
     insert_electrolyte_volume_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
-    bubbler_gas: str ="",
+    bubbler_gas: str = "",
     previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
@@ -996,22 +999,22 @@ def ADSS_sub_CA_photo(
 
     if aliquot_pre:
         washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        washone = washmod % 4 % 3 % 2
+        washtwo = (washmod + 1) % 4 % 3 % 2
+        washthree = (washmod + 2) % 4 % 3 % 2
+        washfour = (washmod + 3) % 4 % 3 % 2
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
-                EquilibrationTime_s= 0,
+                EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
                 PAL_Injector_id=PAL_Injector_id,
-                rinse_1 = washone,
-                rinse_2= washtwo,
-                rinse_3= washthree,
-                rinse_4= washfour,
+                rinse_1=washone,
+                rinse_2=washtwo,
+                rinse_3=washthree,
+                rinse_4=washfour,
             )
         )
 
@@ -1082,22 +1085,22 @@ def ADSS_sub_CA_photo(
 
     if aliquot_post:
         washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        washone = washmod % 4 % 3 % 2
+        washtwo = (washmod + 1) % 4 % 3 % 2
+        washthree = (washmod + 2) % 4 % 3 % 2
+        washfour = (washmod + 3) % 4 % 3 % 2
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
-                EquilibrationTime_s= 0,
+                EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
                 PAL_Injector_id=PAL_Injector_id,
-                rinse_1 = washone,
-                rinse_2= washtwo,
-                rinse_3= washthree,
-                rinse_4= washfour,
+                rinse_1=washone,
+                rinse_2=washtwo,
+                rinse_3=washthree,
+                rinse_4=washfour,
             )
         )
 
@@ -1111,7 +1114,9 @@ def ADSS_sub_CV(
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
     Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
-    scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
+    scanrate_voltsec: Optional[
+        float
+    ] = 0.02,  # scan rate in volts/second or amps/second.
     samplerate_sec: float = 0.1,
     cycles: int = 1,
     gamry_i_range: str = "auto",
@@ -1128,7 +1133,7 @@ def ADSS_sub_CV(
     aliquot_pre: bool = False,
     aliquot_post: bool = False,
     washmod_in: int = 0,
-    bubbler_gas: str ="",
+    bubbler_gas: str = "",
     previous_liquid_injected: str = "",
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here",
@@ -1154,22 +1159,22 @@ def ADSS_sub_CV(
 
     if aliquot_pre:
         washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        washone = washmod % 4 % 3 % 2
+        washtwo = (washmod + 1) % 4 % 3 % 2
+        washthree = (washmod + 2) % 4 % 3 % 2
+        washfour = (washmod + 3) % 4 % 3 % 2
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
-                EquilibrationTime_s= 0,
+                EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
                 PAL_Injector_id=PAL_Injector_id,
-                rinse_1 = washone,
-                rinse_2= washtwo,
-                rinse_3= washthree,
-                rinse_4= washfour,
+                rinse_1=washone,
+                rinse_2=washtwo,
+                rinse_3=washthree,
+                rinse_4=washfour,
             )
         )
 
@@ -1232,39 +1237,38 @@ def ADSS_sub_CV(
 
     if aliquot_post:
         washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        washone = washmod % 4 % 3 % 2
+        washtwo = (washmod + 1) % 4 % 3 % 2
+        washthree = (washmod + 2) % 4 % 3 % 2
+        washfour = (washmod + 3) % 4 % 3 % 2
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
-                EquilibrationTime_s= 0,
+                EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
                 PAL_Injector_id=PAL_Injector_id,
-                rinse_1 = washone,
-                rinse_2= washtwo,
-                rinse_3= washthree,
-                rinse_4= washfour,
+                rinse_1=washone,
+                rinse_2=washtwo,
+                rinse_3=washthree,
+                rinse_4=washfour,
             )
         )
-
 
     return apm.planned_actions  # returns complete action list to orch
 
 
 def ADSS_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 8,  #8 all aliquot 6in situ aliquot sub 7, bubbler/injected flag
+    experiment_version: int = 8,  # 8 all aliquot 6in situ aliquot sub 7, bubbler/injected flag
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
     ph: float = 9.53,
     ref_type: str = "inhouse",
     ref_offset__V: float = 0.0,
-    bubbler_gas: str ="",
+    bubbler_gas: str = "",
     previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
@@ -1285,9 +1289,9 @@ def ADSS_sub_OCV(
     bubble_pump_forward_time_s: float = 10,
     run_use: RunUse = "data",
 ):
-    
+
     washmod = washmod_in
-   
+
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
@@ -1305,22 +1309,22 @@ def ADSS_sub_OCV(
 
     if aliquot_pre:
         washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        washone = washmod % 4 % 3 % 2
+        washtwo = (washmod + 1) % 4 % 3 % 2
+        washthree = (washmod + 2) % 4 % 3 % 2
+        washfour = (washmod + 3) % 4 % 3 % 2
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
-                EquilibrationTime_s= 0,
+                EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
                 PAL_Injector_id=PAL_Injector_id,
-                rinse_1 = washone,
-                rinse_2= washtwo,
-                rinse_3= washthree,
-                rinse_4= washfour,
+                rinse_1=washone,
+                rinse_2=washtwo,
+                rinse_3=washthree,
+                rinse_4=washfour,
             )
         )
 
@@ -1336,7 +1340,6 @@ def ADSS_sub_OCV(
             "simple_threshold": simple_threshold,
             "signal_change_threshold": signal_change_threshold,
             "amplitude_threshold": amplitude_threshold,
-
         },
         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         to_global_params=["has_bubble"],
@@ -1375,13 +1378,13 @@ def ADSS_sub_OCV(
                 "check_condition": "equals",
                 "check_value": True,
                 "conditional_experiment_name": "ADSS_sub_remove_bubble",
-                "conditional_experiment_params": {  
+                "conditional_experiment_params": {
                     "Tval__s": Tval__s,
                     "gamry_i_range": gamry_i_range,
                     "samplerate_sec": samplerate_sec,
                     "ph": ph,
                     "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,                    
+                    "ref_offset__V": ref_offset__V,
                     "pump_reverse_time_s": bubble_pump_reverse_time_s,
                     "pump_forward_time_s": bubble_pump_forward_time_s,
                     "RSD_threshold": RSD_threshold,
@@ -1389,30 +1392,29 @@ def ADSS_sub_OCV(
                     "signal_change_threshold": signal_change_threshold,
                     "amplitude_threshold": amplitude_threshold,
                     "run_use": run_use,
-                    }
-                    
+                },
             },
             from_global_act_params={"has_bubble": "has_bubble"},
         )
 
     if aliquot_post:
         washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        washone = washmod % 4 % 3 % 2
+        washtwo = (washmod + 1) % 4 % 3 % 2
+        washthree = (washmod + 2) % 4 % 3 % 2
+        washfour = (washmod + 3) % 4 % 3 % 2
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
-                EquilibrationTime_s= 0,
+                EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
                 PAL_Injector_id=PAL_Injector_id,
-                rinse_1 = washone,
-                rinse_2= washtwo,
-                rinse_3= washthree,
-                rinse_4= washfour,
+                rinse_1=washone,
+                rinse_2=washtwo,
+                rinse_3=washthree,
+                rinse_4=washfour,
             )
         )
 
@@ -1421,7 +1423,7 @@ def ADSS_sub_OCV(
 
 def ADSS_sub_OCV_photo(
     experiment: Experiment,
-    experiment_version: int = 9,  #9allaliquot 7 in situ aliquot sub,8 bubbler/injected flags
+    experiment_version: int = 9,  # 9allaliquot 7 in situ aliquot sub,8 bubbler/injected flags
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
@@ -1430,7 +1432,7 @@ def ADSS_sub_OCV_photo(
     ref_offset__V: float = 0.0,
     led_wavelength: str = "385",
     toggle_illum_duty: float = 1,
-    bubbler_gas: str ="",
+    bubbler_gas: str = "",
     previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
@@ -1443,7 +1445,7 @@ def ADSS_sub_OCV_photo(
     rinse_1: int = 1,
     rinse_4: int = 0,
 ):
-    
+
     washmod = washmod_in
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -1463,22 +1465,22 @@ def ADSS_sub_OCV_photo(
 
     if aliquot_pre:
         washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        washone = washmod % 4 % 3 % 2
+        washtwo = (washmod + 1) % 4 % 3 % 2
+        washthree = (washmod + 2) % 4 % 3 % 2
+        washfour = (washmod + 3) % 4 % 3 % 2
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
-                EquilibrationTime_s= 0,
+                EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
                 PAL_Injector_id=PAL_Injector_id,
-                rinse_1 = washone,
-                rinse_2= washtwo,
-                rinse_3= washthree,
-                rinse_4= washfour,
+                rinse_1=washone,
+                rinse_2=washtwo,
+                rinse_3=washthree,
+                rinse_4=washfour,
             )
         )
 
@@ -1523,22 +1525,22 @@ def ADSS_sub_OCV_photo(
 
     if aliquot_post:
         washmod += 1
-        washone = washmod %4 %3 %2
-        washtwo = (washmod + 1) %4 %3 %2
-        washthree = (washmod + 2) %4 %3 %2
-        washfour = (washmod + 3) %4 %3 %2
+        washone = washmod % 4 % 3 % 2
+        washtwo = (washmod + 1) % 4 % 3 % 2
+        washthree = (washmod + 2) % 4 % 3 % 2
+        washfour = (washmod + 3) % 4 % 3 % 2
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
                 experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
-                EquilibrationTime_s= 0,
+                EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
                 PAL_Injector_id=PAL_Injector_id,
-                rinse_1 = washone,
-                rinse_2= washtwo,
-                rinse_3= washthree,
-                rinse_4= washfour,
+                rinse_1=washone,
+                rinse_2=washtwo,
+                rinse_3=washthree,
+                rinse_4=washfour,
             )
         )
 
@@ -1599,10 +1601,10 @@ def ADSS_sub_insitu_actions(
             washfour = 0
         else:
             washmod += 1
-            washone = washmod %4 %3 %2
-            washtwo = (washmod + 1) %4 %3 %2
-            washthree = (washmod + 2) %4 %3 %2
-            washfour = (washmod + 3) %4 %3 %2
+            washone = washmod % 4 % 3 % 2
+            washtwo = (washmod + 1) % 4 % 3 % 2
+            washthree = (washmod + 2) % 4 % 3 % 2
+            washfour = (washmod + 3) % 4 % 3 % 2
 
         for mtup, interval in zip(mlist, intervals):
             if mtup[0] == "aliquot":
@@ -1645,10 +1647,10 @@ def ADSS_sub_insitu_actions(
                 vwait = 61  # orig 65
                 if not injector_wash_one:
                     washmod += 1
-                    washone = washmod %4 %3 %2
-                    washtwo = (washmod + 1) %4 %3 %2
-                    washthree = (washmod + 2) %4 %3 %2
-                    washfour = (washmod + 3) %4 %3 %2
+                    washone = washmod % 4 % 3 % 2
+                    washtwo = (washmod + 1) % 4 % 3 % 2
+                    washthree = (washmod + 2) % 4 % 3 % 2
+                    washfour = (washmod + 3) % 4 % 3 % 2
 
                 apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
                 apm.add(
@@ -2019,6 +2021,7 @@ def ADSS_sub_stopheat(
     )
     return apm.planned_actions  # returns complete action list to orch
 
+
 def ADSS_sub_cellfill_prefilled_nosampleload(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -2029,7 +2032,7 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
     ReturnLineWait_s: float = 0,
 ):
     apm = ActionPlanMaker()
-    
+
     apm.add(
         NI_server,
         "gasvalve",
@@ -2091,6 +2094,7 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
 
     return apm.planned_actions
+
 
 def ADSS_sub_cellfill_prefilled(
     experiment: Experiment,
@@ -2767,10 +2771,10 @@ def ADSS_sub_remove_bubble(
             bubble_pump_forward_time_s=bubble_pump_forward_time_s,
             bubble_pump_reverse_time_s=bubble_pump_reverse_time_s,
             run_use=run_use,
-
         )
     )
     return apm.planned_actions
+
 
 def ADSS_sub_PAL_deep_clean(
     experiment: Experiment,
@@ -2816,8 +2820,6 @@ def ADSS_sub_PAL_tray_to_tray(
     rinse_2: int = 0,
     rinse_3: int = 0,
     rinse_4: int = 0,
-
-
 ):
     apm = ActionPlanMaker()
 
@@ -2843,7 +2845,6 @@ def ADSS_sub_PAL_tray_to_tray(
     return apm.planned_actions  # returns complete action list to orch
 
 
-
 def ADSS_sub_PAL_export_icpms(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -2852,8 +2853,7 @@ def ADSS_sub_PAL_export_icpms(
     survey_runs: int = 1,
     main_runs: int = 3,
     rack: int = 2,
-    dilution_factor: float = 10
-
+    dilution_factor: float = 10,
 ):
     apm = ActionPlanMaker()
 
