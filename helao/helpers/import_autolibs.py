@@ -87,9 +87,8 @@ def import_autolibs(
         for userfile in userfiles:
             get_libs(lib_dir=user_library_dir, lib_file=userfile)
             LOGGER.info(
-                f"Pausing for 3 seconds to notify: custom {library_type}s were imported from {os.path.join(user_library_dir, userfile)}",
+                f"Custom {library_type}s were imported from {os.path.join(user_library_dir, userfile)}",
             )
-            time.sleep(3)
 
     LOGGER.info(
         f"imported {len(libs)} {library_type}s specified by config.",
