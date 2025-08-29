@@ -31,6 +31,7 @@ def import_autolibs(
     def get_libs(lib_dir, lib_file):
         if lib_file.endswith(".py") and os.path.isfile(lib_file):
             lib_path = lib_file
+            lib_file = lib_file.split(".py")[0]
         else:
             lib_file = lib_file.split(".py")[0]
             LOGGER.info(
@@ -44,8 +45,8 @@ def import_autolibs(
                 lib_path = os.path.join(
                     "helao", "deploy", "hte", f"{library_type}s", f"{lib_file}.py"
                 )
-        library_file_hash = get_filehash(lib_dir)
-        tempd = SourceFileLoader(lib_file, lib_dir).load_module().__dict__
+        library_file_hash = get_filehash(lib_path)
+        tempd = SourceFileLoader(lib_file, lib_path).load_module().__dict__
         for func in tempd.get(f"{library_type.upper()}S", []):
             if func in tempd:
                 library_lib.update({func: tempd[func]})
