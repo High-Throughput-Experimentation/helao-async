@@ -19,7 +19,7 @@ class PostProcess(HloPostProcessor):
         processed_file_list = []
         for act_file in self.files:
             try:
-                if act_file.file_type == "helao__file":
+                if act_file.file_type.endswith("helao__file") and act_file.file_name.endswith(".hlo"):
                     file_path = os.path.join(self.output_dir, act_file.file_name)
                     _, data = read_hlo(file_path)
                     df = pd.DataFrame(data)
