@@ -60,7 +60,7 @@ def import_autolibs(
         )
         library_path = world_config_dict.get(
             f"{library_type}_path",
-            os.path.join("helao", "deploy", config_deployment], f"{library_type}s"),
+            os.path.join("helao", "deploy", config_deployment, f"{library_type}s"),
         )
     if not os.path.isdir(library_path):
         LOGGER.error(
