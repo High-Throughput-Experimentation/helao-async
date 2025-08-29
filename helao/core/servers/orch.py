@@ -202,7 +202,7 @@ class Orch(Base):
             world_config_dict=self.world_cfg,
             library_dir=None,
             user_library_dir=self.helaodirs.user_seq,
-            library_type="experiment",
+            library_type="sequence",
         )
 
         self.use_db = "DB" in self.world_cfg["servers"].keys()
