@@ -19,8 +19,8 @@ else:
 
 def import_autolibs(
     world_config_dict: dict,
-    library_path: Optional[str] = None,
-    user_library_path: Optional[str] = None,
+    library_dir: Optional[str] = None,
+    user_library_dir: Optional[str] = None,
     library_type: str = "sequence",
 ):
     """Import automation library functions into environment."""
@@ -28,20 +28,24 @@ def import_autolibs(
     library_lib = {}
     library_codehash_lib = {}
 
-    def get_libs(lib_path, lib_file):
-        LOGGER.info(
-            f"importing {library_type}s from '{lib_file}' from '{lib_path}'",
-        )
-        lib_path = os.path.join(lib_path, f"{lib_file}.py")
-        if not os.path.isfile(lib_path):
-            LOGGER.warning(
-                f"{library_type} library path {lib_path} does not exist, trying 'hte' deployment",
+    def get_libs(lib_dir, lib_file):
+        if lib_file.endswith(".py") and os.path.isfile(lib_file):
+            lib_path = lib_file
+        else:
+            lib_file = lib_file.split(".py")[0]
+            LOGGER.info(
+                f"importing {library_type}s from '{lib_file}' from '{lib_dir}'",
             )
-            lib_path = os.path.join(
-                "helao", "deploy", "hte", f"{library_type}s", f"{lib_file}.py"
-            )
-        tempd = SourceFileLoader(lib_file, lib_path).load_module().__dict__
-        library_file_hash = get_filehash(lib_path)
+            lib_path = os.path.join(lib_dir, f"{lib_file}.py")
+            if not os.path.isfile(lib_path):
+                LOGGER.warning(
+                    f"{library_type} library path {lib_path} does not exist, trying 'hte' deployment",
+                )
+                lib_path = os.path.join(
+                    "helao", "deploy", "hte", f"{library_type}s", f"{lib_file}.py"
+                )
+        tempd = SourceFileLoader(lib_file, lib_dir).load_module().__dict__
+        library_file_hash = get_filehash(lib_dir)
         for func in tempd.get(f"{library_type.upper()}S", []):
             if func in tempd:
                 library_lib.update({func: tempd[func]})
@@ -54,34 +58,35 @@ def import_autolibs(
                     f"!!! Could not find {library_type} function '{func}' in '{lib_file}'",
                 )
 
-    if library_path is None:
+    if library_dir is None:
         config_deployment = os.path.basename(
             os.path.dirname(os.path.dirname(CONFIG["loaded_config_path"]))
         )
-        library_path = world_config_dict.get(
+        library_dir = world_config_dict.get(
             f"{library_type}_path",
             os.path.join("helao", "deploy", config_deployment, f"{library_type}s"),
         )
-    if not os.path.isdir(library_path):
+    if not os.path.isdir(library_dir):
         LOGGER.error(
-            f"{library_type} path {library_path} was specified but is not a valid directory",
+            f"{library_type} path {library_dir} was specified but is not a valid directory",
         )
-        return library_lib
+        return library_lib, library_codehash_lib
+    
     libs = world_config_dict.get(f"{library_type}_libraries", [])
     for lib in libs:
-        get_libs(lib_path=library_path, lib_file=lib)
+        get_libs(lib_dir=library_dir, lib_file=lib)
 
     # now add all user_seq
-    if user_library_path is not None:
+    if user_library_dir is not None:
         userfiles = [
             os.path.splitext(userfile)[0]
-            for userfile in os.listdir(user_library_path)
+            for userfile in os.listdir(user_library_dir)
             if userfile.endswith(".py")
         ]
         for userfile in userfiles:
-            get_libs(lib_path=user_library_path, lib_file=userfile)
+            get_libs(lib_dir=user_library_dir, lib_file=userfile)
             LOGGER.info(
-                f"Pausing for 3 seconds to notify: custom {library_type}s were imported from {os.path.join(user_library_path, userfile)}",
+                f"Pausing for 3 seconds to notify: custom {library_type}s were imported from {os.path.join(user_library_dir, userfile)}",
             )
             time.sleep(3)
 
