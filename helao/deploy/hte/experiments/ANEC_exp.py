@@ -43,14 +43,14 @@ from socket import gethostname
 from typing import Optional
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helao.deploy.hte.drivers.robot.pal_driver import PALtools
+from ..drivers.robot.pal_driver import PALtools
 from helao.core.models.sample import SolidSample, LiquidSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
-from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
-from helao.deploy.hte.drivers.io.enum import TriggerType
+from ..drivers.motion.galil_motion_driver import MoveModes, TransformationModes
+from ..drivers.io.enum import TriggerType
 
 # list valid experiment functions
 EXPERIMENTS = __all__
