@@ -1,9 +1,11 @@
 import os
 import glob
+
 # import inspect
 
 # from .sequence_constructor import constructor
 from .premodels import Sequence
+
 
 class BaseParser:
     def __init__(self):

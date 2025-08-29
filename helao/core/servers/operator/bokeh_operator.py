@@ -90,7 +90,7 @@ class return_experiment_lib(BaseModel):
 
 class BokehOperator:
     sequence: Sequence
-    
+
     def __init__(self, vis_serv: Vis, orch):
         self.vis = vis_serv
         self.orch = orch
@@ -144,7 +144,14 @@ class BokehOperator:
         }
 
         self.sequence_lists = {
-            k: [] for k in ["sequence_name", "sequence_label", "sequence_uuid", "campaign_name", "campaign_uuid"]
+            k: []
+            for k in [
+                "sequence_name",
+                "sequence_label",
+                "sequence_uuid",
+                "campaign_name",
+                "campaign_uuid",
+            ]
         }
 
         self.experiment_lists = {k: [] for k in ["experiment_name", "experiment_uuid"]}
@@ -327,13 +334,17 @@ class BokehOperator:
         )
         self.button_estop_orch.on_event(ButtonClick, self.callback_estop_orch)
         self.button_add_expplan = Button(
-            label="Add exp plan", button_type="default", width=100,
+            label="Add exp plan",
+            button_type="default",
+            width=100,
         )
         self.button_add_expplan.on_event(ButtonClick, self.callback_add_expplan)
         self.button_add_smpseqs = Button(
             label="Split plan", button_type="default", width=100
         )
-        self.button_add_smpseqs.on_event(ButtonClick, self.callback_add_sample_sequences)
+        self.button_add_smpseqs.on_event(
+            ButtonClick, self.callback_add_sample_sequences
+        )
         self.button_stop_orch = Button(
             label="Stop Orch", button_type="default", width=70
         )
@@ -495,9 +506,7 @@ class BokehOperator:
             width=150,
             height=40,
         )
-        self.input_campaign_name2.on_change(
-            "value", self.callback_copy_campaign_name2
-        )
+        self.input_campaign_name2.on_change("value", self.callback_copy_campaign_name2)
 
         self.input_sequence_comment = TextAreaInput(
             value="",
@@ -1633,7 +1642,11 @@ class BokehOperator:
         defaults = []
 
         seqspec_path = self.seqspecs[idx]
-        seqfunc_params = self.seqspec_parser.list_params(seqspec_path, self.orch)
+        try:
+            seqfunc_params = self.seqspec_parser.list_params(seqspec_path, self.orch)
+        except Exception:
+            LOGGER.error(f"error parsing specfile {seqspec_path}", exc_info=True)
+            seqfunc_params = {}
 
         for arg, argtype in self.seqspec_parser.PARAM_TYPES.items():
             if arg in seqfunc_params:

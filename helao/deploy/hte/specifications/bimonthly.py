@@ -7,6 +7,13 @@ from helao.helpers.specification_parser import BaseParser
 from helao.helpers.sequence_constructor import constructor
 from helao.helpers.helao_data import HelaoData
 
+from helao.helpers import helao_logging as logging
+
+if logging.LOGGER is None:
+    LOGGER = logging.make_logger(__file__)
+else:
+    LOGGER = logging.LOGGER
+
 
 class SpecParser(BaseParser):
     def __init__(self):
@@ -36,6 +43,11 @@ class SpecParser(BaseParser):
         zdat = HelaoData(specfile)
         zyml = zdat.yml
         seqname = zyml["sequence_name"]
+        if "sequence_name" not in orch.sequence_lib:
+            LOGGER.warning(
+                f"sequence '{seqname}' not found in current sequence library"
+            )
+            return {}
         seqfunc = orch.sequence_lib[seqname]
         argspec = inspect.getfullargspec(seqfunc)
         tmpargs = list(argspec.args)
