@@ -35,7 +35,7 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.helpers.spec_map import SPECSRV_MAP
-from ..drivers.io.enum import TriggerType
+from helao.deploy.hte.drivers.io.enum import TriggerType
 
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.machine import MachineModel as MM
