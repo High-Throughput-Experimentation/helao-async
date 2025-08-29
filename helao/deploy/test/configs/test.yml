@@ -29,6 +29,6 @@ servers:
     host: 127.0.0.1
     port: 5002
     group: visualizer
-    bokeh: sim_visualizer
+    bokeh: livesim_visualizer
     params:
       doc_name: Websocket Live Visualizer

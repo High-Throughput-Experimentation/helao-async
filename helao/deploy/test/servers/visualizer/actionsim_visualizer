@@ -1,5 +1,6 @@
 __all__ = ["makeBokehApp"]
 
+import os
 from importlib import import_module
 from socket import gethostname
 
@@ -8,9 +9,8 @@ from bokeh.layouts import layout, Spacer
 
 from helao.core.servers.vis import HelaoVis
 from helao.core.servers.vis import Vis
-
-from helao.helpers.config_loader import CONFIG
 from helao.helpers import helao_logging as logging
+from helao.helpers.config_loader import CONFIG
 
 if logging.LOGGER is None:
     LOGGER = logging.make_logger(__file__)
@@ -34,13 +34,15 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
         server_key=server_key,
         doc=doc,
     )
+    config = app.helao_cfg
+    config_filename = os.path.basename(config["loaded_config_path"])
 
     app.vis.doc.add_root(
         layout(
             [
                 Spacer(width=20),
                 Div(
-                    text=f"<b>Live visualizer on {gethostname().lower()} -- config: {confPrefix}.py</b>",
+                    text=f"<b>Action visualizer on {gethostname().lower()} -- config: {config_filename}</b>",
                     width=1004,
                     height=32,
                     style={"font-size": "200%", "color": "#CB4335"},
@@ -56,21 +58,14 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
     vis_classes = {}
     # create visualizer objects for defined instruments
     vis_map = {
-        "co2sensor_server": ("co2_vis", "C_co2", ["port"]),
-        "mfc_server": ("mfc_vis", "C_mfc", ["devices"]),
-        "nidaqmx_server": ("temp_vis", "C_temperature", ["dev_monitor"]),
-        "galil_io": ("pressure_vis", "C_pressure", ["monitor_ai"]),
-        "tec_server": ("tec_vis", "C_tec", []),
+        "cpsim_server": ("oersim_vis", "C_oersimvis"),
     }
     vis_dict = {}
 
-    for fkey, (vismod, viscls, req_pars) in vis_map.items():
+    for fkey, (vismod, viscls) in vis_map.items():
         vis_dict[fkey] = []
         fservnames = find_server_names(vis=app.vis, fast_key=fkey)
         for fsname, conf_pars in fservnames:
-            if req_pars:
-                if not all([x in conf_pars for x in req_pars]):
-                    continue
             vis_classes[viscls] = getattr(import_module(f"{vis_root}.{vismod}"), viscls)
             vis_dict[fkey].append(
                 vis_classes[viscls](vis_serv=app.vis, serv_key=fsname)

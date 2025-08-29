@@ -27,7 +27,7 @@ servers:
     host: 127.0.0.1
     port: 5002
     group: visualizer
-    bokeh: action_visualizer
+    bokeh: actionsim_visualizer
     params:
       doc_name: 'demo0: OER Simulation Visualizer'
       launch_browser: true
@@ -42,7 +42,7 @@ servers:
     host: 127.0.0.1
     port: 5003
     group: visualizer
-    bokeh: live_visualizer
+    bokeh: livesim_visualizer
     params:
       doc_name: GP Live Visualizer
       launch_browser: true

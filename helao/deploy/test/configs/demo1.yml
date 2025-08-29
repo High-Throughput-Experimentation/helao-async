@@ -29,7 +29,7 @@ servers:
     host: 127.0.0.1
     port: 5012
     group: visualizer
-    bokeh: action_visualizer
+    bokeh: actionsim_visualizer
     params:
       doc_name: 'demo1: OER Simulation Visualizer'
       launch_browser: true
