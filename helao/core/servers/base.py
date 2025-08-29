@@ -263,52 +263,46 @@ class Base:
         self.local_action_queue = zdeque([])
         self.fast_urls = []
 
-        self.hlo_postprocessor = None
-        self.hlo_postprocess_script = self.server_cfg.get("hlo_postprocess_script", "")
+        self.hlo_postprocessors = []
+        self.hlo_postprocess_libs = self.server_cfg.get("hlo_postprocess_libs", [])
 
-        if self.hlo_postprocess_script.endswith(".py") and os.path.exists(
-            self.hlo_postprocess_script
-        ):
-            LOGGER.info(
-                f"Loading hlo post-processor from {self.hlo_postprocess_script}"
-            )
-            self.hlo_postprocessor = (
-                SourceFileLoader(
-                    "hlo_post",
-                    self.hlo_postprocess_script,
+        for hplib in self.hlo_postprocess_libs:
+            mod_name = os.path.basename(hplib).split(".py")[0]
+            if hplib.endswith(".py") and os.path.exists(hplib):
+                LOGGER.info(f"Loading hlo post-processor from {hplib}")
+                mod_name = os.path.basename(hplib).split(".py")[0]
+                self.hlo_postprocessors.append(
+                    SourceFileLoader(mod_name, hplib).load_module().PostProcess
                 )
-                .load_module()
-                .PostProcess
-            )
-        elif self.hlo_postprocess_script:
-            script_path = None
-            LOGGER.info("Looking for hlo post-processor in deployments")
-            deploy_script_path = os.path.join(
-                "helao",
-                "deploy",
-                CONFIG["deployment"],
-                "processors",
-                f"{self.hlo_postprocess_script}.py",
-            )
-            hte_path = os.path.join(
-                "helao",
-                "deploy",
-                "hte",
-                "processors",
-                f"{self.hlo_postprocess_script}.py",
-            )
-            if os.path.exists(deploy_script_path):
-                script_path = deploy_script_path
-            elif os.path.exists(hte_path):
-                script_path = hte_path
-            if script_path is not None:
-                LOGGER.info("Loading hlo post-processor from processors module")
-                proc_spec = spec_from_file_location("hlo_post", script_path)
-                proc_mod = module_from_spec(proc_spec)
-                proc_spec.loader.exec_module(proc_mod)
-                self.hlo_postprocessor = proc_mod.PostProcess
             else:
-                LOGGER.info("Post-processor was not found in processors module")
+                script_path = None
+                LOGGER.info("Looking for hlo post-processor in deployments")
+                deploy_script_path = os.path.join(
+                    "helao",
+                    "deploy",
+                    CONFIG["deployment"],
+                    "processors",
+                    f"{hplib}.py",
+                )
+                hte_path = os.path.join(
+                    "helao",
+                    "deploy",
+                    "hte",
+                    "processors",
+                    f"{hplib}.py",
+                )
+                if os.path.exists(deploy_script_path):
+                    script_path = deploy_script_path
+                elif os.path.exists(hte_path):
+                    script_path = hte_path
+                if script_path is not None:
+                    LOGGER.info("Loading hlo post-processor from processors module")
+                    proc_spec = spec_from_file_location(mod_name, script_path)
+                    proc_mod = module_from_spec(proc_spec)
+                    proc_spec.loader.exec_module(proc_mod)
+                    self.hlo_postprocessors.append(proc_mod.PostProcess)
+                else:
+                    LOGGER.info("Post-processor was not found in processors module")
 
         self.ntp_last_sync_file = None
         if self.helaodirs.root is not None:
@@ -3112,13 +3106,19 @@ class Active:
                 save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
             try:
                 # call custom hlo post-processor if it exists
-                if self.base.hlo_postprocessor is not None:
-                    loop = asyncio.get_running_loop()
-                    postprocessor = self.base.hlo_postprocessor(self.action, save_root)
-                    updated_file_list = await loop.run_in_executor(
-                        None, postprocessor.process
-                    )
-                    self.action.files = updated_file_list
+                if self.base.hlo_postprocessors:
+                    for hpp, libname in zip(
+                        self.base.hlo_postprocessors, self.base.hlo_postprocess_libs
+                    ):
+                        LOGGER.info(
+                            f"Running custom HLO post-processor: {os.path.basename(libname).split('.py')[0]}"
+                        )
+                        loop = asyncio.get_running_loop()
+                        postprocessor = hpp(self.action, save_root)
+                        updated_file_list = await loop.run_in_executor(
+                            None, postprocessor.process
+                        )
+                        self.action.files = updated_file_list
             except Exception:
                 LOGGER.error("Failed to run custom HLO post-processor", exc_info=True)
             try:
