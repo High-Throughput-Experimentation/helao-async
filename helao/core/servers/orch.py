@@ -38,8 +38,7 @@ from helao.core.error import ErrorCodes
 from helao.core.servers.operator.bokeh_operator import BokehOperator
 from helao.core.servers.vis import HelaoVis
 from helao.helpers.server_api import HelaoFastAPI
-from helao.helpers.import_experiments import import_experiments
-from helao.helpers.import_sequences import import_sequences
+from helao.helpers.import_autolibs import import_autolibs
 from helao.helpers.dispatcher import (
     async_private_dispatcher,
     async_action_dispatcher,
@@ -193,15 +192,17 @@ class Orch(Base):
             fastapp: The FastAPI application instance.
         """
         super().__init__(fastapp)
-        self.experiment_lib, self.experiment_codehash_lib = import_experiments(
+        self.experiment_lib, self.experiment_codehash_lib = import_autolibs(
             world_config_dict=self.world_cfg,
-            experiment_path=None,
-            user_experiment_path=self.helaodirs.user_exp,
+            library_path=None,
+            user_library_path=self.helaodirs.user_exp,
+            library_type="experiment",
         )
-        self.sequence_lib, self.sequence_codehash_lib = import_sequences(
+        self.sequence_lib, self.sequence_codehash_lib = import_autolibs(
             world_config_dict=self.world_cfg,
-            sequence_path=None,
-            user_sequence_path=self.helaodirs.user_seq,
+            library_path=None,
+            user_library_path=self.helaodirs.user_seq,
+            library_type="experiment",
         )
 
         self.use_db = "DB" in self.world_cfg["servers"].keys()
