@@ -8,7 +8,7 @@ experiment_libraries:
   - ECHE_exp
   - ECHEUVIS_exp
   - UVIS_exp
-  - C:\INST_hlo\CODE\helao-async\helao\deploy\experiments\TEST_exp.py
+  - helao\deploy\test\experiments\TEST_exp.py
 experiment_params:
   toggle_is_shutter: false
   gamrychannelwait: -1
@@ -17,7 +17,7 @@ sequence_libraries:
   - ECHE_seq
   - ECHEUVIS_seq
   - UVIS_T_seq
-  - C:\INST_hlo\CODE\helao-async\helao\deploy\experiments\TEST_seq.py
+  -helao\deploy\test\experiments\TEST_seq.py
 sequence_params:
   led_wavelengths_nm:
     - -1
