@@ -139,6 +139,7 @@ class ActionModel(ShortActionModel):
     # process_group_index: Optional[int] = 0 # unnecessary if we rely on process_finish as group terminator
     sync_data: bool = True
     campaign_name: Optional[str] = None
+    campaign_uuid: Optional[UUID] = None
     # not in ActionModel:
     start_condition: ActionStartCondition = ActionStartCondition.wait_for_all
     save_act: bool = True  # default should be true
