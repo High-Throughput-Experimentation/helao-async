@@ -42,5 +42,5 @@ class ProcessModel(ShortProcessModel):
     samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
 ] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
-    # TODO: created assembly global label, created solid...
     campaign_name: Optional[str] = None
+    campaign_uuid: Optional[UUID] = None

@@ -1646,6 +1646,8 @@ class HelaoSyncer:
                         "dummy",
                         "simulation",
                         "run_type",
+                        "campaign_name",
+                        "campaign_uuid",
                     ]
                 }
                 if "data_request_id" in exp_prog.yml.meta:
