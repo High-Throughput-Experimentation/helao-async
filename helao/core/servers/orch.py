@@ -10,6 +10,9 @@ if logging.LOGGER is None:
 else:
     LOGGER = logging.LOGGER
 
+from importlib.util import spec_from_file_location
+from importlib.util import module_from_spec
+from importlib.machinery import SourceFileLoader
 import asyncio
 import sys
 from copy import deepcopy
@@ -53,6 +56,7 @@ from helao.helpers.zdeque import zdeque
 from helao.helpers.legacy_api import HTELegacyAPI
 from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.helpers import config_loader
+from helao.helpers.meta_processor import MetaProcessor
 
 CONFIG = config_loader.CONFIG
 
@@ -267,6 +271,18 @@ class Orch(Base):
         self.step_thru_sequences = False
         self.status_summary = {}
         self.global_params = {}
+
+        self.exp_postprocessors: List[MetaProcessor] = []
+        self.exp_postprocess_libs = self.server_cfg.get("exp_postprocess_libs", [])
+        self.import_postprocessors(
+            self.exp_postprocess_libs, self.exp_postprocessors, MetaProcessor
+        )
+
+        self.seq_postprocessors: List[MetaProcessor] = []
+        self.seq_postprocess_libs = self.server_cfg.get("seq_postprocess_libs", [])
+        self.import_postprocessors(
+            self.seq_postprocess_libs, self.seq_postprocessors, MetaProcessor
+        )
 
     def exception_handler(self, loop, context):
         """
@@ -1094,6 +1110,8 @@ class Orch(Base):
             actserv_cfg = self.world_cfg["servers"][act.action_server.server_name]
             act.action_server.hostname = actserv_cfg["host"]
             act.action_server.port = actserv_cfg["port"]
+            act.campaign_name = self.active_experiment.campaign_name
+            act.campaign_uuid = self.active_experiment.campaign_uuid
             staged_acts.append(act)
         if process_order_groups:
             self.active_experiment.process_order_groups = process_order_groups
@@ -2403,6 +2421,19 @@ class Orch(Base):
             self.active_sequence.finished_global_params = {
                 k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
             }
+
+            # post-process experiment object
+            if self.seq_postprocessors:
+                for spp, libname in zip(
+                    self.seq_postprocessors, self.seq_postprocess_libs
+                ):
+                    LOGGER.info(
+                        f"Running custom SEQ post-processor: {os.path.basename(libname).split('.py')[0]}"
+                    )
+                    loop = asyncio.get_running_loop()
+                    postprocessor = spp(self.active_sequence, self)
+                    await loop.run_in_executor(None, postprocessor.process)
+
             await self.write_seq(self.active_sequence)
             self.last_sequence = deepcopy(self.active_sequence)
             await self.put_lbuf(
@@ -2468,6 +2499,18 @@ class Orch(Base):
                 old_status=HloStatus.active,
                 new_status=HloStatus.finished,
             )
+
+            # post-process experiment object
+            if self.exp_postprocessors:
+                for epp, libname in zip(
+                    self.exp_postprocessors, self.exp_postprocess_libs
+                ):
+                    LOGGER.info(
+                        f"Running custom EXP post-processor: {os.path.basename(libname).split('.py')[0]}"
+                    )
+                    loop = asyncio.get_running_loop()
+                    postprocessor = epp(self.active_experiment, self)
+                    await loop.run_in_executor(None, postprocessor.process)
 
             # add finished exp to seq
             # !!! add to dispatched_experiments
