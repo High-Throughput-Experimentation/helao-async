@@ -80,6 +80,7 @@ from helao.core.models.file import (
 from helao.helpers.file_in_use import file_in_use
 from helao.core.error import ErrorCodes
 from helao.helpers import config_loader
+from helao.helpers.hlo_postprocessor import HloPostProcessor
 
 CONFIG = config_loader.CONFIG
 
@@ -263,46 +264,12 @@ class Base:
         self.local_action_queue = zdeque([])
         self.fast_urls = []
 
-        self.hlo_postprocessors = []
+        self.hlo_postprocessors: List[HloPostProcessor] = []
         self.hlo_postprocess_libs = self.server_cfg.get("hlo_postprocess_libs", [])
 
-        for hplib in self.hlo_postprocess_libs:
-            mod_name = os.path.basename(hplib).split(".py")[0]
-            if hplib.endswith(".py") and os.path.exists(hplib):
-                LOGGER.info(f"Loading hlo post-processor from {hplib}")
-                mod_name = os.path.basename(hplib).split(".py")[0]
-                self.hlo_postprocessors.append(
-                    SourceFileLoader(mod_name, hplib).load_module().PostProcess
-                )
-            else:
-                script_path = None
-                LOGGER.info("Looking for hlo post-processor in deployments")
-                deploy_script_path = os.path.join(
-                    "helao",
-                    "deploy",
-                    CONFIG["deployment"],
-                    "processors",
-                    f"{hplib}.py",
-                )
-                hte_path = os.path.join(
-                    "helao",
-                    "deploy",
-                    "hte",
-                    "processors",
-                    f"{hplib}.py",
-                )
-                if os.path.exists(deploy_script_path):
-                    script_path = deploy_script_path
-                elif os.path.exists(hte_path):
-                    script_path = hte_path
-                if script_path is not None:
-                    LOGGER.info("Loading hlo post-processor from processors module")
-                    proc_spec = spec_from_file_location(mod_name, script_path)
-                    proc_mod = module_from_spec(proc_spec)
-                    proc_spec.loader.exec_module(proc_mod)
-                    self.hlo_postprocessors.append(proc_mod.PostProcess)
-                else:
-                    LOGGER.info("Post-processor was not found in processors module")
+        self.import_postprocessors(
+            self.hlo_postprocess_libs, self.hlo_postprocessors, HloPostProcessor
+        )
 
         self.ntp_last_sync_file = None
         if self.helaodirs.root is not None:
@@ -1626,6 +1593,54 @@ class Base:
             ]
         for exec_key in matching_execs:
             self.stop_executor(exec_key)
+
+    def import_postprocessors(self, name_list, class_list, proc_class):
+        proc_class_type = (
+            proc_class.__name__.split("Post")[0].split("Processor")[0].lower()
+        )
+        for pplib in name_list:
+            mod_name = os.path.basename(pplib).split(".py")[0]
+            if pplib.endswith(".py") and os.path.exists(pplib):
+                LOGGER.info(f"Loading {proc_class_type} post-processor from {pplib}")
+                mod_name = os.path.basename(pplib).split(".py")[0]
+                ppclass = SourceFileLoader(mod_name, pplib).load_module().PostProcess
+                if issubclass(ppclass, proc_class):
+                    class_list.append(ppclass)
+            else:
+                script_path = None
+                LOGGER.info(f"Looking for {pplib} post-processor in deployments")
+                deploy_script_path = os.path.join(
+                    "helao",
+                    "deploy",
+                    CONFIG["deployment"],
+                    "processors",
+                    f"{pplib}.py",
+                )
+                hte_path = os.path.join(
+                    "helao",
+                    "deploy",
+                    "hte",
+                    "processors",
+                    f"{pplib}.py",
+                )
+                if os.path.exists(deploy_script_path):
+                    script_path = deploy_script_path
+                elif os.path.exists(hte_path):
+                    script_path = hte_path
+                if script_path is not None:
+                    LOGGER.info(
+                        f"Loading {proc_class_type} post-processor from {pplib} processors module"
+                    )
+                    proc_spec = spec_from_file_location(mod_name, script_path)
+                    proc_mod = module_from_spec(proc_spec)
+                    proc_spec.loader.exec_module(proc_mod)
+                    ppclass = proc_mod.PostProcess
+                    if issubclass(ppclass, proc_class):
+                        class_list.append(ppclass)
+                else:
+                    LOGGER.info(
+                        f"Post-processor {pplib} was not found in processors module"
+                    )
 
 
 class Active:

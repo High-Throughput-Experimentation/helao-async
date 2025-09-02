@@ -5,8 +5,9 @@ from abc import ABC, abstractmethod
 from helao.core.models.file import FileInfo
 from .premodels import Action
 
+
 class HloPostProcessor(ABC):
-    
+
     def __init__(self, action: Action, save_root: str):
         self.action = action
         if action.manual_action:
@@ -19,7 +20,7 @@ class HloPostProcessor(ABC):
         seq_yml_paths = glob(os.path.join(seq_dir, "*.yml"))
         self.seq_yml_path = seq_yml_paths[0] if seq_yml_paths else None
         self.files = action.files
-    
+
     @abstractmethod
     def process(self) -> List[FileInfo]:
         """Return updated list of all action files, after post-processing."""
