@@ -35,9 +35,10 @@ dependencies:
   - joblib
   - jupyterlab
   - matplotlib
+  - mpltern
   - munch
   - ntplib
-  - numpy=1
+  - numpy
   - orjson
   - pandas
   - paramiko=3
