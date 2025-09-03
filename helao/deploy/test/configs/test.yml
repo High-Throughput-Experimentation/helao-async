@@ -18,10 +18,10 @@ servers:
       enable_op: true
       bokeh_port: 5001
       launch_browser: true
-      exp_postprocess_libs:
-        - append_params
-      seq_postprocess_libs:
-        - append_params
+    exp_postprocess_libs:
+      - append_params
+    seq_postprocess_libs:
+      - append_params
   SIM:
     host: 127.0.0.1
     port: 8002
