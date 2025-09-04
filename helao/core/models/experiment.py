@@ -125,5 +125,6 @@ class ExperimentModel(ExperimentTemplate):
     sync_data: bool = True
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
+    run_id: Optional[UUID] = None
     initial_global_params: dict = Field(default={})
     finished_global_params: dict = Field(default={})

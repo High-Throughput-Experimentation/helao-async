@@ -1,5 +1,6 @@
 __all__ = ["gen_uuid"]
 
+import hashlib
 import uuid
 from uuid_extensions import uuid7
 from typing import Optional
@@ -11,3 +12,8 @@ def gen_uuid(input: Optional[str] = None) -> uuid.UUID:
         return uuid7()
     else:
         return uuid.uuid5(uuid.NAMESPACE_URL, input)
+
+
+def md5_string(input: str) -> uuid.UUID:
+    "Generate a hash string from input string."
+    return uuid.UUID(hashlib.md5(input.encode("utf-8")).hexdigest())
