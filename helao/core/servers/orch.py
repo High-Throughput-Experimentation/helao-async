@@ -233,6 +233,7 @@ class Orch(Base):
         self.active_sequence: Sequence = None
         self.active_seq_exp_counter = 0
         self.last_sequence: Sequence = None
+        self.active_run_id: Optional[UUID] = None
         self.bokehapp = None
         self.orch_op = None
         self.op_enabled = self.server_params.get("enable_op", False)
@@ -898,6 +899,10 @@ class Orch(Base):
                         f"global parameter {k} not found in global_params, skipping"
                     )
 
+            # attach run_id
+            if self.active_run_id is not None:
+                self.active_sequence.run_id = self.active_run_id
+
             # if planned_experiments is empty, unpack sequence,
             # otherwise operator already populated planned_experiments
             if self.active_sequence.sequence_name in self.sequence_lib:
@@ -1048,6 +1053,10 @@ class Orch(Base):
         self.active_experiment.run_type = self.run_type
         self.active_experiment.orchestrator = self.server
         self.active_experiment.init_exp(time_offset=self.ntp_offset)
+
+        # attach run_id
+        if self.active_run_id is not None:
+            self.active_experiment.run_id = self.active_run_id
 
         self.globalstatusmodel.new_experiment(
             exp_uuid=self.active_experiment.experiment_uuid
@@ -1302,6 +1311,10 @@ class Orch(Base):
                     LOGGER.info(
                         f"global parameter {k} not found in global_params, skipping"
                     )
+
+            # attach run_id
+            if self.active_run_id is not None:
+                A.run_id = self.active_run_id
 
             # actserv_exists, _ = await endpoints_available([A.url])
             # if not actserv_exists:
@@ -1668,6 +1681,7 @@ class Orch(Base):
                 ]
             ):
                 self.export_queues(timestamp_pck=True)
+
             return True
 
         # except asyncio.CancelledError:
@@ -1679,6 +1693,7 @@ class Orch(Base):
             LOGGER.error("ERROR: ", exc_info=True)
             await self.estop_loop()
             return False
+
 
     async def orch_wait_for_all_actions(self):
         """
@@ -1772,6 +1787,7 @@ class Orch(Base):
 
         # set globalstatusmodel.loop_state to estop
         self.globalstatusmodel.loop_state = LoopStatus.estopped
+        self.active_run_id = None
 
         # force stop all running actions in the status dict (for this orch)
         await self.estop_actions(switch=False)  # don't latch actionserver model
@@ -2045,6 +2061,8 @@ class Orch(Base):
             sequence.sequence_codehash = self.sequence_codehash_lib[
                 sequence.sequence_name
             ]
+        if len(self.sequence_dq) == 0:
+            self.active_run_id = gen_uuid()
         self.sequence_dq.append(sequence)
         return sequence.sequence_uuid
 
@@ -2063,10 +2081,10 @@ class Orch(Base):
             sub_sequence_uuids = []
             if "reference_after_sample_list" in sequence.sequence_params:
                 reference_list = sequence.sequence_params["reference_after_sample_list"]
-                campaign_seq_param = "reference_after_sample_list"
+                run_seq_param = "reference_after_sample_list"
             else:
                 reference_list = plate_sample_no_list
-                campaign_seq_param = "plate_sample_no_list"
+                run_seq_param = "plate_sample_no_list"
             sub_sequence_samples = []
             for i, plate_sample_no in enumerate(plate_sample_no_list):
                 sub_sequence_samples.append(plate_sample_no)
@@ -2091,9 +2109,11 @@ class Orch(Base):
                         sub_sequence.sequence_codehash = self.sequence_codehash_lib[
                             sub_sequence.sequence_name
                         ]
-                    sub_sequence.campaign_sequence_parameter_variable = [
-                        campaign_seq_param
+                    sub_sequence.run_sequence_parameter_variable = [
+                        run_seq_param
                     ]
+                    if len(self.sequence_dq) == 0:
+                        self.active_run_id = gen_uuid()
                     self.sequence_dq.append(sub_sequence)
                     sub_sequence_uuids.append(sub_sequence.sequence_uuid)
                     sub_sequence_samples = []
@@ -2805,6 +2825,8 @@ class Orch(Base):
             "last_50_seq_uuids": self.last_50_sequence_uuids,
             "global_status_model": self.globalstatusmodel,
         }
+        if self.active_run_id is not None:
+            queue_dict["active_run_id"] = self.active_run_id
         if timestamp_pck:
             pck_name = f"queues_{datetime.now().strftime('%y%m%d.%H%M%S')}.pck"
         else:
@@ -2859,6 +2881,8 @@ class Orch(Base):
             for x in queue_dict["exp"]:
                 self.experiment_dq.append(x)
             for x in queue_dict["seq"]:
+                if len(self.sequence_dq) == 0:
+                    self.active_run_id = gen_uuid()
                 self.sequence_dq.append(x)
             self.active_experiment = queue_dict["active_exp"]
             self.last_experiment = queue_dict["last_exp"]
@@ -2871,4 +2895,5 @@ class Orch(Base):
             self.last_50_experiment_uuids = queue_dict["last_50_exp_uuids"]
             self.last_50_sequence_uuids = queue_dict["last_50_seq_uuids"]
             self.globalstatusmodel = queue_dict["globalstatusmodel"]
+            self.active_run_id = queue_dict.get("active_run_id", None)
         return save_path

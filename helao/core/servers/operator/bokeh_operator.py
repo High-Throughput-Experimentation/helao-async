@@ -43,7 +43,7 @@ else:
 
 from helao.helpers.to_json import parse_bokeh_input
 from helao.helpers.unpack_samples import unpack_samples_helper
-from helao.helpers.gen_uuid import gen_uuid
+from helao.helpers.gen_uuid import md5_string
 from helao.core.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 
@@ -1136,7 +1136,7 @@ class BokehOperator:
         campaign_name = self.input_campaign_name.value
         if campaign_name != "":
             seq.campaign_name = campaign_name
-            seq.campaign_uuid = gen_uuid()
+            seq.campaign_uuid = md5_string(campaign_name)
         self.vis.doc.add_next_tick_callback(partial(self.orch.add_sequence, seq))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -1260,7 +1260,7 @@ class BokehOperator:
             campaign_name = self.input_campaign_name.value
             if campaign_name != "":
                 self.sequence.campaign_name = campaign_name
-                self.sequence.campaign_uuid = gen_uuid()
+                self.sequence.campaign_uuid = md5_string(campaign_name)
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sequence, self.sequence)
             )
@@ -1278,7 +1278,7 @@ class BokehOperator:
             campaign_name = self.input_campaign_name.value
             if campaign_name != "":
                 self.sequence.campaign_name = campaign_name
-                self.sequence.campaign_uuid = gen_uuid()
+                self.sequence.campaign_uuid = md5_string(campaign_name)
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sample_sequences, self.sequence)
             )

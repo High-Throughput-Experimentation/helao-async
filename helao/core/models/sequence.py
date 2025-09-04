@@ -37,7 +37,8 @@ class SequenceTemplate(BaseModel, HelaoDict):
     )  # populated by operator using sequence library funcs
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
-    campaign_sequence_parameter_variable: Optional[List[str]] = None
+    run_id: Optional[UUID] = None
+    run_sequence_parameter_variable: Optional[List[str]] = None
     from_global_seq_params: dict = {}
 
 class SequenceModel(SequenceTemplate):
