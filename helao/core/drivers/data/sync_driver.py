@@ -59,7 +59,6 @@ from helao.helpers.zip_dir import zip_dir
 
 from time import sleep
 from glob import glob
-import aiohttp
 
 ABR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence"}
 MOD_MAP = {
@@ -1648,6 +1647,7 @@ class HelaoSyncer:
                         "run_type",
                         "campaign_name",
                         "campaign_uuid",
+                        "run_id",
                     ]
                 }
                 if "data_request_id" in exp_prog.yml.meta:
