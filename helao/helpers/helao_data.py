@@ -189,7 +189,7 @@ class HelaoData:
                 self._data_files = [
                     x
                     for x in glob(os.path.join(yml_reldir, "**", "*"), recursive=True)
-                    if not x.split(".")[-1] not in skip_exts
+                    if x.split(".")[-1] not in skip_exts
                 ]
                 nosync_path = self.ymldir.replace("RUNS_SYNCED", "RUNS_NOSYNC")
 
