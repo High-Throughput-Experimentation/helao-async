@@ -1,9 +1,9 @@
 @echo off
-HA_DIR=%~dp0
+set HA_DIR=%~dp0
 call conda activate helao
 
 echo resetting helao-async and pulling updates
-cd %HA_DIR
+cd %HA_DIR%
 git fetch --prune --all && git reset --hard && git pull
 cd helao\deploy
 for /d %%d in (*) do (
@@ -19,5 +19,5 @@ for /d %%d in (*) do (
         )
     )
 )
-cd %HA_DIR
+cd %HA_DIR%
 echo[ 
