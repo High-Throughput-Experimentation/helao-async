@@ -17,4 +17,5 @@ for /d %%d in (*) do (
         )
     )
 )
+cd %HA_DIR
 echo[ 
