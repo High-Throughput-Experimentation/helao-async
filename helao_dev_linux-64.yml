@@ -37,7 +37,7 @@ dependencies:
   - mpltern
   - munch
   - ntplib
-  - numpy
+  - numpy=1
   - orjson
   - pandas
   - paramiko=3
