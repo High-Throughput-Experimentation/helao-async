@@ -120,7 +120,7 @@ class Experiment(Sequence, ExperimentModel):
         experiment_time = self.experiment_timestamp.strftime("%y%m%d.%H%M%S")
         sequence_dir = self.sequence_output_dir
         return os.path.join(
-            sequence_dir,
+            str(sequence_dir),
             f"{experiment_time}__{self.experiment_name}",
         ).replace(r"\\", "/")
 
@@ -259,7 +259,7 @@ class Action(Experiment, ActionModel):
         experiment_dir = self.experiment_output_dir
         return "/".join(
             [
-                experiment_dir,
+                str(experiment_dir),
                 f"{self.orch_submit_order}__"
                 f"{self.action_split}__"
                 f"{self.action_server.server_name}__{self.action_name}",
