@@ -249,16 +249,32 @@ class HelaoDataModel(HelaoModel):
         return hlo_files
 
     @property
-    def hlo_file(self):
-        """Return primary .hlo filename for this action."""
-        return self.data_files[0]
+    def other_files(self):
+        meta = self.json
+        file_list = meta.get("files", [])
+        other_files = [x for x in file_list if x not in self.data_files]
+        return other_files
+
+    def hlo_file_tup_type(self, contains: str = ""):
+        """Return primary .hlo filename, filetype, and data keys for this action."""
+
+        hlo_files = [x for x in self.data_files if x["file_name"].endswith(".hlo")]
+        if contains:
+            hlo_files = [x for x in hlo_files if contains in x["file_type"]]
+        if not hlo_files:
+            return "", "", []
+        first_hlo = hlo_files[0]
+        retkeys = ["file_name", "file_type", "data_keys"]
+        return [first_hlo.get(k, "") for k in retkeys]
 
     @property
     def hlo_file_tup(self):
-        """Return primary .hlo filename, filetype, and data keys for this action."""
-        first_hlo = self.hlo_file
-        retkeys = ["file_name", "file_type", "data_keys"]
-        return [first_hlo.get(k, "") for k in retkeys]
+        return self.hlo_file_tup_type()
+
+    @property
+    def hlo_file(self):
+        """Return primary .hlo filename for this action."""
+        return self.data_files[0]
 
     @property
     def hlo(self):
