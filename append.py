@@ -18,8 +18,8 @@ helao_repo_root = os.path.dirname(os.path.realpath(__file__))
 
 
 def appender(confPrefix, appendPrefix):
-    confDict = read_config(confPrefix, helao_repo_root)
-    appenDict = read_config(appendPrefix, helao_repo_root)
+    confDict = read_config(confPrefix)
+    appenDict = read_config(appendPrefix)
     overlap = [k for k in appenDict["servers"].keys() if k in confDict["servers"].keys()]
     if overlap:
         print(f"config dict from '{appendPrefix}' overlaps with '{confPrefix}")
