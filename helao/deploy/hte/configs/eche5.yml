@@ -2,7 +2,7 @@ dummy: true
 simulation: false
 experiment_libraries:
   - ECHE_exp
-  - TEST_exp
+  - helao\deploy\test\experiments\TEST_exp.py
   - samples_exp
 experiment_params:
   gamrychannelwait: -1

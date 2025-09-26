@@ -3,10 +3,10 @@ simulation: false
 experiment_libraries:
   - samples_exp
   - XRFS_exp
-  - TEST_exp
+  - helao\deploy\test\experiments\TEST_exp.py
 sequence_libraries:
   - XRFS_seq
-  - TEST_seq
+  - helao\deploy\test\experiments\TEST_seq.py
 run_type: xrfs
 root: C:\INST_hlo
 servers:

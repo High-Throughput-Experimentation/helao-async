@@ -3,10 +3,10 @@ simulation: false
 experiment_libraries:
   - samples_exp
   - ICPMS_exp
-  - TEST_exp
+  - helao\deploy\test\experiments\TEST_exp.py
 sequence_libraries:
   - ICPMS_seq
-  - TEST_seq
+  - helao\deploy\test\experiments\TEST_seq.py
 run_type: icpm
 root: C:\INST_hlo
 servers:
