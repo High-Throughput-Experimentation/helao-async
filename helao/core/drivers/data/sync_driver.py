@@ -1098,7 +1098,8 @@ class HelaoSyncer:
                 if not os.path.isdir(datedir):
                     continue
                 try:
-                    dateonly = datetime.strptime(os.path.basename(datedir), "%y%m%d")
+                    dateonly = datetime.strptime(os.path.basename(datedir), "%m%d")
+                    dateonly.replace(year=datetime.strptime(os.path.basename(os.path.dirname(datedir)), "%y.%U").year)
                 except ValueError:
                     dateonly = datetime.strptime(
                         os.path.basename(datedir), "%y%m%d.%H%M%S%f"
