@@ -5,7 +5,7 @@ experiment_libraries:
   - helao\deploy\test\experiments\TEST_exp.py
 sequence_libraries:
   - OERSIM_seq
-  - helao\deploy\test\experiments\TEST_seq.py
+  - helao\deploy\test\sequences\TEST_seq.py
 run_type: simulation
 root: C:/INST_hlo
 servers:
