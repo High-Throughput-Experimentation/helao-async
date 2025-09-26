@@ -22,7 +22,7 @@ from pydantic import BaseModel
 CONFIG: Munch = None
 
 
-def read_config(confArg, helao_repo_root):
+def read_config(confArg):
     """
     Loads a configuration file in either Python (.py) or YAML (.yml) format.
 
@@ -38,6 +38,14 @@ def read_config(confArg, helao_repo_root):
         FileNotFoundError: If the specified configuration file does not exist or if the prefix
                            does not correspond to an existing .py or .yml file.
     """
+    helao_repo_root = os.path.abspath(__file__)
+    while os.path.basename(helao_repo_root) != "helao":  # find helao module directory
+        helao_repo_root = os.path.dirname(helao_repo_root)
+        if helao_repo_root == "/":
+            raise FileNotFoundError(
+                "Could not find helao repo root while searching for config file."
+            )
+    helao_repo_root = os.path.dirname(helao_repo_root)  # go up one to repo root
     confPrefix = os.path.basename(confArg).replace(".py", "").replace(".yml", "")
     if confArg.endswith(".py") and os.path.exists(confArg):
         # LOGGER.info(f"Loading config from {confArg}")
@@ -94,6 +102,7 @@ def read_config(confArg, helao_repo_root):
                 "Config argument was a prefix but .py or .yml could not be found."
             )
     config["loaded_config_path"] = full_path
+    config["helao_repo_root"] = helao_repo_root
     return config
 
 
@@ -101,7 +110,7 @@ def load_global_config(confArg: str, set_global: bool = False):
     helao_repo_root = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     )
-    config_dict = read_config(confArg, helao_repo_root)
+    config_dict = read_config(confArg)
     if set_global:
         global CONFIG
         CONFIG = munchify(

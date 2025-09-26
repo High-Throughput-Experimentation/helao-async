@@ -599,7 +599,7 @@ def main():
         print(branches)
     helao_repo_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
-    config = read_config(confArg, helao_repo_root)
+    config = read_config(confArg)
     if len(sys.argv) > 2:
         extraopt = sys.argv[2]
     else:
