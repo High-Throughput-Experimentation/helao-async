@@ -22,7 +22,7 @@ from pydantic import BaseModel
 CONFIG: Munch = None
 
 
-def read_config(confArg):
+def read_config(confArg, *args, **kwargs):
     """
     Loads a configuration file in either Python (.py) or YAML (.yml) format.
 
