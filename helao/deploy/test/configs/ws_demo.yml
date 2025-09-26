@@ -2,9 +2,9 @@ dummy: true
 simulation: true
 experiment_libraries:
   - simulatews_exp
-  - TEST_exp
+  - helao\deploy\test\experiments\TEST_exp.py
 sequence_libraries:
-  - TEST_seq
+  - helao\deploy\test\experiments\TEST_seq.py
 run_type: simulation
 root: c:/INST_hlo
 servers:
