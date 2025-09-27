@@ -134,7 +134,7 @@ class XrfsAnalysis(BaseAnalysis):
         diam = float(diam_str)
         unit = unit.strip()
 
-        area = CM_SCALE[unit] * (diam / 2) ** 2 * 3.14159
+        area = (CM_SCALE[unit] * (diam / 2)) ** 2 * 3.14159
 
         calib_prefix = f"{kv:.0f}-{current:.0f}-{diam_str.strip()}-vacu-"
         calib_path = self.analysis_params.get("calibration_file_path", "")
