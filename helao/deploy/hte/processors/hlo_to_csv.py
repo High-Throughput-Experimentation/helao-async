@@ -1,18 +1,15 @@
-from helao.helpers import helao_logging as logging
-
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
 import os
 from typing import List
 from copy import copy
+
+import pandas as pd
+
 from helao.core.models.file import FileInfo
 from helao.helpers.hlo_postprocessor import HloPostProcessor
-
 from helao.helpers.read_hlo import read_hlo
-import pandas as pd
+from helao.helpers import helao_logging as logging
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class PostProcess(HloPostProcessor):

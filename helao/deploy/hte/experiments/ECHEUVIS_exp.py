@@ -63,6 +63,7 @@ TOGGLE_TRIGGERTYPE = TriggerType.risingedge
 # lowspec conditional -- 3
 # lowspec sequence: no XYZ; no pump
 
+
 def ECHEUVIS_sub_startup(experiment: Experiment):
     """Unload custom position and enable IR emitter."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -385,7 +386,10 @@ def ECHEUVIS_sub_CA_led(
                 "n_avg": spec_n_avg,
                 "duration": toggle2_time,
             },
-            from_global_act_params={"_fast_samples_in": "fast_samples_in", "calibrated_int_time_ms": "int_time"},
+            from_global_act_params={
+                "_fast_samples_in": "fast_samples_in",
+                "calibrated_int_time_ms": "int_time",
+            },
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=spec_technique,
             process_contrib=[
@@ -748,7 +752,10 @@ def ECHEUVIS_sub_OCV_led(
                 "n_avg": spec_n_avg,
                 "duration": toggle2_time,
             },
-            from_global_act_params={"_fast_samples_in": "fast_samples_in", "calibrated_int_time_ms": "int_time"},
+            from_global_act_params={
+                "_fast_samples_in": "fast_samples_in",
+                "calibrated_int_time_ms": "int_time",
+            },
             start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=spec_technique,
             process_contrib=[

@@ -1,8 +1,8 @@
-""" A device class for the Galil motion controller, used by a FastAPI server instance.
+"""A device class for the Galil motion controller, used by a FastAPI server instance.
 
 The 'galil' device class exposes motion and I/O functions from the underlying 'gclib'
 library. Class methods are specific to Galil devices. Device configuration is read from
-config/config.py. 
+config/config.py.
 
 This driver requires gclib to be installed. After installation, activate the helao
 environment and run:
@@ -30,11 +30,8 @@ import traceback
 from bokeh.server.server import Server
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-    
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.base import Base
 from helao.core.error import ErrorCodes
 from helao.helpers.premodels import Action
@@ -118,7 +115,7 @@ class Galil:
 
         # need to check if config settings exist
         # else need to create empty ones
-        self.axis_id = self.config_dict.get("axis_id",{})
+        self.axis_id = self.config_dict.get("axis_id", {})
 
         # Mplatexy is identity matrix by default
         self.transform = TransformXY(self.base, self.M_instr, self.axis_id)
@@ -490,7 +487,9 @@ class Galil:
             current_instrxyz = self.transform.transform_motorxyz_to_instrxyz(
                 current_positionvec[0:3]
             )
-            LOGGER.info(f"current instrument position (calc from motor): {current_instrxyz}")
+            LOGGER.info(
+                f"current instrument position (calc from motor): {current_instrxyz}"
+            )
             if mode == MoveModes.relative:
                 new_instrxyz = current_instrxyz
                 for i in range(3):
@@ -586,7 +585,9 @@ class Galil:
             # recalculate the distance in mm into distance in counts
             # if 1:
             try:
-                LOGGER.info(f"count_to_mm: {axl}, {self.config_dict['count_to_mm'][axl]}")
+                LOGGER.info(
+                    f"count_to_mm: {axl}, {self.config_dict['count_to_mm'][axl]}"
+                )
                 float_counts = (
                     d / self.config_dict["count_to_mm"][axl]
                 )  # calculate float dist from steupd
@@ -607,7 +608,7 @@ class Galil:
                     speed = self.motor_max_speed_count_sec
                 self._speed = speed
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 LOGGER.error(f"motor numerical error for axis '{ax}': {repr(e), tb,}")
                 # something went wrong in the numerical part so we give that as feedback
                 ret_moved_axis.append(None)
@@ -665,7 +666,7 @@ class Galil:
 
                 # continue
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 LOGGER.error(f"motor error: '", exc_info=True)
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
@@ -743,7 +744,7 @@ class Galil:
         try:
             self.g.GClose()  # don't forget to close connections!
         except gclib.GclibError as e:
-            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             return {"connection": {"Unexpected GclibError:", e}}
         return {"connection": "motor_offline"}
 
@@ -993,7 +994,7 @@ class Galil:
             # self.motor_off_shutdown(axis = self.get_all_axis())
             self.g.GClose()
         except Exception as e:
-            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             LOGGER.error(f"could not close galil connection: {repr(e), tb,}")
         if self.aligner_enabled and self.aligner:
             self.aligner.IOtask.cancel()
@@ -1027,7 +1028,9 @@ class Galil:
                         return new_matrix
 
                 except Exception as e:
-                    tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                    tb = "".join(
+                        traceback.format_exception(type(e), e, e.__traceback__)
+                    )
                     LOGGER.error(f"error loading matrix for '{file}': {repr(e), tb,}")
                     return None
         else:
@@ -1052,7 +1055,9 @@ class Galil:
     def reset_plate_transfermatrix(self):
         self.update_plate_transfermatrix(newtransfermatrix=self.dflt_matrix)
 
-    async def solid_get_platemap(self, plate_id: Optional[int] = None, **kwargs) -> dict:
+    async def solid_get_platemap(
+        self, plate_id: Optional[int] = None, **kwargs
+    ) -> dict:
         return {
             "platemap": await self.unified_db.get_platemap(
                 [SolidSample(plate_id=plate_id)]
@@ -1334,7 +1339,7 @@ class TransformXY:
             try:
                 self.Minv = self.M.I
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 LOGGER.error(f"System Matrix singular ", exc_info=True)
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
                 self.Minv = np.matrix(
@@ -1344,7 +1349,7 @@ class TransformXY:
             try:
                 self.Minstrinv = self.Minstr.I
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 LOGGER.error(f"Instrument Matrix singular ", exc_info=True)
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
                 self.Minstrinv = np.matrix(
@@ -1392,7 +1397,7 @@ class TransformXY:
 
             return self.Mplatexy
         except Exception as e:
-            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             LOGGER.error(f"Instrument Matrix singular ", exc_info=True)
             # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
             self.Minv = np.matrix([[0, 0, 0], [0, 0, 0], [0, 0, -1]])

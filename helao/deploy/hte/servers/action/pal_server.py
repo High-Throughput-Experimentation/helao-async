@@ -24,7 +24,11 @@ from helao.core.models.sample import (
     SampleType,
     LiquidSample,
     GasSample,
-    AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample,
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
     NoneSample,
     SolidSample,
 )
@@ -34,10 +38,7 @@ from helao.helpers.premodels import Action
 
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 def makeApp(server_key):
@@ -592,8 +593,10 @@ def makeApp(server_key):
     async def archive_tray_load(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        load_sample_in: Union[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-, dict] = Body(
+        load_sample_in: Union[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
+            dict,
+        ] = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
             embed=True,
         ),
@@ -662,7 +665,9 @@ def makeApp(server_key):
     async def archive_tray_update_position(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample] = Body(
+        sample: Union[
+            AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
+        ] = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
             embed=True,
         ),
@@ -776,7 +781,9 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
         custom: dev_customitems = None,
-        load_sample_in: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample] = Body(
+        load_sample_in: Union[
+            AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
+        ] = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
             embed=True,
         ),
@@ -989,8 +996,9 @@ def makeApp(server_key):
     async def db_get_samples(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body(
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body(
             [LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()})],
             embed=True,
         ),
@@ -1014,8 +1022,9 @@ def makeApp(server_key):
     async def db_new_samples(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Body(
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body(
             [
                 LiquidSample(
                     **{

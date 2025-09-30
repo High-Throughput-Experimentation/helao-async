@@ -221,7 +221,9 @@ def UVIS_sub_measure(
             "set_digital_out",
             {
                 "do_item": toggle_source,
-                "on": False if run_use == "ref_dark" and spec_type == SpecType.T else True,
+                "on": (
+                    False if run_use == "ref_dark" and spec_type == SpecType.T else True
+                ),
             },
         )
 

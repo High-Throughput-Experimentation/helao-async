@@ -497,7 +497,7 @@ class HelaoDataModel(HelaoModel):
     @property
     def hlo(self):
         """Retrieve json data from S3 via HelaoLoader."""
-        return self.loader.get_hlo(self.yml_path, self.hlo_file['file_name'])
+        return self.loader.get_hlo(self.yml_path, self.hlo_file["file_name"])
 
     def read_hlo_file(self, filename):
         return self.loader.get_hlo(self.yml_path, filename)

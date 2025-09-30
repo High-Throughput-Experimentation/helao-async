@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI
 from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
+
 CONFIG = config_loader.CONFIG
 
 __all__ = ["HelaoBokehAPI", "HelaoFastAPI"]

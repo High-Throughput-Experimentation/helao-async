@@ -60,8 +60,12 @@ def main():
                 seq_label="gcld-test",
                 param_defaults=TEST_defaults,
             )
-            print(f"{gen_ts()} Got measurement request for plate {PLATE_ID}, sample {sample_no}.")
-            print(f"{gen_ts()} Measurement parameters for sequence: {seq.sequence_uuid}:")
+            print(
+                f"{gen_ts()} Got measurement request for plate {PLATE_ID}, sample {sample_no}."
+            )
+            print(
+                f"{gen_ts()} Measurement parameters for sequence: {seq.sequence_uuid}:"
+            )
             pprint(seq.sequence_params)
             operator.add_sequence(seq.get_seq())
             print(f"{gen_ts()} Dispatching measurement sequence: {seq.sequence_uuid}")
@@ -73,7 +77,9 @@ def main():
             current_state, active_seq, last_seq = wait_for_orch(
                 operator, LoopStatus.started
             )
-            print(f"{gen_ts()} Measurement sequence {active_seq['sequence_uuid']} has started.")
+            print(
+                f"{gen_ts()} Measurement sequence {active_seq['sequence_uuid']} has started."
+            )
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
@@ -109,13 +115,17 @@ def main():
                     )
                     return -1
 
-            print(f"{gen_ts()} Unconditional 30 second wait for upload tasks to process.")
+            print(
+                f"{gen_ts()} Unconditional 30 second wait for upload tasks to process."
+            )
             time.sleep(30)
 
             # when orchestrator has stopped, check DB server for upload state
             num_sync_tasks = num_uploads(db_cfg)
             while num_sync_tasks > 0:
-                print(f"{gen_ts()} Waiting for {num_sync_tasks} sequence uploads to finish.")
+                print(
+                    f"{gen_ts()} Waiting for {num_sync_tasks} sequence uploads to finish."
+                )
                 time.sleep(10)
                 num_sync_tasks = num_uploads(db_cfg)
 
@@ -139,7 +149,9 @@ def main():
             current_state, active_seq, last_seq = wait_for_orch(
                 operator, LoopStatus.started
             )
-            print(f"{gen_ts()} Analysis sequence {active_seq['sequence_uuid']} has started.")
+            print(
+                f"{gen_ts()} Analysis sequence {active_seq['sequence_uuid']} has started."
+            )
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
@@ -177,9 +189,7 @@ def main():
             print(f"{gen_ts()} Analysis sequence complete.")
             with CLIENT:
                 print("{gen_ts()} Test mode: resetting data request status to pending.")
-                output = CLIENT.set_status(
-                    "pending", data_request_id=data_request.id
-                )
+                output = CLIENT.set_status("pending", data_request_id=data_request.id)
         else:
             print(f"{gen_ts()} No data requests are pending, creating a new one.")
             test_req = CreateDataRequestModel(

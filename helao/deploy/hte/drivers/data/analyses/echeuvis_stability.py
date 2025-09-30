@@ -16,11 +16,7 @@ from helao.helpers.gen_uuid import gen_uuid
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
 from helao.core.models.run_use import RunUse
@@ -168,7 +164,7 @@ class EcheUvisInputs(AnalysisInput):
             .action_uuid,
             query_df,
         )
-        keep_eche = ['run_OCV', 'run_CA']
+        keep_eche = ["run_OCV", "run_CA"]
         eche_acts = query_df.query(
             "run_use=='data' & action_name.isin(@keep_eche)"
         ).sort_values("action_timestamp")
@@ -178,7 +174,7 @@ class EcheUvisInputs(AnalysisInput):
         self.presitu_ocv_act = HelaoAction(
             list(eche_acts.action_uuid)[presitu_ocv_idx], query_df
         )
-        keep_ocv = ['run_OCV', 'acquire_spec_extrig']
+        keep_ocv = ["run_OCV", "acquire_spec_extrig"]
         ocv_specs = query_df.query(
             "run_use=='data' & action_name.isin(@keep_ocv) & experiment_name=='ECHEUVIS_sub_OCV_led'"
         ).sort_values("action_timestamp")
@@ -281,7 +277,11 @@ class EcheUvisInputs(AnalysisInput):
         inputs = []
         for ak in action_keys:
             euis = vars(self)[ak]
-            ru = ak.split("_spec")[0].replace("insitu", "data").replace("presitu", "preca_baseline")
+            ru = (
+                ak.split("_spec")[0]
+                .replace("insitu", "data")
+                .replace("presitu", "preca_baseline")
+            )
             if not isinstance(euis, list):
                 euis = [euis]
             for eui in euis:
@@ -463,19 +463,21 @@ class EcheUvisAnalysis(BaseAnalysis):
                 axis=0,
             )
         except Exception:
-            LOGGER.warning(f"Cannot skip first {ap['skip_first_n']} spectra of insitu CA, aggregating last {ap['agg_last_secs']} seconds.", exc_info=True)
+            LOGGER.warning(
+                f"Cannot skip first {ap['skip_first_n']} spectra of insitu CA, aggregating last {ap['agg_last_secs']} seconds.",
+                exc_info=True,
+            )
             agg_insitu = aggfunc(
                 itup[2][
-                    np.where(
-                        (itup[1][0] - itup[1].max())
-                        >= -ap["agg_last_secs"]
-                    )[0].min() :
+                    np.where((itup[1][0] - itup[1].max()) >= -ap["agg_last_secs"])[
+                        0
+                    ].min() :
                 ],
                 axis=0,
             )
 
         # aggregate presitu OCV spectra over final t seconds, omitting first n
-        try:    
+        try:
             agg_presitu = aggfunc(
                 ptup[2][
                     np.where(
@@ -486,13 +488,15 @@ class EcheUvisAnalysis(BaseAnalysis):
                 axis=0,
             )
         except Exception:
-            LOGGER.warning(f"Cannot skip first {ap['skip_first_n']} spectra of presitu CA, aggregating last {ap['agg_last_secs']} seconds.", exc_info=True)
+            LOGGER.warning(
+                f"Cannot skip first {ap['skip_first_n']} spectra of presitu CA, aggregating last {ap['agg_last_secs']} seconds.",
+                exc_info=True,
+            )
             agg_presitu = aggfunc(
                 ptup[2][
-                    np.where(
-                        (ptup[1][0] - ptup[1].max())
-                        >= -ap["agg_last_secs"]
-                    )[0].min() :
+                    np.where((ptup[1][0] - ptup[1].max()) >= -ap["agg_last_secs"])[
+                        0
+                    ].min() :
                 ],
                 axis=0,
             )

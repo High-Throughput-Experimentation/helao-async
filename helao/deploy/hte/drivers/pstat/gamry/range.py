@@ -3,11 +3,7 @@ from enum import StrEnum
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 RANGES = {
     "mode0": 0,
@@ -27,6 +23,7 @@ RANGES = {
     "mode14": 14,
     "mode15": 15,
 }
+
 
 # for IFC1010
 class Gamry_IErange_IFC1010(StrEnum):
@@ -142,6 +139,7 @@ def split_val_unit(val_string: str) -> tuple[float, str]:
     number = val_string[: -len(unit)]
     return to_float(number), unit
 
+
 def to_amps(number: float, unit: str) -> Union[float, None]:
     unit = unit.lower()
     unit_map = {
@@ -152,7 +150,7 @@ def to_amps(number: float, unit: str) -> Union[float, None]:
         "ua": 1e-6,
         "ma": 1e-3,
         "a": 1,
-        "ka": 1e3
+        "ka": 1e3,
     }
     exp = unit_map.get(unit, None)
     if exp is None:
@@ -206,9 +204,7 @@ def get_range(requested_range: Union[str, None], range_enum: StrEnum):
                 break
 
         if idx is None:
-            LOGGER.error(
-                "could not detect IErange, using 'auto'"
-            )
+            LOGGER.error("could not detect IErange, using 'auto'")
             return range_enum.auto
 
     ret_range = range_enum(lookupvals[idx])

@@ -143,7 +143,9 @@ class DryUvisInputs(AnalysisInput):
     def insitu_spec(self):
         return self.insitu_spec_act.hlo
 
-    def get_datamodels(self, global_sample_label: str, *args, **kwargs) -> List[AnalysisDataModel]:
+    def get_datamodels(
+        self, global_sample_label: str, *args, **kwargs
+    ) -> List[AnalysisDataModel]:
         action_keys = [k for k in vars(self).keys() if "spec_act" in k]
         inputs = []
         for ak in action_keys:
@@ -193,6 +195,7 @@ class DryUvisOutputs(BaseModel):
 
 class DryUvisAnalysis(BaseAnalysis):
     """Dry UVIS Analysis for GCLD demonstration."""
+
     analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID

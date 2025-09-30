@@ -2,11 +2,7 @@ __all__ = ["Base", "ActiveParams", "Active", "DummyBase"]
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from importlib.util import spec_from_file_location
 from importlib.util import module_from_spec
 from importlib.machinery import SourceFileLoader

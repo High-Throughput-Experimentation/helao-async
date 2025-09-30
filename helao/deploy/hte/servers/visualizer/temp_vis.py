@@ -13,12 +13,9 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
-from helao.core.servers. vis import Vis
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+from helao.core.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 
@@ -199,7 +196,9 @@ class C_temperature:
             self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        LOGGER.info(f" ... Temperature sensor visualizer subscribing to: {self.data_url}")
+        LOGGER.info(
+            f" ... Temperature sensor visualizer subscribing to: {self.data_url}"
+        )
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()

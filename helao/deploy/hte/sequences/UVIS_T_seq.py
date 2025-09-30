@@ -34,7 +34,10 @@ def UVIS_T(
     epm = ExperimentPlanMaker()
     epm.add("UVIS_sub_unloadall_customs", {})
     if use_z_motor:
-        epm.add("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": True, "z_height": cell_disengaged_z})
+        epm.add(
+            "ECHEUVIS_sub_disengage",
+            {"clear_we": True, "clear_ce": True, "z_height": cell_disengaged_z},
+        )
     epm.add(
         "UVIS_sub_setup_ref",
         {
@@ -46,7 +49,10 @@ def UVIS_T(
         },
     )
     if use_z_motor:
-        epm.add("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
+        epm.add(
+            "ECHEUVIS_sub_engage",
+            {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z},
+        )
     # dark ref
     epm.add(
         "UVIS_sub_measure",
@@ -87,7 +93,10 @@ def UVIS_T(
     )
 
     if use_z_motor:
-        epm.add("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
+        epm.add(
+            "ECHEUVIS_sub_disengage",
+            {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z},
+        )
     for plate_sample in plate_sample_no_list:
         epm.add("UVIS_sub_unloadall_customs", {})
         epm.add(
@@ -99,7 +108,10 @@ def UVIS_T(
             },
         )
         if use_z_motor:
-            epm.add("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
+            epm.add(
+                "ECHEUVIS_sub_engage",
+                {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z},
+            )
         # perform transmission spec
         epm.add(
             "UVIS_sub_measure",
@@ -120,7 +132,10 @@ def UVIS_T(
             },
         )
         if use_z_motor:
-            epm.add("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
+            epm.add(
+                "ECHEUVIS_sub_disengage",
+                {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z},
+            )
 
     epm.add("UVIS_sub_unloadall_customs", {})
     epm.add(
@@ -132,9 +147,12 @@ def UVIS_T(
             "solid_sample_no": plate_sample_no_list[-1],
             "specref_code": specref_code,
         },
-)
+    )
     if use_z_motor:
-        epm.add("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
+        epm.add(
+            "ECHEUVIS_sub_engage",
+            {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z},
+        )
     # dark ref
     epm.add(
         "UVIS_sub_measure",
@@ -175,7 +193,10 @@ def UVIS_T(
     )
 
     if use_z_motor:
-        epm.add("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
+        epm.add(
+            "ECHEUVIS_sub_disengage",
+            {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z},
+        )
     epm.add("UVIS_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list

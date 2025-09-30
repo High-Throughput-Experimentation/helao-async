@@ -5,10 +5,9 @@ from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
 
 class Executor:
     """
@@ -65,7 +64,7 @@ class Executor:
         oneoff: bool = True,
         exec_id: Optional[str] = None,
         concurrent: bool = True,
-        **kwargs
+        **kwargs,
     ):
         """
         Initializes the Executor.
@@ -104,7 +103,7 @@ class Executor:
         """
         Asynchronous method to run setup procedures for the executor.
 
-        This method prints a message indicating that the generic executor is running 
+        This method prints a message indicating that the generic executor is running
         setup methods and initializes the setup error code to `ErrorCodes.none`.
 
         Returns:
@@ -118,7 +117,7 @@ class Executor:
         Sets the pre-execution function.
 
         This method assigns a function to be executed before the main execution.
-        
+
         Args:
             pre_exec_func (function): A function to be executed before the main execution.
         """
@@ -129,7 +128,7 @@ class Executor:
         Asynchronous method to execute a task.
 
         Returns:
-            dict: A dictionary containing the keys "data" and "error". 
+            dict: A dictionary containing the keys "data" and "error".
                   "data" is an empty dictionary, and "error" is set to ErrorCodes.none.
         """
         return {"data": {}, "error": ErrorCodes.none}
@@ -174,7 +173,7 @@ class Executor:
         a dictionary containing an empty data dictionary and the cleanup error code.
 
         Returns:
-            dict: A dictionary with keys "data" (an empty dictionary) and "error" 
+            dict: A dictionary with keys "data" (an empty dictionary) and "error"
                   (the cleanup error code set to `ErrorCodes.none`).
         """
         return {"data": {}, "error": ErrorCodes.none}
@@ -184,7 +183,7 @@ class Executor:
         Sets the post-execution function.
 
         This method assigns a given function to be executed after the main execution.
-        
+
         Args:
             post_exec_func (function): A function to be set as the post-execution function.
         """
@@ -207,7 +206,7 @@ class Executor:
         Sets a manual stop function for the executor.
 
         Args:
-            manual_stop_func (function): A function that will be used to manually stop the executor. 
+            manual_stop_func (function): A function that will be used to manually stop the executor.
                                          This function should take no arguments.
         """
         self._manual_stop = MethodType(manual_stop_func, self)

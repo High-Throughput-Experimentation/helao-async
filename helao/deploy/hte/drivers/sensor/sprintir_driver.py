@@ -1,6 +1,4 @@
-""" A device class for the SprintIR-6S CO2 sensor.
-
-"""
+"""A device class for the SprintIR-6S CO2 sensor."""
 
 __all__ = []
 
@@ -11,11 +9,6 @@ import asyncio
 import serial
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
 from helao.core.error import ErrorCodes
 from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
@@ -27,6 +20,7 @@ from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 """ Notes:
 
@@ -241,7 +235,9 @@ class SprintIR:
         blanks = 0
         while True:
             if blanks == reset_after:
-                LOGGER.warning(f"Did not receive a co2 message from sensor after {reset_after} checks, resetting polling mode.")
+                LOGGER.warning(
+                    f"Did not receive a co2 message from sensor after {reset_after} checks, resetting polling mode."
+                )
                 self.com.write(b"K 2\r\n")
                 blanks = 0
             try:
@@ -435,5 +431,7 @@ class CO2MonExec(Executor):
     async def _post_exec(self):
         "Cleanup methods, return error state."
         if self.num_acqs > 0:
-            self.active.action.action_params["mean_co2_ppm"] = self.total / self.num_acqs
+            self.active.action.action_params["mean_co2_ppm"] = (
+                self.total / self.num_acqs
+            )
         return {"data": {}, "error": ErrorCodes.none}

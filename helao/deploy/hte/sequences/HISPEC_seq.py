@@ -1,9 +1,9 @@
 __all__ = [
     "HISPEC_CV",
     "HISPEC_EIS_only",
-    #"ECHEUVIS_CV_led",
-   # "ECHEUVIS_CA_led",
-    #"ECHEUVIS_CP_led",
+    # "ECHEUVIS_CV_led",
+    # "ECHEUVIS_CA_led",
+    # "ECHEUVIS_CP_led",
     "ECHEUVIS_postseq",
 ]
 
@@ -15,17 +15,19 @@ SEQUENCES = __all__
 
 
 def HISPEC_CV(
-    sequence_version: int = 1, # @Dan - what is this? -- this is a version number for the sequence, you should increment it when you modify sequence arguments and the experiment list
-    plate_id: int = 1, # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
-    plate_sample_no_list: list = [2], # @Dan - what is this? -- the sample_no is uniquely assigned to an x,y location on a material library according to its plate map which was defined at the synthesis step
+    sequence_version: int = 1,  # @Dan - what is this? -- this is a version number for the sequence, you should increment it when you modify sequence arguments and the experiment list
+    plate_id: int = 1,  # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
+    plate_sample_no_list: list = [
+        2
+    ],  # @Dan - what is this? -- the sample_no is uniquely assigned to an x,y location on a material library according to its plate map which was defined at the synthesis step
     cycles: int = 1,
-    Ival__A: float = 0.0015*0.045,
+    Ival__A: float = 0.0015 * 0.045,
     scanrate_voltsec: float = 0.01,
     cell_fill_wait: float = 60.0,
     Tval__s: float = 60,
     CP_Tval__s: float = 60,
     reservoir_electrolyte: Electrolyte = Electrolyte.hispeca,  # @Ben -- this is an enum for a common abbreviation we give to our electrolytes used in our screening protocols, they typically have an integer pH at the end, see helao.core.models.electrolyte and add one there if needed
-    reservoir_liquid_sample_no: int = 1,# @Dan -- what is this? -- this is the liquid sample number in the liquid sample database, you will need to 'create' a liquid sample for the electrolyte you're using, so that the cell is filled with a liquid sample that inherits the reservoir attributes
+    reservoir_liquid_sample_no: int = 1,  # @Dan -- what is this? -- this is the liquid sample number in the liquid sample database, you will need to 'create' a liquid sample for the electrolyte you're using, so that the cell is filled with a liquid sample that inherits the reservoir attributes
     solution_bubble_gas: str = "None",
     solution_ph: float = 0,
     Flow_during_SpEC: bool = False,
@@ -45,7 +47,7 @@ def HISPEC_CV(
     FrequencyNumber: int = 60,
     Duration__s: float = 0,  # Duration in seconds.
     AcqInterval__s: float = 0.1,
-    AcqInterval_CA_CP__s:float = 0.5,  # Time between data acq in seconds.
+    AcqInterval_CA_CP__s: float = 0.5,  # Time between data acq in seconds.
     SweepMode: str = "log",
     Repeats: int = 10,
     DelayFraction: float = 0.1,
@@ -53,28 +55,27 @@ def HISPEC_CV(
     measurement_area: float = 0.045,  # 2.4 mm diameter droplet
     liquid_volume_ml: float = 1.0,
     use_z_motor: bool = True,  # @Ben -- I think this should default to True
-    cell_engaged_z: float = 3.5, # # units of mm.
+    cell_engaged_z: float = 3.5,  # # units of mm.
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
-
     #######
-    #Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
+    # Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     # Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     # Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps. # temporarily uncommented to test a fixed V2
-    #Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
-    #scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
-    ):
+    # Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
+    # scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
+):
     epm = ExperimentPlanMaker()
     epm.add("HISPEC_sub_unloadall_customs", {})
     epm.add(
-            "HISPEC_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
+        "HISPEC_sub_disengage",
+        {
+            "clear_we": True,
+            "clear_ce": False,
+            "z_height": cell_disengaged_z,
+            "vent_wait": cell_vent_wait,
+        },
+    )
 
     for i, plate_sample in enumerate(plate_sample_no_list):
         if i > 0 and use_z_motor:
@@ -116,24 +117,22 @@ def HISPEC_CV(
                     "ECHEUVIS_sub_interrupt",
                     {"reason": "Restore flow and prepare for sample measurement."},
                 )
-        
+
         if not Flow_during_SpEC:
             epm.add("HISPEC_sub_stop_flow", {})
-
-        
 
         epm.add(
             "HISPEC_sub_OCV",
             {
                 "Tval__s": Tval__s,
-                "SampleRate":0.5,
-            }
-                )
-        
+                "SampleRate": 0.5,
+            },
+        )
+
         epm.add(
             "HISPEC_sub_PEIS",
             {
-                #"Vinit_vsRHE": Vinit_vsRHE,
+                # "Vinit_vsRHE": Vinit_vsRHE,
                 "Vamp__V": Vamp__V,
                 "Finit__Hz": Finit__Hz,
                 "Ffinal__Hz": Ffinal__Hz,
@@ -150,33 +149,36 @@ def HISPEC_CV(
                 "Bandwidth": Bandwidth,
                 "solution_ph": solution_ph,
                 "ref_vs_nhe": ref_vs_nhe,
-            }, from_global_exp_params={"min_offset_ocv": "Vinit__V"})
-        
+            },
+            from_global_exp_params={"min_offset_ocv": "Vinit__V"},
+        )
 
         epm.add(
             "HISPEC_sub_CP",
-            {"Ival__A" : Ival__A,
-            "Tval__s" : CP_Tval__s,
-            "AcqInterval__s": AcqInterval_CA_CP__s})
-        
+            {
+                "Ival__A": Ival__A,
+                "Tval__s": CP_Tval__s,
+                "AcqInterval__s": AcqInterval_CA_CP__s,
+            },
+        )
 
-        epm.add("HISPEC_sub_CA",
+        epm.add(
+            "HISPEC_sub_CA",
             {
                 # "Ival__A" : Ival__A,
-                "Tval__s" : Tval__s,
+                "Tval__s": Tval__s,
                 "AcqInterval__s": AcqInterval_CA_CP__s,
-            }, from_global_exp_params={"min_offset_ocv": "Vval__V"})
-        
-        
+            },
+            from_global_exp_params={"min_offset_ocv": "Vval__V"},
+        )
 
         epm.add(
             "HISPEC_sub_SpEC",
             {
-                #"Vinit_vsRHE": Vinit_vsRHE,
-
+                # "Vinit_vsRHE": Vinit_vsRHE,
                 # "Vapex1_vsRHE": Vapex1_vsRHE,
-                #"Vapex2_vsRHE": Vapex2_vsRHE,
-                #"Vfinal_vsRHE": Vfinal_vsRHE,
+                # "Vapex2_vsRHE": Vapex2_vsRHE,
+                # "Vfinal_vsRHE": Vfinal_vsRHE,
                 "scanrate_voltsec": scanrate_voltsec,
                 "samplerate_sec": samplerate_sec,
                 "cycles": cycles,
@@ -191,8 +193,13 @@ def HISPEC_CV(
                 "toggle1_init_delay": toggle1_init_delay,
                 "toggle1_duty": toggle1_duty,
                 # "OCV_vsRef": Vapex2_vsRHE,
-            # })
-            }, from_global_exp_params={"min_offset_ocv": "Vapex2_vsRHE", "CP_Ewe_V__mean_final":"Vapex1_vsRHE"} ) # temporarily commented this out to test a fixed V2
+                # })
+            },
+            from_global_exp_params={
+                "min_offset_ocv": "Vapex2_vsRHE",
+                "CP_Ewe_V__mean_final": "Vapex1_vsRHE",
+            },
+        )  # temporarily commented this out to test a fixed V2
 
     epm.add("ECHE_sub_unloadall_customs", {})
 
@@ -225,14 +232,16 @@ def HISPEC_CV(
 
 
 def HISPEC_EIS_only(
-    sequence_version: int = 1, # @Dan - what is this? -- this is a version number for the sequence, you should increment it when you modify sequence arguments and the experiment list
-    plate_id: int = 1, # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
-    plate_sample_no_list: list = [2], # @Dan - what is this? -- the sample_no is uniquely assigned to an x,y location on a material library according to its plate map which was defined at the synthesis step
+    sequence_version: int = 1,  # @Dan - what is this? -- this is a version number for the sequence, you should increment it when you modify sequence arguments and the experiment list
+    plate_id: int = 1,  # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
+    plate_sample_no_list: list = [
+        2
+    ],  # @Dan - what is this? -- the sample_no is uniquely assigned to an x,y location on a material library according to its plate map which was defined at the synthesis step
     reservoir_electrolyte: Electrolyte = Electrolyte.hispeca,  # @Ben -- this is an enum for a common abbreviation we give to our electrolytes used in our screening protocols, they typically have an integer pH at the end, see helao.core.models.electrolyte and add one there if needed
-    reservoir_liquid_sample_no: int = 1, # @Dan -- what is this? -- this is the liquid sample number in the liquid sample database, you will need to 'create' a liquid sample for the electrolyte you're using, so that the cell is filled with a liquid sample that inherits the reservoir attributes
+    reservoir_liquid_sample_no: int = 1,  # @Dan -- what is this? -- this is the liquid sample number in the liquid sample database, you will need to 'create' a liquid sample for the electrolyte you're using, so that the cell is filled with a liquid sample that inherits the reservoir attributes
     solution_bubble_gas: str = "None",
     solution_ph: float = 0,
-    #Vinit__V: float = 0.0,  # Initial value in volts or amps.
+    # Vinit__V: float = 0.0,  # Initial value in volts or amps.
     Vamp__V: float = 0.01,  # Amplitude value in volts
     Finit__Hz: float = 200000,  # Initial frequency in Hz.
     Ffinal__Hz: float = 1000,  # Final frequency in Hz.
@@ -252,15 +261,17 @@ def HISPEC_EIS_only(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     use_z_motor: bool = True,  # @Ben -- I think this should default to True
-    cell_engaged_z: float = 3.5, # units of mm.
+    cell_engaged_z: float = 3.5,  # units of mm.
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
     cell_fill_wait: float = 60,
 ):
     epm = ExperimentPlanMaker()
 
-    epm.add("HISPEC_sub_startup", {})  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
-    
+    epm.add(
+        "HISPEC_sub_startup", {}
+    )  # @Ben -- if you use this experiment, you'll need to update the hispec.yml config to include ECHEUVIS_exp under experiment_libraries
+
     if use_z_motor:
         epm.add(
             "ECHEUVIS_sub_disengage",
@@ -309,8 +320,8 @@ def HISPEC_EIS_only(
                     "flow_ce": True,
                     "z_height": cell_engaged_z,
                     "fill_wait": cell_fill_wait,
-                    "calibrate_intensity": False, #@Dan - kept this action but turned this flag to false to prevent it trying to access doric WLED - not sure if this will work... -- it should work because the references to doric_wled aren't going to be used
-                    "max_integration_time": int(10)
+                    "calibrate_intensity": False,  # @Dan - kept this action but turned this flag to false to prevent it trying to access doric WLED - not sure if this will work... -- it should work because the references to doric_wled aren't going to be used
+                    "max_integration_time": int(10),
                 },
             )
         else:
@@ -324,15 +335,15 @@ def HISPEC_EIS_only(
             "ECHE_sub_OCV",
             {
                 "Tval__s": 0.1,
-                "SampleRate":0.01,
-            }
-                )
+                "SampleRate": 0.01,
+            },
+        )
 
         epm.add(
             "HISPEC_sub_PEIS",
             {
-                #"Vinit_vsRHE": Vinit_vsRHE,
-                #"Vapex1_vsRHE": Vapex1_vsRHE,
+                # "Vinit_vsRHE": Vinit_vsRHE,
+                # "Vapex1_vsRHE": Vapex1_vsRHE,
                 "Vamp__V": Vamp__V,
                 "Finit__Hz": Finit__Hz,
                 "Ffinal__Hz": Ffinal__Hz,
@@ -349,7 +360,9 @@ def HISPEC_EIS_only(
                 "Bandwidth": Bandwidth,
                 "solution_ph": solution_ph,
                 "ref_vs_nhe": ref_vs_nhe,
-            }, from_global_exp_params={"Ewe_V__mean_final": "Vinit__V" })
+            },
+            from_global_exp_params={"Ewe_V__mean_final": "Vinit__V"},
+        )
 
     epm.add("ECHE_sub_unloadall_customs", {})
 
@@ -364,10 +377,11 @@ def HISPEC_EIS_only(
                 "fill_wait": cell_fill_wait,
             },
         )
-    
+
     epm.add("HISPEC_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
+
 
 # def ECHEUVIS_CP_led(
 #     sequence_version: int = 5,

@@ -1,4 +1,4 @@
-""" GP simulation server
+"""GP simulation server
 
 FastAPI server host for the GP modeling simulator.
 
@@ -16,10 +16,9 @@ from helao.helpers.premodels import Action
 from ...drivers.data.gpsim_driver import GPSim, GPSimExec
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
 
 def makeApp(server_key):
 
@@ -110,9 +109,9 @@ def makeApp(server_key):
     ):
         """Record simulated data."""
         active = await app.base.setup_and_contain_action()
-        active.action.action_params[
-            "orch_str"
-        ] = f"{active.action.orch_key} {active.action.orch_host}:{active.action.orch_port}"
+        active.action.action_params["orch_str"] = (
+            f"{active.action.orch_key} {active.action.orch_host}:{active.action.orch_port}"
+        )
         active.action.action_abbr = "GPSIM"
         executor = GPSimExec(
             active=active,

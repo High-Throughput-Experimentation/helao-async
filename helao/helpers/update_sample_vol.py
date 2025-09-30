@@ -3,10 +3,8 @@ from .print_message import print_message
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
 
 def update_vol(BS: SampleModel, delta_vol_ml: float, dilute: bool):
     """
@@ -30,7 +28,9 @@ def update_vol(BS: SampleModel, delta_vol_ml: float, dilute: bool):
         old_vol = BS.volume_ml
         tot_vol = old_vol + delta_vol_ml
         if tot_vol <= 0:
-            LOGGER.error("new volume is <= 0, setting it to zero and setting status to destroyed")
+            LOGGER.error(
+                "new volume is <= 0, setting it to zero and setting status to destroyed"
+            )
             BS.zero_volume()
             tot_vol = 0
         BS.volume_ml = tot_vol

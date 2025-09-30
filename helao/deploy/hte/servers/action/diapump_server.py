@@ -1,7 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-""" A FastAPI service definition for a diaphragm pump server.
-
-"""
+"""A FastAPI service definition for a diaphragm pump server."""
 
 __all__ = ["makeApp"]
 
@@ -39,7 +37,7 @@ def makeApp(server_key):
     @app.post("/stop_pump", tags=["private"])
     async def stop_pump():
         await app.driver.stop()
-    
+
     @app.post(f"/{server_key}/run_continuous", tags=["action"])
     async def run_continuous(
         action: Action = Body({}, embed=True),
@@ -54,18 +52,18 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/cancel_run_continuous", tags=["action"])
     async def cancel_run_continuous(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
-            exec_id: Optional[str] = None,
-        ):
-            """Stop flowrate & acquisition for given device_name."""
-            active = await app.base.setup_and_contain_action()
-            if active.action.action_params["exec_id"] is not None:
-                app.base.stop_executor(active.action.action_params["exec_id"])
-            else:
-                app.base.stop_all_executor_prefix("run_continuous", {})
-            finished_action = await active.finish()
-            return finished_action.as_dict()
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        exec_id: Optional[str] = None,
+    ):
+        """Stop flowrate & acquisition for given device_name."""
+        active = await app.base.setup_and_contain_action()
+        if active.action.action_params["exec_id"] is not None:
+            app.base.stop_executor(active.action.action_params["exec_id"])
+        else:
+            app.base.stop_all_executor_prefix("run_continuous", {})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     # @app.post(f"/{server_key}/dispense_byvolume", tags=["action"])
     # async def dispense_byvolume(

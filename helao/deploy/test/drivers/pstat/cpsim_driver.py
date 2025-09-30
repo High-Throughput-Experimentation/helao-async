@@ -4,11 +4,8 @@ import asyncio
 import functools
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-    
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.helpers.zstd_io import unzpickle
@@ -24,7 +21,9 @@ class CPSim:
         self.world_config = action_serv.world_cfg
         self.loaded_plate = self.config_dict["plate_id"]
         self.data_file = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),
+            os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+            ),
             "demos",
             "data",
             "oer13_cps.pzstd",

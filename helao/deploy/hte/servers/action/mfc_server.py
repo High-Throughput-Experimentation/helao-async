@@ -1,7 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-""" Serial MFC server
-
-"""
+"""Serial MFC server"""
 
 __all__ = ["makeApp"]
 
@@ -9,7 +7,13 @@ from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.core.servers.base_api import BaseAPI
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
 from ...drivers.mfc.alicat_driver import (
     AliCatMFC,
     MfcExec,
@@ -19,10 +23,9 @@ from ...drivers.mfc.alicat_driver import (
 )
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
 
 async def mfc_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
@@ -94,7 +97,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             stay_open: bool = False,
             duration: float = -1,
             acquisition_rate: float = 0.2,
-            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+            fast_samples_in: List[
+                Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+            ] = Body([], embed=True),
             exec_id: Optional[str] = None,
         ):
             """Set flow rate and record."""
@@ -123,7 +128,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
                 if active.action.action_params["device_name"] is None:
                     dev_dict = {}
                 else:
-                    dev_dict = {"device_name": active.action.action_params["device_name"]}
+                    dev_dict = {
+                        "device_name": active.action.action_params["device_name"]
+                    }
                 app.base.stop_all_executor_prefix("acquire_flowrate", dev_dict)
             finished_action = await active.finish()
             return finished_action.as_dict()
@@ -138,7 +145,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             stay_open: bool = False,
             duration: float = -1,
             acquisition_rate: float = 0.2,
-            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+            fast_samples_in: List[
+                Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+            ] = Body([], embed=True),
             exec_id: Optional[str] = None,
         ):
             """Set pressure and record."""
@@ -167,7 +176,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
                 if active.action.action_params["device_name"] is None:
                     dev_dict = {}
                 else:
-                    dev_dict = {"device_name": active.action.action_params["device_name"]}
+                    dev_dict = {
+                        "device_name": active.action.action_params["device_name"]
+                    }
                 app.base.stop_all_executor_prefix("acquire_pressure", dev_dict)
             finished_action = await active.finish()
             return finished_action.as_dict()
@@ -205,7 +216,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             active = await app.base.setup_and_contain_action(action_abbr="hold_valve")
-            await app.driver.hold_valve(active.action.action_params.get("device_name", None))
+            await app.driver.hold_valve(
+                active.action.action_params.get("device_name", None)
+            )
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -216,7 +229,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             active = await app.base.setup_and_contain_action(action_abbr="cancel_hold")
-            await app.driver.hold_cancel(active.action.action_params.get("device_name", None))
+            await app.driver.hold_cancel(
+                active.action.action_params.get("device_name", None)
+            )
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -273,7 +288,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
                 if active.action.action_params["device_name"] is None:
                     dev_dict = {}
                 else:
-                    dev_dict = {"device_name": active.action.action_params["device_name"]}
+                    dev_dict = {
+                        "device_name": active.action.action_params["device_name"]
+                    }
                 app.base.stop_all_executor_prefix("maintain_pressure", dev_dict)
             finished_action = await active.finish()
             return finished_action.as_dict()
@@ -361,6 +378,7 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             device_name: app.driver.dev_mfcs = devices[0], command: str = ""
         ):
             return app.driver._send(device_name, command)
+
 
 def makeApp(server_key):
 

@@ -1,5 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-""" A FastAPI service definition for a potentiostat device server, e.g. Gamry.
+"""A FastAPI service definition for a potentiostat device server, e.g. Gamry.
 
 andor_server uses the Executor model with helao.drivers.spec.andor.driver which decouples
 the hardware driver class from the action server base class.
@@ -24,10 +24,7 @@ from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI in
 from ...drivers.spec.andor.driver import AndorDriver, DriverStatus
 
 global LOGGER
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class AndorCooling(Executor):
@@ -60,7 +57,9 @@ class AndorCooling(Executor):
         """Set SensorCooling flag and wait for stabilization."""
         LOGGER.debug(f"setting cam.SensorCooling = {self.cooldown}")
         resp = self.driver.set_cooldown(self.cooldown)
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        error = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
         return {"error": error}
 
     async def _poll(self) -> dict:
@@ -100,7 +99,9 @@ class AndorAdjustND(Executor):
         """Run ND filter adjustment routine."""
         LOGGER.debug("Running driver.adjust_ND()")
         resp = self.driver.adjust_ND()
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        error = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
         return {"error": error, "data": resp.data}
 
 
@@ -117,7 +118,9 @@ class AndorAcquire(Executor):
 
             # link attrs for convenience
             self.action_params = self.active.action.action_params
-            self.active.action.action_params['action_path']=str(self.active.action.action_output_dir)
+            self.active.action.action_params["action_path"] = str(
+                self.active.action.action_output_dir
+            )
 
             self.driver = self.active.driver
 
@@ -147,7 +150,9 @@ class AndorAcquire(Executor):
             LOGGER.debug("setting trigger")
             resp = self.driver.set_trigger(self.external_trigger)
             error = (
-                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+                ErrorCodes.none
+                if resp.response == "success"
+                else ErrorCodes.critical_error
             )
         except Exception:
             error = ErrorCodes.critical_error
@@ -157,7 +162,10 @@ class AndorAcquire(Executor):
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
         resp = self.driver.get_data(
-            frames=self.frames_per_poll, total_duration=self.duration, external=self.external_trigger, first_tick=self.first_tick
+            frames=self.frames_per_poll,
+            total_duration=self.duration,
+            external=self.external_trigger,
+            first_tick=self.first_tick,
         )
         if not resp.data:
             LOGGER.info("No data received.")
@@ -165,7 +173,9 @@ class AndorAcquire(Executor):
         if self.first_tick is None:
             self.first_tick = resp.data["tick_time"][0]
         latest_tick = resp.data["tick_time"][-1]
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        error = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
         if resp.status == DriverStatus.ok:
             status = HloStatus.finished
         else:
@@ -180,7 +190,9 @@ class AndorAcquire(Executor):
     async def _post_exec(self):
         resp = self.driver.cleanup()
 
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        error = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
         return {"error": error, "data": {}}
 
 

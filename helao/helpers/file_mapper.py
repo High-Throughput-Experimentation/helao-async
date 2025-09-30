@@ -23,22 +23,23 @@ class FileMapper:
     Methods:
         __init__(save_path: Union[str, Path]):
             Initializes the FileMapper with the given save path.
-        
+
         locate(p: str) -> Union[str, None]:
             Locates the file path based on the given relative path and returns the absolute path if found.
-        
+
         read_hlo(p: str, retries: int = 3) -> Union[tuple, None]:
             Reads an HLO file from the given relative path with a specified number of retries.
-        
+
         read_yml(p: str) -> dict:
             Reads a YAML file from the given relative path and returns its contents as a dictionary.
-        
+
         read_lines(p: str) -> list:
             Reads a text file from the given relative path and returns its contents as a list of lines.
-        
+
         read_bytes(p: str) -> bytes:
             Reads a binary file from the given relative path and returns its contents as bytes.
     """
+
     def __init__(self, save_path: Union[str, Path]):
         """
         Initializes the FileMapper object with the given save path.

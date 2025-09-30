@@ -8,7 +8,9 @@ class _cam(BaseModel):
     name: Optional[str] = None
     file_name: Optional[str] = None
     file_path: Optional[str] = None
-    sample_out_type: Optional[str] = None  # should not be assembly, only liquid, solid...
+    sample_out_type: Optional[str] = (
+        None  # should not be assembly, only liquid, solid...
+    )
     ttl_start: bool = False
     ttl_continue: bool = False
     ttl_done: bool = False
@@ -16,11 +18,13 @@ class _cam(BaseModel):
     source: Optional[str] = None
     dest: Optional[str] = None
 
+
 class _positiontype(str, Enum):
     tray = "tray"
     custom = "custom"
     next_empty_vial = "next_empty_vial"
     next_full_vial = "next_full_vial"
+
 
 class GCsampletype(str, Enum):
     liquid = "liquid"

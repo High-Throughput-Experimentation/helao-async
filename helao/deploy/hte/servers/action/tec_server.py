@@ -1,7 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-"""Thermoelectric cooler server
-
-"""
+"""Thermoelectric cooler server"""
 
 __all__ = ["makeApp"]
 
@@ -9,8 +7,18 @@ from typing import List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.core.servers.base_api import BaseAPI
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
-from ...drivers.temperature_control.mecom_driver import MeerstetterTEC, TECMonExec, TECWaitExec
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
+from ...drivers.temperature_control.mecom_driver import (
+    MeerstetterTEC,
+    TECMonExec,
+    TECWaitExec,
+)
 
 
 def makeApp(server_key):
@@ -29,7 +37,9 @@ def makeApp(server_key):
         action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
     ):
         """Record TEC values (does not affect setpoint or control)."""
         active = await app.base.setup_and_contain_action()
@@ -72,7 +82,7 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        "Enable TEC control."""
+        "Enable TEC control." ""
         active = await app.base.setup_and_contain_action(action_abbr="enableTEC")
         app.driver.enable()
         finished_action = await active.finish()
@@ -118,5 +128,5 @@ def makeApp(server_key):
                 executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()
-    
+
     return app

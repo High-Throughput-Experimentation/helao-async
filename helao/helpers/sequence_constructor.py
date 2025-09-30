@@ -10,7 +10,7 @@ def constructor(
     sequence_function: callable,
     params: dict = {},
     sequence_label: Optional[str] = None,
-    data_request_id: Optional[UUID] = None
+    data_request_id: Optional[UUID] = None,
 ) -> Sequence:
     """
     Constructs a Sequence object by invoking a sequence function with specified parameters.

@@ -56,10 +56,7 @@ from ...drivers.pstat.biologic.technique import (
 
 
 global LOGGER
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class BiologicExec(Executor):

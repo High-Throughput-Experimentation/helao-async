@@ -1,4 +1,4 @@
-""" HelaoDriver wrapper around easy-biologic package for Biologic potentiostats
+"""HelaoDriver wrapper around easy-biologic package for Biologic potentiostats
 
 https://github.com/bicarlsen/easy-biologic
 
@@ -18,11 +18,7 @@ from typing import Optional
 # save a default log file system temp
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import numpy as np
 import pandas as pd
 import easy_biologic as ebl
@@ -265,20 +261,26 @@ class BiologicDriver(HelaoDriver):
             ]
 
             data = pd.DataFrame(parsed).to_dict(orient="list")
-            data = {program.field_remap[k]: v for k, v in data.items()}            
+            data = {program.field_remap[k]: v for k, v in data.items()}
             values = pd.DataFrame(values_list).to_dict(orient="list")
             values = {f"_{k}": v for k, v in values.items()}
 
             data.update(values)
-            
-            if 'modulus' in data.keys():
+
+            if "modulus" in data.keys():
                 try:
-                    data["X_ohm"] = (-np.array(data['modulus']) * np.sin(np.array(data['phase']))).tolist()
-                    data["R_ohm"] = (np.array(data['modulus']) * np.cos(np.array(data['phase']))).tolist()
+                    data["X_ohm"] = (
+                        -np.array(data["modulus"]) * np.sin(np.array(data["phase"]))
+                    ).tolist()
+                    data["R_ohm"] = (
+                        np.array(data["modulus"]) * np.cos(np.array(data["phase"]))
+                    ).tolist()
                 except Exception:
-                    LOGGER.warning("Unexpected value in modulus or phase data, unable to calculate X_ohm and R_ohm.")
-                    data["X_ohm"] = [np.nan] * len(data['modulus'])
-                    data["R_ohm"] = [np.nan] * len(data['modulus'])
+                    LOGGER.warning(
+                        "Unexpected value in modulus or phase data, unable to calculate X_ohm and R_ohm."
+                    )
+                    data["X_ohm"] = [np.nan] * len(data["modulus"])
+                    data["R_ohm"] = [np.nan] * len(data["modulus"])
 
             response = DriverResponse(
                 response=DriverResponseType.success,

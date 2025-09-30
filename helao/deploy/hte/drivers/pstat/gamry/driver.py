@@ -7,16 +7,13 @@ All public methods must return a DriverResponse.
 """
 
 import sys
+
 sys.coinit_flags = 0x0
 
 # save a default log file system temp
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import comtypes
 import comtypes.client as client
 import psutil
@@ -65,9 +62,7 @@ class GamryDriver(HelaoDriver):
         self.connection_raised = False
         self.stopping = False
         self.connect()
-        LOGGER.debug(
-            f"connected to {self.device_name} on device_id {self.device_id}"
-        )
+        LOGGER.debug(f"connected to {self.device_name} on device_id {self.device_id}")
 
     def connect(self) -> DriverResponse:
         try:
@@ -78,7 +73,9 @@ class GamryDriver(HelaoDriver):
             )
             devices = client.CreateObject("GamryCOM.GamryDeviceList")
             self.device_name = devices.EnumSections()[self.device_id]
-            self.model = GAMRY_DEVICES.get(self.device_name.split("-")[0], GAMRY_DEVICES["DEFAULT"])
+            self.model = GAMRY_DEVICES.get(
+                self.device_name.split("-")[0], GAMRY_DEVICES["DEFAULT"]
+            )
             self.pstat = client.CreateObject(self.model.device)
             self.pstat.Init(self.device_name)
             self.pstat.Open()
@@ -94,7 +91,6 @@ class GamryDriver(HelaoDriver):
             )
         return response
 
-
     def get_status(self, retries: int = 5) -> DriverResponse:
         """Return current driver status."""
         if self.pstat is not None:
@@ -102,7 +98,9 @@ class GamryDriver(HelaoDriver):
                 self.state = self.pstat.State()
                 state = dict([x.split("\t") for x in self.state.split("\r\n") if x])
                 response = DriverResponse(
-                    response=DriverResponseType.success, data=state, status=DriverStatus.ok
+                    response=DriverResponseType.success,
+                    data=state,
+                    status=DriverStatus.ok,
                 )
             except Exception:
                 LOGGER.error("get_status failed", exc_info=True)

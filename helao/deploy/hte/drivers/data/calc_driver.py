@@ -1,4 +1,4 @@
-""" Local data calculation server
+"""Local data calculation server
 
 This server performs calculations on locally saved data for in-situ amendment of running
 sequences, i.e. repeated experiment looping, thresholding, etc.
@@ -8,6 +8,7 @@ Calc.fill_syringe_volume_check() and Calc.check_co2_purge_level() need to be upd
 handle orchestrator requests originating outside of the config launch group.
 
 """
+
 import time
 import os
 import numpy as np
@@ -17,11 +18,8 @@ from scipy.signal import savgol_filter
 from ruamel.yaml import YAML
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.base import Base, Active
 from helao.helpers.premodels import Experiment
 from helao.helpers.file_mapper import FileMapper
@@ -95,7 +93,9 @@ class Calc:
         ymls = sorted([x for x in paths if x.endswith(".yml")])
 
         if len(hlos) != len(ymls):
-            LOGGER.error(f"mismatch number of data files ({len(hlos)}), metadata files ({len(ymls)})")
+            LOGGER.error(
+                f"mismatch number of data files ({len(hlos)}), metadata files ({len(ymls)})"
+            )
             return {}
 
         hlo_dict = {}
@@ -371,9 +371,11 @@ class Calc:
             pred[k]["rsi"] = rsi  # raw indices from full vector
 
             for bin_key in ("bin", "smooth", "smooth_refadj", "smooth_refadj_scl"):
-                pred[k][bin_key]["wl"] = pred["T"]["full"]["wl"][rsi]  # center index of bin
+                pred[k][bin_key]["wl"] = pred["T"]["full"]["wl"][
+                    rsi
+                ]  # center index of bin
                 pred[k][bin_key]["epoch"] = pred[k]["full"]["epoch"]
-                
+
             hv = [
                 1239.8 / x for x in pred[k]["bin"]["wl"]
             ]  # convert binned wl[nm] to energy[eV]
@@ -680,9 +682,11 @@ class Calc:
                         "sample_label": specd[uk]["smplist"],
                         "action_uuids": specd[uk]["action_uuids"],
                         "epoch": sd["bin"]["epoch"].tolist(),
-                        "wavelength": sd["bin"]["wl"].tolist()
-                        if bk.startswith("smooth")
-                        else bd["wl"].tolist(),
+                        "wavelength": (
+                            sd["bin"]["wl"].tolist()
+                            if bk.startswith("smooth")
+                            else bd["wl"].tolist()
+                        ),
                         "data": bd[ik].tolist(),
                     }
                     arraydict[f"{arrayname}"] = ad
@@ -715,15 +719,21 @@ class Calc:
             elif purge_if == "above":
                 loop_condition = mean_co2_ppm > co2_ppm_thresh
             else:
-                LOGGER.info("'purge_if' parameter was an unsupported string, using value 'above'")
+                LOGGER.info(
+                    "'purge_if' parameter was an unsupported string, using value 'above'"
+                )
                 loop_condition = mean_co2_ppm > co2_ppm_thresh
         else:
             purge_if = float(purge_if)
             if abs(purge_if) >= 1.0:
-                LOGGER.info("abs('purge_if') parameter is numerical and > 1.0, treating as percentage of threshold")
+                LOGGER.info(
+                    "abs('purge_if') parameter is numerical and > 1.0, treating as percentage of threshold"
+                )
                 purge_if = purge_if / 100
             else:
-                LOGGER.info("abs('purge_if') parameter is numerical and < 1.0, treating as fraction of threshold")
+                LOGGER.info(
+                    "abs('purge_if') parameter is numerical and < 1.0, treating as fraction of threshold"
+                )
             ## old behavior: signed value determines over or under threshold
             ## purge_if<0 means purge if current ppm is below pct diff
             ## purge_if>0 means purge if current ppm is above pct diff
@@ -759,9 +769,13 @@ class Calc:
                 break
 
         if loop_condition and num_consecutive_repeats > max_repeats:
-            LOGGER.info(f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_repeats ({max_repeats}) reached. Exiting.")
+            LOGGER.info(
+                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_repeats ({max_repeats}) reached. Exiting."
+            )
         elif loop_condition:
-            LOGGER.info(f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition. Looping.")
+            LOGGER.info(
+                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition. Looping."
+            )
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
                 experiment_params=repeat_experiment_params,
@@ -782,7 +796,9 @@ class Calc:
             LOGGER.info(f"insert_experiment got response: {resp}")
             LOGGER.info(f"insert_experiment returned error: {error}")
         else:
-            LOGGER.info(f"mean_co2_ppm: {mean_co2_ppm} meets threshold condition. Exiting.")
+            LOGGER.info(
+                f"mean_co2_ppm: {mean_co2_ppm} meets threshold condition. Exiting."
+            )
 
         return_dict = {
             "epoch": float(time.time()),
@@ -805,7 +821,9 @@ class Calc:
             fill_needed = True
             fill_vol = target_volume_ul - present_volume_ul
             repeat_experiment_params = {"fill_volume_ul": fill_vol}
-            LOGGER.info(f"current syringe volume: {present_volume_ul} does not meet threshold condition. Refilling")
+            LOGGER.info(
+                f"current syringe volume: {present_volume_ul} does not meet threshold condition. Refilling"
+            )
         elif check_volume_ul == 0:
             fill_needed = True
             fill_vol = target_volume_ul - present_volume_ul
@@ -813,7 +831,9 @@ class Calc:
             LOGGER.info(f"Refilling to target volume: {target_volume_ul}")
         else:
             fill_needed = False
-            LOGGER.info(f"current syringe volume: {present_volume_ul} does meet threshold condition. No action needed.")
+            LOGGER.info(
+                f"current syringe volume: {present_volume_ul} does meet threshold condition. No action needed."
+            )
 
         if fill_needed:
             rep_exp = Experiment(

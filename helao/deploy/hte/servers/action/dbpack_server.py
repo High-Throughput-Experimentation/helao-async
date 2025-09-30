@@ -1,8 +1,8 @@
 # shell: uvicorn motion_server:app --reload
-""" Data packaging server
+"""Data packaging server
 
 The data packaging server collates finished actions into processes.
-Finished actions which do not contribute process information are pushed to 
+Finished actions which do not contribute process information are pushed to
 """
 
 __all__ = ["makeApp"]

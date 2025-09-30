@@ -1,4 +1,3 @@
-
 """
 This module defines the core classes and methods for the Helao driver framework.
 
@@ -17,6 +16,7 @@ Functions:
     HelaoDriver.disconnect(self) -> DriverResponse: Release connection to resource.
     DriverPoller.get_data(self) -> DriverResponse: Method to be implemented by subclasses to return a dictionary of polled values.
 """
+
 import asyncio
 from abc import ABC, abstractmethod
 from enum import StrEnum
@@ -25,10 +25,7 @@ from dataclasses import dataclass, field
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class DriverStatus(StrEnum):
@@ -147,7 +144,7 @@ class HelaoDriver(ABC):
         """
         Returns the creation timestamp formatted as a string.
 
-        The timestamp is formatted as "YYYY-MM-DD HH:MM:SS,mmm" where "mmm" 
+        The timestamp is formatted as "YYYY-MM-DD HH:MM:SS,mmm" where "mmm"
         represents milliseconds.
 
         Returns:
@@ -207,19 +204,19 @@ class DriverPoller:
     --------
     __init__(driver: HelaoDriver, wait_time: float = 0.05) -> None
         Initializes the DriverPoller with the given driver and wait time.
-    
+
     async _start_polling()
         Starts the polling process by raising a signal.
-    
+
     async _stop_polling()
         Stops the polling process by raising a signal.
-    
+
     async _poll_signal_loop()
         An internal loop that waits for polling signals to start or stop polling.
-    
+
     async _poll_sensor_loop()
         An internal loop that performs the actual polling of the driver at regular intervals.
-    
+
     get_data() -> DriverResponse
         A placeholder method to retrieve data from the driver. Should be implemented by subclasses.
     """
@@ -299,8 +296,8 @@ class DriverPoller:
         """
         Asynchronous loop that continuously polls for signals.
 
-        This method runs an infinite loop that waits for a signal from the 
-        `poll_signalq` queue. When a signal is received, it sets the `polling` 
+        This method runs an infinite loop that waits for a signal from the
+        `poll_signalq` queue. When a signal is received, it sets the `polling`
         attribute and logs the event.
 
         Returns:
@@ -315,11 +312,11 @@ class DriverPoller:
         Asynchronous loop that continuously polls a sensor for data.
 
         This method runs indefinitely, checking if polling is enabled and, if so,
-        retrieves data from the sensor. If data is received, it updates the 
-        `live_dict` with the new data and the timestamp of the last update. If a 
+        retrieves data from the sensor. If data is received, it updates the
+        `live_dict` with the new data and the timestamp of the last update. If a
         base hook is defined, it also sends the data to the base hook.
 
-        The loop sleeps for a duration specified by `self.wait_time` between each 
+        The loop sleeps for a duration specified by `self.wait_time` between each
         polling attempt.
 
         Attributes:

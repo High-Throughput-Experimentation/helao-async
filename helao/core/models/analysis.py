@@ -1,4 +1,9 @@
-__all__ = ["AnalysisModel", "ShortAnalysisModel", "AnalysisDataModel", "AnalysisOutputModel"]
+__all__ = [
+    "AnalysisModel",
+    "ShortAnalysisModel",
+    "AnalysisDataModel",
+    "AnalysisOutputModel",
+]
 
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union, Dict
@@ -16,6 +21,7 @@ class ShortAnalysisModel(BaseModel, HelaoDict):
     hlo_version: Optional[str] = Field(default_factory=get_hlo_version)
     analysis_uuid: Optional[UUID] = None
     analysis_timestamp: Optional[datetime] = None
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.analysis_timestamp is None:
@@ -61,10 +67,11 @@ class AnalysisModel(ShortAnalysisModel):
 
 class AnalysisInput(ABC):
     process_params: dict
-    
+
     @abstractmethod
     def get_datamodels(self, *args, **kwargs) -> List[AnalysisDataModel]:
         return NotImplemented
+
 
 class AnalysisOutput(BaseModel):
     """
@@ -79,4 +86,5 @@ class AnalysisOutput(BaseModel):
         Subclass this base class to define custom analysis output models
         with additional attributes as needed for your analysis workflow.
     """
+
     output_type: str

@@ -878,6 +878,7 @@ def ANEC_CA_pretreat(
 
     return epm.planned_experiments
 
+
 def ANEC_CA_DOE_demo(
     sequence_version: int = 1,
     plate_id: int = 4534,
@@ -931,7 +932,6 @@ def ANEC_CA_DOE_demo(
         {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
-
     epm.add(
         "ANEC_sub_CA",
         {
@@ -962,6 +962,7 @@ def ANEC_CA_DOE_demo(
     epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     return epm.planned_experiments
+
 
 def ANEC_CA_DOE_demo_headspace(
     sequence_version: int = 1,
@@ -1010,7 +1011,6 @@ def ANEC_CA_DOE_demo_headspace(
         {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
-
     epm.add(
         "ANEC_sub_CA",
         {
@@ -1035,6 +1035,7 @@ def ANEC_CA_DOE_demo_headspace(
     epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     return epm.planned_experiments
+
 
 def ANEC_repeat_CA(
     sequence_version: int = 1,

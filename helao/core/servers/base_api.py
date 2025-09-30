@@ -24,10 +24,7 @@ from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class BaseAPI(HelaoFastAPI):

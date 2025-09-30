@@ -33,6 +33,7 @@ class BaseAnalysis:
         export_analysis(bucket: str, region: str, dummy: bool = True, global_sample_label: Optional[str] = None) -> Tuple[dict, dict]:
             Exports the analysis results to a specified S3 bucket and returns the analysis model and outputs.
     """
+
     analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID
@@ -43,7 +44,7 @@ class BaseAnalysis:
     run_type: str
     technique_name: str
     analysis_codehash: str
-    
+
     def gen_uuid(self, global_sample_label: Optional[str] = None):
         """
         Generates a UUID for the analysis based on various attributes.
@@ -64,7 +65,7 @@ class BaseAnalysis:
         """
         input_data_models = self.inputs.get_datamodels(global_sample_label)
         if global_sample_label is None:
-            ru_data = [x for x in input_data_models if x.run_use==RunUse.data]
+            ru_data = [x for x in input_data_models if x.run_use == RunUse.data]
             if ru_data:
                 global_sample_label = ru_data[0].global_sample_label
         hash_rep = {
@@ -107,7 +108,7 @@ class BaseAnalysis:
         """
         input_data_models = self.inputs.get_datamodels(global_sample_label)
         if global_sample_label is None:
-            ru_data = [x for x in input_data_models if x.run_use==RunUse.data]
+            ru_data = [x for x in input_data_models if x.run_use == RunUse.data]
             if ru_data:
                 global_sample_label = ru_data[0].global_sample_label
 

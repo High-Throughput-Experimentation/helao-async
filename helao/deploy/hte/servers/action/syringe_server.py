@@ -1,7 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-""" A FastAPI service definition for a syringe pump server.
-
-"""
+"""A FastAPI service definition for a syringe pump server."""
 
 __all__ = ["makeApp"]
 

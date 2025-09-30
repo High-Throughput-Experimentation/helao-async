@@ -45,33 +45,42 @@ class Variable:
             raise Exception(error_msg)
 
     def add_to_favorites(self) -> int:
-        str_sql1 = sql.SQL("""SELECT "id" FROM "stations" WHERE "name" = {station_name}""").format(
-            station_name = sql.Literal(self._station_name),
+        str_sql1 = sql.SQL(
+            """SELECT "id" FROM "stations" WHERE "name" = {station_name}"""
+        ).format(
+            station_name=sql.Literal(self._station_name),
         )
         station_id = query(str_sql1)
 
-        str_sql2 = sql.SQL("""UPDATE "opcVariables" SET "exportFavorite" = true WHERE "stationId" = '{stationId}' AND "nodeId" = {nodeId} RETURNING "id" """).format(
-            stationId = sql.Literal(station_id[0][0]),
-            nodeId = sql.Literal(self._node_id),
+        str_sql2 = sql.SQL(
+            """UPDATE "opcVariables" SET "exportFavorite" = true WHERE "stationId" = '{stationId}' AND "nodeId" = {nodeId} RETURNING "id" """
+        ).format(
+            stationId=sql.Literal(station_id[0][0]),
+            nodeId=sql.Literal(self._node_id),
         )
         res = query(str_sql2)
         script_log.debug(f"OPC variable with id: {res[0][0]} added to favorites ")
         return res[0][0]
 
     def remove_from_favorites(self) -> int:
-        str_sql1 = sql.SQL("""SELECT "id" FROM "stations" WHERE "name" = {station_name}""").format(
-            station_name = sql.Literal(self._station_name),
+        str_sql1 = sql.SQL(
+            """SELECT "id" FROM "stations" WHERE "name" = {station_name}"""
+        ).format(
+            station_name=sql.Literal(self._station_name),
         )
         station_id = query(str_sql1)
 
-        str_sql2 = sql.SQL("""UPDATE "opcVariables" SET "exportFavorite" = false WHERE "stationId" = '{stationId}' AND "nodeId" = {nodeId} RETURNING "id" """).format(
-            stationId = sql.Literal(station_id[0][0]),
-            nodeId = sql.Literal(self._node_id),
+        str_sql2 = sql.SQL(
+            """UPDATE "opcVariables" SET "exportFavorite" = false WHERE "stationId" = '{stationId}' AND "nodeId" = {nodeId} RETURNING "id" """
+        ).format(
+            stationId=sql.Literal(station_id[0][0]),
+            nodeId=sql.Literal(self._node_id),
         )
         res = query(str_sql2)
         script_log.debug(f"OPC variable with id: {res[0][0]} removed from favorites ")
         return res[0][0]
-    
+
+
 class Station:
     def __init__(self, station_name: str, app_config: dict) -> None:
         self._station_name = station_name
@@ -85,7 +94,9 @@ class Station:
                 break
 
         if self._connection_options is None:
-            raise Exception(f'Configuration for station with name "{station_name}" not found')
+            raise Exception(
+                f'Configuration for station with name "{station_name}" not found'
+            )
         else:
             script_log.debug(
                 f'Successfully loaded station configuration for station with name "{station_name}"'
@@ -135,16 +146,22 @@ class Station:
                 f'Failed to create variable with node id: "{node_id}", error message: {e}'
             )
             raise Exception(e)
-        
+
     def remove_all_from_favorites(self) -> None:
-        str_sql1 = sql.SQL("""SELECT "id" FROM "stations" WHERE "name" = {station_name}""").format(
-            station_name = sql.Literal(self._station_name),
+        str_sql1 = sql.SQL(
+            """SELECT "id" FROM "stations" WHERE "name" = {station_name}"""
+        ).format(
+            station_name=sql.Literal(self._station_name),
         )
         station_id = query(str_sql1)
 
-        str_sql2 = sql.SQL("""UPDATE "opcVariables" SET "exportFavorite" = false WHERE "stationId" = '{stationId}' """).format(
-            stationId = sql.Literal(station_id[0][0]),
+        str_sql2 = sql.SQL(
+            """UPDATE "opcVariables" SET "exportFavorite" = false WHERE "stationId" = '{stationId}' """
+        ).format(
+            stationId=sql.Literal(station_id[0][0]),
         )
         res = query(str_sql2)
-        script_log.debug(f"All OPC variables with station id: {station_id[0][0]} removed from favorites")
+        script_log.debug(
+            f"All OPC variables with station id: {station_id[0][0]} removed from favorites"
+        )
         return None

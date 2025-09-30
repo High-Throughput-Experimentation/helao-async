@@ -39,6 +39,7 @@ class ShortActionModel(BaseModel, HelaoDict):
         orch_host (Optional[str]): Hostname of the orchestrator.
         orch_port (Optional[int]): Port of the orchestrator.
     """
+
     hlo_version: Optional[str] = Field(default_factory=get_hlo_version)
     action_uuid: Optional[UUID] = None
     action_output_dir: Optional[Path] = None
@@ -98,6 +99,7 @@ class ActionModel(ShortActionModel):
         from_global_act_params (dict): Parameters received from global context.
         to_global_params (Union[list, dict]): Parameters to pass to global context.
     """
+
     orchestrator: MachineModel = MachineModel()
     access: str = "hte"
     dummy: bool = False

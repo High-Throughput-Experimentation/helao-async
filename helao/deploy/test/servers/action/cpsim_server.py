@@ -1,4 +1,4 @@
-""" CP simulation server
+"""CP simulation server
 
 FastAPI server host for the OER screening simulator.
 

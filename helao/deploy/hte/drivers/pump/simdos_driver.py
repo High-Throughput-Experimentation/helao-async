@@ -1,6 +1,4 @@
-""" A device class for the KNF SIMDOS RC-P series diaphragm pump.
-
-"""
+"""A device class for the KNF SIMDOS RC-P series diaphragm pump."""
 
 __all__ = []
 
@@ -11,11 +9,8 @@ from enum import IntEnum, Enum
 
 # import traceback
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.error import ErrorCodes
 from helao.core.servers.base import Base
@@ -79,22 +74,25 @@ FADIAG = [
     "no encoder sensor signal",
 ]
 
+
 class PumpMode(IntEnum):
     continuous = 0
     volume = 1
     rate = 2
+
 
 class PumpParam(Enum):
     rate = "RV"
     time = "DT"
     volume = "DV"
 
+
 PUMPLIMS = {
     PumpParam.rate: (30, 20000),
     PumpParam.time: (100, 99595999),
-    PumpParam.volume: (30, 9999999)
-    
+    PumpParam.volume: (30, 9999999),
 }
+
 
 def str2bin(val: str):
     try:
@@ -141,7 +139,9 @@ class SIMDOS:
             if self.poll_signalq.full():
                 self.poll_signalq.get_nowait()  # unsure if we should set polling directly, do normal put, or put_nowait
             self.polling = True
-            LOGGER.warning("could not raise start signal, forcing polling loop to start")
+            LOGGER.warning(
+                "could not raise start signal, forcing polling loop to start"
+            )
 
     async def stop_polling(self):
         LOGGER.info("got 'stop_polling' request, raising signal")
@@ -157,7 +157,6 @@ class SIMDOS:
             self.polling = False
             LOGGER.warning("could not raise start signal, forcing polling loop to stop")
 
-
     async def poll_signal_loop(self):
         while True:
             self.polling = await self.poll_signalq.get()
@@ -170,11 +169,7 @@ class SIMDOS:
         self.com.flush()
         full_resp = self.com.readlines()
         # keep only ack responses
-        resp = [
-            x
-            for x in full_resp
-            if x.decode("ascii").startswith("\x06")
-        ]
+        resp = [x for x in full_resp if x.decode("ascii").startswith("\x06")]
         # strip frame
         resp = [x.decode("ascii").split("\x06\x02")[-1].split("\x03")[0] for x in resp]
         if not resp:
@@ -418,6 +413,7 @@ class RunExec(Executor):
             LOGGER.info("could not stop pump")
             error = ErrorCodes.cmd_error
         return {"error": error}
+
 
 #     async def _post_exec(self):
 #         LOGGER.info("PumpExec running cleanup methods.")

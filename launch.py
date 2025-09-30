@@ -51,7 +51,6 @@ from helao.helpers import helao_logging as logging
 LAUNCH_LOGGER: Logger = logging.make_logger(__file__)
 
 
-
 class Pidd:
     """
     A class to manage process IDs (PIDs) for various servers.
@@ -461,7 +460,9 @@ def launcher(confArg, confDict, helao_repo_root, extraopt=""):
     pidd = Pidd(
         pidFile=f"pids_{confPrefix}_{extraopt}.pck", pidPath=helaodirs.states_root
     )
-    if not validateConfig(PIDD=pidd, confDict=confDict, helao_repo_root=helao_repo_root):
+    if not validateConfig(
+        PIDD=pidd, confDict=confDict, helao_repo_root=helao_repo_root
+    ):
         LAUNCH_LOGGER.error(f"Configuration for '{confPrefix}' is invalid.")
         raise Exception(f"Configuration for '{confPrefix}' is invalid.")
     else:
@@ -682,7 +683,10 @@ def main():
                 LAUNCH_LOGGER.error(f"Error compressing log: {old_log}", exc_info=True)
 
     pidd = launcher(
-        confArg=confArg, confDict=config, helao_repo_root=helao_repo_root, extraopt=extraopt
+        confArg=confArg,
+        confDict=config,
+        helao_repo_root=helao_repo_root,
+        extraopt=extraopt,
     )
 
     def hotkey_msg():

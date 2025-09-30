@@ -6,7 +6,7 @@ class Electrolyte(str, Enum):
     slf10 = "SLF10"
     oer10 = "OER10"
     pslf10 = "PSLF10"
-    hispeca = "HISPEC-A" # HISPEC acid screening - 0.1 M HClO4 in 0.9 M NaClO4
+    hispeca = "HISPEC-A"  # HISPEC acid screening - 0.1 M HClO4 in 0.9 M NaClO4
     oer9 = "OER9"
     slf7 = "SLF7"
     slf9 = "SLF9"
@@ -19,4 +19,3 @@ class Electrolyte(str, Enum):
     fcn7 = "FCN7"
     her1 = "HER1"
     other = "other-see-comment"
-    

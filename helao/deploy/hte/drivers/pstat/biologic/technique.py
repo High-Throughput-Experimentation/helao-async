@@ -10,20 +10,20 @@ from enum import StrEnum
 
 # class IRange(StrEnum):
 #     p100 = "p100"
-#     n1   = "n1"  
-#     n10  = "n10" 
+#     n1   = "n1"
+#     n10  = "n10"
 #     n100 = "n100"
-#     u1   = "u1"  
-#     u10  = "u10" 
+#     u1   = "u1"
+#     u10  = "u10"
 #     u100 = "u100"
-#     m1   = "m1"  
-#     m10  = "m10" 
+#     m1   = "m1"
+#     m10  = "m10"
 #     m100 = "m100"
 #     a1   = "a1"    # 1 amp
 
-#     KEEP    = "KEEP"   
+#     KEEP    = "KEEP"
 #     BOOSTER = "BOOSTER"
-#     AUTO    = "AUTO"   
+#     AUTO    = "AUTO"
 
 # class ERange(StrEnum):
 #     v2_5 = "v2_5"
@@ -31,9 +31,11 @@ from enum import StrEnum
 #     v10 = "v10"
 #     AUTO = "AUTO"
 
+
 class SweepMode(StrEnum):
     LINEAR = "lin"
-    LOG    = "log"
+    LOG = "log"
+
 
 @dataclass
 class BiologicTechnique:
@@ -140,7 +142,7 @@ TECH_PEIS = BiologicTechnique(
         "Bandwidth": "bandwidth",
         # "DriftCorrection": "correction",
         # "DelayFraction": "wait",
-        },
+    },
     field_map={
         "process": "process",
         "time": "t_s",
@@ -156,7 +158,7 @@ TECH_PEIS = BiologicTechnique(
         "impedance_ce_phase": "phase_ce",
         "impedance_ce_modulus": "modulus_ce",
         "frequency": "f_Hz",
-        },
+    },
 )
 
 TECH_GEIS = BiologicTechnique(
@@ -179,7 +181,7 @@ TECH_GEIS = BiologicTechnique(
         "Bandwidth": "bandwidth",
         # "AcqInterval__V": "voltage_interval",
         # "DriftCorrection": "correction",
-        },
+    },
     field_map={
         "process": "process",
         "time": "t_s",
@@ -195,7 +197,10 @@ TECH_GEIS = BiologicTechnique(
         "impedance_ce_phase": "phase_ce",
         "impedance_ce_modulus": "modulus_ce",
         "frequency": "f_Hz",
-        },
+    },
 )
 
-BIOTECHS = {x.technique_name: x for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV, TECH_GEIS, TECH_PEIS]}
+BIOTECHS = {
+    x.technique_name: x
+    for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV, TECH_GEIS, TECH_PEIS]
+}

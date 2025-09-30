@@ -23,8 +23,8 @@ def run_ocv(pstat):
         state = resp.status
         time.sleep(DATA_RATE)
     print("OCV measurement complete.")
-        
-    
+
+
 def main():
     if len(sys.argv) < 2:
         print(
@@ -46,7 +46,9 @@ def main():
     print(f"model: {pstat.model}")
     print(f"device id: {device_id}")
 
-    print(f"Running OCV for {DURATION_SECONDS} seconds, recording every {DATA_RATE} seconds.")
+    print(
+        f"Running OCV for {DURATION_SECONDS} seconds, recording every {DATA_RATE} seconds."
+    )
     run_ocv(pstat)
 
     print(f"Closing connection.")

@@ -18,8 +18,8 @@ class ZeroconfManager:
         self.server_host = server_host
         self.server_port = server_port
         self.ip_version = IPVersion.V4Only
-        
-        props = {'instrument': socket.gethostname(), 'group': None}
+
+        props = {"instrument": socket.gethostname(), "group": None}
         self.info = AsyncServiceInfo(
             "_http._tcp.local.",
             "Paul's Test Web Site._http._tcp.local.",
@@ -30,7 +30,6 @@ class ZeroconfManager:
         )
         self.loop = asyncio.get_event_loop()
         self.irq = asyncio.Queue(1)
-
 
     async def register_services(self, infos: List[AsyncServiceInfo]) -> None:
         self.aiozc = AsyncZeroconf(ip_version=self.ip_version)

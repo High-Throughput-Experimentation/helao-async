@@ -28,16 +28,14 @@ from bokeh.layouts import gridplot
 from bokeh.models.widgets import FileInput
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 from helao.core.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 from helao.core.models.data import DataModel
 from helao.core.error import ErrorCodes
 
 from ..drivers.motion.enum import MoveModes, TransformationModes
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class Aligner:
@@ -877,7 +875,7 @@ class Aligner:
             try:
                 new_matrix = np.matrix(json.loads(filecontent))
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 LOGGER.error(f"error loading matrix ", exc_info=True)
                 new_matrix = self.motor.dflt_matrix
 
@@ -1358,7 +1356,7 @@ class Aligner:
         try:
             M = np.dot(A, B.I)
         except Exception as e:
-            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             # should not happen when all xyplate coordinates are unique
             # (previous function removes all duplicate xyplate points)
             # but can still produce a not valid Matrix
@@ -1514,7 +1512,7 @@ class Aligner:
 
                 self.motorpos_q.task_done()
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 LOGGER.error(f"aligner IOloop error: ", exc_info=True)
 
     def IOloop_helper(self):

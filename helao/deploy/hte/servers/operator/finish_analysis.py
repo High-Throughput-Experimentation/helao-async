@@ -24,7 +24,7 @@ PLATE_ID = 6083
 env_config = sys.argv[2]
 RESUME_ID = "76196ebd-00b6-4e3c-aa01-0a0e0326f6c2"
 SEQUENCE_ID = "7549bd61-897f-409e-9977-c9f727e61121"
-    
+
 load_dotenv(dotenv_path=Path(env_config))
 
 TEST = False
@@ -236,7 +236,11 @@ def main():
         acknowledged_requests = CLIENT.read_data_requests(status="acknowledged")
 
     if RESUME_ID and not resumed:
-        matching_requests = [req for req in pending_requests + acknowledged_requests if str(req.id) == RESUME_ID]
+        matching_requests = [
+            req
+            for req in pending_requests + acknowledged_requests
+            if str(req.id) == RESUME_ID
+        ]
         if matching_requests:
             data_request = matching_requests[0]
             resumed = True
@@ -266,15 +270,11 @@ def main():
         )
         if current_state in [LoopStatus.error, LoopStatus.estopped]:
             with CLIENT:
-                output = CLIENT.set_status(
-                    "failed", data_request_id=data_request.id
-                )
+                output = CLIENT.set_status("failed", data_request_id=data_request.id)
                 input(
                     "Press Enter to reset failed request to pending and exit operator..."
                 )
-                output = CLIENT.set_status(
-                    "pending", data_request_id=data_request.id
-                )
+                output = CLIENT.set_status("pending", data_request_id=data_request.id)
                 return -1
 
         # wait for analysis end (orch_state == "idle")
@@ -283,18 +283,13 @@ def main():
         )
         if current_state in [LoopStatus.error, LoopStatus.estopped]:
             with CLIENT:
-                output = CLIENT.set_status(
-                    "failed", data_request_id=data_request.id
-                )
+                output = CLIENT.set_status("failed", data_request_id=data_request.id)
                 input(
                     "Press Enter to reset failed request to pending and exit operator..."
                 )
-                output = CLIENT.set_status(
-                    "pending", data_request_id=data_request.id
-                )
+                output = CLIENT.set_status("pending", data_request_id=data_request.id)
                 return -1
         print(f"{gen_ts()} Analysis sequence complete.")
-
 
 
 if __name__ == "__main__":

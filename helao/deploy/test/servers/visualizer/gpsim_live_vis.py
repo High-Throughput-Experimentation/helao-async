@@ -14,12 +14,9 @@ from bokeh.models.widgets import Toggle
 import numpy as np
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
-from helao.core.servers. vis import Vis
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+from helao.core.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 
@@ -77,7 +74,11 @@ class C_gpsimlivevis:
         self.plot.yaxis.axis_label = "density"
 
         self.status_button = Toggle(
-            label="Disabled", disabled=True, button_type="success", width=400, align="end"
+            label="Disabled",
+            disabled=True,
+            button_type="success",
+            width=400,
+            align="end",
         )  # success: green, danger: red
 
         self.table = DataTable(

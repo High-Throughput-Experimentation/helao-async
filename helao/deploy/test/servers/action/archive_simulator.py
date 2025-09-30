@@ -1,4 +1,4 @@
-""" Archive simulation server
+"""Archive simulation server
 
 FastAPI server host for the archive simulator driver. Loads historical data.
 TODO: Return addressable space, measured, and unmeasured positions.
@@ -12,11 +12,8 @@ from fastapi import Body
 import pandas as pd
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.base import Base
 from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
@@ -121,7 +118,9 @@ class ArchiveSim:
         if element_fracs in self.loaded_space:
             match = self.loaded_df.iloc[self.loaded_space.index(element_fracs)]
             sample_no = int(match.Sample)
-            compstr = '-'.join([f"{e}{f:.1f}" for e,f in zip(self.loaded_els, element_fracs)])
+            compstr = "-".join(
+                [f"{e}{f:.1f}" for e, f in zip(self.loaded_els, element_fracs)]
+            )
             LOGGER.info(f"acquired sample {sample_no} with composition {compstr}")
             eta3 = float(match.EtaV_CP3)
             eta10 = float(match.EtaV_CP10)
@@ -164,9 +163,9 @@ def makeApp(server_key):
     @app.post(f"/get_measured", tags=["private"])
     def get_measured(start_idx: int = 0):
         measured = app.driver.get_acquired()
-        if start_idx is None or start_idx==0:
+        if start_idx is None or start_idx == 0:
             return measured
-        elif len(measured)>start_idx:
+        elif len(measured) > start_idx:
             return measured[start_idx:]
         else:
             return []
@@ -252,7 +251,9 @@ def makeApp(server_key):
             }
         )
         finished_action = await active.finish()
-        LOGGER.info(f"final action_params: {', '.join(finished_action.action_params.keys())}")
+        LOGGER.info(
+            f"final action_params: {', '.join(finished_action.action_params.keys())}"
+        )
         return finished_action.as_dict()
 
     return app

@@ -1,7 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-""" Serial sensor server
-
-"""
+"""Serial sensor server"""
 
 __all__ = ["makeApp"]
 
@@ -9,7 +7,13 @@ from typing import List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.core.servers.base_api import BaseAPI
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
 from ...drivers.sensor.sprintir_driver import SprintIR, CO2MonExec
 
 
@@ -29,7 +33,9 @@ def makeApp(server_key):
         action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
     ):
         """Record CO2 ppm level."""
         active = await app.base.setup_and_contain_action()

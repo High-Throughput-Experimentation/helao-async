@@ -27,14 +27,12 @@ from helao.core.models.action_start_condition import ActionStartCondition
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class Sequence(SequenceModel):
     "Experiment grouping class."
+
     # not in SequenceModel:
     dispatched_experiments: List[ExperimentModel] = (
         []
@@ -78,7 +76,7 @@ class Sequence(SequenceModel):
         if plate:
             serial = f"{plate}{str(sum([int(x) for x in str(plate)]) % 10)}"
             if f"-{serial}" not in self.sequence_label:
-                if len(smpno)==1:
+                if len(smpno) == 1:
                     append_plate = f"-{serial}-{smpno[0]}"
                 else:
                     append_plate = f"-{serial}"
@@ -94,6 +92,7 @@ class Sequence(SequenceModel):
 
 class Experiment(Sequence, ExperimentModel):
     "Sample-action grouping class."
+
     # not in ExperimentModel, dispatched_actions is a list of completed ActionModels:
     dispatched_actions: List[ActionModel] = []
 
@@ -213,6 +212,7 @@ class Experiment(Sequence, ExperimentModel):
 
 class Action(Experiment, ActionModel):
     "Sample-action identifier class."
+
     # internal
     file_conn_keys: List[UUID] = Field(default=[])
     # flag for dataLOGGER
