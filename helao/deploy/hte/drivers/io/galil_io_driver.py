@@ -1,8 +1,8 @@
-""" A device class for the Galil motion controller, used by a FastAPI server instance.
+"""A device class for the Galil motion controller, used by a FastAPI server instance.
 
 The 'galil' device class exposes motion and I/O functions from the underlying 'gclib'
 library. Class methods are specific to Galil devices. Device configuration is read from
-config/config.py. 
+config/config.py.
 
 This driver requires gclib to be installed. After installation, activate the helao
 environment and run:
@@ -28,11 +28,8 @@ from typing import Union, Optional, List
 
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes

@@ -5,14 +5,19 @@ from fastapi import Body
 from helao.core.servers.base_api import BaseAPI
 from ...drivers.io.galil_io_driver import Galil, TriggerType, AiMonExec
 from helao.helpers.premodels import Action
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
 from helao.core.error import ErrorCodes
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
 
 async def galil_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
@@ -46,7 +51,11 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 action_version: int = 1,
                 duration: float = -1,
                 acquisition_rate: float = 0.2,
-                fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+                fast_samples_in: List[
+                    Union[
+                        AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
+                    ]
+                ] = Body([], embed=True),
             ):
                 """Record galil analog inputs (monitor_ai)."""
                 active = await app.base.setup_and_contain_action()
@@ -188,7 +197,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
                     Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]
                 ] = None,
             ):
-
                 """Toggles output.
                 Args:
                     trigger_name: di on which the toggle starts

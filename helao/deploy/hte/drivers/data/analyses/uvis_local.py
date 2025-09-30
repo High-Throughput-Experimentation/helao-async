@@ -15,7 +15,11 @@ from helao.helpers.gen_uuid import gen_uuid
 
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
-from helao.core.drivers.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
+from helao.core.drivers.data.loaders.localfs import (
+    HelaoProcess,
+    HelaoAction,
+    LocalLoader,
+)
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],
@@ -105,7 +109,9 @@ class DryUvisInputs(AnalysisInput):
     def insitu_spec(self):
         return self.insitu_spec_act.hlo
 
-    def get_datamodels(self, global_sample_label: str, *args, **kwargs) -> List[AnalysisDataModel]:
+    def get_datamodels(
+        self, global_sample_label: str, *args, **kwargs
+    ) -> List[AnalysisDataModel]:
         action_keys = [k for k in vars(self).keys() if "spec_act" in k]
         inputs = []
         for ak in action_keys:
@@ -155,6 +161,7 @@ class DryUvisOutputs(BaseModel):
 
 class DryUvisAnalysis(BaseAnalysis):
     """Dry UVIS Analysis for GCLD demonstration."""
+
     analysis_name: str
     analysis_timestamp: datetime
     analysis_uuid: UUID

@@ -1,5 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-""" A FastAPI service definition for a potentiostat device server, e.g. Gamry.
+"""A FastAPI service definition for a potentiostat device server, e.g. Gamry.
 
 gamry_server2 uses the Executor model with helao.drivers.pstat.gamry.driver which decouples
 the hardware driver class from the action server base class.
@@ -21,7 +21,13 @@ import pandas as pd
 from fastapi import Body, Query
 
 from helao.core.error import ErrorCodes
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
 from helao.core.models.hlostatus import HloStatus
 
 from helao.core.servers.base_api import BaseAPI
@@ -41,10 +47,7 @@ from ...drivers.pstat.gamry.technique import (
 )
 
 global LOGGER
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class GamryExec(Executor):
@@ -124,7 +127,9 @@ class GamryExec(Executor):
         LOGGER.debug("starting measurement")
         resp = self.driver.measure(self.ttl_params)
         self.start_time = resp.data.get("start_time", time.time())
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        error = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
         return {"error": error}
 
     async def _poll(self) -> dict:
@@ -199,7 +204,9 @@ class GamryExec(Executor):
                                         )
                                         self.last_alert_time = poll_iter_time
             error = (
-                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+                ErrorCodes.none
+                if resp.response == "success"
+                else ErrorCodes.critical_error
             )
             status = HloStatus.active if resp.message != "done" else HloStatus.finished
             return {"error": error, "status": status, "data": resp.data}
@@ -232,7 +239,9 @@ class GamryExec(Executor):
             )
             self.active.action.action_params["has_bubble"] = has_bubble
 
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        error = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
         return {"error": error, "data": {}}
 
     async def _manual_stop(self) -> dict:
@@ -256,7 +265,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     async def run_LSV(
         action: Action = Body({}, embed=True),
         action_version: int = 3,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
         Vfinal__V: float = 1.0,  # Final value in volts or amps.
         ScanRate__V_s: float = 1.0,  # Scan rate in volts/sec or amps/sec.
@@ -295,7 +306,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     async def run_CA(
         action: Action = Body({}, embed=True),
         action_version: int = 3,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Vval__V: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
@@ -334,7 +347,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     async def run_CP(
         action: Action = Body({}, embed=True),
         action_version: int = 3,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Ival__A: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
@@ -372,7 +387,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     async def run_CV(
         action: Action = Body({}, embed=True),
         action_version: int = 3,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
         Vapex1__V: float = 1.0,  # Apex 1 value in volts or amps.
         Vapex2__V: float = -1.0,  # Apex 2 value in volts or amps.
@@ -415,7 +432,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     async def run_OCV(
         action: Action = Body({}, embed=True),
         action_version: int = 3,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Tval__s: float = 10.0,
         AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
         RSD_threshold: float = 1,
@@ -446,7 +465,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     async def run_RCA(
         action: Action = Body({}, embed=True),
         action_version: int = 3,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
         Vinit__V: float = 0.0,
         Tinit__s: float = 0.5,
         Vstep__V: float = 0.5,

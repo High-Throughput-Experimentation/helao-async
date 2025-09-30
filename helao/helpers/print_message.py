@@ -9,7 +9,7 @@ def print_message(logger, server_name, *args, **kwargs):
     logger (logging.Logger): The logger instance to use for logging the message.
     server_name (str, optional): The name of the server. Defaults to None.
     *args: Variable length argument list to be joined into the log message.
-    **kwargs: Arbitrary keyword arguments to determine the log level. 
+    **kwargs: Arbitrary keyword arguments to determine the log level.
               Recognized keys are "error", "warning", "warn", and "info".
 
     The log level is determined based on the presence of specific keys in kwargs:

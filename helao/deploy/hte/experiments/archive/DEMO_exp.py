@@ -76,10 +76,7 @@ def DEMO_sub_CA(
 
     elif WE_versus == "rhe":
         potential_vsRef = (
-            WE_potential__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - REF_TABLE[ref_type]
+            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
         )
 
     apm.add(

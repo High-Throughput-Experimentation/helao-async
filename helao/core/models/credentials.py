@@ -24,7 +24,7 @@ class HelaoCredentials(BaseSettings):
         if not isinstance(_env_file, Path):
             _env_file = Path(_env_file)
         super().__init__(_env_file=_env_file, **kwargs)
-    
+
     def set_api_port(self, port: int):
         self.API_PORT = port
 
@@ -33,7 +33,11 @@ class HelaoCredentials(BaseSettings):
         pgdsn = PostgresDsn.build(
             scheme="postgresql",
             username=self.API_USER,
-            password=urllib.parse.quote(self.API_PASSWORD.get_secret_value()) if self.API_PASSWORD else "",
+            password=(
+                urllib.parse.quote(self.API_PASSWORD.get_secret_value())
+                if self.API_PASSWORD
+                else ""
+            ),
             host="127.0.0.1",
             port=self.API_PORT,
             path=self.API_DB,
@@ -41,7 +45,12 @@ class HelaoCredentials(BaseSettings):
         pgdsn_schema = f"{pgdsn}?options=--search_path%3d{self.API_SCHEMA}"
         return pgdsn_schema
 
-    def display(self, show_defaults: bool = False, show_passwords: bool = False, simple: bool = False):
+    def display(
+        self,
+        show_defaults: bool = False,
+        show_passwords: bool = False,
+        simple: bool = False,
+    ):
         params = []
         for key, val in self.model_dump().items():
             if simple and key not in self._simple_params:
@@ -52,7 +61,9 @@ class HelaoCredentials(BaseSettings):
                     if show_passwords and ("PASSWORD" in key or "KEY" in key)
                     else val
                 )
-                if (show_defaults or key in self.__fields_set__) or key in self._always_set:
+                if (
+                    show_defaults or key in self.__fields_set__
+                ) or key in self._always_set:
                     params.append(f"{key} = {str_val}")
                 else:
                     params.append(f"# {key} = {str_val}")

@@ -10,7 +10,11 @@ from helao.core.version import get_filehash
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput, AnalysisOutput
 
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
-from helao.core.drivers.data.loaders.localfs import HelaoProcess, HelaoAction, LocalLoader
+from helao.core.drivers.data.loaders.localfs import (
+    HelaoProcess,
+    HelaoAction,
+    LocalLoader,
+)
 
 ANALYSIS_DEFAULTS = {
     "fom_key": "ExtCal.Concentration_ppb",
@@ -29,12 +33,16 @@ class IcpmsInputs(AnalysisInput):
         )
         self.process_params = self.icpms.process_params
         filed = [
-            d for d in self.icpms.json["files"] if d["file_type"] in ["icpms_helao__file", "icpms_helao__json_file"]
+            d
+            for d in self.icpms.json["files"]
+            if d["file_type"] in ["icpms_helao__file", "icpms_helao__json_file"]
         ][0]
         self.global_sample_label = [x for x in filed["sample"] if "__liquid__" in x][0]
         action_uuid = filed["action_uuid"]
         action_dir = [
-            d for d in self.icpms.json["dispatched_actions_abbr"] if d["action_uuid"] == action_uuid
+            d
+            for d in self.icpms.json["dispatched_actions_abbr"]
+            if d["action_uuid"] == action_uuid
         ][0]["action_output_dir"]
         action_reldir = "/".join(action_dir.split("/")[-2:])
         self.icpms_act = local_loader.get_act(
@@ -51,7 +59,7 @@ class IcpmsInputs(AnalysisInput):
         filename, filetype, datakeys = self.icpms_act.hlo_file_tup
         adm = AnalysisDataModel(
             action_uuid=self.icpms_act.action_uuid,
-            run_use=self.icpms_act.json['run_use'],
+            run_use=self.icpms_act.json["run_use"],
             raw_data_path=f"raw_data/{self.icpms_act.action_uuid}/{filename}",
             global_sample_label=self.global_sample_label,
             file_name=filename,
@@ -59,6 +67,7 @@ class IcpmsInputs(AnalysisInput):
             data_keys=datakeys,
         )
         return [adm]
+
 
 class IcpmsOutputs(AnalysisOutput):
     element: list
@@ -70,6 +79,7 @@ class IcpmsOutputs(AnalysisOutput):
 
 class IcpmsAnalysis(BaseAnalysis):
     """Dry UVIS Analysis for GCLD demonstration."""
+
     inputs: IcpmsInputs
     outputs: IcpmsOutputs
     global_sample_label: str
@@ -110,6 +120,6 @@ class IcpmsAnalysis(BaseAnalysis):
             value=hlo_data[fom_key],
             fom_key=fom_key,
             global_sample_label=self.global_sample_label,
-            output_type="composition.icpms_concentration"
+            output_type="composition.icpms_concentration",
         )
         return True

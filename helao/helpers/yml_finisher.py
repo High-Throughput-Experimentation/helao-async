@@ -15,10 +15,7 @@ from .premodels import Sequence, Experiment, Action
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
@@ -111,7 +108,7 @@ async def move_dir(
                 f"Invalid object {obj_type} was provided. Can only move Action, Experiment, or Sequence."
             )
             return {}
-            
+
     yml_dir = os.path.normpath(os.path.join(save_dir, target_subdir))
 
     new_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", dest_dir))

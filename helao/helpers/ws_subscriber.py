@@ -8,6 +8,7 @@ Classes:
         A class that subscribes to a WebSocket server and receives broadcasted messages asynchronously.
                 Initializes the WebSocket subscriber with the given host, port, path, and optional max queue length.
 """
+
 import asyncio
 import pickle
 import collections
@@ -31,6 +32,7 @@ class WsSyncClient:
             if the connection fails. Returns the decompressed and deserialized message
             if successful, otherwise returns an empty dictionary.
     """
+
     def __init__(self, host, port, path):
         """
         Initializes the WebSocket subscriber with the given host, port, and path.
@@ -70,11 +72,10 @@ class WsSyncClient:
                 if recv_bytes:
                     return pickle.loads(pyzstd.decompress(recv_bytes))
             except Exception:
-                print(
-                    f"Could not connect, retrying {retry_idx+1}/{retry_limit}"
-                )
+                print(f"Could not connect, retrying {retry_idx+1}/{retry_limit}")
                 time.sleep(2)
         return {}
+
 
 class WsSubscriber:
     """
@@ -88,10 +89,10 @@ class WsSubscriber:
     Methods:
         __init__(host, port, path, max_qlen=500):
             Initializes the WsSubscriber with the given host, port, path, and optional max queue length.
-        
+
         subscriber_loop():
             Coroutine that connects to the WebSocket server and receives messages, retrying on failure.
-        
+
         read_messages():
             Asynchronously empties the recv_queue and returns the messages.
     """
@@ -114,12 +115,12 @@ class WsSubscriber:
         """
         Asynchronous method to handle the subscription loop for receiving data.
 
-        This method attempts to connect to a WebSocket server at `self.data_url` and 
-        receive data in a loop. The received data is expected to be compressed with 
-        `pyzstd` and serialized with `pickle`. The decompressed and deserialized data 
+        This method attempts to connect to a WebSocket server at `self.data_url` and
+        receive data in a loop. The received data is expected to be compressed with
+        `pyzstd` and serialized with `pickle`. The decompressed and deserialized data
         is appended to `self.recv_queue`.
 
-        If the connection fails, it will retry up to `retry_limit` times with a delay 
+        If the connection fails, it will retry up to `retry_limit` times with a delay
         of 2 seconds between each retry.
 
         Attributes:
@@ -140,9 +141,7 @@ class WsSubscriber:
                         recv_data_dict = pickle.loads(pyzstd.decompress(recv_bytes))
                         self.recv_queue.append(recv_data_dict)
             except Exception:
-                print(
-                    f"Could not connect, retrying {retry_idx+1}/{retry_limit}"
-                )
+                print(f"Could not connect, retrying {retry_idx+1}/{retry_limit}")
                 time.sleep(2)
 
     async def read_messages(self):

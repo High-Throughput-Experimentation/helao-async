@@ -5,10 +5,7 @@ import pandas as pd
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
 
 global LOGGER
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 def bubble_detection(

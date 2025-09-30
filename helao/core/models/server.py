@@ -37,7 +37,9 @@ class EndpointModel(BaseModel, HelaoDict):
     # todo: - add local queue and priority lists here?
 
     def __str__(self):
-        finished_uuids = [uuid.hex for uuid in self.nonactive_dict.get(HloStatus.finished, {}).keys()]
+        finished_uuids = [
+            uuid.hex for uuid in self.nonactive_dict.get(HloStatus.finished, {}).keys()
+        ]
         return f"active:{[uuid.hex for uuid in self.active_dict.keys()]}, finished:{finished_uuids}"
 
     def __repr__(self):
@@ -134,16 +136,18 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         json_dict = {
             k: vars(self)[k]
             for k in (
-                'orchestrator',
-                'active_dict',
-                'nonactive_dict',
-                'loop_intent',
-                'loop_state',
-                'orch_state',
-                'counter_dispatched_actions',
+                "orchestrator",
+                "active_dict",
+                "nonactive_dict",
+                "loop_intent",
+                "loop_state",
+                "orch_state",
+                "counter_dispatched_actions",
             )
         }
-        json_dict['server_dict'] = {f"{k[0]}@{k[1]}": v for k, v in self.server_dict.items()}
+        json_dict["server_dict"] = {
+            f"{k[0]}@{k[1]}": v for k, v in self.server_dict.items()
+        }
         return json_dict
 
     def actions_idle(self) -> bool:
@@ -222,7 +226,9 @@ class GlobalStatusModel(BaseModel, HelaoDict):
     def update_global_with_acts(self, actionservermodel: ActionServerModel):
         if actionservermodel.action_server.as_key() not in self.server_dict:
             # add it for the first time
-            self.server_dict.update({actionservermodel.action_server.as_key(): actionservermodel})
+            self.server_dict.update(
+                {actionservermodel.action_server.as_key(): actionservermodel}
+            )
         else:
             self.server_dict[actionservermodel.action_server.as_key()].endpoints.update(
                 actionservermodel.endpoints
@@ -266,7 +272,10 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         finished_uuids = []
         for _, status_dict in self.nonactive_dict.items():
             for action_uuid, statusmodel in status_dict.items():
-                if exp_uuid == statusmodel.experiment_uuid and action_uuid not in finished_uuids:
+                if (
+                    exp_uuid == statusmodel.experiment_uuid
+                    and action_uuid not in finished_uuids
+                ):
                     finished_acts.append(statusmodel)
                     finished_uuids.append(action_uuid)
         # TODO: properly clear actions from endpointstatusmodel only for exp_uuid

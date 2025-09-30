@@ -11,10 +11,7 @@ from helao.core.models.helaodirs import HelaoDirs
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:

@@ -18,11 +18,8 @@ import boto3
 import aiohttp
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.error import ErrorCodes
 from helao.core.servers.base import Base
 from helao.core.models.process import ProcessModel
@@ -170,7 +167,9 @@ class HelaoYml:
         if inst_idx:
             inst_idx = inst_idx[0]
         else:
-            LOGGER.warning("!!! 'INST' directory was not found in yml path. Cannot proceed.")
+            LOGGER.warning(
+                "!!! 'INST' directory was not found in yml path. Cannot proceed."
+            )
             return False
         self.status = self.target.parts[inst_idx + 1].replace("RUNS_", "")
         self.data_dir = self.target.parent
@@ -331,7 +330,9 @@ class ExpYml(HelaoYml):
                     self.create_process(group_idx)
                     self.progress.write()
             else:
-                LOGGER.info(f"Cannot create process {group_idx} with actions still pending.")
+                LOGGER.info(
+                    f"Cannot create process {group_idx} with actions still pending."
+                )
             # self.progress.read()
         group_keys = sorted([k for k in self.progress.keys() if isinstance(k, int)])
         process_metas = [self.progress[k]["meta"] for k in group_keys]
@@ -633,10 +634,14 @@ class DBPack:
         else:
             self.read_log()
         if self.config_dict.get("testing", False):
-            LOGGER.info("testing flag is True, UUIDs will be regenerated for API/S3 push.")
+            LOGGER.info(
+                "testing flag is True, UUIDs will be regenerated for API/S3 push."
+            )
             self.testing_uuid_dict = {}
         else:
-            LOGGER.info("testing flag is False, will use original UUIDs for API/S3 push.")
+            LOGGER.info(
+                "testing flag is False, will use original UUIDs for API/S3 push."
+            )
             self.testing_uuid_dict = None
         self.loop = asyncio.get_event_loop()
         self.task_queue = asyncio.Queue()
@@ -658,7 +663,9 @@ class DBPack:
                     tb = "".join(
                         traceback.format_exception(type(e), e, e.__traceback__)
                     )
-                    LOGGER.error(f"Error during dbpack.finish_yml() {yml_target}. {repr(e), tb,}")
+                    LOGGER.error(
+                        f"Error during dbpack.finish_yml() {yml_target}. {repr(e), tb,}"
+                    )
             # else:
             #     self.base.print_message(
             #         f"Path {yml_target} no longer exists, skipping."
@@ -686,7 +693,9 @@ class DBPack:
                             tb = "".join(
                                 traceback.format_exception(type(e), e, e.__traceback__)
                             )
-                            LOGGER.error(f"Directory {datedir} is empty, but could not removed. {repr(e), tb,}")
+                            LOGGER.error(
+                                f"Directory {datedir} is empty, but could not removed. {repr(e), tb,}"
+                            )
                     weekdir = os.path.dirname(datedir)
                     if len(glob(os.path.join(weekdir, "*"))) == 0:
                         try:
@@ -695,7 +704,9 @@ class DBPack:
                             tb = "".join(
                                 traceback.format_exception(type(e), e, e.__traceback__)
                             )
-                            LOGGER.error(f"Directory {weekdir} is empty, but could not removed. {repr(e), tb,}")
+                            LOGGER.error(
+                                f"Directory {weekdir} is empty, but could not removed. {repr(e), tb,}"
+                            )
 
     def read_log(self):
         self.log_dict = yml_load(self.log_path)
@@ -716,7 +727,9 @@ class DBPack:
         if all(self.log_dict[yml_path].values()):
             self.log_dict.pop(yml_path)
         else:
-            LOGGER.info(f"Cannot clear {yml_path} from log when API or S3 ops are still pending.")
+            LOGGER.info(
+                f"Cannot clear {yml_path} from log when API or S3 ops are still pending."
+            )
         self.write_log()
 
     def list_pending(self):
@@ -903,7 +916,9 @@ class DBPack:
         # zip sequence directory
         for target in synced_sequences:
             zip_target = target.parent.parent.joinpath(f"{target.parent.name}.zip")
-            LOGGER.info(f"Full sequence has synced, creating zip: {zip_target.__str__()}")
+            LOGGER.info(
+                f"Full sequence has synced, creating zip: {zip_target.__str__()}"
+            )
             zip_dir(target.parent, zip_target)
             self.cleanup_root()
 
@@ -962,7 +977,9 @@ class YmlOps:
         ]
         req_model = modmap[meta_type](**pdict["meta"]).clean_dict()
         req_url = f"https://{self.dbp.api_host}/{plural[meta_type]}/"
-        LOGGER.info(f"attempting API push for {self.yml.target.__str__()} :: {progress_key} :: {p_uuid}")
+        LOGGER.info(
+            f"attempting API push for {self.yml.target.__str__()} :: {progress_key} :: {p_uuid}"
+        )
         try_create = True
         last_response = {}
         async with aiohttp.ClientSession() as session:
@@ -977,9 +994,13 @@ class YmlOps:
                             self.yml.progress.write()
                         elif resp.status == 400:
                             try_create = False
-                        LOGGER.info(f"[{i+1}/{retry_num}] {api_str} {p_uuid} returned status: {resp.status}")
+                        LOGGER.info(
+                            f"[{i+1}/{retry_num}] {api_str} {p_uuid} returned status: {resp.status}"
+                        )
                         last_response = await resp.json()
-                        LOGGER.info(f"[{i+1}/{retry_num}] {api_str} {p_uuid} response: {last_response}")
+                        LOGGER.info(
+                            f"[{i+1}/{retry_num}] {api_str} {p_uuid} response: {last_response}"
+                        )
                     # await asyncio.sleep(1)
 
         if pdict["api"]:
@@ -1012,9 +1033,13 @@ class YmlOps:
                 for i in range(retry_num):
                     async with session.post(fail_url, json=fail_model) as resp:
                         if resp.status == 200:
-                            LOGGER.info(f"successful API push for failed {self.yml.target.__str__()} :: {progress_key} :: {p_uuid}")
+                            LOGGER.info(
+                                f"successful API push for failed {self.yml.target.__str__()} :: {progress_key} :: {p_uuid}"
+                            )
                         else:
-                            LOGGER.info(f"failed API push for failed {self.yml.target.__str__()} :: {progress_key} :: {p_uuid}")
+                            LOGGER.info(
+                                f"failed API push for failed {self.yml.target.__str__()} :: {progress_key} :: {p_uuid}"
+                            )
                             LOGGER.info(f"response: {await resp.json()}")
             if isinstance(progress_key, str):
                 self.dbp.update_log(self.yml.target.__str__(), {"api": False})
@@ -1035,7 +1060,9 @@ class YmlOps:
             except botocore.exceptions.ClientError as e:
                 _ = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.dbp.base.print_message(e)
-                LOGGER.info(f"Retry S3 upload [{i}/{retry_num}]: {self.dbp.bucket}, {target}")
+                LOGGER.info(
+                    f"Retry S3 upload [{i}/{retry_num}]: {self.dbp.bucket}, {target}"
+                )
                 await asyncio.sleep(1)
         LOGGER.info(f"Did not upload {target} after {retry_num} tries.")
         return False

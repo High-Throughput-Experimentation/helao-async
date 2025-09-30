@@ -3,11 +3,8 @@ import asyncio
 import time
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-    
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.helpers.zstd_io import unzpickle
@@ -232,7 +229,9 @@ class GPSim:
                 if idx in self.available[plate_key]:
                     self.available[plate_key].remove(idx)
             self.global_step += 1
-        LOGGER.info(f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points")
+        LOGGER.info(
+            f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points"
+        )
         return data
 
     async def fit_model(self, plate_id, orch_str: str = ""):
@@ -251,7 +250,7 @@ class GPSim:
                     "pred_avail",
                     "gt_acquired",
                     "orchestrator",
-                    "status"
+                    "status",
                 )
             }
             # populate live_dict
@@ -431,7 +430,9 @@ class GPSim:
             LOGGER.info(f"insert_experiment got response: {resp}")
             LOGGER.info(f"insert_experiment returned error: {error}")
         else:
-            LOGGER.info(f"Threshold condition {stop_condition} {thresh_value} has been met.")
+            LOGGER.info(
+                f"Threshold condition {stop_condition} {thresh_value} has been met."
+            )
         return_dict = progress
         return_dict.update(
             {

@@ -39,11 +39,7 @@ import gzip
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.base import Base
 from helao.core.models.process import ProcessModel
 from helao.core.models.action import ShortActionModel
@@ -1099,7 +1095,11 @@ class HelaoSyncer:
                     continue
                 try:
                     dateonly = datetime.strptime(os.path.basename(datedir), "%m%d")
-                    dateonly.replace(year=datetime.strptime(os.path.basename(os.path.dirname(datedir)), "%y.%U").year)
+                    dateonly.replace(
+                        year=datetime.strptime(
+                            os.path.basename(os.path.dirname(datedir)), "%y.%U"
+                        ).year
+                    )
                 except ValueError:
                     dateonly = datetime.strptime(
                         os.path.basename(datedir), "%y%m%d.%H%M%S%f"

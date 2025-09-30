@@ -8,7 +8,7 @@ from typing import List, Optional, Union
 from uuid import UUID
 from pydantic import BaseModel, Field
 
-from .sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
+from .sample import AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
 from .action import ShortActionModel
 from .file import FileInfo
 from .machine import MachineModel
@@ -37,10 +37,12 @@ class ProcessModel(ShortProcessModel):
     process_group_index: Optional[int] = None
     data_request_id: Optional[UUID] = None
     dispatched_actions_abbr: List[ShortActionModel] = Field(default=[])
-    samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
-    samples_out: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
+    samples_in: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
+    samples_out: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None

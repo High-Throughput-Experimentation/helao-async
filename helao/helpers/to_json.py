@@ -6,10 +6,10 @@ import json
 def fix_numerics(val):
     """
     Recursively converts numeric strings in the input to their appropriate numeric types.
-    
+
     Args:
         val (str, list, dict): The input value which can be a string, list, or dictionary.
-        
+
     Returns:
         The input value with numeric strings converted to their respective numeric types.
         - If the input is a string that represents a boolean ('True' or 'False'), it is converted to a boolean.
@@ -20,10 +20,15 @@ def fix_numerics(val):
     """
     if isinstance(val, str):
         stripped = val.strip()
-        if stripped in ['True', 'False']:
+        if stripped in ["True", "False"]:
             return eval(stripped)
         stripped = stripped.lower()
-        cleaned = stripped.lstrip('-').replace('.', '', 1).replace('e-', '', 1).replace('e', '', 1)
+        cleaned = (
+            stripped.lstrip("-")
+            .replace(".", "", 1)
+            .replace("e-", "", 1)
+            .replace("e", "", 1)
+        )
         if cleaned.isdigit():
             retval = float(stripped)
             return retval

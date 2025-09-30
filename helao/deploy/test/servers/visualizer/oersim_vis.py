@@ -14,13 +14,10 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers. vis import Vis
+from helao.core.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 
@@ -183,9 +180,7 @@ class C_oersimvis:
                             compstr = "-".join(
                                 [
                                     f"{x}{y:.2f}"
-                                    for x, y in zip(
-                                        data_val, uuid_dict["atfracs"]
-                                    )
+                                    for x, y in zip(data_val, uuid_dict["atfracs"])
                                 ]
                             )
                             if self.cur_comp != compstr:

@@ -31,7 +31,9 @@ def setup_logger(log_name, log_folder, level) -> logging.Logger:
     file_handler = logging.FileHandler(log_path, mode="w")
     file_handler.setFormatter(filet_formatter)
 
-    stream_formatter = logging.Formatter("%(asctime)s : %(name)s >> [%(levelname)s] %(message)s")
+    stream_formatter = logging.Formatter(
+        "%(asctime)s : %(name)s >> [%(levelname)s] %(message)s"
+    )
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(stream_formatter)
 

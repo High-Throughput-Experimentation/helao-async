@@ -21,18 +21,18 @@ from enum import Enum
 from pydantic import BaseModel, Field, root_validator
 
 from helao.core.models.sample import (
-    AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample,
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
     object_to_sample,
 )
 from helao.core.helaodict import HelaoDict
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 VTUnion = ForwardRef("VTUnion")
 
 
@@ -44,8 +44,9 @@ class CustomTypes(str, Enum):
 
 
 class Custom(BaseModel, HelaoDict):
-    sample: Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = NoneSample()
+    sample: Optional[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = NoneSample()
     custom_name: str
     custom_type: CustomTypes
     blocked: bool = False
@@ -94,14 +95,23 @@ class Custom(BaseModel, HelaoDict):
             LOGGER.error(f"invalid 'custom_type': {self.custom_type}")
             return False
 
-    def unload(self) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
+    def unload(
+        self,
+    ) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
         ret_sample = deepcopy(self.sample)
         self.blocked = False
         self.max_vol_ml = None
         self.sample = NoneSample()
         return ret_sample
 
-    def load(self, sample_in: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]) -> Tuple[bool, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    def load(
+        self,
+        sample_in: Union[
+            AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
+        ],
+    ) -> Tuple[
+        bool, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ]:
         if self.sample != NoneSample():
             LOGGER.error("sample already loaded. Unload first to load new one.")
             return False, NoneSample()
@@ -118,8 +128,9 @@ class _VT_template(BaseModel, HelaoDict):
     positions: int  # = positions
     vials: List[bool] = Field(default=[])
     blocked: List[bool] = Field(default=[])
-    samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = Field(default=[])
+    samples: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = Field(default=[])
     # reset_tray()
 
     @root_validator(skip_on_failure=True)
@@ -128,7 +139,11 @@ class _VT_template(BaseModel, HelaoDict):
         vials = values.get("vials")
         blocked = values.get("blocked")
         samples = values.get("samples")
-        if len(vials) != positions or len(blocked) != positions or len(samples) != positions:
+        if (
+            len(vials) != positions
+            or len(blocked) != positions
+            or len(samples) != positions
+        ):
             values["vials"] = [False for i in range(positions)]
             values["blocked"] = [False for i in range(positions)]
             values["samples"] = [NoneSample() for i in range(positions)]
@@ -148,11 +163,14 @@ class _VT_template(BaseModel, HelaoDict):
     def reset_tray(self):
         self.vials: List[bool] = [False for i in range(self.positions)]
         self.blocked: List[bool] = [False for i in range(self.positions)]
-        self.samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = [NoneSample() for i in range(self.positions)]
+        self.samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [NoneSample() for i in range(self.positions)]
 
     def first_empty(self):
-        res = next((i for i, j in enumerate(self.vials) if not j and not self.blocked[i]), None)
+        res = next(
+            (i for i, j in enumerate(self.vials) if not j and not self.blocked[i]), None
+        )
         return res
 
     def first_full(self):
@@ -173,8 +191,9 @@ class _VT_template(BaseModel, HelaoDict):
             except Exception:
                 self.samples[i] = NoneSample()
 
-    def unload(self) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]:
+    def unload(
+        self,
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         ret_sample = []
         for sample in self.samples:
             if sample != NoneSample():

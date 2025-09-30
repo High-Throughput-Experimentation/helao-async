@@ -64,7 +64,9 @@ class FileConn(BaseModel, HelaoDict):
 
     def deepcopy(self):
         newfileconn = FileConn(
-            params=deepcopy(self.params), added_hlo_separator=deepcopy(self.added_hlo_separator), file=None
+            params=deepcopy(self.params),
+            added_hlo_separator=deepcopy(self.added_hlo_separator),
+            file=None,
         )
         return newfileconn
 

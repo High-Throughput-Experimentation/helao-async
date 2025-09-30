@@ -6,14 +6,12 @@ from mecom import MeCom, ResponseException, WrongChecksum
 from mecom.exceptions import ResponseTimeout
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 # default queries from command table below
 DEFAULT_QUERIES = [

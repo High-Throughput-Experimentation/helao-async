@@ -1,4 +1,3 @@
-
 from typing import Optional, Dict
 from scipy.signal import sawtooth
 
@@ -20,7 +19,6 @@ from scipy.interpolate import UnivariateSpline
 from scipy import signal
 
 
-
 class SpEC:
     """
     The SpEC class is used to store and manipulate spectral and CV data. Using SpEC you can:
@@ -30,6 +28,7 @@ class SpEC:
     - Break apart CV and spectral data into indivual linear sweeps
     - Downsample spectral data that is recorded at very high frame rates and wavelength resolutions to obtain highly averaged dataframes
     """
+
     def __init__(
         self,
         Andorspec: Optional[pd.DataFrame] = None,
@@ -43,48 +42,56 @@ class SpEC:
         self.interpolation = interpolation if interpolation is not None else {}
         self.spec_scans = spec_scans if spec_scans is not None else {}
         self.CV_scans = CV_scans if CV_scans is not None else {}
-    
-    
+
     ## Reader class methods
 
-
-    def read_CV(self,
-                path: str,
-                 default_U_header:str='Ewe_V',
-                 default_t_header:str='t_s',
-                 default_cycle_header:str='cycle',
-                 default_current_header:str='I_A',
-                 return_additional_headers:list[str]=None,
-                 return_metadata:bool=False):
+    def read_CV(
+        self,
+        path: str,
+        default_U_header: str = "Ewe_V",
+        default_t_header: str = "t_s",
+        default_cycle_header: str = "cycle",
+        default_current_header: str = "I_A",
+        return_additional_headers: list[str] = None,
+        return_metadata: bool = False,
+    ):
         """This function reads a CV.hlo file and returns a pandas dataframe with the data"""
-        self.CV = read_CV_hlo(path,
-                    default_U_header,
-                    default_t_header,
-                    default_cycle_header,
-                    default_current_header,
-                    return_additional_headers,
-                    return_metadata)
-        
+        self.CV = read_CV_hlo(
+            path,
+            default_U_header,
+            default_t_header,
+            default_cycle_header,
+            default_current_header,
+            return_additional_headers,
+            return_metadata,
+        )
+
     def read_spec_parquet(self, path: str):
         """This function reads a parquet file and returns a pandas dataframe with the data"""
         self.Andorspec = pd.read_parquet(path)
 
-
-    def populate_interpolation(self, path:str):
+    def populate_interpolation(self, path: str):
         """Import the interpolation data from a .json file"""
         with open(path) as f:
             data_dict = json.load(f)
             self.interpolation = tuple(data_dict.values())
-        return self.interpolation   
+        return self.interpolation
 
     # scan manipulation methods - these methods are used to break apart the CV and spectral data into individual scans
 
-    def populate_spec_scans(self, cycle_header: str='cycle', direction_header:str='direction', time_header:str='t (s)', U_header:str='U (V)', J_header:str='J (A)' ):
+    def populate_spec_scans(
+        self,
+        cycle_header: str = "cycle",
+        direction_header: str = "direction",
+        time_header: str = "t (s)",
+        U_header: str = "U (V)",
+        J_header: str = "J (A)",
+    ):
         """This function reads the Andorspec attribute of the SpEC object. It uses pandas groupby operations
         to group the data by cycle and then by scan direction. It then populates the spec_scans attribute of the SpEC
         object with a dictionary of dictionaries. The first key is the cycle number, the second key is the scan direction.
         The value is the dataframe of the spectral data for that cycle and scan direction.
-        
+
         inputs: self
         outputs: self.spec_scans: Dict
         """
@@ -104,13 +111,13 @@ class SpEC:
                     .drop(direction_header, axis=1)
                     .drop(cycle_header, axis=1)
                     .drop(time_header, axis=1)
-                    .drop(J_header, axis=1))
-                Anodic.index=Anodic[U_header].astype(float)
-                Anodic.drop(columns=[U_header],inplace=True)
-                Anodic=Anodic.T
-                Anodic.index=Anodic.index.astype(float)
+                    .drop(J_header, axis=1)
+                )
+                Anodic.index = Anodic[U_header].astype(float)
+                Anodic.drop(columns=[U_header], inplace=True)
+                Anodic = Anodic.T
+                Anodic.index = Anodic.index.astype(float)
 
-                
             except Exception as e:
                 Anodic = None
                 print(f"no anodic data in scan number {i}, {e} scan data set to None")
@@ -124,10 +131,10 @@ class SpEC:
                     .drop(time_header, axis=1)
                     .drop(J_header, axis=1)
                 )
-                Cathodic.index=Cathodic[U_header]
-                Cathodic.drop(columns=[U_header],inplace=True)
-                Cathodic=Cathodic.T
-                Cathodic.index=Anodic.index.astype(float)
+                Cathodic.index = Cathodic[U_header]
+                Cathodic.drop(columns=[U_header], inplace=True)
+                Cathodic = Cathodic.T
+                Cathodic.index = Anodic.index.astype(float)
             except Exception as e:
                 print(f"no cathodic data in scan number {i}, {e} scan data set to None")
                 Cathodic = None
@@ -136,22 +143,20 @@ class SpEC:
         self.spec_scans = cycle_dict
         return self.spec_scans
 
-        
-
-    def populate_CV_scans(self, cycle_header: str='cycle', time_header:str='t_s'):
+    def populate_CV_scans(self, cycle_header: str = "cycle", time_header: str = "t_s"):
         """Like populate spec scans this function uses the derivative of the interpolation function to determine the scan direction
         of the CV data and add this to the CV. It then groups the CV data by cycle and scan direction.
         It then populates the CV_scans attribute of the SpEC object with a dictionary of dictionaries.
         The first key is the cycle number, the second key is the scan direction. The value is the dataframe
         of the CV data for that cycle and scan direction
-        
+
         inputs: self
         outputs: self.CV_scans: Dict
         """
 
         cycle_dict = {}
 
-        for i in range(int(self.CV[cycle_header].max()+1)):
+        for i in range(int(self.CV[cycle_header].max() + 1)):
             try:
                 temp = self.CV.groupby([cycle_header]).get_group((i,))
             except Exception as e:
@@ -184,9 +189,8 @@ class SpEC:
                     .get_group(("anodic",))
                     .drop("direction", axis=1)
                     .drop("cycle", axis=1)
-                        )
-                    
-                
+                )
+
             except Exception as e:
                 Anodic = None
                 print(f"no anodic data in scan number {i}, {e} scan data set to None")
@@ -215,7 +219,7 @@ def calculateDOD(
     """This function calculates Delta OD for a single cycle and scan direction. If the referance potential
     given is not present the nearest potential is used. The function returns a dataframe. If smooth_strength is set to 0
     the function returns the raw data. If smooth_strength is an odd integer the function returns the data smoothed by a golay function
-    
+
     inputs:
     SpEC_object: an instance of the SpEC class with spec_scans or spec_scans_downsampled populated
     cycle_number: int - the cycle number of the data you want to process
@@ -264,7 +268,7 @@ def plot_DOD(
     reference_potential: Optional[str] = None,
 ):
     """This function takes in a DOD dataframe and plots it. The function returns a plot using a uniform colormap.
-    
+
     args:
     DOD_dataframe: pd.DataFrame - a single dataframe from the spec_scans_downsampled attribute of the SpEC object
     Title: str - the title you wish the plot to have
@@ -329,8 +333,6 @@ def plot_DOD(
     return fig, ax
 
 
-
-
 def Co_plot_DOD_and_CV(
     DOD_dataframe: pd.DataFrame,
     CV_dataframe: pd.DataFrame,
@@ -343,16 +345,16 @@ def Co_plot_DOD_and_CV(
     x_min: Optional[float] = None,
     reference_potential: Optional[str] = None,
     scan_direction: Optional[str] = None,
-    cmap_option = cmc.roma,
+    cmap_option=cmc.roma,
     colour_bar_label: Optional[str] = None,
     ref_electrode_name: Optional[str] = None,
     referance_electrode_correction: Optional[float] = None,
 ):
     """This function can be used to make inital co-plots of DOD and linear sweep data. It generates a plot.
 
-    args: 
+    args:
     DOD_dataframe: pd.DataFrame - a single dataframe from the spec_scans_downsampled attribute of the SpEC object
-    CV_dataframe: pd.DataFrame - a single dataframe from the CV_scans attribute of the SpEC object. Must be the same 
+    CV_dataframe: pd.DataFrame - a single dataframe from the CV_scans attribute of the SpEC object. Must be the same
     cycle and scan direction as the chosen DOD_dataframe
     Title: str - the title of the plot
     y_max: float - the maximum value of the O.D axis
@@ -367,17 +369,16 @@ def Co_plot_DOD_and_CV(
     colour_bar_label: str - the label of the colour bar
     ref_electrode_name: str - the name of the reference electrode
     referance_electrode_correction: float - the correction factor for the referance electrode if needed
-    
-    
+
+
     """
 
     if referance_electrode_correction != None:
 
-        correction=referance_electrode_correction
+        correction = referance_electrode_correction
 
     else:
-        correction=0
-    
+        correction = 0
 
     # get the number of collumns in DOD
     n = DOD_dataframe.shape[1]
@@ -397,10 +398,10 @@ def Co_plot_DOD_and_CV(
             DOD_dataframe.index, DOD_dataframe.iloc[:, i], color=colors[i], linewidth=2
         )
 
-    v_min = DOD_dataframe.columns.min()+correction
-    v_max = DOD_dataframe.columns.max()+correction
+    v_min = DOD_dataframe.columns.min() + correction
+    v_max = DOD_dataframe.columns.max() + correction
     # Normalize the color map
-    norm = mpl.colors.Normalize(vmin=v_min+correction, vmax=v_max+correction)
+    norm = mpl.colors.Normalize(vmin=v_min + correction, vmax=v_max + correction)
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
 
@@ -442,13 +443,20 @@ def Co_plot_DOD_and_CV(
     cmap = cmap_option
 
     colors = cmap(np.linspace(0, 1, num_points))
- 
 
     for i in range(num_points - 2):
         if scan_direction is not None and scan_direction == "anodic":
-            ax[1].plot(CV.iloc[i : i + 2, 0]+correction, CV.iloc[i : i + 2, 1], color=colors[i])
+            ax[1].plot(
+                CV.iloc[i : i + 2, 0] + correction,
+                CV.iloc[i : i + 2, 1],
+                color=colors[i],
+            )
         elif scan_direction is not None and scan_direction == "cathodic":
-            ax[1].plot(CV.iloc[i : i + 2, 0]+correction, CV.iloc[i : i + 2, 1], color=colors[-i])
+            ax[1].plot(
+                CV.iloc[i : i + 2, 0] + correction,
+                CV.iloc[i : i + 2, 1],
+                color=colors[-i],
+            )
 
     ax[1].set_xlabel("U ($V$)", fontsize=12)
 
@@ -490,10 +498,10 @@ def Co_plot_DOD_and_CV(
     plt.show()
 
 
-
 def normalise_DOD(DOD_dataframe: pd.DataFrame, by_max: bool = True):
     """This function takes in a DOD dataframe and normalises it to the maximum value of each collumn. The function returns a normalised DOD dataframe
-    The by max flag can be set to False to normalise to the minimum value of each  - good for negative data"""
+    The by max flag can be set to False to normalise to the minimum value of each  - good for negative data
+    """
     # write a lambda fucnction that normalises each collumn of a dataframe by the maximum value of that collumn
     if by_max:
         normalise = lambda x: x / x.max()
@@ -505,19 +513,16 @@ def normalise_DOD(DOD_dataframe: pd.DataFrame, by_max: bool = True):
     return DOD_normalised
 
 
-def select_spectrum_at_nearest_voltage(
-        DOD_dataframe: pd.DataFrame,
-        voltage: float
-):
+def select_spectrum_at_nearest_voltage(DOD_dataframe: pd.DataFrame, voltage: float):
     """This function takes in a DOD dataframe and selects the spectrum
-      at the nearest voltage to the voltage given. 
-      The function returns a single spectrum as a dataframe
-      
-        inputs: DOD_dataframe - a downsamples dataframe converted to Delta O.D
-        voltage - the voltage you want to select the spectrum at
+    at the nearest voltage to the voltage given.
+    The function returns a single spectrum as a dataframe
 
-        outputs: a single spectrum as a dataframe
-      """
+      inputs: DOD_dataframe - a downsamples dataframe converted to Delta O.D
+      voltage - the voltage you want to select the spectrum at
+
+      outputs: a single spectrum as a dataframe
+    """
     # get the number of collumns in DOD
     n = DOD_dataframe.shape[1]
     # get the color map
@@ -527,9 +532,10 @@ def select_spectrum_at_nearest_voltage(
 
     return DOD_dataframe.iloc[:, nearest_potential_index]
 
+
 def downsample_spectra_for_differential_analysis(
-        DOD_dataframe: pd.DataFrame,
-        voltage_step: float):
+    DOD_dataframe: pd.DataFrame, voltage_step: float
+):
     """
     This function takes in a DOD dataframe and a dataframe of spectra every voltage
     step using the select_spectrum_at_nearest_voltage function. The function returns a downsampled dataframe
@@ -553,7 +559,9 @@ def downsample_spectra_for_differential_analysis(
     # iterate through the voltages to extract the spectra
 
     for voltage in voltages_to_extract:
-        spectra_dict[voltage] = select_spectrum_at_nearest_voltage(DOD_dataframe, voltage)
+        spectra_dict[voltage] = select_spectrum_at_nearest_voltage(
+            DOD_dataframe, voltage
+        )
 
     # convert the dictionary to a dataframe
 
@@ -561,22 +569,26 @@ def downsample_spectra_for_differential_analysis(
 
     return downsampled_spectra
 
+
 def calculate_differential_spectra(
     DOD_dataframe: pd.DataFrame,
     voltage_step: float,
     smooth_strength: int = 0,
-    Normalise: bool = True,):
+    Normalise: bool = True,
+):
     """
-    This function takes in a DOD dataframe and a voltage step. 
-    It uses the downsample_spectra_for_differential_analysis 
+    This function takes in a DOD dataframe and a voltage step.
+    It uses the downsample_spectra_for_differential_analysis
     function to extract the spectra at every voltage step.
     It then applies np.diff on the collumns of the downsampled dataframe.
-    If the smooth_strength is greater than 0 it applies a 
+    If the smooth_strength is greater than 0 it applies a
     savgol filter to the data of the desired strength. If Normalise is set to True
     the function normalises the data to the maximum value of each collumn.
     """
 
-    downsampled_spectra = downsample_spectra_for_differential_analysis(DOD_dataframe, voltage_step)
+    downsampled_spectra = downsample_spectra_for_differential_analysis(
+        DOD_dataframe, voltage_step
+    )
 
     # get the minimum value of the collumns of the downsampled dataframe
 
@@ -584,30 +596,31 @@ def calculate_differential_spectra(
 
     differential_spectra = downsampled_spectra.diff(axis=1)
 
-    
+    # insert a collumn of zeros with the same length as the first collumn of the dataframe
+    # differential_spectra.insert(0, min_U, np.zeros(differential_spectra.shape[0]))
 
-    #insert a collumn of zeros with the same length as the first collumn of the dataframe   
-    #differential_spectra.insert(0, min_U, np.zeros(differential_spectra.shape[0]))
-    
     if smooth_strength != 0:
 
-        differential_spectra = differential_spectra.apply(lambda x: signal.savgol_filter(x, smooth_strength, 3), axis=0)
+        differential_spectra = differential_spectra.apply(
+            lambda x: signal.savgol_filter(x, smooth_strength, 3), axis=0
+        )
 
     if Normalise:
         differential_spectra = normalise_DOD(differential_spectra)
 
     return differential_spectra
 
+
 def fit_current_to_univariate_spline(
-        U: np.ndarray,
-        J: np.ndarray,
-        smoothing_factor: float = 0.000000001,
-        plotbl: bool = False 
-    ):
+    U: np.ndarray,
+    J: np.ndarray,
+    smoothing_factor: float = 0.000000001,
+    plotbl: bool = False,
+):
     """
     This function takes in a voltage and current array
       and fits a univariate spline to the data.
-    It plots the fit and the original data to compare 
+    It plots the fit and the original data to compare
     and returns the spline object.
 
     inputs: U - voltage array
@@ -627,17 +640,19 @@ def fit_current_to_univariate_spline(
     spl.set_smoothing_factor(smoothing_factor)
     if plotbl:
         # Plot the spline function
-        plt.plot(U_sorted, spl(U_sorted), 'r', lw=1)
+        plt.plot(U_sorted, spl(U_sorted), "r", lw=1)
 
         # Plot the original data
-        plt.plot(U_sorted, J_sorted, 'b', lw=1) 
-        plt.xlabel('Voltage (E)')
-        plt.ylabel('Current (J)')
-        plt.title('CV Spline Fit')
+        plt.plot(U_sorted, J_sorted, "b", lw=1)
+        plt.xlabel("Voltage (E)")
+        plt.ylabel("Current (J)")
+        plt.title("CV Spline Fit")
         # set the x range from -0.2 to 1.5
         plt.xlim(-0.2, 1.5)
 
     return spl
+
+
 def Downsample_Potential(SpEC_scans_dataframe, voltage_resolution: float):
     """
     This is a helper function for the Downsample_spec_scans function. You can also use it on its own.
@@ -652,8 +667,8 @@ def Downsample_Potential(SpEC_scans_dataframe, voltage_resolution: float):
 
     Returns:
     downsampled dataframe: pd.DataFrame
-    
-    
+
+
     """
 
     all_spectra = SpEC_scans_dataframe
@@ -692,6 +707,7 @@ def Downsample_Potential(SpEC_scans_dataframe, voltage_resolution: float):
 
 # read helper functions
 
+
 def select_file_path():
     """This is the base function to select a file, it opens a prompt and returns
     a path obect.
@@ -704,7 +720,6 @@ def select_file_path():
     )  # Show the file dialog and get the selected file path
     root.destroy()  # Close the root window
     # convert the file path into a raw string so spaces are not escaped]
-
 
     return Path(file_path)
 
@@ -719,7 +734,7 @@ def change_directory_to_new_expt():
     root.destroy()  # Close the root window
     return os.chdir(file_path)
 
-       
+
 def yml_load(input: Union[str, Path]):
     """
     Load a YAML file or string.
@@ -751,7 +766,9 @@ def yml_load(input: Union[str, Path]):
     return obj
 
 
-def read_hlo(path: str, keep_keys: list = [], omit_keys: list = []) -> Tuple[dict, dict]:
+def read_hlo(
+    path: str, keep_keys: list = [], omit_keys: list = []
+) -> Tuple[dict, dict]:
     """
     Reads a .hlo file and returns its metadata and data.
     Args:
@@ -762,8 +779,10 @@ def read_hlo(path: str, keep_keys: list = [], omit_keys: list = []) -> Tuple[dic
             - The second dictionary contains the data, where each key maps to a list of values.
     """
     if keep_keys and omit_keys:
-        print("Both keep_keys and omit_keys are provided. keep_keys will take precedence.")
-    
+        print(
+            "Both keep_keys and omit_keys are provided. keep_keys will take precedence."
+        )
+
     path_to_hlo = Path(path)
     header_lines = []
     header_end = False
@@ -796,39 +815,53 @@ def read_hlo(path: str, keep_keys: list = [], omit_keys: list = []) -> Tuple[dic
     return meta, data
 
 
-def read_CV_hlo(path: str,
-                 default_U_header:str='Ewe_V',
-                 default_t_header:str='t_s',
-                 default_cycle_header:str='cycle',
-                 default_current_header:str='I_A',
-                 return_additional_headers:list[str]=None,
-                 return_metadata:bool=False) -> pd.DataFrame:
+def read_CV_hlo(
+    path: str,
+    default_U_header: str = "Ewe_V",
+    default_t_header: str = "t_s",
+    default_cycle_header: str = "cycle",
+    default_current_header: str = "I_A",
+    return_additional_headers: list[str] = None,
+    return_metadata: bool = False,
+) -> pd.DataFrame:
     """This function reads a CV.hlo file and returns a pandas dataframe with the data
     from the headers 'Ewe_V', 't_s' and 'cycle'. Additional headers may also be entered
      as a list of strings to be returned in the dataframe. If no additional headers are
      entered, only the default headers are returned. If the return_metadata flag is set
      the metadata dict is also returned - this allows the user to see the full data associated
      with the CV measurment.
-     
+
      inputs:
             default_U_header: the default collumn header for the voltage data in the hlo
             default_t_header: the default collumn header for the time data in the hlo
             default_cycle_header: the default collumn header for the cycle data in the hlo
             return_additional_headers: a list of additional headers to be returned in the dataframe
-            return_metadata: a flag to return the metadata """
+            return_metadata: a flag to return the metadata"""
     # combine the default headers with the areturn_additional_headers by adding them to a list
     if return_additional_headers is not None:
-        headers = [default_U_header, default_t_header, default_cycle_header, default_current_header, *return_additional_headers]
+        headers = [
+            default_U_header,
+            default_t_header,
+            default_cycle_header,
+            default_current_header,
+            *return_additional_headers,
+        ]
     else:
-        headers = [default_U_header, default_t_header, default_cycle_header, default_current_header]
+        headers = [
+            default_U_header,
+            default_t_header,
+            default_cycle_header,
+            default_current_header,
+        ]
 
     meta, data = read_hlo(path, keep_keys=headers)
 
     if return_metadata:
-        return  meta['column_headings'], pd.DataFrame(data)
+        return meta["column_headings"], pd.DataFrame(data)
     else:
-        return pd.DataFrame(data) 
-    
+        return pd.DataFrame(data)
+
+
 # fitting helper function
 def sawtooth2(time, amplitude, period, phase, offset):
     """This helper function generates a sawtooth wave with the following parameters:
@@ -841,15 +874,14 @@ def sawtooth2(time, amplitude, period, phase, offset):
 
     returns: a voltage value or a voltage array
     """
-    return (amplitude * sawtooth((2 * np.pi * time) / (period) - phase, 0.5) + offset) 
-
+    return amplitude * sawtooth((2 * np.pi * time) / (period) - phase, 0.5) + offset
 
 
 def extract_average_spectrum_in_voltage_window(
-        DOD_dataframe: pd.DataFrame,
-        voltage_window_lower: float,
-        voltage_window_upper: float
-        ):
+    DOD_dataframe: pd.DataFrame,
+    voltage_window_lower: float,
+    voltage_window_upper: float,
+):
     """
     This function takes in a DOD dataframe and uses pandas groupby operations to average
     collumns whose collumn names fall within the voltage window. The function returns an
@@ -875,58 +907,67 @@ def extract_average_spectrum_in_voltage_window(
     return data
 
 
-
 if __name__ == "__main__":
 
     spec1 = SpEC()
 
-    spec1.read_CV('CV-3.3.0.0__0.hlo')
+    spec1.read_CV("CV-3.3.0.0__0.hlo")
 
-    spec1.read_spec_parquet('spectra_calibrated.parquet')
-
+    spec1.read_spec_parquet("spectra_calibrated.parquet")
 
     spec1.populate_spec_scans()
 
-    spec1.populate_interpolation('interpolation.json')
+    spec1.populate_interpolation("interpolation.json")
 
     spec1.populate_CV_scans()
 
-
-    test, test2 = calculateDOD(spec1, 1, 'anodic', 0.0)
+    test, test2 = calculateDOD(spec1, 1, "anodic", 0.0)
 
     test.index
 
-
     for key, value in spec1.CV_scans.items():
 
-            for key2, value2 in value.items():
-                CV=spec1.CV_scans[key][key2]
-                if key2 == 'anodic':
-                    test, ref =calculateDOD(spec1, key, key2, -2, 21)
-                    Co_plot_DOD_and_CV(test,
-                                        CV,
-                                            Title=f'cycle {key} {key2}',
-                                            y_max=0.2, y_min=-0.01,
-                                                x_min=400, x_max=800,
-                                                reference_potential=f"$ {ref}V_{{Ag/AgCl}}$",
-                                                    scan_direction=key2,
-                                                    cmap_option=cmc.roma)
-                elif key2 == 'cathodic':
-                    test, ref =calculateDOD(spec1, key, key2, -2, 21)
-                    Co_plot_DOD_and_CV(test,
-                                        CV,
-                                            Title=f'cycle {key} {key2}',
-                                            y_max=0.2, y_min=-0.04,
-                                                x_min=400, x_max=800,
-                                                reference_potential=f"$ {ref}V_{{Ag/AgCl}}$",
-                                                    scan_direction=key2,
-                                                    cmap_option=cmc.roma)
-                #plt.savefig(os.path.join(full_output_path, f'Cycle_{key}_{key2}.png'))
-                plt.close() 
+        for key2, value2 in value.items():
+            CV = spec1.CV_scans[key][key2]
+            if key2 == "anodic":
+                test, ref = calculateDOD(spec1, key, key2, -2, 21)
+                Co_plot_DOD_and_CV(
+                    test,
+                    CV,
+                    Title=f"cycle {key} {key2}",
+                    y_max=0.2,
+                    y_min=-0.01,
+                    x_min=400,
+                    x_max=800,
+                    reference_potential=f"$ {ref}V_{{Ag/AgCl}}$",
+                    scan_direction=key2,
+                    cmap_option=cmc.roma,
+                )
+            elif key2 == "cathodic":
+                test, ref = calculateDOD(spec1, key, key2, -2, 21)
+                Co_plot_DOD_and_CV(
+                    test,
+                    CV,
+                    Title=f"cycle {key} {key2}",
+                    y_max=0.2,
+                    y_min=-0.04,
+                    x_min=400,
+                    x_max=800,
+                    reference_potential=f"$ {ref}V_{{Ag/AgCl}}$",
+                    scan_direction=key2,
+                    cmap_option=cmc.roma,
+                )
+            # plt.savefig(os.path.join(full_output_path, f'Cycle_{key}_{key2}.png'))
+            plt.close()
 
-            data, ref=calculateDOD(spec1, 0, 'cathodic', -0.2, 21)
-    plot_DOD(data, y_max=0.16, y_min=-0.01, x_min=400, x_max=800, reference_potential=f"$ {ref}V_{{Ag/AgCl}}$")
+        data, ref = calculateDOD(spec1, 0, "cathodic", -0.2, 21)
+    plot_DOD(
+        data,
+        y_max=0.16,
+        y_min=-0.01,
+        x_min=400,
+        x_max=800,
+        reference_potential=f"$ {ref}V_{{Ag/AgCl}}$",
+    )
 
-    pd.read_parquet('spectra_calibrated.parquet')
-
-
+    pd.read_parquet("spectra_calibrated.parquet")

@@ -5,9 +5,10 @@ from ..logger import script_log
 
 
 class LeancatSession:
-    
+
     def __init__(self) -> None:
         pass
+
 
 commands_queue = queue.Queue()
 
@@ -53,4 +54,3 @@ def create_timestamp_annotation(description="") -> int:
     resp_session_id = res[0][0]
     script_log.debug(f"Created new timestamp annotation with id: {resp_session_id}")
     return resp_session_id
-

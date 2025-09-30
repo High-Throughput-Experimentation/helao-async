@@ -1,6 +1,4 @@
-""" A device class for the KD Scientific Legato 100 series syringe pump.
-
-"""
+"""A device class for the KD Scientific Legato 100 series syringe pump."""
 
 __all__ = []
 
@@ -12,11 +10,8 @@ from typing import Optional
 
 # import traceback
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.error import ErrorCodes
 from helao.core.servers.base import Base
@@ -196,7 +191,9 @@ class KDS100:
                             else:
                                 continue
                         if state != self.last_state:
-                            LOGGER.info(f"pump state changed from '{self.last_state}' to '{state}'")
+                            LOGGER.info(
+                                f"pump state changed from '{self.last_state}' to '{state}'"
+                            )
                             self.last_state = state
                         rate = int(addrstate_rate.split(state_split)[-1])
                         pumptime = int(pumptime)
@@ -298,7 +295,9 @@ class KDS100:
     #     "Set infusion|withdraw ramp rate in units TODO"
     #     pass
 
-    async def clear_time(self, pump_name: Optional[str] = None, direction: Optional[int] = 0):
+    async def clear_time(
+        self, pump_name: Optional[str] = None, direction: Optional[int] = 0
+    ):
         if direction == 1:
             cmd = "citime"
         elif direction == -1:

@@ -6,7 +6,7 @@ __all__ = [
     "generate_sample_no_list",
     "load_liquid_sample",
     "create_and_load_liquid_sample",
-    "orch_sub_wait"
+    "orch_sub_wait",
 ]
 
 
@@ -33,6 +33,7 @@ PAL_server = MachineModel(
 
 ORCH_HOST = gethostname()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
+
 
 def create_liquid_sample(
     experiment: Experiment,
@@ -163,9 +164,7 @@ def create_assembly_sample(
     ]
     solid_list = [
         SolidSample(machine_name="legacy", plate_id=plate_id, sample_no=sample_no)
-        for plate_id, sample_no in zip(
-            solid_plate_ids, solid_sample_nos
-        )
+        for plate_id, sample_no in zip(solid_plate_ids, solid_sample_nos)
     ]
 
     # combine all samples now in a partlist
@@ -254,26 +253,20 @@ def load_liquid_sample(
     machine_name: str = "hte-xxxx-xx",
     tray: int = 0,
     slot: int = 0,
-    vial: int = 0
+    vial: int = 0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    liquid = LiquidSample(
-        sample_no=liquid_sample_no, machine_name=machine_name
-    )
+    liquid = LiquidSample(sample_no=liquid_sample_no, machine_name=machine_name)
 
     apm.add(
         PAL_server,
         "archive_tray_load",
-        {
-            "load_sample_in": liquid,
-            "tray": tray,
-            "slot": slot,
-            "vial": vial
-        },
+        {"load_sample_in": liquid, "tray": tray, "slot": slot, "vial": vial},
     )
 
     return apm.planned_actions  # returns complete action list to orch
+
 
 def create_and_load_liquid_sample(
     experiment: Experiment,
@@ -290,7 +283,7 @@ def create_and_load_liquid_sample(
     comment: str = "comment",
     tray: int = 0,
     slot: int = 0,
-    vial: int = 0
+    vial: int = 0,
 ):
     """creates a custom liquid sample
     input fields contain json strings"""
@@ -318,22 +311,18 @@ def create_and_load_liquid_sample(
                 )
             ],
         },
-        to_global_params=["_fast_sample_out"]
+        to_global_params=["_fast_sample_out"],
     )
 
-    
     apm.add(
         PAL_server,
         "archive_tray_load",
-        {
-            "tray": tray,
-            "slot": slot,
-            "vial": vial
-        },
-        from_global_act_params={"_fast_sample_out": "load_sample_in"}
+        {"tray": tray, "slot": slot, "vial": vial},
+        from_global_act_params={"_fast_sample_out": "load_sample_in"},
     )
 
     return apm.planned_actions  # returns complete action list to orch
+
 
 def orch_sub_wait(
     experiment: Experiment,
@@ -341,6 +330,6 @@ def orch_sub_wait(
     wait_time_s: float = 10,
 ):
     apm = ActionPlanMaker()
-       
+
     apm.add(ORCH_server, "wait", {"waittime": wait_time_s})
     return apm.planned_actions  # returns complete action list to orch

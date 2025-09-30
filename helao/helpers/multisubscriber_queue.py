@@ -14,36 +14,37 @@ class MultisubscriberQueue:
     Methods:
         __init__(**kwargs):
             Initializes the MultisubscriberQueue instance.
-        
+
         __len__():
             Returns the number of subscribers.
-        
+
         __contains__(q):
             Checks if a queue is in the list of subscribers.
-        
+
         async subscribe():
             Subscribes to data using an async generator. Instead of working with the Queue directly, the client can subscribe to data and have it yielded directly.
-        
+
         queue():
             Gets a new async Queue and adds it to the list of subscribers.
-        
+
         queue_context():
             Gets a new queue context wrapper. The queue context wrapper allows the queue to be automatically removed from the subscriber pool when the context is exited.
-        
+
         remove(q):
             Removes a queue from the pool of subscribers. Raises a KeyError if the queue does not exist.
-        
+
         async put(data: Any):
             Puts new data on all subscriber queues.
                 data: The data to be put on the queues.
-        
+
         put_nowait(data: Any):
             Puts new data on all subscriber queues without waiting.
                 data: The data to be put on the queues.
-        
+
         async close():
             Forces clients using MultisubscriberQueue.subscribe() to end iteration.
     """
+
     def __init__(self, **kwargs):
         """
         Initializes a new instance of the class.
@@ -80,8 +81,8 @@ class MultisubscriberQueue:
         Asynchronously subscribes to a queue and yields values from it.
 
         This coroutine function enters a queue context and continuously retrieves
-        values from the queue. It yields each value until it encounters a 
-        StopAsyncIteration, at which point it breaks the loop and stops the 
+        values from the queue. It yields each value until it encounters a
+        StopAsyncIteration, at which point it breaks the loop and stops the
         subscription.
 
         Yields:
@@ -182,6 +183,7 @@ class _QueueContext:
     Args:
         parent: The parent object that provides the queue management methods.
     """
+
     def __init__(self, parent):
         """
         Initializes the instance of the class.
@@ -197,7 +199,7 @@ class _QueueContext:
         Enter the runtime context related to this object.
 
         This method is called when the 'with' statement is used. It initializes
-        the queue attribute by calling the parent object's queue method and 
+        the queue attribute by calling the parent object's queue method and
         returns the queue.
 
         Returns:
@@ -210,7 +212,7 @@ class _QueueContext:
         """
         Exit the runtime context related to this object.
 
-        This method is called when the 'with' statement is used. It removes the 
+        This method is called when the 'with' statement is used. It removes the
         queue from the parent object.
 
         Parameters:

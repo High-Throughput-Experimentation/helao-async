@@ -16,14 +16,11 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 
-from helao.core.servers. vis import Vis
+from helao.core.servers.vis import Vis
 from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
@@ -64,9 +61,7 @@ class C_specvis:
         self.cmap = cm.get_cmap("Reds_r", self.max_spectra)
         self.latest_coloridx = 0
 
-        self.data_url = (
-            f"ws://{self.specserv_config['host']}:{self.specserv_config['port']}/ws_data"
-        )
+        self.data_url = f"ws://{self.specserv_config['host']}:{self.specserv_config['port']}/ws_data"
 
         self.wl = private_dispatcher(
             self.spec_key,

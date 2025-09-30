@@ -5,11 +5,7 @@ import os
 from datetime import datetime
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from importlib.util import spec_from_file_location
 from importlib.util import module_from_spec
 from importlib.machinery import SourceFileLoader
@@ -1694,7 +1690,6 @@ class Orch(Base):
             await self.estop_loop()
             return False
 
-
     async def orch_wait_for_all_actions(self):
         """
         Waits for all actions to complete.
@@ -2109,9 +2104,7 @@ class Orch(Base):
                         sub_sequence.sequence_codehash = self.sequence_codehash_lib[
                             sub_sequence.sequence_name
                         ]
-                    sub_sequence.run_sequence_parameter_variable = [
-                        run_seq_param
-                    ]
+                    sub_sequence.run_sequence_parameter_variable = [run_seq_param]
                     if len(self.sequence_dq) == 0:
                         self.active_run_id = gen_uuid()
                     self.sequence_dq.append(sub_sequence)

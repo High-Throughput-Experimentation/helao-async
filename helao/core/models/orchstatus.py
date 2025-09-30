@@ -16,6 +16,7 @@ class LoopStatus(str, Enum):
     stopped = "stopped"
     error = "error"
 
+
 class LoopIntent(str, Enum):
     estop = "estop"
     skip = "skip"

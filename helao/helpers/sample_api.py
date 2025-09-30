@@ -19,11 +19,7 @@ from uuid import UUID
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from .legacy_api import HTELegacyAPI
 from helao.core.models.sample import (
     AssemblySample,

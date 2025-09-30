@@ -49,7 +49,10 @@ from helao.core.models.machine import MachineModel
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
-from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
+from helao.deploy.hte.drivers.motion.galil_motion_driver import (
+    MoveModes,
+    TransformationModes,
+)
 from helao.deploy.hte.drivers.io.enum import TriggerType
 
 # list valid experiment functions
@@ -233,11 +236,7 @@ def ANEC_sub_heatoff(
 
     apm = ActionPlanMaker()
 
-    apm.add(
-        TEC_server,
-        "cancel_record_tec",
-        {}
-    )
+    apm.add(TEC_server, "cancel_record_tec", {})
     apm.add(TEC_server, "disable_tec", {})
 
     return apm.planned_actions
@@ -263,7 +262,7 @@ def ANEC_sub_setheat(
     apm.add(
         TEC_server,
         "record_tec",
-        {"duration": -1,"acquisition_rate": 0.2},
+        {"duration": -1, "acquisition_rate": 0.2},
         nonblocking=True,
     )
     # =============================================================================
@@ -429,6 +428,7 @@ def ANEC_sub_cleanup(
     apm.add_actions(ANEC_sub_drain_cell(experiment))
     return apm.planned_actions
 
+
 def ANEC_sub_GC_headspacealiquot_nomixing(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -464,6 +464,7 @@ def ANEC_sub_GC_headspacealiquot_nomixing(
         ],
     )
     return apm.planned_actions
+
 
 def ANEC_sub_GC_preparation(
     experiment: Experiment,
@@ -684,6 +685,7 @@ def ANEC_sub_aliquot_nomixing(
 
     return apm.planned_actions
 
+
 def ANEC_sub_aliquot(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -807,10 +809,7 @@ def ANEC_sub_CA(
         potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
     elif WE_versus == "rhe":
         potential_vsRef = (
-            WE_potential__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - REF_TABLE[ref_type]
+            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
         )
     apm.add(
         PAL_server,
@@ -861,10 +860,7 @@ def ANEC_sub_HeatCA(
         potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
     elif WE_versus == "rhe":
         potential_vsRef = (
-            WE_potential__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - REF_TABLE[ref_type]
+            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
         )
     apm.add(
         PAL_server,
@@ -983,10 +979,7 @@ def ANEC_sub_photo_CA(
         potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
     elif WE_versus == "rhe":
         potential_vsRef = (
-            WE_potential__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - REF_TABLE[ref_type]
+            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
         )
     apm.add(
         PAL_server,
@@ -1065,18 +1058,10 @@ def ANEC_sub_CV(
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
-        potential_init_vsRef = (
-            WE_potential_init__V - 1.0 * ref_offset__V
-        )
-        potential_apex1_vsRef = (
-            WE_potential_apex1__V - 1.0 * ref_offset__V
-        )
-        potential_apex2_vsRef = (
-            WE_potential_apex2__V - 1.0 * ref_offset__V
-        )
-        potential_final_vsRef = (
-            WE_potential_final__V - 1.0 * ref_offset__V
-        )
+        potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
+        potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
+        potential_apex2_vsRef = WE_potential_apex2__V - 1.0 * ref_offset__V
+        potential_final_vsRef = WE_potential_final__V - 1.0 * ref_offset__V
     elif WE_versus == "rhe":
         potential_init_vsRef = (
             WE_potential_init__V
@@ -1158,18 +1143,10 @@ def ANEC_sub_HeatCV(
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
-        potential_init_vsRef = (
-            WE_potential_init__V - 1.0 * ref_offset__V
-        )
-        potential_apex1_vsRef = (
-            WE_potential_apex1__V - 1.0 * ref_offset__V
-        )
-        potential_apex2_vsRef = (
-            WE_potential_apex2__V - 1.0 * ref_offset__V
-        )
-        potential_final_vsRef = (
-            WE_potential_final__V - 1.0 * ref_offset__V
-        )
+        potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
+        potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
+        potential_apex2_vsRef = WE_potential_apex2__V - 1.0 * ref_offset__V
+        potential_final_vsRef = WE_potential_final__V - 1.0 * ref_offset__V
     elif WE_versus == "rhe":
         potential_init_vsRef = (
             WE_potential_init__V
@@ -1276,18 +1253,12 @@ def ANEC_sub_photo_CV(
     toggle_illum_time: float = -1,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    CV_duration_sec = (
-        abs(WE_potential_apex1__V - WE_potential_init__V)
-        / ScanRate_V_s
-    )
-    CV_duration_sec += (
-        abs(WE_potential_final__V - WE_potential_apex2__V)
-        / ScanRate_V_s
-    )
+    CV_duration_sec = abs(WE_potential_apex1__V - WE_potential_init__V) / ScanRate_V_s
+    CV_duration_sec += abs(WE_potential_final__V - WE_potential_apex2__V) / ScanRate_V_s
     CV_duration_sec += (
         abs(WE_potential_apex2__V - WE_potential_apex1__V)
         / ScanRate_V_s
-#        * Cycles
+        #        * Cycles
     )
     CV_duration_sec += (
         abs(WE_potential_apex2__V - WE_potential_apex1__V)
@@ -1299,18 +1270,10 @@ def ANEC_sub_photo_CV(
     if int(round(toggle_illum_time)) == -1:
         toggle_illum_time = CV_duration_sec
     if WE_versus == "ref":
-        potential_init_vsRef = (
-            WE_potential_init__V - 1.0 * ref_offset__V
-        )
-        potential_apex1_vsRef = (
-            WE_potential_apex1__V - 1.0 * ref_offset__V
-        )
-        potential_apex2_vsRef = (
-            WE_potential_apex2__V - 1.0 * ref_offset__V
-        )
-        potential_final_vsRef = (
-            WE_potential_final__V - 1.0 * ref_offset__V
-        )
+        potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
+        potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
+        potential_apex2_vsRef = WE_potential_apex2__V - 1.0 * ref_offset__V
+        potential_final_vsRef = WE_potential_final__V - 1.0 * ref_offset__V
     elif WE_versus == "rhe":
         potential_init_vsRef = (
             WE_potential_init__V
@@ -1536,20 +1499,13 @@ def ANEC_sub_photo_LSV(
     toggle_illum_time: float = -1,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    CV_duration_sec = (
-        abs(WE_potential_apex1__V - WE_potential_init__V)
-        / ScanRate_V_s
-    )
+    CV_duration_sec = abs(WE_potential_apex1__V - WE_potential_init__V) / ScanRate_V_s
 
     if int(round(toggle_illum_time)) == -1:
         toggle_illum_time = CV_duration_sec
     if WE_versus == "ref":
-        potential_init_vsRef = (
-            WE_potential_init__V - 1.0 * ref_offset__V
-        )
-        potential_apex1_vsRef = (
-            WE_potential_apex1__V - 1.0 * ref_offset__V
-        )
+        potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
+        potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
     elif WE_versus == "rhe":
         potential_init_vsRef = (
             WE_potential_init__V

@@ -12,14 +12,11 @@ from fastapi import Body
 import pandas as pd
 
 from helao.helpers import helao_logging as logging
-
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 from helao.core.servers.base import Base
 from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class MotionSim:

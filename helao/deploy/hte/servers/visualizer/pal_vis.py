@@ -15,14 +15,10 @@ from bokeh.models import DataTable, TableColumn
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.data import DataPackageModel
-from helao.core.servers. vis import Vis
+from helao.core.servers.vis import Vis
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.core.error import ErrorCodes
 

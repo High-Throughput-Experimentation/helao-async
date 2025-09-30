@@ -189,12 +189,11 @@ def HISPEC_sub_engage(
     # calibrate_intensity: bool = False,
     max_integration_time: int = 150,
     # illumination_source: str = "doric_wled",
-    ):
+):
 
     # raise z (engage)
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    
     apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
     # close vent valves
     for item in ("we_vent", "ce_vent"):
@@ -322,7 +321,7 @@ def HISPEC_sub_startup(
         )
     )
 
-    #get sample plate coordinates
+    # get sample plate coordinates
     apm.add(
         MOTOR_server,
         "solid_get_samples_xy",

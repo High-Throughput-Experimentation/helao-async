@@ -35,6 +35,7 @@ class zdeque(deque):
         index(x):
             Return the index of item `x` after pickling and compressing it.
     """
+
     def __init__(self, *args, **kwargs):
         """
         Initialize a new instance of the class.
@@ -72,7 +73,7 @@ class zdeque(deque):
         """
         Remove and return an object from the left end of the deque.
 
-        This method overrides the `popleft` method of the superclass to 
+        This method overrides the `popleft` method of the superclass to
         decompress and deserialize the object using `pyzstd` and `pickle`.
 
         Returns:
@@ -85,7 +86,7 @@ class zdeque(deque):
         """
         Remove and return an object from the deque.
 
-        This method overrides the default `pop` method to decompress and 
+        This method overrides the default `pop` method to decompress and
         deserialize the object using `pyzstd` and `pickle` before returning it.
 
         Returns:

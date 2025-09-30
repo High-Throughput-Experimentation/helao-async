@@ -1,16 +1,10 @@
-""" Kinesis motor server
-
-"""
+"""Kinesis motor server"""
 
 __all__ = ["makeApp"]
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import time
 import asyncio
 from typing import Optional
@@ -73,7 +67,9 @@ class KinesisMotorExec(Executor):
             LOGGER.info("KinesisMotorExec starting motion.")
             resp = self.driver.move(self.axis_name, move_mode, move_value)
             error = (
-                ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+                ErrorCodes.none
+                if resp.response == "success"
+                else ErrorCodes.critical_error
             )
             return {"error": error}
         else:

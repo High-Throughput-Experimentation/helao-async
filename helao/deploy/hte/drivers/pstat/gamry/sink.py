@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+
 class GamryDtaqSink:
     """Event sink for reading data from Gamry device."""
+
     def __init__(self, dtaq):
         self.dtaq = dtaq
         self.acquired_points = []
@@ -30,6 +32,7 @@ class GamryDtaqSink:
 @dataclass
 class DummySink:
     """Dummy class for when the Gamry is not used."""
+
     dtaq: Optional[object] = None
     status: str = "idle"
     acquired_points: list = field(default_factory=list)

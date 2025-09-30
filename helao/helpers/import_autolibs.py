@@ -1,7 +1,6 @@
 __all__ = ["import_autolibs"]
 
 import os
-import time
 from typing import Optional
 from importlib.machinery import SourceFileLoader
 from helao.core.version import get_filehash
@@ -10,11 +9,7 @@ from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
 
 CONFIG = config_loader.CONFIG
-
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 def import_autolibs(
@@ -72,7 +67,7 @@ def import_autolibs(
             f"{library_type} path {library_dir} was specified but is not a valid directory",
         )
         return library_lib, library_codehash_lib
-    
+
     libs = world_config_dict.get(f"{library_type}_libraries", [])
     for lib in libs:
         get_libs(lib_dir=library_dir, lib_file=lib)

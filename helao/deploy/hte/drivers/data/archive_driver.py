@@ -26,11 +26,7 @@ import json
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.base import Base, Active
 from helao.core.error import ErrorCodes
 
@@ -585,7 +581,7 @@ class Archive:
                 ]
             )
             csv_filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%y%m%d-%H%M%S%f')}_ICPMS.csv"
-            
+
             await myactive.write_file(
                 file_type="pal_icpms_file",
                 filename=csv_filename,
@@ -594,7 +590,7 @@ class Archive:
                 header=headerline,
                 sample_str=None,
             )
-            
+
         else:
             LOGGER.info(f"Slot {slot} not found in positions dict. Cannot export.")
 

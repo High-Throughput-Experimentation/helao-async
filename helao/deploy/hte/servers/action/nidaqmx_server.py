@@ -20,7 +20,13 @@ from typing import List, Union
 
 from helao.core.servers.base_api import BaseAPI
 from ...drivers.io.nidaqmx_driver import cNIMAX, DevMonExec
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helao.core.error import ErrorCodes
@@ -204,7 +210,6 @@ def makeApp(server_key):
             finished_act = await active.finish()
             return finished_act.as_dict()
 
-
     if dev_multivalve:
 
         @app.post(f"/{server_key}/multivalve", tags=["action"])
@@ -310,7 +315,9 @@ def makeApp(server_key):
         async def cellIV(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+            fast_samples_in: List[
+                Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+            ] = Body([], embed=True),
             Tval: float = 10.0,
             SampleRate: int = Query(1.0, ge=1),
             TTLwait: int = -1,  # -1 disables, else select TTL channel
@@ -320,7 +327,7 @@ def makeApp(server_key):
                  SampleRate: samples per second
                  Tval: time of measurement in seconds
                  TTLwait: trigger channel, -1 disables, else select TTL channel"""
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "multiCV"
             active_dict = await app.driver.run_cell_IV(A)
             return active_dict
@@ -333,7 +340,9 @@ def makeApp(server_key):
             action_version: int = 1,
             duration: float = -1,
             acquisition_rate: float = 0.2,
-            fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+            fast_samples_in: List[
+                Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+            ] = Body([], embed=True),
         ):
             """Record NIMax monitor device channels."""
             active = await app.base.setup_and_contain_action()

@@ -1,5 +1,5 @@
 # shell: uvicorn motion_server:app --reload
-""" Analysis server
+"""Analysis server
 
 The analysis server produces and uploads ESAMP-style analyses to S3 and API,
 it differs from calc_server.py which does not produce Analysis models.
@@ -69,12 +69,12 @@ def makeApp(server_key):
     ):
         """Generates dry UVIS-T analyses from sequence_uuid."""
         active = await app.base.setup_and_contain_action()
-            
+
         await app.driver.batch_calc_dryuvis(
-            plate_id=active.action.action_params['plate_id'],
-            sequence_uuid=UUID(active.action.action_params['sequence_uuid']),
-            params=active.action.action_params['params'],
-            recent=active.action.action_params['recent'],
+            plate_id=active.action.action_params["plate_id"],
+            sequence_uuid=UUID(active.action.action_params["sequence_uuid"]),
+            params=active.action.action_params["params"],
+            recent=active.action.action_params["recent"],
         )
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -90,12 +90,12 @@ def makeApp(server_key):
     ):
         """Generates ECHEUVIS stability analyses from sequence_uuid."""
         active = await app.base.setup_and_contain_action()
-            
+
         await app.driver.batch_calc_echeuvis(
-            plate_id=active.action.action_params['plate_id'],
-            sequence_uuid=UUID(active.action.action_params['sequence_uuid']),
-            params=active.action.action_params['params'],
-            recent=active.action.action_params['recent'],
+            plate_id=active.action.action_params["plate_id"],
+            sequence_uuid=UUID(active.action.action_params["sequence_uuid"]),
+            params=active.action.action_params["params"],
+            recent=active.action.action_params["recent"],
         )
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -109,10 +109,10 @@ def makeApp(server_key):
     ):
         """Generates ICPMS concentration analyses from sequence zip path."""
         active = await app.base.setup_and_contain_action()
-            
+
         await app.driver.batch_calc_icpms_local(
-            sequence_zip_path=active.action.action_params['sequence_zip_path'],
-            params=active.action.action_params['params'],
+            sequence_zip_path=active.action.action_params["sequence_zip_path"],
+            params=active.action.action_params["params"],
         )
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -126,10 +126,10 @@ def makeApp(server_key):
     ):
         """Generates XRFS calibration analyses from sequence zip path."""
         active = await app.base.setup_and_contain_action()
-            
+
         await app.driver.batch_calc_xrfs_local(
-            sequence_zip_path=active.action.action_params['sequence_zip_path'],
-            params=active.action.action_params['params'],
+            sequence_zip_path=active.action.action_params["sequence_zip_path"],
+            params=active.action.action_params["params"],
         )
         finished_action = await active.finish()
         return finished_action.as_dict()

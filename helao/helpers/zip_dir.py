@@ -4,10 +4,7 @@ import zipfile
 
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 def rm_tree(pth):
@@ -23,7 +20,7 @@ def rm_tree(pth):
         OSError: If an error occurs while deleting a file or directory.
     """
     pth = Path(pth)
-    for child in pth.glob('*'):
+    for child in pth.glob("*"):
         if child.is_file():
             child.unlink()
         else:

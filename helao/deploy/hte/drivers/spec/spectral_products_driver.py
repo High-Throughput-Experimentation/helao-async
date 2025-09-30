@@ -9,10 +9,6 @@ import traceback
 import numpy as np
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
 from helao.core.models.file import FileConnParams, HloHeaderModel
@@ -24,6 +20,9 @@ from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.core.servers.base import Base, Active
 from ...drivers.io.enum import TriggerType
 from ...drivers.spec.enum import SpecTrigType
+
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class SM303:
@@ -178,7 +177,9 @@ class SM303:
             self.wl_saved = (ctypes.c_double * 1024)()
             self.spec.spGetWLTable(ctypes.byref(self.wl_saved), self.dev_num)
             self.pxwl = list(self.wl_saved)
-            LOGGER.info(f"Loaded wavelength range from EEPROM: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels.")
+            LOGGER.info(
+                f"Loaded wavelength range from EEPROM: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
+            )
             self.ready = True
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))

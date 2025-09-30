@@ -1,4 +1,4 @@
-""" Motion simulation server
+"""Motion simulation server
 
 FastAPI server host for the websocket simulator driver.
 
@@ -14,14 +14,17 @@ import numpy as np
 
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.core.models.sample import AssemblySample, LiquidSample, GasSample,SolidSample, NoneSample
+from helao.core.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+)
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.base import Base, Executor
 from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
@@ -50,6 +53,7 @@ class WsSim:
     def shutdown(self):
         pass
 
+
 class WsExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -76,6 +80,7 @@ class WsExec(Executor):
             "data": live_dict,
         }
 
+
 def makeApp(server_key):
 
     app = BaseAPI(
@@ -92,7 +97,9 @@ def makeApp(server_key):
         action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
-        fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
     ):
         """Record simulated data."""
         active = await app.base.setup_and_contain_action()

@@ -1,5 +1,4 @@
-""" Andor Camera driver for Helao
-"""
+"""Andor Camera driver for Helao"""
 
 from pyAndorSDK3 import AndorSDK3, CameraException
 import numpy as np
@@ -11,11 +10,7 @@ from pyAndorSpectrograph.spectrograph import ATSpectrograph
 # save a default log file system temp
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 from helao.core.drivers.helao_driver import (
     HelaoDriver,
@@ -602,7 +597,13 @@ class AndorDriver(HelaoDriver):
             self.cleanup()
         return response
 
-    def get_data(self, frames: int, total_duration: float, external: bool = True, first_tick: Optional[float] = None) -> DriverResponse:
+    def get_data(
+        self,
+        frames: int,
+        total_duration: float,
+        external: bool = True,
+        first_tick: Optional[float] = None,
+    ) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
             status = DriverStatus.busy

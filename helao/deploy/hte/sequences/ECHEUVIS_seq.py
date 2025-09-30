@@ -1118,12 +1118,8 @@ def ECHEUVIS_diagnostic_CV(
             "CA_duration_sec": 10,
             "gamry_i_range": "1mA",
             "illumination_source": led_name_CA,
-            "illumination_wavelength": led_wavelengths_nm[
-                led_names.index(led_name_CA)
-            ],
-            "illumination_intensity": led_intensities_mw[
-                led_names.index(led_name_CA)
-            ],
+            "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA)],
+            "illumination_intensity": led_intensities_mw[led_names.index(led_name_CA)],
             "illumination_intensity_date": led_date,
             "illumination_side": led_type,
             "toggle_illum_duty": toggleCA_illum_duty,
@@ -1160,12 +1156,8 @@ def ECHEUVIS_diagnostic_CV(
             "reference_electrode_type": "NHE",
             "ref_vs_nhe": ref_vs_nhe,
             "illumination_source": led_name_CA,
-            "illumination_wavelength": led_wavelengths_nm[
-                led_names.index(led_name_CA)
-            ],
-            "illumination_intensity": led_intensities_mw[
-                led_names.index(led_name_CA)
-            ],
+            "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA)],
+            "illumination_intensity": led_intensities_mw[led_names.index(led_name_CA)],
             "illumination_intensity_date": led_date,
             "illumination_side": led_type,
             "toggle_illum_duty": 1.0,
@@ -1371,7 +1363,7 @@ def ECHEUVIS_multiCA_led(
                     "z_height": cell_engaged_z,
                     "fill_wait": cell_fill_wait,
                     "calibrate_intensity": True,
-                    "max_integration_time": int(1000 * toggleSpec_period / spec_n_avg)
+                    "max_integration_time": int(1000 * toggleSpec_period / spec_n_avg),
                 },
             )
         else:

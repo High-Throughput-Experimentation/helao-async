@@ -29,6 +29,7 @@ class SequenceTemplate(BaseModel, HelaoDict):
         planned_experiments (List[ExperimentTemplate]): List of planned experiments in the sequence.
         from_global_seq_params (dict): Parameters received from global sequence context.
     """
+
     sequence_name: Optional[str] = None
     sequence_params: dict = {}
     sequence_label: Optional[str] = "noLabel"
@@ -40,6 +41,7 @@ class SequenceTemplate(BaseModel, HelaoDict):
     run_id: Optional[UUID] = None
     run_sequence_parameter_variable: Optional[List[str]] = None
     from_global_seq_params: dict = {}
+
 
 class SequenceModel(SequenceTemplate):
     """
@@ -63,6 +65,7 @@ class SequenceModel(SequenceTemplate):
         campaign_name (Optional[str]): Name of the campaign.
         manual_action (bool): If True, sequence contains manual actions.
     """
+
     hlo_version: Optional[str] = Field(default_factory=get_hlo_version)
     access: Optional[str] = "hte"
     dummy: bool = False

@@ -16,13 +16,10 @@ from bokeh.models import Button
 from bokeh.events import ButtonClick
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers. vis import Vis
+from helao.core.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 from helao.helpers.dispatcher import async_private_dispatcher
 
@@ -57,7 +54,9 @@ class C_potvis:
         self.last_update_time = time.time()
 
         self.potentiostat_key = serv_key
-        self.potserv_config = self.vis.world_cfg["servers"].get(self.potentiostat_key, None)
+        self.potserv_config = self.vis.world_cfg["servers"].get(
+            self.potentiostat_key, None
+        )
         if self.potserv_config is None:
             return
         self.potserv_host = self.potserv_config.get("host", None)
@@ -346,8 +345,12 @@ class C_potvis:
                 self.datasource.data = {key: [] for key in self.data_dict_keys}
                 if action_name in AXIS_MAP:
                     xlab, ylab = AXIS_MAP[action_name]
-                    self.xaxis_selector_group.update(active=self.data_dict_keys.index(xlab))
-                    self.yaxis_selector_group.update(active=self.data_dict_keys.index(ylab))
+                    self.xaxis_selector_group.update(
+                        active=self.data_dict_keys.index(xlab)
+                    )
+                    self.yaxis_selector_group.update(
+                        active=self.data_dict_keys.index(ylab)
+                    )
                     self.xselect = self.xaxis_selector_group.active
                     self.yselect = self.yaxis_selector_group.active
                 self._add_plots()

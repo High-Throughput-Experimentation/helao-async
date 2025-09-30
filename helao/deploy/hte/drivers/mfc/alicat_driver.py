@@ -1,13 +1,13 @@
-""" A device class for the AliCat mass flow controller.
+"""A device class for the AliCat mass flow controller.
 
 This device class uses the python implementation from https://github.com/numat/alicat
-and additional methods from https://documents.alicat.com/Alicat-Serial-Primer.pdf. The 
+and additional methods from https://documents.alicat.com/Alicat-Serial-Primer.pdf. The
 default gas list included in the module code differs from our MFC at G16 (i-C4H10),
-G25 (He-25), and G26 (He-75). Update the gas list registers in case any of the 3 gases 
+G25 (He-25), and G26 (He-75). Update the gas list registers in case any of the 3 gases
 are used.
 
 NOTE: Factory default control setpoint is analog and must be changed for driver operation.
-Setpoint setup (Menu-Control-Setpoint_setup-Setpoint_source) has to be set to serial. 
+Setpoint setup (Menu-Control-Setpoint_setup-Setpoint_source) has to be set to serial.
 
 """
 
@@ -23,11 +23,6 @@ from typing import Union, Optional
 import numpy as np
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
-    
 from helao.core.error import ErrorCodes
 from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
@@ -36,7 +31,7 @@ from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.helpers.ws_subscriber import WsSyncClient as WSC
 
-# setup pressure control and ramping
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class AliCatMFC:
@@ -142,9 +137,15 @@ class AliCatMFC:
                     try:
                         resp_dict = fc.get_status()
                     except Exception as e:
-                        LOGGER.info(f"Exception occured on get_status() {e}. Resetting MFC.")
-                        self.make_fc_instance(dev_name, self.config_dict["devices"][dev_name])
-                        self.fcs[dev_name]._set_control_point(self.fcs_last_mode[dev_name], 5)
+                        LOGGER.info(
+                            f"Exception occured on get_status() {e}. Resetting MFC."
+                        )
+                        self.make_fc_instance(
+                            dev_name, self.config_dict["devices"][dev_name]
+                        )
+                        self.fcs[dev_name]._set_control_point(
+                            self.fcs_last_mode[dev_name], 5
+                        )
                         LOGGER.info("MFC connection restored")
                         continue
                     # self.base.print_message(
@@ -516,7 +517,9 @@ class MfcConstPresExec(MfcExec):
             and not self.filling
             and iter_time - self.last_fill >= self.refill_freq
         ):
-            LOGGER.info(f"pressure below {self.target_pressure}, filling {fill_scc} scc over {fill_time} seconds")
+            LOGGER.info(
+                f"pressure below {self.target_pressure}, filling {fill_scc} scc over {fill_time} seconds"
+            )
             self.filling = True
             openvlv_resp = await self.active.driver.hold_cancel(
                 device_name=self.device_name,
@@ -578,7 +581,9 @@ class MfcConstConcExec(MfcExec):
             return
         co2serv_host = co2serv_config.get("host", None)
         co2serv_port = co2serv_config.get("port", None)
-        LOGGER.info(f"subscribing to {self.co2serv_key} at {co2serv_host}:{co2serv_port}")
+        LOGGER.info(
+            f"subscribing to {self.co2serv_key} at {co2serv_host}:{co2serv_port}"
+        )
 
         self.wsc = WSC(co2serv_host, co2serv_port, "ws_live")
 

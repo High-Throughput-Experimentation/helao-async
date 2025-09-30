@@ -4,6 +4,7 @@ Parameter keys are ordered according to GamryCOM.GamrySignal* Init() args, and n
 modified as little as possible with the exception of ScanRate -> AcqInterval__s.
 
 """
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Union
 from enum import StrEnum
@@ -110,22 +111,12 @@ ISIGNAL_RUPDN = GamrySignal(
 
 VSIGNAL_ARRAY = GamrySignal(
     name="GamryCOM.GamrySignalArray",
-    param_keys=[
-        "Cycles",
-        "AcqInterval__s",
-        "AcqPointsPerCycle",
-        "SignalArray__V"
-    ],
+    param_keys=["Cycles", "AcqInterval__s", "AcqPointsPerCycle", "SignalArray__V"],
     mode=ControlMode.PstatMode,
 )
 
 ISIGNAL_ARRAY = GamrySignal(
     name="GamryCOM.GamrySignalArray",
-    param_keys=[
-        "Cycles",
-        "AcqInterval__s",
-        "AcqPointsPerCycle",
-        "SignalArray__V"
-    ],
+    param_keys=["Cycles", "AcqInterval__s", "AcqPointsPerCycle", "SignalArray__V"],
     mode=ControlMode.GstatMode,
 )

@@ -12,10 +12,7 @@ from helao.core.servers.vis import Vis
 from helao.helpers.config_loader import CONFIG
 from helao.helpers import helao_logging as logging
 
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:

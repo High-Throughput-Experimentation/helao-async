@@ -46,7 +46,6 @@ def CP_loop(
 
     epm = ExperimentPlanMaker()
 
-
     # CP
     epm.add(
         "PSTAT_exp_CP",
@@ -68,7 +67,4 @@ def CP_loop(
         },
     )
 
-
     return epm.planned_experiments  # returns complete experiment list
-
-

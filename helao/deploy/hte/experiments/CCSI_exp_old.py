@@ -43,7 +43,10 @@ from helao.core.models.sample import SolidSample, LiquidSample, GasSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
-from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
+from helao.deploy.hte.drivers.motion.galil_motion_driver import (
+    MoveModes,
+    TransformationModes,
+)
 from helao.deploy.hte.drivers.io.enum import TriggerType
 
 # list valid experiment functions
@@ -66,7 +69,6 @@ WATERCLEANPUMP_server = MachineModel(
     server_name="SYRINGE1", machine_name=ORCH_HOST
 ).as_dict()
 toggle_triggertype = TriggerType.fallingedge
-
 
 
 def CCSI_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
@@ -197,7 +199,7 @@ def CCSI_sub_alloff(
 def CCSI_sub_headspace_purge_and_measure(
     experiment: Experiment,
     experiment_version: int = 6,
-    HSpurge_duration: float = 20, 
+    HSpurge_duration: float = 20,
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
     co2measure_duration: float = 20,
@@ -211,13 +213,15 @@ def CCSI_sub_headspace_purge_and_measure(
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
     else:
 
-#
-# DILUTION PURGE        
+        #
+        # DILUTION PURGE
         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": DeltaDilute1_duration})  # DeltaDilute time usually 15
+        apm.add(
+            ORCH_server, "wait", {"waittime": DeltaDilute1_duration}
+        )  # DeltaDilute time usually 15
 
-#
-# MAIN HEADSPACE PURGE
+    #
+    # MAIN HEADSPACE PURGE
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
@@ -234,13 +238,13 @@ def CCSI_sub_headspace_purge_and_measure(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
- 
+
     if initialization:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
-#
-# HEADSPACE EVALUATION
+    #
+    # HEADSPACE EVALUATION
     apm.add(
         CO2S_server,
         "acquire_co2",
@@ -255,14 +259,13 @@ def CCSI_sub_headspace_purge_and_measure(
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
-
     return apm.planned_actions
 
 
 def CCSI_sub_drain(
     experiment: Experiment,
-    experiment_version: int = 5,  
-    HSpurge_duration: float = 20,  
+    experiment_version: int = 5,
+    HSpurge_duration: float = 20,
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
     recirculation: bool = False,
@@ -274,13 +277,15 @@ def CCSI_sub_drain(
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
     else:
 
-#
-# DILUTION PURGE        
+        #
+        # DILUTION PURGE
         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": DeltaDilute1_duration})  # DeltaDilute time usually 15
+        apm.add(
+            ORCH_server, "wait", {"waittime": DeltaDilute1_duration}
+        )  # DeltaDilute time usually 15
 
-#
-# MAIN HEADSPACE PURGE and FILL
+    #
+    # MAIN HEADSPACE PURGE and FILL
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
@@ -306,8 +311,6 @@ def CCSI_sub_drain(
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
 
     return apm.planned_actions
-
-
 
 
 def CCSI_sub_initialization_end_state(
@@ -365,10 +368,17 @@ def CCSI_sub_initialization_firstpart(
     Sensorpurge1_duration: float = 15,
     #    DeltaDilute1_duration: float = 15,
 ):
- #   
- # ALL OFF
+    #
+    # ALL OFF
     apm = ActionPlanMaker()
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0,},)
+    apm.add(
+        NI_server,
+        "pump",
+        {
+            "pump": "RecirculatingPeriPump1",
+            "on": 0,
+        },
+    )
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0}, asc.no_wait)
@@ -384,8 +394,8 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "9", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
-#
-# MAIN HEADSPACE PURGE and FILL
+    #
+    # MAIN HEADSPACE PURGE and FILL
     # headspace flow purge cell via v1 v6
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
@@ -415,8 +425,8 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": Alphapurge1_duration})
 
-#
-# AUX PROBE PURGE
+    #
+    # AUX PROBE PURGE
     # eche probe flow purge via v5
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 1}, asc.no_wait)
@@ -426,8 +436,8 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": Probepurge1_duration})
 
-#
-# pCO2 SENSOR PURGE
+    #
+    # pCO2 SENSOR PURGE
     # only valve 3 closed //differ from probe purge
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": Sensorpurge1_duration})
@@ -971,7 +981,8 @@ def CCSI_sub_co2maintainconcentration(
         {
             "flowrate_sccm": flowrate_sccm,
             "ramp_sccm_sec": flowramp_sccm,
-            "duration": co2measure_duration + 30,  # arbitrary time to allow for final correction
+            "duration": co2measure_duration
+            + 30,  # arbitrary time to allow for final correction
             "target_co2_ppm": target_co2_ppm,
             "headspace_scc": headspace_scc,
             "refill_freq_sec": refill_freq_sec,
@@ -998,7 +1009,6 @@ def CCSI_sub_co2maintainconcentration(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
-
 
     #    apm.add(ORCH_server, "wait", {"waittime": co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
@@ -1066,9 +1076,11 @@ def CCSI_sub_flowflush(
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     return apm.planned_actions
 
+
 #
 # PRE CL
 #
+
 
 def CCSI_sub_clean_inject(
     experiment: Experiment,
@@ -1105,8 +1117,8 @@ def CCSI_sub_clean_inject(
         apm.add(ORCH_server, "wait", {"waittime": 5.25})
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
 
-#
-# LIQUID FILL
+    #
+    # LIQUID FILL
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 1}, asc.no_wait)
@@ -1130,16 +1142,14 @@ def CCSI_sub_clean_inject(
     )
     apm.add(ORCH_server, "wait", {"waittime": 5.25})
 
-
     apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
     apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait)
     apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait)
     apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": LiquidCleanWait_s})
 
-
-#
-# HEADSPACE REC
+    #
+    # HEADSPACE REC
     # mfc off, v2, v1ab v7 close
     # mfc off
     apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
@@ -1203,8 +1213,8 @@ def CCSI_sub_clean_inject(
             from_global_act_params={"_present_volume_ul": "present_syringe_volume_ul"},
         )
 
-#
-# LIQUID DRAIN
+    #
+    # LIQUID DRAIN
     apm.add_actions(
         CCSI_sub_drain(
             experiment=experiment,

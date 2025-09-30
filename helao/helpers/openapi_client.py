@@ -300,9 +300,11 @@ class OpenAPIClient:
                         op_details=operation_spec,
                     )
 
-                    method_name = operation_spec.get(
-                        "summary", operation_id.lower()
-                    ).lower().replace(" ", "_")
+                    method_name = (
+                        operation_spec.get("summary", operation_id.lower())
+                        .lower()
+                        .replace(" ", "_")
+                    )
                     setattr(
                         self, method_name, method_function.__get__(self, self.__class__)
                     )

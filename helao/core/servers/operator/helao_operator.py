@@ -19,32 +19,33 @@ class HelaoOperator:
     Methods:
         __init__(config_arg, orch_key):
             Initializes the HelaoOperator with the given configuration and orchestrator key.
-        
+
         request(endpoint: str, path_params: dict = {}, json_params: dict = {}):
             Sends a request to the orchestrator server and returns the response.
-        
+
         start():
             Dispatches a start request to the orchestrator server.
-        
+
         stop():
             Dispatches a stop request to the orchestrator server.
-        
+
         orch_state():
             Retrieves the current state of the orchestrator.
-        
+
         get_active_experiment():
             Retrieves the currently active experiment.
-        
+
         get_active_sequence():
             Retrieves the currently active sequence.
-        
+
         add_experiment(experiment: Experiment, index: int = -1):
             Adds an experiment to the active sequence or creates a new sequence.
-        
+
         add_sequence(sequence: Sequence):
             Adds a sequence to the orchestrator queue.
     """
-    def __init__(self, config_arg: str, orch_key:str = "ORCH"):
+
+    def __init__(self, config_arg: str, orch_key: str = "ORCH"):
         """
         Initializes the HelaoOperator instance.
 
@@ -90,7 +91,7 @@ class HelaoOperator:
             json_params (dict, optional): The JSON parameters to include in the request. Defaults to {}.
 
         Returns:
-            dict: The response from the request. If an exception occurs, returns a dictionary with 
+            dict: The response from the request. If an exception occurs, returns a dictionary with
                   "orch_state", "loop_state", and "loop_intent" set to "unreachable".
         """
         try:
@@ -192,7 +193,7 @@ class HelaoOperator:
         Adds a sequence to the operator.
 
         Args:
-            sequence (Sequence): The sequence object to be added. It should have a method `as_dict` 
+            sequence (Sequence): The sequence object to be added. It should have a method `as_dict`
                                   that converts the sequence to a dictionary format.
 
         Returns:
@@ -212,7 +213,7 @@ class HelaoOperator:
             List of 50 most recently dispatched sequence uuids.
         """
         return self.request("latest_sequence_uuids")
-    
+
     def get_latest_experiments(self):
         """
         Retrieve list of most recent experiment uuids.
@@ -223,7 +224,7 @@ class HelaoOperator:
             List of 50 most recently dispatched experiment uuids.
         """
         return self.request("latest_experiment_uuids")
-    
+
     def get_latest_actions(self):
         """
         Retrieve list of most recent action uuids.
@@ -234,4 +235,3 @@ class HelaoOperator:
             List of 50 most recently dispatched action uuids.
         """
         return self.request("latest_action_uuids")
-    

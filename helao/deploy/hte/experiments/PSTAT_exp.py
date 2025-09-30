@@ -5,7 +5,10 @@ from helao.helpers.premodels import Experiment, ActionPlanMaker
 
 __all__ = ["PSTAT_exp_CP"]
 EXPERIMENTS = __all__
-PSTAT_server = MachineModel(server_name="PSTAT", machine_name=gethostname().lower()).as_dict()
+PSTAT_server = MachineModel(
+    server_name="PSTAT", machine_name=gethostname().lower()
+).as_dict()
+
 
 def PSTAT_exp_CP(
     experiment: Experiment,
@@ -51,10 +54,18 @@ def PSTAT_exp_CP(
         "alert_above": alert_above,
         "alert_sleep__s": alert_sleep_sec,
         "alertTreshEwe_V": alert_thresh_Ewe_V,
-        "SetStopXMin": float(stop_voltage_min) if stop_voltage_min!="" else None,
-        "SetStopXMax": float(stop_voltage_max) if stop_voltage_max!="" else None,
-        "SetStopAtDelayXMin": int(stop_voltage_min_delay_pts) if stop_voltage_min_delay_pts!="" else None,
-        "SetStopAtDelayXMax": int(stop_voltage_max_delay_pts) if stop_voltage_max_delay_pts!="" else None,
+        "SetStopXMin": float(stop_voltage_min) if stop_voltage_min != "" else None,
+        "SetStopXMax": float(stop_voltage_max) if stop_voltage_max != "" else None,
+        "SetStopAtDelayXMin": (
+            int(stop_voltage_min_delay_pts)
+            if stop_voltage_min_delay_pts != ""
+            else None
+        ),
+        "SetStopAtDelayXMax": (
+            int(stop_voltage_max_delay_pts)
+            if stop_voltage_max_delay_pts != ""
+            else None
+        ),
     }
 
     for _ in range(num_repeats):

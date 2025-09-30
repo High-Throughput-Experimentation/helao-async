@@ -8,9 +8,7 @@ class MetaProcessor(ABC):
         self.meta = meta
         self.meta_type = meta.__class__.__name__.lower()
         self.global_params = (
-            core.global_params
-            if core.__class__.__name__.lower() == "orch"
-            else {}
+            core.global_params if core.__class__.__name__.lower() == "orch" else {}
         )
 
     @abstractmethod

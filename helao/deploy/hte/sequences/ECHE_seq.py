@@ -101,8 +101,8 @@ def ECHE_4CA_led_1CV_led(
     preCV_duration: float = 3,
     OCV_duration: float = 1,
     gamry_i_range: str = "auto",
-    gamrychannelwait: int= -1,
-    gamrychannelsend: int= 0,
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 0,
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -661,8 +661,8 @@ def ECHE_CA_led(
     CA_samplerate_sec: float = 0.05,
     OCV_duration: float = 1,
     gamry_i_range: str = "auto",
-    gamrychannelwait: int= -1,
-    gamrychannelsend: int= 0,
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 0,
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -760,8 +760,8 @@ def ECHE_CV_led(
     CV_cycles: int = 1,
     preCV_duration: float = 3,
     gamry_i_range: str = "auto",
-    gamrychannelwait: int= -1,
-    gamrychannelsend: int= 0,
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 0,
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -923,8 +923,8 @@ def ECHE_CP_led(
     CP_duration_sec: float = 15,
     CP_samplerate_sec: float = 0.05,
     gamry_i_range: str = "auto",
-    gamrychannelwait: int= -1,
-    gamrychannelsend: int= 0,
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 0,
     led_name_CP: str = "doric_led1",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -992,6 +992,7 @@ def ECHE_CP_led(
         epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
+
 
 def ECHE_CVs_CAs(
     sequence_version: int = 1,
@@ -1188,6 +1189,7 @@ def ECHE_CVs_CAs(
 
     return epm.planned_experiments  # returns complete experiment list
 
+
 def ECHE_cleanCVs_regCVs_CAs(
     sequence_version: int = 1,
     plate_id: int = 6307,
@@ -1269,7 +1271,7 @@ def ECHE_cleanCVs_regCVs_CAs(
         #         "CA_duration_sec": preCV_duration,
         #     },
         # )
-        #CVcleansweepfirst
+        # CVcleansweepfirst
         epm.add(
             "ECHE_sub_CV",
             {
@@ -1290,7 +1292,6 @@ def ECHE_cleanCVs_regCVs_CAs(
                 "ref_offset__V": ref_offset__V,
             },
         )
-
 
         # CV1
         epm.add(

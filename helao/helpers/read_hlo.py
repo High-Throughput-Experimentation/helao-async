@@ -66,4 +66,3 @@ def read_hlo(
         meta = {}
 
     return meta, data
-

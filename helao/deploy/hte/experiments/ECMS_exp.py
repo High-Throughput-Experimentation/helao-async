@@ -50,6 +50,7 @@ from helao.helpers.ref_electrode import REF_TABLE
 # from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.deploy.hte.drivers.io.enum import TriggerType
 from typing import List
+
 # list valid experiment functions
 EXPERIMENTS = __all__
 
@@ -578,6 +579,7 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     apm.add(ORCH_server, "wait", {"waittime": MS_baseline_duration})
     return apm.planned_actions
 
+
 def ECMS_sub_headspace_purge_and_Arbaseline(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -595,7 +597,7 @@ def ECMS_sub_headspace_purge_and_Arbaseline(
     # Fill cell with liquid
     apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 1})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 1})   
+    apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 1})
     apm.add(
         CALIBRATIONMFCSECOND_server,
         "set_flowrate",
@@ -612,13 +614,14 @@ def ECMS_sub_headspace_purge_and_Arbaseline(
         {"device_name": "Caligassecond"},
         asc.no_wait,
     )
-    
+
     apm.add(ORCH_server, "wait", {"waittime": Arequilibrium_duration})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": MS_baseline_duration})
     return apm.planned_actions
+
 
 def ECMS_sub_electrolyte_recirculation_on(
     experiment: Experiment,
@@ -1207,6 +1210,7 @@ def ECMS_sub_threegascali(
 
     return apm.planned_actions
 
+
 def ECMS_sub_inertgascali(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -1237,9 +1241,8 @@ def ECMS_sub_inertgascali(
         asc.no_wait,
     )
     # set Calibration gas flow rate
-    #apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
     # cali gas one
-
 
     # cali gas two
     apm.add(
@@ -1261,6 +1264,7 @@ def ECMS_sub_inertgascali(
     apm.add(ORCH_server, "wait", {"waittime": MSsignal_quilibrium_time})
 
     return apm.planned_actions
+
 
 def ECMS_sub_pulsecali(
     experiment: Experiment,
@@ -1345,7 +1349,7 @@ def ECMS_sub_pulsecali(
 #             ProcessContrib.samples_out,
 #         ],
 #     )
-# 
+#
 #     # ORCH/wait with no wait condition for CO2 flow duration time
 #     apm.add(
 #         ORCH_server,
@@ -1388,29 +1392,30 @@ def ECMS_sub_pulsecali(
 #         {"device_name": "Caligassecond"},
 #         start_condition=asc.no_wait,
 #     )
-# 
-#         
+#
+#
 #     apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
 #     # apm.add(ORCH_server, "wait", {"waittime": 10})
-# 
+#
 #     return apm.planned_actions
-# 
+#
 # =============================================================================
 def ECMS_sub_preCA_CO2flow(
     experiment: Experiment,
     experiment_version: int = 1,
     MS_equilibrium_time: float = 10.0,
     total_MFC_flow_rate_sccm: float = 10.0,
-    flow_change_duration_sec: List[float] = [10.0,60.0],
-    CO2_flow_rate_sccm: List[float] = [0.0,10.0],
-    #inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
+    flow_change_duration_sec: List[float] = [10.0, 60.0],
+    CO2_flow_rate_sccm: List[float] = [0.0, 10.0],
+    # inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-
-    for cycle, (CO2_flow_duration_sec, CO2_flow_rate) in enumerate(zip(flow_change_duration_sec, CO2_flow_rate_sccm)):
-    # ORCH/wait with no wait condition for CO2 flow duration time
-        inert_gas_flow_rate_sccm= total_MFC_flow_rate_sccm-CO2_flow_rate
+    for cycle, (CO2_flow_duration_sec, CO2_flow_rate) in enumerate(
+        zip(flow_change_duration_sec, CO2_flow_rate_sccm)
+    ):
+        # ORCH/wait with no wait condition for CO2 flow duration time
+        inert_gas_flow_rate_sccm = total_MFC_flow_rate_sccm - CO2_flow_rate
         apm.add(
             ORCH_server,
             "wait",
@@ -1433,8 +1438,9 @@ def ECMS_sub_preCA_CO2flow(
             MFC_server,
             "cancel_hold_valve_action",
             {"device_name": "CO2"},
-            start_condition=asc.no_wait,)
-            
+            start_condition=asc.no_wait,
+        )
+
         # CALIBRATIONMFCSECOND for inert gas set flow rate
         apm.add(
             CALIBRATIONMFCSECOND_server,
@@ -1454,7 +1460,6 @@ def ECMS_sub_preCA_CO2flow(
             start_condition=asc.no_wait,
         )
 
-        
     apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
@@ -1474,9 +1479,9 @@ def ECMS_sub_CA_CO2flow(
     pH: float = 6.8,
     MS_equilibrium_time: float = 10.0,
     total_MFC_flow_rate_sccm: float = 10.0,
-    flow_change_duration_sec: List[float] = [60.0,60.0,60.0],
-    CO2_flow_rate_sccm: List[float] = [0.0,10.0,0.0],
-    #inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
+    flow_change_duration_sec: List[float] = [60.0, 60.0, 60.0],
+    CO2_flow_rate_sccm: List[float] = [0.0, 10.0, 0.0],
+    # inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
@@ -1513,9 +1518,11 @@ def ECMS_sub_CA_CO2flow(
         ],
     )
 
-    for cycle, (CO2_flow_duration_sec, CO2_flow_rate) in enumerate(zip(flow_change_duration_sec, CO2_flow_rate_sccm)):
-    # ORCH/wait with no wait condition for CO2 flow duration time
-        inert_gas_flow_rate_sccm= total_MFC_flow_rate_sccm-CO2_flow_rate
+    for cycle, (CO2_flow_duration_sec, CO2_flow_rate) in enumerate(
+        zip(flow_change_duration_sec, CO2_flow_rate_sccm)
+    ):
+        # ORCH/wait with no wait condition for CO2 flow duration time
+        inert_gas_flow_rate_sccm = total_MFC_flow_rate_sccm - CO2_flow_rate
         apm.add(
             ORCH_server,
             "wait",
@@ -1538,8 +1545,9 @@ def ECMS_sub_CA_CO2flow(
             MFC_server,
             "cancel_hold_valve_action",
             {"device_name": "CO2"},
-            start_condition=asc.no_wait,)
-            
+            start_condition=asc.no_wait,
+        )
+
         # CALIBRATIONMFCSECOND for inert gas set flow rate
         apm.add(
             CALIBRATIONMFCSECOND_server,
@@ -1559,7 +1567,6 @@ def ECMS_sub_CA_CO2flow(
             start_condition=asc.no_wait,
         )
 
-        
     apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 

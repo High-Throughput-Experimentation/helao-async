@@ -16,13 +16,10 @@ from bokeh.models import Button
 from bokeh.events import ButtonClick
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers. vis import Vis
+from helao.core.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 from helao.helpers.dispatcher import async_private_dispatcher
 
@@ -133,7 +130,7 @@ class C_biovis:
             for ch in range(self.num_channels)
         ]
 
-        for i,x in enumerate(self.stop_buttons):
+        for i, x in enumerate(self.stop_buttons):
             x.on_event(ButtonClick, partial(self.callback_stop_measure, channel=i))
 
         # generate 2-column layout for potentiostat channels
@@ -154,7 +151,9 @@ class C_biovis:
         self.plot_divs = [
             vert_item
             for vert_group in zip(
-                self.stop_buttons, self.vert_groups, [Spacer(height=10)] * len(self.vert_groups)
+                self.stop_buttons,
+                self.vert_groups,
+                [Spacer(height=10)] * len(self.vert_groups),
             )
             for vert_item in vert_group
         ]
@@ -335,8 +334,12 @@ class C_biovis:
                 }
                 if action_name in AXIS_MAP:
                     xlab, ylab = AXIS_MAP[action_name]
-                    self.xaxis_selector_group.update(active=self.data_dict_keys.index(xlab))
-                    self.yaxis_selector_group.update(active=self.data_dict_keys.index(ylab))
+                    self.xaxis_selector_group.update(
+                        active=self.data_dict_keys.index(xlab)
+                    )
+                    self.yaxis_selector_group.update(
+                        active=self.data_dict_keys.index(ylab)
+                    )
                     self.xselect = self.xaxis_selector_group.active
                     self.yselect = self.yaxis_selector_group.active
                 self._add_plots(channel)

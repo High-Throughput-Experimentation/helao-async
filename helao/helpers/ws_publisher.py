@@ -28,6 +28,7 @@ class WsPublisher:
         broadcast(websocket: WebSocket):
             Subscribes to the source queue and broadcasts transformed messages to the WebSocket connection.
     """
+
     active_connections: List[WebSocket]
 
     def __init__(self, source_queue, xform_func=lambda x: x):
@@ -36,7 +37,7 @@ class WsPublisher:
 
         Args:
             source_queue (queue.Queue): The source queue from which messages will be consumed.
-            xform_func (callable, optional): A transformation function to apply to each message. 
+            xform_func (callable, optional): A transformation function to apply to each message.
                                              Defaults to a no-op function (lambda x: x).
 
         Attributes:

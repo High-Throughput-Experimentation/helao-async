@@ -54,7 +54,9 @@ class Db:
 
         self._connection = None
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10))
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10)
+    )
     @reconnect
     def query(self, sql, *args):
         try:
@@ -75,7 +77,9 @@ class Db:
         except Exception as e:
             return "Error: " + str(e)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10))
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10)
+    )
     @reconnect
     def check_notifications(self):
         msgArray = []

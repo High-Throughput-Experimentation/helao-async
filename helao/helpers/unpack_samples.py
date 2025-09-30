@@ -3,34 +3,43 @@ __all__ = ["unpack_samples_helper"]
 from typing import List, Tuple, Union
 
 from helao.core.models.sample import (
-                            AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample,
-                            SampleType
-                           )
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+    SampleType,
+)
 
-def unpack_samples_helper(samples: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-] = []) -> Tuple[List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-],List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]:
+
+def unpack_samples_helper(
+    samples: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = [],
+) -> Tuple[
+    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+]:
     """
-    Unpacks a list of samples into separate lists based on their sample type.
+        Unpacks a list of samples into separate lists based on their sample type.
 
-    This function takes a list of samples, which can include nested assembly samples,
-    and recursively unpacks them into separate lists for liquid, solid, and gas samples.
+        This function takes a list of samples, which can include nested assembly samples,
+        and recursively unpacks them into separate lists for liquid, solid, and gas samples.
 
-    Args:
-        samples (List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]): A list of samples to be unpacked. Each sample can be of type
-                                        liquid, solid, gas, or assembly. Assembly samples can contain
-                                        other samples, including nested assemblies.
+        Args:
+            samples (List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ]): A list of samples to be unpacked. Each sample can be of type
+                                            liquid, solid, gas, or assembly. Assembly samples can contain
+                                            other samples, including nested assemblies.
 
-    Returns:
-        Tuple[List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-]]: A tuple containing three lists:
-            - liquid_list: List of liquid samples.
-            - solid_list: List of solid samples.
-            - gas_list: List of gas samples.
+        Returns:
+            Tuple[List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ], List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ]]: A tuple containing three lists:
+                - liquid_list: List of liquid samples.
+                - solid_list: List of solid samples.
+                - gas_list: List of gas samples.
     """
     liquid_list = []
     solid_list = []
@@ -42,8 +51,9 @@ def unpack_samples_helper(samples: List[Union[AssemblySample, LiquidSample, GasS
             for part in sample.parts:
                 if part.sample_type == SampleType.assembly:
                     # recursive unpacking
-                    tmp_liquid_list, tmp_solid_list, tmp_gas_list = \
-                        unpack_samples_helper(samples = [part])
+                    tmp_liquid_list, tmp_solid_list, tmp_gas_list = (
+                        unpack_samples_helper(samples=[part])
+                    )
                     for s in tmp_liquid_list:
                         liquid_list.append(s)
                     for s in tmp_gas_list:

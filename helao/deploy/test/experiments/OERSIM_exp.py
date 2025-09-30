@@ -33,9 +33,7 @@ def OERSIM_sub_load_plate(
 ):
     apm = ActionPlanMaker()
     apm.add(CPSIM_server, "change_plate", {"plate_id": plate_id})
-    apm.add(
-        CPSIM_server, "get_loaded_plate", {}, to_global_params=["_loaded_plate_id"]
-    )
+    apm.add(CPSIM_server, "get_loaded_plate", {}, to_global_params=["_loaded_plate_id"])
     apm.add(
         GPSIM_server,
         "initialize_plate",
@@ -53,15 +51,13 @@ def OERSIM_sub_measure_CP(
     init_random_points: int = 5,
 ):
     apm = ActionPlanMaker()
-    apm.add(
-        CPSIM_server, "get_loaded_plate", {}, to_global_params=["_loaded_plate_id"]
-    )
+    apm.add(CPSIM_server, "get_loaded_plate", {}, to_global_params=["_loaded_plate_id"])
     apm.add(
         GPSIM_server,
         "acquire_point",
         {},
         from_global_act_params={"_loaded_plate_id": "plate_id"},
-        to_global_params=["_feature"]
+        to_global_params=["_feature"],
     )
     apm.add(
         CPSIM_server, "measure_cp", {}, from_global_act_params={"_feature": "comp_vec"}

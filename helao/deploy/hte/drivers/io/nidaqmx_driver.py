@@ -29,10 +29,9 @@ from helao.core.models.data import DataModel
 from helao.core.models.hlostatus import HloStatus
 
 from helao.helpers import helao_logging as logging
-if logging.LOGGER is None:
-    LOGGER = logging.make_logger(__file__)
-else:
-    LOGGER = logging.LOGGER
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
 
 class cNIMAX:
     def __init__(self, action_serv: Base):
@@ -495,7 +494,9 @@ class cNIMAX:
                                 self.IO_do_meas = await self.IO_signalq.get()
                             await asyncio.sleep(0.1)
 
-                        LOGGER.info(f"NImax IV finished with IO_do_meas {self.IO_do_meas}")
+                        LOGGER.info(
+                            f"NImax IV finished with IO_do_meas {self.IO_do_meas}"
+                        )
 
                         # await self.IO_signalq.put(False)
                         self.IO_do_meas = False
