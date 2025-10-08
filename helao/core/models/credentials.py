@@ -20,6 +20,7 @@ class HelaoCredentials(BaseSettings):
     JUMPBOX_USER: str = ""
     JUMPBOX_KEYFILE: str = ""
     OPENAPI_JSON: str = ""
+    PLATE_API_KEY: str = ""
 
     def __init__(self, _env_file: str | Path, **kwargs):
         if not isinstance(_env_file, Path):
