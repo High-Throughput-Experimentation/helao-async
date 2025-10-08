@@ -35,6 +35,7 @@ dependencies:
   - joblib
   - jupyterlab
   - matplotlib
+  - mendeleev
   - mpltern
   - munch
   - ntplib
