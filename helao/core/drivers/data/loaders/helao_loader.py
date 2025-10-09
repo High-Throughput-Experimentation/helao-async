@@ -80,11 +80,15 @@ class HelaoLoader:
         self.s3_cache = {}  # {s3_path: hlo_dict}
         self.sql_cache = {}  # {(uuid, type): json_dict}
 
-    def get_json(self, helao_type: str, uuid: UUID):
-        obj = self.res.Object(
-            bucket_name="helao.data", key=f"{helao_type}/{str(uuid)}.json"
-        )
+    def get_bytes(self, s3_bucket: str, s3_key: str):
+        obj = self.res.Object(bucket_name=s3_bucket, key=s3_key)
         obytes = io.BytesIO(obj.get()["Body"].read())
+        return obytes
+
+    def get_json(self, helao_type: str, uuid: UUID):
+        obytes = self.get_bytes(
+            s3_bucket="helao.data", s3_key=f"{helao_type}/{str(uuid)}.json"
+        )
         md = json.load(obytes)
         return md
 
