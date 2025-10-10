@@ -757,7 +757,7 @@ Bases: `object`
 Driver class for API push and S3 upload operations.
 
 config_dict = {
-: “aws_config_path”: “path_to_AWS_CONFIG_FILE”,
+: “aws_config_path”: “path_to_AWS_CONFIG_PATH”,
   “aws_bucket”: “helao.data.testing”
 
 }

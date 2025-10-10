@@ -611,7 +611,7 @@ class DBPack:
     """Driver class for API push and S3 upload operations.
 
     config_dict = {
-        "aws_config_path": "path_to_AWS_CONFIG_FILE",
+        "aws_config_path": "path_to_AWS_CONFIG_PATH",
         "aws_bucket": "helao.data.testing"
     }
     """
@@ -620,7 +620,7 @@ class DBPack:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
-        os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
+        os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
         self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
         self.s3 = self.aws_session.client("s3")
         self.bucket = self.config_dict["aws_bucket"]

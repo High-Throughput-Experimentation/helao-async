@@ -152,7 +152,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         )
         self.s3 = pgs3.LOADER.cli
         self.s3r = pgs3.LOADER.res
-        # os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
+        # os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
         # self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
         # self.s3 = self.aws_session.client("s3")
         self.bucket = pgs3.LOADER.s3_bucket
