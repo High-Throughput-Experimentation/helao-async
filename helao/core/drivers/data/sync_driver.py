@@ -1018,7 +1018,6 @@ class HelaoSyncer:
                 aws_access_key_id= self.config_dict["aws_access_key_id"],
                 aws_secret_access_key=self.config_dict["aws_secret_access_key"],
                 region_name=self.config_dict["region"],
-                profile_name=self.config_dict["aws_profile"]
             )
             self.s3 = self.aws_session.client("s3")
             self.s3r = boto3.resource("s3")
