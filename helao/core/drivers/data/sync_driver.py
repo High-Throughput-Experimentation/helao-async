@@ -993,7 +993,7 @@ class HelaoSyncer:
         cparser = ConfigParser()
         if "AWS_CONFIG_FILE" in os.environ:
             with open(os.environ["AWS_CONFIG_FILE"]) as f:
-                cparser.read(f)
+                cparser.read_file(f)
             aws_config = {k: dict(v) for k,v in cparser.items()}
             self.config_dict.update(aws_config.get(self.config_dict["aws_profile"], {}))
             self.config_dict["aws_config_path"] = os.environ["AWS_CONFIG_FILE"]
