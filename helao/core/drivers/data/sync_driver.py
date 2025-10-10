@@ -991,12 +991,14 @@ class HelaoSyncer:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         cparser = ConfigParser()
-        if "AWS_CONFIG_FILE" in os.environ:
-            with open(os.environ["AWS_CONFIG_FILE"]) as f:
+        if "AWS_CONFIG_PATH" in os.environ:
+            with open(os.environ["AWS_CONFIG_PATH"]) as f:
                 cparser.read_file(f)
-            aws_config = {k: dict(v) for k,v in cparser.items()}
-            self.config_dict.update(aws_config.get(self.config_dict["aws_profile"], {}))
-            self.config_dict["aws_config_path"] = os.environ["AWS_CONFIG_FILE"]
+            aws_profile = self.config_dict.get("aws_profile", "")
+            if aws_profile in cparser:
+                aws_config = dict(cparser[aws_profile])
+                self.config_dict.update(aws_config)
+                self.config_dict["aws_config_path"] = os.environ["AWS_CONFIG_PATH"]
         
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 8)
@@ -1009,7 +1011,7 @@ class HelaoSyncer:
                 "params", {}
             )
         if "aws_config_path" in self.config_dict:
-            os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
+            os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
             self.aws_session = boto3.Session(
                 profile_name=self.config_dict["aws_profile"]
             )
