@@ -1000,6 +1000,7 @@ class HelaoSyncer:
                 LOGGER.info(aws_config)
                 self.config_dict.update(aws_config)
                 self.config_dict["aws_config_path"] = os.environ["AWS_CONFIG_PATH"]
+                self.config_dict["aws_profile"] = aws_profile
         
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 8)
