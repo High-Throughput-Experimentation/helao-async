@@ -994,7 +994,7 @@ class HelaoSyncer:
         if "AWS_CONFIG_PATH" in os.environ:
             with open(os.environ["AWS_CONFIG_PATH"]) as f:
                 cparser.read_file(f)
-            aws_profile = self.config_dict.get("aws_profile", "")
+            aws_profile = self.config_dict.get("aws_profile", "default")
             if aws_profile in cparser:
                 aws_config = dict(cparser[aws_profile])
                 self.config_dict.update(aws_config)
