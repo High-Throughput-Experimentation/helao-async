@@ -1000,6 +1000,7 @@ class HelaoSyncer:
                 self.config_dict.update(aws_config)
                 self.config_dict["aws_config_path"] = os.environ["AWS_CONFIG_PATH"]
                 self.config_dict["aws_profile"] = aws_profile
+                LOGGER.info(self.config_dict)
         
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 8)
@@ -1014,6 +1015,9 @@ class HelaoSyncer:
         if "aws_config_path" in self.config_dict:
             os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
             self.aws_session = boto3.Session(
+                aws_access_key_id= self.config_dict["aws_access_key_id"],
+                aws_secret_access_key=self.config_dict["aws_secret_access_key"],
+                region_name=self.config_dict["region_name"],
                 profile_name=self.config_dict["aws_profile"]
             )
             self.s3 = self.aws_session.client("s3")
