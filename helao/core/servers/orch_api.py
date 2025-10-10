@@ -146,6 +146,7 @@ class OrchAPI(HelaoFastAPI):
                                     "process_uuid",
                                     "data_request_id",
                                     "campaign_name",
+                                    "campaign_uuid",
                                     "sync_data",
                                 ]:
                                     extra_params[k] = eval_val(v)
@@ -198,6 +199,7 @@ class OrchAPI(HelaoFastAPI):
                                 "process_uuid",
                                 "data_request_id",
                                 "campaign_name",
+                                "campaign_uuid",
                                 "sync_data",
                             ]:
                                 extra_params[k] = eval_val(v)

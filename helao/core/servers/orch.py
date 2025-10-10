@@ -1011,6 +1011,9 @@ class Orch(Base):
         self.active_experiment.orch_host = self.orch_host
         self.active_experiment.orch_port = self.orch_port
         self.active_experiment.sequence_uuid = self.active_sequence.sequence_uuid
+        if self.active_sequence.campaign_name:
+            self.active_experiment.campaign_name = self.active_sequence.campaign_name
+            self.active_experiment.campaign_uuid = self.active_sequence.campaign_uuid
         self.active_seq_exp_counter += 1
 
         # LOGGER.info("copying global vars to experiment")

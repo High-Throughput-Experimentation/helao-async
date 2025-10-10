@@ -31,7 +31,7 @@ class ProcessModel(ShortProcessModel):
     simulation: bool = False
     technique_name: Optional[str] = None
     run_type: Optional[str] = None
-    run_use: Optional[RunUse] = "data"
+    run_use: Optional[RunUse] = RunUse.data
     process_timestamp: Optional[datetime] = None
     process_params: Optional[dict] = {}
     process_group_index: Optional[int] = None
