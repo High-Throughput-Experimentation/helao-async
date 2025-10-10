@@ -29,7 +29,7 @@ from bokeh.models.widgets import FileInput
 
 from helao.helpers import helao_logging as logging
 from helao.core.servers.vis import Vis
-from helao.helpers.legacy_api import HTELegacyAPI
+from helao.helpers.plate_api import HTEPlateAPI
 from helao.core.models.data import DataModel
 from helao.core.error import ErrorCodes
 
@@ -43,7 +43,7 @@ class Aligner:
         self.vis = vis_serv
         self.motor = motor
         self.config_dict = self.vis.server_cfg.get("params", {})
-        self.dataAPI = HTELegacyAPI()
+        self.dataAPI = HTEPlateAPI()
         self.motorpos_q = asyncio.Queue()
 
         # flag to check if we actual should align

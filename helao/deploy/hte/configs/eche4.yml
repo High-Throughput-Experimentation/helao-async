@@ -161,7 +161,6 @@ servers:
   #   group: action
   #   fast: analysis_server
   #   params:
-  #     env_file: k:/users/hte/.credentials/helao_data.env
   #     local_only: false
   # CAM:
   #   host: hte-eche-04.htejcap.caltech.edu

@@ -41,7 +41,7 @@ from helao.helpers.to_json import parse_bokeh_input
 from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.helpers.gen_uuid import md5_string
 from helao.core.servers.vis import Vis
-from helao.helpers.legacy_api import HTELegacyAPI
+from helao.helpers.plate_api import HTEPlateAPI
 
 from helao.core.models.orchstatus import LoopStatus
 from helao.helpers.premodels import Sequence, Experiment
@@ -90,7 +90,7 @@ class BokehOperator:
     def __init__(self, vis_serv: Vis, orch):
         self.vis = vis_serv
         self.orch = orch
-        self.dataAPI = HTELegacyAPI()
+        self.dataAPI = HTEPlateAPI()
 
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.loaded_config_path = self.vis.world_cfg.get("loaded_config_path", "")

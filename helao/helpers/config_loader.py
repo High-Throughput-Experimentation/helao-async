@@ -103,13 +103,13 @@ def read_config(confArg, *args, **kwargs):
             )
     config["loaded_config_path"] = full_path
     config["helao_repo_root"] = helao_repo_root
+    config["helao_credentials_path"] = os.environ.get("HELAO_CREDENTIALS", "")
+    if "ALERT_CONFIG_PATH" in os.environ:
+        config["alert_config_path"] = os.environ["ALERT_CONFIG_PATH"]
     return config
 
 
 def load_global_config(confArg: str, set_global: bool = False):
-    helao_repo_root = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    )
     config_dict = read_config(confArg)
     if set_global:
         global CONFIG

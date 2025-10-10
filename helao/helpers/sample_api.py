@@ -20,7 +20,7 @@ from uuid import UUID
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from .legacy_api import HTELegacyAPI
+from .plate_api import HTEPlateAPI
 from helao.core.models.sample import (
     AssemblySample,
     LiquidSample,
@@ -584,7 +584,7 @@ class SolidSampleAPI(SampleModelAPI):
             Serv_class=Serv_class,
             extra_columns="plate_id INTEGER NOT NULL",
         )
-        self.legacyAPI = HTELegacyAPI()
+        self.legacyAPI = HTEPlateAPI()
 
     async def get_platemap(
         self,

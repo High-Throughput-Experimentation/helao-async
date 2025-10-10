@@ -49,7 +49,7 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.core.servers.base import Base, Active
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.zdeque import zdeque
-from helao.helpers.legacy_api import HTELegacyAPI
+from helao.helpers.plate_api import HTEPlateAPI
 from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.helpers import config_loader
 from helao.helpers.meta_processor import MetaProcessor
@@ -61,7 +61,7 @@ CONFIG = config_loader.CONFIG
 colorama.init(strip=not sys.stdout.isatty())
 
 
-LEGACY_API = HTELegacyAPI()
+PLATE_API = HTEPlateAPI()
 
 
 class Orch(Base):
@@ -820,11 +820,11 @@ class Orch(Base):
         plate_found = False
         if "solid_plate_id" in paramd or "plate_id" in paramd:
             # check for valid plate if solid_plate_id or plate_id is a sequence parameter
-            if LEGACY_API.has_access:
+            if PLATE_API.has_access:
                 for pid_key in ["solid_plate_id", "plate_id"]:
                     pid_val = paramd.get(pid_key, None)
                     if pid_val is not None:
-                        platemap = LEGACY_API.get_platemap_plateid(pid_val)
+                        platemap = PLATE_API.get_platemap_plateid(pid_val)
                         if platemap:
                             plate_found = True
                             LOGGER.info(
@@ -947,7 +947,7 @@ class Orch(Base):
                         f"Error uploading initial active sequence json to s3: {e}"
                     )
 
-            if self.verify_plates and LEGACY_API.has_access:
+            if self.verify_plates and PLATE_API.has_access:
                 plate_found = self.verify_plate_in_params(
                     self.active_sequence.sequence_params
                 )
@@ -1143,7 +1143,7 @@ class Orch(Base):
                     f"Error uploading initial active experiment json to s3: {e}"
                 )
 
-        if self.verify_plates and LEGACY_API.has_access:
+        if self.verify_plates and PLATE_API.has_access:
             plate_found = self.verify_plate_in_params(
                 self.active_experiment.experiment_params
             )
