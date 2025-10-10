@@ -24,6 +24,7 @@ import io
 import codecs
 import json
 import asyncio
+from configparser import ConfigParser
 from zipfile import ZipFile
 from pathlib import Path
 from datetime import datetime
@@ -989,6 +990,14 @@ class HelaoSyncer:
         """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
+        cparser = ConfigParser()
+        if "AWS_CONFIG_FILE" in os.environ:
+            with open(os.environ["AWS_CONFIG_FILE"]) as f:
+                cparser.read(f)
+            aws_config = {k: dict(v) for k,v in cparser.items()}
+            self.config_dict.update(aws_config.get(self.config_dict["aws_profile"], {}))
+            self.config_dict["aws_config_path"] = os.environ["AWS_CONFIG_FILE"]
+        
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 8)
         # to load this driver on orch, we check the default "DB" key or take a manually-specified key

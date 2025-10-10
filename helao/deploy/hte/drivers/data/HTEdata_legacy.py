@@ -6,7 +6,7 @@ __all__ = ["HTEdata"]
 
 
 from helao.core.servers.base import Base
-from helao.core.drivers.data import HTELegacyAPI
+from helao.core.drivers.data import HTEPlateAPI
 
 
 # class LocalDataHandler:
@@ -110,7 +110,7 @@ class HTEdata:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
 
-        self.dataAPI = HTELegacyAPI()
+        self.dataAPI = HTEPlateAPI()
 
     def get_platexycalibration(self, plateid: int, *args, **kwargs):
         return None
@@ -138,7 +138,7 @@ class HTEdata:
 
     def get_elements_plateid(self, plateid: int, *args, **kwargs) -> list:
         return self.dataAPI.get_elements_plateid(
-            plateid,
+            plateid=plateid,
             multielementink_concentrationinfo_bool=False,
             print_key_or_keyword="screening_print_id",
             exclude_elements_list=[""],

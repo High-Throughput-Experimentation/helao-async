@@ -107,10 +107,7 @@ servers:
     group: action
     fast: dbpack_server
     params:
-      aws_config_path: k:/users/hte/.credentials/aws_config.ini
       aws_profile: default
-      aws_bucket: helao.data
-      api_host: caltech-api.modelyst.com
       testing: false
     verbose: true
   CAM:
@@ -120,3 +117,10 @@ servers:
     fast: cam_server
     params:
       axis_ip: 192.168.200.230
+  ANA:
+    host: hte-uvis-04.htejcap.caltech.edu
+    port: 8014
+    group: action
+    fast: analysis_server
+    params:
+      local_only: false

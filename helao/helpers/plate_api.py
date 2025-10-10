@@ -1,24 +1,35 @@
 __all__ = ["HTEPlateAPI"]
 
+import os
+
 import pandas as pd
 import httpx
 import mendeleev
 
 from helao.helpers import helao_logging as logging
-from helao.helpers.openapi_client import OpenAPIClient
 from helao.core.drivers.data.loaders.helao_loader import HelaoLoader
+from helao.helpers.legacy_api import HTELegacyAPI
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class HTEPlateAPI:
     def __init__(self, env_file: str = ".env"):
-        self.loader = HelaoLoader(env_file=env_file)
-        self.ocli = OpenAPIClient(openapi_json_url=self.loader.hcred.OPENAPI_JSON)
+        if "HELAO_CREDENTIALS" in os.environ and not os.path.exists(env_file):
+            env_file = os.environ["HELAO_CREDENTIALS"]
+        try:
+            self.loader = HelaoLoader(env_file=env_file)
+        except Exception:
+            LOGGER.warning("Could not load HTEPlateAPI credentials from .env file.", exc_info=True)
+            self.loader = None
         self.map_cache = {}
+        self.legacy_plateid_threshold: int = 10000
+        self.legacy_api = HTELegacyAPI()
 
     @property
     def has_access(self):
+        if self.loader is None:
+            return self.legacy_api.has_access
         try:
             sts_client = self.loader.sess.client("sts")
             sts_client.get_caller_identity()
@@ -27,14 +38,14 @@ class HTEPlateAPI:
             LOGGER.error("No access to AWS services", exc_info=True)
             return False
 
-    def get_info(self, plate_id: int) -> dict | None:
+    def get_info(self, plateid: int) -> dict | None:
         try:
             ep: str = self.loader.hcred.OPENAPI_JSON.replace("/openapi.json", "")
-            ep += f"/plate/{plate_id}"
+            ep += f"/plate/{plateid}"
             resp: httpx.Response = httpx.get(ep)
             return resp.json()
         except Exception:
-            LOGGER.error("Cannot find plate_id info.", exc_info=True)
+            LOGGER.error("Cannot find plateid info.", exc_info=True)
             return None
 
     def get_platemap(self, map_id: int) -> pd.DataFrame:
@@ -63,8 +74,10 @@ class HTEPlateAPI:
         map_df["sample_no"] = map_df.Sample
         return map_df.to_dict(orient="records")
 
-    def get_info_plate_id(self, plate_id: int):
-        infod = self.get_info(plate_id)
+    def get_info_plateid(self, plateid: int):
+        if plateid < self.legacy_plateid_threshold:
+            return self.legacy_api.get_info_plateid(plateid)
+        infod = self.get_info(plateid)
         if infod is None:
             return None
         if "screening_map_id" not in infod:
@@ -72,24 +85,40 @@ class HTEPlateAPI:
         screening_map_id = infod["screening_map_id"]
         return self.get_platemapdlist(screening_map_id)
 
-    def check_plate_id(self, plate_id: int):
-        infod = self.get_info(plate_id)
-        # 1. checks that the plate_id (info file) exists
+    def get_platemap_plateid(self, plateid: int):
+        if plateid < self.legacy_plateid_threshold:
+            return self.legacy_api.get_platemap_plateid(plateid)
+        else:
+            return self.get_info_plateid(plateid)
+
+    def get_rcp_plateid(self, plateid: int):
+        LOGGER.info(f" ... get rcp for plateid: {plateid}")
+        return self.legacy_api.get_rcp_plateid(plateid)
+
+    def check_plateid(self, plateid: int):
+        if plateid < self.legacy_plateid_threshold:
+            return self.legacy_api.check_plateid(plateid)
+        infod = self.get_info(plateid)
+        # 1. checks that the plateid (info file) exists
         if infod is not None:
             return True
         else:
             return False
 
-    def check_printrecord_plate_id(self, plate_id: int):
-        infod = self.get_info(plate_id)
+    def check_printrecord_plateid(self, plateid: int):
+        if plateid < self.legacy_plateid_threshold:
+            return self.legacy_api.check_printrecord_plateid(plateid)
+        infod = self.get_info(plateid)
         if infod is not None:
             if "screening_print_id" not in infod:
                 return False
             else:
                 return True
 
-    def check_annealrecord_plate_id(self, plate_id: int):
-        infod = self.get_info(plate_id)
+    def check_annealrecord_plateid(self, plateid: int):
+        if plateid < self.legacy_plateid_threshold:
+            return self.legacy_api.check_annealrecord_plateid(plateid)
+        infod = self.get_info(plateid)
         if infod is not None:
             if "anneals" not in infod:
                 return False
@@ -107,15 +136,18 @@ class HTEPlateAPI:
         except Exception:
             LOGGER.error("Could not locate print_id.", exc_info=True)
 
-    def get_elements_plate_id(
+    def get_elements_plateid(
         self,
-        plate_id: int | dict,
+        plateid: int | dict,
         exclude_elements_list: list = [""],
+        **kwargs,
     ) -> list[str] | None:
-        if isinstance(plate_id, dict):
-            infofiled: dict = plate_id
+        if isinstance(plateid, dict):
+            infofiled: dict = plateid
         else:
-            infofiled: dict | None = self.get_info(plate_id)
+            if plateid < self.legacy_plateid_threshold:
+                return self.legacy_api.get_elements_plateid(plateid=plateid, exclude_elements_list=exclude_elements_list, **kwargs)
+            infofiled: dict | None = self.get_info(plateid)
             if infofiled is None:
                 return None
         print_id: str | None = infofiled.get("screening_print_id", None)
