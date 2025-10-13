@@ -12,3 +12,5 @@ class RunUse(str, Enum):
     standard = "standard"
     blank = "blank"
     preca_baseline = "preca_baseline"
+    pre_anneal = "pre_anneal"
+    post_anneal = "post_anneal"
