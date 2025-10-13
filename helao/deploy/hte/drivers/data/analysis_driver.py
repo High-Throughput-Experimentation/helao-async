@@ -272,8 +272,9 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                 dummy=self.world_config.get("dummy", True),
             )
             process_dict = pgs3.LOADER.get_prc(process_uuid, hmod=False)
-            if process_dict.get("data_request_id", None) is not None:
-                model_dict["data_request_id"] = process_dict["data_request_id"]
+            for pkey in ["data_request_id", "campaign_uuid", "campaign_name", "run_id"]:
+                if process_dict.get(pkey, None) is not None:
+                    model_dict[pkey] = process_dict[pkey]
             ana_tsstr = model_dict.get(
                 "analysis_timestamp", set_time().strftime("%Y-%m-%d %H:%M:%S.%f")
             )
