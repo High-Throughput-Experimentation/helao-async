@@ -30,7 +30,7 @@ class ShortAnalysisModel(BaseModel, HelaoDict):
 
 class AnalysisDataModel(BaseModel, HelaoDict):
     action_uuid: UUID
-    run_use: RunUse = "data"
+    run_use: RunUse = RunUse.data
     raw_data_path: str
     global_sample_label: Optional[str] = None
     composition: Optional[dict] = None
@@ -62,6 +62,8 @@ class AnalysisModel(ShortAnalysisModel):
     inputs: List[AnalysisDataModel]
     outputs: List[AnalysisOutputModel]
     data_request_id: Optional[UUID] = None
+    campaign_name: Optional[str] = None
+    campaign_uuid: Optional[UUID] = None
     # TODO: include run_type, process_timestamp, technique_name
 
 
