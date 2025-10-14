@@ -70,7 +70,11 @@ class HTEPlateAPI:
     def get_platemapdlist(self, map_id: int) -> list[dict]:
         map_df = self.get_platemap(map_id)
         for col in "ABCDEFGH":
-            map_df[col] = map_df[col].apply(lambda x: float(x.strip()))
+            try:
+                map_df[col] = map_df[col].apply(lambda x: float(x.strip()))
+            except Exception:
+                # already float
+                pass
         map_df["sample_no"] = map_df.Sample
         return map_df.to_dict(orient="records")
 
