@@ -143,7 +143,7 @@ class HTEPlateAPI:
         **kwargs,
     ) -> list[str] | None:
         if isinstance(plateid, dict):
-            infofiled: dict = plateid
+            infofiled = plateid
         else:
             if plateid < self.legacy_plateid_threshold:
                 return self.legacy_api.get_elements_plateid(plateid=plateid, exclude_elements_list=exclude_elements_list, **kwargs)
@@ -155,11 +155,19 @@ class HTEPlateAPI:
             return None
         printd = self.get_print(print_id)
 
-        els = [
-            d["chemical_id"].split("_target")[0].capitalize()
-            for d in printd["sources"]
-            if "_target_" in d["chemical_id"]
-        ]
-        el_syms = [mendeleev.element(el).symbol for el in els]
+        if printd is not None and self.loader is not None:
 
-        return [el for el in el_syms if el not in exclude_elements_list]
+            els = [
+                d["chemical_id"].split("_target")[0].capitalize()
+                for d in printd["sources"]
+                if "_target_" in d["chemical_id"]
+            ]
+            el_syms = [mendeleev.element(el).symbol for el in els]
+
+            return [el for el in el_syms if el not in exclude_elements_list]
+        
+        else:
+            LOGGER.warning("Could not retrieve elements.")
+            LOGGER.warning(f"printd: {printd}")
+            LOGGER.warning(f"loader: {self.loader}")
+            return None
