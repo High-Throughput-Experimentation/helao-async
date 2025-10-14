@@ -2,14 +2,24 @@ __all__ = ["gen_uuid"]
 
 import hashlib
 import uuid
+from datetime import datetime
 from uuid_extensions import uuid7
 from typing import Optional
 
 
-def gen_uuid(input: Optional[str] = None) -> uuid.UUID:
+def uuid7_from_datetime(dt) -> uuid.UUID:
+    "Generate a uuid7 from a datetime object."
+    return uuid7(int(dt.timestamp() * 1e9))
+
+
+def gen_uuid(input: Optional[str | int | datetime] = None) -> uuid.UUID:
     "Generate a uuid, encode with larger character set, and trucate."
     if input is None:
         return uuid7()
+    elif isinstance(input, datetime):
+        return uuid7_from_datetime(input)
+    elif isinstance(input, int):
+        return uuid7(input)
     else:
         return uuid.uuid5(uuid.NAMESPACE_URL, input)
 
