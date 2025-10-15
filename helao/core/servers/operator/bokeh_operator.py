@@ -1281,7 +1281,10 @@ class BokehOperator:
             campaign_name = self.input_campaign_name.value
             if campaign_name != "":
                 self.sequence.campaign_name = campaign_name
-                self.sequence.campaign_uuid = md5_string(campaign_name)
+                if self.input_campaign_uuid.value.strip() == "":
+                    self.sequence.campaign_uuid = md5_string(campaign_name)
+                else:
+                    self.sequence.campaign_uuid = self.input_campaign_uuid.value.strip()
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sequence, self.sequence)
             )
@@ -1299,7 +1302,10 @@ class BokehOperator:
             campaign_name = self.input_campaign_name.value
             if campaign_name != "":
                 self.sequence.campaign_name = campaign_name
-                self.sequence.campaign_uuid = md5_string(campaign_name)
+                if self.input_campaign_uuid.value.strip() == "":
+                    self.sequence.campaign_uuid = md5_string(campaign_name)
+                else:
+                    self.sequence.campaign_uuid = self.input_campaign_uuid.value.strip()
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sample_sequences, self.sequence)
             )
