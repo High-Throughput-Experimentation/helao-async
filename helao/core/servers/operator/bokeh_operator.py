@@ -504,6 +504,24 @@ class BokehOperator:
         )
         self.input_campaign_name2.on_change("value", self.callback_copy_campaign_name2)
 
+        self.input_campaign_uuid = TextInput(
+            value="",
+            title="campaign uuid",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        self.input_campaign_uuid.on_change("value", self.callback_copy_campaign_uuid)
+
+        self.input_campaign_uuid2 = TextInput(
+            value="",
+            title="campaign uuid",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        self.input_campaign_uuid2.on_change("value", self.callback_copy_campaign_uuid2)
+
         self.input_sequence_comment = TextAreaInput(
             value="",
             title="sequence comment",
@@ -564,6 +582,8 @@ class BokehOperator:
                             self.input_sequence_label,
                             Spacer(width=20),
                             self.input_campaign_name,
+                            Spacer(width=20),
+                            self.input_campaign_uuid,
                         ],
                         [self.input_sequence_comment],
                         [
@@ -607,6 +627,8 @@ class BokehOperator:
                             self.input_sequence_label2,
                             Spacer(width=20),
                             self.input_campaign_name2,
+                            Spacer(width=20),
+                            self.input_campaign_uuid2,
                         ],
                         [self.input_sequence_comment2],
                         [
@@ -1132,7 +1154,10 @@ class BokehOperator:
         campaign_name = self.input_campaign_name.value
         if campaign_name != "":
             seq.campaign_name = campaign_name
-            seq.campaign_uuid = md5_string(campaign_name)
+            if self.input_campaign_uuid.value.strip() == "":
+                seq.campaign_uuid = md5_string(campaign_name)
+            else:
+                seq.campaign_uuid = self.input_campaign_uuid.value.strip()
         self.vis.doc.add_next_tick_callback(partial(self.orch.add_sequence, seq))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -2208,6 +2233,24 @@ class BokehOperator:
                 self.update_input_value,
                 self.input_campaign_name,
                 self.input_campaign_name2.value,
+            )
+        )
+
+    def callback_copy_campaign_uuid(self, attr, old, new):
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                self.update_input_value,
+                self.input_campaign_uuid2,
+                self.input_campaign_uuid.value,
+            )
+        )
+
+    def callback_copy_campaign_uuid2(self, attr, old, new):
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                self.update_input_value,
+                self.input_campaign_uuid,
+                self.input_campaign_uuid2.value,
             )
         )
 
