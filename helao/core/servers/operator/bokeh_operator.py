@@ -33,6 +33,7 @@ import inspect
 from pydantic import BaseModel
 import numpy as np
 from functools import partial
+import builtins
 
 from helao.helpers import helao_logging as logging
 
@@ -60,6 +61,12 @@ from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.plotting import figure, Figure
 from bokeh.events import ButtonClick, DoubleTap
 from bokeh.models.widgets import FileInput
+
+BUILTIN_TYPES = [
+    getattr(builtins, d)
+    for d in dir(builtins)
+    if isinstance(getattr(builtins, d), type)
+]
 
 
 class return_sequence_lib(BaseModel):
@@ -1426,8 +1433,14 @@ class BokehOperator:
         LOGGER.info(f"selected sequence from list: {selected_sequence}")
 
         sequence_params = {
-            paraminput.title: input_type(parse_bokeh_input(paraminput.value))
-            for paraminput, input_type in zip(self.seq_param_input, self.seq_param_input_types)
+            paraminput.title: (
+                input_type(parse_bokeh_input(paraminput.value))
+                if input_type in BUILTIN_TYPES
+                else parse_bokeh_input(paraminput.value)
+            )
+            for paraminput, input_type in zip(
+                self.seq_param_input, self.seq_param_input_types
+            )
         }
         for k, v in sequence_params.items():
             LOGGER.info(
@@ -1461,8 +1474,14 @@ class BokehOperator:
         selected_experiment = self.experiment_dropdown.value
         LOGGER.info(f"selected experiment from list: {selected_experiment}")
         experiment_params = {
-            paraminput.title: input_type(parse_bokeh_input(paraminput.value))
-            for paraminput, input_type in zip(self.exp_param_input, self.exp_param_input_types)
+            paraminput.title: (
+                input_type(parse_bokeh_input(paraminput.value))
+                if input_type in BUILTIN_TYPES
+                else parse_bokeh_input(paraminput.value)
+            )
+            for paraminput, input_type in zip(
+                self.exp_param_input, self.exp_param_input_types
+            )
         }
         for k, v in experiment_params.items():
             LOGGER.info(
@@ -1749,7 +1768,14 @@ class BokehOperator:
         )
 
     def add_dynamic_inputs(
-        self, param_input, private_input, param_layout, args, defaults, argtypes, argtype_list
+        self,
+        param_input,
+        private_input,
+        param_layout,
+        args,
+        defaults,
+        argtypes,
+        argtype_list,
     ):
         item = 0
         for idx in range(len(args)):
