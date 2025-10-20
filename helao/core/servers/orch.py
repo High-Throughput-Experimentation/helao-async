@@ -1341,9 +1341,13 @@ class Orch(Base):
             result_actiondict = None
             async with self.aiolock:
                 try:
-                    result_actiondict, error_code = await async_action_dispatcher(
-                        self.world_cfg, A
-                    )
+                    if self.globalstatusmodel.loop_intent == LoopIntent.estop or self.globalstatusmodel.loop_state == LoopStatus.estopped:
+                        LOGGER.info("orchestrator estopped, not dispatching action")
+                        error_code = ErrorCodes.estop
+                    else:
+                        result_actiondict, error_code = await async_action_dispatcher(
+                            self.world_cfg, A
+                        )
                 except Exception as e:
                     LOGGER.info(f"Error while dispatching action {A.action_name}: {e}")
                     error_code = ErrorCodes.http
