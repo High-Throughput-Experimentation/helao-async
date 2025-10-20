@@ -125,13 +125,16 @@ class BokehOperator:
         self.layout = []
         self.seq_param_layout = []
         self.seq_param_input = []
+        self.seq_param_input_types = []
         self.seq_private_input = []
         self.exp_param_layout = []
         self.exp_param_input = []
+        self.exp_param_input_types = []
         self.exp_private_input = []
 
         self.seqspec_param_layout = []
         self.seqspec_param_input = []
+        self.seqspec_param_input_types = []
         self.seqspec_private_input = []
 
         self.sequence = None
@@ -1423,8 +1426,8 @@ class BokehOperator:
         LOGGER.info(f"selected sequence from list: {selected_sequence}")
 
         sequence_params = {
-            paraminput.title: parse_bokeh_input(paraminput.value)
-            for paraminput in self.seq_param_input
+            paraminput.title: input_type(parse_bokeh_input(paraminput.value))
+            for paraminput, input_type in zip(self.seq_param_input, self.seq_param_input_types)
         }
         for k, v in sequence_params.items():
             LOGGER.info(
@@ -1458,8 +1461,8 @@ class BokehOperator:
         selected_experiment = self.experiment_dropdown.value
         LOGGER.info(f"selected experiment from list: {selected_experiment}")
         experiment_params = {
-            paraminput.title: parse_bokeh_input(paraminput.value)
-            for paraminput in self.exp_param_input
+            paraminput.title: input_type(parse_bokeh_input(paraminput.value))
+            for paraminput, input_type in zip(self.exp_param_input, self.exp_param_input_types)
         }
         for k, v in experiment_params.items():
             LOGGER.info(
@@ -1545,6 +1548,7 @@ class BokehOperator:
             defaults.insert(0, "")
 
         self.seq_param_input = []
+        self.seq_param_input_types = []
         self.seq_private_input = []
         self.seq_param_layout = [
             Spacer(height=10),
@@ -1572,6 +1576,7 @@ class BokehOperator:
             args,
             defaults,
             argtypes,
+            self.seq_param_input_types,
         )
 
         if not self.seq_param_input:
@@ -1609,6 +1614,7 @@ class BokehOperator:
             defaults.insert(0, "")
 
         self.exp_param_input = []
+        self.exp_param_input_types = []
         self.exp_private_input = []
         self.exp_param_layout = [
             Spacer(height=10),
@@ -1635,6 +1641,7 @@ class BokehOperator:
             args,
             defaults,
             argtypes,
+            self.exp_param_input_types,
         )
 
         if not self.exp_param_input:
@@ -1686,6 +1693,7 @@ class BokehOperator:
             defaults.insert(0, "")
 
         self.seqspec_param_input = []
+        self.seqspec_param_input_types = []
         self.seqspec_private_input = []
         self.seqspec_param_layout = [
             Spacer(height=10),
@@ -1713,6 +1721,7 @@ class BokehOperator:
             args,
             defaults,
             argtypes,
+            self.seqspec_param_input_types,
         )
 
         if not self.seqspec_param_input:
@@ -1740,7 +1749,7 @@ class BokehOperator:
         )
 
     def add_dynamic_inputs(
-        self, param_input, private_input, param_layout, args, defaults, argtypes
+        self, param_input, private_input, param_layout, args, defaults, argtypes, argtype_list
     ):
         item = 0
         for idx in range(len(args)):
@@ -1758,6 +1767,7 @@ class BokehOperator:
                     height=40,
                 )
             )
+            argtype_list.append(argtypes[idx])
             param_layout.append(
                 layout(
                     [
