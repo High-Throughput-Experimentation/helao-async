@@ -149,7 +149,7 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
         @app.post(f"/{server_key}/set_velocity", tags=["action"])
-        async def set_flowrate(
+        async def set_velocity(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             axis: app.driver.dev_kinesis = motors[0],
