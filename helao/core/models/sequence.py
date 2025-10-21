@@ -12,6 +12,7 @@ from .experiment import (
     ShortExperimentModel,
     ExperimentTemplate,
 )
+from .file import FileInfo
 from .machine import MachineModel
 
 from helao.core.version import get_hlo_version
@@ -76,6 +77,8 @@ class SequenceModel(SequenceTemplate):
     sequence_output_dir: Optional[Path] = None
     sequence_codehash: Optional[str] = None
     sequence_comment: Optional[str] = None
+    files: List[FileInfo] = Field(default=[])
+    aux_files: List[str] = Field(default=[])
     data_request_id: Optional[UUID] = None
     orchestrator: MachineModel = MachineModel()
     dispatched_experiments_abbr: List[ShortExperimentModel] = Field(

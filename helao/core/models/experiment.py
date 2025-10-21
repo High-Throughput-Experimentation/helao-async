@@ -119,6 +119,7 @@ class ExperimentModel(ExperimentTemplate):
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
+    aux_files: List[str] = Field(default=[])
     process_list: List[UUID] = Field(default=[])  # populated by DB yml_finisher
     process_order_groups: Dict[int, List[int]] = Field(default={})
     data_request_id: Optional[UUID] = None
