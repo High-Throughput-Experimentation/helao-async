@@ -37,6 +37,7 @@ from helao.core.error import ErrorCodes
 from helao.core.servers.operator.bokeh_operator import BokehOperator
 from helao.core.servers.vis import HelaoVis
 from helao.helpers.server_api import HelaoFastAPI
+from helao.helpers.set_time import set_time
 from helao.helpers.import_autolibs import import_autolibs
 from helao.helpers.dispatcher import (
     async_private_dispatcher,
@@ -2438,6 +2439,7 @@ class Orch(Base):
                 old_status=HloStatus.active,
                 new_status=HloStatus.finished,
             )
+            self.active_sequence.sequence_finished_timestamp = set_time(offset=self.ntp_offset)
             self.active_sequence.finished_global_params = {
                 k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
             }
@@ -2519,6 +2521,7 @@ class Orch(Base):
                 old_status=HloStatus.active,
                 new_status=HloStatus.finished,
             )
+            self.active_experiment.experiment_finished_timestamp = set_time(offset=self.ntp_offset)
 
             # post-process experiment object
             if self.exp_postprocessors:

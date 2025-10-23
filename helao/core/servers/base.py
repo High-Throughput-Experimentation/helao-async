@@ -47,6 +47,7 @@ from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.ws_publisher import WsPublisher
+from helao.helpers.set_time import set_time
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import (
     SampleType,
@@ -253,7 +254,7 @@ class Base:
 
         self.ntp_server = "time.nist.gov"
         self.ntp_response = None
-        self.ntp_offset = None  # add to system time for correction
+        self.ntp_offset: float = 0.0  # add to system time for correction
         self.ntp_last_sync = None
         self.aiolock = asyncio.Lock()
         self.endpoint_queues = {}
@@ -2981,6 +2982,7 @@ class Active:
                     old_status=HloStatus.active,
                     new_status=HloStatus.finished,
                 )
+                action.action_finished_timestamp = set_time(offset=self.base.ntp_offset)
 
                 if action.error_code != ErrorCodes.none:
                     if HloStatus.errored not in action.action_status:

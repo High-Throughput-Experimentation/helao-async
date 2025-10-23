@@ -120,6 +120,7 @@ class ActionModel(ShortActionModel):
     action_output: dict = Field(default={})
     action_etc: Optional[float] = None  # expected time to completion
     action_codehash: Optional[str] = None
+    action_finished_timestamp: Optional[datetime] = None
     parent_action_uuid: Optional[UUID] = None
     child_action_uuid: Optional[UUID] = None
     samples_in: List[

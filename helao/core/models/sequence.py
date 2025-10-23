@@ -77,6 +77,7 @@ class SequenceModel(SequenceTemplate):
     sequence_output_dir: Optional[Path] = None
     sequence_codehash: Optional[str] = None
     sequence_comment: Optional[str] = None
+    sequence_finished_timestamp: Optional[datetime] = None
     files: List[FileInfo] = Field(default=[])
     aux_files: List[str] = Field(default=[])
     data_request_id: Optional[UUID] = None

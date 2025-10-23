@@ -110,6 +110,7 @@ class ExperimentModel(ExperimentTemplate):
     experiment_output_dir: Optional[Path] = None
     experiment_codehash: Optional[str] = None
     experiment_label: Optional[str] = None
+    experiment_finished_timestamp: Optional[datetime] = None
     planned_actions: list = []
     dispatched_actions_abbr: List[ShortActionModel] = Field(default=[])
     samples_in: List[
