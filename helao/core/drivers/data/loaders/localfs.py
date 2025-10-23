@@ -387,9 +387,8 @@ class LocalLoader:
     def get_bytes(self, yml_path: str, fn: str) -> bytes:
         """Get raw bytes of a file, either from a zip archive or a regular file adjacent to action yml."""
         if self.target.endswith(".zip"):
-            ftarget = "/".join([os.path.dirname(yml_path), fn])
             with ZipFile(self.target, "r") as zf:
-                fbytes = zf.open(ftarget).read()
+                fbytes = zf.open(fn).read()
         else:
             FM = FileMapper(yml_path)
             fpath = os.path.join(os.path.dirname(yml_path), fn)
