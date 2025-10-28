@@ -44,6 +44,8 @@ class BaseAnalysis:
     run_type: str
     technique_name: str
     analysis_codehash: str
+    campaign_name: Optional[str] = None
+    campaign_uuid: Optional[UUID] = None
 
     def gen_uuid(self, global_sample_label: Optional[str] = None):
         """
@@ -162,5 +164,7 @@ class BaseAnalysis:
             inputs=input_data_models,
             outputs=output_data_models,
             dummy=dummy,
+            campaign_name=self.campaign_name,
+            campaign_uuid=self.campaign_uuid,
         )
         return ana_model.clean_dict(), self.outputs.model_dump()
