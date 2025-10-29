@@ -34,6 +34,8 @@ from .device import GamryPstat, GAMRY_DEVICES, TTL_OUTPUTS, TTL_OFF
 from .sink import GamryDtaqSink, DummySink
 from .technique import GamryTechnique
 from .range import get_range, RANGES
+from .signal import ControlMode
+from .readz import ReadZ
 
 DUMMY_SINK = DummySink()
 
@@ -53,6 +55,7 @@ class GamryDriver(HelaoDriver):
         self.technique = None
         self.pstat = None
         self.signal = None
+        self.readz = None
         self.ready = True
         self.counter = 0
         # get params from config or use defaults
@@ -485,3 +488,57 @@ class GamryDriver(HelaoDriver):
             self.kill_gamrycom().response
         except Exception:
             LOGGER.error("shutdown error", exc_info=True)
+
+    def setup_eis(
+        self,
+        control_mode: ControlMode,
+        fast: bool,
+        zmod: float,
+        freq_start: float,
+        freq_stop: float,
+        points_per_decade: int,
+        ac_amplitude: float,
+        dc_amplitude: float,
+        use_ac_ierange: bool = False,
+    ) -> DriverResponse:
+        """Set up EIS measurement on potentiostat."""
+        try:
+            # check for ongoing measurement via dtaqsink
+            if not isinstance(self.dtaqsink, DummySink):
+                raise TypeError(
+                    "dtaqsink is not of type DummySink. Another technique may be running."
+                )
+            self.dtaq = client.CreateObject("GamryCOM.GamryReadZ")
+            frequencies = np.logspace(
+                np.log10(freq_start),
+                np.log10(freq_stop),
+                num=int(
+                    np.ceil(
+                        np.abs(np.log10(freq_stop / freq_start) * points_per_decade)
+                    )
+                ),
+            ).tolist()
+
+            self.readz = ReadZ(
+                control_mode,
+                self.pstat,
+                self.dtaq,
+                self.GamryCOM,
+                "ReadZSpeedFast" if fast else "ReadZSpeedNorm",
+                ac_amplitude,
+                dc_amplitude,
+                frequencies,
+                use_ac_ierange,
+            )
+
+            response = DriverResponse(
+                response=DriverResponseType.success,
+                message="EIS setup complete",
+                status=DriverStatus.ok,
+            )
+        except Exception:
+            LOGGER.error("EIS setup failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
