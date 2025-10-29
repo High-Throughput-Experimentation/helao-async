@@ -15,7 +15,7 @@ class GamryDtaqSink:
         count = 1
         while count > 0:
             try:
-                count, points = self.dtaq.Cook(1000)
+                count, points = self.dtaq.Cook(1024)
                 self.acquired_points.extend(zip(*points))
             except Exception:
                 count = 0
