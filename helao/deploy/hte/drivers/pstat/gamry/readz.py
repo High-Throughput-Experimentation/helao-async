@@ -18,6 +18,7 @@ class ReadZ:
         readspeed,
         ac_amplitude,
         dc_amplitude,
+        expected_z,
         frequencies=[],
         use_ac_ierange=False,
         init_cell_off=True,
@@ -35,6 +36,7 @@ class ReadZ:
         self.dtaqsink = GamryReadZSink(self.dtaq)
         self.init_cell_off = init_cell_off
         self.leave_cell_on = leave_cell_on
+        self.expected_z = expected_z
 
     def init_pstat(self):
         self.pstat.SetAchSelect(self.GamryCOM.GND)
@@ -51,21 +53,19 @@ class ReadZ:
         self.pstat.SetIruptMode(self.GamryCOM.IruptOff)
 
         self.dtaq.Init(self.pstat)
-        self.dtaq.SetSpeed(
-            getattr(self.GamryCOM, self.readspeed)
-        )  # TODO: calculate readzspeed
+        self.dtaq.SetSpeed(getattr(self.GamryCOM, self.readspeed))
         self.dtaq.SetGain(1.0)
         self.dtaq.SetINoise(0.0)
         self.dtaq.SetVNoise(0.0)
         self.dtaq.SetIENoise(0.0)
-        self.dtaq.SetZmod(self.z_guess)  # TODO: calculate z_guess
+        self.dtaq.SetZmod(self.expected_z)  # TODO: calculate z_guess
 
         if self.control_mode == ControlMode.GstatMode:
             self.pstat.SetCASpeed(3)
             self.dtaq.SetIdc(self.dc_amplitude)
             LOGGER.info(f"Setting DC current to {self.dc_amplitude:.2e} A")
             LOGGER.info(f"Setting AC current to {self.ac_amplitude:.2e} A")
-            self.set_ie_range(self.freq_list[0], self.z_guess)
+            self.set_ie_range(self.freq_list[0], self.expected_z)
             if self.init_cell_off:
                 self.pstat.SetCell(self.GamryCOM.CellOn)  # turn the cell on
                 LOGGER.debug("Waiting 3s for sample equilibration...")
@@ -78,30 +78,20 @@ class ReadZ:
             v_max = abs(self.dc_amplitude) + np.sqrt(2) * abs(self.ac_amplitude)
             self.pstat.SetVchRange(self.pstat.TestVchRange(v_max))
 
-            self.pstat.SetCASpeed(3)  # MedFast
-            self.pstat.SetVoltage(self.dc_amplitude)  # Set DC voltage
+            self.pstat.SetCASpeed(3) 
+            self.pstat.SetVoltage(self.dc_amplitude)
 
-            # Estimate current range
-            # IERange = self.pstat.TestIERange((abs(self.dc_amp_req) + (2 ** 0.5) * self.ac_amp_req) / self.z_guess)
-            # print('IERange:', IERange)
-            # self.pstat.SetIERange(IERange)
-            self.set_ie_range(self.freq_list[0], self.z_guess)
+            self.set_ie_range(self.freq_list[0], self.expected_z)
             if self.init_cell_off:
-                # Get DC current
                 self.pstat.SetCell(self.GamryCOM.CellOn)
                 time.sleep(1)
                 self.dtaq.SetIdc(self.pstat.MeasureI())
-        
+
         LOGGER.info(f"VchRange: {self.pstat.VchRange()}")
         self.pstat.SetCell(self.GamryCOM.CellOn)
 
     def set_ie_range(self, frequency: float, z_guess: float, s_dc_max: float = 1.0):
-        # Get IE range
         if self.use_ac_ierange:
-            # "Correct" way: need to account for frequency to select IERange.
-            # Seems to yield worse results than using DC IERange for galv measurements.
-            # Args to TestIERangeAC are: i_ac_max, v_ac_max, i_dc_max, v_dc_max, freq
-
             if self.control_mode == ControlMode.GstatMode:
                 v_ac_max = self.ac_amplitude * z_guess * 2
                 IERange = self.pstat.TestIERangeAC(
@@ -113,42 +103,29 @@ class ReadZ:
                     i_ac_max, self.ac_amplitude, s_dc_max, self.dc_amplitude, frequency
                 )
         else:
-            # "Incorrect" way: just use DC IERange.
-            # Seems to work better for galv mode.
             if self.control_mode == ControlMode.GstatMode:
-                # Get max current amplitude with 5% buffer
+                # 5% buffer
                 i_max = 1.05 * (
                     abs(self.dc_amplitude) + (2**0.5) * abs(self.ac_amplitude)
                 )
             else:
-                # Estimate (very roughly) max current
                 i_max = (
                     2
                     * (abs(self.dc_amplitude) + (2**0.5) * self.ac_amplitude)
-                    / self.z_guess
+                    / self.expected_z
                 )
 
             IERange = self.pstat.TestIERange(i_max)
 
         LOGGER.info(f"IERange: {IERange}")
-
-        # Set IERange
         self.pstat.SetIERange(IERange)
 
         if self.control_mode == ControlMode.GstatMode:
-            # In galv mode, we need to set the internal voltage to the correct value
-            # to produce the requested DC current
-            # Get internal resistance
             Rm = self.pstat.IEResistor(IERange)
+            v_internal = Rm * self.dc_amplitude
+            self.pstat.SetVoltage(v_internal)
 
-            # Get internal voltage amplitude to produce requested current
-            v_dc_internal = Rm * self.dc_amplitude
-
-            # Set IERange and internal voltage
-            self.pstat.SetVoltage(v_dc_internal)
-
-    def set_cycle_lim(self, frequency):
-        # From LVEIS example
+    def set_cycle_limit(self, frequency):
         if frequency > 3e4:
             cycle_lim = (10, 20)
         elif frequency > 1e3:
