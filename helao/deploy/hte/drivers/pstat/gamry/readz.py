@@ -58,7 +58,7 @@ class ReadZ:
         self.dtaq.SetINoise(0.0)
         self.dtaq.SetVNoise(0.0)
         self.dtaq.SetIENoise(0.0)
-        self.dtaq.SetZmod(self.expected_z)  # TODO: calculate z_guess
+        self.dtaq.SetZmod(self.expected_z)
 
         if self.control_mode == ControlMode.GstatMode:
             self.pstat.SetCASpeed(3)
