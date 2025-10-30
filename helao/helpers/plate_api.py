@@ -162,10 +162,10 @@ class HTEPlateAPI:
         if printd is not None and self.loader is not None:
 
             els = [
-                d["chemical_id"].split("_target")[0].capitalize()
+                d["chemical_id"].split("_")[0].capitalize()
                 for d in printd["sources"]
-                if "_target_" in d["chemical_id"]
             ]
+            els = [el for el in els if el not in ("O", "Ar", "N", "C", "He", "Ne", "Kr", "Xe", "Rn")]
             el_syms = [mendeleev.element(el).symbol for el in els]
 
             return [el for el in el_syms if el not in exclude_elements_list]
