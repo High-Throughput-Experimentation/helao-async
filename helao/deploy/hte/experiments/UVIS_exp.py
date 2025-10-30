@@ -226,10 +226,20 @@ def UVIS_sub_measure(
                 ),
             },
         )
+    else:
+        # turn on illumination for all reflectance measurements
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {
+                "do_item": toggle_source,
+                "on": True,
+            },
+        )
 
-        # wait for 1 second for shutter to actuate
-        if toggle_is_shutter:
-            apm.add(ORCH_server, "wait", {"waittime": 1})
+    # wait for 1 second for shutter to actuate
+    if toggle_is_shutter:
+        apm.add(ORCH_server, "wait", {"waittime": 1})
 
     # take webcam image
     if acquire_image:
