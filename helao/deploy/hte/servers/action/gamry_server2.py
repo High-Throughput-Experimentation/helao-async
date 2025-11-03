@@ -35,7 +35,7 @@ from helao.helpers.premodels import Action
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
-from ...drivers.pstat.gamry.driver import GamryDriver
+from ...drivers.pstat.gamry.driver import GamryDriver, DriverStatus, ControlMode
 from ...drivers.pstat.gamry.technique import (
     GamryTechnique,
     TECH_LSV,
@@ -45,6 +45,7 @@ from ...drivers.pstat.gamry.technique import (
     TECH_OCV,
     TECH_RCA,
 )
+from ...drivers.pstat.gamry.readz import ReadZ
 
 global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -217,6 +218,208 @@ class GamryExec(Executor):
 
     async def _post_exec(self):
         resp = self.driver.cleanup(self.ttl_params)
+
+        # parse calculate outputs from data buffer:
+        for k in ["t_s", "Ewe_V", "I_A"]:
+            if k in self.data_buffer:
+                meanv = np.nanmean(np.array(self.data_buffer[k])[-5:])
+                self.active.action.action_params[f"{k}__mean_final"] = meanv
+
+        if self.active.action.action_name == "run_OCV":
+            data_df = pd.DataFrame(self.data_buffer)
+            rsd_thresh = self.action_params.get("RSD_threshold", 1)
+            simple_thresh = self.action_params.get("simple_threshold", 1)
+            signal_change_thresh = self.action_params.get("signal_change_threshold", 1)
+            amplitude_thresh = self.action_params.get("amplitude_threshold", 1)
+            has_bubble = bubble_detection(
+                data_df,
+                rsd_thresh,
+                simple_thresh,
+                signal_change_thresh,
+                amplitude_thresh,
+            )
+            self.active.action.action_params["has_bubble"] = has_bubble
+
+        error = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
+        return {"error": error, "data": {}}
+
+    async def _manual_stop(self) -> dict:
+        """Interrupt measurement and disconnect cell."""
+        resp = await self.driver.stop()
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.stop
+        return {"error": error}
+
+
+class GamryEisExec(Executor):
+    driver: GamryDriver
+    readz: ReadZ
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            self.poll_rate = 0.01  # pump events every 10 millisecond
+            self.concurrent = False
+            self.data_buffer = defaultdict(lambda: deque(maxlen=1000))
+
+            self.ttl_params = {
+                k: self.action_params.get(k, -1) for k in ("TTLwait", "TTLsend")
+            }
+            # link attrs for convenience
+            self.action_params = self.active.action.action_params
+            self.driver = self.active.driver
+            self.control_mode = self.action_params["control_mode"]
+            
+            self.frequencies = np.logspace(
+                np.log10(self.action_params["Finit__Hz"]),
+                np.log10(self.action_params["Ffinal__Hz"]),
+                num=self.action_params["FrequencyNumber"],
+            ).tolist()
+            self.frequency_index = 0
+
+            resp = self.driver.setup_eis(
+                control_mode=self.control_mode,
+                fast=self.action_params.get("fast", False),
+                zmod=self.action_params["Zmod_Ohm"],
+                frequency=self.frequencies[self.frequency_index],
+                dc_amplitude=self.action_params[
+                    (
+                        "Vinit__V"
+                        if self.control_mode == ControlMode.PstatMode
+                        else "Iinit__A"
+                    )
+                ],
+                ac_amplitude=self.action_params[
+                    (
+                        "Vamp__V"
+                        if self.control_mode == ControlMode.PstatMode
+                        else "Iamp__A"
+                    )
+                ],
+                use_ac_ierange=self.action_params.get("use_ac_ierange", False),
+            )
+            if resp.status == DriverStatus.error:
+                raise Exception("GamryEisExec driver setup_eis failed.")
+
+            # no external timer, event sink signals end of measurement
+            self.duration = -1
+
+            self.last_alert_time = 0
+
+            LOGGER.info("GamryEisExec initialized.")
+        except Exception:
+            LOGGER.error("GamryEisExec was not initialized.", exc_info=True)
+
+    async def _pre_exec(self) -> dict:
+        """Setup potentiostat device for given technique."""
+        resp = self.driver.readz.init_pstat()
+        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
+        return {"error": error}
+
+    async def _exec(self) -> dict:
+        """Begin measurement or wait for TTL trigger if specified."""
+        if self.ttl_params["TTLwait"] > -1:
+            bits = self.driver.pstat.DigitalIn()
+            LOGGER.info(f"Gamry DIbits: {bits}, waiting for trigger.")
+            while not bits:
+                await asyncio.sleep(0.001)
+                bits = self.driver.pstat.DigitalIn()
+        LOGGER.debug("starting measurement")
+        self.
+        self.driver.readz.measure_frequency(self.driver.readz.freq_list[0])
+        self.start_time = resp.data.get("start_time", time.time())
+        error = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
+        return {"error": error}
+
+    async def _poll(self) -> dict:
+        """Return data and status from dtaq event sink."""
+        try:
+            resp = self.driver.get_data(self.poll_rate)
+            # populate executor buffer for output calculation
+            for k, v in resp.data.items():
+                self.data_buffer[k].extend(v)
+            # check for alert thresholds at this point in data_buffer
+            poll_iter_time = time.time()
+            if self.alert_params["alert_sleep__s"] is not None:
+                single_alert = (
+                    self.alert_params["alert_sleep__s"] <= 0
+                    and self.last_alert_time == 0
+                )
+                ongoing_alert = self.alert_params["alert_sleep__s"] > 0 and (
+                    poll_iter_time - self.last_alert_time
+                    > self.alert_params["alert_sleep__s"]
+                )
+                if single_alert or ongoing_alert:
+                    LOGGER.debug(
+                        f"single_alert: {single_alert}, ongoing_alert: {ongoing_alert}"
+                    )
+                    min_duration = self.alert_params["alert_duration__s"]
+                    if (
+                        min_duration > 0
+                        and self.data_buffer.get("t_s", [-1])[-1] > min_duration
+                    ):
+                        LOGGER.debug(
+                            f"elapsed time is above min_duration: {min_duration}"
+                        )
+                        time_buffer = self.data_buffer["t_s"]
+                        idx = 1
+                        latest_t = time_buffer[-1]
+                        slice_duration = latest_t - time_buffer[-idx]
+                        while (len(time_buffer) > idx) and (
+                            slice_duration < min_duration
+                        ):
+                            idx += 1
+                            slice_duration = latest_t - time_buffer[-idx]
+                        LOGGER.debug(f"slice index is: {-idx}")
+                        if slice_duration >= min_duration:
+                            LOGGER.debug(
+                                f"slice_duration {slice_duration:.3f} is above min_duration"
+                            )
+                            for thresh_key in ("Ewe_V", "I_A"):
+                                thresh_val = self.alert_params.get(
+                                    f"alertThresh{thresh_key}", None
+                                )
+                                if thresh_val is not None:
+                                    data_dq = self.data_buffer[thresh_key]
+                                    slice_vals = list(
+                                        itertools.islice(
+                                            data_dq, len(data_dq) - idx, len(data_dq)
+                                        )
+                                    )
+                                    if (
+                                        all([x > thresh_val for x in slice_vals])
+                                        and self.alert_params["alert_above"]
+                                    ):
+                                        LOGGER.alert(
+                                            f"{thresh_key} went above {thresh_val} for {min_duration} seconds."
+                                        )
+                                        self.last_alert_time = poll_iter_time
+                                    elif (
+                                        all([x < thresh_val for x in slice_vals])
+                                        and not self.alert_params["alert_above"]
+                                    ):
+                                        LOGGER.alert(
+                                            f"{thresh_key} went below {thresh_val} for {min_duration} seconds."
+                                        )
+                                        self.last_alert_time = poll_iter_time
+            error = (
+                ErrorCodes.none
+                if resp.response == "success"
+                else ErrorCodes.critical_error
+            )
+            status = HloStatus.active if resp.message != "done" else HloStatus.finished
+            return {"error": error, "status": status, "data": resp.data}
+        except Exception:
+            LOGGER.error("GamryExec poll error", exc_info=True)
+            print(data_dq)
+            return {"error": ErrorCodes.critical_error, "status": HloStatus.errored}
+
+    async def _post_exec(self):
+        resp = self.driver.cleanup(self.ttl_params)
+        self.driver.readz = None
 
         # parse calculate outputs from data buffer:
         for k in ["t_s", "Ewe_V", "I_A"]:
@@ -502,6 +705,60 @@ async def gamry_dyn_endpoints(app: BaseAPI):
 
         active.action.action_abbr = "RCA"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_RCA)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    @app.post(f"/{server_key}/run_PEIS", tags=["action"])
+    async def run_PEIS(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
+        Vinit__V: float = 0.00,  # Initial value in volts or amps.
+        Vamp__V: float = 0.01,  # Amplitude value in volts
+        Finit__Hz: float = 1000,  # Initial frequency in Hz.
+        Ffinal__Hz: float = 1000000,  # Final frequency in Hz.
+        FrequencyNumber: int = 60,
+        Duration__s: float = 0,  # Duration in seconds.
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        SweepMode: str = "log",
+        Repeats: int = 10,
+        DelayFraction: float = 0.1,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+    ):
+        """run Potentiostatic EIS"""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "PEIS"
+        executor = GamryEisExec(active=active, oneoff=False)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    @app.post(f"/{server_key}/run_GEIS", tags=["action"])
+    async def run_GEIS(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
+        Iinit__A: float = 0.01,  # Initial value in volts or amps.
+        Iamp__A: float = 0.1,  # Final value in volts or amps.
+        Finit__Hz: float = 1,  # Initial frequency in Hz.
+        Ffinal__Hz: float = 10000,  # Final frequency in Hz.
+        FrequencyNumber: int = 60,
+        Duration__s: float = 0,  # Duration in seconds.
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        SweepMode: str = "log",
+        Repeats: int = 10,
+        DelayFraction: float = 0.1,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+    ):
+        """run Galvanostataic EIS"""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "GEIS"
+        executor = GamryEisExec(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
