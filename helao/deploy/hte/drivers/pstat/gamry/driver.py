@@ -494,9 +494,7 @@ class GamryDriver(HelaoDriver):
         control_mode: ControlMode,
         fast: bool,
         zmod: float,
-        freq_start: float,
-        freq_stop: float,
-        points_per_decade: int,
+        frequency: float,
         ac_amplitude: float,
         dc_amplitude: float,
         use_ac_ierange: bool = False,
@@ -509,15 +507,6 @@ class GamryDriver(HelaoDriver):
                     "dtaqsink is not of type DummySink. Another technique may be running."
                 )
             self.dtaq = client.CreateObject("GamryCOM.GamryReadZ")
-            frequencies = np.logspace(
-                np.log10(freq_start),
-                np.log10(freq_stop),
-                num=int(
-                    np.ceil(
-                        np.abs(np.log10(freq_stop / freq_start) * points_per_decade)
-                    )
-                ),
-            ).tolist()
 
             self.readz = ReadZ(
                 control_mode,
@@ -527,7 +516,7 @@ class GamryDriver(HelaoDriver):
                 "ReadZSpeedFast" if fast else "ReadZSpeedNorm",
                 ac_amplitude,
                 dc_amplitude,
-                frequencies,
+                frequency,
                 use_ac_ierange,
             )
 
