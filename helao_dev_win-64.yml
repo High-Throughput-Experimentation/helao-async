@@ -17,6 +17,7 @@ dependencies:
     - git+https://github.com/onepunchdan/easy-biologic
   - aiofiles
   - aiohttp
+  - anywidget
   - asyncua
   - bokeh=2
   - boto3
@@ -32,6 +33,7 @@ dependencies:
   - ipykernel
   - ipympl
   - ipywidgets
+  - itables
   - joblib
   - jupyterlab
   - matplotlib
@@ -42,8 +44,10 @@ dependencies:
   - numpy=1
   - orjson
   - pandas
+  - panel
   - paramiko=3
   - pip
+  - plotly
   - psutil
   - psycopg2
   - pyaml
