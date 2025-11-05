@@ -11,6 +11,7 @@ __all__ = ["makeApp"]
 
 
 import asyncio
+import json
 import time
 import itertools
 from typing import Optional, List, Union
@@ -29,11 +30,13 @@ from helao.core.models.sample import (
     NoneSample,
 )
 from helao.core.models.hlostatus import HloStatus
+from helao.core.models.file import HloFileGroup
 
 from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
+from helao.helpers.yml_tools import yml_dumps
 from helao.helpers.bubble_detection import bubble_detection
 from ...drivers.pstat.gamry.driver import GamryDriver, DriverStatus, ControlMode
 from ...drivers.pstat.gamry.technique import (
@@ -277,6 +280,7 @@ class GamryEisExec(Executor):
                 num=self.action_params["FrequencyNumber"],
             ).tolist()
             self.frequency_index = 0
+            self.offset = self.action_params.get("")
 
             resp = self.driver.setup_eis(
                 control_mode=self.control_mode,
@@ -313,6 +317,24 @@ class GamryEisExec(Executor):
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
+        if self.action_params.get("versus_OCV", False):
+            ocv_duration = self.action_params.get("OCV_duration__s", 2.0)
+            ocv_rate = self.action_params.get("OCV_acquisition_period__s", 0.1)
+            LOGGER.info(f"measuring OCV for {ocv_duration:.1f} seconds")
+            ts, vs = await self.readz.measure_ocv(ocv_duration)
+            self.mean_ocv = np.mean(vs[-5:])
+            self.offset += self.mean_ocv
+            ocv_data = {"t_s": ts, "Ewe_V": vs}
+            await self.active.write_file(
+                output_str = json.dumps(ocv_data),
+                file_type = "pstat_helao__file",
+                filename = "init_ocv.hlo",
+                file_group = HloFileGroup.helao_files,
+                header = yml_dumps({"mean_ocv": self.mean_ocv}),
+                json_data_keys = list(ocv_data.keys())
+            )
+            LOGGER.info(f"OCV result: {self.mean_ocv:.3f} V")
+            
         resp = self.driver.readz.init_pstat()
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         return {"error": error}
@@ -715,7 +737,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
-        Vinit__V: float = 0.00,  # Initial value in volts or amps.
+        versus_OCV: bool = True,  # adds mean OCV value to offset vs ref if True
+        OCV_duration__s: float = 2.0, # run OCV to set voltage offset
+        OCV_acquisition_period__s: float = 0.1,
+        Voffset__V: float = 0.00,  # Initial value in volts or amps.
         Vamp__V: float = 0.01,  # Amplitude value in volts
         Finit__Hz: float = 1000,  # Initial frequency in Hz.
         Ffinal__Hz: float = 1000000,  # Final frequency in Hz.
@@ -742,7 +767,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
-        Iinit__A: float = 0.01,  # Initial value in volts or amps.
+        Ioffset__A: float = 0.01,  # Initial value in volts or amps.
         Iamp__A: float = 0.1,  # Final value in volts or amps.
         Finit__Hz: float = 1,  # Initial frequency in Hz.
         Ffinal__Hz: float = 10000,  # Final frequency in Hz.

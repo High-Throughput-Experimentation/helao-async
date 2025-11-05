@@ -2569,7 +2569,7 @@ class Active:
         header: Optional[str] = None,
         sample_str: Optional[str] = None,
         file_sample_label: Optional[List[str] | str] = None,
-        json_data_keys: Optional[str] = None,
+        json_data_keys: Optional[List[str]] = None,
         action: Optional[Action] = None,
     ):
         """
