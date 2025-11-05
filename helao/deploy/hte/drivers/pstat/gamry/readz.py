@@ -1,4 +1,5 @@
 import time
+import asyncio
 import numpy as np
 
 from .signal import ControlMode
@@ -42,6 +43,18 @@ class ReadZ:
         self.init_cell_off = init_cell_off
         self.leave_cell_on = leave_cell_on
         self.expected_z = expected_z
+
+    async def measure_ocv(self, duration: float = 2.0, acquisition_period: float = 0.1):
+        self.pstat.Open()
+        self.pstat.SetCell(self.GamryCOM.CellOff)
+        data = []
+
+        ocv_start_time = time.time()
+        while time.time() - ocv_start_time <= duration:
+            data.append((time.time() - ocv_start_time, self.pstat.MeasureV()))
+            await asyncio.sleep(acquisition_period)
+        ts, vs = list(zip(*data))
+        return list(ts), list(vs)
 
     def init_pstat(self):
         try:
@@ -162,6 +175,7 @@ class ReadZ:
         LOGGER.info(f"Measuring frequency: {frequency:.2f} Hz")
         self.set_cycle_limit(frequency)
         self.dtaq.Measure(frequency, self.ac_amplitude)
+
 
 class GamryReadZSink:
     """Event sink for reading data from Gamry device."""
