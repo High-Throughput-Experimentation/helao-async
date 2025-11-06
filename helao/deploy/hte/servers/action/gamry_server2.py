@@ -272,9 +272,17 @@ class GamryEisExec(Executor):
             # link attrs for convenience
             self.action_params = self.active.action.action_params
             self.driver = self.active.driver
-            self.control_mode = ControlMode.PstatMode if self.active.action.action_abbr == "PEIS" else ControlMode.GstatMode
-            
-            decades = np.abs(np.log10(self.action_params["Finit__Hz"]/self.action_params["Ffinal__Hz"]))
+            self.control_mode = (
+                ControlMode.PstatMode
+                if self.active.action.action_abbr == "PEIS"
+                else ControlMode.GstatMode
+            )
+
+            decades = np.abs(
+                np.log10(
+                    self.action_params["Finit__Hz"] / self.action_params["Ffinal__Hz"]
+                )
+            )
             self.frequencies = np.logspace(
                 np.log10(self.action_params["Finit__Hz"]),
                 np.log10(self.action_params["Ffinal__Hz"]),
@@ -327,15 +335,15 @@ class GamryEisExec(Executor):
             self.offset += self.mean_ocv
             ocv_data = {"t_s": ts, "Ewe_V": vs}
             await self.active.write_file(
-                output_str = json.dumps(ocv_data),
-                file_type = "pstat_helao__file",
-                filename = "init_ocv.hlo",
-                file_group = HloFileGroup.helao_files,
-                header = yml_dumps({"mean_ocv": self.mean_ocv}),
-                json_data_keys = list(ocv_data.keys())
+                output_str=json.dumps(ocv_data),
+                file_type="pstat_helao__file",
+                filename="init_ocv.hlo",
+                file_group=HloFileGroup.helao_files,
+                header=yml_dumps({"mean_ocv": self.mean_ocv}),
+                json_data_keys=list(ocv_data.keys()),
             )
             LOGGER.info(f"OCV result: {self.mean_ocv:.3f} V")
-            
+
         resp = self.driver.readz.init_pstat()
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         return {"error": error}
@@ -349,7 +357,6 @@ class GamryEisExec(Executor):
                 await asyncio.sleep(0.001)
                 bits = self.driver.pstat.DigitalIn()
         LOGGER.debug("starting measurement")
-        self.
         self.driver.readz.measure_frequency(self.driver.readz.freq_list[0])
         self.start_time = resp.data.get("start_time", time.time())
         error = (
@@ -739,7 +746,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         versus_OCV: bool = True,  # adds mean OCV value to offset vs ref if True
-        OCV_duration__s: float = 2.0, # run OCV to set voltage offset
+        OCV_duration__s: float = 2.0,  # run OCV to set voltage offset
         OCV_acquisition_period__s: float = 0.1,
         Voffset__V: float = 0.00,  # Initial value in volts or amps.
         Vamp__V: float = 0.01,  # Amplitude value in volts
