@@ -173,9 +173,12 @@ class XrfsAnalysis(BaseAnalysis):
             ]
 
         if not calib_path:
-            calib_libs = glob(
+            calglob = (
                 rf"K:\experiments\xrfs\user\calibration_libraries\{calib_prefix}*.csv"
+                if sys.platform == "win32"
+                else f"/mnt/k/experiments/xrfs/user/calibration_libraries/{calib_prefix}*.csv"
             )
+            calib_libs = glob(calglob)
             filtered_libs = [
                 x
                 for x in calib_libs
