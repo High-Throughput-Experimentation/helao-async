@@ -168,7 +168,7 @@ class XrfsAnalysis(BaseAnalysis):
         if not norm_els:
             norm_els = [
                 x
-                for x in re.findall("([A-Z]+[a-z]*)", seq_label)
+                for x in re.findall("([A-Z][a-z]*)", seq_label)
                 if x not in ("O", "Ar", "N", "H")
             ]
 
