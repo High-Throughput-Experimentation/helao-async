@@ -272,12 +272,13 @@ class GamryEisExec(Executor):
             # link attrs for convenience
             self.action_params = self.active.action.action_params
             self.driver = self.active.driver
-            self.control_mode = self.action_params["control_mode"]
+            self.control_mode = ControlMode.PstatMode if self.active.action.action_abbr == "PEIS" else ControlMode.GstatMode
             
+            decades = np.abs(np.log10(self.action_params["Finit__Hz"]/self.action_params["Ffinal__Hz"]))
             self.frequencies = np.logspace(
                 np.log10(self.action_params["Finit__Hz"]),
                 np.log10(self.action_params["Ffinal__Hz"]),
-                num=self.action_params["FrequencyNumber"],
+                num=int(decades) * self.action_params["FrequenciesPerDecade"] + 1,
             ).tolist()
             self.frequency_index = 0
             self.offset = self.action_params.get("")
@@ -742,12 +743,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         OCV_acquisition_period__s: float = 0.1,
         Voffset__V: float = 0.00,  # Initial value in volts or amps.
         Vamp__V: float = 0.01,  # Amplitude value in volts
-        Finit__Hz: float = 1000,  # Initial frequency in Hz.
-        Ffinal__Hz: float = 1000000,  # Final frequency in Hz.
-        FrequencyNumber: int = 60,
-        Duration__s: float = 0,  # Duration in seconds.
-        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        SweepMode: str = "log",
+        Finit__Hz: float = 1e6,  # Initial frequency in Hz.
+        Ffinal__Hz: float = 10,  # Final frequency in Hz.
+        FrequenciesPerDecade: int = 10,
+        AcqInterval__s: float = 0.001,  # Time between data acq in seconds.
         Repeats: int = 10,
         DelayFraction: float = 0.1,
         TTLwait: int = -1,
@@ -769,12 +768,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         ] = Body([], embed=True),
         Ioffset__A: float = 0.01,  # Initial value in volts or amps.
         Iamp__A: float = 0.1,  # Final value in volts or amps.
-        Finit__Hz: float = 1,  # Initial frequency in Hz.
-        Ffinal__Hz: float = 10000,  # Final frequency in Hz.
-        FrequencyNumber: int = 60,
-        Duration__s: float = 0,  # Duration in seconds.
-        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-        SweepMode: str = "log",
+        Finit__Hz: float = 1e6,  # Initial frequency in Hz.
+        Ffinal__Hz: float = 10,  # Final frequency in Hz.
+        FrequenciesPerDecade: int = 10,
+        AcqInterval__s: float = 0.001,  # Time between data acq in seconds.
         Repeats: int = 10,
         DelayFraction: float = 0.1,
         TTLwait: int = -1,
