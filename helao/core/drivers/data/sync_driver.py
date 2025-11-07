@@ -1521,7 +1521,7 @@ class HelaoSyncer:
         if not prog.api_done or force_api:
             LOGGER.debug(f"Pushing prog.yml to API for {prog.yml.target.name}")
             api_success = await self.to_api(meta, prog.yml.type)
-            LOGGER.info(f"API push returned {api_success} for {prog.yml.target.name}")
+            LOGGER.debug(f"API push returned {api_success} for {prog.yml.target.name}")
             if api_success:
                 prog.dict["api"] = True
                 prog.write_dict()
