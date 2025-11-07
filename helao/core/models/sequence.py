@@ -1,4 +1,4 @@
-__all__ = ["SequenceTemplate", "SequenceModel"]
+__all__ = ["ShortSequenceModel", "SequenceModel"]
 
 from datetime import datetime
 from typing import List, Optional
@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 from .hlostatus import HloStatus
 from .experiment import (
     ShortExperimentModel,
-    ExperimentTemplate,
 )
 from .file import FileInfo
 from .machine import MachineModel
@@ -19,7 +18,7 @@ from helao.core.version import get_hlo_version
 from helao.core.helaodict import HelaoDict
 
 
-class SequenceTemplate(BaseModel, HelaoDict):
+class ShortSequenceModel(BaseModel, HelaoDict):
     """
     Template model for defining a sequence in the HELAO system.
 
@@ -27,14 +26,15 @@ class SequenceTemplate(BaseModel, HelaoDict):
         sequence_name (Optional[str]): Name of the sequence.
         sequence_params (dict): Parameters for the sequence.
         sequence_label (Optional[str]): Label for the sequence.
-        planned_experiments (List[ExperimentTemplate]): List of planned experiments in the sequence.
+        planned_experiments (List[ShortExperimentModel]): List of planned experiments in the sequence.
         from_global_seq_params (dict): Parameters received from global sequence context.
     """
 
     sequence_name: Optional[str] = None
     sequence_params: dict = {}
     sequence_label: Optional[str] = "noLabel"
-    planned_experiments: List[ExperimentTemplate] = Field(
+    sequence_comment: Optional[str] = None
+    planned_experiments: List[ShortExperimentModel] = Field(
         default=[]
     )  # populated by operator using sequence library funcs
     campaign_name: Optional[str] = None
@@ -44,7 +44,7 @@ class SequenceTemplate(BaseModel, HelaoDict):
     from_global_seq_params: dict = {}
 
 
-class SequenceModel(SequenceTemplate):
+class SequenceModel(ShortSequenceModel):
     """
     Comprehensive model for representing a full sequence in the HELAO system.
 
@@ -76,7 +76,6 @@ class SequenceModel(SequenceTemplate):
     sequence_status: List[HloStatus] = Field(default=[])
     sequence_output_dir: Optional[Path] = None
     sequence_codehash: Optional[str] = None
-    sequence_comment: Optional[str] = None
     sequence_finished_timestamp: Optional[datetime] = None
     files: List[FileInfo] = Field(default=[])
     aux_files: List[str] = Field(default=[])
