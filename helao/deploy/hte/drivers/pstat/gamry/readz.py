@@ -1,6 +1,7 @@
 import time
 import asyncio
 import numpy as np
+import comtypes.client as client
 
 from .signal import ControlMode
 from helao.core.drivers.helao_driver import (
@@ -39,7 +40,7 @@ class ReadZ:
         self.dc_amplitude = dc_amplitude
         self.frequency = frequency
         self.use_ac_ierange = use_ac_ierange
-        self.dtaqsink = GamryReadZSink(self.dtaq)
+        self.dtaqsink = GamryReadZSink(self.dtaq, gc=self.GamryCOM)
         self.init_cell_off = init_cell_off
         self.leave_cell_on = leave_cell_on
         self.expected_z = expected_z
@@ -176,15 +177,94 @@ class ReadZ:
         self.set_cycle_limit(frequency)
         self.dtaq.Measure(frequency, self.ac_amplitude)
 
+    def get_data(self, pump_rate: float) -> DriverResponse:
+        """Retrieve data from device buffer."""
+        try:
+            client.PumpEvents(pump_rate)
+            total_points = len(self.dtaqsink.acquired_points)
+            if self.counter < total_points:
+                new_data = self.dtaqsink.acquired_points[self.counter : total_points]
+                # data_dict = {
+                #     k: v
+                #     for k, v in zip(
+                #         self.technique.dtaq.output_keys, np.matrix(new_data).T.tolist()
+                #     )
+                # }
+                data_dict = {"DATA": new_data}
+            else:
+                data_dict = {}
+
+            sink_state = self.dtaqsink.status
+            if sink_state == "measuring" or self.counter < total_points:
+                status = DriverStatus.busy
+            elif sink_state == "retry":
+                status = DriverStatus.busy
+            elif sink_state == "error":
+                status = DriverStatus.error
+            elif sink_state == "done":
+                status = DriverStatus.ok
+            else:
+                status = DriverStatus.ok
+            self.counter = total_points
+            response = DriverResponse(
+                response=DriverResponseType.success,
+                message=sink_state,
+                data=data_dict,
+                status=status,
+            )
+        except Exception:
+            LOGGER.error("get_data failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed,
+                status=DriverStatus.error,
+            )
+        return response
+
+    async def stop(self) -> DriverResponse:
+        """General stop method to abort all active methods e.g. motion, I/O, compute."""
+        try:
+            if not self.stopping:
+                if self.dtaqsink.dtaq is not None:
+                    self.stopping = True
+                    self.dtaqsink.dtaq.Run(False)
+                    self.dtaqsink.dtaq.Stop()
+                    self.dtaqsink.status = "done"
+                    self.stopping = False
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("stop failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
 
 class GamryReadZSink:
     """Event sink for reading data from Gamry device."""
 
-    def __init__(self, dtaq):
+    def __init__(self, dtaq, gc):
         self.dtaq = dtaq
+        self.GamryCOM = gc
         self.acquired_points = []
         self.status = "idle"
         self.buffer_size = 0
+        self.z_values = {}
+
+    def read_z_values(self):
+        keys = [
+            "Zfreq",
+            "Zreal",
+            "Zimag",
+            "Zsig",
+            "Zmod",
+            "Zphz",
+            "Idc",
+            "Vdc",
+            "IERange",
+        ]
+        self.z_values = {k: getattr(self.dtaq, k)() for k in keys}
 
     def cook(self):
         count = 1
@@ -201,4 +281,16 @@ class GamryReadZSink:
 
     def _IGamryReadZEvents_OnDataDone(self, _self, com_status):
         self.cook()  # a final cook
-        self.status = "done"
+        if com_status == self.GamryCOM.ReadZStatusRetry:
+            self.status = "retry"
+        elif com_status == self.GamryCOM.ReadZStatusOk:
+            self.read_z_values()
+            self.status = "done"
+        else:
+            self.status = "error"
+
+    def reset(self):
+        self.acquired_points = []
+        self.status = "idle"
+        self.buffer_size = 0
+        self.z_values = {}
