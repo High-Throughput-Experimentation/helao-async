@@ -282,11 +282,22 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             HMS = ana_ts.strftime("%H%M%S")
             year_week = ana_ts.strftime("%y.%U")
             analysis_day = ana_ts.strftime("%m%d")
+            analysis_suffix = ""
+            gsl = model_dict.get("global_sample_label", "")
+            first_action_dir = process_dict["dispatched_actions_abbr"][0]["action_output_dir"]
+            sequence_part = first_action_dir.split("/")[-3]
+            if len(sequence_part.split("__"))==3:
+                sequence_label = sequence_part.split("__")[-1]
+                analysis_suffix = f"__{sequence_label}"
+            elif gsl.startswith("legacy__solid__"):
+                plate_id = gsl.split("legacy__solid__")[-1].split("_")[0]
+                checksum = sum([int(x) for x in plate_id]) % 10
+                analysis_suffix = f"__{plate_id}{checksum}"
             local_ana_dir = os.path.join(
                 self.local_ana_root,
                 year_week,
                 analysis_day,
-                f"{HMS}__{eua.analysis_name}",
+                f"{HMS}__{eua.analysis_name}{analysis_suffix}",
             )
             os.makedirs(local_ana_dir, exist_ok=True)
             with open(
