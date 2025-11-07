@@ -1,4 +1,4 @@
-__all__ = ["ExperimentTemplate", "ExperimentModel", "ShortExperimentModel"]
+__all__ = ["ShortExperimentModel", "ExperimentModel"]
 
 from datetime import datetime
 from typing import List, Optional, Dict, Union
@@ -39,31 +39,17 @@ class ShortExperimentModel(BaseModel, HelaoDict):
 
     experiment_uuid: Optional[UUID] = None
     experiment_name: Optional[str] = None
+    experiment_params: dict = {}
     experiment_output_dir: Optional[Path] = None
+    experiment_comment: Optional[str] = None
     orch_key: Optional[str] = None
     orch_host: Optional[str] = None
     orch_port: Optional[int] = None
     data_request_id: Optional[UUID] = None
-
-
-class ExperimentTemplate(BaseModel, HelaoDict):
-    """
-    Template model for defining an experiment in the HELAO system.
-
-    Attributes:
-        experiment_name (Optional[str]): Name of the experiment.
-        experiment_params (dict): Parameters for the experiment.
-        data_request_id (Optional[UUID]): UUID for a data request associated with the experiment.
-        from_global_exp_params (dict): Parameters received from global experiment context.
-    """
-
-    experiment_name: Optional[str] = None
-    experiment_params: dict = {}
-    data_request_id: Optional[UUID] = None
     from_global_exp_params: dict = {}
 
 
-class ExperimentModel(ExperimentTemplate):
+class ExperimentModel(ShortExperimentModel):
     """
     Comprehensive model for representing a full experiment in the HELAO system.
 

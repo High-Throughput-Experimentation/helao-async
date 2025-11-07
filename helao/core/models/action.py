@@ -46,6 +46,7 @@ class ShortActionModel(BaseModel, HelaoDict):
     action_actual_order: Optional[int] = 0
     orch_submit_order: Optional[int] = 0
     action_server: MachineModel = MachineModel()
+    action_comment: Optional[str] = None
     orch_key: Optional[str] = None
     orch_host: Optional[str] = None
     orch_port: Optional[int] = None

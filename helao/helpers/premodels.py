@@ -52,7 +52,7 @@ class Sequence(SequenceModel):
         ]
         # either we have a plan at the beginning or not
         # don't add it later from the dispatched_experiments
-        # seq.planned_experiments = [ExperimentTemplate(**exp.model_dump()) for exp in self.dispatched_experiments]
+        # seq.planned_experiments = [ShortExperimentModel(**exp.model_dump()) for exp in self.dispatched_experiments]
         return seq
 
     def init_seq(self, time_offset: float = 0, force: Optional[bool] = False):
