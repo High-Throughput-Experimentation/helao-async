@@ -493,11 +493,11 @@ class GamryDriver(HelaoDriver):
         self,
         control_mode: ControlMode,
         fast: bool,
-        zmod: float,
         frequency: float,
         ac_amplitude: float,
         dc_amplitude: float,
-        use_ac_ierange: bool = False,
+        z_expected: float,
+        set_ierange_ac: bool = False,
     ) -> DriverResponse:
         """Set up EIS measurement on potentiostat."""
         try:
@@ -516,8 +516,9 @@ class GamryDriver(HelaoDriver):
                 "ReadZSpeedFast" if fast else "ReadZSpeedNorm",
                 ac_amplitude,
                 dc_amplitude,
+                z_expected,
                 frequency,
-                use_ac_ierange,
+                set_ierange_ac,
             )
 
             response = DriverResponse(

@@ -271,7 +271,7 @@ class GamryEisExec(Executor):
             }
             # link attrs for convenience
             self.action_params = self.active.action.action_params
-            self.max_repeats = self.action_params.get("MaxRepeats", 5)
+            self.max_repeats = self.action_params["MaxRetries"]
             self.driver = self.active.driver
 
             if self.active.action.action_abbr == "PEIS":
@@ -287,12 +287,13 @@ class GamryEisExec(Executor):
                     self.action_params["Finit__Hz"] / self.action_params["Ffinal__Hz"]
                 )
             )
-            self.frequencies = np.logspace(
+            self.freq_list = np.logspace(
                 np.log10(self.action_params["Finit__Hz"]),
                 np.log10(self.action_params["Ffinal__Hz"]),
                 num=int(decades) * self.action_params["FrequenciesPerDecade"] + 1,
             ).tolist()
-            self.frequency_index = 0
+            self.z_expected = self.action_params["Zinit_expected_Ohm"]
+            self.freq_idx = 0
             self.retry_count = 0
 
             # no external timer, event sink signals end of measurement
@@ -333,9 +334,8 @@ class GamryEisExec(Executor):
             # create ReadZ instance and attach to driver (self.driver.readz)
             resp = self.driver.setup_eis(
                 control_mode=self.control_mode,
-                fast=self.action_params.get("EIS_speed", False),
-                zmod=self.action_params["Zmod_Ohm"],
-                frequency=self.frequencies[self.frequency_index],
+                fast=self.action_params["ReadFast"],
+                frequency=self.freq_list[self.freq_idx],
                 dc_amplitude=self.offset,
                 ac_amplitude=self.action_params[
                     (
@@ -344,7 +344,8 @@ class GamryEisExec(Executor):
                         else "Iamp__A"
                     )
                 ],
-                use_ac_ierange=self.action_params.get("use_ac_ierange", False),
+                z_expected=self.z_expected,
+                set_ierange_ac=self.action_params["IErange_fromAC"],
             )
             if resp.status == DriverStatus.error:
                 raise Exception("GamryEisExec driver setup_eis failed.")
@@ -367,7 +368,7 @@ class GamryEisExec(Executor):
                     await asyncio.sleep(0.001)
                     bits = self.driver.pstat.DigitalIn()
             LOGGER.debug("starting measurement")
-            self.readz.measure_frequency(self.frequencies[self.frequency_index])
+            self.readz.measure_frequency(self.freq_list[self.freq_idx])
             self.start_time = time.time()
             error = ErrorCodes.none
         except Exception:
@@ -392,18 +393,21 @@ class GamryEisExec(Executor):
                     self.retry_count += 1
                 elif resp.message == "done":
                     self.retry_count = 0
-                    self.frequency_index += 1
+                    self.freq_idx += 1
 
-                if self.retry_count > self.max_repeats or self.frequency_index >= len(
-                    self.frequencies
+                if self.retry_count > self.max_repeats or self.freq_idx >= len(
+                    self.freq_list
                 ):
                     status = HloStatus.finished
                 else:
                     self.readz.dtaqsink.reset()
                     LOGGER.info(
-                        f"Proceeding to frequency {self.frequencies[self.frequency_index]:.2e} Hz, attempt {self.retry_count}/{self.max_repeats}."
+                        f"Proceeding to frequency {self.freq_list[self.freq_idx]:.2e} Hz, attempt {self.retry_count}/{self.max_repeats}."
                     )
-                    self.readz.measure_frequency(self.frequencies[self.frequency_index])
+                    if self.action_params["IErange_fromAC"] and self.active.action.action_abbr == "GEIS":
+                        self.z_expected = resp.data.get("Zmod", self.z_expected)
+                        self.readz.set_ierange(self.freq_list[self.freq_idx], self.z_expected)
+                    self.readz.measure_frequency(self.freq_list[self.freq_idx])
 
             if resp.data:
                 resp.data["elapsed_time_s"] = time.time() - self.start_time
@@ -698,9 +702,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Finit__Hz: float = 1e6,  # Initial frequency in Hz.
         Ffinal__Hz: float = 10,  # Final frequency in Hz.
         FrequenciesPerDecade: int = 10,
-        EIS_speed: str = "normal",  # "fast" or "normal"
-        MaxRepeats: int = 10,
-        DelayFraction: float = 0.1,
+        Zinit_expected_Ohm: float = 100.0,
+        ReadFast: bool = False, # True for fast EIS, False for normal 
+        MaxRetries: int = 10,
         TTLwait: int = -1,
         TTLsend: int = -1,
     ):
@@ -723,9 +727,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Finit__Hz: float = 1e6,  # Initial frequency in Hz.
         Ffinal__Hz: float = 10,  # Final frequency in Hz.
         FrequenciesPerDecade: int = 10,
-        EIS_speed: str = "normal",  # "fast" or "normal"
-        MaxRepeats: int = 10,
-        DelayFraction: float = 0.1,
+        Zinit_expected_Ohm: float = 100.0,
+        ReadFast: bool = False, # True for fast EIS, False for normal 
+        MaxRetries: int = 10,
         TTLwait: int = -1,
         TTLsend: int = -1,
     ):
