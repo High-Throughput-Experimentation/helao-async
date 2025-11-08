@@ -182,6 +182,7 @@ class ReadZ:
         """Retrieve data from device buffer."""
         try:
             client.PumpEvents(pump_rate)
+            time.sleep(0.1)
             total_points = len(self.dtaqsink.acquired_points)
             print("acq_pts:", total_points)
 
@@ -220,7 +221,6 @@ class ReadZ:
             if not self.stopping:
                 if self.dtaqsink.dtaq is not None:
                     self.stopping = True
-                    self.dtaqsink.dtaq.Run(False)
                     self.dtaqsink.dtaq.Stop()
                     self.dtaqsink.status = "done"
                     self.stopping = False

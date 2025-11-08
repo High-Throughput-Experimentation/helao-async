@@ -418,6 +418,7 @@ class GamryEisExec(Executor):
 
     async def _post_exec(self):
         resp = self.driver.cleanup(self.ttl_params)
+        self.driver.close_eis()
         self.driver.readz = None
         self.readz = None
 
