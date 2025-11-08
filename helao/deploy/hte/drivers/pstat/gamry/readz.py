@@ -56,10 +56,12 @@ class ReadZ:
         self.init_cell_off = init_cell_off
         self.leave_cell_on = leave_cell_on
         self.z_expected = z_expected
+        self.events = None
         self.counter = 0
 
     def init_pstat(self):
         try:
+            self.events = client.GetEvents(self.dtaq, self.dtaqsink)
             self.pstat.SetAchSelect(self.GamryCOM.GND)
             self.pstat.SetCtrlMode(getattr(self.GamryCOM, self.control_mode.value))
             self.pstat.SetIEStability(self.GamryCOM.StabilityFast)
@@ -290,3 +292,9 @@ class GamryReadZSink:
         self.status = "idle"
         self.buffer_size = 0
         self.z_values = {}
+    
+    def _IGamryDtaqEvents_OnDataAvailable(self, _arg0):
+        self.cook()
+
+    def _IGamryDtaqEvents_OnDataDone(self, _arg0):
+        self.cook()  # a final cook
