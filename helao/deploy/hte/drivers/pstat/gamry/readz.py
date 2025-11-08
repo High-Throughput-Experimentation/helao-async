@@ -271,11 +271,11 @@ class GamryReadZSink:
             except Exception:
                 count = 0
 
-    def _IGamryReadZEvents_OnDataAvailable(self, _arg0):
+    def _IGamryReadZEvents_OnDataAvailable(self, this):
         self.cook()
         self.status = "measuring"
 
-    def _IGamryReadZEvents_OnDataDone(self, _arg0, done_status):
+    def _IGamryReadZEvents_OnDataDone(self, this, done_status):
         com_status = done_status
         print("data done event received")
         self.cook()  # a final cook
@@ -292,9 +292,3 @@ class GamryReadZSink:
         self.status = "idle"
         self.buffer_size = 0
         self.z_values = {}
-    
-    def _IGamryDtaqEvents_OnDataAvailable(self, _arg0):
-        self.cook()
-
-    def _IGamryDtaqEvents_OnDataDone(self, _arg0):
-        self.cook()  # a final cook
