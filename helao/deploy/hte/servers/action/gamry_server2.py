@@ -705,6 +705,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Zinit_expected_Ohm: float = 100.0,
         ReadFast: bool = False, # True for fast EIS, False for normal 
         MaxRetries: int = 10,
+        IErange_fromAC: bool = False,
         TTLwait: int = -1,
         TTLsend: int = -1,
     ):
@@ -730,6 +731,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Zinit_expected_Ohm: float = 100.0,
         ReadFast: bool = False, # True for fast EIS, False for normal 
         MaxRetries: int = 10,
+        IErange_fromAC: bool = False,
         TTLwait: int = -1,
         TTLsend: int = -1,
     ):
