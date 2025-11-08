@@ -37,9 +37,9 @@ class ReadZ:
         readspeed,
         ac_amplitude,
         dc_amplitude,
-        expected_z,
+        z_expected,
         frequency,
-        use_ac_ierange=False,
+        set_ierange_ac=False,
         init_cell_off=True,
         leave_cell_on=False,
     ):
@@ -51,11 +51,11 @@ class ReadZ:
         self.ac_amplitude = ac_amplitude
         self.dc_amplitude = dc_amplitude
         self.frequency = frequency
-        self.use_ac_ierange = use_ac_ierange
+        self.set_ierange_ac = set_ierange_ac
         self.dtaqsink = GamryReadZSink(self.dtaq, gc=self.GamryCOM)
         self.init_cell_off = init_cell_off
         self.leave_cell_on = leave_cell_on
-        self.expected_z = expected_z
+        self.z_expected = z_expected
         self.counter = 0
 
     def init_pstat(self):
@@ -79,14 +79,14 @@ class ReadZ:
             self.dtaq.SetINoise(0.0)
             self.dtaq.SetVNoise(0.0)
             self.dtaq.SetIENoise(0.0)
-            self.dtaq.SetZmod(self.expected_z)
+            self.dtaq.SetZmod(self.z_expected)
 
             if self.control_mode == ControlMode.GstatMode:
                 self.pstat.SetCASpeed(3)
                 self.dtaq.SetIdc(self.dc_amplitude)
                 LOGGER.info(f"Setting DC current to {self.dc_amplitude:.2e} A")
                 LOGGER.info(f"Setting AC current to {self.ac_amplitude:.2e} A")
-                self.set_ie_range(self.frequency, self.expected_z)
+                self.set_ierange(self.frequency, self.z_expected)
                 if self.init_cell_off:
                     self.pstat.SetCell(self.GamryCOM.CellOn)  # turn the cell on
                     LOGGER.debug("Waiting 3s for sample equilibration...")
@@ -102,7 +102,7 @@ class ReadZ:
                 self.pstat.SetCASpeed(3)
                 self.pstat.SetVoltage(self.dc_amplitude)
 
-                self.set_ie_range(self.frequency, self.expected_z)
+                self.set_ierange(self.frequency, self.z_expected)
                 if self.init_cell_off:
                     self.pstat.SetCell(self.GamryCOM.CellOn)
                     time.sleep(1)
@@ -125,8 +125,8 @@ class ReadZ:
             )
         return response
 
-    def set_ie_range(self, frequency: float, z_guess: float, s_dc_max: float = 1.0):
-        if self.use_ac_ierange:
+    def set_ierange(self, frequency: float, z_guess: float, s_dc_max: float = 1.0):
+        if self.set_ierange_ac:
             if self.control_mode == ControlMode.GstatMode:
                 v_ac_max = self.ac_amplitude * z_guess * 2
                 IERange = self.pstat.TestIERangeAC(
@@ -147,7 +147,7 @@ class ReadZ:
                 i_max = (
                     2
                     * (abs(self.dc_amplitude) + (2**0.5) * self.ac_amplitude)
-                    / self.expected_z
+                    / self.z_expected
                 )
 
             IERange = self.pstat.TestIERange(i_max)
