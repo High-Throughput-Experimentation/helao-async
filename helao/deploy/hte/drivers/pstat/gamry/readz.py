@@ -14,6 +14,18 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
+async def measure_ocv(pstat, gamrycom, duration: float = 2.0, acquisition_period: float = 0.1):
+    # pstat.Open()
+    pstat.SetCell(gamrycom.CellOff)
+    data = []
+
+    ocv_start_time = time.time()
+    while time.time() - ocv_start_time <= duration:
+        data.append((time.time() - ocv_start_time, pstat.MeasureV()))
+        await asyncio.sleep(acquisition_period)
+    ts, vs = list(zip(*data))
+    return list(ts), list(vs)
+
 class ReadZ:
 
     def __init__(
@@ -44,18 +56,7 @@ class ReadZ:
         self.init_cell_off = init_cell_off
         self.leave_cell_on = leave_cell_on
         self.expected_z = expected_z
-
-    async def measure_ocv(self, duration: float = 2.0, acquisition_period: float = 0.1):
-        self.pstat.Open()
-        self.pstat.SetCell(self.GamryCOM.CellOff)
-        data = []
-
-        ocv_start_time = time.time()
-        while time.time() - ocv_start_time <= duration:
-            data.append((time.time() - ocv_start_time, self.pstat.MeasureV()))
-            await asyncio.sleep(acquisition_period)
-        ts, vs = list(zip(*data))
-        return list(ts), list(vs)
+        self.counter = 0
 
     def init_pstat(self):
         try:
@@ -182,27 +183,20 @@ class ReadZ:
         try:
             client.PumpEvents(pump_rate)
             total_points = len(self.dtaqsink.acquired_points)
-            if self.counter < total_points:
-                new_data = self.dtaqsink.acquired_points[self.counter : total_points]
-                # data_dict = {
-                #     k: v
-                #     for k, v in zip(
-                #         self.technique.dtaq.output_keys, np.matrix(new_data).T.tolist()
-                #     )
-                # }
-                data_dict = {"DATA": new_data}
-            else:
-                data_dict = {}
+            print("acq_pts:", total_points)
 
             sink_state = self.dtaqsink.status
+            LOGGER.info(f"Data sink state: {sink_state}")
+            data_dict = {}
             if sink_state == "measuring" or self.counter < total_points:
                 status = DriverStatus.busy
             elif sink_state == "retry":
-                status = DriverStatus.busy
+                status = DriverStatus.retry
             elif sink_state == "error":
                 status = DriverStatus.error
             elif sink_state == "done":
                 status = DriverStatus.ok
+                data_dict = self.dtaqsink.z_values
             else:
                 status = DriverStatus.ok
             self.counter = total_points
