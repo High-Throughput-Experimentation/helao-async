@@ -262,6 +262,7 @@ class GamryEisExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         try:
+            self.action_params = self.active.action.action_params
             self.poll_rate = 0.01  # pump events every 10 millisecond
             self.concurrent = False
             self.data_buffer = defaultdict(lambda: deque(maxlen=1000))
@@ -270,7 +271,6 @@ class GamryEisExec(Executor):
                 k: self.action_params.get(k, -1) for k in ("TTLwait", "TTLsend")
             }
             # link attrs for convenience
-            self.action_params = self.active.action.action_params
             self.max_repeats = self.action_params["MaxRetries"]
             self.driver = self.active.driver
 
