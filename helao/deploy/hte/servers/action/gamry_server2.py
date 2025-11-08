@@ -48,7 +48,7 @@ from ...drivers.pstat.gamry.technique import (
     TECH_OCV,
     TECH_RCA,
 )
-from ...drivers.pstat.gamry.readz import ReadZ
+from ...drivers.pstat.gamry.readz import ReadZ, measure_ocv
 
 global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -271,12 +271,16 @@ class GamryEisExec(Executor):
             }
             # link attrs for convenience
             self.action_params = self.active.action.action_params
+            self.max_repeats = self.action_params.get("MaxRepeats", 5)
             self.driver = self.active.driver
-            self.control_mode = (
-                ControlMode.PstatMode
-                if self.active.action.action_abbr == "PEIS"
-                else ControlMode.GstatMode
-            )
+
+            if self.active.action.action_abbr == "PEIS":
+                self.control_mode = ControlMode.PstatMode
+                self.offset = self.action_params.get("Voffset__V", 0.0)
+
+            else:
+                self.control_mode = ControlMode.GstatMode
+                self.offset = self.action_params.get("Ioffset__A", 0.0)
 
             decades = np.abs(
                 np.log10(
@@ -289,20 +293,50 @@ class GamryEisExec(Executor):
                 num=int(decades) * self.action_params["FrequenciesPerDecade"] + 1,
             ).tolist()
             self.frequency_index = 0
-            self.offset = self.action_params.get("")
+            self.retry_count = 0
 
+            # no external timer, event sink signals end of measurement
+            self.duration = -1
+
+            LOGGER.info("GamryEisExec initialized.")
+        except Exception:
+            LOGGER.error("GamryEisExec was not initialized.", exc_info=True)
+
+    async def _pre_exec(self) -> dict:
+        """Setup potentiostat device for given technique."""
+        try:
+            if self.action_params.get("versus_OCV", False):
+                ocv_duration = self.action_params.get("OCV_duration__s", 2.0)
+                ocv_acq_period = self.action_params.get(
+                    "OCV_acquisition_period__s", 0.1
+                )
+                LOGGER.info(f"measuring OCV for {ocv_duration:.1f} seconds")
+                ts, vs = await measure_ocv(
+                    self.driver.pstat,
+                    self.driver.GamryCOM,
+                    ocv_duration,
+                    ocv_acq_period,
+                )
+                self.mean_ocv = np.mean(vs[-5:])
+                self.offset += self.mean_ocv
+                ocv_data = {"t_s": ts, "Ewe_V": vs}
+                await self.active.write_file(
+                    output_str=json.dumps(ocv_data),
+                    file_type="pstat_helao__file",
+                    filename="init_ocv.hlo",
+                    file_group=HloFileGroup.helao_files,
+                    header=yml_dumps({"mean_ocv": self.mean_ocv}),
+                    json_data_keys=list(ocv_data.keys()),
+                )
+                LOGGER.info(f"OCV result: {self.mean_ocv:.3f} V")
+
+            # create ReadZ instance and attach to driver (self.driver.readz)
             resp = self.driver.setup_eis(
                 control_mode=self.control_mode,
-                fast=self.action_params.get("fast", False),
+                fast=self.action_params.get("EIS_speed", False),
                 zmod=self.action_params["Zmod_Ohm"],
                 frequency=self.frequencies[self.frequency_index],
-                dc_amplitude=self.action_params[
-                    (
-                        "Vinit__V"
-                        if self.control_mode == ControlMode.PstatMode
-                        else "Iinit__A"
-                    )
-                ],
+                dc_amplitude=self.offset,
                 ac_amplitude=self.action_params[
                     (
                         "Vamp__V"
@@ -314,163 +348,74 @@ class GamryEisExec(Executor):
             )
             if resp.status == DriverStatus.error:
                 raise Exception("GamryEisExec driver setup_eis failed.")
+            self.readz = self.driver.readz
 
-            # no external timer, event sink signals end of measurement
-            self.duration = -1
-
-            self.last_alert_time = 0
-
-            LOGGER.info("GamryEisExec initialized.")
+            resp = self.readz.init_pstat()
+            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         except Exception:
-            LOGGER.error("GamryEisExec was not initialized.", exc_info=True)
-
-    async def _pre_exec(self) -> dict:
-        """Setup potentiostat device for given technique."""
-        if self.action_params.get("versus_OCV", False):
-            ocv_duration = self.action_params.get("OCV_duration__s", 2.0)
-            ocv_rate = self.action_params.get("OCV_acquisition_period__s", 0.1)
-            LOGGER.info(f"measuring OCV for {ocv_duration:.1f} seconds")
-            ts, vs = await self.readz.measure_ocv(ocv_duration)
-            self.mean_ocv = np.mean(vs[-5:])
-            self.offset += self.mean_ocv
-            ocv_data = {"t_s": ts, "Ewe_V": vs}
-            await self.active.write_file(
-                output_str=json.dumps(ocv_data),
-                file_type="pstat_helao__file",
-                filename="init_ocv.hlo",
-                file_group=HloFileGroup.helao_files,
-                header=yml_dumps({"mean_ocv": self.mean_ocv}),
-                json_data_keys=list(ocv_data.keys()),
-            )
-            LOGGER.info(f"OCV result: {self.mean_ocv:.3f} V")
-
-        resp = self.driver.readz.init_pstat()
-        error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
+            LOGGER.error("GamryEisExec _pre_exec error", exc_info=True)
+            error = ErrorCodes.setup
         return {"error": error}
 
     async def _exec(self) -> dict:
         """Begin measurement or wait for TTL trigger if specified."""
-        if self.ttl_params["TTLwait"] > -1:
-            bits = self.driver.pstat.DigitalIn()
-            LOGGER.info(f"Gamry DIbits: {bits}, waiting for trigger.")
-            while not bits:
-                await asyncio.sleep(0.001)
+        try:
+            if self.ttl_params["TTLwait"] > -1:
                 bits = self.driver.pstat.DigitalIn()
-        LOGGER.debug("starting measurement")
-        self.driver.readz.measure_frequency(self.driver.readz.freq_list[0])
-        self.start_time = resp.data.get("start_time", time.time())
-        error = (
-            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
-        )
+                LOGGER.info(f"Gamry DIbits: {bits}, waiting for trigger.")
+                while not bits:
+                    await asyncio.sleep(0.001)
+                    bits = self.driver.pstat.DigitalIn()
+            LOGGER.debug("starting measurement")
+            self.readz.measure_frequency(self.frequencies[self.frequency_index])
+            self.start_time = time.time()
+            error = ErrorCodes.none
+        except Exception:
+            LOGGER.error("GamryEisExec _exec error", exc_info=True)
+            error = ErrorCodes.critical_error
         return {"error": error}
 
     async def _poll(self) -> dict:
         """Return data and status from dtaq event sink."""
         try:
-            resp = self.driver.readz.get_data(self.poll_rate)
-            # populate executor buffer for output calculation
-            for k, v in resp.data.items():
-                self.data_buffer[k].extend(v)
-            # check for alert thresholds at this point in data_buffer
-            poll_iter_time = time.time()
-            if self.alert_params["alert_sleep__s"] is not None:
-                single_alert = (
-                    self.alert_params["alert_sleep__s"] <= 0
-                    and self.last_alert_time == 0
-                )
-                ongoing_alert = self.alert_params["alert_sleep__s"] > 0 and (
-                    poll_iter_time - self.last_alert_time
-                    > self.alert_params["alert_sleep__s"]
-                )
-                if single_alert or ongoing_alert:
-                    LOGGER.debug(
-                        f"single_alert: {single_alert}, ongoing_alert: {ongoing_alert}"
-                    )
-                    min_duration = self.alert_params["alert_duration__s"]
-                    if (
-                        min_duration > 0
-                        and self.data_buffer.get("t_s", [-1])[-1] > min_duration
-                    ):
-                        LOGGER.debug(
-                            f"elapsed time is above min_duration: {min_duration}"
-                        )
-                        time_buffer = self.data_buffer["t_s"]
-                        idx = 1
-                        latest_t = time_buffer[-1]
-                        slice_duration = latest_t - time_buffer[-idx]
-                        while (len(time_buffer) > idx) and (
-                            slice_duration < min_duration
-                        ):
-                            idx += 1
-                            slice_duration = latest_t - time_buffer[-idx]
-                        LOGGER.debug(f"slice index is: {-idx}")
-                        if slice_duration >= min_duration:
-                            LOGGER.debug(
-                                f"slice_duration {slice_duration:.3f} is above min_duration"
-                            )
-                            for thresh_key in ("Ewe_V", "I_A"):
-                                thresh_val = self.alert_params.get(
-                                    f"alertThresh{thresh_key}", None
-                                )
-                                if thresh_val is not None:
-                                    data_dq = self.data_buffer[thresh_key]
-                                    slice_vals = list(
-                                        itertools.islice(
-                                            data_dq, len(data_dq) - idx, len(data_dq)
-                                        )
-                                    )
-                                    if (
-                                        all([x > thresh_val for x in slice_vals])
-                                        and self.alert_params["alert_above"]
-                                    ):
-                                        LOGGER.alert(
-                                            f"{thresh_key} went above {thresh_val} for {min_duration} seconds."
-                                        )
-                                        self.last_alert_time = poll_iter_time
-                                    elif (
-                                        all([x < thresh_val for x in slice_vals])
-                                        and not self.alert_params["alert_above"]
-                                    ):
-                                        LOGGER.alert(
-                                            f"{thresh_key} went below {thresh_val} for {min_duration} seconds."
-                                        )
-                                        self.last_alert_time = poll_iter_time
+            resp = self.readz.get_data(self.poll_rate)
             error = (
                 ErrorCodes.none
                 if resp.response == "success"
                 else ErrorCodes.critical_error
             )
-            status = HloStatus.active if resp.message != "done" else HloStatus.finished
+            status = HloStatus.active
+            if resp.message == "error":
+                status = HloStatus.finished
+            else:
+                if resp.message == "retry":
+                    self.retry_count += 1
+                elif resp.message == "done":
+                    self.retry_count = 0
+                    self.frequency_index += 1
+
+                if self.retry_count > self.max_repeats or self.frequency_index >= len(
+                    self.frequencies
+                ):
+                    status = HloStatus.finished
+                else:
+                    self.readz.dtaqsink.reset()
+                    LOGGER.info(
+                        f"Proceeding to frequency {self.frequencies[self.frequency_index]:.2e} Hz, attempt {self.retry_count}/{self.max_repeats}."
+                    )
+                    self.readz.measure_frequency(self.frequencies[self.frequency_index])
+
+            if resp.data:
+                resp.data["elapsed_time_s"] = time.time() - self.start_time
             return {"error": error, "status": status, "data": resp.data}
         except Exception:
             LOGGER.error("GamryExec poll error", exc_info=True)
-            print(data_dq)
             return {"error": ErrorCodes.critical_error, "status": HloStatus.errored}
 
     async def _post_exec(self):
         resp = self.driver.cleanup(self.ttl_params)
         self.driver.readz = None
-
-        # parse calculate outputs from data buffer:
-        for k in ["t_s", "Ewe_V", "I_A"]:
-            if k in self.data_buffer:
-                meanv = np.nanmean(np.array(self.data_buffer[k])[-5:])
-                self.active.action.action_params[f"{k}__mean_final"] = meanv
-
-        if self.active.action.action_name == "run_OCV":
-            data_df = pd.DataFrame(self.data_buffer)
-            rsd_thresh = self.action_params.get("RSD_threshold", 1)
-            simple_thresh = self.action_params.get("simple_threshold", 1)
-            signal_change_thresh = self.action_params.get("signal_change_threshold", 1)
-            amplitude_thresh = self.action_params.get("amplitude_threshold", 1)
-            has_bubble = bubble_detection(
-                data_df,
-                rsd_thresh,
-                simple_thresh,
-                signal_change_thresh,
-                amplitude_thresh,
-            )
-            self.active.action.action_params["has_bubble"] = has_bubble
+        self.readz = None
 
         error = (
             ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
@@ -479,7 +424,7 @@ class GamryEisExec(Executor):
 
     async def _manual_stop(self) -> dict:
         """Interrupt measurement and disconnect cell."""
-        resp = await self.driver.stop()
+        resp = await self.readz.stop()
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.stop
         return {"error": error}
 
@@ -753,8 +698,8 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Finit__Hz: float = 1e6,  # Initial frequency in Hz.
         Ffinal__Hz: float = 10,  # Final frequency in Hz.
         FrequenciesPerDecade: int = 10,
-        AcqInterval__s: float = 0.001,  # Time between data acq in seconds.
-        Repeats: int = 10,
+        EIS_speed: str = "normal",  # "fast" or "normal"
+        MaxRepeats: int = 10,
         DelayFraction: float = 0.1,
         TTLwait: int = -1,
         TTLsend: int = -1,
@@ -778,8 +723,8 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Finit__Hz: float = 1e6,  # Initial frequency in Hz.
         Ffinal__Hz: float = 10,  # Final frequency in Hz.
         FrequenciesPerDecade: int = 10,
-        AcqInterval__s: float = 0.001,  # Time between data acq in seconds.
-        Repeats: int = 10,
+        EIS_speed: str = "normal",  # "fast" or "normal"
+        MaxRepeats: int = 10,
         DelayFraction: float = 0.1,
         TTLwait: int = -1,
         TTLsend: int = -1,

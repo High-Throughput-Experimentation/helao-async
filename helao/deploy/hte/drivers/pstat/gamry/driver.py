@@ -531,3 +531,25 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
         return response
+
+    def close_eis(self):
+        """Close EIS measurement on potentiostat."""
+        try:
+            if self.dtaq is not None:
+                self.dtaq.Run(False)
+                self.dtaq.stop()
+            if self.pstat is not None:
+                self.pstat.SetCell(self.GamryCOM.CellOff)
+                self.pstat.Close()
+            self.readz = None
+            response = DriverResponse(
+                response=DriverResponseType.success,
+                message="EIS closed",
+                status=DriverStatus.ok,
+            )
+        except Exception:
+            LOGGER.error("EIS close failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
