@@ -541,7 +541,7 @@ class GamryDriver(HelaoDriver):
                 self.dtaq.stop()
             if self.pstat is not None:
                 self.pstat.SetCell(self.GamryCOM.CellOff)
-                self.pstat.Close()
+                # self.pstat.Close()
             self.readz = None
             response = DriverResponse(
                 response=DriverResponseType.success,
