@@ -395,18 +395,23 @@ class GamryEisExec(Executor):
                     self.retry_count = 0
                     self.freq_idx += 1
 
-                if self.retry_count > self.max_repeats or self.freq_idx >= len(
+                if self.retry_count > self.max_repeats or self.freq_idx == len(
                     self.freq_list
                 ):
                     status = HloStatus.finished
                 else:
                     self.readz.dtaqsink.reset()
                     LOGGER.info(
-                        f"Proceeding to frequency {self.freq_list[self.freq_idx]:.2e} Hz, attempt {self.retry_count}/{self.max_repeats}."
+                        f"Proceeding to frequency {self.freq_list[self.freq_idx]:.2e} Hz ({self.freq_idx+1}/{len(self.freq_list)}), attempt {self.retry_count}/{self.max_repeats}."
                     )
-                    if self.action_params["IErange_fromAC"] and self.active.action.action_abbr == "GEIS":
+                    if (
+                        self.action_params["IErange_fromAC"]
+                        and self.active.action.action_abbr == "GEIS"
+                    ):
                         self.z_expected = resp.data.get("Zmod", self.z_expected)
-                        self.readz.set_ierange(self.freq_list[self.freq_idx], self.z_expected)
+                        self.readz.set_ierange(
+                            self.freq_list[self.freq_idx], self.z_expected
+                        )
                     self.readz.measure_frequency(self.freq_list[self.freq_idx])
 
             if resp.data:
@@ -704,7 +709,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Ffinal__Hz: float = 10,  # Final frequency in Hz.
         FrequenciesPerDecade: int = 10,
         Zinit_expected_Ohm: float = 100.0,
-        ReadFast: bool = False, # True for fast EIS, False for normal 
+        ReadFast: bool = False,  # True for fast EIS, False for normal
         MaxRetries: int = 10,
         IErange_fromAC: bool = False,
         TTLwait: int = -1,
@@ -730,7 +735,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Ffinal__Hz: float = 10,  # Final frequency in Hz.
         FrequenciesPerDecade: int = 10,
         Zinit_expected_Ohm: float = 100.0,
-        ReadFast: bool = False, # True for fast EIS, False for normal 
+        ReadFast: bool = False,  # True for fast EIS, False for normal
         MaxRetries: int = 10,
         IErange_fromAC: bool = False,
         TTLwait: int = -1,
