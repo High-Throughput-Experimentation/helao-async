@@ -326,7 +326,7 @@ class GamryEisExec(Executor):
                     file_type="pstat_helao__file",
                     filename="init_ocv.hlo",
                     file_group=HloFileGroup.helao_files,
-                    header=yml_dumps({"mean_ocv": self.mean_ocv}),
+                    header=yml_dumps({"mean_ocv": float(self.mean_ocv)}),
                     json_data_keys=list(ocv_data.keys()),
                 )
                 LOGGER.info(f"OCV result: {self.mean_ocv:.3f} V")
