@@ -415,7 +415,7 @@ class GamryEisExec(Executor):
                     self.readz.measure_frequency(self.freq_list[self.freq_idx])
 
             if resp.data:
-                resp.data["elapsed_time_s"] = time.time() - self.start_time
+                resp.data["t_s"] = time.time() - self.start_time
             return {"error": error, "status": status, "data": resp.data}
         except Exception:
             LOGGER.error("GamryExec poll error", exc_info=True)
