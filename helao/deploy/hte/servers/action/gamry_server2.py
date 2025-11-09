@@ -386,7 +386,7 @@ class GamryEisExec(Executor):
                 else ErrorCodes.critical_error
             )
             status = HloStatus.active
-            if resp.message == "error":
+            if resp.message in ["error", "idle"]:
                 status = HloStatus.finished
             else:
                 if resp.message == "retry":
