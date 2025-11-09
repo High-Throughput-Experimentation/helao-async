@@ -36,6 +36,8 @@ AXIS_MAP = {
     "run_OCV": ("t_s", "Ewe_V"),
     "run_RCA": ("t_s", "I_A"),
     "run_LSV": ("Ewe_V", "I_A"),
+    "run_PEIS": ("Zreal", "Zimag"),
+    "run_GEIS": ("Zreal", "Zimag"),
     # "run_EIS": ("Re_Z", "Im_Z"),
 }
 
@@ -70,7 +72,7 @@ class C_potvis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["t_s", "Ewe_V", "Ach_V", "I_A"]
+        self.data_dict_keys = ["t_s", "Ewe_V", "Ach_V", "I_A", "Zreal", "Zimag"]
         self.datasource = ColumnDataSource(
             data={key: [] for key in self.data_dict_keys}
         )
