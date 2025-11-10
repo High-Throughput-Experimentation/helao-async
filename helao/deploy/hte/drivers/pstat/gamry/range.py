@@ -127,6 +127,24 @@ class Gamry_IErange_dflt(StrEnum):
     mode14 = "mode14"
     mode15 = "mode15"
 
+class Gamry_IErange_30K(StrEnum):
+    auto = "auto"
+    # mode0 = "mode0"
+    # mode1 = "mode1"
+    mode2 = "300pA"
+    mode3 = "3nA"
+    mode4 = "30nA"
+    mode5 = "300nA"
+    mode6 = "3uA"
+    mode7 = "30uA"
+    mode8 = "300uA"
+    mode9 = "3mA"
+    mode10 = "30mA"
+    mode11 = "300mA"
+    mode12 = "3A"
+    mode13 = "30A"
+    # mode14 = "mode14"
+    # mode15 = "mode15"
 
 def split_val_unit(val_string: str) -> tuple[float, str]:
     def to_float(val):

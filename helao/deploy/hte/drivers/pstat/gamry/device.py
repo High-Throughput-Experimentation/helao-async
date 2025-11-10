@@ -6,6 +6,7 @@ from .range import (
     Gamry_IErange_PCI4G750,
     Gamry_IErange_REF600,
     Gamry_IErange_dflt,
+    Gamry_IErange_REF30K,
 )
 
 
@@ -68,6 +69,12 @@ DEFAULT = GamryPstat(
     set_rangemode=True,
 )
 
+REF30K = GamryPstat(
+    device="GamryCOM.GamryPC6Pstat",
+    ierange=Gamry_IErange_REF30K,
+    set_sensemode=False,
+    set_rangemode=True,
+)
 
 GAMRY_DEVICES = {
     "IFC1010": IFC1010,
@@ -76,4 +83,5 @@ GAMRY_DEVICES = {
     "PCI4G300": PCI4G300,
     "PCI4G750": PCI4G750,
     "DEFAULT": DEFAULT,
+    "REF30K": REF30K
 }
