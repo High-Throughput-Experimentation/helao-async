@@ -70,7 +70,7 @@ DEFAULT = GamryPstat(
 )
 
 REF30K = GamryPstat(
-    device="GamryCOM.GamryPC6Pstat",
+    device="GamryCOM.GamryPC5Pstat",
     ierange=Gamry_IErange_REF30K,
     set_sensemode=False,
     set_rangemode=True,
