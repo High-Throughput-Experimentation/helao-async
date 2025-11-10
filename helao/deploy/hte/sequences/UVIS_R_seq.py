@@ -23,7 +23,7 @@ def UVIS_R(
     specref_code: int = 1,
     led_type: str = "front",
     led_date: str = "n/a",
-    led_names: list = ["xenon"],
+    led_names: list = ["lamp_shutter"],
     led_wavelengths_nm: list = [-1],
     led_intensities_mw: list = [-1],
     toggle_is_shutter: bool = False,
@@ -97,7 +97,7 @@ def UVIS_R(
             )
 
     epm.add("UVIS_sub_unloadall_customs", {})
-    epm.add("UVIS_sub_shutdown", {})
+    epm.add("UVIS_sub_shutdown", {"toggle_source": led_names[0]})
 
     return epm.planned_experiments  # returns complete experiment list
 
