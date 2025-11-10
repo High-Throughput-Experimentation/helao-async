@@ -72,7 +72,7 @@ class C_potvis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["t_s", "Ewe_V", "Ach_V", "I_A", "Zreal", "Zimag"]
+        self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "Zreal", "Zimag", "Zfreq", "Zphz"]
         self.datasource = ColumnDataSource(
             data={key: [] for key in self.data_dict_keys}
         )
@@ -273,8 +273,12 @@ class C_potvis:
                     for data_label, data_val in uuid_dict.items():
                         if data_label in self.data_dict_keys:
                             if isinstance(data_val, list):
+                                if data_label == "Zimag":
+                                    data_val = [-1 * val for val in data_val]
                                 data_dict[data_label] += data_val
                             else:
+                                if data_label == "Zimag":
+                                    data_val = -1 * data_val
                                 data_dict[data_label].append(data_val)
 
             # check for missing I_A in OCV
@@ -309,7 +313,7 @@ class C_potvis:
             line_color=colors[0],
             source=self.datasource,
             name=self.cur_action_uuid,
-            legend_label=ystr,
+            legend_label=ystr if ystr != "Zimag" else "-Zimag",
         )
         for i, puuid in enumerate(self.prev_action_uuids):
             self.plot_prev.line(

@@ -176,7 +176,7 @@ class ReadZ:
         self.dtaq.SetCycleLim(*cycle_lim)
 
     def measure_frequency(self, frequency):
-        LOGGER.info(f"Measuring frequency: {frequency:.2f} Hz")
+        LOGGER.debug(f"Measuring frequency: {frequency:.2f} Hz")
         self.set_cycle_limit(frequency)
         self.dtaq.Measure(frequency, self.ac_amplitude)
 
@@ -186,7 +186,7 @@ class ReadZ:
             client.PumpEvents(pump_rate)
             time.sleep(0.1)
             total_points = len(self.dtaqsink.acquired_points)
-            print("acq_pts:", total_points)
+            LOGGER.debug("acq_pts:", total_points)
 
             sink_state = self.dtaqsink.status
             LOGGER.info(f"Data sink state: {sink_state}")
@@ -291,7 +291,6 @@ class GamryReadZSink:
 
     def _IGamryReadZEvents_OnDataDone(self, this, done_status):
         com_status = done_status
-        print("data done event received")
         self.cook()  # a final cook
         if com_status == self.GamryCOM.ReadZStatusRetry:
             self.status = "retry"
