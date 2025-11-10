@@ -135,7 +135,7 @@ def UVIS_sub_shutdown(experiment: Experiment, toggle_source: str = "lamp_shutter
         "set_digital_out",
         {
             "do_item": toggle_source,
-            "on": True,
+            "on": False,
         },
     )
     return apm.planned_actions  # returns complete action list to orch
