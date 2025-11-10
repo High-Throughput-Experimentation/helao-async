@@ -126,10 +126,18 @@ def UVIS_sub_startup(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def UVIS_sub_shutdown(experiment: Experiment):
+def UVIS_sub_shutdown(experiment: Experiment, toggle_source: str = "lamp_shutter"):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # unload all samples from custom positions
     apm.add_actions(UVIS_sub_unloadall_customs(experiment=experiment))
+    apm.add(
+        IO_server,
+        "set_digital_out",
+        {
+            "do_item": toggle_source,
+            "on": True,
+        },
+    )
     return apm.planned_actions  # returns complete action list to orch
 
 
