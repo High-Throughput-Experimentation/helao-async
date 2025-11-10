@@ -127,7 +127,7 @@ class Gamry_IErange_dflt(StrEnum):
     mode14 = "mode14"
     mode15 = "mode15"
 
-class Gamry_IErange_30K(StrEnum):
+class Gamry_IErange_REF30K(StrEnum):
     auto = "auto"
     # mode0 = "mode0"
     # mode1 = "mode1"
