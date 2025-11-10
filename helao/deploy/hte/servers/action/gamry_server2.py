@@ -263,7 +263,7 @@ class GamryEisExec(Executor):
         super().__init__(*args, **kwargs)
         try:
             self.action_params = self.active.action.action_params
-            self.poll_rate = 1.0  # pump events every 10 millisecond
+            self.poll_rate = 0.01  # pump events every 10 millisecond
             self.concurrent = False
             self.data_buffer = defaultdict(lambda: deque(maxlen=1000))
 
