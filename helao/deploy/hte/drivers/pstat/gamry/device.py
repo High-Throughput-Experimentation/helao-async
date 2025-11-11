@@ -73,7 +73,7 @@ REF30K = GamryPstat(
     device="GamryCOM.GamryPstat",
     ierange=Gamry_IErange_REF30K,
     set_sensemode=False,
-    set_rangemode=True,
+    set_rangemode=False,
 )
 
 GAMRY_DEVICES = {
