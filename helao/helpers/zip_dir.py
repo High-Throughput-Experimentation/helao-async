@@ -1,10 +1,34 @@
 from typing import Union
 from pathlib import Path
 import zipfile
+import aiofiles
+import anyio
 
+from zipstream import AsyncZipStream, ZIP_DEFLATED
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+async def rm_tree_async(pth: Union[anyio.Path, str]):
+    """
+    Recursively removes a directory and all its contents asynchronously.
+
+    Args:
+        pth (str or Path): The path to the directory to be removed.
+
+    """
+    if isinstance(pth, str):
+        pth = anyio.Path(pth)
+    elif isinstance(pth, Path):
+        pth = anyio.Path(str(pth))
+
+    async for child in pth.glob("*"):
+        if await child.is_file():
+            await child.unlink()
+        else:
+            await rm_tree_async(child)
+    await pth.rmdir()
 
 
 def rm_tree(pth):
@@ -26,6 +50,25 @@ def rm_tree(pth):
         else:
             rm_tree(child)
     pth.rmdir()
+
+
+async def zip_dir_async(target_dir: Union[Path, str], filename: Union[Path, str]):
+    success = False
+    try:
+        zs = AsyncZipStream(compress_type=ZIP_DEFLATED, compress_level=9)
+        if isinstance(target_dir, Path):
+            target_dir = str(target_dir)
+        if isinstance(filename, Path):
+            filename = str(filename)
+        z = await zs.add_path(target_dir)
+        async with aiofiles.open(filename, "wb") as f:
+            await f.writelines(z)
+        success = True
+        LOGGER.info(f"Zipped {target_dir} to {filename}")
+    except Exception:
+        LOGGER.error("Error while zipping folder, cannot remove.", exc_info=True)
+    if success:
+        await rm_tree_async(target_dir)
 
 
 def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]):
