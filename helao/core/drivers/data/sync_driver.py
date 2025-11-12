@@ -1867,35 +1867,34 @@ class HelaoSyncer:
             if self.s3 is None:
                 LOGGER.info("S3 is not configured. Skipping to S3 upload.")
                 return True
-            with self.s3 as s3:
-                if isinstance(msg, dict):
-                    LOGGER.debug("Converting dict to json.")
-                    uploadee = dict2json(msg)
-                    uploader = s3.upload_fileobj
-                    if compress:
-                        if not target.endswith(".gz"):
-                            target = f"{target}.gz"
-                        buffer = io.BytesIO()
-                        with gzip.GzipFile(fileobj=buffer, mode="wb") as f:
-                            f.write(uploadee.read())
-                        buffer.seek(0)
-                        uploadee = buffer
-                else:
-                    LOGGER.info("Converting path to str")
-                    uploadee = str(msg)
-                    uploader = s3.upload_file
-                for i in range(retries + 1):
-                    if i > 0:
-                        LOGGER.info(f"S3 retry [{i}/{retries}]: {self.bucket}, {target}")
-                    try:
-                        await uploader(uploadee, self.bucket, target)
-                        return True
-                    except Exception:
-                        LOGGER.error(
-                            f"Failed to upload {target} to S3, retrying in 30 seconds",
-                            exc_info=True,
-                        )
-                        await asyncio.sleep(30)
+            if isinstance(msg, dict):
+                LOGGER.debug("Converting dict to json.")
+                uploadee = dict2json(msg)
+                uploader = self.s3.upload_fileobj
+                if compress:
+                    if not target.endswith(".gz"):
+                        target = f"{target}.gz"
+                    buffer = io.BytesIO()
+                    with gzip.GzipFile(fileobj=buffer, mode="wb") as f:
+                        f.write(uploadee.read())
+                    buffer.seek(0)
+                    uploadee = buffer
+            else:
+                LOGGER.info("Converting path to str")
+                uploadee = str(msg)
+                uploader = self.s3.upload_file
+            for i in range(retries + 1):
+                if i > 0:
+                    LOGGER.info(f"S3 retry [{i}/{retries}]: {self.bucket}, {target}")
+                try:
+                    await uploader(uploadee, self.bucket, target)
+                    return True
+                except Exception:
+                    LOGGER.error(
+                        f"Failed to upload {target} to S3, retrying in 30 seconds",
+                        exc_info=True,
+                    )
+                    await asyncio.sleep(30)
             LOGGER.info(f"Did not upload {target} after {retries} tries.")
             return False
         except Exception:
