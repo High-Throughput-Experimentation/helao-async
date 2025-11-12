@@ -1020,7 +1020,7 @@ class HelaoSyncer:
                 region_name=self.config_dict["region"],
             )
             self.s3 = self.aws_session.client("s3")
-            self.s3r = aioboto3.resource("s3")
+            self.s3r = self.aws_session.resource("s3")
         else:
             self.aws_session = None
             self.s3 = None
