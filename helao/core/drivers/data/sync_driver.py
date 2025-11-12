@@ -33,7 +33,7 @@ import traceback
 from collections import defaultdict
 from copy import copy
 
-import boto3
+import aioboto3
 import gzip
 
 # from filelock import FileLock
@@ -1014,13 +1014,13 @@ class HelaoSyncer:
             )
         if "aws_config_path" in self.config_dict:
             os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
-            self.aws_session = boto3.Session(
+            self.aws_session = aioboto3.Session(
                 aws_access_key_id= self.config_dict["aws_access_key_id"],
                 aws_secret_access_key=self.config_dict["aws_secret_access_key"],
                 region_name=self.config_dict["region"],
             )
             self.s3 = self.aws_session.client("s3")
-            self.s3r = boto3.resource("s3")
+            self.s3r = aioboto3.resource("s3")
         else:
             self.aws_session = None
             self.s3 = None
@@ -1867,34 +1867,35 @@ class HelaoSyncer:
             if self.s3 is None:
                 LOGGER.info("S3 is not configured. Skipping to S3 upload.")
                 return True
-            if isinstance(msg, dict):
-                LOGGER.debug("Converting dict to json.")
-                uploadee = dict2json(msg)
-                uploader = self.s3.upload_fileobj
-                if compress:
-                    if not target.endswith(".gz"):
-                        target = f"{target}.gz"
-                    buffer = io.BytesIO()
-                    with gzip.GzipFile(fileobj=buffer, mode="wb") as f:
-                        f.write(uploadee.read())
-                    buffer.seek(0)
-                    uploadee = buffer
-            else:
-                LOGGER.info("Converting path to str")
-                uploadee = str(msg)
-                uploader = self.s3.upload_file
-            for i in range(retries + 1):
-                if i > 0:
-                    LOGGER.info(f"S3 retry [{i}/{retries}]: {self.bucket}, {target}")
-                try:
-                    uploader(uploadee, self.bucket, target)
-                    return True
-                except Exception:
-                    LOGGER.error(
-                        f"Failed to upload {target} to S3, retrying in 30 seconds",
-                        exc_info=True,
-                    )
-                    await asyncio.sleep(30)
+            async with self.s3 as s3:
+                if isinstance(msg, dict):
+                    LOGGER.debug("Converting dict to json.")
+                    uploadee = dict2json(msg)
+                    uploader = s3.upload_fileobj
+                    if compress:
+                        if not target.endswith(".gz"):
+                            target = f"{target}.gz"
+                        buffer = io.BytesIO()
+                        with gzip.GzipFile(fileobj=buffer, mode="wb") as f:
+                            f.write(uploadee.read())
+                        buffer.seek(0)
+                        uploadee = buffer
+                else:
+                    LOGGER.info("Converting path to str")
+                    uploadee = str(msg)
+                    uploader = s3.upload_file
+                for i in range(retries + 1):
+                    if i > 0:
+                        LOGGER.info(f"S3 retry [{i}/{retries}]: {self.bucket}, {target}")
+                    try:
+                        await uploader(uploadee, self.bucket, target)
+                        return True
+                    except Exception:
+                        LOGGER.error(
+                            f"Failed to upload {target} to S3, retrying in 30 seconds",
+                            exc_info=True,
+                        )
+                        await asyncio.sleep(30)
             LOGGER.info(f"Did not upload {target} after {retries} tries.")
             return False
         except Exception:
