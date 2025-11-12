@@ -33,7 +33,7 @@ import traceback
 from collections import defaultdict
 from copy import copy
 
-import aioboto3
+import boto3
 import gzip
 
 # from filelock import FileLock
@@ -1014,13 +1014,13 @@ class HelaoSyncer:
             )
         if "aws_config_path" in self.config_dict:
             os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
-            self.aws_session = aioboto3.Session(
+            self.aws_session = boto3.Session(
                 aws_access_key_id= self.config_dict["aws_access_key_id"],
                 aws_secret_access_key=self.config_dict["aws_secret_access_key"],
                 region_name=self.config_dict["region"],
             )
             self.s3 = self.aws_session.client("s3")
-            self.s3r = self.aws_session.resource("s3")
+            self.s3r = boto3.resource("s3")
         else:
             self.aws_session = None
             self.s3 = None
@@ -1887,7 +1887,7 @@ class HelaoSyncer:
                 if i > 0:
                     LOGGER.info(f"S3 retry [{i}/{retries}]: {self.bucket}, {target}")
                 try:
-                    await uploader(uploadee, self.bucket, target)
+                    uploader(uploadee, self.bucket, target)
                     return True
                 except Exception:
                     LOGGER.error(
