@@ -474,9 +474,9 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
-            LOGGER.warning("kill_gamrycom error", exc_info=True)
+            LOGGER.warning("kill_gamrycom failed, likely already exited", exc_info=False)
             response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
+                response=DriverResponseType.failed, status=DriverStatus.ok
             )
         return response
 
