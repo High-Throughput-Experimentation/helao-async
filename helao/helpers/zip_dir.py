@@ -62,7 +62,8 @@ async def zip_dir_async(target_dir: Union[Path, str], filename: Union[Path, str]
             filename = str(filename)
         await zs.add_path(target_dir)
         async with aiofiles.open(filename, "wb") as f:
-            await f.writelines(zs)
+            async for line in zs:
+                await f.write(line)
         success = True
         LOGGER.info(f"Zipped {target_dir} to {filename}")
     except Exception:
