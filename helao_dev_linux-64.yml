@@ -13,10 +13,12 @@ dependencies:
     - pyft232
     - sqlmodel
     - uuid7
-    - git+https://github.com/spomjaksilp/pyMeCom
-    - git+https://github.com/onepunchdan/easy-biologic
+    - https://github.com/meerstetter/pyMeCom/archive/master.zip
+    - https://github.com/onepunchdan/easy-biologic/archive/main.zip
+    - https://github.com/stexandev/zipstream-ng/archive/feature/async.zip
   - aiofiles
   - aiohttp
+  - anyio
   - anywidget
   - asyncua
   - bokeh=2

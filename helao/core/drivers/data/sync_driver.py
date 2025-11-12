@@ -52,7 +52,7 @@ from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
 from helao.helpers.parquet import hlo_to_parquet
 from helao.helpers.yml_tools import yml_dumps, yml_load
-from helao.helpers.zip_dir import zip_dir
+from helao.helpers.zip_dir import zip_dir_async
 
 from time import sleep
 from glob import glob
@@ -1584,7 +1584,7 @@ class HelaoSyncer:
                 LOGGER.info(
                     f"Full sequence has synced, creating zip: {str(zip_target)}"
                 )
-                zip_dir(prog.yml.target.parent, zip_target)
+                await zip_dir_async(prog.yml.target.parent, zip_target)
                 self.cleanup_root()
                 # LOGGER.info(f"Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
