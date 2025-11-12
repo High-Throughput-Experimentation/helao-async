@@ -1867,7 +1867,7 @@ class HelaoSyncer:
             if self.s3 is None:
                 LOGGER.info("S3 is not configured. Skipping to S3 upload.")
                 return True
-            async with self.s3 as s3:
+            with self.s3 as s3:
                 if isinstance(msg, dict):
                     LOGGER.debug("Converting dict to json.")
                     uploadee = dict2json(msg)
