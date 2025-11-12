@@ -60,15 +60,15 @@ async def zip_dir_async(target_dir: Union[Path, str], filename: Union[Path, str]
             target_dir = str(target_dir)
         if isinstance(filename, Path):
             filename = str(filename)
-        z = await zs.add_path(target_dir)
+        await zs.add_path(target_dir)
         async with aiofiles.open(filename, "wb") as f:
-            await f.writelines(z)
+            await f.writelines(zs)
         success = True
         LOGGER.info(f"Zipped {target_dir} to {filename}")
     except Exception:
         LOGGER.error("Error while zipping folder, cannot remove.", exc_info=True)
     if success:
-        await rm_tree_async(target_dir)
+        await rm_tree_async(str(target_dir))
 
 
 def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]):
