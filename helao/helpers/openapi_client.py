@@ -9,7 +9,7 @@ class OpenAPIClient:
     Dynamically creates methods for GET and POST operations based on the 'operationId'.
     """
 
-    def __init__(self, openapi_json_url: str):
+    def __init__(self, openapi_json_url: str, api_key: ""):
         """
         Initializes the OpenAPIClient.
 
@@ -17,6 +17,7 @@ class OpenAPIClient:
             openapi_json_url: The URL to the openapi.json file.
         """
         self.openapi_json_url = openapi_json_url
+        self.api_key = api_key
         self._client = None
 
         # Derive a base URL from the openapi_json_url. This serves as the base for resolving
@@ -27,7 +28,9 @@ class OpenAPIClient:
             self.derived_base_url += "/"
 
         try:
-            self._client = httpx.Client()
+            self._client = httpx.Client(
+                headers={"X-Api-Key": self.api_key} if self.api_key else None
+            )
             response = self._client.get(self.openapi_json_url)
             response.raise_for_status()
             self.spec = response.json()
