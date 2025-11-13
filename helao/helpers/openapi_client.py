@@ -9,7 +9,7 @@ class OpenAPIClient:
     Dynamically creates methods for GET and POST operations based on the 'operationId'.
     """
 
-    def __init__(self, openapi_json_url: str, api_key: ""):
+    def __init__(self, openapi_json_url: str, api_key: str = ""):
         """
         Initializes the OpenAPIClient.
 
