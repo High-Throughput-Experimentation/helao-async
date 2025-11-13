@@ -54,7 +54,7 @@ class XrfsInputs(AnalysisInput):
         action_reldir = "/".join(action_dir.split("/")[-2:])
         self.xrfs_act = local_loader.get_act(
             local_loader.actions.query(
-                "action_localpath.str.startswith(@action_reldir)"
+                "action_localpath.str.contains(@action_reldir)"
             ).index[0]
         )
 
