@@ -40,9 +40,9 @@ class HTEPlateAPI:
 
     def get_info(self, plateid: int) -> dict | None:
         try:
-            ep: str = self.loader.hcred.OPENAPI_JSON.replace("/openapi.json", "")
-            ep += f"/plate/{plateid}"
-            resp: httpx.Response = httpx.get(ep)
+            ep: str = self.loader.hcred.PLATE_API.replace("/openapi.json", "")
+            ep += f"/plate/id/{plateid}"
+            resp: httpx.Response = httpx.get(ep, headers={"X-Api-Key": self.loader.hcred.PLATE_API_KEY})
             return resp.json()
         except Exception:
             LOGGER.error("Cannot find plateid info.", exc_info=True)
