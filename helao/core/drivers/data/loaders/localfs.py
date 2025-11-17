@@ -14,6 +14,80 @@ from helao.helpers.yml_tools import yml_load
 from helao.helpers.file_mapper import FileMapper
 
 
+def parse_seq_path(ymlp, target):
+    if os.path.isfile(ymlp):
+        yml_dir = os.path.basename(os.path.dirname(ymlp))
+        if target.endswith(".zip"):
+            yml_dir = os.path.basename(target).replace(".zip", "")
+        yml_file = os.path.basename(ymlp)
+    else:
+        yml_dir = os.path.basename(ymlp)
+        yml_file = None
+    seq_path_parts = yml_dir.split("__")
+    seq_name = seq_path_parts[1]
+    seq_lab = "__".join(seq_path_parts[2:])
+    plate_id = -1
+    serial_parts = seq_lab.split("-")
+    check_serial = None
+    sample_no = None
+    try:
+        if serial_parts[-2].isdigit() and len(serial_parts) > 2:
+            check_serial = serial_parts[-2]
+            if serial_parts[-1].isdigit():
+                sample_no = int(serial_parts[-1])
+        elif serial_parts[-1].isdigit() and len(serial_parts) > 1:
+            check_serial = serial_parts[-1]
+    except Exception:
+        print("could not parse serial parts:", serial_parts)
+    if check_serial is not None:
+        plate_str = check_serial[:-1]
+        checksum = check_serial[-1]
+        if sum([int(x) for x in plate_str]) % 10 == int(checksum):
+            plate_id = int(plate_str)
+            seq_lab = seq_lab.split("-")[0]
+    timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%h%m%s%f")
+    return timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp
+
+
+def parse_exp_path(ymlp):
+    if os.path.isfile(ymlp):
+        yml_dir = os.path.basename(os.path.dirname(ymlp))
+    else:
+        yml_dir = os.path.basename(ymlp)
+    _, exp_name = yml_dir.split("__")
+    yml_file = os.path.basename(ymlp)
+    timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
+    return timestamp, exp_name, yml_dir, ymlp
+
+
+def parse_act_path(ymlp):
+    if os.path.isfile(ymlp):
+        yml_dir = os.path.basename(os.path.dirname(ymlp))
+    else:
+        yml_dir = os.path.basename(ymlp)
+    path_parts = yml_dir.split("__")
+    if len(path_parts) == 5:
+        act_order, act_split, _, server_name, act_name = path_parts
+    elif len(path_parts) == 4:
+        act_order, act_split, server_name, act_name = path_parts
+    else:
+        raise ValueError(f"could not parse action path parts: {path_parts}")
+    yml_file = os.path.basename(ymlp)
+    timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
+    return timestamp, act_order, act_split, server_name, act_name, yml_dir, ymlp
+
+
+def parse_prc_path(ymlp):
+    yml_dir = os.path.basename(os.path.dirname(ymlp))
+    _, exp_name = yml_dir.split("__")
+    yml_file = os.path.basename(ymlp)
+    idx, prc_uuid, techname = yml_file.replace("-prc.yml", "").split("__")
+    prc_uuid = UUID(prc_uuid)
+    prc_idx = int(idx)
+    exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%y%m%d.%H%M%S%f")
+    return prc_idx, prc_uuid, techname, yml_dir, ymlp, exp_timestamp, exp_name
+
+
 class LocalLoader:
     """Provides cached access to local data.
     The LocalLoader class is designed to efficiently load and manage data
@@ -97,36 +171,7 @@ class LocalLoader:
 
         seq_parts = []
         for ymlp in self._yml_paths["seq"]:
-            yml_dir = os.path.basename(os.path.dirname(ymlp))
-            if self.target.endswith(".zip"):
-                yml_dir = os.path.basename(self.target).replace(".zip", "")
-            seq_path_parts = yml_dir.split("__")
-            seq_name = seq_path_parts[1]
-            seq_lab = "__".join(seq_path_parts[2:])
-            plate_id = -1
-            serial_parts = seq_lab.split("-")
-            check_serial = None
-            sample_no = None
-            try:
-                if serial_parts[-2].isdigit() and len(serial_parts) > 2:
-                    check_serial = serial_parts[-2]
-                    if serial_parts[-1].isdigit():
-                        sample_no = int(serial_parts[-1])
-                elif serial_parts[-1].isdigit() and len(serial_parts) > 1:
-                    check_serial = serial_parts[-1]
-            except Exception:
-                print("could not parse serial parts:", serial_parts)
-            if check_serial is not None:
-                plate_str = check_serial[:-1]
-                checksum = check_serial[-1]
-                if sum([int(x) for x in plate_str]) % 10 == int(checksum):
-                    plate_id = int(plate_str)
-                    seq_lab = seq_lab.split("-")[0]
-            yml_file = os.path.basename(ymlp)
-            timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
-            seq_parts.append(
-                (timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp)
-            )
+            seq_parts.append(parse_seq_path(ymlp, self.target))
         self.sequences = pd.DataFrame(
             seq_parts,
             columns=[
@@ -142,16 +187,10 @@ class LocalLoader:
 
         exp_parts = []
         for ymlp in self._yml_paths["exp"]:
-            yml_dir = os.path.basename(os.path.dirname(ymlp))
-            _, exp_name = yml_dir.split("__")
-            yml_file = os.path.basename(ymlp)
-            timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
             exp_parts.append(
                 (
-                    timestamp,
-                    exp_name,
-                    yml_dir,
-                    ymlp,
+                    *parse_exp_path(ymlp),
+                    *parse_seq_path(os.path.dirname(ymlp), self.target),
                 )
             )
         self.experiments = pd.DataFrame(
@@ -161,30 +200,25 @@ class LocalLoader:
                 "experiment_name",
                 "experiment_dir",
                 "experiment_localpath",
+                "sequence_timestamp",
+                "sequence_name",
+                "sequence_label",
+                "plate_id",
+                "sample_no",
+                "sequence_dir",
+                "sequence_localpath",
             ],
         )
 
         act_parts = []
         for ymlp in self._yml_paths["act"]:
-            yml_dir = os.path.basename(os.path.dirname(ymlp))
-            path_parts = yml_dir.split("__")
-            if len(path_parts) == 5:
-                act_order, act_split, _, server_name, act_name = path_parts
-            elif len(path_parts) == 4:
-                act_order, act_split, server_name, act_name = path_parts
-            else:
-                raise ValueError(f"could not parse action path parts: {path_parts}")
-            yml_file = os.path.basename(ymlp)
-            timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
             act_parts.append(
                 (
-                    timestamp,
-                    act_order,
-                    act_split,
-                    server_name,
-                    act_name,
-                    yml_dir,
-                    ymlp,
+                    *parse_act_path(ymlp),
+                    *parse_exp_path(os.path.dirname(ymlp)),
+                    *parse_seq_path(
+                        os.path.dirname(os.path.dirname(ymlp)), self.target
+                    ),
                 )
             )
         self.actions = pd.DataFrame(
@@ -196,19 +230,27 @@ class LocalLoader:
                 "action_server",
                 "action_name",
                 "action_dir",
-                "action_localpath",
+                "action_localpath",                
+                "experiment_timestamp",
+                "experiment_name",
+                "experiment_dir",
+                "experiment_localpath",
+                "sequence_timestamp",
+                "sequence_name",
+                "sequence_label",
+                "plate_id",
+                "sample_no",
+                "sequence_dir",
+                "sequence_localpath",
             ],
         )
 
         prc_parts = []
         for ymlp in self._yml_paths["prc"]:
-            yml_dir = os.path.basename(os.path.dirname(ymlp))
-            _, exp_name = yml_dir.split("__")
-            yml_file = os.path.basename(ymlp)
-            idx, prc_uuid, techname = yml_file.replace("-prc.yml", "").split("__")
-            prc_uuid = UUID(prc_uuid)
-            prc_idx = int(idx)
-            exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%y%m%d.%H%M%S%f")
+
+            prc_idx, prc_uuid, techname, yml_dir, ymlp, exp_timestamp, exp_name = (
+                parse_prc_path(ymlp)
+            )
             prc_parts.append(
                 (
                     prc_idx,
@@ -389,8 +431,10 @@ class LocalLoader:
 
     def get_bytes(self, yml_path: str, fn: str) -> bytes:
         """Get raw bytes of a file, either from a zip archive or a regular file adjacent to action yml."""
-        if self.target.endswith(".zip") and yml_path=="":
-            rel_seqzip_path = fn.split(self.sequences.iloc[0].sequence_dir)[-1].lstrip("/")
+        if self.target.endswith(".zip") and yml_path == "":
+            rel_seqzip_path = fn.split(self.sequences.iloc[0].sequence_dir)[-1].lstrip(
+                "/"
+            )
             with ZipFile(self.target, "r") as zf:
                 fbytes = zf.open(rel_seqzip_path).read()
         else:
