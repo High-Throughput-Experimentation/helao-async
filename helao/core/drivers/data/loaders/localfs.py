@@ -19,10 +19,8 @@ def parse_seq_path(ymlp, target):
         yml_dir = os.path.basename(os.path.dirname(ymlp))
         if target.endswith(".zip"):
             yml_dir = os.path.basename(target).replace(".zip", "")
-        yml_file = os.path.basename(ymlp)
     else:
         yml_dir = os.path.basename(ymlp)
-        yml_file = None
     seq_path_parts = yml_dir.split("__")
     seq_name = seq_path_parts[1]
     seq_lab = "__".join(seq_path_parts[2:])
@@ -45,6 +43,7 @@ def parse_seq_path(ymlp, target):
         if sum([int(x) for x in plate_str]) % 10 == int(checksum):
             plate_id = int(plate_str)
             seq_lab = seq_lab.split("-")[0]
+    yml_file = os.path.basename(ymlp)
     timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%h%m%s%f")
     return timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp
 
