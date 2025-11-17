@@ -56,11 +56,13 @@ async def zip_dir_async(target_dir: Union[Path, str], filename: Union[Path, str]
     success = False
     try:
         zs = AsyncZipStream(compress_type=ZIP_DEFLATED, compress_level=9)
-        if isinstance(target_dir, Path):
-            target_dir = str(target_dir)
+        if isinstance(target_dir, str):
+            target_dir = Path(target_dir)
         if isinstance(filename, Path):
             filename = str(filename)
-        await zs.add_path(target_dir)
+        for entry in target_dir.rglob("*"):
+            if entry.is_file():
+                await zs.add_path(str(entry))
         async with aiofiles.open(filename, "wb") as f:
             async for line in zs:
                 await f.write(line)
