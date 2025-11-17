@@ -107,12 +107,15 @@ class LocalLoader:
             serial_parts = seq_lab.split("-")
             check_serial = None
             sample_no = None
-            if serial_parts[-2].isdigit() and len(serial_parts) > 2:
-                check_serial = serial_parts[-2]
-                if serial_parts[-1].isdigit():
-                    sample_no = int(serial_parts[-1])
-            elif serial_parts[-1].isdigit() and len(serial_parts) > 1:
-                check_serial = serial_parts[-1]
+            try:
+                if serial_parts[-2].isdigit() and len(serial_parts) > 2:
+                    check_serial = serial_parts[-2]
+                    if serial_parts[-1].isdigit():
+                        sample_no = int(serial_parts[-1])
+                elif serial_parts[-1].isdigit() and len(serial_parts) > 1:
+                    check_serial = serial_parts[-1]
+            except Exception:
+                print("could not parse serial parts:", serial_parts)
             if check_serial is not None:
                 plate_str = check_serial[:-1]
                 checksum = check_serial[-1]
