@@ -15,7 +15,7 @@ from helao.helpers.file_mapper import FileMapper
 
 
 def parse_seq_path(ymlp, target):
-    if ymlp.endswith(".yml"):
+    if ymlp.endswith(".yml") or target.endswith(".zip"):
         yml_dir = os.path.basename(os.path.dirname(ymlp))
         if target.endswith(".zip"):
             yml_dir = os.path.basename(target).replace(".zip", "")
