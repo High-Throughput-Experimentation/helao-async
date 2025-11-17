@@ -44,8 +44,7 @@ def parse_seq_path(ymlp, target):
             plate_id = int(plate_str)
             seq_lab = seq_lab.split("-")[0]
     yml_file = os.path.basename(ymlp)
-    print(yml_file)
-    timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%h%m%s%f")
+    timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
     return timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp
 
 
