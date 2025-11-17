@@ -17,10 +17,13 @@ from helao.helpers.file_mapper import FileMapper
 def parse_seq_path(ymlp, target):
     if ymlp.endswith(".yml") or target.endswith(".zip"):
         yml_dir = os.path.basename(os.path.dirname(ymlp))
+        yml_file = os.path.basename(ymlp)
         if target.endswith(".zip"):
             yml_dir = os.path.basename(target).replace(".zip", "")
+            yml_file = os.path.basename(ymlp)
     else:
         yml_dir = os.path.basename(ymlp)
+        yml_file = yml_dir
     seq_path_parts = yml_dir.split("__")
     seq_name = seq_path_parts[1]
     seq_lab = "__".join(seq_path_parts[2:])
@@ -43,7 +46,6 @@ def parse_seq_path(ymlp, target):
         if sum([int(x) for x in plate_str]) % 10 == int(checksum):
             plate_id = int(plate_str)
             seq_lab = seq_lab.split("-")[0]
-    yml_file = os.path.basename(ymlp)
     timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
     return timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp
 
@@ -186,12 +188,7 @@ class LocalLoader:
 
         exp_parts = []
         for ymlp in self._yml_paths["exp"]:
-            exp_parts.append(
-                (
-                    *parse_exp_path(ymlp),
-                    *parse_seq_path(os.path.dirname(ymlp), self.target),
-                )
-            )
+            exp_parts.append(parse_exp_path(ymlp))
         self.experiments = pd.DataFrame(
             exp_parts,
             columns=[
@@ -199,27 +196,12 @@ class LocalLoader:
                 "experiment_name",
                 "experiment_dir",
                 "experiment_localpath",
-                "sequence_timestamp",
-                "sequence_name",
-                "sequence_label",
-                "plate_id",
-                "sample_no",
-                "sequence_dir",
-                "sequence_localpath",
             ],
         )
 
         act_parts = []
         for ymlp in self._yml_paths["act"]:
-            act_parts.append(
-                (
-                    *parse_act_path(ymlp),
-                    *parse_exp_path(os.path.dirname(ymlp)),
-                    *parse_seq_path(
-                        os.path.dirname(os.path.dirname(ymlp)), self.target
-                    ),
-                )
-            )
+            act_parts.append(parse_act_path(ymlp))
         self.actions = pd.DataFrame(
             act_parts,
             columns=[
@@ -229,18 +211,7 @@ class LocalLoader:
                 "action_server",
                 "action_name",
                 "action_dir",
-                "action_localpath",                
-                "experiment_timestamp",
-                "experiment_name",
-                "experiment_dir",
-                "experiment_localpath",
-                "sequence_timestamp",
-                "sequence_name",
-                "sequence_label",
-                "plate_id",
-                "sample_no",
-                "sequence_dir",
-                "sequence_localpath",
+                "action_localpath",
             ],
         )
 
