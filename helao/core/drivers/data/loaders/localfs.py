@@ -245,6 +245,19 @@ class LocalLoader:
             ],
         )
 
+        self.actions["experiment_index"] = self.actions.action_localpath.apply(
+            lambda x: self._get_experiment_index(x)
+        )
+        self.actions = self.actions.merge(
+            self.experiments.reset_index(), left_on="experiment_index", right_on="index"
+        )
+
+    def _get_experiment_index(self, action_local_path):
+        alp = os.path.dirname(os.path.dirname(action_local_path))
+        return self.experiments.query(
+            "experiment_localpath.str.startswith(@alp)"
+        ).index[0]
+
     def clear_cache(self):
         """Clears all caches.
 
