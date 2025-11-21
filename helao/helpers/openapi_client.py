@@ -136,7 +136,7 @@ class OpenAPIClient:
                                     if param_in == "path":
                                         resolved_path_template = (
                                             resolved_path_template.replace(
-                                                f"{{{param_name}}}", str(param_value)
+                                                f"{{{param_name}}}", quote(str(param_value), safe='')
                                             )
                                         )
                                     elif param_in == "query":
@@ -169,17 +169,6 @@ class OpenAPIClient:
                                 else:
                                     quoted_query_params[key] = value
 
-                            quoted_request_body_data = {}
-                            for _key, value in request_body_data.items():
-                                if isinstance(_key, str):
-                                    key = quote(_key, safe='')
-                                else:
-                                    key = _key
-                                if isinstance(value, str):
-                                    quoted_request_body_data[key] = quote(value, safe='')
-                                else:
-                                    quoted_request_body_data[key] = value
-
                             try:
                                 if current_http_method == "get":
                                     response = self_instance._client.get(
@@ -189,7 +178,7 @@ class OpenAPIClient:
                                     response = self_instance._client.post(
                                         full_url,
                                         params=quoted_query_params,
-                                        json=quoted_request_body_data,
+                                        json=request_body_data,
                                     )
                                 else:
                                     raise NotImplementedError(
