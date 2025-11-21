@@ -1,6 +1,6 @@
 import httpx
 import json
-from urllib.parse import urljoin
+from urllib.parse import urljoin, quote
 
 
 class OpenAPIClient:
@@ -156,6 +156,28 @@ class OpenAPIClient:
                             full_url = urljoin(
                                 base_url_for_calls, relative_path_for_join
                             )
+                            
+                            quoted_query_params = {}
+                            for _key, value in query_params.items():
+                                if isinstance(_key, str):
+                                    key = quote(_key, safe='')
+                                else:
+                                    key = _key
+                                if isinstance(value, str):
+                                    quoted_query_params[key] = quote(value, safe='')
+                                else:
+                                    quoted_query_params[key] = value
+
+                            quoted_request_body_data = {}
+                            for _key, value in request_body_data.items():
+                                if isinstance(_key, str):
+                                    key = quote(_key, safe='')
+                                else:
+                                    key = _key
+                                if isinstance(value, str):
+                                    quoted_request_body_data[key] = quote(value, safe='')
+                                else:
+                                    quoted_request_body_data[key] = value
 
                             try:
                                 if current_http_method == "get":
@@ -163,7 +185,7 @@ class OpenAPIClient:
                                         headers=self_instance.headers
                                     ) as client:
                                         response = await client.get(
-                                            full_url, params=query_params
+                                            full_url, params=quoted_query_params
                                         )
                                 elif current_http_method == "post":
                                     async with httpx.AsyncClient(
@@ -171,8 +193,8 @@ class OpenAPIClient:
                                     ) as client:
                                         response = await client.post(
                                             full_url,
-                                            params=query_params,
-                                            json=request_body_data,
+                                            params=quoted_query_params,
+                                            json=quoted_request_body_data,
                                         )
                                 else:
                                     raise NotImplementedError(
