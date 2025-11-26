@@ -138,10 +138,25 @@ async def move_dir(
         ]
         for p in dst_list:
             os.makedirs(os.path.dirname(p), exist_ok=True)
-        copy_results = await asyncio.gather(
-            *[aioshutil.copy(src, dst) for src, dst in zip(src_list, dst_list)],
+            
+        mvtups = []
+        cptups = []
+        for src, dst in zip(src_list, dst_list):
+            if "RUNS_NOSYNC" in dst:
+                mvtups.append((src, dst))
+            else:
+                cptups.append((src, dst))
+        
+        move_results = await asyncio.gather(
+            *[aioshutil.move(src, dst) for src, dst in mvtups],
             return_exceptions=True,
         )
+            
+        copy_results = await asyncio.gather(
+            *[aioshutil.copy(src, dst) for src, dst in cptups],
+            return_exceptions=True,
+        )
+        
         exists_list = [f for f in dst_list if os.path.exists(f)]
         if len(exists_list) == len(src_list):
             copy_success = True
@@ -152,6 +167,7 @@ async def move_dir(
                 f"Could not copy {len(src_list)} files to FINISHED, retrying after {retry_delay} seconds"
             )
             LOGGER.info(src_list)
+            LOGGER.info(move_results)
             LOGGER.info(copy_results)
             copy_retries += 1
         await asyncio.sleep(retry_delay)
