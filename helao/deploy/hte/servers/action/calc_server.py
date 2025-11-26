@@ -130,7 +130,7 @@ def makeApp(server_key):
         action_version: int = 2,
         min_offset_ocv: float | bool = False,
         new_ocv: float | bool = False,
-        offset_value: float = -0.2,
+        offset_value: float = 0,
     ):
         """
         min_offset_ocv and new_ocv should be set by a previous run_OCV action and inherited
