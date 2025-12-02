@@ -51,7 +51,12 @@ toggle_triggertype = TriggerType.fallingedge
 def UVIS_sub_unloadall_customs(experiment: Experiment):
     """Clear samples from measurement position."""
     apm = ActionPlanMaker()
-    apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
+    apm.add(
+        PAL_server,
+        "archive_custom_unloadall",
+        {"destroy_liquid": True},
+        start_condition=ActionStartCondition.no_wait,
+    )
     return apm.planned_actions
 
 
@@ -101,6 +106,7 @@ def UVIS_sub_startup(
                 machine_name="legacy",
             ),
         },
+        start_condition=ActionStartCondition.wait_for_server,
     )
     # get sample plate coordinates
     apm.add(
@@ -110,6 +116,7 @@ def UVIS_sub_startup(
             "plate_id": solid_plate_id,
             "sample_no": solid_sample_no,
         },
+        start_condition=ActionStartCondition.no_wait,
         to_global_params=["_platexy"],  # save new liquid_sample_no of cell to globals
     )
     # move to position
@@ -121,6 +128,7 @@ def UVIS_sub_startup(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
+        start_condition=ActionStartCondition.wait_for_previous,
         from_global_act_params={"_platexy": "d_mm"},
     )
     return apm.planned_actions  # returns complete action list to orch
@@ -137,6 +145,7 @@ def UVIS_sub_shutdown(experiment: Experiment, toggle_source: str = "lamp_shutter
             "do_item": toggle_source,
             "on": False,
         },
+        start_condition=ActionStartCondition.no_wait,
     )
     return apm.planned_actions  # returns complete action list to orch
 
@@ -155,6 +164,7 @@ def UVIS_sub_movetosample(
             "plate_id": solid_plate_id,
             "sample_no": solid_sample_no,
         },
+        start_condition=ActionStartCondition.no_wait,
         to_global_params=[
             "_platexy"
         ],  # save new liquid_sample_no of eche cell to globals
@@ -168,6 +178,7 @@ def UVIS_sub_movetosample(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
+        start_condition=ActionStartCondition.wait_for_previous,
         from_global_act_params={"_platexy": "d_mm"},
     )
     return apm.planned_actions  # returns complete action list to orch
@@ -219,6 +230,7 @@ def UVIS_sub_measure(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
+        start_condition=ActionStartCondition.no_wait,
         to_global_params=["_fast_samples_in"],
     )
 
@@ -233,6 +245,7 @@ def UVIS_sub_measure(
                     False if run_use == "ref_dark" and spec_type == SpecType.T else True
                 ),
             },
+            start_condition=ActionStartCondition.no_wait,
         )
     else:
         # turn on illumination for all reflectance measurements
@@ -243,11 +256,12 @@ def UVIS_sub_measure(
                 "do_item": toggle_source,
                 "on": True,
             },
+            start_condition=ActionStartCondition.no_wait,
         )
 
     # wait for 1 second for shutter to actuate
     if toggle_is_shutter:
-        apm.add(ORCH_server, "wait", {"waittime": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 1}, start_condition=ActionStartCondition.wait_for_previous)
 
     # take webcam image
     if acquire_image:
@@ -255,6 +269,7 @@ def UVIS_sub_measure(
             CAM_server,
             "acquire_image",
             {"duration": 0},
+            start_condition=ActionStartCondition.wait_for_previous,
             from_global_act_params={"_fast_samples_in": "fast_samples_in"},
             run_use=run_use,
             technique_name=technique_name,
@@ -331,6 +346,7 @@ def UVIS_sub_setup_ref(
                 "sample_no": solid_sample_no,
                 "specref_code": specref_code,
             },
+            start_condition=ActionStartCondition.no_wait,
             to_global_params=["_refno", "_refxy"],
         )
         apm.add(
@@ -340,6 +356,7 @@ def UVIS_sub_setup_ref(
                 "custom": solid_custom_position,
                 "plate_id": solid_plate_id,
             },
+            start_condition=ActionStartCondition.no_wait,
             from_global_act_params={"_refno": "sample_no"},
         )
     elif reference_mode == "builtin":
@@ -347,6 +364,7 @@ def UVIS_sub_setup_ref(
             MOTOR_server,
             "solid_get_builtin_specref",
             {"ref_position_name": ref_position_name},
+            start_condition=ActionStartCondition.wait_for_previous,
             to_global_params=["_refxy"],
         )
         apm.add(
@@ -357,6 +375,7 @@ def UVIS_sub_setup_ref(
                 "sample_no": solid_sample_no,
                 "plate_id": solid_plate_id,
             },
+            start_condition=ActionStartCondition.no_wait,
         )
     elif reference_mode == "blank":
         apm.add(
@@ -375,6 +394,7 @@ def UVIS_sub_setup_ref(
                     machine_name="legacy",
                 ),
             },
+            start_condition=ActionStartCondition.no_wait,
         )
         apm.add(
             MOTOR_server,
@@ -384,6 +404,7 @@ def UVIS_sub_setup_ref(
                 "sample_no": solid_sample_no,
             },
             to_global_params={"_platexy": "_refxy"},
+            start_condition=ActionStartCondition.no_wait,
         )
     # move to position
     apm.add(
@@ -398,6 +419,7 @@ def UVIS_sub_setup_ref(
                 else TransformationModes.motorxy
             ),
         },
+        start_condition=ActionStartCondition.wait_for_previous,
         from_global_act_params={"_refxy": "d_mm"},
     )
     return apm.planned_actions  # returns complete action list to orch
