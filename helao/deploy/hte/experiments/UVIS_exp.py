@@ -15,6 +15,7 @@ __all__ = [
     "UVIS_calc_abs",
     "UVIS_analysis_dry",
     "UVIS_measure_references",
+    "UVIS_sub_shutoff_lamp",
 ]
 
 
@@ -44,6 +45,7 @@ PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
+PDU_server = MM(server_name="PDU", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -564,5 +566,17 @@ def UVIS_measure_references(
             run_use=RunUse.ref_light,
             reference_mode="builtin",
         )
+    )
+    return apm.planned_actions
+
+
+def UVIS_sub_shutoff_lamp(experiment: Experiment, outlet_number: int = 1):
+    """Clear samples from measurement position."""
+    apm = ActionPlanMaker()
+    apm.add(
+        PDU_server,
+        "switch_outlet",
+        {"outlet_number": outlet_number, "on": False},
+        start_condition=ActionStartCondition.no_wait,
     )
     return apm.planned_actions
