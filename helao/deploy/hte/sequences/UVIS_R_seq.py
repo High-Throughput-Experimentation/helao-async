@@ -2,7 +2,7 @@
 Sequence library for UVIS
 """
 
-__all__ = ["UVIS_R", "UVIS_R_postseq"]
+__all__ = ["UVIS_R", "UVIS_R_postseq", "UVIS_R_shutoff"]
 
 from helao.helpers.premodels import ExperimentPlanMaker
 
@@ -119,3 +119,18 @@ def UVIS_R_postseq(
     )
 
     return epm.planned_experiments  # returns complete experiment list
+
+def UVIS_R_shutoff(
+    sequence_version: int = 1,
+    outlet_number: int = 1,
+):
+    epm = ExperimentPlanMaker()
+    epm.add(
+        "UVIS_sub_shutoff_lamp",
+        {
+            "outlet_number": outlet_number,
+        },
+    )
+
+    return epm.planned_experiments  # returns complete experiment list
+)
