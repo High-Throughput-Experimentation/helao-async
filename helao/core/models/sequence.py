@@ -37,6 +37,7 @@ class ShortSequenceModel(BaseModel, HelaoDict):
     planned_experiments: List[ShortExperimentModel] = Field(
         default=[]
     )  # populated by operator using sequence library funcs
+    run_type: Optional[str] = None
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
     run_id: Optional[UUID] = None
