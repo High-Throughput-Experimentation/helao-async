@@ -107,10 +107,10 @@ def move_to_synced(file_path: Path):
     parts = list(file_path.parts)
     target_path = Path(str(file_path).replace("RUNS_FINISHED", "RUNS_SYNCED"))
     if "RUNS_SYNCED" in parts:
-        LOGGER.info(f"File {file_path} is already synced. Skipping.")
+        LOGGER.debug(f"File {file_path} is already synced. Skipping.")
         return target_path
     elif not file_path.exists():
-        LOGGER.info(f"File {file_path} does not exist. Skipping.")
+        LOGGER.debug(f"File {file_path} does not exist. Skipping.")
         return target_path
     state_index = parts.index("RUNS_FINISHED")
     parts[state_index] = "RUNS_SYNCED"
@@ -1000,7 +1000,7 @@ class HelaoSyncer:
                 self.config_dict.update(aws_config)
                 self.config_dict["aws_config_path"] = os.environ["AWS_CONFIG_PATH"]
                 self.config_dict["aws_profile"] = aws_profile
-                LOGGER.info(self.config_dict)
+                LOGGER.debug(self.config_dict)
         
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 8)
@@ -1139,10 +1139,10 @@ class HelaoSyncer:
         """
         task_name = task.get_name()
         if task_name in self.running_tasks:
-            LOGGER.info(f"Removing {task_name} from running_tasks.")
+            LOGGER.debug(f"Removing {task_name} from running_tasks.")
             self.running_tasks.pop(task_name)
         try:
-            LOGGER.info(f"Removing {task_name} from task_set.")
+            LOGGER.debug(f"Removing {task_name} from task_set.")
             self.task_set.discard(task_name)
         except KeyError:
             pass
@@ -1258,7 +1258,7 @@ class HelaoSyncer:
         """
         yml_path = Path(upath) if isinstance(upath, str) else upath
         if rank < rank_limit:
-            LOGGER.info(
+            LOGGER.debug(
                 f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request."
             )
         elif yml_path.name in self.task_set:
@@ -1266,7 +1266,7 @@ class HelaoSyncer:
                 f"{str(yml_path)} is already queued, skipping enqueue request."
             )
         elif yml_path.name in self.running_tasks.keys():
-            LOGGER.info(
+            LOGGER.debug(
                 f"{str(yml_path)} is already running, skipping enqueue request."
             )
         else:
@@ -1344,7 +1344,7 @@ class HelaoSyncer:
         # first check if child objects are registered with API (non-actions)
         if prog.yml.type != "action":
             if prog.yml.active_children:
-                LOGGER.info(
+                LOGGER.debug(
                     f"Cannot sync {str(prog.yml.target)}, children are still 'active'."
                 )
                 return False
@@ -1373,7 +1373,7 @@ class HelaoSyncer:
                         self.running_tasks.pop(prog.yml.target.name)
                 self.task_set.discard(prog.yml.target.name)
                 await self.enqueue_yml(prog.yml.target, rank)
-                LOGGER.info(f"{str(prog.yml.target)} re-queued, exiting.")
+                LOGGER.debug(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
 
         # LOGGER.info(f"{str(prog.yml.target)} children are synced, proceeding.")
@@ -1392,7 +1392,7 @@ class HelaoSyncer:
             while prog.dict.get("files_pending", []):
                 for sp in prog.dict["files_pending"]:
                     fp = Path(sp)
-                    LOGGER.info(f"Pushing {sp} to S3 for {prog.yml.target.name}")
+                    LOGGER.debug(f"Pushing {sp} to S3 for {prog.yml.target.name}")
                     if fp.suffix == ".hlo":
                         if fp.stat().st_size < 1024**3:  # 1GB
                             file_s3_key = (
@@ -1400,7 +1400,7 @@ class HelaoSyncer:
                             )
                             if compress:
                                 file_s3_key += ".gz"
-                            LOGGER.info("Parsing hlo dicts.")
+                            LOGGER.debug("Parsing hlo dicts.")
                             try:
                                 file_meta, file_data = read_hlo(sp)
                             except Exception:
@@ -1412,7 +1412,7 @@ class HelaoSyncer:
                                 file_data = {}
                             msg = {"meta": file_meta, "data": file_data}
                         else:
-                            LOGGER.info(
+                            LOGGER.debug(
                                 "hlo file larger than 1GB, converting to parquet."
                             )
                             file_s3_key = (
@@ -1441,11 +1441,11 @@ class HelaoSyncer:
                         compress=compress,
                     )
                     if file_success:
-                        LOGGER.info("Removing file from pending list.")
+                        LOGGER.debug("Removing file from pending list.")
                         prog.dict["files_pending"].remove(sp)
                         LOGGER.info(f"Adding file to S3 dict. {str(fp)}: {file_s3_key}")
                         prog.dict["files_s3"].update({str(fp): file_s3_key})
-                        LOGGER.info(f"Updating progress: {prog.dict}")
+                        LOGGER.debug(f"Updating progress: {prog.dict}")
                         prog.write_dict()
 
                         # update files list with uploaded filename
@@ -1477,7 +1477,7 @@ class HelaoSyncer:
 
         # if prog.yml is an experiment first check processes before pushing to API
         if prog.yml.type == "experiment":
-            LOGGER.info(f"Finishing processes for {prog.yml.target.name}")
+            LOGGER.debug(f"Finishing processes for {prog.yml.target.name}")
             retry_count = 0
             s3_unf, api_unf = prog.list_unfinished_procs()
             while s3_unf or api_unf:
@@ -1497,7 +1497,7 @@ class HelaoSyncer:
                     for _, d in sorted(prog.dict["process_metas"].items())
                 ]
 
-        LOGGER.info(f"Patching model for {prog.yml.target.name}")
+        LOGGER.debug(f"Patching model for {prog.yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
         meta = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(strip_private=True)
 
@@ -1545,7 +1545,7 @@ class HelaoSyncer:
                     move_success = move_to_synced(file_path)
 
             # finally move yaml and update target
-            LOGGER.info(f"Moving {yml_target_name} to RUNS_SYNCED")
+            LOGGER.debug(f"Moving {yml_target_name} to RUNS_SYNCED")
             # with prog.yml.filelock:
             yml_success = move_to_synced(yml_path)
             if yml_success:
@@ -1880,7 +1880,7 @@ class HelaoSyncer:
                     buffer.seek(0)
                     uploadee = buffer
             else:
-                LOGGER.info("Converting path to str")
+                LOGGER.debug("Converting path to str")
                 uploadee = str(msg)
                 uploader = self.s3.upload_file
             for i in range(retries + 1):
