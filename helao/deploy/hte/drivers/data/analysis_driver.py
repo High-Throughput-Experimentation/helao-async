@@ -284,9 +284,11 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             analysis_day = ana_ts.strftime("%m%d")
             analysis_suffix = ""
             gsl = model_dict.get("global_sample_label", "")
-            first_action_dir = process_dict["dispatched_actions_abbr"][0]["action_output_dir"]
+            first_action_dir = process_dict["dispatched_actions_abbr"][0][
+                "action_output_dir"
+            ]
             sequence_part = first_action_dir.split("/")[-3]
-            if len(sequence_part.split("__"))==3:
+            if len(sequence_part.split("__")) == 3:
                 sequence_label = sequence_part.split("__")[-1]
                 analysis_suffix = f"__{sequence_label}"
             elif gsl.startswith("legacy__solid__"):
@@ -609,15 +611,37 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         local_loader = LocalLoader(sequence_zip_path)
         pdf = local_loader.processes
 
-        for puuid in pdf.process_uuid:
-            await self.enqueue_calc(
-                (
-                    puuid,
-                    local_loader,
-                    params,
-                    XrfsAnalysis,
+        # for puuid in pdf.process_uuid:
+        #     await self.enqueue_calc(
+        #         (
+        #             puuid,
+        #             local_loader,
+        #             params,
+        #             XrfsAnalysis,
+        #         )
+        #     )
+
+        semaphore = asyncio.Semaphore(self.max_tasks)
+
+        async def _wrap_coro(coro):
+            async with semaphore:
+                return await coro
+
+        await asyncio.gather(
+            *[
+                _wrap_coro(
+                    self.enqueue_calc(
+                        (
+                            puuid,
+                            local_loader,
+                            params,
+                            XrfsAnalysis,
+                        )
+                    )
                 )
-            )
+                for puuid in pdf.process_uuid
+            ]
+        )
 
     def shutdown(self):
         pass
