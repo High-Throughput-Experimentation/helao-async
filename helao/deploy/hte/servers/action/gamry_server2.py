@@ -748,33 +748,6 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    # @app.post(f"/{server_key}/run_EIS", tags=["action"])
-    # async def run_EIS(
-    #     action: Action = Body({}, embed=True),
-    #     action_version: int = 1,
-    #     fast_samples_in: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Body([], embed=True),
-    #     Vval__V: float = 0.0,
-    #     Tval__s: float = 10.0,
-    #     Freq: float = 1000.0,
-    #     RMS: float = 0.02,
-    #     Precision: Optional[
-    #         float
-    #     ] = 0.001,  # The precision is used in a Correlation Coefficient (residual power) based test to determine whether or not to measure another cycle.
-    #     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
-    #     TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-    #     TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
-    #     IErange: model_ierange = "auto",
-    # ):
-    #     """Electrochemical Impendance Spectroscopy
-    #     NOT TESTED
-    #     use 4bit bitmask for triggers
-    #     IErange depends on gamry model used (test actual limit before using)"""
-    #     active = await app.base.setup_and_contain_action()
-    #     active.action.action_abbr = "EIS"
-    #     executor = GamryExec(active=active, oneoff=False, technique=TECH_EIS)
-    #     active_action_dict = active.start_executor(executor)
-    #     return active_action_dict
-
 
 def makeApp(server_key):
 
