@@ -4,7 +4,7 @@ set HA_DIR=%REPO_PARENT_FOLDER%helao-async
 conda env list | findstr /r /c:"^helao.*envs\\helao$"
 if ERRORLEVEL 1 (
     echo 'helao' conda environment was not found, creating it now...
-    conda env create -f helao_pinned_win-64.yml -n helao
+    conda env create -f helao_dev_win-64.yml -n helao
 )
 echo.
 call conda activate helao
