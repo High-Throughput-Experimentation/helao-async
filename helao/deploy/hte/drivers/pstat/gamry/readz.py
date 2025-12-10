@@ -191,17 +191,15 @@ class ReadZ:
             sink_state = self.dtaqsink.status
             LOGGER.info(f"Data sink state: {sink_state}")
             data_dict = {}
-            if sink_state == "measuring" or self.counter < total_points:
+            if sink_state == "measuring":
                 status = DriverStatus.busy
             elif sink_state == "retry":
                 status = DriverStatus.retry
             elif sink_state == "error":
                 status = DriverStatus.error
-            # elif sink_state == "done":
-            #     status = DriverStatus.ok
-            #     data_dict = self.dtaqsink.z_values
             else:
                 status = DriverStatus.ok
+            if sink_state == "done" or self.counter == total_points:
                 data_dict = self.dtaqsink.z_values
             self.counter = total_points
             response = DriverResponse(
