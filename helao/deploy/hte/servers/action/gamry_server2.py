@@ -399,6 +399,8 @@ class GamryEisExec(Executor):
                     self.freq_list
                 ):
                     status = HloStatus.finished
+                elif resp.message == "measuring":
+                    pass
                 else:
                     self.readz.dtaqsink.reset()
                     LOGGER.info(
