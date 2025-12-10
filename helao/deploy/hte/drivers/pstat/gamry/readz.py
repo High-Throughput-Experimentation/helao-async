@@ -199,9 +199,10 @@ class ReadZ:
                 status = DriverStatus.error
             elif sink_state == "done":
                 status = DriverStatus.ok
-                data_dict = self.dtaqsink.z_values
             else:
                 status = DriverStatus.ok
+            if self.dtaqsink.z_values:
+                data_dict.update(self.dtaqsink.z_values)
             self.counter = total_points
             response = DriverResponse(
                 response=DriverResponseType.success,
