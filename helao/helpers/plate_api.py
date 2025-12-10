@@ -15,14 +15,13 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 class HTEPlateAPI:
     def __init__(self, env_file: str = None):
-        if "HELAO_CREDENTIALS" in os.environ and not os.path.exists(env_file):
+        self.loader = None
+        if "HELAO_CREDENTIALS" in os.environ and env_file is not None and not os.path.exists(env_file):
             env_file = os.environ["HELAO_CREDENTIALS"]
-        try:
-            if env_file is not None:
+            try:
                 self.loader = HelaoLoader(env_file=env_file)
-        except Exception:
-            LOGGER.warning("Could not load HTEPlateAPI credentials from .env file.", exc_info=True)
-            self.loader = None
+            except Exception:
+                LOGGER.warning("Could not load HTEPlateAPI credentials from .env file.", exc_info=True)
         self.map_cache = {}
         self.legacy_plateid_threshold: int = 10000
         self.legacy_api = HTELegacyAPI()
