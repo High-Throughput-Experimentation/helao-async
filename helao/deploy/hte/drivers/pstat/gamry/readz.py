@@ -183,7 +183,6 @@ class ReadZ:
     def get_data(self, pump_rate: float) -> DriverResponse:
         """Retrieve data from device buffer."""
         try:
-            time.sleep(0.1)
             client.PumpEvents(pump_rate)
             time.sleep(0.1)
             total_points = len(self.dtaqsink.acquired_points)
@@ -198,11 +197,12 @@ class ReadZ:
                 status = DriverStatus.retry
             elif sink_state == "error":
                 status = DriverStatus.error
-            elif sink_state == "done":
-                status = DriverStatus.ok
-                data_dict = self.dtaqsink.z_values
+            # elif sink_state == "done":
+            #     status = DriverStatus.ok
+            #     data_dict = self.dtaqsink.z_values
             else:
                 status = DriverStatus.ok
+                data_dict = self.dtaqsink.z_values
             self.counter = total_points
             response = DriverResponse(
                 response=DriverResponseType.success,
