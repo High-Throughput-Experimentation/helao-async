@@ -1270,9 +1270,9 @@ class HelaoSyncer:
                 f"{str(yml_path)} is already running, skipping enqueue request."
             )
         else:
-            async with self.aiolock:
-                self.task_set.add(yml_path.name)
-                await self.task_queue.put((rank, yml_path))
+            # async with self.aiolock:
+            self.task_set.add(yml_path.name)
+            await self.task_queue.put((rank, yml_path))
             LOGGER.info(f"Added {str(yml_path)} to syncer queue with priority {rank}.")
 
     async def sync_yml(
