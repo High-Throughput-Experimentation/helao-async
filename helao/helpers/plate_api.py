@@ -14,14 +14,18 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class HTEPlateAPI:
-    def __init__(self, env_file: str = None):
+    def __init__(self, env_file: str | None = None):
         self.loader = None
-        if "HELAO_CREDENTIALS" in os.environ and env_file is not None and not os.path.exists(env_file):
+        if "HELAO_CREDENTIALS" in os.environ:
             env_file = os.environ["HELAO_CREDENTIALS"]
+        if env_file is not None and os.path.exists(env_file):
             try:
                 self.loader = HelaoLoader(env_file=env_file)
             except Exception:
-                LOGGER.warning("Could not load HTEPlateAPI credentials from .env file.", exc_info=True)
+                LOGGER.warning(
+                    "Could not load HTEPlateAPI credentials from .env file.",
+                    exc_info=True,
+                )
         self.map_cache = {}
         self.legacy_plateid_threshold: int = 10000
         self.legacy_api = HTELegacyAPI()
@@ -152,7 +156,11 @@ class HTEPlateAPI:
             infofiled = plateid
         else:
             if plateid < self.legacy_plateid_threshold:
-                return self.legacy_api.get_elements_plateid(plateid=plateid, exclude_elements_list=exclude_elements_list, **kwargs)
+                return self.legacy_api.get_elements_plateid(
+                    plateid=plateid,
+                    exclude_elements_list=exclude_elements_list,
+                    **kwargs,
+                )
             infofiled: dict | None = self.get_info(plateid)
             if infofiled is None:
                 return None
@@ -164,14 +172,17 @@ class HTEPlateAPI:
         if printd is not None and self.loader is not None:
 
             els = [
-                d["chemical_id"].split("_")[0].capitalize()
-                for d in printd["sources"]
+                d["chemical_id"].split("_")[0].capitalize() for d in printd["sources"]
             ]
-            els = [el for el in els if el not in ("O", "Ar", "N", "C", "He", "Ne", "Kr", "Xe", "Rn")]
+            els = [
+                el
+                for el in els
+                if el not in ("O", "Ar", "N", "C", "He", "Ne", "Kr", "Xe", "Rn")
+            ]
             el_syms = [mendeleev.element(el).symbol for el in els]
 
             return [el for el in el_syms if el not in exclude_elements_list]
-        
+
         else:
             LOGGER.warning("Could not retrieve elements.")
             LOGGER.warning(f"printd: {printd}")
