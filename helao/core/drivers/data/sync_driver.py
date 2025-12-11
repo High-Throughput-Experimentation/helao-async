@@ -2021,7 +2021,7 @@ class HelaoSyncer:
         finished_dir = str(self.base.helaodirs.save_root).replace(
             "RUNS_ACTIVE", "RUNS_FINISHED"
         )
-        pending = glob(os.path.join(finished_dir, "**", "*-seq.yml"), recursive=True)
+        pending = glob(os.path.join(finished_dir, "*", "*", "*-seq.yml"))
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
         LOGGER.info(f"Found {len(pending)} pending sequences in RUNS_FINISHED.")
@@ -2041,7 +2041,7 @@ class HelaoSyncer:
         finished_dir = str(self.base.helaodirs.save_root).replace(
             "RUNS_ACTIVE", "RUNS_FINISHED"
         )
-        pending = glob(os.path.join(finished_dir, "**", "*-act.yml"), recursive=True)
+        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*", "*-act.yml"))
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
         LOGGER.info(f"Found {len(pending)} pending actions in RUNS_FINISHED.")
@@ -2066,7 +2066,7 @@ class HelaoSyncer:
         finished_dir = str(self.base.helaodirs.save_root).replace(
             "RUNS_ACTIVE", "RUNS_FINISHED"
         )
-        pending = glob(os.path.join(finished_dir, "**", "*-seq.yml"), recursive=True)
+        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*-exp.yml"))
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
         LOGGER.info(f"Found {len(pending)} pending experiments in RUNS_FINISHED.")
