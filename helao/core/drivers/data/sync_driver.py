@@ -2027,7 +2027,52 @@ class HelaoSyncer:
         LOGGER.info(f"Found {len(pending)} pending sequences in RUNS_FINISHED.")
         return pending
 
-    async def finish_pending(self, omit_manual_exps: bool = True):
+    def list_pending_acts(self, omit_manual_exps: bool = True):
+        """
+        Lists pending actions in the RUNS_FINISHED directory.
+
+        This method searches for actions files in the RUNS_FINISHED directory
+        and returns a list of pending actions. By default, it omits actions
+        that are manually orchestrated.
+
+        Returns:
+            list: A list of file paths to the pending action yaml files.
+        """
+        finished_dir = str(self.base.helaodirs.save_root).replace(
+            "RUNS_ACTIVE", "RUNS_FINISHED"
+        )
+        pending = glob(os.path.join(finished_dir, "**", "*-act.yml"), recursive=True)
+        if omit_manual_exps:
+            pending = [x for x in pending if "manual_orch_seq" not in x]
+        LOGGER.info(f"Found {len(pending)} pending actions in RUNS_FINISHED.")
+        return pending
+
+    def list_pending_exps(self, omit_manual_exps: bool = True):
+        """
+        Lists pending experiments in the RUNS_FINISHED directory.
+
+        This method searches for experiment files in the RUNS_FINISHED directory
+        and returns a list of pending experiments. By default, it omits experiments
+        that are manually orchestrated.
+
+        Args:
+            omit_manual_exps (bool): If True, experiments containing 'manual_orch_seq'
+                                     in their filename will be omitted from the list.
+                                     Defaults to True.
+
+        Returns:
+            list: A list of file paths to the pending experiment files.
+        """
+        finished_dir = str(self.base.helaodirs.save_root).replace(
+            "RUNS_ACTIVE", "RUNS_FINISHED"
+        )
+        pending = glob(os.path.join(finished_dir, "**", "*-seq.yml"), recursive=True)
+        if omit_manual_exps:
+            pending = [x for x in pending if "manual_orch_seq" not in x]
+        LOGGER.info(f"Found {len(pending)} pending experiments in RUNS_FINISHED.")
+        return pending
+
+    async def finish_pending(self, omit_manual_exps: bool = True, actions_first: bool = False):
         """
         Processes and enqueues pending sequences from the RUNS_FINISHED directory.
 
@@ -2042,7 +2087,13 @@ class HelaoSyncer:
         Returns:
             list: A list of pending sequences that were processed and enqueued.
         """
-        pending = self.list_pending(omit_manual_exps)
+        pending = []
+        if actions_first:
+            pending += self.list_pending_acts(omit_manual_exps)
+            LOGGER.info(f"Enqueueing {len(pending)} actions from RUNS_FINISHED.")
+            pending += self.list_pending_exps(omit_manual_exps)
+            LOGGER.info(f"Enqueueing {len(pending)} experiments from RUNS_FINISHED.")
+        pending += self.list_pending(omit_manual_exps)
         LOGGER.info(f"Enqueueing {len(pending)} sequences from RUNS_FINISHED.")
         for pp in pending:
             if os.path.exists(

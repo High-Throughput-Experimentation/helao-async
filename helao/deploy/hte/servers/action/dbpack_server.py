@@ -33,9 +33,9 @@ def makeApp(server_key):
         return app.driver.list_pending()
 
     @app.post("/finish_pending", tags=["private"])
-    async def finish_pending():
+    async def finish_pending(actions_first: bool = True):
         """Finds and queues sequence ymls from RUNS_FINISHED."""
-        return await app.driver.finish_pending()
+        return await app.driver.finish_pending(actions_first=actions_first)
 
     @app.post("/reset_sync", tags=["private"])
     def reset_sync(sync_path: str):
