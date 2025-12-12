@@ -1,18 +1,24 @@
 import os
 import inspect
 import subprocess
-import sys
 from datetime import datetime
 from socket import gethostname
 
 __all__ = ["hlo_version", "get_hlo_version"]
 
 
+def get_branch_commithash():
+    """Return current git branch and commit hash."""
+    command = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+    branch = subprocess.check_output(command).decode("utf8").strip()
+    command = ["git", "rev-parse", "--short", "HEAD"]
+    commit_hash = subprocess.check_output(command).decode("utf8").strip()
+    return branch, commit_hash
+
 def get_filehash(filename: str):
     filename = os.path.abspath(filename)
     parent_dir = os.path.dirname(filename)
-    # command = ['git', 'ls-files', '-s', filename, '--abbrev']
-    command = ["git", "show", "-s", "--format=%h"]
+    command = ["git", "log", "-n", "1", "--pretty=format:%h", "--", filename]
     response = subprocess.check_output(command, cwd=parent_dir).decode("utf8").split()
     if response:
         short_hash = response[0]
@@ -24,7 +30,7 @@ def get_filehash(filename: str):
 def get_hlo_version():
     """Return hard-coded HELAO release version."""
     try:
-        return get_filehash(sys._getframe().f_code.co_filename)
+        return get_branch_commithash()[1]
     except Exception:
         return f"{gethostname()}_{datetime.now().strftime('%y%m%d')}"
 
