@@ -171,6 +171,7 @@ def private_dispatcher(
     private_action: str,
     params_dict: dict = {},
     json_dict: dict = {},
+    timeout: int = 180,
 ):
     """
     Sends a POST request to a specified server and handles the response.
@@ -193,6 +194,7 @@ def private_dispatcher(
             url,
             params=params_dict,
             json=json_dict,
+            timeout=timeout,
         ) as resp:
             error_code = ErrorCodes.http
             try:
