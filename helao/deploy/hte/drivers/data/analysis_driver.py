@@ -664,7 +664,7 @@ class LocalAnalysisExecutor(HelaoExecutor):
         except Exception:
             LOGGER.error("Failed to initialize LocalAnalysisExecutor.", exc_info=True)
 
-    def _pre_exec(self):
+    async def _pre_exec(self):
         try:
             self.loader = LocalLoader(self.action_params["sequence_zip_path"])
             LOGGER.info("Initialized LocalLoader in LocalAnalysisExecutor.")
@@ -674,7 +674,7 @@ class LocalAnalysisExecutor(HelaoExecutor):
             error = ErrorCodes.critical
         return {"error": error}
 
-    def _exec(self):
+    async def _exec(self):
         try:
             processes = self.loader.processes
             for puuid in processes.process_uuid:
