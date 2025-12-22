@@ -115,7 +115,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self.world_config = action_serv.world_cfg
         self.config_dict["env_file"] = self.world_config["helao_credentials_path"]
         self.local_ana_root = os.path.join(self.world_config["root"], "ANALYSES")
-        self.max_tasks = self.config_dict.get("max_tasks", 8)
+        self.max_tasks = self.config_dict.get("max_tasks", 4)
         # declare global loader for analysis models used by driver.batch_* methods
         self.get_loader()
         # self.api_host = self.config_dict["api_host"]
@@ -611,37 +611,37 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         local_loader = LocalLoader(sequence_zip_path)
         pdf = local_loader.processes
 
-        # for puuid in pdf.process_uuid:
-        #     await self.enqueue_calc(
-        #         (
-        #             puuid,
-        #             local_loader,
-        #             params,
-        #             XrfsAnalysis,
-        #         )
-        #     )
-
-        semaphore = asyncio.Semaphore(self.max_tasks)
-
-        async def _wrap_coro(coro):
-            async with semaphore:
-                return await coro
-
-        await asyncio.gather(
-            *[
-                _wrap_coro(
-                    self.enqueue_calc(
-                        (
-                            puuid,
-                            local_loader,
-                            params,
-                            XrfsAnalysis,
-                        )
-                    )
+        for puuid in pdf.process_uuid:
+            await self.enqueue_calc(
+                (
+                    puuid,
+                    local_loader,
+                    params,
+                    XrfsAnalysis,
                 )
-                for puuid in pdf.process_uuid
-            ]
-        )
+            )
+
+        # semaphore = asyncio.Semaphore(self.max_tasks)
+
+        # async def _wrap_coro(coro):
+        #     async with semaphore:
+        #         return await coro
+
+        # await asyncio.gather(
+        #     *[
+        #         _wrap_coro(
+        #             self.enqueue_calc(
+        #                 (
+        #                     puuid,
+        #                     local_loader,
+        #                     params,
+        #                     XrfsAnalysis,
+        #                 )
+        #             )
+        #         )
+        #         for puuid in pdf.process_uuid
+        #     ]
+        # )
 
     def shutdown(self):
         pass
