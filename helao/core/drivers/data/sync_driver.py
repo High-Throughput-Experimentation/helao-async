@@ -1434,7 +1434,7 @@ class HelaoSyncer:
                         ).replace("\\", "/")
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{rel_posix_path}"
                         msg = fp
-                    LOGGER.info(f"Destination: {file_s3_key}")
+                    LOGGER.debug(f"Destination: {file_s3_key}")
                     file_success = await self.to_s3(
                         msg=msg,
                         target=file_s3_key,
