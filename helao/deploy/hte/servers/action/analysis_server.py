@@ -13,7 +13,12 @@ from fastapi import Body
 
 from helao.helpers.premodels import Action
 from helao.core.servers.base_api import BaseAPI
-from ...drivers.data.analysis_driver import HelaoAnalysisSyncer
+from ...drivers.data.analysis_driver import (
+    HelaoAnalysisSyncer,
+    LocalAnalysisExecutor,
+    XrfsAnalysis,
+    IcpmsAnalysis,
+)
 
 
 def makeApp(server_key):
@@ -110,12 +115,11 @@ def makeApp(server_key):
         """Generates ICPMS concentration analyses from sequence zip path."""
         active = await app.base.setup_and_contain_action()
 
-        await app.driver.batch_calc_icpms_local(
-            sequence_zip_path=active.action.action_params["sequence_zip_path"],
-            params=active.action.action_params["params"],
+        executor = LocalAnalysisExecutor(
+            analysis_class=IcpmsAnalysis, active=active, oneoff=True, concurrent=True
         )
-        finished_action = await active.finish()
-        return finished_action.as_dict()
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
 
     @app.post(f"/{server_key}/analyze_xrfs_local", tags=["action"])
     async def analyze_xrfs_local(
@@ -127,12 +131,11 @@ def makeApp(server_key):
         """Generates XRFS calibration analyses from sequence zip path."""
         active = await app.base.setup_and_contain_action()
 
-        await app.driver.batch_calc_xrfs_local(
-            sequence_zip_path=active.action.action_params["sequence_zip_path"],
-            params=active.action.action_params["params"],
+        executor = LocalAnalysisExecutor(
+            analysis_class=XrfsAnalysis, active=active, oneoff=True, concurrent=True
         )
-        finished_action = await active.finish()
-        return finished_action.as_dict()
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
 
     @app.post("/list_running_tasks", tags=["private"])
     def list_current_tasks():
