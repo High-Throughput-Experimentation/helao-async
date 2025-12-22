@@ -555,7 +555,7 @@ class OrchAPI(HelaoFastAPI):
                         cleared_actives.append(uuid)
                         self.orch.globalstatusmodel.active_dict.pop(uuid)
                         if HloStatus.skipped not in endpointmodel.nonactive_dict:
-                            endpointmodel[HloStatus.skipped] = {}
+                            endpointmodel.nonactive_dict[HloStatus.skipped] = {}
                         endpointmodel.nonactive_dict[HloStatus.skipped].update(
                             {uuid: statusmodel}
                         )
