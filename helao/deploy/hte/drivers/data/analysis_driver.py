@@ -23,7 +23,10 @@ import pandas as pd
 from helao.core.servers.base import Base
 from helao.helpers.set_time import set_time
 from helao.helpers.yml_tools import yml_dumps
+from helao.helpers.executor import HelaoExecutor
+from helao.core.error import ErrorCodes
 from helao.core.drivers.data.sync_driver import HelaoSyncer
+from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
 from helao.core.drivers.data.loaders import pgs3
 from helao.core.drivers.data.loaders.localfs import LocalLoader
 from ...drivers.data.analyses.echeuvis_stability import (
@@ -645,3 +648,47 @@ class HelaoAnalysisSyncer(HelaoSyncer):
 
     def shutdown(self):
         pass
+
+
+class LocalAnalysisExecutor(HelaoExecutor):
+    driver: HelaoAnalysisSyncer
+
+    def __init__(self, analysis_class: BaseAnalysis, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            self.poll_rate = 0.1
+            self.action_params = self.active.action.action_params
+            self.driver = self.active.driver
+            self.analysis_class = analysis_class
+            LOGGER.info("Initialized LocalAnalysisExecutor.")
+        except Exception:
+            LOGGER.error("Failed to initialize LocalAnalysisExecutor.", exc_info=True)
+
+    def _pre_exec(self):
+        try:
+            self.loader = LocalLoader(self.action_params["sequence_zip_path"])
+            LOGGER.info("Initialized LocalLoader in LocalAnalysisExecutor.")
+            error = ErrorCodes.none
+        except Exception:
+            LOGGER.error("Failed to initialize LocalLoader.", exc_info=True)
+            error = ErrorCodes.critical
+        return {"error": error}
+
+    def _exec(self):
+        try:
+            processes = self.loader.processes
+            for puuid in processes.process_uuid:
+                await self.driver.enqueue_calc(
+                    (
+                        puuid,
+                        self.loader,
+                        self.action_params.get("params", {}),
+                        self.analysis_class,
+                    )
+                )
+            LOGGER.info("Enqueued all calculations in LocalAnalysisExecutor.")
+            error = ErrorCodes.none
+        except Exception:
+            LOGGER.error("Failed to enqueue calculations.", exc_info=True)
+            error = ErrorCodes.critical
+        return {"error": error}
