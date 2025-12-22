@@ -2735,6 +2735,8 @@ class Orch(Base):
         """
         status_summary = {}
         for serv_key, serv_dict in self.world_cfg["servers"].items():
+            if serv_key in ["DB", "ANA"]:
+                continue
             if "ignore_heartbeats" in serv_dict.get("params", {}):
                 continue
             if "bokeh" not in serv_dict and "demovis" not in serv_dict:
