@@ -10,16 +10,29 @@ __all__ = ["hlo_version", "get_hlo_version"]
 def get_branch_commithash():
     """Return current git branch and commit hash."""
     command = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
-    branch = subprocess.check_output(command).decode("utf8").strip()
+    branch = (
+        subprocess.check_output(command, stderr=subprocess.STDOUT)
+        .decode("utf8")
+        .strip()
+    )
     command = ["git", "rev-parse", "--short", "HEAD"]
-    commit_hash = subprocess.check_output(command).decode("utf8").strip()
+    commit_hash = (
+        subprocess.check_output(command, stderr=subprocess.STDOUT)
+        .decode("utf8")
+        .strip()
+    )
     return branch, commit_hash
+
 
 def get_filehash(filename: str):
     filename = os.path.abspath(filename)
     parent_dir = os.path.dirname(filename)
     command = ["git", "log", "-n", "1", "--pretty=format:%h", "--", filename]
-    response = subprocess.check_output(command, cwd=parent_dir).decode("utf8").split()
+    response = (
+        subprocess.check_output(command, cwd=parent_dir, stderr=subprocess.STDOUT)
+        .decode("utf8")
+        .split()
+    )
     if response:
         short_hash = response[0]
     else:
