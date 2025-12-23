@@ -23,7 +23,7 @@ import pandas as pd
 from helao.core.servers.base import Base
 from helao.helpers.set_time import set_time
 from helao.helpers.yml_tools import yml_dumps
-from helao.helpers.executor import HelaoExecutor
+from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes
 from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
@@ -650,7 +650,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         pass
 
 
-class LocalAnalysisExecutor(HelaoExecutor):
+class LocalAnalysisExecutor(Executor):
     driver: HelaoAnalysisSyncer
 
     def __init__(self, analysis_class: BaseAnalysis, *args, **kwargs):
