@@ -394,6 +394,8 @@ class EcheUvisAnalysis(BaseAnalysis):
         self.ca_potential_vrhe = self.inputs.insitu.process_params["CA_potential_vsRHE"]
         # print("getting code hash")
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
+        self.analysis_codepath = sys._getframe().f_code.co_filename
+        self.analysis_classname = self.__class__.__name__
         self.analysis_uuid = self.gen_uuid()
 
     def calc_output(self):

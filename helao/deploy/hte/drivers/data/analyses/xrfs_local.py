@@ -116,6 +116,8 @@ class XrfsAnalysis(BaseAnalysis):
         self.technique_name = self.inputs.xrfs.technique_name
 
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
+        self.analysis_codepath = sys._getframe().f_code.co_filename
+        self.analysis_classname = self.__class__.__name__
         self.global_sample_label = self.inputs.global_sample_label
         self.analysis_uuid = self.gen_uuid(self.inputs.global_sample_label)
 

@@ -44,6 +44,8 @@ class BaseAnalysis:
     run_type: str
     technique_name: str
     analysis_codehash: str
+    analysis_codepath: str
+    analysis_classname: str
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
 
@@ -157,6 +159,8 @@ class BaseAnalysis:
             analysis_timestamp=set_time(),
             analysis_params=self.analysis_params,
             analysis_codehash=self.analysis_codehash,
+            analysis_codepath=self.analysis_codepath,
+            analysis_classname=self.analysis_classname,
             global_sample_label=global_sample_label,
             analysis_uuid=self.analysis_uuid,
             process_uuid=self.process_uuid,
