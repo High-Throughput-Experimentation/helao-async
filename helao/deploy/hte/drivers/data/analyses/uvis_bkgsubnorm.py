@@ -238,6 +238,8 @@ class DryUvisAnalysis(BaseAnalysis):
         )
         self.process_uuid = process_uuid
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
+        self.analysis_codepath = sys._getframe().f_code.co_filename
+        self.analysis_classname = self.__class__.__name__
         self.analysis_uuid = self.gen_uuid()
 
     def calc_output(self):
