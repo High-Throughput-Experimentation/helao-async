@@ -195,15 +195,15 @@ class Orch(Base):
         super().__init__(fastapp)
         self.experiment_lib, self.experiment_codehash_lib, self.experiment_codepath_lib = import_autolibs(
             world_config_dict=self.world_cfg,
-            library_dir=None,
-            user_library_dir=self.helaodirs.user_exp,
-            library_type="experiment",
+            lib_dir=None,
+            user_lib_dir=self.helaodirs.user_exp,
+            lib_type="experiment",
         )
         self.sequence_lib, self.sequence_codehash_lib, self.sequence_codepath_lib = import_autolibs(
             world_config_dict=self.world_cfg,
-            library_dir=None,
-            user_library_dir=self.helaodirs.user_seq,
-            library_type="sequence",
+            lib_dir=None,
+            user_lib_dir=self.helaodirs.user_seq,
+            lib_type="sequence",
         )
 
         self.use_db = "DB" in self.world_cfg["servers"].keys()
