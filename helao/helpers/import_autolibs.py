@@ -14,14 +14,15 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 def import_autolibs(
     world_config_dict: dict,
-    library_dir: Optional[str] = None,
-    user_library_dir: Optional[str] = None,
-    library_type: str = "sequence",
+    lib_dir: Optional[str] = None,
+    user_lib_dir: Optional[str] = None,
+    lib_type: str = "sequence",
 ):
     """Import automation library functions into environment."""
 
-    library_lib = {}
-    library_codehash_lib = {}
+    lib = {}
+    codehash_lib = {}
+    codepath_lib = {}
 
     def get_libs(lib_dir, lib_file):
         if lib_file.endswith(".py") and os.path.isfile(lib_file):
@@ -30,62 +31,63 @@ def import_autolibs(
         else:
             lib_file = lib_file.split(".py")[0]
             LOGGER.info(
-                f"importing {library_type}s from '{lib_file}' from '{lib_dir}'",
+                f"importing {lib_type}s from '{lib_file}' from '{lib_dir}'",
             )
             lib_path = os.path.join(lib_dir, f"{lib_file}.py")
             if not os.path.isfile(lib_path):
                 LOGGER.warning(
-                    f"{library_type} library path {lib_path} does not exist, trying 'hte' deployment",
+                    f"{lib_type} library path {lib_path} does not exist, trying 'hte' deployment",
                 )
                 lib_path = os.path.join(
-                    "helao", "deploy", "hte", f"{library_type}s", f"{lib_file}.py"
+                    "helao", "deploy", "hte", f"{lib_type}s", f"{lib_file}.py"
                 )
-        library_file_hash = get_filehash(lib_path)
+        lib_file_hash = get_filehash(lib_path)
         tempd = SourceFileLoader(lib_file, lib_path).load_module().__dict__
-        for func in tempd.get(f"{library_type.upper()}S", []):
+        for func in tempd.get(f"{lib_type.upper()}S", []):
             if func in tempd:
-                library_lib.update({func: tempd[func]})
-                library_codehash_lib.update({func: library_file_hash})
+                lib.update({func: tempd[func]})
+                codehash_lib.update({func: lib_file_hash})
+                codepath_lib.update({func: lib_path})
                 LOGGER.info(
-                    f"added {library_type[:3]} '{func}' to {library_type} library"
+                    f"added {lib_type[:3]} '{func}' to {lib_type} library"
                 )
             else:
                 LOGGER.error(
-                    f"!!! Could not find {library_type} function '{func}' in '{lib_file}'",
+                    f"!!! Could not find {lib_type} function '{func}' in '{lib_file}'",
                 )
 
-    if library_dir is None:
+    if lib_dir is None:
         config_deployment = os.path.basename(
             os.path.dirname(os.path.dirname(CONFIG["loaded_config_path"]))
         )
-        library_dir = world_config_dict.get(
-            f"{library_type}_path",
-            os.path.join("helao", "deploy", config_deployment, f"{library_type}s"),
+        lib_dir = world_config_dict.get(
+            f"{lib_type}_path",
+            os.path.join("helao", "deploy", config_deployment, f"{lib_type}s"),
         )
-    if not os.path.isdir(library_dir):
+    if not os.path.isdir(lib_dir):
         LOGGER.error(
-            f"{library_type} path {library_dir} was specified but is not a valid directory",
+            f"{lib_type} path {lib_dir} was specified but is not a valid directory",
         )
-        return library_lib, library_codehash_lib
+        return lib, codehash_lib
 
-    libs = world_config_dict.get(f"{library_type}_libraries", [])
+    libs = world_config_dict.get(f"{lib_type}_libraries", [])
     for lib in libs:
-        get_libs(lib_dir=library_dir, lib_file=lib)
+        get_libs(lib_dir=lib_dir, lib_file=lib)
 
     # now add all user_seq
-    if user_library_dir is not None:
+    if user_lib_dir is not None:
         userfiles = [
             os.path.splitext(userfile)[0]
-            for userfile in os.listdir(user_library_dir)
+            for userfile in os.listdir(user_lib_dir)
             if userfile.endswith(".py")
         ]
         for userfile in userfiles:
-            get_libs(lib_dir=user_library_dir, lib_file=userfile)
+            get_libs(lib_dir=user_lib_dir, lib_file=userfile)
             LOGGER.info(
-                f"Custom {library_type}s were imported from {os.path.join(user_library_dir, userfile)}",
+                f"Custom {lib_type}s were imported from {os.path.join(user_lib_dir, userfile)}",
             )
 
     LOGGER.info(
-        f"imported {len(libs)} {library_type}s specified by config.",
+        f"imported {len(libs)} {lib_type}s specified by config.",
     )
-    return library_lib, library_codehash_lib
+    return lib, codehash_lib, codepath_lib

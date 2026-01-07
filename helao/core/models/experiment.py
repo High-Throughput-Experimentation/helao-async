@@ -95,6 +95,8 @@ class ExperimentModel(ShortExperimentModel):
     experiment_status: List[HloStatus] = Field(default=[])
     experiment_output_dir: Optional[Path] = None
     experiment_codehash: Optional[str] = None
+    experiment_codepath: Optional[str] = None
+    experiment_funcname: Optional[str] = None
     experiment_label: Optional[str] = None
     experiment_finished_timestamp: Optional[datetime] = None
     planned_actions: list = []
