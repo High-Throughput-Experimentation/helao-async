@@ -71,8 +71,8 @@ def import_autolibs(
         return lib, codehash_lib, codepath_lib
 
     libs = world_config_dict.get(f"{lib_type}_libraries", [])
-    for lib in libs:
-        get_libs(lib_dir=lib_dir, lib_file=lib)
+    for library in libs:
+        get_libs(lib_dir=lib_dir, lib_file=library)
 
     # now add all user_seq
     if user_lib_dir is not None:
