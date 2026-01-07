@@ -68,7 +68,7 @@ def import_autolibs(
         LOGGER.error(
             f"{lib_type} path {lib_dir} was specified but is not a valid directory",
         )
-        return lib, codehash_lib
+        return lib, codehash_lib, codepath_lib
 
     libs = world_config_dict.get(f"{lib_type}_libraries", [])
     for lib in libs:
