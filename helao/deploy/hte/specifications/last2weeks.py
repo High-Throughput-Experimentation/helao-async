@@ -60,5 +60,7 @@ class SpecParser(BaseParser):
         seqfunc = orch.sequence_lib[seqname]
         newseq = constructor(seqfunc, loaded_params)
         newseq.sequence_codehash = orch.sequence_codehash_lib[seqname]
+        newseq.sequence_codepath = orch.sequence_codepath_lib[seqname]
+        newseq.sequence_funcname = orch.sequence_codehash_lib[seqname].__name__
         newseq.sequence_label = "synced-seq-params"
         return newseq

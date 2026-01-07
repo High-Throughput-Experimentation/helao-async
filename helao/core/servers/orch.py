@@ -193,13 +193,13 @@ class Orch(Base):
             fastapp: The FastAPI application instance.
         """
         super().__init__(fastapp)
-        self.experiment_lib, self.experiment_codehash_lib = import_autolibs(
+        self.experiment_lib, self.experiment_codehash_lib, self.experiment_codepath_lib = import_autolibs(
             world_config_dict=self.world_cfg,
             library_dir=None,
             user_library_dir=self.helaodirs.user_exp,
             library_type="experiment",
         )
-        self.sequence_lib, self.sequence_codehash_lib = import_autolibs(
+        self.sequence_lib, self.sequence_codehash_lib, self.sequence_codepath_lib = import_autolibs(
             world_config_dict=self.world_cfg,
             library_dir=None,
             user_library_dir=self.helaodirs.user_seq,
@@ -1089,6 +1089,12 @@ class Orch(Base):
         self.active_experiment.experiment_codehash = self.experiment_codehash_lib[
             self.active_experiment.experiment_name
         ]
+        self.active_experiment.experiment_codepath = self.experiment_codepath_lib[
+            self.active_experiment.experiment_name
+        ]
+        self.active_experiment.experiment_funcname = self.experiment_codehash_lib[
+            self.active_experiment.experiment_name
+        ].__name__
         if unpacked_acts is None:
             LOGGER.error("no actions in experiment")
             self.action_dq = zdeque([])
@@ -2067,6 +2073,13 @@ class Orch(Base):
             sequence.sequence_codehash = self.sequence_codehash_lib[
                 sequence.sequence_name
             ]
+
+            sequence.sequence_codepath = self.sequence_codepath_lib[
+                sequence.sequence_name
+            ]
+            sequence.sequence_funcname = self.sequence_codehash_lib[
+                sequence.sequence_name
+            ].__name__
         if len(self.sequence_dq) == 0:
             self.active_run_id = gen_uuid()
         self.sequence_dq.append(sequence)
@@ -2113,6 +2126,12 @@ class Orch(Base):
                         and sub_sequence.sequence_name in self.sequence_codehash_lib
                     ):
                         sub_sequence.sequence_codehash = self.sequence_codehash_lib[
+                            sub_sequence.sequence_name
+                        ]
+                        sub_sequence.sequence_codepath = self.sequence_codepath_lib[
+                            sub_sequence.sequence_name
+                        ]
+                        sub_sequence.sequence_funcname = self.sequence_codehash_lib[
                             sub_sequence.sequence_name
                         ]
                     sub_sequence.run_sequence_parameter_variable = [run_seq_param]
