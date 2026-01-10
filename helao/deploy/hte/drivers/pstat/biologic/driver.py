@@ -100,6 +100,7 @@ class BiologicDriver(HelaoDriver):
                     if any([x > 0 for x in states])
                     else DriverStatus.ok
                 )
+                
                 data = {i: x for i, x in enumerate(states)}
             elif channel not in self.channels:
                 status = DriverStatus.uninitialized
