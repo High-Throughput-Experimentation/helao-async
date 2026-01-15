@@ -1,6 +1,6 @@
 @echo off
 set HA_DIR=%~dp0
-call conda activate helao
+@REM call conda activate helao
 
 echo resetting helao-async and pulling updates
 cd %HA_DIR%
