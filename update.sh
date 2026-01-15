@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 HA_DIR=$(readlink -f $0 | xargs -0 dirname)
-conda activate helao
+# conda activate helao
 
 echo "resetting helao-async and pulling updates"
 cd "$HA_DIR" || exit
