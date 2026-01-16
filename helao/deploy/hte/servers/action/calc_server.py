@@ -127,7 +127,9 @@ def makeApp(server_key):
         action_version: int = 2,
         min_offset_ocv: float | bool = False,
         new_ocv: float | bool = False,
-        offset_value: float = 0.0,
+        lower_limit: float = -0,
+        upper_limit: float = 1.2,
+        offset_value: float = -0,
     ):
         """
         min_offset_ocv and new_ocv should be set by a previous run_OCV action and inherited
@@ -156,7 +158,14 @@ def makeApp(server_key):
                 f"Error getting global params in calc_server.py, try perhaps the host details set here are wrong: {e}"
             )
         result = min(min_offset_ocv, new_ocv)
+        if result<lower_limit:
+            result = lower_limit
+            LOGGER.warning(f"minimum potential was below lower limit, setting to {lower_limit}")
+        elif result>upper_limit:
+            result = upper_limit
+            LOGGER.warning(f"minimum potential was above upper limit, setting to {upper_limit}")
 
+        
         LOGGER.info(f"minimum potential was: {result}")
         await active.enqueue_data_dflt(datadict={"result": result})
         active.action.action_params["min_offset_ocv"] = result
