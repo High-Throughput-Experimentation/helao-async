@@ -20,6 +20,7 @@ class HelaoCredentials(BaseSettings):
     JUMPBOX_USER: str = ""
     JUMPBOX_KEYFILE: str = ""
     OPENAPI_JSON: str = ""
+    PLATE_API_JSON: str = ""
     PLATE_API_KEY: str = ""
     PLATE_API: str = ""
 
