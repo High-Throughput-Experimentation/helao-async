@@ -704,7 +704,7 @@ def HISPEC_sub_CP(
     apm.add(
         CALC_server,
         "check_CP_Ewe_bounds",
-        {"CP_Ewe_V__mean_final": "CP_Ewe_V__mean_final"},
+        {},
         to_global_params={"CP_Ewe_V__mean_final": "CP_Ewe_V__mean_final"},
         )
     return apm.planned_actions
