@@ -358,6 +358,17 @@ def HISPEC_sub_shutdown(experiment: Experiment):
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
     return apm.planned_actions  # returns complete action list to orch
 
+def HISPEC_sub_check_CP_Ewe_bounds(experiment: Experiment,
+    experiment_version: int = 1,
+    Ewe_V__mean_final: float = 0.3,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(CALC_server, "check_CP_Ewe_bounds", {"Ewe_V__mean_final": Ewe_V__mean_final},
+    to_global_params={"limited_Ewe_V__mean_final": "Ewe_V__mean_final"}
+    )
+
+    return apm.planned_actions  # returns complete action list to orch
+
 
 def HISPEC_calculate_lower_vertex_potential(
     experiment: Experiment,
@@ -689,6 +700,11 @@ def HISPEC_sub_CP(
         ],
         to_global_params={"Ewe_V__mean_final": "CP_Ewe_V__mean_final"},
     )
+
+    apm.add(
+        CALC_server,
+        "check_CP_Ewe_bounds",
+        {"CP_Ewe_V__mean_final": "CP_Ewe_V__mean_final"})
     return apm.planned_actions
 
 

@@ -7,6 +7,8 @@ Calc server is used for in-sequence data processing.
 __all__ = ["makeApp"]
 
 import json
+from tkinter import E
+import numpy as np
 from typing import Union
 from fastapi import Body
 
@@ -172,4 +174,43 @@ def makeApp(server_key):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+
+    @app.post(f"/{server_key}/check_CP_Ewe_bounds", tags=["action"])
+    async def check_CP_Ewe_bounds(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        Ewe_V__mean_final: float | bool = False,
+        limted_Ewe_V__mean_final: float | bool = False,
+        lower_limit: float = -1,
+        upper_limit: float = 3,
+
+            ): 
+        active = await app.base.setup_and_contain_action(action_abbr="CheckCPEweBounds")
+
+        try:
+            Ewe_V__mean_final = active.action.action_params["CP_Ewe_V__mean_final"]
+            if not isinstance(Ewe_V__mean_final, (int, float, np.floating)):
+                Ewe_V__mean_final = 0.4
+                LOGGER.warning("Ewe_V__mean_final not found in global params, setting to 0.4")
+            else:
+                Ewe_V__mean_final = Ewe_V__mean_final
+        except Exception as e:
+            LOGGER.error(f"Error getting global params: {e}")
+            print(
+                f"Error getting global params in calc_server.py, try perhaps the host details set here are wrong: {e}"
+            )
+        if Ewe_V__mean_final<lower_limit:
+            limted_Ewe_V__mean_final = lower_limit
+            LOGGER.info(f"Ewe_V__mean_final was below lower limit, setting to {lower_limit}")
+        elif Ewe_V__mean_final>upper_limit:
+            limted_Ewe_V__mean_final = upper_limit
+            LOGGER.info(f"Ewe_V__mean_final was above upper limit, setting to {upper_limit}")
+        else:
+            limted_Ewe_V__mean_final = Ewe_V__mean_final
+        await active.enqueue_data_dflt(datadict={"CP_Ewe_V__mean_final": limted_Ewe_V__mean_final})
+        active.action.action_params["CP_Ewe_V__mean_final"] = limted_Ewe_V__mean_final
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+                
     return app
