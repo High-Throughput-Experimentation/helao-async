@@ -321,6 +321,7 @@ class SampleModelAPI:
                             con=self._con,
                         )
                         retsample = self._df_to_sample(retdf)
+                        LOGGER.info(retsample)
                         if sample.sample_type is not None:
                             ret_samples.append(retsample)
                         else:
