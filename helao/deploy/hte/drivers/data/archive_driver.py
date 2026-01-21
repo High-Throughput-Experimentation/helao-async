@@ -1325,6 +1325,7 @@ class Archive:
             # check if source_liquid_in is valid
             # converts source_liquid_in to a list
             source_liquid_in = object_to_sample(source_liquid_in)
+            LOGGER.info(f"source_liquid_in: {source_liquid_in.model_dump()}")
             samples_in = await self.unified_db.get_samples(samples=[source_liquid_in])
 
             if not samples_in:
