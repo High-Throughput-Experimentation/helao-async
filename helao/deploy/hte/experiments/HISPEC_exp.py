@@ -674,6 +674,18 @@ def HISPEC_sub_CP(
 ):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_global_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
     apm.add(
         action_server=PSTAT_server,
         action_name="run_CP",
