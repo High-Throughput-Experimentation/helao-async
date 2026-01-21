@@ -190,8 +190,9 @@ def makeApp(server_key):
         try:
             Ewe_V__mean_final = active.action.action_params["CP_Ewe_V__mean_final"]
             if not isinstance(Ewe_V__mean_final, (int, float, np.floating)):
+                LOGGER.warning(f"Ewe_V__mean_final not found in global params, setting to 0.4, value was: {Ewe_V__mean_final}")
                 Ewe_V__mean_final = 0.4
-                LOGGER.warning("Ewe_V__mean_final not found in global params, setting to 0.4")
+
             else:
                 Ewe_V__mean_final = Ewe_V__mean_final
         except Exception as e:
