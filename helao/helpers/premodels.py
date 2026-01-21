@@ -209,7 +209,9 @@ class Experiment(Sequence, ExperimentModel):
         #     LOGGER.error(f"samples_in labels: {in_labels}")
         #     LOGGER.error(f"samples_out labels: {out_labels}")
 
-
+# when a server is working on an action it is important to 
+# see what experiment the action belongs to. This turns the 
+# action model into an instance of an Action 
 class Action(Experiment, ActionModel):
     "Sample-action identifier class."
 
@@ -352,6 +354,8 @@ class ActionPlanMaker:
         action_name: str,
         action_params: dict,
         start_condition: ActionStartCondition = ActionStartCondition.wait_for_all,
+        to_global_params: dict = {},
+        from_global_act_params: dict = {},
         **kwargs,
     ):
         """Shorthand add_action()."""
@@ -362,6 +366,8 @@ class ActionPlanMaker:
                 "action_name": action_name,
                 "action_params": action_params,
                 "start_condition": start_condition,
+                "to_global_params": to_global_params,
+                "from_global_act_params": from_global_act_params,
             }
         )
         action_dict.update(kwargs)
@@ -380,11 +386,12 @@ class ExperimentPlanMaker:
     ):
         self.planned_experiments = []
 
-    def add(self, selected_experiment, experiment_params, **kwargs):
+    def add(self, experiment_name, experiment_params, from_global_exp_params={}, **kwargs):
         self.planned_experiments.append(
             Experiment(
-                experiment_name=selected_experiment,
+                experiment_name=experiment_name,
                 experiment_params=experiment_params,
+                from_global_exp_params=from_global_exp_params,
                 **kwargs,
             ),
         )
