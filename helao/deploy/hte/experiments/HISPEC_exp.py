@@ -703,13 +703,14 @@ def HISPEC_sub_CP(
         },
         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_previous,
-        technique_name="CP",
+    technique_name="CP",
         process_finish=False,
         process_contrib=[
             ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
+        # global params has a global scope on the level of the orch
         to_global_params={"Ewe_V__mean_final": "CP_Ewe_V__mean_final"},
     )
 
@@ -717,8 +718,8 @@ def HISPEC_sub_CP(
         CALC_server,
         "check_CP_Ewe_bounds",
         {},
-        
-        from_global_params={"CP_Ewe_V__mean_final": "CP_Ewe_V__mean_final"},
+        # global act params inherits from global params - we need to call from this to give the correct name
+        from_global_act_params={"CP_Ewe_V__mean_final": "CP_Ewe_V__mean_final"},
     )
     return apm.planned_actions
 

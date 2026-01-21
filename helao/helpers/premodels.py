@@ -209,7 +209,9 @@ class Experiment(Sequence, ExperimentModel):
         #     LOGGER.error(f"samples_in labels: {in_labels}")
         #     LOGGER.error(f"samples_out labels: {out_labels}")
 
-
+# when a server is working on an action it is important to 
+# see what experiment the action belongs to. This turns the 
+# action model into an instance of an Action 
 class Action(Experiment, ActionModel):
     "Sample-action identifier class."
 
