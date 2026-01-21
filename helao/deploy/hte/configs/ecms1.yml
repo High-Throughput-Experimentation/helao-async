@@ -132,7 +132,7 @@ servers:
     host: hte-ecms-03.htejcap.caltech.edu
     port: 8004
     group: action
-    fast: gamry_server
+    fast: gamry_server2
     params:
       dev_id: 0
       filterfreq_hz: 1000.0
