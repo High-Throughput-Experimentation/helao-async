@@ -197,7 +197,7 @@ def HISPEC_CV(
             },
             from_global_exp_params={
                 "min_offset_ocv": "Vapex2_vsRHE",
-                "CP_Ewe_V__mean_final": "Vapex1_vsRHE",
+                "CP_Ewe_V__mean_final_limited": "Vapex1_vsRHE",
             },
         )  # temporarily commented this out to test a fixed V2
 
