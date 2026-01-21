@@ -2028,7 +2028,7 @@ class BokehOperator:
 
         if input_plate_id is not None:
             # pmdata = json.loads(self.dataAPI.get_platemap_plateid(input_plate_id.value))
-            pmdata = self.dataAPI.get_platemap_plateid(input_plate_id.value)
+            pmdata = self.dataAPI.get_platemap_plateid(int(input_plate_id.value))
 
             xyarr = np.array((X, Y)).T
             pmxy = np.array([[col["x"], col["y"]] for col in pmdata])
@@ -2105,7 +2105,7 @@ class BokehOperator:
             and input_sample_no is not None
         ):
             # pmdata = json.loads(self.dataAPI.get_platemap_plateid(input_plate_id.value))
-            pmdata = self.dataAPI.get_platemap_plateid(input_plate_id.value)
+            pmdata = self.dataAPI.get_platemap_plateid(int(input_plate_id.value))
             buf = ""
             if PMnum is not None and pmdata:
                 if PMnum[0] is not None:  # need to check as this can also happen
