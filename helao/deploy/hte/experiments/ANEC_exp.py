@@ -340,14 +340,17 @@ def ANEC_sub_flush_fill_cell(
     apm.add(ORCH_server, "wait", {"waittime": equilibration_time})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
     # (3) Create liquid sample and add to assembly
+    ## the hostname.lower() used in ORCH_HOST is incompatible with older liquids that were created with all-caps hostname
+    liquid_sample_in = LiquidSample(
+                sample_no=reservoir_liquid_sample_no, machine_name=gethostname()
+            )
+    liquid_sample_in.global_label = liquid_sample_in.get_global_label()
     apm.add(
         PAL_server,
         "archive_custom_add_liquid",
         {
             "custom": "cell1_we",
-            "source_liquid_in": LiquidSample(
-                sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
-            ),
+            "source_liquid_in": liquid_sample_in,
             "volume_ml": volume_ul_cell_liquid,
             "combine_liquids": True,
             "dilute_liquids": True,
