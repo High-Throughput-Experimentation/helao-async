@@ -1218,8 +1218,8 @@ class BokehOperator:
 
         plateid = to_int(new)
         if plateid is not None:
-            self.get_pm(new, sender)
-            self.get_elements_plateid(new, sender)
+            self.get_pm(plateid, sender)
+            self.get_elements_plateid(plateid, sender)
 
             private_input, param_input = self.find_param_private_input(sender)
             if private_input is None or param_input is None:
@@ -1988,7 +1988,7 @@ class BokehOperator:
             x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
         )
 
-    def get_pm(self, plateid, sender):
+    def get_pm(self, plateid: int, sender):
         """gets plate map"""
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
