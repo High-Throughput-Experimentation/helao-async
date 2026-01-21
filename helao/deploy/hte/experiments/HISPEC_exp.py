@@ -719,7 +719,10 @@ def HISPEC_sub_CP(
         "check_CP_Ewe_bounds",
         {},
         # global act params inherits from global params - we need to call from this to give the correct name
+        #consume the value for the action
         from_global_act_params={"CP_Ewe_V__mean_final": "CP_Ewe_V__mean_final"},
+        # now write a new value to the global params
+        to_global_params={"CP_Ewe_V__mean_final": "CP_Ewe_V__mean_final_limited"},
     )
     return apm.planned_actions
 
