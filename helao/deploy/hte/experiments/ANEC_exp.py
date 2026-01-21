@@ -347,7 +347,7 @@ def ANEC_sub_flush_fill_cell(
             "custom": "cell1_we",
             "source_liquid_in": LiquidSample(
                 sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
-            ).model_dump(),
+            ),
             "volume_ml": volume_ul_cell_liquid,
             "combine_liquids": True,
             "dilute_liquids": True,
