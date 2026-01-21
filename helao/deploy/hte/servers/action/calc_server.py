@@ -179,7 +179,7 @@ def makeApp(server_key):
     async def check_CP_Ewe_bounds(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        Ewe_V__mean_final: float | bool = False,
+        CP_Ewe_V__mean_final: float | bool = False,
         limted_Ewe_V__mean_final: float | bool = False,
         lower_limit: float = -1,
         upper_limit: float = 3,
