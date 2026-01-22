@@ -101,6 +101,7 @@ class SampleModelAPI:
             await asyncio.sleep(1)
         self._con = sqlite3.connect(self._db)
         self._cur = self._con.cursor()
+        LOGGER.info(f"opened db: {self._db}")
 
     def _close_db(self):
         """Commits changes to sqlite db and closes connection and cursor."""
@@ -108,6 +109,7 @@ class SampleModelAPI:
             # commit any changes
             self._con.commit()
             self._con.close()
+            LOGGER.info(f"closed db: {self._db}")
             self._con = None
             self._cur = None
 
