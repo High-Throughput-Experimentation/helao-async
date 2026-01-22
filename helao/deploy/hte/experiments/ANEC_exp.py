@@ -188,7 +188,7 @@ def ANEC_sub_load_solid(
                     "plate_id": solid_plate_id,
                     "machine_name": "legacy",
                 }
-            ).model_dump(),
+            ),
         },
     )
 
@@ -533,7 +533,7 @@ def ANEC_sub_load_solid_only(
                 sample_no=solid_sample_no,
                 plate_id=solid_plate_id,
                 machine_name="legacy",
-            ).model_dump(),
+            ),
         },
     )
     return apm.planned_actions
@@ -562,7 +562,7 @@ def ANEC_sub_load_solid_and_clean_cell(
                 sample_no=solid_sample_no,
                 plate_id=solid_plate_id,
                 machine_name="legacy",
-            ).model_dump(),
+            ),
         },
     )
     apm.add_actions(ANEC_sub_drain_cell(experiment))
