@@ -29,7 +29,7 @@ class OpenAPIClient:
 
         try:
             self.headers = {"X-Api-Key": self.api_key} if self.api_key else None
-            with httpx.Client(headers=self.headers) as client:
+            with httpx.Client(headers=self.headers, timeout=30.0) as client:
                 response = client.get(self.openapi_json_url)
             response.raise_for_status()
             self.spec = response.json()
@@ -135,7 +135,8 @@ class OpenAPIClient:
                                     if param_in == "path":
                                         resolved_path_template = (
                                             resolved_path_template.replace(
-                                                f"{{{param_name}}}", quote(str(param_value), safe='')
+                                                f"{{{param_name}}}",
+                                                quote(str(param_value), safe=""),
                                             )
                                         )
                                     elif param_in == "query":
@@ -156,15 +157,15 @@ class OpenAPIClient:
                             full_url = urljoin(
                                 base_url_for_calls, relative_path_for_join
                             )
-                            
+
                             quoted_query_params = {}
                             for _key, value in query_params.items():
                                 if isinstance(_key, str):
-                                    key = quote(_key, safe='')
+                                    key = quote(_key, safe="")
                                 else:
                                     key = _key
                                 if isinstance(value, str):
-                                    quoted_query_params[key] = quote(value, safe='')
+                                    quoted_query_params[key] = quote(value, safe="")
                                 else:
                                     quoted_query_params[key] = value
 

@@ -39,7 +39,7 @@ class NetbooterDriver(HelaoDriver):
             )
         else:
             self.auth = httpx.BasicAuth(username=username, password=password)
-            self.client = httpx.Client(auth=self.auth)
+            self.client = httpx.Client(auth=self.auth, timeout=30.0)
             self.host_url = f"http://{hostname}/cmd.cgi?"
 
     def switch_outlet(self, outlet_number: int, on: bool):

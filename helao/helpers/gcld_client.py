@@ -125,6 +125,7 @@ class DataRequestsClient:
         self.client = httpx.Client(
             base_url=self.base_url,
             headers={"x-api-key": self.api_key},
+            timeout=30.0,
         )
         return self
 
