@@ -342,7 +342,7 @@ def ANEC_sub_flush_fill_cell(
     # (3) Create liquid sample and add to assembly
     ## the hostname.lower() used in ORCH_HOST is incompatible with older liquids that were created with all-caps hostname
     liquid_sample_in = LiquidSample(
-                sample_no=reservoir_liquid_sample_no, machine_name=gethostname()
+                sample_no=reservoir_liquid_sample_no, machine_name=gethostname().lower()
             )
     liquid_sample_in.global_label = liquid_sample_in.get_global_label()
     apm.add(
