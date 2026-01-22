@@ -1351,7 +1351,12 @@ class Archive:
         # and get sample from custom position
         if custom in self.positions.customs_dict:
             custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
-            LOGGER.info(f"custom sample in valid position: {custom_sample}")
+            if isinstance(custom_sample, NoneSample):
+                LOGGER.error(f"A blank sample is loaded in custom position '{custom}', unload it first.")
+                error = ErrorCodes.no_sample
+                return error, [], []
+            else:
+                LOGGER.info(f"custom sample in valid position: {custom_sample}")
         else:
             error = ErrorCodes.not_available
             return error, [], []
@@ -1730,7 +1735,12 @@ class Archive:
         # and get sample from custom position
         if custom in self.positions.customs_dict:
             custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
-            LOGGER.info(f"custom sample in valid position: {custom_sample}")
+            if isinstance(custom_sample, NoneSample):
+                LOGGER.error(f"A blank sample is loaded in custom position '{custom}', unload it first.")
+                error = ErrorCodes.no_sample
+                return error, [], []
+            else:
+                LOGGER.info(f"custom sample in valid position: {custom_sample}")
         else:
             error = ErrorCodes.not_available
             return error, [], []
