@@ -302,9 +302,13 @@ class BokehOperator:
         )
 
         self.planner_tab = Panel(
-            child=self.experiment_plan_table, title=f"Sequence Planner ({len(self.sequence.planned_experiments) if self.sequence is not None else 0})"
+            child=self.experiment_plan_table,
+            title=f"Sequence Planner ({len(self.sequence.planned_experiments) if self.sequence is not None else 0})",
         )
-        self.active_tab = Panel(child=self.active_action_table, title=f"Active Actions ({len(self.orch.active_actions)})")
+        self.active_tab = Panel(
+            child=self.active_action_table,
+            title=f"Active Actions ({len(self.active_action_lists['action_name'])})",
+        )
         self.planactive_tabs = Tabs(
             tabs=[self.planner_tab, self.active_tab], height_policy="min"
         )
@@ -1455,7 +1459,9 @@ class BokehOperator:
         self.sequence.sequence_label = self.input_sequence_label.value
         self.sequence.sequence_params = sequence_params
         if prepend:
-            self.sequence.planned_experiments = expplan_list + self.sequence.planned_experiments
+            self.sequence.planned_experiments = (
+                expplan_list + self.sequence.planned_experiments
+            )
         else:
             self.sequence.planned_experiments += expplan_list
         self.sequence.sequence_codehash = self.orch.get_sequence_codehash(
@@ -2208,7 +2214,9 @@ class BokehOperator:
             )
             self.orch_status_button.button_type = "danger"
         self.planner_tab.title = f"Sequence Planner ({len(self.sequence.planned_experiments) if self.sequence is not None else 0})"
-        self.active_tab.title = f"Active Actions ({len(self.orch.active_actions)})"
+        self.active_tab.title = (
+            f"Active Actions ({len(self.active_action_lists['action_name'])})"
+        )
 
     async def IOloop(self):
         self.IOloop_run = True
