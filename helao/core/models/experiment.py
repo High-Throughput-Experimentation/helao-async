@@ -17,6 +17,7 @@ from .sample import (
 )
 from .action import ShortActionModel
 from .file import FileInfo
+from .run_use import RunUse
 from .machine import MachineModel
 
 from helao.core.version import get_hlo_version
@@ -89,6 +90,7 @@ class ExperimentModel(ShortExperimentModel):
     simulation: bool = False
     # name of "instrument": eche, anec, adss etc. defined in world config
     run_type: Optional[str] = None
+    run_use: Optional[RunUse] = RunUse.data
     sequence_uuid: Optional[UUID] = None
     experiment_uuid: Optional[UUID] = None
     experiment_timestamp: Optional[datetime] = None
