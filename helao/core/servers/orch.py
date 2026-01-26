@@ -2094,9 +2094,9 @@ class Orch(Base):
         self.sequence_dq.append(sequence)
         return sequence.sequence_uuid
 
-    async def add_sample_sequences(self, sequence: Sequence):
+    async def add_split_sequences(self, sequence: Sequence):
         """
-        Splits a sequence on plate_sample_no_list and adds to the sequence deque.
+        Splits a sequence on split_by_seq_params and group_by_seq_params as defined in ORCH params config, then adds to deque.
 
         Args:
             sequence (Sequence): The sequence object to be added.
@@ -2104,28 +2104,36 @@ class Orch(Base):
         Returns:
             list: List of UUIDs of the added sequences.
         """
-        if "plate_sample_no_list" in sequence.sequence_params:
-            plate_sample_no_list = sequence.sequence_params["plate_sample_no_list"]
+        possible_splits = [
+            x
+            for x in sequence.sequence_params
+            if x in self.server_params.get("split_by_seq_params", [])
+        ]
+        possible_groups = [
+            x
+            for x in sequence.sequence_params
+            if x in self.server_params.get("group_by_seq_params", [])
+        ]
+
+        if possible_splits:
+            split_key = possible_splits[0]
+            split_list = sequence.sequence_params[split_key]
             sub_sequence_uuids = []
-            if "reference_after_sample_list" in sequence.sequence_params:
-                reference_list = sequence.sequence_params["reference_after_sample_list"]
-                run_seq_param = "reference_after_sample_list"
+            if possible_groups:
+                group_key = possible_groups[0]
+                group_list = sequence.sequence_params[group_key]
+                run_seq_param = group_key
             else:
-                reference_list = plate_sample_no_list
-                run_seq_param = "plate_sample_no_list"
-            sub_sequence_samples = []
-            for i, plate_sample_no in enumerate(plate_sample_no_list):
-                sub_sequence_samples.append(plate_sample_no)
-                if (
-                    plate_sample_no in reference_list
-                    or i == len(plate_sample_no_list) - 1
-                ):
+                group_list = split_list
+                run_seq_param = split_key
+            sub_sequence_items = []
+            for i, item in enumerate(split_list):
+                sub_sequence_items.append(item)
+                if item in group_list or i == len(split_list) - 1:
                     # create a copy of the sequence
                     sub_sequence = deepcopy(sequence)
                     # set the plate_sample_no in the params
-                    sub_sequence.sequence_params["plate_sample_no_list"] = (
-                        sub_sequence_samples
-                    )
+                    sub_sequence.sequence_params[split_key] = sub_sequence_items
                     # generate new sub_sequence uuid
                     sub_sequence.sequence_uuid = gen_uuid()
                     # Clear planned experiments to ensure they regenerate when the sub-sequence is dequeued.
@@ -2148,7 +2156,7 @@ class Orch(Base):
                         self.active_run_id = gen_uuid()
                     self.sequence_dq.append(sub_sequence)
                     sub_sequence_uuids.append(sub_sequence.sequence_uuid)
-                    sub_sequence_samples = []
+                    sub_sequence_items = []
             return sub_sequence_uuids
         else:
             return await self.add_sequence(sequence)

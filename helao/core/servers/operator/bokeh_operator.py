@@ -353,7 +353,7 @@ class BokehOperator:
             label="Split plan", button_type="default", width=100
         )
         self.button_add_smpseqs.on_event(
-            ButtonClick, self.callback_add_sample_sequences
+            ButtonClick, self.callback_add_split_sequences
         )
         self.button_stop_orch = Button(
             label="Stop Orch", button_type="default", width=70
@@ -1306,7 +1306,7 @@ class BokehOperator:
             self.sequence = None
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
-    def callback_add_sample_sequences(self, event):
+    def callback_add_split_sequences(self, event):
         """add experiment plan as sequences split by sample to orch sequence_dq"""
         if self.sequence is not None:
             sellabel = self.input_sequence_label.value
@@ -1321,7 +1321,7 @@ class BokehOperator:
                 else:
                     self.sequence.campaign_uuid = self.input_campaign_uuid.value.strip()
             self.vis.doc.add_next_tick_callback(
-                partial(self.orch.add_sample_sequences, self.sequence)
+                partial(self.orch.add_split_sequences, self.sequence)
             )
             # clear current experiment_plan (sequence in operator)
             self.sequence = None
