@@ -344,7 +344,7 @@ class BokehOperator:
         )
         self.button_estop_orch.on_event(ButtonClick, self.callback_estop_orch)
         self.button_add_expplan = Button(
-            label="Add exp plan",
+            label="Add plan",
             button_type="default",
             width=100,
         )
@@ -2213,6 +2213,7 @@ class BokehOperator:
                 f"{self.orch.globalstatusmodel.loop_state.value}"
             )
             self.orch_status_button.button_type = "danger"
+        self.button_add_expplan.label = f"Add plan [{plan_count}]"
 
     async def IOloop(self):
         self.IOloop_run = True
