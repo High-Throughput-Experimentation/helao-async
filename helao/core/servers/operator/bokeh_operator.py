@@ -2213,9 +2213,11 @@ class BokehOperator:
                 f"{self.orch.globalstatusmodel.loop_state.value}"
             )
             self.orch_status_button.button_type = "danger"
-        self.planner_tab.title = f"Sequence Planner ({len(self.sequence.planned_experiments) if self.sequence is not None else 0})"
-        self.active_tab.title = (
-            f"Active Actions ({len(self.active_action_lists['action_name'])})"
+        self.planner_tab.update(
+            title=f"Sequence Planner ({len(self.sequence.planned_experiments) if self.sequence is not None else 0})"
+        )
+        self.active_tab.update(
+            title=f"Active Actions ({len(self.active_action_lists['action_name'])})"
         )
 
     async def IOloop(self):
