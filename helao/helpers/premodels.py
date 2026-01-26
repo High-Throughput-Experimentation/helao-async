@@ -371,6 +371,8 @@ class ActionPlanMaker:
             }
         )
         action_dict.update(kwargs)
+        if "run_use" not in kwargs:
+            action_dict["run_use"] = self._experiment.run_use
         self.planned_actions.append(Action(**action_dict))
 
     @property
