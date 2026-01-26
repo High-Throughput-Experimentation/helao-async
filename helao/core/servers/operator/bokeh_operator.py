@@ -1369,15 +1369,11 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_prepend_seq(self, event):
-        sequence = self.populate_sequence()
-        for i, D in enumerate(sequence.planned_experiments):
-            self.sequence.planned_experiments.insert(i, D)
+        self.populate_sequence(prepend=True)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_append_seq(self, event):
-        sequence = self.populate_sequence()
-        for D in sequence.planned_experiments:
-            self.sequence.planned_experiments.append(D)
+        self.populate_sequence(prepend=False)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_prepend_exp(self, event):
@@ -1428,7 +1424,7 @@ class BokehOperator:
                 pdict = json.load(f)
         return pdict.get(ptype, {}).get(name, {})
 
-    def populate_sequence(self):
+    def populate_sequence(self, prepend: bool = False):
         selected_sequence = self.sequence_dropdown.value
         LOGGER.info(f"selected sequence from list: {selected_sequence}")
 
@@ -1452,23 +1448,19 @@ class BokehOperator:
             sequence_name=selected_sequence, sequence_params=sequence_params
         )
 
-        sequence = Sequence()
-        sequence.sequence_name = selected_sequence
-        sequence.sequence_label = self.input_sequence_label.value
-        sequence.sequence_params = sequence_params
-        for expplan in expplan_list:
-            sequence.planned_experiments.append(expplan)
-
         if self.sequence is None:
             self.sequence = Sequence()
-        self.sequence.sequence_name = sequence.sequence_name
-        self.sequence.sequence_label = sequence.sequence_label
-        self.sequence.sequence_params = sequence.sequence_params
+            self.sequence.planned_experiments = []
+        self.sequence.sequence_name = selected_sequence
+        self.sequence.sequence_label = self.input_sequence_label.value
+        self.sequence.sequence_params = sequence_params
+        if prepend:
+            self.sequence.planned_experiments = expplan_list + self.sequence.planned_experiments
+        else:
+            self.sequence.planned_experiments += expplan_list
         self.sequence.sequence_codehash = self.orch.get_sequence_codehash(
             selected_sequence
         )
-
-        return sequence
 
     def populate_experimentmodel(self) -> Experiment:
         selected_experiment = self.experiment_dropdown.value
