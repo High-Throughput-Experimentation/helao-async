@@ -302,9 +302,9 @@ class BokehOperator:
         )
 
         self.planner_tab = Panel(
-            child=self.experiment_plan_table, title="Sequence Planner"
+            child=self.experiment_plan_table, title=f"Sequence Planner ({len(self.sequence.planned_experiments)})"
         )
-        self.active_tab = Panel(child=self.active_action_table, title="Active Actions")
+        self.active_tab = Panel(child=self.active_action_table, title=f"Active Actions ({len(self.orch.active_actions)})")
         self.planactive_tabs = Tabs(
             tabs=[self.planner_tab, self.active_tab], height_policy="min"
         )
@@ -2207,6 +2207,8 @@ class BokehOperator:
                 f"{self.orch.globalstatusmodel.loop_state.value}"
             )
             self.orch_status_button.button_type = "danger"
+        self.planner_tab.title = f"Sequence Planner ({len(self.sequence.planned_experiments)})"
+        self.active_tab.title = f"Active Actions ({len(self.orch.active_actions)})"
 
     async def IOloop(self):
         self.IOloop_run = True
