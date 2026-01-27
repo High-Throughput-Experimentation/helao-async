@@ -31,10 +31,6 @@ def ADSS_AL_seq(
     bubble_removal_simple_threshold: float = 0.3,
     bubble_removal_signal_change_threshold: float = 0.01,
     bubble_removal_amplitude_threshold: float = 0.05,
-    # purge wait times
-    purge_wait_initialN2_min: int = 10,
-    purge_wait_N2_to_O2_min: int = 5,
-    purge_wait_O2_to_N2_min: int = 15,
     # electrolyte info
     rinse_with_electrolyte_bf_prefill_volume_uL: float = 3000,
     rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec: float = 30,
@@ -207,46 +203,6 @@ def ADSS_AL_seq(
             run_use="ref",
         )
 
-        # start O2 cycles
-        for i, CV_cycle in enumerate(ref_CV_cycles):
-            epm.add(
-                "ADSS_sub_CV",
-                {
-                    "Vinit_vsRHE": ref_Vinit_vsRHE,
-                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
-                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
-                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
-                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
-                    "SampleRate": ref_CV_samplerate_sec,
-                    "cycles": CV_cycle,
-                    "gamry_i_range": gamry_i_range,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "aliquot_insitu": False,
-                    "bubbler_gas": "O2",
-                    "run_use": "ref",
-                },
-            )
-
-        # switch from O2 to N2 and saturate
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
-        )
-        # need to remove O2 gas sample
-        epm.add("ADSS_sub_unload_gas_only", {})
-        # test need
-        epm.add(
-            "ADSS_sub_PAL_load_gas",
-            {
-                "bubbled_gas": "N2",
-                "reservoir_gas_sample_no": 1,
-            },
-        )
-
         # unload sample
         epm.add("ADSS_sub_unloadall_customs", {})
 
@@ -328,14 +284,7 @@ def ADSS_AL_seq(
 
     washmod = 0
 
-    for lpl, upl, sample_no in zip(LPL_list, UPL_list, plate_sample_no_list):
-        print(
-            "##########################################################\n"
-            + "Current LPL is {} Vrhe\n".format(lpl)
-            + "Current UPL is {} Vrhe\n".format(upl)
-            + "Current Sample is {}\n".format(sample_no)
-            + "##########################################################"
-        )
+    for sample_no in plate_sample_no_list:
 
         if not same_sample:
 
