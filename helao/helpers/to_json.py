@@ -57,6 +57,6 @@ def parse_bokeh_input(v):
     """
     try:
         val = json.loads(v.replace("'", '"'))
-    except ValueError:
+    except Exception:
         val = v
     return fix_numerics(val)
