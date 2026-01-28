@@ -33,10 +33,10 @@ def fix_numerics(val):
             retval = float(stripped)
             return retval
     elif isinstance(val, list):
-        retval = [fix_numerics(x) for x in val]
+        retval = [parse_bokeh_input(x) for x in val]
         return retval
     elif isinstance(val, dict):
-        retval = {k: fix_numerics(v) for k, v in val.items()}
+        retval = {k: parse_bokeh_input(v) for k, v in val.items()}
         return retval
     return val
 
