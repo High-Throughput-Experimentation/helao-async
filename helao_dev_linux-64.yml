@@ -78,6 +78,7 @@ dependencies:
   - sqlalchemy
   - sshtunnel
   - starlette
+  - statsmodels
   - termcolor
   - tqdm
   - uvicorn
