@@ -233,7 +233,7 @@ class XrfsAnalysis(BaseAnalysis):
                 sm.add_constant(X)
                 model = sm.OLS(Y, X, hasconst=True).fit()
                 pred = (
-                    model.get_prediction(counts)
+                    model.get_prediction(count)
                     .summary_frame(alpha=0.05)
                     .rename(
                         {
