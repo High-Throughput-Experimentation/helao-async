@@ -139,6 +139,7 @@ class XrfsAnalysis(BaseAnalysis):
         area = (CM_SCALE[unit] * (diam / 2)) ** 2 * 3.14159
 
         calib_prefix = f"multi-{kv:.0f}-{current:.0f}-{diam_str.strip()}-vacu-"
+        force_latest_calibration = self.analysis_params.get("force_latest_calibration", False)
         calib_path = self.analysis_params.get("calibration_file_path", "")
 
         norm_els = self.analysis_params.get("norm_elements", [])
@@ -181,11 +182,14 @@ class XrfsAnalysis(BaseAnalysis):
                 else f"/mnt/k/experiments/xrfs/user/calibration_libraries/{calib_prefix}*.csv"
             )
             calib_libs = glob(calglob)
-            filtered_libs = [
-                x
-                for x in calib_libs
-                if int(x.split("__")[-1].split("-")[0][2:]) < int(ymd_dir)
-            ]
+            if force_latest_calibration:
+                filtered_libs = [
+                    x
+                    for x in calib_libs
+                    if int(x.split("__")[-1].split("-")[0][2:]) < int(ymd_dir)
+                ]
+            else:
+                filtered_libs = calib_libs
             latest_lib = sorted(
                 filtered_libs, key=lambda x: int(x.split("__")[-1].split("-")[0][2:])
             )[-1]
