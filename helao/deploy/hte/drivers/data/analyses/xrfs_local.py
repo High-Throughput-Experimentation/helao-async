@@ -285,14 +285,14 @@ class XrfsAnalysis(BaseAnalysis):
                     [
                         x
                         for x in transitions
-                        if x.startswith(f"{el}.") and x in caldf.transition_str
+                        if x.startswith(f"{el}.") and x in caldf.transition_str.values
                     ]
                 )
             else:
                 el_trans = [
                     x
                     for x in transitions
-                    if x.startswith(f"{el}.") and x in caldf.transition_str
+                    if x.startswith(f"{el}.") and x in caldf.transition_str.values
                 ]
             norm_nmoles.append(nanomoles[transitions.index(el_trans[-1])])
             norm_trans.append(el_trans[-1])
