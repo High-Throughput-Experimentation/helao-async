@@ -6,9 +6,9 @@ from uuid import UUID
 from datetime import datetime
 from typing import List
 
-from pydantic import BaseModel
 import numpy as np
 import pandas as pd
+import statsmodels.api as sm
 
 from helao.core.version import get_filehash
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput, AnalysisOutput
@@ -138,7 +138,7 @@ class XrfsAnalysis(BaseAnalysis):
 
         area = (CM_SCALE[unit] * (diam / 2)) ** 2 * 3.14159
 
-        calib_prefix = f"{kv:.0f}-{current:.0f}-{diam_str.strip()}-vacu-"
+        calib_prefix = f"multi-{kv:.0f}-{current:.0f}-{diam_str.strip()}-vacu-"
         calib_path = self.analysis_params.get("calibration_file_path", "")
 
         norm_els = self.analysis_params.get("norm_elements", [])
@@ -193,8 +193,10 @@ class XrfsAnalysis(BaseAnalysis):
 
         self.analysis_params["calibration_file_path"] = calib_path
         self.analysis_params["norm_elements"] = norm_els
+        self.analysis_params["calibration_list"] = []
 
-        calibd = pd.read_csv(calib_path).set_index("transition").to_dict("index")
+        # calibd = pd.read_csv(calib_path).set_index("transition").to_dict("index")
+        caldf = pd.read_csv(calib_path)
 
         elements = []
         transitions = []
@@ -207,11 +209,63 @@ class XrfsAnalysis(BaseAnalysis):
             elements.append(trans.split(".")[0])
             transitions.append(trans)
             counts.append(count)
-            if trans in calibd:
-                tdict = calibd[trans]
-                nanomoles.append(count * tdict["nmol.CPS"])
-                nanomoles_2sig.append(count * tdict["relerr_nmol.CPS"])
-                nanomoles_per_cm2.append(count * tdict["nmol.CPS"] / area)
+
+            edf = caldf.query("transition_str==@trans")[
+                [
+                    "serial_no",
+                    "symbol",
+                    "transition_str",
+                    "mean",
+                    "sd",
+                    "median",
+                    "n",
+                    "element_dens",
+                    "atomic_mass",
+                ]
+            ]
+            if edf.shape[0] > 0:
+                Y = edf.element_dens.to_numpy()
+                X = edf["mean"].to_numpy()
+                sm.add_constant(X)
+                model = sm.OLS(Y, X, hasconst=True).fit()
+                pred = (
+                    model.get_prediction(counts)
+                    .summary_frame(alpha=0.05)
+                    .rename(
+                        {
+                            "mean": "ug_per_cm2",
+                            "mean_se": "std_err",
+                            "mean_ci_lower": "ci_95pct_lower",
+                            "mean_ci_upper": "ci_95pct_upper",
+                        },
+                        axis=1,
+                    )
+                    .to_dict(orient="records")[0]
+                )
+                atomic_mass = edf.iloc[0].atomic_mass
+                mole_density = pred["ug_per_cm2"] * 1e-6 / atomic_mass
+                nanomole_density = mole_density * 1e9
+
+                nanomoles_per_cm2.append(nanomole_density)
+                nanomoles.append(nanomole_density * area)
+                nanomoles_2sig.append(pred["std_err"] * 1e-6 / atomic_mass * 1e9 * area)
+
+                calib_list = (
+                    edf.rename(
+                        {
+                            "serial_no": "calib_std_serial_no",
+                            "symbol": "element",
+                            "mean": "counts_mean",
+                            "sd": "counts_stdev",
+                            "n": "num_acq",
+                            "element_dens": "ug_per_cm2",
+                        },
+                        axis=1,
+                    )
+                    .drop("atomic_mass", axis=1)
+                    .to_dict(orient="records")
+                )
+                self.analysis_params["calibration_list"] += calib_list
             else:
                 nanomoles.append(np.nan)
                 nanomoles_2sig.append(np.nan)
@@ -224,11 +278,17 @@ class XrfsAnalysis(BaseAnalysis):
         for el in norm_els:
             if len([x for x in elements if x == el]) > 1:
                 el_trans = sorted(
-                    [x for x in transitions if x.startswith(f"{el}.") and x in calibd]
+                    [
+                        x
+                        for x in transitions
+                        if x.startswith(f"{el}.") and x in caldf.transition_str
+                    ]
                 )
             else:
                 el_trans = [
-                    x for x in transitions if x.startswith(f"{el}.") and x in calibd
+                    x
+                    for x in transitions
+                    if x.startswith(f"{el}.") and x in caldf.transition_str
                 ]
             norm_nmoles.append(nanomoles[transitions.index(el_trans[-1])])
             norm_trans.append(el_trans[-1])
