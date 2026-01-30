@@ -11,12 +11,14 @@ SEQUENCES = __all__
 def XRFS_postseq(
     sequence_version: int = 1,
     sequence_zip_path: str = "",
+    params: dict = {},
 ):
     epm = ExperimentPlanMaker()
     epm.add(
         "XRFS_standards_calibration",
         {
             "sequence_zip_path": sequence_zip_path,
+            "params": params
         },
     )
 
