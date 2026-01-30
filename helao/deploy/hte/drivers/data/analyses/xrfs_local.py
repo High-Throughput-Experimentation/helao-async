@@ -182,7 +182,7 @@ class XrfsAnalysis(BaseAnalysis):
                 else f"/mnt/k/experiments/xrfs/user/calibration_libraries/{calib_prefix}*.csv"
             )
             calib_libs = glob(calglob)
-            if force_latest_calibration:
+            if not force_latest_calibration:
                 filtered_libs = [
                     x
                     for x in calib_libs
