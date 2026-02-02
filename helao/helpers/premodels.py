@@ -354,7 +354,7 @@ class ActionPlanMaker:
         action_name: str,
         action_params: dict,
         start_condition: ActionStartCondition = ActionStartCondition.wait_for_all,
-        to_global_params: dict = {},
+        to_global_params: dict|list = {},
         from_global_act_params: dict = {},
         **kwargs,
     ):
