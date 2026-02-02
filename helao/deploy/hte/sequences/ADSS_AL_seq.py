@@ -156,7 +156,16 @@ def ADSS_AL_seq(
         if not use_current_electrolyte:
             epm.add(
                 "ADSS_sub_refill_syringe",
-                {
+                
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            },
+        )
+
+        # pump recirculate forward
+        epm.add(
+            "ADSS_sub_recirculate",
+            {
+                "direction_forward_or_reverse": "forward",{
                     "syringe": "electrolyte",
                     "fill_volume_ul": liquid_sample_volume_ul,
                     "Syringe_rate_ulsec": 300,
@@ -756,3 +765,166 @@ def ADSS_AL_seq(
     )
 
     return epm.planned_experiments  # returns complete experiment list
+
+
+def ADSS_AL_seq_new(
+    sequence_version: int = 1,
+    solid_plate_id: int = 6307,
+    plate_sample_no_list: list = [],
+    ca_potential_list: list = [0.6, 0.7, 0.8],
+):
+    
+    epm = ExperimentPlanMaker()
+
+    washmod = 1
+    for sample_no in plate_sample_no_list:
+        # phase 0: initial fill on ref -- finishes with filled cell, no samples loaded
+        epm.add(
+            "ADSS_sub_drain_cell",
+            {},
+        )
+        epm.add(
+            "ADSS_sub_unloadall_customs",
+            {}
+        )
+        epm.add(
+            "ADSS_sub_setup_cell",
+            {},
+        )
+
+        # phase 1: reference measurement -- finishes with empty cell, no samples loaded
+        epm.add(
+            "ADSS_sub_reference_setup",
+            {}
+        )
+        epm.add(
+            "ADSS_sub_OCV_bubble_check",
+            {"bubble_check": True, "aliquot_post_ocv": False, "run_use": "ref"},
+        )
+        washmod += 1  # increment washmod after each aliquot
+        
+        ## CLEAN CELL WITH WATER
+        if move_to_clean_and_clean:
+        epm.add("ADSS_sub_move_to_clean_cell", {})
+        for i in range(number_of_cleans):
+            epm.add(
+                "ADSS_sub_clean_cell",
+                {
+                    "Clean_volume_ul": clean_volume_ul,
+                    "ReturnLineWait_s": clean_recirculate_sec,
+                    "DrainWait_s": clean_drain_sec,
+                },
+            )
+            # if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
+            if clean_volume_ul > 10000:
+                volume = 6000 + clean_volume_ul
+            else:
+                volume = clean_volume_ul
+
+            epm.add(
+                "ADSS_sub_refill_syringe",
+                {
+                    "syringe": "waterclean",
+                    "fill_volume_ul": volume,
+                    "Syringe_rate_ulsec": 300,
+                },
+            )
+
+        # FLUSH WITH ELECTROLYTE TO REMOVE CLEANING WATER
+        if rinse_with_electrolyte_bf_prefill:
+            epm.add(
+                "ADSS_sub_cellfill_prefilled_nosampleload",
+                {
+                    "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
+                },
+            )
+            epm.add(
+                "ADSS_sub_recirculate",
+                {
+                    "direction_forward_or_reverse": "forward",
+                    "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+                },
+            )
+            epm.add(
+                "ADSS_sub_drain_cell",
+                {
+                    "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
+                    "ReturnLineReverseWait_s": 5,
+                    #    "ResidualWait_s": ResidualWait_s,
+                },
+            )
+            epm.add(
+                "ADSS_sub_refill_syringe",
+                {
+                    "syringe": "electrolyte",
+                    "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
+                },
+            )
+
+        
+        epm.add(
+            "ADSS_sub_drain_cell",
+            {},
+        )
+        epm.add(
+            "ADSS_sub_unloadall_customs",
+            {}
+        )
+
+        # phase 2: sample measurement
+        epm.add(
+            "ADSS_sub_load_assembly",
+            {}
+        )
+
+        epm.add(
+            "ADSS_sub_recirculate_alternating",
+            {"forward_time_s": 30.0, "reverse_time_s": 15.0},
+        )
+        epm.add(
+            "ADSS_sub_OCV_bubble_check",
+            {"bubble_check": True, "aliquot_post_ocv": False, "run_use": "data"},
+        )
+
+        for ca_potential in ca_potential_list:
+            epm.add(
+                "ADSS_sub_CA",
+                {
+                    "CA_potential": ca_potential,
+                    "washmod_in": washmod,
+                    "aliquot_post": True,
+                },
+            )
+            washmod += 1
+
+
+        # phase 3: reference measurement -- finishes with empty cell, no samples loaded
+        epm.add(
+            "ADSS_sub_drain_cell",
+            {},
+        )
+        epm.add(
+            "ADSS_sub_unloadall_customs",
+            {}
+        )
+        epm.add(
+            "ADSS_sub_setup_cell",
+            {},
+        )
+        epm.add(
+            "ADSS_sub_reference_setup",
+            {}
+        )
+        epm.add(
+            "ADSS_sub_OCV_bubble_check",
+            {"bubble_check": True, "aliquot_post_ocv": False, "run_use": "ref"},
+        )
+        epm.add(
+            "ADSS_sub_OCV_bubble_check",
+            {"bubble_check": True, "aliquot_post_ocv": False, "run_use": "ref"},
+        )
+        washmod += 1  # increment washmod after each aliquot
+    
+    return epm.planned_experiments
