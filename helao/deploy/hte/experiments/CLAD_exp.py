@@ -102,7 +102,7 @@ def CLAD_sub_load_sample(
     liquid_volume_ul: Optional[float] = None,
     gas_sample_no: Optional[int] = None,
     gas_volume_ml: Optional[float] = None,
-    bubbled_gas: Optional[str] = None,
+    bubbler_gas: Optional[str] = None,
 ):
     apm = ActionPlanMaker()
 
@@ -477,7 +477,7 @@ def CLAD_sub_load_assembly(
     fill_rate_ul_s: float = 300.0,
     gas_sample_no: int = 2,
     gas_volume_ml: float = 1.0,
-    bubbled_gas: str = "O2",
+    bubbler_gas: str = "O2",
 ):
     """Registers solid, liquid, and gas into load_position, then moves to solid, seals, and fills liquid.
 
@@ -492,7 +492,7 @@ def CLAD_sub_load_assembly(
         fill_rate_ul_s (float, optional): _description_. Defaults to 300.0.
         gas_sample_no (int, optional): _description_. Defaults to 2.
         gas_volume_ml (float, optional): _description_. Defaults to 1.0.
-        bubbled_gas (str, optional): _description_. Defaults to "O2".
+        bubbler_gas (str, optional): _description_. Defaults to "O2".
 
     Returns:
         _type_: _description_
@@ -563,7 +563,7 @@ def CLAD_sub_load_assembly(
             liquid_volume_ul=fill_volume_ul,
             gas_sample_no=gas_sample_no,
             gas_volume_ml=gas_volume_ml,
-            bubbled_gas=bubbled_gas,
+            bubbler_gas=bubbler_gas,
         )
     )
 
