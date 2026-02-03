@@ -4,6 +4,8 @@ from datetime import datetime
 from helao.core.models.analysis import (
     AnalysisOutputModel,
     AnalysisModel,
+    AnalysisInput,
+    AnalysisOutput,
 )
 from helao.core.models.s3locator import S3Locator
 from helao.core.models.run_use import RunUse
@@ -46,8 +48,11 @@ class BaseAnalysis:
     analysis_codehash: str
     analysis_codepath: str
     analysis_classname: str
+    analysis_action_uuid: Optional[UUID] = None
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
+    inputs: AnalysisInput
+    outputs: AnalysisOutput
 
     def gen_uuid(self, global_sample_label: Optional[str] = None):
         """
