@@ -609,6 +609,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         sequence_zip_path: str = "",
         params: dict = {},
         analysis_action_uuid: Optional[UUID] = None,
+    ):
         """
         Asynchronously calculates XRF (X-Ray Fluorescence) calibration analysis for a batch of processes
         from a local sequence zip file.
