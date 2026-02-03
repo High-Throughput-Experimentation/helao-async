@@ -2746,7 +2746,7 @@ def ADSS_sub_remove_bubble(
     amplitude_threshold: float = 0.05,
     bubble_pump_reverse_time_s: float = 15,
     bubble_pump_forward_time_s: float = 10,
-    run_use: RunUse = "data",
+    run_use: RunUse = RunUse.data,
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})

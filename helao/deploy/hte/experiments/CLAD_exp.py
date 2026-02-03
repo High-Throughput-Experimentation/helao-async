@@ -1,10 +1,14 @@
-"""
-Experiment library for ADSS
-server_key must be a FastAPI action server defined in config
+""" Experiment library for Closed Loop Accelerated Durability (CLAD)
 """
 
 __all__ = [
-    "ADSS_sub_clean_cell",
+    "CLAD_sub_recirculate_alternating",
+    "CLAD_sub_load_sample",
+    "CLAD_sub_fill_cell",
+    "CLAD_sub_setup_cell",
+    "CLAD_sub_reference_setup",
+    "CLAD_sub_OCV_bubble_check",
+    "CLAD_sub_load_assembly",
 ]
 
 
@@ -26,11 +30,8 @@ from helao.deploy.hte.drivers.robot.pal_driver import Spacingmethod, PALtools
 
 from .ADSS_exp import (
     ADSS_sub_drain_cell,
-    ADSS_sub_recirculate,
     ADSS_sub_refill_syringe,
     ADSS_sub_OCV,
-    ADSS_sub_CA,
-    ADSS_sub_move_to_sample,
 )
 
 from helao.core.models.run_use import RunUse
@@ -60,12 +61,12 @@ debug_save_data = True
 ### CONSOLIDATED EXPERIMENTS FOR SIMPLIFIED SEQUENCES
 
 
-def ADSS_sub_recirculate_alternating(
+def CLAD_sub_recirculate_alternating(
     experiment: Experiment,
     experiment_version: int = 1,
-    forward_time_s: float = 30.0,
-    reverse_time_s: float = 15.0,
-    final_time_s: float = 5.0,
+    forward_duration_s: float = 30.0,
+    reverse_duration_s: float = 15.0,
+    final_duration_s: float = 5.0,
 ):
     apm = ActionPlanMaker()
 
@@ -73,24 +74,24 @@ def ADSS_sub_recirculate_alternating(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": forward_time_s})
+    apm.add(ORCH_server, "wait", {"waittime": forward_duration_s})
 
     # RECIRCULATE REVERSE
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": reverse_time_s})
+    apm.add(ORCH_server, "wait", {"waittime": reverse_duration_s})
 
     # RECIRCULATE FORWARD FINAL
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": final_time_s})
+    apm.add(ORCH_server, "wait", {"waittime": final_duration_s})
 
     return apm.planned_actions
 
 
-def ADSS_sub_load_sample(
+def CLAD_sub_load_sample(
     experiment: Experiment,
     experiment_version: int = 1,
     load_position: str = "cell1_we",
@@ -169,7 +170,7 @@ def ADSS_sub_load_sample(
     return apm.planned_actions
 
 
-def ADSS_sub_fill_cell(
+def CLAD_sub_fill_cell(
     experiment: Experiment,
     experiment_version: int = 1,
     fill_volume_ul: float = 3000,
@@ -217,13 +218,13 @@ def ADSS_sub_fill_cell(
 
 
 # 1. CLEAN CELL
-def ADSS_sub_setup_cell(
+def CLAD_sub_setup_cell(
     experiment: Experiment,
     experiment_version: int = 1,
-    rinse_recirc_time_s: float = 30.0,
+    rinse_recirc_duration_s: float = 30.0,
     rinse_volume_ul: float = 3000.0,
     fill_rate_ul_s: float = 300.0,
-    drain_wait_time_s: float = 30.0,
+    drain_wait_duration_s: float = 30.0,
 ):
     apm = ActionPlanMaker()
 
@@ -249,7 +250,7 @@ def ADSS_sub_setup_cell(
 
     # FILL CELL WITHOUT SAMPLE LOAD
     apm.add_actions(
-        ADSS_sub_fill_cell(
+        CLAD_sub_fill_cell(
             experiment=experiment,
             fill_volume_ul=rinse_volume_ul,
             fill_rate_ul_s=fill_rate_ul_s,
@@ -261,13 +262,13 @@ def ADSS_sub_setup_cell(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": rinse_recirc_time_s})
+    apm.add(ORCH_server, "wait", {"waittime": rinse_recirc_duration_s})
 
     # DRAIN CELL
     apm.add_actions(
         ADSS_sub_drain_cell(
             experiment=experiment,
-            DrainWait_s=drain_wait_time_s,
+            DrainWait_s=drain_wait_duration_s,
             ReturnLineReverseWait_s=5.0,
         )
     )
@@ -290,7 +291,7 @@ def ADSS_sub_setup_cell(
 
 
 # 2. REFERENCE MEASUREMENT
-def ADSS_sub_reference_setup(
+def CLAD_sub_reference_setup(
     experiment: Experiment,
     experiment_version: int = 1,
     reference_position_name: str = "builtin_ref_motorxy_2",
@@ -299,12 +300,12 @@ def ADSS_sub_reference_setup(
     liquid_sample_no: int = 1053,
     fill_volume_ul: float = 7000.0,
     fill_rate_ul_s: float = 300.0,
-    fill_recirc_fwd_time_s: float = 30.0,
-    fill_recirc_rev_time_s: float = 15.0,
+    fill_recirc_fwd_duration_s: float = 30.0,
+    fill_recirc_rev_duration_s: float = 15.0,
     electrolyte_ph: float = 1.0,
     reference_offset_V: float = 0.0,
     ocv_duration_s: float = 30.0,
-    ocv_samplerate_s: float = 0.1,
+    ocv_sample_rate_s: float = 0.1,
     gamry_i_range: str = "auto",
 ):
     apm = ActionPlanMaker()
@@ -369,7 +370,7 @@ def ADSS_sub_reference_setup(
 
     # FILL CELL WITH LIQUID
     apm.add_actions(
-        ADSS_sub_fill_cell(
+        CLAD_sub_fill_cell(
             experiment=experiment,
             fill_volume_ul=fill_volume_ul,
             fill_rate_ul_s=fill_rate_ul_s,
@@ -382,11 +383,11 @@ def ADSS_sub_reference_setup(
 
     # RECIRCULATE
     apm.add_actions(
-        ADSS_sub_recirculate_alternating(
+        CLAD_sub_recirculate_alternating(
             experiment=experiment,
-            forward_time_s=fill_recirc_fwd_time_s,
-            reverse_time_s=fill_recirc_rev_time_s,
-            final_time_s=5.0,
+            forward_duration_s=fill_recirc_fwd_duration_s,
+            reverse_duration_s=fill_recirc_rev_duration_s,
+            final_duration_s=5.0,
         )
     )
 
@@ -403,11 +404,11 @@ def ADSS_sub_reference_setup(
     return apm.planned_actions
 
 
-def ADSS_sub_OCV_bubble_check(
+def CLAD_sub_OCV_bubble_check(
     experiment: Experiment,
     experiment_version: int = 1,
     ocv_duration_s: float = 30.0,
-    ocv_samplerate_s: float = 0.1,
+    ocv_sample_rate_s: float = 0.1,
     electrolyte_ph: float = 1.0,
     reference_offset_V: float = 0.0,
     gamry_i_range: str = "auto",
@@ -425,7 +426,7 @@ def ADSS_sub_OCV_bubble_check(
                 experiment_version=experiment_version,
                 check_bubble=True,
                 Tval__s=10,
-                samplerate_sec=ocv_samplerate_s,
+                samplerate_sec=ocv_sample_rate_s,
                 gamry_i_range=gamry_i_range,
                 ph=electrolyte_ph,
                 ref_type="leakless",
@@ -449,7 +450,7 @@ def ADSS_sub_OCV_bubble_check(
             experiment_version=experiment_version,
             check_bubble=False,
             Tval__s=ocv_duration_s,
-            samplerate_sec=ocv_samplerate_s,
+            samplerate_sec=ocv_sample_rate_s,
             gamry_i_range=gamry_i_range,
             ph=electrolyte_ph,
             ref_type="leakless",
@@ -465,7 +466,7 @@ def ADSS_sub_OCV_bubble_check(
 
 
 # 3. SETUP SAMPLE
-def ADSS_sub_load_assembly(
+def CLAD_sub_load_assembly(
     experiment: Experiment,
     experiment_version: int = 1,
     load_position: str = "cell1_we",
@@ -552,7 +553,7 @@ def ADSS_sub_load_assembly(
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
 
     apm.add_actions(
-        ADSS_sub_load_sample(
+        CLAD_sub_load_sample(
             experiment=experiment,
             load_position=load_position,
             clear_position=False,
@@ -567,7 +568,7 @@ def ADSS_sub_load_assembly(
     )
 
     apm.add_actions(
-        ADSS_sub_fill_cell(
+        CLAD_sub_fill_cell(
             experiment=experiment,
             fill_volume_ul=fill_volume_ul,
             fill_rate_ul_s=fill_rate_ul_s,
