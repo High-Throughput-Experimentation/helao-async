@@ -182,7 +182,9 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                 pass
 
     async def enqueue_calc(
-        self, calc_tup: Tuple[UUID, pd.DataFrame, dict, str], rank: int = 5
+        self,
+        calc_tup: Tuple[UUID, pd.DataFrame, dict, BaseAnalysis, Optional[UUID]],
+        rank: int = 5,
     ):
         """
         Adds a calculation task to the queue with a specified priority.
@@ -239,7 +241,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
 
     async def sync_ana(
         self,
-        calc_tup: Tuple[UUID, pd.DataFrame, dict, str],
+        calc_tup: Tuple[UUID, pd.DataFrame, dict, BaseAnalysis, UUID],
         retries: int = 3,
         rank: int = 5,
     ):
@@ -259,7 +261,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         Returns:
             bool: True if the synchronization was successful, False otherwise.
         """
-        process_uuid, process_df, analysis_params, ana_func = calc_tup
+        process_uuid, process_df, analysis_params, ana_func, action_uuid = calc_tup
         # LOGGER.info(f"performing analysis {analysis_name}")
         # LOGGER.info(f"using params {analysis_params}")
         if analysis_params is None:
@@ -274,6 +276,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                 region=self.region,
                 dummy=self.world_config.get("dummy", True),
             )
+            model_dict["analysis_action_uuid"] = action_uuid
             process_dict = pgs3.LOADER.get_prc(process_uuid, hmod=False)
             for pkey in ["data_request_id", "campaign_uuid", "campaign_name", "run_id"]:
                 if process_dict.get(pkey, None) is not None:
@@ -443,6 +446,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         sequence_uuid: Optional[UUID] = None,
         params: dict = {},
         recent: bool = True,
+        analysis_action_uuid: Optional[UUID] = None,
     ):
         """
         Asynchronously calculates ECHEUVIS analysis for a batch of processes.
@@ -496,6 +500,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     pdf,
                     params,
                     EcheUvisAnalysis,
+                    analysis_action_uuid,
                 )
             )
 
@@ -505,6 +510,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         sequence_uuid: Optional[UUID] = None,
         params: dict = {},
         recent: bool = True,
+        analysis_action_uuid: Optional[UUID] = None,
     ):
         """
         Asynchronously calculates dry UV-Vis analysis for a batch of data.
@@ -563,6 +569,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     pdf,
                     params,
                     DryUvisAnalysis,
+                    analysis_action_uuid,
                 )
             )
 
@@ -570,6 +577,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self,
         sequence_zip_path: str = "",
         params: dict = {},
+        analysis_action_uuid: Optional[UUID] = None,
     ):
         """
         Asynchronously calculates ICP-MS (Inductively Coupled Plasma Mass Spectrometry) analysis for a batch of processes
@@ -592,6 +600,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     local_loader,
                     params,
                     IcpmsAnalysis,
+                    analysis_action_uuid,
                 )
             )
 
@@ -599,7 +608,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self,
         sequence_zip_path: str = "",
         params: dict = {},
-    ):
+        analysis_action_uuid: Optional[UUID] = None,
         """
         Asynchronously calculates XRF (X-Ray Fluorescence) calibration analysis for a batch of processes
         from a local sequence zip file.
@@ -621,6 +630,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                     local_loader,
                     params,
                     XrfsAnalysis,
+                    analysis_action_uuid,
                 )
             )
 
@@ -684,6 +694,7 @@ class LocalAnalysisExecutor(Executor):
                         self.loader,
                         self.action_params.get("params", {}),
                         self.analysis_class,
+                        self.active.action.action_uuid,
                     )
                 )
             LOGGER.info("Enqueued all calculations in LocalAnalysisExecutor.")

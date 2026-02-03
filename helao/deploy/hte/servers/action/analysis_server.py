@@ -101,6 +101,7 @@ def makeApp(server_key):
             sequence_uuid=UUID(active.action.action_params["sequence_uuid"]),
             params=active.action.action_params["params"],
             recent=active.action.action_params["recent"],
+            analysis_action_uuid=active.action.action_uuid,
         )
         finished_action = await active.finish()
         return finished_action.as_dict()

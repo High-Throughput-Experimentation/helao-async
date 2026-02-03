@@ -58,6 +58,7 @@ class AnalysisModel(ShortAnalysisModel):
     analysis_codehash: Optional[str] = None
     analysis_codepath: Optional[str] = None
     analysis_classname: Optional[str] = None
+    analysis_action_uuid: Optional[UUID] = None
     global_sample_label: Optional[str] = None
     process_uuid: Optional[UUID] = None
     process_params: Optional[dict] = None
