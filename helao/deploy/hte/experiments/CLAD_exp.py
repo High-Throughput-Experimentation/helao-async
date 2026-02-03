@@ -12,7 +12,7 @@ __all__ = [
 ]
 
 
-from typing import Optional, List
+from typing import Optional
 from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
@@ -20,13 +20,11 @@ from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.sample import SolidSample, LiquidSample, GasSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
-from helao.helpers.ref_electrode import REF_TABLE
 
 from helao.deploy.hte.drivers.motion.galil_motion_driver import (
     MoveModes,
     TransformationModes,
 )
-from helao.deploy.hte.drivers.robot.pal_driver import Spacingmethod, PALtools
 
 from .ADSS_exp import (
     ADSS_sub_drain_cell,
@@ -578,6 +576,3 @@ def CLAD_sub_load_assembly(
 
     return apm.planned_actions
 
-
-# 4. OCV MEASUREMENT
-# 5. CA MEASUREMENT
