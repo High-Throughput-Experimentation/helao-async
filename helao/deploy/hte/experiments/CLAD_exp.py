@@ -26,7 +26,7 @@ from helao.deploy.hte.drivers.motion.galil_motion_driver import (
     TransformationModes,
 )
 
-from helao.deploy.hte.experiments.ADSS_exp import (
+from helao.deploy.hte.experiments.ADSS_xtraclean_exp import (
     ADSS_sub_drain_cell,
     ADSS_sub_refill_syringe,
     ADSS_sub_OCV,
