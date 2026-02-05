@@ -382,7 +382,10 @@ class HelaoYml:
         Returns:
             datetime: A datetime object representing the extracted timestamp.
         """
-        ts = datetime.strptime(self.target.stem.split("-")[0], "%y%m%d.%H%M%S%f")
+        try:
+            ts = datetime.strptime(self.target.stem.split("-")[0], "%y%m%d.%H%M%S%f")
+        except ValueError:
+            ts = datetime.strptime(self.target.stem.split("-")[0], "%Y%m%d.%H%M%S%f")
         return ts
 
     @property
