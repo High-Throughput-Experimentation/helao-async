@@ -276,7 +276,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                 region=self.region,
                 dummy=self.world_config.get("dummy", True),
             )
-            model_dict["analysis_action_uuid"] = action_uuid
+            model_dict["analysis_action_uuid"] = str(action_uuid)
             process_dict = pgs3.LOADER.get_prc(process_uuid, hmod=False)
             for pkey in ["data_request_id", "campaign_uuid", "campaign_name", "run_id"]:
                 if process_dict.get(pkey, None) is not None:
