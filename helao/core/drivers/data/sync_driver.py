@@ -2100,7 +2100,7 @@ class HelaoSyncer:
                 self.reset_sync(
                     os.path.dirname(pp).replace("RUNS_FINISHED", "RUNS_SYNCED")
                 )
-            await self.enqueue_yml(pp)
+            await self.enqueue_yml(pp, rank)
 
         if actions_first:
             pending_acts = self.list_pending_acts(omit_manual_exps)
