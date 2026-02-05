@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from datetime import datetime
 
@@ -36,6 +37,7 @@ def setup_logger(log_name, log_folder, level) -> logging.Logger:
     )
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(stream_formatter)
+    stream_handler.terminator = "\r\n" if sys.platform == "win32" else "\n"
 
     l.setLevel(level)
     l.addHandler(file_handler)
