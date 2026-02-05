@@ -48,6 +48,7 @@ class HTEPlateAPI:
             resp = httpx.get(
                 f"{self.loader.hcred.PLATE_API}/live/plate/id/{plateid}",
                 headers=headers,
+                timeout=30
             )
             return resp.json()
         except Exception:
@@ -141,6 +142,7 @@ class HTEPlateAPI:
             resp = httpx.get(
                 f"{self.loader.hcred.PLATE_API}/live/pvd_print/id/{print_id}",
                 headers=headers,
+                timeout=30,
             )
             return resp.json()
         except Exception:
