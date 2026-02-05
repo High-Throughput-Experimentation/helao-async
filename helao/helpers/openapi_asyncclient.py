@@ -172,14 +172,14 @@ class OpenAPIClient:
                             try:
                                 if current_http_method == "get":
                                     async with httpx.AsyncClient(
-                                        headers=self_instance.headers
+                                        headers=self_instance.headers, timeout=30
                                     ) as client:
                                         response = await client.get(
                                             full_url, params=quoted_query_params
                                         )
                                 elif current_http_method == "post":
                                     async with httpx.AsyncClient(
-                                        headers=self_instance.headers
+                                        headers=self_instance.headers, timeout=30
                                     ) as client:
                                         response = await client.post(
                                             full_url,
