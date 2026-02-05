@@ -1004,7 +1004,7 @@ class HelaoSyncer:
                 self.config_dict["aws_config_path"] = os.environ["AWS_CONFIG_PATH"]
                 self.config_dict["aws_profile"] = aws_profile
                 LOGGER.debug(self.config_dict)
-        
+
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 1)
         # to load this driver on orch, we check the default "DB" key or take a manually-specified key
@@ -1018,7 +1018,7 @@ class HelaoSyncer:
         if "aws_config_path" in self.config_dict:
             os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
             self.aws_session = boto3.Session(
-                aws_access_key_id= self.config_dict["aws_access_key_id"],
+                aws_access_key_id=self.config_dict["aws_access_key_id"],
                 aws_secret_access_key=self.config_dict["aws_secret_access_key"],
                 region_name=self.config_dict["region"],
             )
@@ -2075,7 +2075,9 @@ class HelaoSyncer:
         LOGGER.info(f"Found {len(pending)} pending experiments in RUNS_FINISHED.")
         return pending
 
-    async def finish_pending(self, omit_manual_exps: bool = True, actions_first: bool = False):
+    async def finish_pending(
+        self, omit_manual_exps: bool = True, actions_first: bool = False
+    ):
         """
         Processes and enqueues pending sequences from the RUNS_FINISHED directory.
 
@@ -2090,7 +2092,8 @@ class HelaoSyncer:
         Returns:
             list: A list of pending sequences that were processed and enqueued.
         """
-        async def reset_and_queue(pp, rank: int = 5)
+
+        async def reset_and_queue(pp, rank: int = 5):
             if os.path.exists(
                 pp.replace("RUNS_FINISHED", "RUNS_SYNCED").replace(".yml", ".progress")
             ):
@@ -2106,11 +2109,13 @@ class HelaoSyncer:
                 await reset_and_queue(pp, rank=1)
 
             pending_exps = self.list_pending_exps(omit_manual_exps)
-            LOGGER.info(f"Enqueueing {len(pending_exps)} experiments from RUNS_FINISHED.")
+            LOGGER.info(
+                f"Enqueueing {len(pending_exps)} experiments from RUNS_FINISHED."
+            )
             for pp in pending_exps:
                 await reset_and_queue(pp, rank=2)
 
-        pending_seqs= self.list_pending(omit_manual_exps)
+        pending_seqs = self.list_pending(omit_manual_exps)
         LOGGER.info(f"Enqueueing {len(pending_seqs)} sequences from RUNS_FINISHED.")
 
         for pp in pending_seqs:
