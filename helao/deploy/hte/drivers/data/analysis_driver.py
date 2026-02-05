@@ -118,7 +118,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self.world_config = action_serv.world_cfg
         self.config_dict["env_file"] = self.world_config["helao_credentials_path"]
         self.local_ana_root = os.path.join(self.world_config["root"], "ANALYSES")
-        self.max_tasks = self.config_dict.get("max_tasks", 4)
+        self.max_tasks = self.config_dict.get("max_tasks", 1)
         # declare global loader for analysis models used by driver.batch_* methods
         self.get_loader()
         # self.api_host = self.config_dict["api_host"]
