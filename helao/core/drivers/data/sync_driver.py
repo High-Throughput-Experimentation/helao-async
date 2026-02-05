@@ -1006,7 +1006,7 @@ class HelaoSyncer:
                 LOGGER.debug(self.config_dict)
         
         self.world_config = action_serv.world_cfg
-        self.max_tasks = self.config_dict.get("max_tasks", 8)
+        self.max_tasks = self.config_dict.get("max_tasks", 1)
         # to load this driver on orch, we check the default "DB" key or take a manually-specified key
         if (
             not self.config_dict.get("aws_config_path", False)
@@ -1365,7 +1365,7 @@ class HelaoSyncer:
                     ):
                         await self.enqueue_yml(
                             child.target,
-                            rank - (1 if prog.yml.type == "experiment" else 2),
+                            # rank - (1 if prog.yml.type == "experiment" else 2),
                         )
                         LOGGER.info(str(child.target))
                 # self.base.print_message(
