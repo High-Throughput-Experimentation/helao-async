@@ -46,7 +46,10 @@ def parse_seq_path(ymlp, target):
         if sum([int(x) for x in plate_str]) % 10 == int(checksum):
             plate_id = int(plate_str)
             seq_lab = seq_lab.split("-")[0]
-    timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
+    try:
+        timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
+    except ValueError:
+        timestamp = datetime.strptime(yml_file.split("-")[0], "%Y%m%d.%H%M%S%f")
     return timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp
 
 
@@ -57,7 +60,10 @@ def parse_exp_path(ymlp):
         yml_dir = os.path.basename(ymlp)
     _, exp_name = yml_dir.split("__")
     yml_file = os.path.basename(ymlp)
-    timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
+    try:
+        timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
+    except ValueError:
+        timestamp = datetime.strptime(yml_file.split("-")[0], "%Y%m%d.%H%M%S%f")
     return timestamp, exp_name, yml_dir, ymlp
 
 
@@ -74,7 +80,10 @@ def parse_act_path(ymlp):
     else:
         raise ValueError(f"could not parse action path parts: {path_parts}")
     yml_file = os.path.basename(ymlp)
-    timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
+    try:
+        timestamp = datetime.strptime(yml_file.split("-")[0], "%y%m%d.%H%M%S%f")
+    except ValueError:
+        timestamp = datetime.strptime(yml_file.split("-")[0], "%Y%m%d.%H%M%S%f")
     return timestamp, act_order, act_split, server_name, act_name, yml_dir, ymlp
 
 
@@ -85,7 +94,10 @@ def parse_prc_path(ymlp):
     idx, prc_uuid, techname = yml_file.replace("-prc.yml", "").split("__")
     prc_uuid = UUID(prc_uuid)
     prc_idx = int(idx)
-    exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%y%m%d.%H%M%S%f")
+    try:
+        exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%y%m%d.%H%M%S%f")
+    except ValueError:
+        exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%Y%m%d.%H%M%S%f")
     return prc_idx, prc_uuid, techname, yml_dir, ymlp, exp_timestamp, exp_name
 
 
