@@ -1365,7 +1365,7 @@ class HelaoSyncer:
                     ):
                         await self.enqueue_yml(
                             child.target,
-                            # rank - (1 if prog.yml.type == "experiment" else 2),
+                            rank - (1 if prog.yml.type == "experiment" else 2),
                         )
                         LOGGER.info(str(child.target))
                 # self.base.print_message(
