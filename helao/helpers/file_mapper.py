@@ -160,7 +160,7 @@ class FileMapper:
         if lp is None:
             raise FileNotFoundError
         else:
-            print(lp)
+            # print(lp)
             return dict(yml_load(Path(lp)))
 
     def read_lines(self, p: str):
