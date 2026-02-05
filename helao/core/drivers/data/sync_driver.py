@@ -2090,15 +2090,7 @@ class HelaoSyncer:
         Returns:
             list: A list of pending sequences that were processed and enqueued.
         """
-        pending = []
-        if actions_first:
-            pending += self.list_pending_acts(omit_manual_exps)
-            LOGGER.info(f"Enqueueing {len(pending)} actions from RUNS_FINISHED.")
-            pending += self.list_pending_exps(omit_manual_exps)
-            LOGGER.info(f"Enqueueing {len(pending)} experiments from RUNS_FINISHED.")
-        pending += self.list_pending(omit_manual_exps)
-        LOGGER.info(f"Enqueueing {len(pending)} sequences from RUNS_FINISHED.")
-        for pp in pending:
+        async def reset_and_queue(pp, rank: int = 5)
             if os.path.exists(
                 pp.replace("RUNS_FINISHED", "RUNS_SYNCED").replace(".yml", ".progress")
             ):
@@ -2106,7 +2098,25 @@ class HelaoSyncer:
                     os.path.dirname(pp).replace("RUNS_FINISHED", "RUNS_SYNCED")
                 )
             await self.enqueue_yml(pp)
-        return pending
+
+        if actions_first:
+            pending_acts = self.list_pending_acts(omit_manual_exps)
+            LOGGER.info(f"Enqueueing {len(pending_acts)} actions from RUNS_FINISHED.")
+            for pp in pending_acts:
+                await reset_and_queue(pp, rank=1)
+
+            pending_exps = self.list_pending_exps(omit_manual_exps)
+            LOGGER.info(f"Enqueueing {len(pending_exps)} experiments from RUNS_FINISHED.")
+            for pp in pending_exps:
+                await reset_and_queue(pp, rank=2)
+
+        pending_seqs= self.list_pending(omit_manual_exps)
+        LOGGER.info(f"Enqueueing {len(pending_seqs)} sequences from RUNS_FINISHED.")
+
+        for pp in pending_seqs:
+            await reset_and_queue(pp)
+
+        return pending_seqs
 
     def reset_sync(self, sync_path: str):
         """
