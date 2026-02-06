@@ -797,9 +797,9 @@ def makeApp(server_key):
 
     @app.post("/gamry_is_open", tags=["private"])
     def gamry_is_open():
-        """Return pstat.()."""
+        """Return pstat.TestIsOpen()"""
         state = app.driver.pstat.TestIsOpen()
         # state = dict([x.split("\t") for x in state.split("\r\n") if x])
-        return state.strip() == "true"
+        return state
 
     return app
