@@ -28,6 +28,7 @@ from helao.core.drivers.helao_driver import (
     DriverResponse,
     DriverStatus,
     DriverResponseType,
+    DriverPoller,
 )
 
 from .device import GamryPstat, GAMRY_DEVICES, TTL_OUTPUTS, TTL_OFF
@@ -555,3 +556,23 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
         return response
+
+
+class GamryPoller(DriverPoller):
+    driver: GamryDriver
+    
+    def get_data(self):
+        try:
+            if self.driver.pstat.TestIsOpen():
+                poll_data = {
+                    "epoch_time": time.time(),
+                    "Ewe_V": self.driver.pstat.MeasureV(),
+                    "I_A": self.driver.pstat.MeasureI(),
+                }
+                poll_data.update(self.driver.get_status().data)
+            else:
+                poll_data = {}
+        except Exception:
+            LOGGER.error("polling error", exc_info=True)
+            poll_data = {}
+        return poll_data
