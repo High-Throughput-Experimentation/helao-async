@@ -567,7 +567,6 @@ class GamryPoller(DriverPoller):
         try:
             if self.driver.pstat.TestIsOpen():
                 poll_data = {
-                    "epoch_time": time.time(),
                     "Ewe_V": self.driver.pstat.MeasureV(),
                     "I_A": self.driver.pstat.MeasureI(),
                     "Aux_V": self.driver.pstat.MeasureA(),
