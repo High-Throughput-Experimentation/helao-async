@@ -759,7 +759,7 @@ def makeApp(server_key):
         description="Gamry instrument/action server",
         version=4.0,
         driver_classes=[GamryDriver],
-        poller_class=GamryPoller,
+        # poller_class=GamryPoller,
         dyn_endpoints=gamry_dyn_endpoints,
     )
 
