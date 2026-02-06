@@ -561,6 +561,8 @@ class GamryDriver(HelaoDriver):
 
 
 class GamryPoller(DriverPoller):
+    """ Note: this poller conflicts with running techniques. 
+    """
     driver: GamryDriver
 
     def get_data(self):
