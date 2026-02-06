@@ -475,7 +475,9 @@ class GamryDriver(HelaoDriver):
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
-            LOGGER.warning("kill_gamrycom failed, likely already exited", exc_info=False)
+            LOGGER.warning(
+                "kill_gamrycom failed, likely already exited", exc_info=False
+            )
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.ok
             )
@@ -560,7 +562,7 @@ class GamryDriver(HelaoDriver):
 
 class GamryPoller(DriverPoller):
     driver: GamryDriver
-    
+
     def get_data(self):
         try:
             if self.driver.pstat.TestIsOpen():
@@ -568,11 +570,24 @@ class GamryPoller(DriverPoller):
                     "epoch_time": time.time(),
                     "Ewe_V": self.driver.pstat.MeasureV(),
                     "I_A": self.driver.pstat.MeasureI(),
+                    "Aux_V": self.driver.pstat.MeasureA(),
                 }
                 poll_data.update(self.driver.get_status().data)
+                resp = DriverResponse(
+                    response=DriverResponseType.success,
+                    status=DriverStatus.ok,
+                    data=poll_data,
+                )
             else:
-                poll_data = {}
+                resp = DriverResponse(
+                    response=DriverResponseType.success,
+                    status=DriverStatus.uninitialized,
+                    data={},
+                )
         except Exception:
             LOGGER.error("polling error", exc_info=True)
-            poll_data = {}
-        return poll_data
+            resp = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+
+        return resp
