@@ -795,4 +795,11 @@ def makeApp(server_key):
         state = dict([x.split("\t") for x in state.split("\r\n") if x])
         return state
 
+    @app.post("/gamry_is_open", tags=["private"])
+    def gamry_is_open():
+        """Return pstat.()."""
+        state = app.driver.pstat.TestIsOpen()
+        # state = dict([x.split("\t") for x in state.split("\r\n") if x])
+        return state
+
     return app
