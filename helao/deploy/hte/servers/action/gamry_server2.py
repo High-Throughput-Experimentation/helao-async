@@ -800,6 +800,6 @@ def makeApp(server_key):
         """Return pstat.()."""
         state = app.driver.pstat.TestIsOpen()
         # state = dict([x.split("\t") for x in state.split("\r\n") if x])
-        return state
+        return state.strip() == "true"
 
     return app
