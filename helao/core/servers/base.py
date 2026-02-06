@@ -1144,7 +1144,7 @@ class Base:
 
                 for combo_key in self.status_clients.copy():
                     client_servkey, client_host, client_port = combo_key
-                    LOGGER.info(
+                    LOGGER.debug(
                         f"log_status_task trying to send status to {client_servkey}."
                     )
                     success = False
@@ -1172,7 +1172,7 @@ class Base:
                 self.actionservermodel.endpoints[
                     status_msg.action_name
                 ].clear_finished()
-                LOGGER.info("all log_status_task messages send.")
+                LOGGER.debug("all log_status_task messages sent.")
 
                 active_nonqueued = {
                     endpoint: [
@@ -2390,7 +2390,7 @@ class Active:
         # else we need to add it now because the header is now written
         # before data can be added to the file
         if self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns is None:
-            LOGGER.info("realtime_ns was not set, adding it now.")
+            LOGGER.debug("realtime_ns was not set, adding it now.")
             self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = (
                 self.get_realtime_nowait()
             )
@@ -2424,7 +2424,7 @@ class Active:
         )
 
         if header:
-            LOGGER.info("adding header to new file")
+            LOGGER.debug("adding header to new file")
             if not header.endswith("\n"):
                 header += "\n"
             await self.file_conn_dict[file_conn_key].file.write(header)
@@ -2476,7 +2476,7 @@ class Active:
                 self.action.data_stream_status = data_status
 
                 if data_status not in (None, HloStatus.active):
-                    LOGGER.info(
+                    LOGGER.debug(
                         f"data_stream: skipping package for status: {data_status}"
                     )
                     continue
@@ -2510,7 +2510,7 @@ class Active:
                     if self.file_conn_dict[file_conn_key].file is None:
                         if not self.file_conn_dict[file_conn_key].params.json_data_keys:
                             jsonkeys = [key for key in sample_data.keys()]
-                            LOGGER.info(
+                            LOGGER.debug(
                                 "no json_data_keys defined, using keys from first data message: {jsonkeys[:10]}"
                             )
 
@@ -2518,7 +2518,7 @@ class Active:
                                 jsonkeys
                             )
 
-                        LOGGER.info(f"creating output file for {file_conn_key}")
+                        LOGGER.debug(f"creating output file for {file_conn_key}")
                         # create the file for this data stream
                         await self.log_data_set_output_file(file_conn_key=file_conn_key)
 
@@ -2555,7 +2555,7 @@ class Active:
                     self.num_data_written += 1
 
         except asyncio.CancelledError:
-            LOGGER.info("removing data_q subscription for active")
+            LOGGER.debug("removing data_q subscription for active")
             if dq_sub in self.base.data_q.subscribers:
                 self.base.data_q.remove(dq_sub)
         except Exception as e:
@@ -3059,7 +3059,7 @@ class Active:
                             data={}, errors=[], status=HloStatus.finished
                         )
                     )
-                    LOGGER.info(
+                    LOGGER.debug(
                         f"Waiting for data_stream finished package: {[action.data_stream_status for action in self.action_list]}"
                     )
                     await asyncio.sleep(0.1)
@@ -3070,7 +3070,7 @@ class Active:
                     )
                 retry_counter += 1
 
-            LOGGER.info("checking if all queued data has written.")
+            LOGGER.debug("checking if all queued data has written.")
             write_retries = 5
             write_iter = 0
             while (
@@ -3105,7 +3105,7 @@ class Active:
                     await self.finish_manual_action()
 
                 # all actions are finished
-                LOGGER.info("finishing data logging.")
+                LOGGER.debug("finishing data logging.")
                 for filekey in self.file_conn_dict:
                     if self.file_conn_dict[filekey].file:
                         await self.file_conn_dict[filekey].file.close()
