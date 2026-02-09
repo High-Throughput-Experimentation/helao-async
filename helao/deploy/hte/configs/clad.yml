@@ -1,15 +1,15 @@
 dummy: true
 simulation: false
-builtin_ref_motorxy:
+builtin_ref_motorxy:  # cleaning position
   - -10
   - 10
-builtin_ref_motorxy_2:
+builtin_ref_motorxy_2:  # ref upper
   - -32
   - 35
-builtin_ref_motorxy_3:
+builtin_ref_motorxy_3:  # ref -1
   - -32
   - 27
-builtin_ref_motorxy_4:
+builtin_ref_motorxy_4:  # ref -2
   - -32
   - 19
 builtin_ref_motorxy_5:
