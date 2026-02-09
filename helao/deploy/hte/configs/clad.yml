@@ -20,11 +20,13 @@ builtin_ref_motorxy_6:
   - -5
 experiment_libraries:
   - ADSS_xtraclean_exp
+  - CLAD_exp
   - samples_exp
 experiment_params:
   gamrychannelwait: -1
   gamrychannelsend: -1
 sequence_libraries:
+  - ADSS_seq
   - CLAD_seq
 sequence_params:
   gamrychannelwait: -1
