@@ -2109,7 +2109,8 @@ class Active:
                     file_conn_keys.append(filekey)
 
         for file_conn_key in file_conn_keys:
-            self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = realtime
+            if self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns is None:
+                self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = realtime
 
     async def add_status(self, action=None):
         """
@@ -2392,7 +2393,7 @@ class Active:
         if self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns is None:
             LOGGER.debug("realtime_ns was not set, adding it now.")
             self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = (
-                self.get_realtime_nowait()
+                await self.get_realtime()
             )
 
         header, file_info = self.init_datafile(
@@ -2890,8 +2891,9 @@ class Active:
             for file_conn_key in prev_action.file_conn_keys:
                 # await asyncio.sleep(0.1)
                 LOGGER.info("Creating new file_conn for split action")
+                current_epoch_ns = await self.get_realtime()
                 new_file_conn_key = self.base.new_file_conn_key(
-                    key=str(self.get_realtime_nowait())
+                    key=str(current_epoch_ns)
                 )
                 if new_fileconnparams is None:
                     # get last file conn
@@ -2901,7 +2903,7 @@ class Active:
                     # reset some of the file conn parameters
                     new_file_conn.reset_file_conn()
                     # add new timestamp
-                    new_file_conn.params.hloheader.epoch_ns = self.get_realtime_nowait()
+                    new_file_conn.params.hloheader.epoch_ns = current_epoch_ns
                 else:
                     new_file_conn = FileConn(params=new_fileconnparams)
                     new_file_conn.params.file_conn_key = new_file_conn_key
