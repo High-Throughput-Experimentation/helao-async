@@ -2,7 +2,7 @@
 
 from matplotlib.pylab import fill
 
-__all__ = ["CLAD_seq"]
+SEQUENCES = ["CLAD_seq"]
 
 from typing import List
 from helao.helpers.premodels import ExperimentPlanMaker
