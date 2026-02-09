@@ -34,6 +34,8 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
     config = app.helao_cfg
     config_filename = os.path.basename(config["loaded_config_path"])
 
+    limit_vis = app.server_params.get("limit_vis", [])
+
     app.vis.doc.add_root(
         layout(
             [
@@ -70,6 +72,8 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
         vis_dict[fkey] = []
         fservnames = find_server_names(vis=app.vis, fast_key=fkey)
         for fsname, conf_pars in fservnames:
+            if limit_vis and fsname not in limit_vis:
+                continue
             vis_classes[viscls] = getattr(import_module(f"{vis_root}.{vismod}"), viscls)
             vis_dict[fkey].append(
                 vis_classes[viscls](vis_serv=app.vis, serv_key=fsname)
