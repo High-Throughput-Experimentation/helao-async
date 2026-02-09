@@ -1245,7 +1245,7 @@ class Base:
 
     def get_realtime_nowait(
         self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
-    ) -> float:
+    ) -> int:
         """
         Calculate the real-time in nanoseconds, optionally adjusted by an offset.
 
@@ -1268,7 +1268,7 @@ class Base:
             real_time = timer.time_ns() + offset_ns
         else:
             real_time = epoch_ns + offset_ns
-        return real_time
+        return int(np.floor(real_time))
 
     async def sync_ntp_task(self, resync_time: int = 1800):
         """
