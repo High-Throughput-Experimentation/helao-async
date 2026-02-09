@@ -213,6 +213,7 @@ def CLAD_sub_fill_cell(
         ),
         start_condition=ActionStartCondition.wait_for_orch,
     )
+    return apm.planned_actions
 
 
 # 1. CLEAN CELL
