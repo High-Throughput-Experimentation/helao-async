@@ -610,7 +610,7 @@ class Base:
         json_data_keys: List[str] = [],
         action_abbr: Optional[str] = None,
         file_type: Optional[str] = None,
-        hloheader: HloHeaderModel = HloHeaderModel(),
+        hloheader: Optional[HloHeaderModel] = None,
     ):
         """
         Asynchronously sets up and contains an action.
