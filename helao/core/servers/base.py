@@ -2099,7 +2099,7 @@ class Active:
         """
         # needs to be a sync function
         if realtime is None:
-            realtime = self.get_realtime_nowait()
+            realtime = self.get_realtime_nowait(time_ns())
 
         if file_conn_keys is None:
             # get all fileconn_keys
@@ -2196,7 +2196,7 @@ class Active:
         Returns:
             float: The real-time value with the applied offset.
         """
-        return self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
+        return await self.base.get_realtime(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
         self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
@@ -2393,7 +2393,7 @@ class Active:
         if self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns is None:
             LOGGER.debug("realtime_ns was not set, adding it now.")
             self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = (
-                await self.get_realtime()
+                await self.get_realtime(time_ns())
             )
 
         header, file_info = self.init_datafile(
@@ -2891,7 +2891,7 @@ class Active:
             for file_conn_key in prev_action.file_conn_keys:
                 # await asyncio.sleep(0.1)
                 LOGGER.info("Creating new file_conn for split action")
-                current_epoch_ns = await self.get_realtime()
+                current_epoch_ns = await self.get_realtime(time_ns())
                 new_file_conn_key = self.base.new_file_conn_key(
                     key=str(current_epoch_ns)
                 )
