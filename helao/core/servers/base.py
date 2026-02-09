@@ -1230,7 +1230,7 @@ class Base:
 
     async def get_realtime(
         self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
-    ) -> float:
+    ) -> int:
         """
         Asynchronously retrieves the real-time value.
 
@@ -2090,7 +2090,7 @@ class Active:
     def finish_hlo_header(
         self,
         file_conn_keys: Optional[List[UUID]] = None,
-        realtime: Optional[float] = None,
+        realtime: Optional[int] = None,
     ):
         """
         Finalizes the HLO header for the given file connection keys.
@@ -2196,7 +2196,7 @@ class Active:
 
     async def get_realtime(
         self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
-    ) -> float:
+    ) -> int:
         """
         Asynchronously retrieves the real-time value.
 
@@ -2211,7 +2211,7 @@ class Active:
 
     def get_realtime_nowait(
         self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
-    ) -> float:
+    ) -> int:
         """
         Retrieve the current real-time value without waiting.
 
@@ -2222,7 +2222,7 @@ class Active:
         Returns:
             float: The current real-time value.
         """
-        return self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
+        return int(np.floor(self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)))
 
     async def write_live_data(self, output_str: str, file_conn_key: UUID):
         """
