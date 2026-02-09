@@ -7,8 +7,8 @@ Calc server is used for in-sequence data processing.
 __all__ = ["makeApp"]
 
 import json
-from tkinter import E
 import numpy as np
+from time import time_ns
 from typing import Union
 from fastapi import Body
 
@@ -64,7 +64,7 @@ def makeApp(server_key):
                 action_name=active.action.action_name,
                 column_headings=colnames,
                 optional={"wl": ad["wavelength"]},
-                epoch_ns=app.base.get_realtime_nowait(),
+                epoch_ns=app.base.get_realtime_nowait(time_ns()),
             )
             abbr = active.action.action_abbr
             subi = active.action.orch_submit_order
