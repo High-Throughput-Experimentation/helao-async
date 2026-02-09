@@ -15,7 +15,7 @@ import pickle
 import pathlib
 from random import randint
 from socket import gethostname
-from time import ctime, time, time_ns, sleep
+from time import ctime, time, time_ns, sleep, perf_counter_ns
 from typing import List, Dict, Optional, Union
 from uuid import UUID, uuid1
 import hashlib
@@ -84,6 +84,14 @@ CONFIG = config_loader.CONFIG
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
+
+
+class Timer:
+    def __init__(self):
+        self._offset_ns = time_ns() - perf_counter_ns()
+
+    def time_ns(self):
+        return self._offset_ns + perf_counter_ns()
 
 
 class Base:
@@ -1250,11 +1258,12 @@ class Base:
             if self.ntp_offset is not None:
                 offset_ns = int(np.floor(self.ntp_offset * 1e9))
             else:
-                offset_ns = 0.0
+                offset_ns = 0
         else:
             offset_ns = int(np.floor(offset * 1e9))
         if epoch_ns is None:
-            real_time = time_ns() + offset_ns
+            timer = Timer()
+            real_time = timer.time_ns() + offset_ns
         else:
             real_time = epoch_ns + offset_ns
         return real_time
@@ -2099,7 +2108,7 @@ class Active:
         """
         # needs to be a sync function
         if realtime is None:
-            realtime = self.get_realtime_nowait(time_ns())
+            realtime = self.get_realtime_nowait()
 
         if file_conn_keys is None:
             # get all fileconn_keys
@@ -2393,7 +2402,7 @@ class Active:
         if self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns is None:
             LOGGER.debug("realtime_ns was not set, adding it now.")
             self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = (
-                await self.get_realtime(time_ns())
+                await self.get_realtime()
             )
 
         header, file_info = self.init_datafile(
@@ -2891,7 +2900,7 @@ class Active:
             for file_conn_key in prev_action.file_conn_keys:
                 # await asyncio.sleep(0.1)
                 LOGGER.info("Creating new file_conn for split action")
-                current_epoch_ns = await self.get_realtime(time_ns())
+                current_epoch_ns = await self.get_realtime()
                 new_file_conn_key = self.base.new_file_conn_key(
                     key=str(current_epoch_ns)
                 )
