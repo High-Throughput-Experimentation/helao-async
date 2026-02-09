@@ -23,7 +23,7 @@ class HloHeaderModel(BaseModel, HelaoDict):
     # this can hold instrument/server specific optional header
     # entries
     optional: Optional[Dict] = Field(default={})
-    epoch_ns: Optional[float] = None
+    epoch_ns: Optional[int] = None
 
 
 class FileConnParams(BaseModel, HelaoDict):

@@ -170,8 +170,8 @@ class Base:
         get_lbuf(self, live_key): Get data from the live buffer.
         log_status_task(self, retry_limit: int = 5): Task to log status changes and send updates to clients.
         detach_subscribers(self): Detach all subscribers.
-        get_realtime(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float: Get the current real-time.
-        get_realtime_nowait(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float: Get the current real-time without waiting.
+        get_realtime(self, epoch_ns: Optional[int] = None, offset: Optional[float] = None) -> float: Get the current real-time.
+        get_realtime_nowait(self, epoch_ns: Optional[int] = None, offset: Optional[float] = None) -> float: Get the current real-time without waiting.
         sync_ntp_task(self, resync_time: int = 1800): Task to regularly sync with the NTP server.
         shutdown(self): Shutdown the server and tasks.
         write_act(self, action): Write action metadata to a file.
@@ -1229,7 +1229,7 @@ class Base:
         await asyncio.sleep(1)
 
     async def get_realtime(
-        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+        self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
     ) -> int:
         """
         Asynchronously retrieves the real-time value.
@@ -1244,7 +1244,7 @@ class Base:
         return self.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
-        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+        self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
     ) -> int:
         """
         Calculate the real-time in nanoseconds, optionally adjusted by an offset.
@@ -1704,10 +1704,10 @@ class Active:
             set_error(self, error_code: Optional[ErrorCodes] = None, action: Optional[Action] = None):
                 Sets the error status for the action.
 
-            get_realtime(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
+            get_realtime(self, epoch_ns: Optional[int] = None, offset: Optional[float] = None) -> float:
                 Gets the current real-time with optional epoch and offset.
 
-            get_realtime_nowait(self, epoch_ns: Optional[float] = None, offset: Optional[float] = None) -> float:
+            get_realtime_nowait(self, epoch_ns: Optional[int] = None, offset: Optional[float] = None) -> float:
                 Gets the current real-time without waiting.
 
             write_live_data(self, output_str: str, file_conn_key: UUID):
@@ -2195,7 +2195,7 @@ class Active:
         LOGGER.error(f"ERROR {str(action.action_uuid)} on {action.action_name} status.")
 
     async def get_realtime(
-        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+        self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
     ) -> int:
         """
         Asynchronously retrieves the real-time value.
@@ -2210,7 +2210,7 @@ class Active:
         return await self.base.get_realtime(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
-        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+        self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
     ) -> int:
         """
         Retrieve the current real-time value without waiting.
