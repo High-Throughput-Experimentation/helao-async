@@ -632,6 +632,8 @@ class Base:
             action.action_abbr = action_abbr
         if file_type is None:
             file_type = f"{self.server.server_name.lower()}_helao__file"
+        if hloheader is None:
+            hloheader = HloHeaderModel(epoch_ns=self.get_realtime_nowait())
         active = await self.contain_action(
             ActiveParams(
                 action=action,
