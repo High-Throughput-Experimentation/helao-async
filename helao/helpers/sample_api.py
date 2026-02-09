@@ -665,8 +665,15 @@ class SolidSampleAPI(SampleModelAPI):
                         f"invalid legacy sample no '{sample.sample_no}' on plate {sample.plate_id}"
                     )
             else:
-                LOGGER.error(
-                    "get_sample is not supported yet for non-legacy solid sample"
+                ret_samples.append(
+                    SolidSample(
+                        plate_id=sample.plate_id,
+                        sample_no=sample.sample_no,
+                        machine_name=sample.machine_name,
+                    )
+                )
+                LOGGER.info(
+                    "loading non-legacy solid sample"
                 )
 
         return ret_samples
