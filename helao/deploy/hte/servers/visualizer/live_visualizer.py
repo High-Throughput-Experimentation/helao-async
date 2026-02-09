@@ -32,6 +32,8 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
         doc=doc,
     )
 
+    limit_vis = app.server_params.get("limit_vis", [])
+
     app.vis.doc.add_root(
         layout(
             [
@@ -65,8 +67,13 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
         vis_dict[fkey] = []
         fservnames = find_server_names(vis=app.vis, fast_key=fkey)
         for fsname, conf_pars in fservnames:
+            if limit_vis and fsname not in limit_vis:
+                continue
             if req_pars:
                 if not all([x in conf_pars for x in req_pars]):
+                    LOGGER.info(
+                        f"skipping server '{fsname}' for visualizer '{viscls}' due to missing required parameters: {req_pars}"
+                    )
                     continue
             vis_classes[viscls] = getattr(import_module(f"{vis_root}.{vismod}"), viscls)
             vis_dict[fkey].append(
