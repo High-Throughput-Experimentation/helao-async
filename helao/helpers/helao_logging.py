@@ -16,12 +16,12 @@ import subprocess
 import logging
 import requests
 from queue import Queue
+from logging import Handler
 from logging.handlers import (
     TimedRotatingFileHandler,
     SMTPHandler,
     QueueHandler,
     QueueListener,
-    Handler,
 )
 from typing import Optional
 from pathlib import Path
