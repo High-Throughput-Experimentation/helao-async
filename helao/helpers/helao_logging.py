@@ -11,14 +11,17 @@ Usage:
 
 import tempfile
 import os
+import sys
 import subprocess
 import logging
+import requests
 from queue import Queue
 from logging.handlers import (
     TimedRotatingFileHandler,
     SMTPHandler,
     QueueHandler,
     QueueListener,
+    Handler,
 )
 from typing import Optional
 from pathlib import Path
@@ -63,6 +66,34 @@ class TitledSMTPHandler(SMTPHandler):
 #         else:
 #             title = record.message.split()[0].strip()
 #         return f"{record.levelname} - {title}"
+
+
+class HTTPPostHandler(Handler):
+    def __init__(self, url, headers=None, **kwargs):
+        super().__init__()
+        self.url = url
+        self.headers = (
+            headers if headers is not None else {"Content-type": "application/json"}
+        )
+        self.payload = kwargs
+
+    def emit(self, record):
+        """
+        Emit a record.
+        """
+        try:
+            # Format the log record into a desired structure (e.g., a JSON dictionary)
+            log_entry = self.format(record)
+            payload = {k: v for k, v in self.payload.items()}
+            payload["text"] = log_entry
+
+            # Send the custom payload using requests
+            requests.post(self.url, data=payload, headers=self.headers, timeout=1)
+        except requests.exceptions.RequestException as e:
+            # Handle exceptions, e.g. network issues
+            print(f"Failed to send log record to {self.url}: {e}", file=sys.stderr)
+        except Exception:
+            self.handleError(record)
 
 
 def make_logger(
@@ -170,6 +201,24 @@ def make_logger(
         logger_instance.info(f"Email alerts enabled at log level: {ALERT_LEVEL}")
     else:
         logger_instance.info(f"Email alerts not enabled using config: {email_config}")
+
+    webhook = email_config.get("webhook", None)
+    payload = email_config.get("payload", None)
+    webhook_conditions = [x is not None for x in [webhook, payload]]
+    if all(webhook_conditions):
+        webhook_queue = Queue(-1)
+        webhook_queue_handler = QueueHandler(webhook_queue)
+        webhook_queue_handler.setLevel(ALERT_LEVEL)
+        logger_instance.addHandler(webhook_queue_handler)
+        webhook_handler = HTTPPostHandler(url=webhook, **payload)
+        webhook_handler.setLevel(ALERT_LEVEL)
+        webhook_handler.setFormatter(formatter)
+        # logger_instance.addHandler(webhook_handler)
+        webhook_queue_listener = QueueListener(webhook_queue, webhook_handler)
+        webhook_queue_listener.start()
+        logger_instance.info(f"Webhook alerts enabled at log level: {ALERT_LEVEL}")
+    else:
+        logger_instance.info(f"Webhook alerts not enabled using config: {email_config}")
 
     logger_instance.info(f"writing log events to {log_path}")
     logger_instance.propagate = False
