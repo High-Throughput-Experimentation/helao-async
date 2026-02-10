@@ -43,14 +43,20 @@ class HelaoDict:
                 return val.name
             else:
                 return val.value
-        elif isinstance(val, (int, float, bool, type(None))):
+        elif isinstance(val, type(None)):
+            return val
+        elif isinstance(val, np.bool_):
+            return bool(val)
+        elif isinstance(val, bool):
             return val
         elif isinstance(val, np.integer):
             return int(val)
+        elif isinstance(val, int):
+            return val
         elif isinstance(val, np.floating):
-            return float(val)
-        elif isinstance(val, np.bool_):
-            return bool(val)
+            return round(float(val), 9)
+        elif isinstance(val, float):
+            return round(val, 9)
         elif isinstance(val, str):
             if r"\\" in val:
                 return val.replace(r"\\", "/")
