@@ -18,6 +18,7 @@ from socket import gethostname
 from time import ctime, time, time_ns, sleep, perf_counter_ns
 from typing import List, Dict, Optional, Union
 from uuid import UUID, uuid1
+from glob import glob
 import hashlib
 from copy import deepcopy, copy
 import inspect
@@ -1620,23 +1621,20 @@ class Base:
                 script_path = None
                 LOGGER.info(f"Looking for {pplib} post-processor in deployments")
                 deploy_script_path = os.path.join(
-                    "helao",
-                    "deploy",
-                    CONFIG["deployment"],
-                    "processors",
-                    f"{pplib}.py",
+                    "helao", "deploy", CONFIG["deployment"], "processors", f"{pplib}.py"
                 )
                 hte_path = os.path.join(
-                    "helao",
-                    "deploy",
-                    "hte",
-                    "processors",
-                    f"{pplib}.py",
+                    "helao", "deploy", "hte", "processors", f"{pplib}.py"
+                )
+                any_paths = glob(
+                    os.path.join("helao", "deploy", "*", "processors", f"{pplib}.py")
                 )
                 if os.path.exists(deploy_script_path):
                     script_path = deploy_script_path
                 elif os.path.exists(hte_path):
                     script_path = hte_path
+                elif len(any_paths) > 0:
+                    script_path = any_paths[0]
                 if script_path is not None:
                     LOGGER.info(
                         f"Loading {proc_class_type} post-processor from {pplib} processors module"
@@ -2222,7 +2220,9 @@ class Active:
         Returns:
             float: The current real-time value.
         """
-        return int(np.floor(self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)))
+        return int(
+            np.floor(self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset))
+        )
 
     async def write_live_data(self, output_str: str, file_conn_key: UUID):
         """
