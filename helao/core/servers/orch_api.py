@@ -1244,6 +1244,7 @@ class OrchAPI(HelaoFastAPI):
                 await self.orch.stop()
                 self.orch.current_stop_message = active.action.action_params["reason"]
                 LOGGER.warning(active.action.action_params["reason"])
+                LOGGER.alert(f"ORCH STOPPED ~ {active.action.action_params['reason']}")
                 await self.orch.update_operator(True)
 
             finished_action = await active.finish()
