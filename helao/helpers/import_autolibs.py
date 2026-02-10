@@ -1,6 +1,7 @@
 __all__ = ["import_autolibs"]
 
 import os
+from glob import glob
 from typing import Optional
 from importlib.machinery import SourceFileLoader
 from helao.core.version import get_filehash
@@ -41,6 +42,21 @@ def import_autolibs(
                 lib_path = os.path.join(
                     "helao", "deploy", "hte", f"{lib_type}s", f"{lib_file}.py"
                 )
+            if not os.path.isfile(lib_path):
+                lib_paths = glob(
+                    os.path.join(
+                        "helao", "deploy", "*", f"{lib_type}s", f"{lib_file}.py"
+                    )
+                )
+                if lib_paths:
+                    lib_path = lib_paths[0]
+                    LOGGER.warning(
+                        f"found {lib_type} library path {lib_path} in local deployments, using this path"
+                    )
+                else:
+                    raise FileNotFoundError(
+                        f"{lib_type} library path {lib_path} does not exist, and no local deployments contain {lib_file}.py in their {lib_type}s folder. Please check your config and file paths."
+                    )
         lib_file_hash = get_filehash(lib_path)
         tempd = SourceFileLoader(lib_file, lib_path).load_module().__dict__
         for func in tempd.get(f"{lib_type.upper()}S", []):
@@ -48,9 +64,7 @@ def import_autolibs(
                 lib.update({func: tempd[func]})
                 codehash_lib.update({func: lib_file_hash})
                 codepath_lib.update({func: lib_path})
-                LOGGER.info(
-                    f"added {lib_type[:3]} '{func}' to {lib_type} library"
-                )
+                LOGGER.info(f"added {lib_type[:3]} '{func}' to {lib_type} library")
             else:
                 LOGGER.error(
                     f"!!! Could not find {lib_type} function '{func}' in '{lib_file}'",
