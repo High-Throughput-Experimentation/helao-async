@@ -475,44 +475,24 @@ class Base:
             routeD = {"path": route.path, "name": route.name}
             if "dependant" in dir(route):
                 flatParams = get_flat_params(route.dependant)
-                try:
-                    paramD = {
-                        par.name: {
-                            "outer_type": (
-                                str(par.field_info.annotation).split("'")[1]
-                                if len(str(par.field_info.annotation).split("'")) >= 2
-                                else str(par.field_info.annotation)
-                            ),
-                            "type": (
-                                str(par.type_).split("'")[1]
-                                if len(str(par.type_).split("'")) >= 2
-                                else str(par.type_)
-                            ),
-                            "required": par.required,
-                            # "shape": par.shape,
-                            "default": par.default if par.default is not ... else None,
-                        }
-                        for par in flatParams
+                paramD = {
+                    par.name: {
+                        "outer_type": (
+                            str(par.field_info.annotation).split("'")[1]
+                            if len(str(par.field_info.annotation).split("'")) >= 2
+                            else str(par.field_info.annotation)
+                        ),
+                        # "type": (
+                        #     str(par.type_).split("'")[1]
+                        #     if len(str(par.type_).split("'")) >= 2
+                        #     else str(par.type_)
+                        # ),
+                        "required": par.required,
+                        # "shape": par.shape,
+                        "default": par.default if par.default is not ... else None,
                     }
-                except AttributeError:
-                    paramD = {
-                        par.name: {
-                            "outer_type": (
-                                str(par.field_info.annotation).split("'")[1]
-                                if len(str(par.field_info.annotation).split("'")) >= 2
-                                else str(par.field_info.annotation)
-                            ),
-                            "type": (
-                                str(par.annotation).split("'")[1]
-                                if len(str(par.annotation).split("'")) >= 2
-                                else str(par.annotation)
-                            ),
-                            "required": par.required,
-                            # "shape": par.shape,
-                            "default": par.default if par.default is not ... else None,
-                        }
-                        for par in flatParams
-                    }
+                    for par in flatParams
+                }
                 routeD["params"] = paramD
             else:
                 routeD["params"] = []
