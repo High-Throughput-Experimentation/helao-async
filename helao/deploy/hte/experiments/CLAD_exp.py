@@ -225,6 +225,17 @@ def CLAD_sub_setup_cell(
     fill_rate_ul_s: float = 300.0,
     drain_wait_duration_s: float = 30.0,
 ):
+    """Move cell to rinse position, fill and recirculate with working electrolyte, then drain and refill syringe.
+
+    Args:
+        rinse_recirc_duration_s (float, optional): Defaults to 30.0.
+        rinse_volume_ul (float, optional): Defaults to 3000.0.
+        fill_rate_ul_s (float, optional): Defaults to 300.0.
+        drain_wait_duration_s (float, optional): Defaults to 30.0.
+
+    Returns:
+        list: Planned actions for the experiment.
+    """
     apm = ActionPlanMaker()
 
     # MOVE TO CELL RINSE POSITION
@@ -307,6 +318,26 @@ def CLAD_sub_reference_setup(
     ocv_sample_rate_s: float = 0.1,
     gamry_i_range: str = "auto",
 ):
+    """Move cell to reference position, load reference sample, fill and recirculate with flowing O2, and refill syringe.
+
+    Args:
+        reference_position_name (str, optional): Defaults to "builtin_ref_motorxy_2".
+        reference_sample_label (str, optional): Defaults to "reference-fto__solid__11_1".
+        load_position (str, optional): Defaults to "cell1_we".
+        liquid_sample_no (int, optional): Defaults to 1053.
+        fill_volume_ul (float, optional): Defaults to 7000.0.
+        fill_rate_ul_s (float, optional): Defaults to 300.0.
+        fill_recirc_fwd_duration_s (float, optional): Defaults to 30.0.
+        fill_recirc_rev_duration_s (float, optional): Defaults to 15.0.
+        electrolyte_ph (float, optional): Defaults to 1.0.
+        reference_offset_V (float, optional): Defaults to 0.0.
+        ocv_duration_s (float, optional): Defaults to 30.0.
+        ocv_sample_rate_s (float, optional): Defaults to 0.1.
+        gamry_i_range (str, optional): Defaults to "auto".
+
+    Returns:
+        list: Planned actions for the experiment.
+    """
     apm = ActionPlanMaker()
 
     # MOVE TO REFERENCE POSITION
@@ -415,6 +446,21 @@ def CLAD_sub_OCV_bubble_check(
     aliquot_post_ocv: bool = True,
     run_use: RunUse = RunUse.data,
 ):
+    """Runs bubble-check OCV if bubble_check is True, then runs OCV with aliquot after measurement if aliquot_post_ocv is True.
+
+    Args:
+        ocv_duration_s (float, optional): Defaults to 30.0.
+        ocv_sample_rate_s (float, optional): Defaults to 0.1.
+        electrolyte_ph (float, optional): Defaults to 1.0.
+        reference_offset_V (float, optional): Defaults to 0.0.
+        gamry_i_range (str, optional): Defaults to "auto".
+        bubble_check (bool, optional): Defaults to True.
+        aliquot_post_ocv (bool, optional): Defaults to True.
+        run_use (RunUse, optional): Defaults to RunUse.data.
+
+    Returns:
+        list: Planned actions for the experiment.
+    """
     apm = ActionPlanMaker()
 
     if bubble_check:
@@ -481,20 +527,18 @@ def CLAD_sub_load_assembly(
     """Registers solid, liquid, and gas into load_position, then moves to solid, seals, and fills liquid.
 
     Args:
-        experiment (Experiment): _description_
-        experiment_version (int, optional): _description_. Defaults to 1.
-        load_position (str, optional): _description_. Defaults to "cell1_we".
-        solid_plate_id (int, optional): _description_. Defaults to 4534.
-        solid_sample_no (int, optional): _description_. Defaults to 1.
-        liquid_sample_no (int, optional): _description_. Defaults to 1053.
-        fill_volume_ul (float, optional): _description_. Defaults to 7000.0.
-        fill_rate_ul_s (float, optional): _description_. Defaults to 300.0.
-        gas_sample_no (int, optional): _description_. Defaults to 2.
-        gas_volume_ml (float, optional): _description_. Defaults to 1.0.
-        bubbler_gas (str, optional): _description_. Defaults to "O2".
+        load_position (str, optional): Defaults to "cell1_we".
+        solid_plate_id (int, optional): Defaults to 4534.
+        solid_sample_no (int, optional): Defaults to 1.
+        liquid_sample_no (int, optional): Defaults to 1053.
+        fill_volume_ul (float, optional): Defaults to 7000.0.
+        fill_rate_ul_s (float, optional): Defaults to 300.0.
+        gas_sample_no (int, optional): Defaults to 2.
+        gas_volume_ml (float, optional): Defaults to 1.0.
+        bubbler_gas (str, optional): Defaults to "O2".
 
     Returns:
-        _type_: _description_
+        list: Planned actions for the experiment.
     """
     apm = ActionPlanMaker()
 
