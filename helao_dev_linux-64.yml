@@ -42,7 +42,7 @@ dependencies:
   - mpltern
   - munch
   - ntplib
-  - numpy=1
+  - numpy=2
   - orjson
   - pandas
   - panel
@@ -57,12 +57,12 @@ dependencies:
   - pydantic-settings
   - pydantic
   - pybase64
-  - pyfiglet
+  - pyfiglet=1
   - pyftdi
   - pylablib
   - pymodbus
   - pyserial
-  - python=3.12
+  - python=3.14
   - python-dotenv
   - python-multipart
   - pyusb
