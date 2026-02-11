@@ -220,7 +220,7 @@ class SM303:
         return False
 
     def acquire_spec_adv(self, int_time_ms: float, **kwargs):
-        self.setup_sm303()
+        # self.setup_sm303()
         trigset = self.set_trigger_mode(SpecTrigType.off)
         intmset = self.spec.spSetIntMode(
             ctypes.c_short(2), ctypes.c_double(float(int_time_ms)), self.dev_num
@@ -283,7 +283,7 @@ class SM303:
         Return active dict.
         """
 
-        self.setup_sm303()
+        # self.setup_sm303()
         params = A.action_params
         self.n_avg = params["n_avg"]
         self.fft = params["fft"]
