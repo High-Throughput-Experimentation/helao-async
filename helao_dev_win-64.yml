@@ -43,7 +43,7 @@ dependencies:
   - mpltern
   - munch
   - ntplib
-  - numpy=2
+  - numpy
   - orjson
   - pandas
   - panel
