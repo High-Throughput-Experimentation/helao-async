@@ -67,7 +67,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         sync_exit_callback(self, task: asyncio.Task):
             Callback function to handle task completion and cleanup.
 
-        async enqueue_calc(self, calc_tup: Tuple[UUID, pd.DataFrame, dict, str], rank: int = 5):
+        async enqueue_calc(self, calc_tup: Tuple[UUID, pd.DataFrame, dict, str], rank: int = 0):
             Adds a calculation tuple to the task queue with the specified priority rank.
 
         async syncer(self):
@@ -184,7 +184,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
     async def enqueue_calc(
         self,
         calc_tup: Tuple[UUID, pd.DataFrame, dict, BaseAnalysis, Optional[UUID]],
-        rank: int = 5,
+        rank: int = 0,
     ):
         """
         Adds a calculation task to the queue with a specified priority.

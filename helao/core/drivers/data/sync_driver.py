@@ -40,7 +40,6 @@ import gzip
 
 from helao.helpers import helao_logging as logging
 
-LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.base import Base
 from helao.core.models.process import ProcessModel
 from helao.core.models.action import ShortActionModel
@@ -57,6 +56,7 @@ from helao.helpers.zip_dir import zip_dir
 from time import sleep
 from glob import glob
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 ABR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence"}
 MOD_MAP = {
     "action": Action,
@@ -1241,7 +1241,7 @@ class HelaoSyncer:
         return prog
 
     async def enqueue_yml(
-        self, upath: Union[Path, str], rank: int = 5, rank_limit: int = -5
+        self, upath: Union[Path, str], rank: int = 0, rank_limit: int = -5
     ):
         """
         Enqueue a YAML file to the task queue with a specified rank.
@@ -1365,7 +1365,7 @@ class HelaoSyncer:
                     ):
                         await self.enqueue_yml(
                             child.target,
-                            rank - (1 if prog.yml.type == "experiment" else 2),
+                            rank - 1,
                         )
                         LOGGER.info(str(child.target))
                 # self.base.print_message(
@@ -1375,7 +1375,7 @@ class HelaoSyncer:
                     async with self.aiolock:
                         self.running_tasks.pop(prog.yml.target.name)
                 self.task_set.discard(prog.yml.target.name)
-                await self.enqueue_yml(prog.yml.target, rank)
+                await self.enqueue_yml(prog.yml.target, rank + 1)
                 LOGGER.debug(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
 
@@ -1809,7 +1809,7 @@ class HelaoSyncer:
                         f"Cannot sync experiment because process index {pidx} is missing. See {str(exp_prog.yml.target)}"
                     )
                     self.reset_sync(sync_path)
-                    await self.enqueue_yml(str(exp_prog.yml.target))
+                    await self.enqueue_yml(str(exp_prog.yml.target), 1)
                     return exp_prog
                 meta = exp_prog.dict["process_metas"][pidx]
                 uuid_key = meta["process_uuid"]
@@ -2093,7 +2093,7 @@ class HelaoSyncer:
             list: A list of pending sequences that were processed and enqueued.
         """
 
-        async def reset_and_queue(pp, rank: int = 5):
+        async def reset_and_queue(pp, rank: int = 0):
             if os.path.exists(
                 pp.replace("RUNS_FINISHED", "RUNS_SYNCED").replace(".yml", ".progress")
             ):
@@ -2106,20 +2106,20 @@ class HelaoSyncer:
             pending_acts = self.list_pending_acts(omit_manual_exps)
             LOGGER.info(f"Enqueueing {len(pending_acts)} actions from RUNS_FINISHED.")
             for pp in pending_acts:
-                await reset_and_queue(pp, rank=1)
+                await reset_and_queue(pp, rank=0)
 
             pending_exps = self.list_pending_exps(omit_manual_exps)
             LOGGER.info(
                 f"Enqueueing {len(pending_exps)} experiments from RUNS_FINISHED."
             )
             for pp in pending_exps:
-                await reset_and_queue(pp, rank=2)
+                await reset_and_queue(pp, rank=1)
 
         pending_seqs = self.list_pending(omit_manual_exps)
         LOGGER.info(f"Enqueueing {len(pending_seqs)} sequences from RUNS_FINISHED.")
 
         for pp in pending_seqs:
-            await reset_and_queue(pp)
+            await reset_and_queue(pp, rank=2)
 
         return pending_seqs
 

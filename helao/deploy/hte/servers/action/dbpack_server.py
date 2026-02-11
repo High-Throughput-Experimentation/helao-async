@@ -24,7 +24,16 @@ def makeApp(server_key):
     @app.post("/finish_yml", tags=["private"])
     async def finish_yml(yml_path: str):
         """Pushes HELAO data to S3/API and moves files to RUNS_SYNCED."""
-        await app.driver.enqueue_yml(yml_path.strip('"').strip("'"))
+        clean_path = yml_path.strip('"').strip("'")
+        if clean_path.endswith("-seq.yml"):
+            rank = 2
+        elif clean_path.endswith("-exp.yml"):
+            rank = 1
+        elif clean_path.endswith("-act.yml"):
+            rank = 0
+        else:
+            rank = -1
+        await app.driver.enqueue_yml(clean_path, rank)
         return yml_path
 
     @app.post("/list_pending", tags=["private"])
