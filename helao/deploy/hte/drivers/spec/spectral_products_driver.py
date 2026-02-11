@@ -364,7 +364,7 @@ class SM303:
 
     def read_data(self):
         self._data = (ctypes.c_long * 1056)()
-        if self.n_avg != 1 and self.fft != 0:
+        if self.n_avg != 1 or self.fft != 0:
             result = self.spec.spReadDataAdvEx(
                 ctypes.byref(self._data),
                 ctypes.c_short(self.n_avg),
