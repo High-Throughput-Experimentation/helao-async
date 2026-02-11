@@ -487,9 +487,9 @@ class Base:
                         #     if len(str(par.type_).split("'")) >= 2
                         #     else str(par.type_)
                         # ),
-                        "required": par.required,
+                        # "required": par.required,
                         # "shape": par.shape,
-                        "default": par.default if par.default is not ... else None,
+                        # "default": par.default if par.default is not ... else None,
                     }
                     for par in flatParams
                 }
