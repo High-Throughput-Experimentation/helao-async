@@ -110,6 +110,14 @@ class GamryExec(Executor):
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
+        max_wait = 30
+        init_time = time.time()
+        while self.driver.get_gamry_state()["Cell"] != "0":
+            if time.time() - init_time > max_wait:
+                LOGGER.error("Gamry cell is busy. Timeout reached.")
+                return {"error": ErrorCodes.setup}
+            LOGGER.warning("Gamry cell is busy. Waiting 1 second.")
+            await asyncio.sleep(1)
         resp = self.driver.setup(
             self.technique,
             self.signal_params,
@@ -305,6 +313,14 @@ class GamryEisExec(Executor):
 
     async def _pre_exec(self) -> dict:
         """Setup potentiostat device for given technique."""
+        max_wait = 30
+        init_time = time.time()
+        while self.driver.get_gamry_state()["Cell"] != "0":
+            if time.time() - init_time > max_wait:
+                LOGGER.error("Gamry cell is busy. Timeout reached.")
+                return {"error": ErrorCodes.setup}
+            LOGGER.warning("Gamry cell is busy. Waiting 1 second.")
+            await asyncio.sleep(1)
         try:
             if self.action_params.get("versus_OCV", False):
                 ocv_duration = self.action_params.get("OCV_duration__s", 2.0)
@@ -792,8 +808,7 @@ def makeApp(server_key):
     @app.post("/gamry_state", tags=["private"])
     def gamry_state():
         """Return pstat.State()."""
-        state = app.driver.pstat.State()
-        state = dict([x.split("\t") for x in state.split("\r\n") if x])
+        state = app.driver.get_gamry_state()
         return state
 
     @app.post("/gamry_is_open", tags=["private"])
