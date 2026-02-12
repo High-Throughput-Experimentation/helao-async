@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 class GamryDtaqSink:
     """Event sink for reading data from Gamry device."""
@@ -13,12 +15,19 @@ class GamryDtaqSink:
 
     def cook(self):
         count = 1
+        exception_count = 0
+        exception_max = 5
         while count > 0:
             try:
                 count, points = self.dtaq.Cook(1024)
                 self.acquired_points.extend(zip(*points))
             except Exception:
-                count = 0
+                LOGGER.error("Error while cooking data from Gamry DTAQ.", exc_info=True)
+                count = 1
+                exception_count += 1
+                if exception_count >= exception_max:
+                    LOGGER.error("Maximum number of exceptions reached while cooking data.")
+                    break
 
     def _IGamryDtaqEvents_OnDataAvailable(self):
         self.cook()
