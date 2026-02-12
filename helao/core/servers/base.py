@@ -590,7 +590,13 @@ class Base:
                 server_name="MANUAL", machine_name=gethostname().lower()
             )
         action.action_codehash = get_filehash(sys._getframe(2).f_code.co_filename)
-        action.action_codepath = sys._getframe(2).f_code.co_filename.replace(os.getcwd(), "").strip("\\").strip("/")
+        action.action_codepath = "/".join(
+            sys._getframe(2)
+            .f_code.co_filename.replace(os.getcwd(), "")
+            .strip("\\")
+            .strip("/")
+            .split(os.sep)
+        )
         action.action_funcname = sys._getframe(2).f_code.co_name
         return action
 
