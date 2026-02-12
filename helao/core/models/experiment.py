@@ -111,7 +111,6 @@ class ExperimentModel(ShortExperimentModel):
     aux_files: List[str] = Field(default=[])
     process_list: List[UUID] = Field(default=[])  # populated by DB yml_finisher
     process_order_groups: Dict[int, List[int]] = Field(default={})
-    data_request_id: Optional[UUID] = None
     orch_key: Optional[str] = None
     orch_host: Optional[str] = None
     orch_port: Optional[int] = None
