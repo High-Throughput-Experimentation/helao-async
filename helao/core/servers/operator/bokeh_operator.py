@@ -919,7 +919,10 @@ class BokehOperator:
             tmptypes = tuple(tmptypes)
 
             for t in tmpdefs:
-                t = json.dumps(t)
+                try:
+                    t = json.dumps(t)
+                except Exception:
+                    t = ""
 
             self.sequences.append(
                 return_sequence_lib(
