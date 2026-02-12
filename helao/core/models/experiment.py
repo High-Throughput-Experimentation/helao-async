@@ -84,7 +84,7 @@ class ExperimentModel(ShortExperimentModel):
     """
 
     hlo_version: Optional[str] = Field(default_factory=get_hlo_version)
-    orchestrator: MachineModel = MachineModel()
+    orchestrator: Optional[MachineModel] = None
     access: Optional[str] = "hte"
     dummy: bool = False
     simulation: bool = False
@@ -92,10 +92,8 @@ class ExperimentModel(ShortExperimentModel):
     run_type: Optional[str] = None
     run_use: Optional[RunUse] = RunUse.data
     sequence_uuid: Optional[UUID] = None
-    experiment_uuid: Optional[UUID] = None
     experiment_timestamp: Optional[datetime] = None
     experiment_status: List[HloStatus] = Field(default=[])
-    experiment_output_dir: Optional[Path] = None
     experiment_codehash: Optional[str] = None
     experiment_codepath: Optional[str] = None
     experiment_funcname: Optional[str] = None
