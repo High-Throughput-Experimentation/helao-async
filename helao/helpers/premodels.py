@@ -390,7 +390,7 @@ class ExperimentPlanMaker:
 
     def add(self, experiment_name, experiment_params, from_global_exp_params={}, **kwargs):
         self.planned_experiments.append(
-            ExperimentModel(
+            ShortExperimentModel(
                 experiment_name=experiment_name,
                 experiment_params=experiment_params,
                 from_global_exp_params=from_global_exp_params,
