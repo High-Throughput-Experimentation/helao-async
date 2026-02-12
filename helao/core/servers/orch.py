@@ -29,6 +29,7 @@ from fastapi import WebSocket
 from bokeh.server.server import Server
 
 from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.server import ActionServerModel, GlobalStatusModel
 from helao.core.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
@@ -2164,7 +2165,7 @@ class Orch(Base):
     async def add_experiment(
         self,
         seq: Sequence,
-        experimentmodel: Experiment,
+        experimentmodel: Experiment | ExperimentModel | ShortExperimentModel,
         prepend: bool = False,
         at_index: Optional[int] = None,
     ):
