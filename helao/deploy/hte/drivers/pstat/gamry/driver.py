@@ -565,6 +565,11 @@ class GamryDriver(HelaoDriver):
             self.counter = 0
         return response
 
+    def get_gamry_state(self):
+        state = self.pstat.State()
+        state = dict([x.split("\t") for x in state.split("\r\n") if x])
+        return state
+
 
 class GamryPoller(DriverPoller):
     """ Note: this poller conflicts with running techniques. 
