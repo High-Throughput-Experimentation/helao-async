@@ -16,17 +16,17 @@ class GamryDtaqSink:
     def cook(self):
         count = 1
         exception_count = 0
-        exception_max = 5
+        exception_max = 10
         while count > 0:
             try:
                 count, points = self.dtaq.Cook(1024)
                 self.acquired_points.extend(zip(*points))
             except Exception:
-                LOGGER.error("Error while cooking data from Gamry DTAQ.", exc_info=True)
+                LOGGER.warning("Error while cooking data from Gamry DTAQ.")
                 count = 1
                 exception_count += 1
                 if exception_count >= exception_max:
-                    LOGGER.error("Maximum number of exceptions reached while cooking data.")
+                    LOGGER.error("Maximum number of exceptions reached while cooking data.", exc_info=True)
                     break
 
     def _IGamryDtaqEvents_OnDataAvailable(self):
