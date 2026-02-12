@@ -1471,9 +1471,6 @@ class BokehOperator:
             self.sequence.planned_experiments += expplan_list
         end_time = time.time()
         LOGGER.debug(f"Adding experiments to sequence took {end_time - start_time} seconds")
-        self.sequence.sequence_codehash = self.orch.get_sequence_codehash(
-            selected_sequence
-        )
 
     def populate_experimentmodel(self) -> Experiment:
         selected_experiment = self.experiment_dropdown.value

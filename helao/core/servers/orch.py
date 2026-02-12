@@ -2083,7 +2083,6 @@ class Orch(Base):
             sequence.sequence_codehash = self.sequence_codehash_lib[
                 sequence.sequence_name
             ]
-
             sequence.sequence_codepath = self.sequence_codepath_lib[
                 sequence.sequence_name
             ]
