@@ -18,7 +18,9 @@ Classes:
         sequences and experiments.
 
 """
+from aiodebug.hang_inspection import start
 
+import time
 import traceback
 import asyncio
 import io
@@ -1448,9 +1450,12 @@ class BokehOperator:
             )
 
         self.write_params("seq", selected_sequence, sequence_params)
+        start_time = time.time()
         expplan_list = self.orch.unpack_sequence(
             sequence_name=selected_sequence, sequence_params=sequence_params
         )
+        end_time = time.time()
+        LOGGER.info(f"Unpacking sequence took {end_time - start_time} seconds")
 
         if self.sequence is None:
             self.sequence = Sequence()
@@ -1458,12 +1463,15 @@ class BokehOperator:
         self.sequence.sequence_name = selected_sequence
         self.sequence.sequence_label = self.input_sequence_label.value
         self.sequence.sequence_params = sequence_params
+        start_time = time.time()
         if prepend:
             self.sequence.planned_experiments = (
                 expplan_list + self.sequence.planned_experiments
             )
         else:
             self.sequence.planned_experiments += expplan_list
+        end_time = time.time()
+        LOGGER.info(f"Adding experiments to sequence took {end_time - start_time} seconds")
         self.sequence.sequence_codehash = self.orch.get_sequence_codehash(
             selected_sequence
         )
@@ -2170,6 +2178,7 @@ class BokehOperator:
         pass
 
     async def update_tables(self):
+        start_time = time.time()
         await self.get_sequences()
         await self.get_experiments()
         await self.get_actions()
@@ -2214,6 +2223,8 @@ class BokehOperator:
             )
             self.orch_status_button.button_type = "danger"
         self.button_add_expplan.label = f"Add plan [{plan_count}]"
+        end_time = time.time()
+        LOGGER.info(f"Updating tables took {end_time - start_time} seconds")
 
     async def IOloop(self):
         self.IOloop_run = True
