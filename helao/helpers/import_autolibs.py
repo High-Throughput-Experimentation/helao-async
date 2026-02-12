@@ -63,7 +63,7 @@ def import_autolibs(
             if func in tempd:
                 lib.update({func: tempd[func]})
                 codehash_lib.update({func: lib_file_hash})
-                codepath_lib.update({func: lib_path})
+                codepath_lib.update({func: "/".join(lib_path.split(os.sep))})
                 LOGGER.info(f"added {lib_type[:3]} '{func}' to {lib_type} library")
             else:
                 LOGGER.error(
