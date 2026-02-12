@@ -18,7 +18,6 @@ Classes:
         sequences and experiments.
 
 """
-from aiodebug.hang_inspection import start
 
 import time
 import traceback
@@ -1455,7 +1454,7 @@ class BokehOperator:
             sequence_name=selected_sequence, sequence_params=sequence_params
         )
         end_time = time.time()
-        LOGGER.info(f"Unpacking sequence took {end_time - start_time} seconds")
+        LOGGER.debug(f"Unpacking sequence took {end_time - start_time} seconds")
 
         if self.sequence is None:
             self.sequence = Sequence()
@@ -1471,7 +1470,7 @@ class BokehOperator:
         else:
             self.sequence.planned_experiments += expplan_list
         end_time = time.time()
-        LOGGER.info(f"Adding experiments to sequence took {end_time - start_time} seconds")
+        LOGGER.debug(f"Adding experiments to sequence took {end_time - start_time} seconds")
         self.sequence.sequence_codehash = self.orch.get_sequence_codehash(
             selected_sequence
         )
@@ -2224,7 +2223,7 @@ class BokehOperator:
             self.orch_status_button.button_type = "danger"
         self.button_add_expplan.label = f"Add plan [{plan_count}]"
         end_time = time.time()
-        LOGGER.info(f"Updating tables took {end_time - start_time} seconds")
+        LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
 
     async def IOloop(self):
         self.IOloop_run = True
