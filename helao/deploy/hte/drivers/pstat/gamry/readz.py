@@ -15,7 +15,6 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 async def measure_ocv(pstat, gamrycom, duration: float = 2.0, acquisition_period: float = 0.1):
-    # pstat.Open()
     pstat.SetCell(gamrycom.CellOff)
     data = []
 
