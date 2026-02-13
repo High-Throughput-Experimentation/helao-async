@@ -1464,7 +1464,7 @@ class OrchAPI(HelaoFastAPI):
             time.sleep(0.75)
 
         @self.post("/test_alert", tags=["private"])
-        async def test_alert(text: str = "This is a test alert."):
+        async def test_alert():
             """
             Test alert endpoint.
 
@@ -1474,10 +1474,27 @@ class OrchAPI(HelaoFastAPI):
                 dict: A dictionary representation of the finished action.
             """
             try:
-                LOGGER.alert("TEST ALERT: " + text)
+                LOGGER.alert("TEST ALERT: this is a test alert.")
                 return True
             except Exception:
-                LOGGER.error("Failed to trigger alert: " + text)
+                LOGGER.error("Failed to trigger alert.")
+                return False
+
+        @self.post("/test_receive", tags=["private"])
+        async def test_receive(text: str = "This is a test receive."):
+            """
+            Test receive endpoint.
+
+            This asynchronous function serves as a test endpoint for triggering a receive.
+
+            Returns:
+                dict: A dictionary representation of the finished action.
+            """
+            try:
+                LOGGER.info("TEST RECEIVE: " + text)
+                return True
+            except Exception:
+                LOGGER.error("Failed to trigger receive: " + text)
                 return False
 
 
