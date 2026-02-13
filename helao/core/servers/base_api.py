@@ -682,3 +682,26 @@ class BaseAPI(HelaoFastAPI):
                 self.base.stop_executor(executor_id)
             finished_action = await active.finish()
             return finished_action.as_dict()
+
+
+        @self.post("/test_alert", tags=["private"])
+        async def test_alert(text: str = "This is a test alert.", *args, **kwargs):
+            """
+            Test alert endpoint.
+            
+            This asynchronous function serves as a test endpoint for triggering an alert.
+            
+            Returns:
+                dict: A dictionary representation of the finished action.
+            """
+            LOGGER.info(f"Received test alert request with text: {text}")
+            if args:
+                LOGGER.info("endpoint received additional args: " + str(args))
+            if kwargs:
+                LOGGER.info("endpoint received additional kwargs: " + str(kwargs))
+            try:
+                LOGGER.alert("TEST ALERT: " + text)
+                return True
+            except Exception:
+                LOGGER.error("Failed to trigger alert: " + text)
+                return False
