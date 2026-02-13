@@ -49,7 +49,7 @@ from helao.core.tests.unit_test_sample_models import sample_model_unit_test
 from logging import Logger
 from helao.helpers import helao_logging as logging
 
-LAUNCH_LOGGER: Logger = logging.make_logger(__file__)
+LAUNCH_LOGGER: Logger = None
 
 
 class Pidd:
@@ -456,8 +456,7 @@ def launcher(confArg, confDict, helao_repo_root, extraopt=""):
     helaodirs = helao_dirs(confDict, "launcher")
 
     # save ntp time offset
-    
-    get_ntp_time("time.nist.gov",  os.path.join(helaodirs.log_root, "ntpLastSync.txt"))
+    get_ntp_time("time.nist.gov", os.path.join(helaodirs.log_root, "ntpLastSync.txt"))
 
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
@@ -578,12 +577,12 @@ def main():
         quit()
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
     if os.environ.get("CONDA_DEFAULT_ENV") != "helao":
-        LAUNCH_LOGGER.warning(
+        print(
             "launch.py launcher was not called from a 'helao' conda environment.",
         )
     python_path = os.environ.get("PYTHONPATH")
     if python_path is None:
-        LAUNCH_LOGGER.info("PYTHONPATH environment var not defined.")
+        print("PYTHONPATH environment var not defined.")
         quit()
     else:
         python_paths = (
@@ -606,6 +605,11 @@ def main():
     helao_repo_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
     config = read_config(confArg)
+    helaodirs = helao_dirs(config, "launcher")
+    global LAUNCH_LOGGER
+    LAUNCH_LOGGER = logging.make_logger(
+        __file__, log_dir=helaodirs.log_root, log_level=config["log_level"]
+    )
     if len(sys.argv) > 2:
         extraopt = sys.argv[2]
     else:
