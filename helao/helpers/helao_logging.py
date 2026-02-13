@@ -89,13 +89,20 @@ class HTTPPostHandler(logging.Handler):
 
 
 class NtpOffsetFormatter(logging.Formatter):
-    def __init__(self, *args, offset_seconds=0, **kwargs):
+    def __init__(self, *args, offset_seconds=0, use_utc: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         self.offset = timedelta(seconds=offset_seconds)
+        if use_utc:
+            self.tz = timezone.utc
+        else:
+            now = datetime.now()
+            local_now = now.astimezone()
+            local_tz = local_now.tzinfo
+            self.tz = local_tz
 
     def formatTime(self, record, datefmt=None):
         # Convert the record's timestamp (seconds since epoch) to a UTC datetime
-        ct = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        ct = datetime.fromtimestamp(record.created, tz=self.tz)
         # Apply the desired offset
         dt = ct + self.offset
 
@@ -108,13 +115,20 @@ class NtpOffsetFormatter(logging.Formatter):
 
 
 class ColoredNtpOffsetFormatter(ColoredFormatter):
-    def __init__(self, *args, offset_seconds=0, **kwargs):
+    def __init__(self, *args, offset_seconds=0, use_utc: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         self.offset = timedelta(seconds=offset_seconds)
+        if use_utc:
+            self.tz = timezone.utc
+        else:
+            now = datetime.now()
+            local_now = now.astimezone()
+            local_tz = local_now.tzinfo
+            self.tz = local_tz
 
     def formatTime(self, record, datefmt=None):
         # Convert the record's timestamp (seconds since epoch) to a UTC datetime
-        ct = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        ct = datetime.fromtimestamp(record.created, tz=self.tz)
         # Apply the desired offset
         dt = ct + self.offset
 
