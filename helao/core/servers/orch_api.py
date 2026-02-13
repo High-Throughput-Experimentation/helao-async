@@ -1463,6 +1463,23 @@ class OrchAPI(HelaoFastAPI):
             LOGGER.info("orch shutdown")
             time.sleep(0.75)
 
+        @self.post("/test_alert", tags=["private"])
+        async def test_alert(text: str = "This is a test alert."):
+            """
+            Test alert endpoint.
+
+            This asynchronous function serves as a test endpoint for triggering an alert.
+
+            Returns:
+                dict: A dictionary representation of the finished action.
+            """
+            try:
+                LOGGER.alert("TEST ALERT: " + text)
+                return True
+            except Exception:
+                LOGGER.error("Failed to trigger alert: " + text)
+                return False
+
 
 class WaitExec(Executor):
     """
