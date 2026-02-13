@@ -42,7 +42,7 @@ class FileConnParams(BaseModel, HelaoDict):
     # None will trigger autogeneration of a file name
     file_name: Optional[str] = None
     # the header of the hlo file as dict (will be written as yml)
-    hloheader: Optional[HloHeaderModel] = None
+    hloheader: Optional[HloHeaderModel] = Field(default_factory=HloHeaderModel)
 
 
 class FileConn(BaseModel, HelaoDict):
