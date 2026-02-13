@@ -341,11 +341,7 @@ class Orch(Base):
         """
         self.aloop = asyncio.get_running_loop()
         self.aloop.set_exception_handler(self.exception_handler)
-        if self.ntp_last_sync is None:
-            asyncio.gather(self.get_ntp_time())
 
-        self.sync_ntp_task_run = False
-        self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
         asyncio.gather(self.init_endpoint_status())
 
@@ -2643,7 +2639,6 @@ class Orch(Base):
         """
         await self.detach_subscribers()
         self.status_logger.cancel()
-        self.ntp_syncer.cancel()
         self.status_subscriber.cancel()
 
     async def update_operator(self, msg):
