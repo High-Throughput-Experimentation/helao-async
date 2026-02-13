@@ -49,6 +49,7 @@ from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.ws_publisher import WsPublisher
 from helao.helpers.set_time import set_time
+from helao.helpers.get_ntp_time import read_saved_offset
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import (
     SampleType,
@@ -261,8 +262,6 @@ class Base:
         self.data_publisher = WsPublisher(self.data_q)
         self.live_publisher = WsPublisher(self.live_q)
 
-        self.ntp_server = "time.nist.gov"
-        self.ntp_response = None
         self.ntp_offset: float = 0.0  # add to system time for correction
         self.ntp_last_sync = None
         self.aiolock = asyncio.Lock()
@@ -277,24 +276,9 @@ class Base:
             self.hlo_postprocess_libs, self.hlo_postprocessors, HloPostProcessor
         )
 
-        self.ntp_last_sync_file = None
-        if self.helaodirs.root is not None:
-            self.ntp_last_sync_file = os.path.join(
-                self.helaodirs.states_root, "ntpLastSync.txt"
-            )
-            self.ntplockpath = str(self.ntp_last_sync_file) + ".lock"
-            self.ntplock = FileLock(self.ntplockpath)
-            if not os.path.exists(self.ntplockpath):
-                os.makedirs(os.path.dirname(self.ntplockpath), exist_ok=True)
-                with open(self.ntplockpath, "w") as _:
-                    pass
-            if os.path.exists(self.ntp_last_sync_file):
-                with self.ntplock:
-                    with open(self.ntp_last_sync_file, "r") as f:
-                        tmps = f.readline().strip().split(",")
-                        if len(tmps) == 2:
-                            self.ntp_last_sync, self.ntp_offset = tmps
-                            self.ntp_offset = float(self.ntp_offset)
+        self.ntp_last_sync, self.ntp_offset = read_saved_offset(
+            os.path.join(self.helaodirs.states_root, "ntpLastSync.txt")
+        )
 
     def exception_handler(self, loop, context):
         """
@@ -353,11 +337,7 @@ class Base:
             aiodebug.hang_inspection.stop_wait(self.dumper)
         )
         self.aloop.set_exception_handler(self.exception_handler)
-        if self.ntp_last_sync is None:
-            asyncio.gather(self.get_ntp_time())
 
-        self.sync_ntp_task_run = False
-        self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
         self.status_logger = self.aloop.create_task(self.log_status_task())
@@ -697,56 +677,6 @@ class Base:
         else:
             LOGGER.error(f"Specified action uuid {str(action_uuid)} was not found.")
             return None
-
-    async def get_ntp_time(self):
-        """
-        Asynchronously retrieves the current time from an NTP server and updates the
-        instance variables with the response.
-
-        This method acquires a lock to ensure thread safety while accessing the NTP
-        server. It sends a request to the specified NTP server and updates the
-        following instance variables based on the response:
-        - ntp_response: The full response from the NTP server.
-        - ntp_last_sync: The original time from the NTP response.
-        - ntp_offset: The offset time from the NTP response.
-
-        If the request to the NTP server fails, it logs a timeout message and sets
-        ntp_last_sync to the current time and ntp_offset to 0.0.
-
-        Additionally, it logs the ntp_offset and ntp_last_sync values. If a file path
-        for ntp_last_sync_file is provided, it waits until the file is not in use,
-        then writes the ntp_last_sync and ntp_offset values to the file.
-
-        Raises:
-            ntplib.NTPException: If there is an error in the NTP request.
-
-        Returns:
-            None
-        """
-        with self.ntplock:
-            c = ntplib.NTPClient()
-            try:
-                response = c.request(self.ntp_server, version=3)
-                self.ntp_response = response
-                self.ntp_last_sync = response.orig_time
-                self.ntp_offset = response.offset
-                LOGGER.debug(
-                    f"retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}"
-                )
-            except ntplib.NTPException:
-                LOGGER.info(f"{self.ntp_server} ntp timeout")
-                self.ntp_last_sync = time()
-                self.ntp_offset = 0.0
-
-            LOGGER.debug(f"ntp_offset: {self.ntp_offset}")
-            LOGGER.debug(f"ntp_last_sync: {self.ntp_last_sync}")
-
-            if self.ntp_last_sync_file is not None:
-                while file_in_use(self.ntp_last_sync_file):
-                    LOGGER.info("ntp file already in use, waiting")
-                    await asyncio.sleep(0.1)
-                async with aiofiles.open(self.ntp_last_sync_file, "w") as f:
-                    await f.write(f"{self.ntp_last_sync},{self.ntp_offset}")
 
     async def send_statuspackage(
         self,
@@ -1277,54 +1207,6 @@ class Base:
             real_time = epoch_ns + offset_ns
         return int(np.floor(real_time))
 
-    async def sync_ntp_task(self, resync_time: int = 1800):
-        """
-        Periodically synchronizes the system time with an NTP server.
-
-        This asynchronous task runs in a loop, checking the last synchronization
-        time from a file and determining if a resynchronization is needed based
-        on the provided `resync_time` interval. If the time since the last
-        synchronization exceeds `resync_time`, it triggers an NTP time sync.
-        The task can be cancelled gracefully.
-
-        Args:
-            resync_time (int): The interval in seconds to wait before
-                               resynchronizing the time. Default is 1800 seconds (30 minutes).
-
-        Raises:
-            asyncio.CancelledError: If the task is cancelled during execution.
-        """
-        self.sync_ntp_task_run = True
-        try:
-            while self.sync_ntp_task_run:
-                # await asyncio.sleep(10)
-                # lock = asyncio.Lock()
-                # async with lock:
-                ntp_last_sync = ""
-                if self.ntp_last_sync_file is not None:
-                    await asyncio.sleep(randint(5, 10))
-                    async with aiofiles.open(self.ntp_last_sync_file, "r") as f:
-                        ntp_last_sync = await f.readline()
-                parts = ntp_last_sync.strip().split(",")
-                if len(parts) == 2:
-                    self.ntp_last_sync = float(parts[0])
-                    self.ntp_offset = float(parts[1])
-                else:
-                    self.ntp_last_sync = float(parts[0])
-                    self.ntp_offset = 0.0
-                if time() - self.ntp_last_sync > resync_time:
-                    # self.print_message(
-                    #     f"last time check was more then {resync_time/60.0:.1f} minutes ago, syncing time again."
-                    # )
-                    await self.get_ntp_time()
-                else:
-                    # wait_time = time() - self.ntp_last_sync
-                    wait_time = resync_time
-                    # LOGGER.info(f"waiting {wait_time} until next time check")
-                    await asyncio.sleep(wait_time)
-        except asyncio.CancelledError:
-            LOGGER.info("ntp sync task was cancelled")
-
     async def shutdown(self):
         """
         Asynchronously shuts down the server.
@@ -1338,10 +1220,8 @@ class Base:
         Returns:
             None
         """
-        self.sync_ntp_task_run = False
         await self.detach_subscribers()
         self.status_logger.cancel()
-        self.ntp_syncer.cancel()
 
     async def write_act(self, action: Action):
         """
