@@ -455,9 +455,6 @@ def launcher(confArg, confDict, helao_repo_root, extraopt=""):
     # get the BaseModel which contains all the dirs for helao
     helaodirs = helao_dirs(confDict, "launcher")
 
-    # save ntp time offset
-    get_ntp_time("time.nist.gov", os.path.join(helaodirs.log_root, "ntpLastSync.txt"))
-
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
 
@@ -605,11 +602,11 @@ def main():
     helao_repo_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
     config = read_config(confArg)
+
+    # save ntp time offset
     helaodirs = helao_dirs(config, "launcher")
-    global LAUNCH_LOGGER
-    LAUNCH_LOGGER = logging.make_logger(
-        __file__, log_dir=helaodirs.log_root, log_level=config.get("log_level", 20)
-    )
+    get_ntp_time("time.nist.gov", os.path.join(helaodirs.log_root, "ntpLastSync.txt"))
+
     if len(sys.argv) > 2:
         extraopt = sys.argv[2]
     else:
@@ -652,6 +649,10 @@ def main():
     cprint(f"launching HELAO ({modestring} mode) in 5 seconds...\n\n", "white")
     time.sleep(5)
 
+    global LAUNCH_LOGGER
+    LAUNCH_LOGGER = logging.make_logger(
+        __file__, log_dir=helaodirs.log_root, log_level=config.get("log_level", 20)
+    )
     # compress old logs:
     log_root = os.path.join(config["root"], "LOGS")
     for server_name in ["_MASTER_", "bokeh_launcher", "fast_launcher"]:
