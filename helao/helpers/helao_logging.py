@@ -15,6 +15,8 @@ import sys
 import subprocess
 import logging
 import requests
+import json
+from urllib.parse import quote
 from queue import Queue
 from logging.handlers import (
     TimedRotatingFileHandler,
@@ -82,7 +84,10 @@ class HTTPPostHandler(logging.Handler):
             print("Sending log record to webhook with payload:", payload)
 
             # Send the custom payload using requests
-            requests.post(self.url, json=payload, headers=self.headers, timeout=30)
+            resp = requests.post(self.url, data=payload, headers=self.headers, timeout=30)
+            print(resp.request.body)
+            print(resp.request.url)
+            print(resp.request.path_url)
         except requests.exceptions.RequestException as e:
             # Handle exceptions, e.g. network issues
             print(f"Failed to send log record to {self.url}: {e}", file=sys.stderr)
