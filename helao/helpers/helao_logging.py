@@ -79,9 +79,10 @@ class HTTPPostHandler(logging.Handler):
             log_entry = self.format(record)
             payload = {k: v for k, v in self.payload.items()}
             payload["text"] = log_entry
+            print("Sending log record to webhook with payload:", payload)
 
             # Send the custom payload using requests
-            requests.post(self.url, data=payload, headers=self.headers, timeout=30)
+            requests.post(self.url, json=payload, headers=self.headers, timeout=30)
         except requests.exceptions.RequestException as e:
             # Handle exceptions, e.g. network issues
             print(f"Failed to send log record to {self.url}: {e}", file=sys.stderr)
