@@ -8,10 +8,6 @@ from typing import Optional
 
 from helao.core.models.helaodirs import HelaoDirs
 
-from helao.helpers import helao_logging as logging
-
-LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-
 
 def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
     """
@@ -30,7 +26,7 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
 
     def check_dir(path):
         if not os.path.isdir(path):
-            LOGGER.warning(
+            print(
                 f"Warning: directory '{path}' does not exist. Creating it.",
             )
             os.makedirs(path)
@@ -45,7 +41,7 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
         user_seq = os.path.join(root, "USER_CONFIG", "SEQ")
         ana_root = os.path.join(root, "ANALYSES")
         process_root = os.path.join(root, "PROCESSES")
-        LOGGER.info(f"Found root directory in config: {world_cfg['root']}")
+        print(f"Found root directory in config: {world_cfg['root']}")
         check_dir(root)
         check_dir(save_root)
         check_dir(log_root)
@@ -73,7 +69,7 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
             old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
             nots_counter = 0
             for old_log in old_log_txts:
-                LOGGER.info(f"Compressing: {old_log}")
+                print(f"Compressing: {old_log}")
                 try:
                     timestamp_found = False
                     timestamp = ""
@@ -104,7 +100,7 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
                         zf.write(old_log, arcname)
                     os.remove(old_log)
                 except Exception as e:
-                    LOGGER.info(f"Error compressing log: {old_log}, {e}")
+                    print(f"Error compressing log: {old_log}, {e}")
 
     else:
         helaodirs = HelaoDirs(
