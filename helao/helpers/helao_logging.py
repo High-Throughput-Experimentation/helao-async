@@ -27,6 +27,7 @@ from pathlib import Path
 
 from colorlog import ColoredFormatter
 from datetime import datetime, timezone, timedelta
+from helao.helpers.get_ntp_time import read_saved_offset
 
 ALERT_LEVEL = 60
 logging.addLevelName(ALERT_LEVEL, "ALERT")
@@ -149,11 +150,17 @@ def make_logger(
     log_dir = temp_dir if log_dir is None else log_dir
     log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
-    formatter = NtpOffsetFormatter(format_string)
+    ntp_path = os.path.join(log_dir, "ntpLastSync.txt")
+    if os.path.exists(ntp_path):
+        _, offset_seconds = read_saved_offset(ntp_path)
+    else:
+        offset_seconds = 0
+    formatter = NtpOffsetFormatter(format_string, offset_seconds=offset_seconds)
     # for stream output
     colored_format_string = "%(log_color)s%(asctime)s | %(levelname)-8s | %(name)s %(reset)s%(white)s:: %(funcName)s @ %(filename)s:%(lineno)d - %(reset)s%(light_blue)s%(message)s"
     colored_formatter = ColoredNtpOffsetFormatter(
         colored_format_string,
+        offset_seconds=offset_seconds,
         log_colors={
             "DEBUG": "cyan",
             "INFO": "light_green",
