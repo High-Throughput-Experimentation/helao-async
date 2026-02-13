@@ -608,7 +608,7 @@ def main():
     helaodirs = helao_dirs(config, "launcher")
     global LAUNCH_LOGGER
     LAUNCH_LOGGER = logging.make_logger(
-        __file__, log_dir=helaodirs.log_root, log_level=config["log_level"]
+        __file__, log_dir=helaodirs.log_root, log_level=config.get("log_level", 20)
     )
     if len(sys.argv) > 2:
         extraopt = sys.argv[2]
