@@ -6,6 +6,7 @@ import faulthandler
 from copy import copy
 from socket import gethostname
 from collections import namedtuple
+from typing_extensions import Annotated
 
 from helao.core.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
 from helao.helpers.eval import eval_val
@@ -683,14 +684,13 @@ class BaseAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-
         @self.post("/test_alert", tags=["private"])
         async def test_alert():
             """
             Test alert endpoint.
-            
+
             This asynchronous function serves as a test endpoint for triggering an alert.
-            
+
             Returns:
                 dict: A dictionary representation of the finished action.
             """
@@ -702,12 +702,12 @@ class BaseAPI(HelaoFastAPI):
                 return False
 
         @self.post("/test_receive", tags=["private"])
-        async def test_receive(text: str = "This is a test receive."):
+        async def test_receive(text: Annotated[str, Body(..., embed=True)]):
             """
             Test receive endpoint.
-            
+
             This asynchronous function serves as a test endpoint for triggering a receive.
-            
+
             Returns:
                 dict: A dictionary representation of the finished action.
             """

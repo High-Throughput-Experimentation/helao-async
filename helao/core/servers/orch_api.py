@@ -6,6 +6,7 @@ from enum import Enum
 from socket import gethostname
 from typing import Union, Optional, List
 from collections import namedtuple
+from typing_extensions import Annotated
 
 from fastapi import Body, WebSocket, Request
 from fastapi.routing import APIRoute
@@ -1481,7 +1482,7 @@ class OrchAPI(HelaoFastAPI):
                 return False
 
         @self.post("/test_receive", tags=["private"])
-        async def test_receive(text: str = "This is a test receive."):
+        async def test_receive(text: Annotated[str, Body(..., embed=True)]):
             """
             Test receive endpoint.
 
