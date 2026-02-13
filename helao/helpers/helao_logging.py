@@ -68,6 +68,7 @@ class HTTPPostHandler(logging.Handler):
             headers if headers is not None else {"Content-type": "application/json"}
         )
         self.payload = kwargs
+        print(f"Initialized HTTPPostHandler with URL: {self.url} and payload: {self.payload}")
 
     def emit(self, record):
         """
