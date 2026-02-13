@@ -84,7 +84,7 @@ class HTTPPostHandler(logging.Handler):
             print("Sending log record to webhook with payload:", payload)
 
             # Send the custom payload using requests
-            resp = requests.post(self.url, params=payload, headers=self.headers, timeout=30)
+            resp = requests.post(self.url, json=payload, headers=self.headers, timeout=30)
             print(resp.request.body)
             print(resp.request.url)
             print(resp.request.path_url)
