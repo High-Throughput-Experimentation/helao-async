@@ -16,7 +16,6 @@ import subprocess
 import logging
 import requests
 from queue import Queue
-from logging import Handler
 from logging.handlers import (
     TimedRotatingFileHandler,
     SMTPHandler,
@@ -27,6 +26,7 @@ from typing import Optional
 from pathlib import Path
 
 from colorlog import ColoredFormatter
+from datetime import datetime, timezone, timedelta
 
 ALERT_LEVEL = 60
 logging.addLevelName(ALERT_LEVEL, "ALERT")
@@ -59,16 +59,7 @@ class TitledSMTPHandler(SMTPHandler):
         return f"{record.levelname} - {title}"
 
 
-# class TitledQueueHandler(QueueHandler):
-#     def getSubject(self, record):
-#         if "~" in record.message:
-#             title = record.message.split("~")[0].strip()
-#         else:
-#             title = record.message.split()[0].strip()
-#         return f"{record.levelname} - {title}"
-
-
-class HTTPPostHandler(Handler):
+class HTTPPostHandler(logging.Handler):
     def __init__(self, url, headers=None, **kwargs):
         super().__init__()
         self.url = url
@@ -88,12 +79,31 @@ class HTTPPostHandler(Handler):
             payload["text"] = log_entry
 
             # Send the custom payload using requests
-            requests.post(self.url, data=payload, headers=self.headers, timeout=1)
+            requests.post(self.url, data=payload, headers=self.headers, timeout=30)
         except requests.exceptions.RequestException as e:
             # Handle exceptions, e.g. network issues
             print(f"Failed to send log record to {self.url}: {e}", file=sys.stderr)
         except Exception:
             self.handleError(record)
+
+
+class NtpOffsetFormatter(logging.Formatter):
+    def __init__(self, *args, offset_seconds=0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.offset = timedelta(seconds=offset_seconds)
+
+    def formatTime(self, record, datefmt=None):
+        # Convert the record's timestamp (seconds since epoch) to a UTC datetime
+        ct = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        # Apply the desired offset
+        dt = ct + self.offset
+
+        if datefmt:
+            return dt.strftime(datefmt)
+        else:
+            # If no datefmt is specified, use a default ISO8601-like format with offset
+            t = dt.strftime(self.default_time_format)
+            return self.default_msec_format % (t, record.msecs)
 
 
 def make_logger(

@@ -1120,7 +1120,7 @@ class HelaoSyncer:
                     )
                 except ValueError:
                     dateonly = datetime.strptime(
-                        os.path.basename(datedir), "%y%m%d.%H%M%S%f"
+                        os.path.basename(datedir), "%Y%m%d"
                     )
                 if dateonly <= today:
                     seq_dirs = glob(os.path.join(datedir, "*"))

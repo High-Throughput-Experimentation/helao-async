@@ -42,6 +42,7 @@ import colorama
 from helao.core.version import get_hlo_version
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.config_loader import read_config
+from helao.helpers.get_ntp_time import get_ntp_time
 
 from helao.core.tests.unit_test_sample_models import sample_model_unit_test
 
@@ -453,6 +454,10 @@ def launcher(confArg, confDict, helao_repo_root, extraopt=""):
     confPrefix = os.path.basename(confArg).replace(".py", "")
     # get the BaseModel which contains all the dirs for helao
     helaodirs = helao_dirs(confDict, "launcher")
+
+    # save ntp time offset
+    
+    get_ntp_time("time.nist.gov",  os.path.join(helaodirs.states_root, "ntpLastSync.txt"))
 
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
