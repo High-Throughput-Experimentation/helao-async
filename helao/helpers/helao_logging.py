@@ -70,7 +70,6 @@ class HTTPPostHandler(logging.Handler):
             headers if headers is not None else {"Content-type": "application/json"}
         )
         self.payload = kwargs
-        print(f"Initialized HTTPPostHandler with URL: {self.url} and payload: {self.payload}")
 
     def emit(self, record):
         """
@@ -81,16 +80,10 @@ class HTTPPostHandler(logging.Handler):
             log_entry = self.format(record)
             payload = {k: v for k, v in self.payload.items()}
             payload["text"] = log_entry
-            print("Sending log record to webhook with payload:", payload)
+            # print("Sending log record to webhook with payload:", payload)
 
             # Send the custom payload using requests
-            resp = requests.post(self.url, json=payload, headers=self.headers, timeout=30)
-            print(resp.request.body)
-            print(resp.request.url)
-            print(resp.request.path_url)
-        except requests.exceptions.RequestException as e:
-            # Handle exceptions, e.g. network issues
-            print(f"Failed to send log record to {self.url}: {e}", file=sys.stderr)
+            requests.post(self.url, json=payload, headers=self.headers, timeout=30)
         except Exception:
             self.handleError(record)
 
