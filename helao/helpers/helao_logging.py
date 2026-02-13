@@ -106,6 +106,25 @@ class NtpOffsetFormatter(logging.Formatter):
             return self.default_msec_format % (t, record.msecs)
 
 
+class ColoredNtpOffsetFormatter(ColoredFormatter):
+    def __init__(self, *args, offset_seconds=0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.offset = timedelta(seconds=offset_seconds)
+
+    def formatTime(self, record, datefmt=None):
+        # Convert the record's timestamp (seconds since epoch) to a UTC datetime
+        ct = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        # Apply the desired offset
+        dt = ct + self.offset
+
+        if datefmt:
+            return dt.strftime(datefmt)
+        else:
+            # If no datefmt is specified, use a default ISO8601-like format with offset
+            t = dt.strftime(self.default_time_format)
+            return self.default_msec_format % (t, record.msecs)
+
+
 def make_logger(
     logger_name: Optional[str] = None,
     log_dir: Optional[str] = None,
@@ -130,10 +149,10 @@ def make_logger(
     log_dir = temp_dir if log_dir is None else log_dir
     log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
-    formatter = logging.Formatter(format_string)
+    formatter = NtpOffsetFormatter(format_string)
     # for stream output
     colored_format_string = "%(log_color)s%(asctime)s | %(levelname)-8s | %(name)s %(reset)s%(white)s:: %(funcName)s @ %(filename)s:%(lineno)d - %(reset)s%(light_blue)s%(message)s"
-    colored_formatter = ColoredFormatter(
+    colored_formatter = ColoredNtpOffsetFormatter(
         colored_format_string,
         log_colors={
             "DEBUG": "cyan",
