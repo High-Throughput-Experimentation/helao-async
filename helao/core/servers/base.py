@@ -277,7 +277,7 @@ class Base:
         )
 
         self.ntp_last_sync, self.ntp_offset = read_saved_offset(
-            os.path.join(self.helaodirs.states_root, "ntpLastSync.txt")
+            os.path.join(self.helaodirs.log_root, "ntpLastSync.txt")
         )
 
     def exception_handler(self, loop, context):

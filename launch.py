@@ -457,7 +457,7 @@ def launcher(confArg, confDict, helao_repo_root, extraopt=""):
 
     # save ntp time offset
     
-    get_ntp_time("time.nist.gov",  os.path.join(helaodirs.states_root, "ntpLastSync.txt"))
+    get_ntp_time("time.nist.gov",  os.path.join(helaodirs.log_root, "ntpLastSync.txt"))
 
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
