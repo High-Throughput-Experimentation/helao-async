@@ -496,6 +496,19 @@ class BaseAPI(HelaoFastAPI):
                 client_servkey, client_host, client_port
             )
 
+        @self.post("/detach_client", tags=["private"])
+        def detach_client(client_servkey: str, client_host: str, client_port: int):
+            """
+            Detach a client from the base server.
+
+            Args:
+                client_servkey (str): The service key of the client to detach.
+
+            Returns:
+                The result of the base server's detach_client method.
+            """
+            return self.base.detach_client(client_servkey, client_host, client_port)
+
         @self.post("/stop_executor", tags=["private"])
         def stop_executor(executor_id: str):
             """
