@@ -44,6 +44,7 @@ class BaseAnalysis:
     process_timestamp: datetime
     process_name: str
     run_type: str
+    run_use: str
     technique_name: str
     analysis_codehash: str
     analysis_codepath: str
@@ -83,6 +84,7 @@ class BaseAnalysis:
             "process_uuid": self.process_uuid,
             "global_sample_label": global_sample_label,
             "analysis_codehash": self.analysis_codehash,
+            "run_use": self.run_use
         }
         return UUID(hasher(hash_rep))
 
