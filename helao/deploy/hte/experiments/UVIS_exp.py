@@ -236,34 +236,30 @@ def UVIS_sub_measure(
         to_global_params=["_fast_samples_in"],
     )
 
-    if spec_type == SpecType.T:
-        # set illumination state before measurement
-        apm.add(
-            IO_server,
-            "set_digital_out",
-            {
-                "do_item": toggle_source,
-                "on": (
-                    False if run_use == "ref_dark" and spec_type == SpecType.T else True
-                ),
-            },
-            start_condition=ActionStartCondition.no_wait,
-        )
-    else:
-        # turn on illumination for all reflectance measurements
-        apm.add(
-            IO_server,
-            "set_digital_out",
-            {
-                "do_item": toggle_source,
-                "on": True,
-            },
-            start_condition=ActionStartCondition.no_wait,
-        )
+    # set illumination state before measurement
+    apm.add(
+        IO_server,
+        "set_digital_out",
+        {
+            "do_item": toggle_source,
+            "on": (
+                False
+                if (run_use == "ref_dark" and spec_type == SpecType.T)
+                or run_use == "shutter_closed"
+                else True
+            ),
+        },
+        start_condition=ActionStartCondition.no_wait,
+    )
 
     # wait for 1 second for shutter to actuate
     if toggle_is_shutter:
-        apm.add(ORCH_server, "wait", {"waittime": 1}, start_condition=ActionStartCondition.wait_for_previous)
+        apm.add(
+            ORCH_server,
+            "wait",
+            {"waittime": 1},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
 
     # take webcam image
     if acquire_image:
@@ -486,7 +482,7 @@ def UVIS_analysis_dry(
 
 def UVIS_measure_references(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     plate_id: int = 1,
     custom_position: str = "cell1_we",
     spec_n_avg: int = 5,
@@ -517,7 +513,26 @@ def UVIS_measure_references(
             ref_position_name="builtin_black_motorxy",
         )
     )
-    # 2) measure dark reference
+    # 2a) measure detector background (shutter closed)
+    apm.add_actions(
+        UVIS_sub_measure(
+            experiment=experiment,
+            spec_type=spec_type,
+            spec_int_time_ms=spec_int_time_ms,
+            spec_n_avg=spec_n_avg,
+            duration_sec=duration_sec,
+            toggle_source=led_names[0],
+            toggle_is_shutter=toggle_is_shutter,
+            illumination_wavelength=led_wavelengths_nm[0],
+            illumination_intensity=led_intensities_mw[0],
+            illumination_intensity_date=led_date,
+            illumination_side=led_type,
+            technique_name=technique_name,
+            run_use=RunUse.shutter_closed,
+            reference_mode="builtin",
+        )
+    )
+    # 2b) measure dark reference
     apm.add_actions(
         UVIS_sub_measure(
             experiment=experiment,
