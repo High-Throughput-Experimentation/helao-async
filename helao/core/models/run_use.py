@@ -14,3 +14,4 @@ class RunUse(str, Enum):
     preca_baseline = "preca_baseline"
     pre_anneal = "pre_anneal"
     post_anneal = "post_anneal"
+    shutter_closed = "shutter_closed"
