@@ -113,6 +113,7 @@ class XrfsAnalysis(BaseAnalysis):
         self.process_timestamp = self.inputs.xrfs.process_timestamp
         self.process_name = self.inputs.xrfs.technique_name
         self.run_type = self.inputs.xrfs.meta_dict.get("run_type", "xrfs")
+        self.run_use = self.inputs.xrfs.meta_dict["run_use"]
         self.technique_name = self.inputs.xrfs.technique_name
 
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
