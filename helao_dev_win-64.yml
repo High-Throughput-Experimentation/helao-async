@@ -68,6 +68,7 @@ dependencies:
   - python-multipart
   - pyusb
   - pyvisa
+  - pyvisa-py
   - pyzmq
   - pyzstd
   - requests
