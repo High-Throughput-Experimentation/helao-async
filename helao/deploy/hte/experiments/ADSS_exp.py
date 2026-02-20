@@ -1614,7 +1614,7 @@ def ADSS_sub_insitu_actions(
                 apm.add(
                     NI_server,
                     "gasvalve",
-                    {"gasvalve": "V1", "on": 0},
+                    {"gasvalve": "inlet", "on": 0},
                     ActionStartCondition.wait_for_orch,
                 )
                 apm.add(
@@ -1656,7 +1656,7 @@ def ADSS_sub_insitu_actions(
                 apm.add(
                     NI_server,
                     "gasvalve",
-                    {"gasvalve": "V1", "on": 1},
+                    {"gasvalve": "inlet", "on": 1},
                     ActionStartCondition.wait_for_orch,
                 )
             elif mtup[0] == "electrolyte":
@@ -2036,10 +2036,10 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
     apm.add(
         NI_server,
         "gasvalve",
-        {"gasvalve": "V1", "on": 0},
+        {"gasvalve": "inlet", "on": 0},
         start_condition=ActionStartCondition.wait_for_orch,
     )
-    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+    # apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
     # apm.add(
     #     WORKSYRINGE_server,
     #     "withdraw",
@@ -2048,7 +2048,7 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
     #         "volume_uL": Solution_volume_ul,
     #     },
     # )
-    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+    # apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
     apm.add(
         WORKSYRINGE_server,
         "infuse",
@@ -2091,7 +2091,7 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
             start_condition=ActionStartCondition.wait_for_previous,
         )
 
-    #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    #    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
 
     return apm.planned_actions
 
@@ -2120,10 +2120,10 @@ def ADSS_sub_cellfill_prefilled(
     apm.add(
         NI_server,
         "gasvalve",
-        {"gasvalve": "V1", "on": 0},
+        {"gasvalve": "inlet", "on": 0},
         start_condition=ActionStartCondition.wait_for_orch,
     )
-    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+    # apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
     # apm.add(
     #     WORKSYRINGE_server,
     #     "withdraw",
@@ -2132,7 +2132,7 @@ def ADSS_sub_cellfill_prefilled(
     #         "volume_uL": Solution_volume_ul,
     #     },
     # )
-    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+    # apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
     apm.add(
         WORKSYRINGE_server,
         "infuse",
@@ -2175,7 +2175,7 @@ def ADSS_sub_cellfill_prefilled(
             start_condition=ActionStartCondition.wait_for_previous,
         )
 
-    #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    #    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
 
     return apm.planned_actions
 
@@ -2190,8 +2190,8 @@ def ADSS_sub_cellfill_flush(
     ReturnLineWait_s: float = 0,
 ):
     apm = ActionPlanMaker()
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
-    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
+    # apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
     # apm.add(
     #     WORKSYRINGE_server,
     #     "withdraw",
@@ -2200,7 +2200,7 @@ def ADSS_sub_cellfill_flush(
     #         "volume_uL": Solution_volume_ul,
     #     },
     # )
-    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+    # apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
     apm.add(
         WORKSYRINGE_server,
         "infuse",
@@ -2215,7 +2215,7 @@ def ADSS_sub_cellfill_flush(
         apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
         apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
-    #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    #    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
 
     return apm.planned_actions
 
@@ -2229,25 +2229,25 @@ def ADSS_sub_drain_cell(
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # clearing return line
     apm.add(ORCH_server, "wait", {"waittime": ReturnLineReverseWait_s})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V4", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "pump_drain", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining reservoir
     apm.add(ORCH_server, "wait", {"waittime": DrainWait_s / 2})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": DrainWait_s / 2})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
-    #    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 1})
+    #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "water_refill", "on": 1})
     #    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining cell
     #    apm.add(ORCH_server, "wait", {"waittime": ResidualWait_s})
     #    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V4", "on": 0})
-    #    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "pump_drain", "on": 0})
+    #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "water_refill", "on": 0})
 
     return apm.planned_actions
 
@@ -2260,7 +2260,7 @@ def ADSS_sub_keep_electrolyte(
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # clearing return line
     apm.add(ORCH_server, "wait", {"waittime": ReturnLineReverseWait_s})
@@ -2278,7 +2278,7 @@ def ADSS_sub_keep_electrolyte(
 # ):
 
 #     apm = ActionPlanMaker()
-#     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+#     apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
 #     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 #     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
 #     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
@@ -2303,7 +2303,7 @@ def ADSS_sub_clean_cell(
 ):
     apm = ActionPlanMaker()
 
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
     if Clean_volume_ul > 10000:
         apm.add(
             CLEANSYRINGE_server,
@@ -2314,9 +2314,9 @@ def ADSS_sub_clean_cell(
             },
         )
         apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": PurgeWait_s})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
 
         apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
         apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
@@ -2342,9 +2342,9 @@ def ADSS_sub_clean_cell(
     )
     apm.add(ORCH_server, "wait", {"waittime": 10})
     if Clean_volume_ul < 7000:
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": PurgeWait_s})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
 
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
@@ -2444,7 +2444,7 @@ def ADSS_sub_move_to_ref_measurement(
 # ):
 #     apm = ActionPlanMaker()
 #     if Solution_volume_ul != 0:
-#         apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
 #         apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #         apm.add(
 #             WORKSYRINGE_server,
@@ -2460,10 +2460,10 @@ def ADSS_sub_move_to_ref_measurement(
 #             {"rate_uL_sec": Syringe_rate_ulsec, "volume_uL": 25},
 #         )
 #         apm.add(ORCH_server, "wait", {"waittime": 40})
-#         apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
 
 #     if Waterclean_volume_ul != 0:
-#         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
+#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 1})
 #         apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #         apm.add(
 #             CLEANSYRINGE_server,
@@ -2479,7 +2479,7 @@ def ADSS_sub_move_to_ref_measurement(
 #             {"rate_uL_sec": Syringe_rate_ulsec, "volume_uL": 25},
 #         )
 #         apm.add(ORCH_server, "wait", {"waittime": 10})
-#         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
+#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 0})
 
 #     return apm.planned_actions
 
@@ -2507,7 +2507,7 @@ def ADSS_sub_sample_aliquot(
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
     )
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": EquilibrationTime_s})
@@ -2538,7 +2538,7 @@ def ADSS_sub_sample_aliquot(
             ProcessContrib.run_use,
         ],
     )
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
 
     return apm.planned_actions  # returns complete action list to orch
 
@@ -2554,7 +2554,7 @@ def ADSS_sub_recirculate(
         dir = 0
     else:
         dir = 1
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": dir})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": wait_time_s})
@@ -2613,7 +2613,7 @@ def ADSS_sub_refill_syringe(
 ):
     apm = ActionPlanMaker()
     if syringe == "waterclean":
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
             CLEANSYRINGE_server,
@@ -2624,11 +2624,11 @@ def ADSS_sub_refill_syringe(
             },
         )
         apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 0})
 
     if syringe == "electrolyte":
         # need valve for this soln
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
             WORKSYRINGE_server,
@@ -2639,7 +2639,7 @@ def ADSS_sub_refill_syringe(
             },
         )
         apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
 
     return apm.planned_actions
 
@@ -2651,7 +2651,7 @@ def ADSS_sub_gasvalve_toggle(
 ):
     # true for N2 flow
     apm = ActionPlanMaker()
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": open})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": open})
 
     return apm.planned_actions  # returns complete action list to orch
 

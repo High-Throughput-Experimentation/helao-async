@@ -140,16 +140,18 @@ servers:
         Ttemp_Ttc_in_reservoir_C: PXI-6289/ai7
         Ttemp_Ktc_out_cell_C: PXI-6289/ai1
         Ttemp_Ktc_out_reservoir_C: PXI-6289/ai2
+      dev_liquidvalve:
+        clean_refill: PXI-6284/port1/line3  # V2 -- 3-way valve for cleaning solution (HNO3) to cell / refill reservoir
+        work_refill: PXI-6284/port1/line4  # V3 -- 3-way valve for working electrolyte to cell / refill reservoir
+        pump_drain: PXI-6284/port1/line5  # V4 -- 3-way valve cell peristaltic pump recirculation / drain 
+        water_refill: PXI-6284/port1/line6  # TODO: V5? -- 3-way valve for water to cell / refill reservoir
       dev_gasvalve:
-        V1: PXI-6284/port1/line2
-        V2: PXI-6284/port1/line3
-        V3: PXI-6284/port1/line4
-        V4: PXI-6284/port1/line5
-        V5: PXI-6284/port1/line6
-        '6': PXI-6284/port1/line7
-        O2N2toggle: PXI-6284/port2/line0
-        '8': PXI-6284/port2/line1
-        '9': PXI-6284/port2/line2
+        inlet: PXI-6284/port1/line2  # V1 -- open gas valve
+        O2N2toggle: PXI-6284/port2/line0  # 3-way valve for O2/N2 gas switching
+      dev_unassigned:
+        unassigned0: PXI-6284/port1/line7
+        unassigned1: PXI-6284/port2/line1
+        unassigned2: PXI-6284/port2/line2
       dev_pump:
         peripump: PXI-6284/port0/line4
         direction: PXI-6284/port0/line0
