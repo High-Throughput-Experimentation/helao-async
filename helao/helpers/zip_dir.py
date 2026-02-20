@@ -1,10 +1,8 @@
 from typing import Union
 from pathlib import Path
 import zipfile
-import aiofiles
 import anyio
 
-from zipstream import AsyncZipStream, ZIP_DEFLATED
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -50,27 +48,6 @@ def rm_tree(pth):
         else:
             rm_tree(child)
     pth.rmdir()
-
-
-async def zip_dir_async(target_dir: Union[Path, str], filename: Union[Path, str]):
-    success = False
-    try:
-        zs = AsyncZipStream(compress_type=ZIP_DEFLATED, compress_level=9)
-        if isinstance(target_dir, str):
-            target_dir = Path(target_dir)
-        if isinstance(filename, Path):
-            filename = str(filename)
-        for entry in target_dir.glob("*"):
-            await zs.add_path(str(entry))
-        async with aiofiles.open(filename, "wb") as f:
-            async for line in zs:
-                await f.write(line)
-        success = True
-        LOGGER.info(f"Zipped {target_dir} to {filename}")
-    except Exception:
-        LOGGER.error("Error while zipping folder, cannot remove.", exc_info=True)
-    if success:
-        await rm_tree_async(str(target_dir))
 
 
 def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]):

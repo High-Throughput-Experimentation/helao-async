@@ -4,18 +4,13 @@ channels:
   - defaults
 dependencies:
   - pip:
-    - aioboto3
-    - aiodebug
-    - aioshutil
-    - nidaqmx
-    - plumbum
-    - pydasher
-    - pyft232
-    - sqlmodel
-    - uuid7
-    - https://github.com/meerstetter/pyMeCom/archive/master.zip
-    - https://github.com/onepunchdan/easy-biologic/archive/main.zip
-    - https://github.com/stexandev/zipstream-ng/archive/feature/async.zip
+      - aiodebug
+      - aioshutil
+      - pydasher
+      - uuid7
+      - https://github.com/meerstetter/pyMeCom/archive/master.zip
+      - https://github.com/onepunchdan/easy-biologic/archive/main.zip
+  - aioboto3
   - aiofiles
   - aiohttp
   - anyio
@@ -42,6 +37,7 @@ dependencies:
   - mendeleev
   - mpltern
   - munch
+  - nidaqmx-python
   - ntplib
   - numpy=1
   - orjson
@@ -50,22 +46,23 @@ dependencies:
   - paramiko=3
   - pip
   - plotly
+  - plumbum
   - psutil
   - psycopg2
   - pyaml
   - pyarrow
+  - pybase64
+  - pydantic
   - pydantic-core
   - pydantic-settings
-  - pydantic
-  - pybase64
   - pyfiglet
   - pyftdi
   - pylablib
   - pymodbus
   - pyserial
-  - python=3.12
   - python-dotenv
   - python-multipart
+  - python=3.12
   - pyusb
   - pyvisa
   - pyvisa-py
@@ -78,6 +75,7 @@ dependencies:
   - scipy
   - shortuuid
   - sqlalchemy
+  - sqlmodel
   - sshtunnel
   - starlette
   - termcolor
