@@ -9,6 +9,8 @@ __all__ = [
     "CLAD_sub_reference_setup",
     "CLAD_sub_OCV_bubble_check",
     "CLAD_sub_load_assembly",
+    "CLAD_sub_clean_cell",
+    "CLAD_sub_refill_syringe",
 ]
 
 
@@ -43,11 +45,14 @@ MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
-SOLUTIONPUMP_server = MachineModel(
-    server_name="SYRINGE0", machine_name=ORCH_HOST
+WORKSYRINGE_server = MachineModel(
+    server_name="SYRINGE_WORK", machine_name=ORCH_HOST
 ).as_dict()
-WATERCLEANPUMP_server = MachineModel(
-    server_name="SYRINGE1", machine_name=ORCH_HOST
+WATERSYRINGE_server = MachineModel(
+    server_name="SYRINGE_WATER", machine_name=ORCH_HOST
+).as_dict()
+CLEANSYRINGE_server = MachineModel(
+    server_name="SYRINGE_CLEAN", machine_name=ORCH_HOST
 ).as_dict()
 
 
@@ -196,7 +201,7 @@ def CLAD_sub_fill_cell(
         start_condition=ActionStartCondition.wait_for_orch,
     )
     apm.add(
-        SOLUTIONPUMP_server,
+        WORKSYRINGE_server,
         "infuse",
         {
             "rate_uL_sec": fill_rate_ul_s,
@@ -287,7 +292,7 @@ def CLAD_sub_setup_cell(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(
-        SOLUTIONPUMP_server,
+        WORKSYRINGE_server,
         "withdraw",
         {
             "rate_uL_sec": fill_rate_ul_s,
@@ -621,3 +626,127 @@ def CLAD_sub_load_assembly(
 
     return apm.planned_actions
 
+
+def CLAD_sub_clean_cell(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    nitric_volume_ul: float = 3000,
+    water_volume_ul: float = 10000,
+    Syringe_rate_ulsec: float = 300,
+    PurgeWait_s: float = 3,
+    ReturnLineWait_s: float = 60,
+    DrainWait_s: float = 80,
+    ReturnLineReverseWait_s: float = 15,
+    Watercleancycle: bool = True,
+    lift: bool = False,
+    #    ResidualWait_s: float = 15,
+):
+    apm = ActionPlanMaker()
+
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+    apm.add(
+        CLEANSYRINGE_server,
+        "infuse",
+        {
+            "rate_uL_sec": Syringe_rate_ulsec,
+            "volume_uL": nitric_volume_ul,
+        },
+    )
+    apm.add(ORCH_server, "wait", {"waittime": 10})
+
+    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+
+    apm.add_actions(
+        ADSS_sub_drain_cell(
+            experiment=experiment,
+            DrainWait_s=DrainWait_s,
+            ReturnLineReverseWait_s=ReturnLineReverseWait_s,
+            # ResidualWait_s=ResidualWait_s,
+        )
+    )
+
+    if Watercleancycle:
+        apm.add(
+            WATERSYRINGE_server,
+            "infuse",
+            {
+                "rate_uL_sec": Syringe_rate_ulsec,
+                "volume_uL": water_volume_ul,
+            },
+        )
+
+        apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
+        apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
+        apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+
+        apm.add_actions(
+            ADSS_sub_drain_cell(
+                experiment=experiment,
+                DrainWait_s=DrainWait_s,
+                ReturnLineReverseWait_s=ReturnLineReverseWait_s,
+                # ResidualWait_s=ResidualWait_s,
+            )
+        )
+
+    if lift:
+        apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+
+    return apm.planned_actions
+
+
+def CLAD_sub_refill_syringe(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    syringe: str = "clean",
+    fill_volume_ul: float = 0,
+    Syringe_rate_ulsec: float = 1000,
+):
+    apm = ActionPlanMaker()
+    if syringe == "clean":
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(
+            CLEANSYRINGE_server,
+            "withdraw",
+            {
+                "rate_uL_sec": Syringe_rate_ulsec,
+                "volume_uL": fill_volume_ul,
+            },
+        )
+        apm.add(ORCH_server, "wait", {"waittime": 10})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
+
+    if syringe == "water":
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 1})  # need to assign new valve for water
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(
+            WATERSYRINGE_server,
+            "withdraw",
+            {
+                "rate_uL_sec": Syringe_rate_ulsec,
+                "volume_uL": fill_volume_ul,
+            },
+        )
+        apm.add(ORCH_server, "wait", {"waittime": 10})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 0})  # need to assign new valve for water
+
+    if syringe == "electrolyte":
+        # need valve for this soln
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(
+            WORKSYRINGE_server,
+            "withdraw",
+            {
+                "rate_uL_sec": Syringe_rate_ulsec,
+                "volume_uL": fill_volume_ul,
+            },
+        )
+        apm.add(ORCH_server, "wait", {"waittime": 10})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+
+    return apm.planned_actions
