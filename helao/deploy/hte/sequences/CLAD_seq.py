@@ -147,7 +147,7 @@ def CLAD_seq(
             },
         )
         epm.add(
-            "ADSS_sub_refill_syringe",
+            "CLAD_sub_refill_syringe",
             {
                 "syringe": "electrolyte",
                 "fill_volume_ul": fill_volume_ul,

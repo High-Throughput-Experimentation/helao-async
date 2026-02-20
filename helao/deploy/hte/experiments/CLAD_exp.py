@@ -30,7 +30,6 @@ from helao.deploy.hte.drivers.motion.galil_motion_driver import (
 
 from helao.deploy.hte.experiments.ADSS_xtraclean_exp import (
     ADSS_sub_drain_cell,
-    ADSS_sub_refill_syringe,
     ADSS_sub_OCV,
 )
 
@@ -74,19 +73,19 @@ def CLAD_sub_recirculate_alternating(
     apm = ActionPlanMaker()
 
     # RECIRCULATE FORWARD
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": forward_duration_s})
 
     # RECIRCULATE REVERSE
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": reverse_duration_s})
 
     # RECIRCULATE FORWARD FINAL
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": final_duration_s})
@@ -197,7 +196,7 @@ def CLAD_sub_fill_cell(
     apm.add(
         NI_server,
         "gasvalve",
-        {"gasvalve": "V1", "on": 0},
+        {"gasvalve": "inlet", "on": 0},
         start_condition=ActionStartCondition.wait_for_orch,
     )
     apm.add(
@@ -274,7 +273,7 @@ def CLAD_sub_setup_cell(
     )
 
     # RECIRCULATE RINSE SOLUTION FORWARD DIRECTION
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": rinse_recirc_duration_s})
@@ -289,7 +288,7 @@ def CLAD_sub_setup_cell(
     )
 
     # REFILL SYRINGE
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(
         WORKSYRINGE_server,
@@ -300,7 +299,7 @@ def CLAD_sub_setup_cell(
         },
     )
     apm.add(ORCH_server, "wait", {"waittime": 10})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
 
     return apm.planned_actions
 
@@ -428,7 +427,7 @@ def CLAD_sub_reference_setup(
 
     # REFILL SYRINGE
     apm.add_actions(
-        ADSS_sub_refill_syringe(
+        CLAD_sub_refill_syringe(
             experiment=experiment,
             syringe="electrolyte",
             fill_volume_ul=fill_volume_ul,
@@ -643,7 +642,7 @@ def CLAD_sub_clean_cell(
 ):
     apm = ActionPlanMaker()
 
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
     apm.add(
         CLEANSYRINGE_server,
         "infuse",
@@ -707,7 +706,7 @@ def CLAD_sub_refill_syringe(
 ):
     apm = ActionPlanMaker()
     if syringe == "clean":
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
             CLEANSYRINGE_server,
@@ -718,10 +717,10 @@ def CLAD_sub_refill_syringe(
             },
         )
         apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 0})
 
     if syringe == "water":
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 1})  # need to assign new valve for water
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "water_refill", "on": 1})  # need to assign new valve for water
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
             WATERSYRINGE_server,
@@ -732,11 +731,11 @@ def CLAD_sub_refill_syringe(
             },
         )
         apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 0})  # need to assign new valve for water
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "water_refill", "on": 0})  # need to assign new valve for water
 
     if syringe == "electrolyte":
         # need valve for this soln
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
             WORKSYRINGE_server,
@@ -747,6 +746,6 @@ def CLAD_sub_refill_syringe(
             },
         )
         apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
 
     return apm.planned_actions
