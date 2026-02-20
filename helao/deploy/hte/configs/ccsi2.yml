@@ -108,7 +108,7 @@ servers:
       port: COM12
       start_margin: 0
     verbose: false
-  SYRINGE0:
+  WORKSYRINGE:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8013
     group: action
@@ -119,7 +119,7 @@ servers:
         zero:
           address: 0
           diameter: 20.05
-  SYRINGE1:
+  WATERSYRINGE:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8014
     group: action
@@ -130,7 +130,7 @@ servers:
         one:
           address: 1
           diameter: 20.05
-  SYRINGE2:
+  CLEANSYRINGE:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8015
     group: action
