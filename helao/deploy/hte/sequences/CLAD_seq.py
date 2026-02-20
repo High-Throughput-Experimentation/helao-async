@@ -1,11 +1,8 @@
 """Sequence library for Closed Loop Accelerated Durability (CLAD)"""
 
-from matplotlib.pylab import fill
+from helao.helpers.premodels import ExperimentPlanMaker
 
 SEQUENCES = ["CLAD_seq"]
-
-from typing import List
-from helao.helpers.premodels import ExperimentPlanMaker
 
 
 def CLAD_seq(
