@@ -197,7 +197,7 @@ servers:
     group: visualizer
     bokeh: action_visualizer
     params: {}
-  SYRINGE_WORK:
+  WORKSYRINGE:
     host: hte-adss-01.htejcap.caltech.edu
     port: 8013
     group: action
@@ -208,7 +208,7 @@ servers:
         zero:
           address: 0
           diameter: 26.7
-  SYRINGE_CLEAN:
+  CLEANSYRINGE:
     host: hte-adss-01.htejcap.caltech.edu
     port: 8014
     group: action

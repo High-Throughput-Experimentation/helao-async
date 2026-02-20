@@ -46,13 +46,13 @@ NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 WORKSYRINGE_server = MachineModel(
-    server_name="SYRINGE_WORK", machine_name=ORCH_HOST
+    server_name="WORKSYRINGE", machine_name=ORCH_HOST
 ).as_dict()
 WATERSYRINGE_server = MachineModel(
-    server_name="SYRINGE_WATER", machine_name=ORCH_HOST
+    server_name="WATERSYRINGE", machine_name=ORCH_HOST
 ).as_dict()
 CLEANSYRINGE_server = MachineModel(
-    server_name="SYRINGE_CLEAN", machine_name=ORCH_HOST
+    server_name="CLEANSYRINGE", machine_name=ORCH_HOST
 ).as_dict()
 
 

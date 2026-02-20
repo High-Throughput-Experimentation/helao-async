@@ -64,17 +64,17 @@ CALC_server = MachineModel(server_name="CALC", machine_name=ORCH_HOST).as_dict()
 CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
 MFC_server = MachineModel(server_name="MFC", machine_name=ORCH_HOST).as_dict()
 N2MFC_server = MachineModel(server_name="N2MFC", machine_name=ORCH_HOST).as_dict()
-SOLUTIONPUMP_server = MachineModel(
-    server_name="SYRINGE0", machine_name=ORCH_HOST
+WORKSYRINGE_server = MachineModel(
+    server_name="WORKSYRINGE", machine_name=ORCH_HOST
 ).as_dict()
 #
 # previous "cleanpump" now named waterpump for dilutions and cleans. not the same as CCSIL clean/water pumps
 # new "cleanpump" now for methanol rinse
-WATERPUMP_server = MachineModel(
-    server_name="SYRINGE1", machine_name=ORCH_HOST
+WATERSYRINGE_server = MachineModel(
+    server_name="WATERSYRINGE", machine_name=ORCH_HOST
 ).as_dict()
-CLEANPUMP_server = MachineModel(
-    server_name="SYRINGE2", machine_name=ORCH_HOST
+CLEANSYRINGE_server = MachineModel(
+    server_name="CLEANSYRINGE", machine_name=ORCH_HOST
 ).as_dict()
 toggle_triggertype = TriggerType.fallingedge
 
@@ -787,7 +787,7 @@ def CCSI_sub_cellfill(
                 )
 
                 apm.add(
-                    CLEANPUMP_server,
+                    CLEANSYRINGE_server,
                     "infuse",
                     {
                         "rate_uL_sec": secondliquid_injection_syringe_rate_ulsec,
@@ -876,7 +876,7 @@ def CCSI_sub_cellfill(
             ],  # save new liquid_sample_no of eche cell to globals
         )
         apm.add(
-            SOLUTIONPUMP_server,
+            WORKSYRINGE_server,
             "infuse",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -999,7 +999,7 @@ def CCSI_sub_cellfill(
             )
 
             apm.add(
-                CLEANPUMP_server,
+                CLEANSYRINGE_server,
                 "infuse",
                 {
                     "rate_uL_sec": secondliquid_injection_syringe_rate_ulsec,
@@ -1100,7 +1100,7 @@ def CCSI_sub_cellfill(
                 )
 
                 apm.add(
-                    CLEANPUMP_server,
+                    CLEANSYRINGE_server,
                     "infuse",
                     {
                         "rate_uL_sec": secondliquid_injection_syringe_rate_ulsec,
@@ -1190,7 +1190,7 @@ def CCSI_sub_cellfill(
         )
 
         apm.add(
-            WATERPUMP_server,
+            WATERSYRINGE_server,
             "infuse",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -1880,7 +1880,7 @@ def CCSI_sub_clean_inject(
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
-            WATERPUMP_server,
+            WATERSYRINGE_server,
             "withdraw",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -1905,7 +1905,7 @@ def CCSI_sub_clean_inject(
             NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait
         )
         apm.add(
-            WATERPUMP_server,
+            WATERSYRINGE_server,
             "infuse",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -1913,7 +1913,7 @@ def CCSI_sub_clean_inject(
             },
         )
         apm.add(
-            WATERPUMP_server,
+            WATERSYRINGE_server,
             "get_present_volume",
             {},
             to_global_params=["_present_volume_ul"],
@@ -2025,7 +2025,7 @@ def CCSI_sub_refill_clean(
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     apm.add(
-        WATERPUMP_server,
+        WATERSYRINGE_server,
         "withdraw",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
@@ -2034,7 +2034,7 @@ def CCSI_sub_refill_clean(
     )
     apm.add(ORCH_server, "wait", {"waittime": 5.25})
     apm.add(
-        WATERPUMP_server,
+        WATERSYRINGE_server,
         "infuse",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
@@ -2055,9 +2055,9 @@ def CCSI_sub_refill_clean(
 # ):
 #     apm = ActionPlanMaker()
 #     if syringe == "waterclean":
-#         apm.add(WATERPUMP_server, "set_present_volume", {"volume_uL": Starting_volume_ul})
+#         apm.add(WATERSYRINGE_server, "set_present_volume", {"volume_uL": Starting_volume_ul})
 #     if syringe == "solution1":
-#         apm.add(SOLUTIONPUMP_server, "set_present_volume", {"volume_uL": Starting_volume_ul})
+#         apm.add(WORKSYRINGE_server, "set_present_volume", {"volume_uL": Starting_volume_ul})
 #     # if more syringes can add more names here
 #     return apm.planned_actions
 
@@ -2071,7 +2071,7 @@ def CCSI_sub_refill_clean(
 # ):
 #     apm = ActionPlanMaker()
 #     apm.add(
-#         WATERPUMP_server,
+#         WATERSYRINGE_server,
 #         "get_present_volume",
 #         {},
 #         to_global_params=["_present_volume_ul"],
@@ -2106,7 +2106,7 @@ def CCSI_sub_refill_clean(
 #         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
 #         apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #         apm.add(
-#             WATERPUMP_server,
+#             WATERSYRINGE_server,
 #             "withdraw",
 #             {
 #                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -2120,7 +2120,7 @@ def CCSI_sub_refill_clean(
 #         # need valve for this soln
 #         apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #         apm.add(
-#             SOLUTIONPUMP_server,
+#             WORKSYRINGE_server,
 #             "withdraw",
 #             {
 #                 "rate_uL_sec": Syringe_rate_ulsec,

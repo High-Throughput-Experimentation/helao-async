@@ -62,11 +62,11 @@ IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
 CALC_server = MachineModel(server_name="CALC", machine_name=ORCH_HOST).as_dict()
 CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
 MFC_server = MachineModel(server_name="MFC", machine_name=ORCH_HOST).as_dict()
-SOLUTIONPUMP_server = MachineModel(
-    server_name="SYRINGE0", machine_name=ORCH_HOST
+WORKSYRINGE_server = MachineModel(
+    server_name="WORKSYRINGE", machine_name=ORCH_HOST
 ).as_dict()
-WATERCLEANPUMP_server = MachineModel(
-    server_name="SYRINGE1", machine_name=ORCH_HOST
+WATERCLEANSYRINGE_server = MachineModel(
+    server_name="WATERSYRINGE", machine_name=ORCH_HOST
 ).as_dict()
 toggle_triggertype = TriggerType.fallingedge
 
@@ -502,7 +502,7 @@ def CCSI_sub_cellfill(
         else:
             procfinish = False
         apm.add(
-            SOLUTIONPUMP_server,
+            WORKSYRINGE_server,
             "infuse",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -553,7 +553,7 @@ def CCSI_sub_cellfill(
             ]
 
         apm.add(
-            WATERCLEANPUMP_server,
+            WATERCLEANSYRINGE_server,
             "infuse",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -1107,7 +1107,7 @@ def CCSI_sub_clean_inject(
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
-            WATERCLEANPUMP_server,
+            WATERCLEANSYRINGE_server,
             "withdraw",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -1127,7 +1127,7 @@ def CCSI_sub_clean_inject(
     apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 1}, asc.no_wait)
     apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait)
     apm.add(
-        WATERCLEANPUMP_server,
+        WATERCLEANSYRINGE_server,
         "infuse",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
@@ -1135,7 +1135,7 @@ def CCSI_sub_clean_inject(
         },
     )
     apm.add(
-        WATERCLEANPUMP_server,
+        WATERCLEANSYRINGE_server,
         "get_present_volume",
         {},
         to_global_params=["_present_volume_ul"],
@@ -1237,7 +1237,7 @@ def CCSI_sub_refill_clean(
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     apm.add(
-        WATERCLEANPUMP_server,
+        WATERCLEANSYRINGE_server,
         "withdraw",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
@@ -1258,9 +1258,9 @@ def CCSI_sub_refill_clean(
 # ):
 #     apm = ActionPlanMaker()
 #     if syringe == "waterclean":
-#         apm.add(WATERCLEANPUMP_server, "set_present_volume", {"volume_uL": Starting_volume_ul})
+#         apm.add(WATERCLEANSYRINGE_server, "set_present_volume", {"volume_uL": Starting_volume_ul})
 #     if syringe == "solution1":
-#         apm.add(SOLUTIONPUMP_server, "set_present_volume", {"volume_uL": Starting_volume_ul})
+#         apm.add(WORKSYRINGE_server, "set_present_volume", {"volume_uL": Starting_volume_ul})
 #     # if more syringes can add more names here
 #     return apm.planned_actions
 
@@ -1274,7 +1274,7 @@ def CCSI_sub_full_fill_syringe(
 ):
     apm = ActionPlanMaker()
     apm.add(
-        WATERCLEANPUMP_server,
+        WATERCLEANSYRINGE_server,
         "get_present_volume",
         {},
         to_global_params=["_present_volume_ul"],
@@ -1309,7 +1309,7 @@ def CCSI_sub_fill_syringe(
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
-            WATERCLEANPUMP_server,
+            WATERCLEANSYRINGE_server,
             "withdraw",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -1323,7 +1323,7 @@ def CCSI_sub_fill_syringe(
         # need valve for this soln
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
-            SOLUTIONPUMP_server,
+            WORKSYRINGE_server,
             "withdraw",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
