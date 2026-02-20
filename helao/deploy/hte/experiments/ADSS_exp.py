@@ -85,11 +85,11 @@ MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
-SOLUTIONPUMP_server = MachineModel(
-    server_name="SYRINGE0", machine_name=ORCH_HOST
+WORKSYRINGE_server = MachineModel(
+    server_name="SYRINGE_WORK", machine_name=ORCH_HOST
 ).as_dict()
-WATERCLEANPUMP_server = MachineModel(
-    server_name="SYRINGE1", machine_name=ORCH_HOST
+CLEANSYRINGE_server = MachineModel(
+    server_name="SYRINGE_CLEAN", machine_name=ORCH_HOST
 ).as_dict()
 
 
@@ -2041,7 +2041,7 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
     )
     # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
     # apm.add(
-    #     SOLUTIONPUMP_server,
+    #     WORKSYRINGE_server,
     #     "withdraw",
     #     {
     #         "rate_uL_sec": Syringe_rate_ulsec,
@@ -2050,7 +2050,7 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
     # )
     # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
     apm.add(
-        SOLUTIONPUMP_server,
+        WORKSYRINGE_server,
         "infuse",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
@@ -2125,7 +2125,7 @@ def ADSS_sub_cellfill_prefilled(
     )
     # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
     # apm.add(
-    #     SOLUTIONPUMP_server,
+    #     WORKSYRINGE_server,
     #     "withdraw",
     #     {
     #         "rate_uL_sec": Syringe_rate_ulsec,
@@ -2134,7 +2134,7 @@ def ADSS_sub_cellfill_prefilled(
     # )
     # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
     apm.add(
-        SOLUTIONPUMP_server,
+        WORKSYRINGE_server,
         "infuse",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
@@ -2193,7 +2193,7 @@ def ADSS_sub_cellfill_flush(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
     # apm.add(
-    #     SOLUTIONPUMP_server,
+    #     WORKSYRINGE_server,
     #     "withdraw",
     #     {
     #         "rate_uL_sec": Syringe_rate_ulsec,
@@ -2202,7 +2202,7 @@ def ADSS_sub_cellfill_flush(
     # )
     # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
     apm.add(
-        SOLUTIONPUMP_server,
+        WORKSYRINGE_server,
         "infuse",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
@@ -2306,7 +2306,7 @@ def ADSS_sub_clean_cell(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     if Clean_volume_ul > 10000:
         apm.add(
-            WATERCLEANPUMP_server,
+            CLEANSYRINGE_server,
             "infuse",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -2333,7 +2333,7 @@ def ADSS_sub_clean_cell(
         )
 
     apm.add(
-        WATERCLEANPUMP_server,
+        CLEANSYRINGE_server,
         "infuse",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
@@ -2447,7 +2447,7 @@ def ADSS_sub_move_to_ref_measurement(
 #         apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
 #         apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #         apm.add(
-#             SOLUTIONPUMP_server,
+#             WORKSYRINGE_server,
 #             "withdraw",
 #             {
 #                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -2455,7 +2455,7 @@ def ADSS_sub_move_to_ref_measurement(
 #             },
 #         )
 #         apm.add(
-#             SOLUTIONPUMP_server,
+#             WORKSYRINGE_server,
 #             "infuse",
 #             {"rate_uL_sec": Syringe_rate_ulsec, "volume_uL": 25},
 #         )
@@ -2466,7 +2466,7 @@ def ADSS_sub_move_to_ref_measurement(
 #         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
 #         apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #         apm.add(
-#             WATERCLEANPUMP_server,
+#             CLEANSYRINGE_server,
 #             "withdraw",
 #             {
 #                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -2474,7 +2474,7 @@ def ADSS_sub_move_to_ref_measurement(
 #             },
 #         )
 #         apm.add(
-#             WATERCLEANPUMP_server,
+#             CLEANSYRINGE_server,
 #             "infuse",
 #             {"rate_uL_sec": Syringe_rate_ulsec, "volume_uL": 25},
 #         )
@@ -2616,7 +2616,7 @@ def ADSS_sub_refill_syringe(
         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
-            WATERCLEANPUMP_server,
+            CLEANSYRINGE_server,
             "withdraw",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,
@@ -2631,7 +2631,7 @@ def ADSS_sub_refill_syringe(
         apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(
-            SOLUTIONPUMP_server,
+            WORKSYRINGE_server,
             "withdraw",
             {
                 "rate_uL_sec": Syringe_rate_ulsec,

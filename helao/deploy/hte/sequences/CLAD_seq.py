@@ -98,11 +98,11 @@ def CLAD_seq(
         )
         washmod += 1  # increment washmod after each aliquot
 
-        ## CLEAN CELL WITH WATER
+        ## CLEAN CELL WITH NITRIC ACID AND WATER
         epm.add("ADSS_sub_move_to_clean_cell", {})
         for _ in range(number_of_cleans):
             epm.add(
-                "ADSS_sub_clean_cell",
+                "CLAD_sub_clean_cell",
                 {
                     "Clean_volume_ul": clean_volume_ul,
                     "ReturnLineWait_s": clean_recirc_duration_s,
@@ -116,9 +116,9 @@ def CLAD_seq(
                 volume = clean_volume_ul
 
             epm.add(
-                "ADSS_sub_refill_syringe",
+                "CLAD_sub_refill_syringe",
                 {
-                    "syringe": "waterclean",
+                    "syringe": "clean",
                     "fill_volume_ul": volume,
                     "Syringe_rate_ulsec": 300,
                 },

@@ -71,11 +71,11 @@ CALIBRATIONMFCSECOND_server = MachineModel(
     server_name="CALIBRATIONMFCSECOND", machine_name=ORCH_HOST
 ).as_dict()
 
-# SOLUTIONPUMP_server = MachineModel(
-#     server_name="SYRINGE0", machine_name=ORCH_HOST
+# WORKSYRINGE_server = MachineModel(
+#     server_name="SYRINGE_WORK", machine_name=ORCH_HOST
 # ).as_dict()
-# WATERCLEANPUMP_server = MachineModel(
-#     server_name="SYRINGE1", machine_name=ORCH_HOST
+# CLEANSYRINGE_server = MachineModel(
+#     server_name="SYRINGE_CLEAN", machine_name=ORCH_HOST
 # ).as_dict()
 toggle_triggertype = TriggerType.fallingedge
 
