@@ -76,9 +76,7 @@ class C_simlivevis:
 
         self.plot = figure(height=300, width=500, output_backend="webgl")
         self.plot.xaxis.formatter = DatetimeTickFormatter(
-            minsec="%T",
             minutes="%T",
-            hourmin="%T",
             hours="%T",
         )
         self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
