@@ -772,10 +772,8 @@ class BokehOperator:
             layout(height_policy="min"),
             self.select_tabs,
             layout(height_policy="min"),
-            layout(height_policy="min"),
             self.layout4,  # placeholder  # placeholder
         )
-        self.vis.doc.add_root(self.dynamic_col)
 
         # select the first item to force an update of the layout
         if self.experiment_select_list and self.select_tabs.active == 1:
@@ -792,6 +790,7 @@ class BokehOperator:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
         self.orch.orch_op = self
 
+        self.vis.doc.add_root(self.dynamic_col)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
         self.update_selector_layout(attr="active", old=0, new=0)
 
