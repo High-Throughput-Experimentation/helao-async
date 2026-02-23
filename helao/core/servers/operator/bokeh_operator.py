@@ -772,9 +772,9 @@ class BokehOperator:
             layout(height_policy="min"),
             self.select_tabs,
             layout(height_policy="min"),
-            layout(height_policy="min"),
             self.layout4,  # placeholder  # placeholder
         )
+        self.vis.doc.add_root(self.dynamic_col)
 
         # select the first item to force an update of the layout
         if self.experiment_select_list and self.select_tabs.active == 1:
@@ -790,8 +790,6 @@ class BokehOperator:
         self.IOtask = asyncio.create_task(self.IOloop())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
         self.orch.orch_op = self
-
-        self.vis.doc.add_root(self.dynamic_col)
 
         if self.sequences:
             self.vis.doc.on_event(
@@ -820,7 +818,7 @@ class BokehOperator:
             columns=columns,
             width=self.max_width - 20,
             height=200,
-            autosize_mode="fit_columns",
+            autosize_mode="force_fit",
             **extra_kwargs,
         )
         return source, table
@@ -971,7 +969,7 @@ class BokehOperator:
             defaults = list(item["defaults"])
             argtypes = list(item["argtypes"])
 
-        self.dynamic_col.children.pop(4)
+        self.dynamic_col.children.pop(3)
 
         for _ in range(len(args) - len(defaults)):
             defaults.insert(0, "")
@@ -1032,7 +1030,7 @@ class BokehOperator:
                 ),
             )
 
-        self.dynamic_col.children.insert(4, layout(param_layout, height_policy="min"))
+        self.dynamic_col.children.insert(3, layout(param_layout, height_policy="min"))
 
         if cfg["refresh"]:
             self.refresh_inputs(param_input, private_input)
