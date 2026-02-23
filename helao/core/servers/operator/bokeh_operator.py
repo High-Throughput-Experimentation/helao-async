@@ -792,6 +792,7 @@ class BokehOperator:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
         self.orch.orch_op = self
 
+        self.vis.doc.add_next_tick_callback(partial(self.update_selector_layout, "active", 0, 0))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def cleanup_session(self, session_context):
