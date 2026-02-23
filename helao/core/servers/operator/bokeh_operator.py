@@ -793,10 +793,14 @@ class BokehOperator:
 
         self.vis.doc.add_root(self.dynamic_col)
 
-        initial_layout = 0 if self.sequences else 1
-        self.vis.doc.on_event(
-            DocumentReady, partial(self.update_selector_layout, "active", initial_layout, initial_layout)
-        )
+        if self.sequences:
+            self.vis.doc.on_event(
+                DocumentReady, partial(self.callback_sequence_select, 0, 0)
+            )
+        else:
+            self.vis.doc.on_event(
+                DocumentReady, partial(self.callback_experiment_select, 0, 0)
+            )
 
     def cleanup_session(self, session_context):
         LOGGER.info("BokehOperator session closed")
