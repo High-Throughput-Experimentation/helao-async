@@ -78,7 +78,6 @@ class C_gpsimlivevis:
             disabled=True,
             button_type="success",
             width=400,
-            align="end",
         )  # success: green, danger: red
 
         self.table = DataTable(
