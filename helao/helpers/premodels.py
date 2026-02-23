@@ -24,6 +24,7 @@ from helao.core.models.experiment import (
 from helao.core.models.sequence import SequenceModel
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.machine import MachineModel
 
 from helao.helpers import helao_logging as logging
 
@@ -350,7 +351,7 @@ class ActionPlanMaker:
 
     def add(
         self,
-        action_server: dict,
+        action_server: dict|MachineModel|str,
         action_name: str,
         action_params: dict,
         start_condition: ActionStartCondition = ActionStartCondition.wait_for_all,
@@ -360,6 +361,10 @@ class ActionPlanMaker:
     ):
         """Shorthand add_action()."""
         action_dict = self._experiment.as_dict()
+        if isinstance(action_server, MachineModel):
+            action_server = action_server.as_dict()
+        elif isinstance(action_server, str):
+            action_server = MachineModel(server_name=action_server).as_dict()
         action_dict.update(
             {
                 "action_server": action_server,
