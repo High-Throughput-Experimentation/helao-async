@@ -58,7 +58,7 @@ from bokeh.models import TabPanel, Tabs
 from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.plotting import figure
-from bokeh.events import ButtonClick, DoubleTap
+from bokeh.events import ButtonClick, DoubleTap, DocumentReady
 from bokeh.models.widgets import FileInput
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -793,15 +793,10 @@ class BokehOperator:
 
         self.vis.doc.add_root(self.dynamic_col)
 
-        if self.sequences:
-            self.vis.doc.add_next_tick_callback(
-                partial(self.update_seq_doc, self.sequences[0]["doc"])
-            )
-        else:
-            self.vis.doc.add_next_tick_callback(
-                partial(self.update_exp_doc, self.experiments[0]["doc"])
-            )
-        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+        initial_layout = 0 if self.sequences else 1
+        self.vis.doc.on_event(
+            DocumentReady, partial(self.update_selector_layout, "active", initial_layout, initial_layout)
+        )
 
     def cleanup_session(self, session_context):
         LOGGER.info("BokehOperator session closed")
