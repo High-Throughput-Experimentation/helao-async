@@ -772,6 +772,7 @@ class BokehOperator:
             layout(height_policy="min"),
             self.select_tabs,
             layout(height_policy="min"),
+            layout(height_policy="min"),
             self.layout4,  # placeholder  # placeholder
         )
 
