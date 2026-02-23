@@ -792,8 +792,16 @@ class BokehOperator:
         self.orch.orch_op = self
 
         self.vis.doc.add_root(self.dynamic_col)
+
+        if self.sequences:
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_seq_doc, self.sequences[0]["doc"])
+            )
+        else:
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_exp_doc, self.experiments[0]["doc"])
+            )
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
-        self.update_selector_layout(attr="active", old=0, new=0)
 
     def cleanup_session(self, session_context):
         LOGGER.info("BokehOperator session closed")
