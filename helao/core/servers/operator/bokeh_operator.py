@@ -792,6 +792,8 @@ class BokehOperator:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
         self.orch.orch_op = self
 
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
     def cleanup_session(self, session_context):
         LOGGER.info("BokehOperator session closed")
         self.IOloop_run = False
@@ -917,6 +919,7 @@ class BokehOperator:
                 self.sequence.campaign_uuid = self.input_campaign_uuid.value.strip()
         self.vis.doc.add_next_tick_callback(partial(orch_method, self.sequence))
         self.sequence = None
+        self.vis.doc.add_next_tick_callback(partial(self._update_param_layout))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def _update_param_layout(
