@@ -502,6 +502,8 @@ class Orch(Base):
             pending_action is not None
             and self.globalstatusmodel.loop_intent == LoopIntent.stop
         ):
+
+            pending_action.action_server.machine_name = self.server.machine_name
             self.action_dq.insert(0, pending_action)
             return False
         return True
@@ -1131,6 +1133,7 @@ class Orch(Base):
             actserv_cfg = self.world_cfg["servers"][act.action_server.server_name]
             act.action_server.hostname = actserv_cfg["host"]
             act.action_server.port = actserv_cfg["port"]
+            act.action_server.machine_name = self.server.machine_name
             act.campaign_name = self.active_experiment.campaign_name
             act.campaign_uuid = self.active_experiment.campaign_uuid
             staged_acts.append(act)
@@ -2350,6 +2353,7 @@ class Orch(Base):
                 # will be updated again once its dispatched again
                 new_action.actual_order = EA_act.actual_order
                 new_action.action_retry = EA_act.action_retry + 1
+                new_action.action_server.machine_name = self.server.machine_name
                 self.action_dq.appendleft(new_action)
             else:
                 LOGGER.info(f"uuid {check_uuid} not found in list of error statuses:")
@@ -2427,6 +2431,7 @@ class Orch(Base):
         current_action_order = self.action_dq[i].action_order
         new_action = sup_action
         new_action.action_order = current_action_order
+        new_action.action_server.machine_name = self.server.machine_name
         self.action_dq.insert(i, new_action)
         del self.action_dq[i + 1]
 
@@ -2449,6 +2454,7 @@ class Orch(Base):
         new_action = sup_action
         new_action.action_uuid = gen_uuid()
         new_action.action_order = new_action_order
+        new_action.action_server.machine_name = self.server.machine_name
         self.action_dq.append(new_action)
 
     async def finish_active_sequence(self):

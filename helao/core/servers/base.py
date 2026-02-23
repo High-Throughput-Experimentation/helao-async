@@ -200,16 +200,12 @@ class Base:
         Raises:
             ValueError: If the root directory is not defined or 'run_type' is missing in the configuration.
         """
-        self.server = MachineModel(
-            server_name=app.helao_srv, machine_name=gethostname().lower()
-        )
 
         self.app = app
+        self.server = app.server
         self.dyn_endpoints = dyn_endpoints
-        self.server_cfg = self.app.helao_cfg["servers"][self.server.server_name]
-        self.server_params = self.app.helao_cfg["servers"][self.server.server_name].get(
-            "params", {}
-        )
+        self.server_cfg = app.server_cfg
+        self.server_params = app.server_params
         self.server.hostname = self.server_cfg["host"]
         self.server.port = self.server_cfg["port"]
         self.world_cfg = self.app.helao_cfg
