@@ -52,11 +52,10 @@ from bokeh.layouts import column
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 from bokeh.models import DataTable, TableColumn
-from bokeh.models.widgets import Paragraph
 from bokeh.models import Select
 from bokeh.models import Button
 from bokeh.models import CheckboxGroup
-from bokeh.models import Panel, Tabs
+from bokeh.models import TabPanel, Tabs
 from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.plotting import figure, Figure
@@ -273,10 +272,10 @@ class BokehOperator:
             autosize_mode="fit_columns",
         )
 
-        self.sequence_tab = Panel(child=self.sequence_table, title="Sequences")
-        self.experiment_tab = Panel(child=self.experiment_table, title="Experiments")
-        self.action_tab = Panel(child=self.action_table, title="Actions")
-        self.action_server_tab = Panel(
+        self.sequence_tab = TabPanel(child=self.sequence_table, title="Sequences")
+        self.experiment_tab = TabPanel(child=self.experiment_table, title="Experiments")
+        self.action_tab = TabPanel(child=self.action_table, title="Actions")
+        self.action_server_tab = TabPanel(
             child=self.action_server_table, title="Action Servers"
         )
         self.queue_tabs = Tabs(
@@ -302,11 +301,11 @@ class BokehOperator:
             fit_columns=False,
         )
 
-        self.planner_tab = Panel(
+        self.planner_tab = TabPanel(
             child=self.experiment_plan_table,
             title="Planned Experiments",
         )
-        self.active_tab = Panel(
+        self.active_tab = TabPanel(
             child=self.active_action_table,
             title="Active Actions",
         )
@@ -474,11 +473,11 @@ class BokehOperator:
             text="""select a sequence specification""", width=600, height_policy="min"
         )
 
-        self.error_txt = Paragraph(
+        self.error_txt = Div(
             text="""no error""",
             width=600,
             height=30,
-            style={"font-size": "100%", "color": "black"},
+            styles={"font-size": "100%", "color": "black"},
         )
 
         self.input_sequence_label = TextInput(
@@ -565,7 +564,7 @@ class BokehOperator:
             text="<b>Orchestrator</b>",
             width=self.max_width - 20,
             height=32,
-            style={"font-size": "150%", "color": "#CB4335"},
+            styles={"font-size": "150%", "color": "#CB4335"},
         )
 
         self.layout0 = layout(
@@ -577,7 +576,7 @@ class BokehOperator:
                             text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
                             height=32,
-                            style={"font-size": "200%", "color": "#CB4335"},
+                            styles={"font-size": "200%", "color": "#CB4335"},
                         ),
                     ],
                     # background="#D6DBDF",
@@ -760,7 +759,7 @@ class BokehOperator:
                                 text="<b>Error message:</b>",
                                 width=200 + 50,
                                 height=15,
-                                style={"font-size": "100%", "color": "black"},
+                                styles={"font-size": "100%", "color": "black"},
                             ),
                         ],
                         [Spacer(width=10), self.error_txt],
@@ -824,11 +823,11 @@ class BokehOperator:
             height_policy="min",
         )
 
-        self.sequence_select_tab = Panel(child=self.layout1, title="Sequence Selection")
-        self.experiment_select_tab = Panel(
+        self.sequence_select_tab = TabPanel(child=self.layout1, title="Sequence Selection")
+        self.experiment_select_tab = TabPanel(
             child=self.layout2, title="Experiment Selection"
         )
-        self.seqspec_select_tab = Panel(child=self.layout3, title="Specification Files")
+        self.seqspec_select_tab = TabPanel(child=self.layout3, title="Specification Files")
         if self.seqspec_folder is not None and self.seqspec_parser is not None:
             self.select_tabs = Tabs(
                 tabs=[
@@ -1583,7 +1582,7 @@ class BokehOperator:
                             text="<b>Optional sequence parameters:</b>",
                             width=200 + 50,
                             height=15,
-                            style={"font-size": "100%", "color": "black"},
+                            styles={"font-size": "100%", "color": "black"},
                         ),
                     ],
                 ],
@@ -1613,7 +1612,7 @@ class BokehOperator:
                                 text="-- none --",
                                 width=200 + 50,
                                 height=15,
-                                style={"font-size": "100%", "color": "black"},
+                                styles={"font-size": "100%", "color": "black"},
                             ),
                         ],
                     ],
@@ -1649,7 +1648,7 @@ class BokehOperator:
                             text="<b>Optional experiment parameters:</b>",
                             width=200 + 50,
                             height=15,
-                            style={"font-size": "100%", "color": "black"},
+                            styles={"font-size": "100%", "color": "black"},
                         ),
                     ],
                 ],
@@ -1678,13 +1677,12 @@ class BokehOperator:
                                 text="-- none --",
                                 width=200 + 50,
                                 height=15,
-                                style={"font-size": "100%", "color": "black"},
+                                styles={"font-size": "100%", "color": "black"},
                             ),
                         ],
                     ],
                     background=self.color_sq_param_inputs,
                     width=self.max_width,
-                    height_policy="min",
                 ),
             )
 
@@ -1728,7 +1726,7 @@ class BokehOperator:
                             text="<b>Required sequence parameters:</b>",
                             width=200 + 50,
                             height=15,
-                            style={"font-size": "100%", "color": "black"},
+                            styles={"font-size": "100%", "color": "black"},
                         ),
                     ],
                 ],
@@ -1758,13 +1756,12 @@ class BokehOperator:
                                 text="-- none --",
                                 width=200 + 50,
                                 height=15,
-                                style={"font-size": "100%", "color": "black"},
+                                styles={"font-size": "100%", "color": "black"},
                             ),
                         ],
                     ],
                     background=self.color_sq_param_inputs,
                     width=self.max_width,
-                    height_policy="min",
                 ),
             )
 
@@ -1804,13 +1801,12 @@ class BokehOperator:
                     [
                         [
                             param_input[item],
-                            Paragraph(
+                            Div(
                                 text=str(argtypes[idx])
                                 .split()[-1]
                                 .strip("'<>]")
                                 .split(".")[-1]
                                 .replace("[", " of "),
-                                align=("start", "end"),
                             ),
                         ],
                         Spacer(height=10),
