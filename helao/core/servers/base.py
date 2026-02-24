@@ -837,97 +837,48 @@ class Base:
         else:
             LOGGER.info(f"Client {combo_key} is not subscribed.")
 
-    async def ws_status(self, websocket: WebSocket):
+    async def _ws_relay(
+        self,
+        websocket: WebSocket,
+        queue: MultisubscriberQueue,
+        label: str,
+        use_as_dict: bool = True,
+    ) -> None:
+        """Accept *websocket*, subscribe to *queue*, and stream compressed messages.
+
+        Shared implementation for :meth:`ws_status`, :meth:`ws_data`,
+        and :meth:`ws_live`.  When *use_as_dict* is ``True`` each message is
+        serialised via ``.as_dict()`` before pickling; otherwise the message
+        object is pickled directly.
         """
-        Handle WebSocket connections for status updates.
-
-        This asynchronous method accepts a WebSocket connection, subscribes to
-        status updates, and sends compressed status messages to the client. If an
-        exception occurs, it logs the error and removes the subscriber from the
-        status queue.
-
-        Args:
-            websocket (WebSocket): The WebSocket connection instance.
-
-        Raises:
-            Exception: If an error occurs during the WebSocket communication.
-        """
-        LOGGER.info("got new status subscriber")
+        LOGGER.info(f"got new {label} subscriber")
         await websocket.accept()
-        status_sub = self.status_q.subscribe()
+        sub = queue.subscribe()
         try:
-            async for status_msg in status_sub:
-                await websocket.send_bytes(
-                    pyzstd.compress(pickle.dumps(status_msg.as_dict()))
-                )
-        # except WebSocketDisconnect:
+            async for msg in sub:
+                payload = msg.as_dict() if use_as_dict else msg
+                await websocket.send_bytes(pyzstd.compress(pickle.dumps(payload)))
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             LOGGER.error(
-                f"Status websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}"
+                f"{label.capitalize()} websocket client "
+                f"{websocket.client[0]}:{websocket.client[1]} disconnected. "
+                f"{repr(e), tb,}"
             )
-            if status_sub in self.status_q.subscribers:
-                self.status_q.remove(status_sub)
+            if sub in queue.subscribers:
+                queue.remove(sub)
 
-    async def ws_data(self, websocket: WebSocket):
-        """
-        Handle WebSocket connections for data subscribers.
+    async def ws_status(self, websocket: WebSocket) -> None:
+        """WebSocket endpoint for compressed status messages."""
+        await self._ws_relay(websocket, self.status_q, "status")
 
-        This asynchronous method accepts a WebSocket connection, subscribes to a data queue,
-        and sends compressed data messages to the WebSocket client. If an exception occurs,
-        it logs the error and removes the subscriber from the data queue.
+    async def ws_data(self, websocket: WebSocket) -> None:
+        """WebSocket endpoint for compressed data messages."""
+        await self._ws_relay(websocket, self.data_q, "data")
 
-        Args:
-            websocket (WebSocket): The WebSocket connection instance.
-
-        Raises:
-            Exception: If any exception occurs during the WebSocket communication.
-        """
-        LOGGER.info("got new data subscriber")
-        await websocket.accept()
-        data_sub = self.data_q.subscribe()
-        try:
-            async for data_msg in data_sub:
-                await websocket.send_bytes(
-                    pyzstd.compress(pickle.dumps(data_msg.as_dict()))
-                )
-        # except WebSocketDisconnect:
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(
-                f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}"
-            )
-            if data_sub in self.data_q.subscribers:
-                self.data_q.remove(data_sub)
-
-    async def ws_live(self, websocket: WebSocket):
-        """
-        Handle a new WebSocket connection for live data streaming.
-
-        This coroutine accepts a WebSocket connection, subscribes to the live data queue,
-        and sends compressed live data messages to the client. If an exception occurs,
-        it logs the error and removes the subscriber from the live data queue.
-
-        Args:
-            websocket (WebSocket): The WebSocket connection instance.
-
-        Raises:
-            Exception: If an error occurs during the WebSocket communication or data processing.
-        """
-        LOGGER.info("got new live_buffer subscriber")
-        await websocket.accept()
-        live_sub = self.live_q.subscribe()
-        try:
-            async for live_msg in live_sub:
-                await websocket.send_bytes(pyzstd.compress(pickle.dumps(live_msg)))
-        # except WebSocketDisconnect:
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(
-                f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}"
-            )
-            if live_sub in self.live_q.subscribers:
-                self.live_q.remove(live_sub)
+    async def ws_live(self, websocket: WebSocket) -> None:
+        """WebSocket endpoint for compressed live-buffer messages."""
+        await self._ws_relay(websocket, self.live_q, "live_buffer", use_as_dict=False)
 
     async def live_buffer_task(self):
         """
@@ -945,29 +896,18 @@ class Base:
         async for live_msg in self.live_q.subscribe():
             self.live_buffer.update(live_msg)
 
-    async def put_lbuf(self, live_dict):
-        """
-        Asynchronously puts a dictionary with updated timestamps into the live queue.
+    @staticmethod
+    def _stamp_lbuf_dict(live_dict: dict) -> dict:
+        """Wrap each value in a ``(value, timestamp)`` tuple for the live buffer."""
+        return {k: (v, time()) for k, v in live_dict.items()}
 
-        Args:
-            live_dict (dict): A dictionary where each key-value pair will be updated with the current time.
+    async def put_lbuf(self, live_dict: dict) -> None:
+        """Stamp *live_dict* with timestamps and publish to the live queue."""
+        await self.live_q.put(self._stamp_lbuf_dict(live_dict))
 
-        Returns:
-            None
-        """
-        new_dict = {k: (v, time()) for k, v in live_dict.items()}
-        await self.live_q.put(new_dict)
-
-    def put_lbuf_nowait(self, live_dict):
-        """
-        Puts a dictionary with current timestamps into the live queue without waiting.
-
-        Args:
-            live_dict (dict): A dictionary where each key-value pair will be updated
-                              with the current time and then put into the live queue.
-        """
-        new_dict = {k: (v, time()) for k, v in live_dict.items()}
-        self.live_q.put_nowait(new_dict)
+    def put_lbuf_nowait(self, live_dict: dict) -> None:
+        """Non-blocking variant of :meth:`put_lbuf`."""
+        self.live_q.put_nowait(self._stamp_lbuf_dict(live_dict))
 
     def get_lbuf(self, live_key):
         """
@@ -996,53 +936,36 @@ class Base:
                         break
             await asyncio.sleep(delay)
 
-    async def process_unified_queue(self):
+    async def _dispatch_queued_action(self, action_queue, queue_label: str) -> None:
+        """Pop one entry from *action_queue*, re-dispatch it, and re-queue on failure.
+
+        Shared implementation for :meth:`process_unified_queue` and
+        :meth:`process_endpoint_queue`.
+        """
         qact, qpars = None, {}
         try:
-            # unified local queue, separate endpoints cannot be concurrent
-            qact, qpars = self.local_action_queue.popleft()
+            qact, qpars = action_queue.popleft()
             LOGGER.info(f"{qact.action_name} was previously queued")
             LOGGER.info(f"running queued {qact.action_name}")
             qact.start_condition = ASC.no_wait
             qact.action_params["queued_launch"] = True
             await async_action_dispatcher(self.world_cfg, qact, qpars)
         except Exception:
-            LOGGER.error(
-                "Failed to process local unified queue",
-                exc_info=True,
-            )
+            LOGGER.error(f"Failed to process {queue_label} queue", exc_info=True)
             if qact is not None:
-                LOGGER.info(f"re-queing {qact.action_name}")
-                self.local_action_queue.appendleft(
-                    (
-                        qact,
-                        qpars,
-                    )
-                )
+                LOGGER.info(f"re-queueing {qact.action_name}")
+                action_queue.appendleft((qact, qpars))
 
-    async def process_endpoint_queue(self, status_msg: ActionModel):
-        qact, qpars = None, None
-        try:
-            # process individiual endpoint queues, can be concurrent
-            qact, qpars = self.endpoint_queues[status_msg.action_name].popleft()
-            LOGGER.info(f"{status_msg.action_name} was previously queued")
-            LOGGER.info(f"running queued {status_msg.action_name}")
-            qact.start_condition = ASC.no_wait
-            qact.action_params["queued_launch"] = True
-            await async_action_dispatcher(self.world_cfg, qact, qpars)
-        except Exception:
-            LOGGER.error(
-                "Failed to process local endpoint queue",
-                exc_info=True,
-            )
-            if qact is not None:
-                LOGGER.info(f"re-queing {status_msg.action_name}")
-                self.endpoint_queues[status_msg.action_name].appendleft(
-                    (
-                        qact,
-                        qpars,
-                    )
-                )
+    async def process_unified_queue(self) -> None:
+        """Dispatch the next action from the unified local queue."""
+        await self._dispatch_queued_action(self.local_action_queue, "local unified")
+
+    async def process_endpoint_queue(self, status_msg: ActionModel) -> None:
+        """Dispatch the next action from the per-endpoint queue for *status_msg*."""
+        await self._dispatch_queued_action(
+            self.endpoint_queues[status_msg.action_name],
+            f"endpoint '{status_msg.action_name}'",
+        )
 
     async def log_status_task(self, retry_limit: int = 5):
         """
@@ -2143,49 +2066,32 @@ class Active:
             )
         )
 
-    async def enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
-        """
-        Asynchronously enqueues data into the data queue.
+    def _build_data_package(
+        self, datamodel: DataModel, action: Optional[Action] = None
+    ) -> tuple:
+        """Return ``(DataPackageModel, has_data)`` for the given *datamodel*.
 
-        Args:
-            datamodel (DataModel): The data model instance containing the data to be enqueued.
-            action (Action, optional): The action associated with the data. If not provided,
-                                       the default action will be used.
-
-        Returns:
-            None
+        Resolves the default action and delegates to :meth:`assemble_data_msg`.
+        Shared by :meth:`enqueue_data` (async) and :meth:`enqueue_data_nowait`.
         """
         if action is None:
             action = self.action
-        await self.base.data_q.put(
-            self.assemble_data_msg(datamodel=datamodel, action=action)
-        )
-        if datamodel.data:
+        return self.assemble_data_msg(datamodel=datamodel, action=action), bool(datamodel.data)
+
+    async def enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
+        """Enqueue *datamodel* into the data queue (awaited put)."""
+        msg, has_data = self._build_data_package(datamodel, action)
+        await self.base.data_q.put(msg)
+        if has_data:
             self.num_data_queued += 1
 
     def enqueue_data_nowait(
         self, datamodel: DataModel, action: Optional[Action] = None
     ):
-        """
-        Enqueues a data message into the queue without waiting.
-
-        Args:
-            datamodel (DataModel): The data model to be enqueued.
-            action (Action, optional): The action associated with the data. Defaults to None.
-
-        Raises:
-            queue.Full: If the queue is full and the data cannot be enqueued.
-
-        Notes:
-            If `action` is not provided, the method uses the instance's `self.action`.
-            Increments `self.num_data_queued` if `datamodel.data` is not empty.
-        """
-        if action is None:
-            action = self.action
-        self.base.data_q.put_nowait(
-            self.assemble_data_msg(datamodel=datamodel, action=action)
-        )
-        if datamodel.data:
+        """Non-blocking variant of :meth:`enqueue_data`."""
+        msg, has_data = self._build_data_package(datamodel, action)
+        self.base.data_q.put_nowait(msg)
+        if has_data:
             self.num_data_queued += 1
 
     def assemble_data_msg(
@@ -2456,6 +2362,48 @@ class Active:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             LOGGER.error(f"data LOGGER task failed with error: {repr(e), tb,}")
 
+    def _resolve_output_path(
+        self,
+        file_type: str,
+        filename: Optional[str],
+        file_group: HloFileGroup,
+        header: Optional[str],
+        file_sample_label,
+        json_data_keys,
+        action: Action,
+    ):
+        """Prepare file-write parameters shared by sync and async variants.
+
+        Returns ``(header, file_info, output_path, output_file)`` when
+        ``action.save_data`` is ``True``, otherwise returns ``None``.
+        Shared by :meth:`write_file` (async) and :meth:`write_file_nowait` (sync).
+        """
+        if not action.save_data:
+            return None
+        header, file_info = self.init_datafile(
+            header=header,
+            file_type=file_type,
+            json_data_keys=json_data_keys,
+            file_sample_label=file_sample_label,
+            filename=filename,
+            file_group=file_group,
+        )
+        save_root = str(self.base.helaodirs.save_root)
+        if action.manual_action:
+            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+        output_path = os.path.join(save_root, action.action_output_dir)
+        output_file = os.path.join(output_path, file_info.file_name)
+        if os.name == "nt":
+            output_file = str(pathlib.PureWindowsPath(output_file))
+        elif os.name == "posix":
+            output_file = str(
+                pathlib.PurePosixPath(pathlib.PureWindowsPath(output_file))
+            ).strip("\\")
+        else:
+            LOGGER.info("could not detect OS, path seps may be mixed")
+        os.makedirs(output_path, exist_ok=True)
+        return header, file_info, output_path, output_file
+
     async def write_file(
         self,
         output_str: str,
@@ -2468,81 +2416,23 @@ class Active:
         json_data_keys: Optional[List[str]] = None,
         action: Optional[Action] = None,
     ):
-        """
-        Asynchronously writes a string to a file with specified parameters.
-
-        Parameters:
-        -----------
-        output_str : str
-            The string content to be written to the file.
-        file_type : str
-            The type of the file to be written.
-        filename : str, optional
-            The name of the file. If not provided, a default name will be used.
-        file_group : HloFileGroup, optional
-            The group to which the file belongs. Default is HloFileGroup.aux_files.
-        header : str, optional
-            The header content to be written at the beginning of the file.
-        sample_str : str, optional
-            A sample string related to the file content.
-        file_sample_label : str, optional
-            A label for the file sample.
-        json_data_keys : str, optional
-            JSON data keys related to the file content.
-        action : Action, optional
-            The action context in which the file is being written. If not provided,
-            the current action context will be used.
-
-        Returns:
-        --------
-        str or None
-            The path to the written file if the action's save_data attribute is True,
-            otherwise None.
-
-        Notes:
-        ------
-        - The method ensures the output directory exists before writing the file.
-        - Handles different OS path conventions (Windows and POSIX).
-        - Writes the header and output string to the file, separated by '%%\n'.
-        """
+        """Async: initialise and write a file; return its path, or None if save_data is False."""
         if action is None:
             action = self.action
-        if action.save_data:
-            header, file_info = self.init_datafile(
-                header=header,
-                file_type=file_type,
-                json_data_keys=json_data_keys,
-                file_sample_label=file_sample_label,
-                filename=filename,
-                file_group=file_group,
-            )
-            action.files.append(file_info)
-            save_root = str(self.base.helaodirs.save_root)
-            if action.manual_action:
-                save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
-            output_path = os.path.join(save_root, action.action_output_dir)
-            output_file = os.path.join(output_path, file_info.file_name)
-            if os.name == "nt":
-                output_file = str(pathlib.PureWindowsPath(output_file))
-            elif os.name == "posix":
-                output_file = str(
-                    pathlib.PurePosixPath(pathlib.PureWindowsPath(output_file))
-                ).strip("\\")
-            else:
-                LOGGER.info("could not detect OS, path seps may be mixed")
-
-            os.makedirs(output_path, exist_ok=True)
-
-            LOGGER.info(f"writing non stream data to: {output_file}")
-
-            async with aiofiles.open(output_file, mode="a+") as f:
-                if header:
-                    await f.write(header)
-                await f.write("%%\n")
-                await f.write(output_str)
-                return output_file
-        else:
+        result = self._resolve_output_path(
+            file_type, filename, file_group, header, file_sample_label, json_data_keys, action
+        )
+        if result is None:
             return None
+        header, file_info, output_path, output_file = result
+        action.files.append(file_info)
+        LOGGER.info(f"writing non stream data to: {output_file}")
+        async with aiofiles.open(output_file, mode="a+") as f:
+            if header:
+                await f.write(header)
+            await f.write("%%\n")
+            await f.write(output_str)
+        return output_file
 
     def write_file_nowait(
         self,
@@ -2556,60 +2446,23 @@ class Active:
         json_data_keys: Optional[str] = None,
         action: Optional[Action] = None,
     ):
-        """
-        Writes a file asynchronously without waiting for the operation to complete.
-
-        Args:
-            output_str (str): The string content to be written to the file.
-            file_type (str): The type of the file to be written.
-            filename (str, optional): The name of the file. Defaults to None.
-            file_group (HloFileGroup, optional): The group to which the file belongs. Defaults to HloFileGroup.aux_files.
-            header (str, optional): The header content to be written at the beginning of the file. Defaults to None.
-            sample_str (str, optional): The sample string associated with the file. Defaults to None.
-            file_sample_label (str, optional): The label for the file sample. Defaults to None.
-            json_data_keys (str, optional): The JSON data keys associated with the file. Defaults to None.
-            action (Action, optional): The action associated with the file writing operation. Defaults to None.
-
-        Returns:
-            str: The path to the written file if the action's save_data attribute is True, otherwise None.
-        """
+        """Sync: initialise and write a file; return its path, or None if save_data is False."""
         if action is None:
             action = self.action
-
-        if action.save_data:
-            header, file_info = self.init_datafile(
-                header=header,
-                file_type=file_type,
-                json_data_keys=json_data_keys,
-                file_sample_label=file_sample_label,
-                filename=filename,
-                file_group=file_group,
-            )
-            save_root = str(self.base.helaodirs.save_root)
-            if action.manual_action:
-                save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
-            output_path = os.path.join(save_root, action.action_output_dir)
-            output_file = os.path.join(output_path, file_info.file_name)
-            if os.name == "nt":
-                output_file = str(pathlib.PureWindowsPath(output_file))
-            elif os.name == "posix":
-                output_file = str(
-                    pathlib.PurePosixPath(pathlib.PureWindowsPath(output_file))
-                ).strip("\\")
-            else:
-                LOGGER.info("could not detect OS, path seps may be mixed")
-
-            os.makedirs(output_path, exist_ok=True)
-            LOGGER.info(f"writing non stream data to: {output_file}")
-            with open(output_file, mode="a+") as f:
-                if header:
-                    f.write(header)
-                f.write("%%\n")
-                f.write(output_str)
-                action.files.append(file_info)
-                return output_file
-        else:
+        result = self._resolve_output_path(
+            file_type, filename, file_group, header, file_sample_label, json_data_keys, action
+        )
+        if result is None:
             return None
+        header, file_info, output_path, output_file = result
+        LOGGER.info(f"writing non stream data to: {output_file}")
+        with open(output_file, mode="a+") as f:
+            if header:
+                f.write(header)
+            f.write("%%\n")
+            f.write(output_str)
+        action.files.append(file_info)
+        return output_file
 
     def set_sample_action_uuid(
         self,
