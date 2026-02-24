@@ -1,33 +1,28 @@
-import json
 import time
 import asyncio
-from copy import copy
 from enum import Enum
-from socket import gethostname
 from typing import Union, Optional, List
 from collections import namedtuple
-from typing_extensions import Annotated
 
-from fastapi import Body, WebSocket, Request
-from fastapi.routing import APIRoute
-from fastapi.exception_handlers import http_exception_handler
+from fastapi import Body, WebSocket
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from helao.core.drivers.helao_driver import HelaoDriver
 from helao.helpers.server_api import HelaoFastAPI
-from helao.helpers.gen_uuid import gen_uuid
-from helao.helpers.eval import eval_val
 from helao.core.servers.orch import Orch
 from helao.core.models.server import ActionServerModel
-from helao.core.models.machine import MachineModel
 from helao.core.models.orchstatus import LoopStatus
-from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from starlette.responses import JSONResponse, Response
 
 from helao.helpers import helao_logging as logging
+from helao.core.servers.base_api import (
+    _make_app_entry_middleware,
+    _make_http_exception_handler,
+    _add_default_head_endpoints,
+    _register_utility_endpoints,
+)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -65,191 +60,10 @@ class OrchAPI(HelaoFastAPI):
         self.driver = None
         self.poller = None
 
-        @self.middleware("http")
-        async def app_entry(request: Request, call_next):
-            """
-            Middleware function to handle incoming requests and manage action endpoints.
-
-            Args:
-                request (Request): The incoming HTTP request.
-                call_next (Callable): The next middleware or endpoint handler to call.
-
-            Returns:
-                Response: The HTTP response.
-
-            Behavior:
-                - Handles HEAD requests by returning an empty response.
-                - Handles POST requests to action endpoints by checking if the endpoint is available.
-                - If available, processes the request immediately.
-                - If busy, queues the action and returns a response indicating the action is queued.
-                - For non-action POST requests, passes the request to the next handler.
-
-            Logging:
-                - Logs debug information for received requests and their types.
-                - Logs information about action endpoint availability and queuing.
-
-            """
-            endpoint = request.url.path.strip("/").split("/")[-1]
-            if request.method == "HEAD":  # comes from endpoint checker, session.head()
-                LOGGER.debug("got HEAD request in middleware")
-                response = Response()
-            elif (
-                request.url.path.strip("/").startswith(f"{server_key}/")
-                and request.method == "POST"
-            ):
-                LOGGER.debug("got action POST request in middleware")
-
-                body_bytes = await request.body()
-                body_dict = json.loads(body_bytes)
-                action_dict = body_dict.get("action", {})
-                start_cond = action_dict.get("start_condition", ASC.wait_for_all)
-                if (
-                    len(self.orch.actionservermodel.endpoints[endpoint].active_dict)
-                    == 0
-                    or start_cond == ASC.no_wait
-                    or action_dict.get("action_params", {}).get("queued_launch", False)
-                ):
-                    LOGGER.debug("action endpoint is available")
-                    response = await call_next(request)
-                elif not self.orch.server_params.get("allow_concurrent_actions", True):
-                    active_endpoints = [
-                        ep
-                        for ep, em in self.orch.actionservermodel.endpoints.items()
-                        if em.active_dict
-                    ]
-                    if len(active_endpoints) > 0:
-                        LOGGER.info("action server is busy, queuing")
-                        action_dict["action_params"] = action_dict.get(
-                            "action_params", {}
-                        )
-                        action_dict["action_params"]["queued_on_actserv"] = True
-                        extra_params = {}
-                        action = Action(**action_dict)
-                        action.action_uuid = gen_uuid()
-                        for d in (
-                            request.query_params,
-                            request.path_params,
-                        ):
-                            for k, v in d.items():
-                                if k in [
-                                    "action_version",
-                                    "start_condition",
-                                    "from_global_seq_params",
-                                    "from_global_exp_params",
-                                    "from_global_act_params",
-                                    "to_global_params",
-                                    "manual_action",
-                                    "nonblocking",
-                                    "process_finish",
-                                    "process_contrib",
-                                    "save_act",
-                                    "save_data",
-                                    "process_uuid",
-                                    "data_request_id",
-                                    "campaign_name",
-                                    "campaign_uuid",
-                                    "sync_data",
-                                ]:
-                                    extra_params[k] = eval_val(v)
-                                else:
-                                    action.action_params[k] = eval_val(v)
-                        action.action_name = request.url.path.strip("/").split("/")[-1]
-                        action.action_server = MachineModel(
-                            server_name=server_key, machine_name=gethostname().lower()
-                        )
-                        # send active status but don't create active object
-                        await self.orch.status_q.put(action.get_act())
-                        response = JSONResponse(action.as_dict())
-                        LOGGER.info(
-                            f"action request for {action.action_name} received, but server does not allow concurrency, queuing action {action.action_uuid}"
-                        )
-                        self.orch.local_action_queue.append(
-                            (
-                                action,
-                                extra_params,
-                            )
-                        )
-                    else:
-                        LOGGER.debug("action server is available")
-                        response = await call_next(request)
-                else:  # collision between two base requests for one resource, queue
-                    LOGGER.info("action endpoint is busy, queuing")
-                    action_dict["action_params"] = action_dict.get("action_params", {})
-                    action_dict["action_params"]["queued_on_actserv"] = True
-                    extra_params = {}
-                    action = Action(**action_dict)
-                    action.action_uuid = gen_uuid()
-                    for d in (
-                        request.query_params,
-                        request.path_params,
-                    ):
-                        for k, v in d.items():
-                            if k in [
-                                "action_version",
-                                "start_condition",
-                                "from_global_seq_params",
-                                "from_global_exp_params",
-                                "from_global_act_params",
-                                "to_global_params",
-                                "manual_action",
-                                "nonblocking",
-                                "process_finish",
-                                "process_contrib",
-                                "save_act",
-                                "save_data",
-                                "process_uuid",
-                                "data_request_id",
-                                "campaign_name",
-                                "campaign_uuid",
-                                "sync_data",
-                            ]:
-                                extra_params[k] = eval_val(v)
-                            else:
-                                action.action_params[k] = eval_val(v)
-                    action.action_name = request.url.path.strip("/").split("/")[-1]
-                    action.action_server = MachineModel(
-                        server_name=server_key, machine_name=gethostname().lower()
-                    )
-                    # send active status but don't create active object
-                    await self.orch.status_q.put(action.get_act())
-                    response = JSONResponse(action.as_dict())
-                    LOGGER.info(
-                        f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
-                    )
-                    self.orch.endpoint_queues[endpoint].append(
-                        (
-                            action,
-                            extra_params,
-                        )
-                    )
-            else:
-                # LOGGER.debug("got non-action POST request")
-                response = await call_next(request)
-            return response
-
-        @self.exception_handler(StarletteHTTPException)
-        async def custom_http_exception_handler(request, exc):
-            """
-            Handles custom HTTP exceptions for requests that match a specific server key.
-
-            Args:
-                request (Request): The incoming HTTP request.
-                exc (HTTPException): The exception that was raised.
-
-            Returns:
-                Response: The HTTP response generated by the default exception handler.
-
-            Behavior:
-                - If the request URL path starts with the specified server key, logs the exception and triggers emergency stop (e-stop) procedures for active operations and executors.
-                - Delegates the actual response generation to the default HTTP exception handler.
-            """
-            if request.url.path.strip("/").startswith(f"{server_key}/"):
-                print(f"Could not process request: {repr(exc)}")
-                for _, active in self.orch.actives.items():
-                    active.set_estop()
-                for executor_id in self.orch.executors:
-                    self.orch.stop_executor(executor_id)
-            return await http_exception_handler(request, exc)
+        self.middleware("http")(_make_app_entry_middleware(server_key, lambda: self.orch))
+        self.exception_handler(StarletteHTTPException)(
+            _make_http_exception_handler(server_key, lambda: self.orch)
+        )
 
         @self.on_event("startup")
         async def startup_event():
@@ -293,25 +107,7 @@ class OrchAPI(HelaoFastAPI):
                 self.driver = self.drivers[0]
             self.orch.endpoint_queues_init()
 
-        @self.on_event("startup")
-        async def add_default_head_endpoints() -> None:
-            """
-            Adds default HEAD endpoints for all existing POST routes in the server.
-
-            This method iterates through the server's routes and checks if the route
-            is an instance of APIRoute and supports the POST method. For each such route,
-            it creates a copy of the route, changes its method to HEAD, and appends it
-            to the server's routes. The new HEAD route is not included in the schema.
-
-            Returns:
-                None
-            """
-            for route in self.routes:
-                if isinstance(route, APIRoute) and "POST" in route.methods:
-                    new_route = copy(route)
-                    new_route.methods = {"HEAD"}
-                    new_route.include_in_schema = False
-                    self.routes.append(new_route)
+        self.on_event("startup")(lambda: _add_default_head_endpoints(self))
 
         # --- BASE endpoints ---
         @self.websocket("/ws_status")
@@ -1350,42 +1146,7 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @self.post("/_raise_exception", tags=["private"])
-        def _raise_exception():
-            """
-            Raises a test exception for error recovery debugging purposes.
-
-            This function is used to simulate an exception in order to test
-            the error handling and recovery mechanisms of the system.
-
-            Raises:
-                Exception: Always raises an exception with the message
-                       "test exception for error recovery debugging".
-            """
-            raise Exception("test exception for error recovery debugging")
-
-        @self.post("/_raise_async_exception", tags=["private"])
-        async def _raise_async_exception():
-            """
-            Asynchronously raises an exception after a delay.
-
-            This function schedules an asynchronous task that sleeps for 10 seconds
-            and then raises an exception. It is useful for testing error recovery
-            and debugging asynchronous code.
-
-            Returns:
-                bool: Always returns True.
-            """
-
-            async def sleep_then_error():
-                print(f"Start time: {time.time()}")
-                await asyncio.sleep(10)
-                print(f"End time: {time.time()}")
-                raise Exception("test async exception for error recovery debugging")
-
-            loop = asyncio.get_running_loop()
-            loop.create_task(sleep_then_error())
-            return True
+        _register_utility_endpoints(self)
 
         @self.post("/clear_global_params_private", tags=["private"])
         def clear_global_params_private():
@@ -1476,40 +1237,6 @@ class OrchAPI(HelaoFastAPI):
             self.orch.bokehapp.stop()
             LOGGER.info("orch shutdown")
             time.sleep(0.75)
-
-        @self.post("/test_alert", tags=["private"])
-        async def test_alert():
-            """
-            Test alert endpoint.
-
-            This asynchronous function serves as a test endpoint for triggering an alert.
-
-            Returns:
-                dict: A dictionary representation of the finished action.
-            """
-            try:
-                LOGGER.alert("TEST ALERT: this is a test alert.")
-                return True
-            except Exception:
-                LOGGER.error("Failed to trigger alert.")
-                return False
-
-        @self.post("/test_receive", tags=["private"])
-        async def test_receive(text: Annotated[str, Body(..., embed=True)]):
-            """
-            Test receive endpoint.
-
-            This asynchronous function serves as a test endpoint for triggering a receive.
-
-            Returns:
-                dict: A dictionary representation of the finished action.
-            """
-            try:
-                LOGGER.info("TEST RECEIVE: " + text)
-                return True
-            except Exception:
-                LOGGER.error("Failed to trigger receive: " + text)
-                return False
 
 
 class WaitExec(Executor):
