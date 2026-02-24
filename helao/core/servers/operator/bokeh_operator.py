@@ -791,14 +791,14 @@ class BokehOperator:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
         self.orch.orch_op = self
 
-        if self.sequences:
-            self.vis.doc.on_event(
-                DocumentReady, partial(self.callback_sequence_select, 0, 0)
-            )
-        else:
-            self.vis.doc.on_event(
-                DocumentReady, partial(self.callback_experiment_select, 0, 0)
-            )
+        # if self.sequences:
+        #     self.vis.doc.on_event(
+        #         DocumentReady, partial(self.callback_sequence_select, 0, 0)
+        #     )
+        # else:
+        #     self.vis.doc.on_event(
+        #         DocumentReady, partial(self.callback_experiment_select, 0, 0)
+        #     )
 
     def cleanup_session(self, session_context):
         LOGGER.info("BokehOperator session closed")
