@@ -58,7 +58,7 @@ from bokeh.models import TabPanel, Tabs
 from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.plotting import figure
-from bokeh.events import ButtonClick, DoubleTap, DocumentReady
+from bokeh.events import ButtonClick, DoubleTap
 from bokeh.models.widgets import FileInput
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -790,15 +790,6 @@ class BokehOperator:
         self.IOtask = asyncio.create_task(self.IOloop())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
         self.orch.orch_op = self
-
-        # if self.sequences:
-        #     self.vis.doc.on_event(
-        #         DocumentReady, partial(self.callback_sequence_select, 0, 0)
-        #     )
-        # else:
-        #     self.vis.doc.on_event(
-        #         DocumentReady, partial(self.callback_experiment_select, 0, 0)
-        #     )
 
     def cleanup_session(self, session_context):
         LOGGER.info("BokehOperator session closed")
