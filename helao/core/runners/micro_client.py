@@ -39,10 +39,6 @@ class MinimalOrch:
             if actionservermodel.last_action_uuid is not None:
                 self.register_action_uuid(actionservermodel.last_action_uuid)
 
-            recent_nonactive = self.globalstatusmodel.update_global_with_acts(
-                actionservermodel=actionservermodel
-            )
-
             estop_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
                 hlostatus=HloStatus.estopped
             )
@@ -61,7 +57,6 @@ class MinimalOrch:
                 self.globalstatusmodel.orch_state = OrchStatus.busy
 
             await self.interrupt_q.put(self.globalstatusmodel)
-            await self.update_operator(True)
             return True
 
 
