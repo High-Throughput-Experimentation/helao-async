@@ -530,7 +530,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_CA", tags=["action"])
+    @app.post(f"/{server_key}/run_CAOCV", tags=["action"])
     async def run_CAOCV(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
