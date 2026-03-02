@@ -203,8 +203,8 @@ TECH_CAOCV = BiologicTechnique(
     technique_name="CAOCV",
     easy_class=blp.CAOCV,
     parameter_map={
-        "CA_Vval__V": "ca_voltages",
-        "CA_Tval__s": "ca_durations",
+        "CA_Vval__V_list": "ca_voltages",
+        "CA_Tval__s_list": "ca_durations",
         "CA_AcqInterval__s": "ca_time_interval",
         "CA_AcqInterval__A": "ca_current_interval",
         "CA_IRange": "ca_current_range",

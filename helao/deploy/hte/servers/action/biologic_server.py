@@ -537,8 +537,8 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
-        CA_Vval__V: float = 0.0,
-        CA_Tval__s: float = 10.0,
+        CA_Vval__V_list: List[float] = Body([], embed=True),
+        CA_Tval__s_list: List[float] = Body([], embed=True),
         CA_AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
         CA_IRange: EC_IRange = EC_IRange.AUTO,
         CA_ERange: EC_ERange = EC_ERange.AUTO,
