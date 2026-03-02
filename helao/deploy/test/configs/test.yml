@@ -3,9 +3,9 @@ simulation: true
 show_debug: true
 experiment_libraries:
   - simulatews_exp
-  - helao\deploy\test\experiments\TEST_exp.py
+  - helao/deploy/test/experiments/TEST_exp.py
 sequence_libraries:
-  - helao\deploy\test\sequences\TEST_seq.py
+  - helao/deploy/test/sequences/TEST_seq.py
 run_type: simulation
 root: C:/INST_hlo
 servers:
