@@ -916,7 +916,6 @@ class BokehOperator:
                 self.sequence.campaign_uuid = self.input_campaign_uuid.value.strip()
         self.vis.doc.add_next_tick_callback(partial(orch_method, self.sequence))
         self.sequence = None
-        self.vis.doc.add_next_tick_callback(partial(self._update_param_layout))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def _update_param_layout(
