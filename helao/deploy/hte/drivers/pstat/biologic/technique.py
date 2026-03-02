@@ -199,6 +199,29 @@ TECH_GEIS = BiologicTechnique(
         "frequency": "f_Hz",
     },
 )
+TECH_CAOCV = BiologicTechnique(
+    technique_name="CAOCV",
+    easy_class=blp.CAOCV,
+    parameter_map={
+        "CA_Vval__V": "ca_voltages",
+        "CA_Tval__s": "ca_durations",
+        "CA_AcqInterval__s": "ca_time_interval",
+        "CA_AcqInterval__A": "ca_current_interval",
+        "CA_IRange": "ca_current_range",
+        "CA_ERange": "ca_voltage_range",
+        "CA_Bandwidth": "ca_bandwidth",
+        "OCV_Tval__s": "ocv_time",
+        "OCV_AcqInterval__s": "ocv_time_interval",
+        "OCV_AcqInterval__V": "ocv_voltage_interval",
+    },
+    field_map={
+        "time": "t_s",
+        "voltage": "Ewe_V",
+        "current": "I_A",
+        "power": "P_W",
+        "cycle": "cycle",
+    },
+)
 
 BIOTECHS = {
     x.technique_name: x
