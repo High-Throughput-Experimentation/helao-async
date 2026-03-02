@@ -52,6 +52,7 @@ from ...drivers.pstat.biologic.technique import (
     TECH_CV,
     TECH_GEIS,
     TECH_PEIS,
+    TECH_CAOCV,
 )
 
 
@@ -529,6 +530,50 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
+    @app.post(f"/{server_key}/run_CA", tags=["action"])
+    async def run_CAOCV(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        fast_samples_in: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
+        CA_Vval__V: float = 0.0,
+        CA_Tval__s: float = 10.0,
+        CA_AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
+        CA_IRange: EC_IRange = EC_IRange.AUTO,
+        CA_ERange: EC_ERange = EC_ERange.AUTO,
+        CA_Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
+        OCV_Tval__s: float = 10.0,
+        OCV_AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        channel: int = 0,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+        TTLduration: float = 1.0,
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
+    ):
+        """Chronoamperometry (current response on amplied potential)
+        use 4bit bitmask for triggers
+        IErange depends on biologic model used
+        (test actual limit before using)"""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "CAOCV"
+        active.action.action_params["CA_AcqInterval__A"] = 10.0
+        active.action.action_params["CA_IRange"] = EC_IRange_map[
+            active.action.action_params["CA_IRange"]
+        ]
+        active.action.action_params["CA_ERange"] = EC_ERange_map[
+            active.action.action_params["CA_ERange"]
+        ]
+        active.action.action_params["CA_Bandwidth"] = EC_Bandwidth_map[
+            active.action.action_params["CA_Bandwidth"]
+        ]
+        active.action.action_params["OCV_AcqInterval__V"] = 10.0
+        executor = BiologicExec(active=active, oneoff=False, technique=TECH_CAOCV)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
 
 def makeApp(server_key):
 
