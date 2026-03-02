@@ -225,5 +225,5 @@ TECH_CAOCV = BiologicTechnique(
 
 BIOTECHS = {
     x.technique_name: x
-    for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV, TECH_GEIS, TECH_PEIS]
+    for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV, TECH_GEIS, TECH_PEIS, TECH_CAOCV]
 }
