@@ -20,7 +20,7 @@ global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-class apply_voltage(Executor):
+class ApplyVoltageExecutor(Executor):
     driver: PowerSupplyDriver
 
     def __init__(self, *args, **kwargs):
@@ -38,7 +38,7 @@ class apply_voltage(Executor):
             self.duration = -1
         except Exception:
             LOGGER.error(f"Failed to initialize apply_voltage executor:", exc_info=True)
-            return {"error": ErrorCodes.critical_error}
+          # init should never return for any python class!
 
     async def _pre_exec(self):
         " connect to the power supply and set the output to on"
@@ -54,14 +54,14 @@ class apply_voltage(Executor):
         " apply the voltage to the power supply"
         voltage = self.action_params["voltage"]
         sleep_time = self.action_params["sleep_time"]
-        resp = self.driver.apply_voltage_async(voltage=voltage, sleep_time=sleep_time)
+        resp = await self.driver.apply_voltage_async(voltage=voltage, sleep_time=sleep_time)
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
         " poll the voltage of the power supply"
-        resp = self.driver.get_current_async(sleep_time=self.poll_rate)
+        resp = await self.driver.get_current_async(sleep_time=self.poll_rate)
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
         return {"error": ErrorCodes.none, "data": resp.data}
@@ -108,7 +108,7 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         active.action.action_params["sleep_time"] = sleep_time
 
         # Start executor
-        executor = apply_voltage(active=active, oneoff=False)
+        executor = ApplyVoltageExecutor(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
 
         return active_action_dict

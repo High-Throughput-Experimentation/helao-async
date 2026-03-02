@@ -7,7 +7,7 @@ import time
 import asyncio
 
 # print(dir(pv.ResourceManager))
-print(dir(pv.resources.serial.SerialInstrument))
+# print(dir(pv.resources.serial.SerialInstrument))
 
 
 # save a default log file system temp
@@ -166,6 +166,19 @@ class PowerSupplyDriver(HelaoDriver):
                 status=DriverStatus.error,
                 message=f"apply_voltage failed",
             )
+
+
+    def stop(self) -> DriverResponse:
+        """
+        Stops the power supply. This is just a dummy method to satisfy the interface.
+        """
+        if self.instrument is None:
+            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.uninitialized, message="not connected")
+        try:
+            return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        except Exception:
+            pv.logger.error("stop failed:", exc_info=True)
+            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"stop failed: {e}")
 
 
 
