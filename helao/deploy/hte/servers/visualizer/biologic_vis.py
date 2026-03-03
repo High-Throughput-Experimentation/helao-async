@@ -35,6 +35,7 @@ AXIS_MAP = {
     "run_CV": ("Ewe_V", "I_A"),
     "run_OCV": ("t_s", "Ewe_V"),
     "run_PEIS": ("R_ohm", "X_ohm"),
+    "run_CAOCV": ("t_s", "I_A"),
 }
 
 VALID_ACTION_NAME = [k for k in AXIS_MAP.keys()]
