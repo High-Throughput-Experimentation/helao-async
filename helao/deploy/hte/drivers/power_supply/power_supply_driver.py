@@ -82,7 +82,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
         except Exception:
             pv.logger.error("set_output_on failed:", exc_info=True)
-            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"set_output_on failed: {e}")
+            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"set_output_on failed:")
 
     def set_voltage(self, voltage_v: float = 0.0) -> DriverResponse:
         if self.instrument is None:
@@ -92,7 +92,17 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
         except Exception:
             pv.logger.error("set_voltage failed:", exc_info=True)
-            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"set_voltage failed: {e}")
+            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"set_voltage failed:")
+    
+    def set_current(self, current_a: float = 0.0) -> DriverResponse:
+        if self.instrument is None:
+            return DriverResponse(response=DriverResponseType.success, status=DriverStatus.uninitialized, data={})
+        try:
+            self.instrument.write(f"ISET1:{current_a}")
+            return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        except Exception:
+            pv.logger.error("set_current failed:", exc_info=True)
+            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"set_current failed:")
 
     def get_voltage(self) -> DriverResponse:
         if self.instrument is None:
@@ -102,7 +112,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok, data={"voltage_v": voltage_v})
         except Exception:
             pv.logger.error("get_voltage failed:", exc_info=True)
-            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"get_voltage failed: {e}")
+            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"get_voltage failed:")
     
     async def get_voltage_async(self, sleep_time: float = 0.05) -> 'DriverResponse':
         """
@@ -116,7 +126,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok, data={"voltage_v": voltage_v})
         except Exception:
             pv.logger.error("get_voltage_async failed:", exc_info=True)
-            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"get_voltage_async failed: {e}")
+            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"get_voltage_async failed:")
 
     async def get_current_async(self, sleep_time: float = 0.05) -> 'DriverResponse':
         """
@@ -125,12 +135,16 @@ class PowerSupplyDriver(HelaoDriver):
         if self.instrument is None:
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.uninitialized, message="not connected")
         try:
-            current_a = float(self.instrument.query("IOUT1?"))
+            current_a = self.instrument.query("IOUT1?")
+            try:
+                current_a = float(current_a)
+            except ValueError:
+                return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"return of get current is not a float: {current_a}")
             await asyncio.sleep(sleep_time)
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok, data={"current_a": current_a})
         except Exception:
             pv.logger.error("get_current_async failed:", exc_info=True)
-            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"get_current failed: {e}")
+            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"get_current failed")
 
 
             
@@ -168,6 +182,41 @@ class PowerSupplyDriver(HelaoDriver):
             )
 
 
+    async def apply_current_async(self, current: float, sleep_time: float = 0.05) -> 'DriverResponse':
+        """
+        Asynchronously sets the output voltage of the power supply to the specified value.
+
+        Args:
+            current (float): The current value to set.
+            sleep_time (float): The time to sleep between commands.
+
+        Returns:
+            DriverResponse: Result of the operation.
+        """
+        if self.instrument is None:
+            return DriverResponse(
+                response=DriverResponseType.failed,
+                status=DriverStatus.uninitialized,
+                message="not connected",
+            )
+        try:
+            self.instrument.write(f"ISET1:{current}")
+            await asyncio.sleep(sleep_time)
+            return DriverResponse(
+                response=DriverResponseType.success,
+                status=DriverStatus.ok,
+                data={"set_current": current},
+                message="Current applied successfully.",
+            )
+        except Exception:
+            pv.logger.error("apply_current_async failed:", exc_info=True)
+            return DriverResponse(
+                response=DriverResponseType.failed,
+                status=DriverStatus.error,
+                message=f"apply_voltage failed",
+            )
+
+
     def stop(self) -> DriverResponse:
         """
         Stops the power supply. This is just a dummy method to satisfy the interface.
@@ -178,7 +227,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
         except Exception:
             pv.logger.error("stop failed:", exc_info=True)
-            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"stop failed: {e}")
+            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"stop failed:")
 
 
 
@@ -195,7 +244,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.uninitialized)
         except Exception:
             pv.logger.error("disconnect failed:", exc_info=True)
-            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"disconnect failed: {e}")
+            return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"disconnect failed:")
 
     def reset(self) -> DriverResponse:
         self.disconnect()
