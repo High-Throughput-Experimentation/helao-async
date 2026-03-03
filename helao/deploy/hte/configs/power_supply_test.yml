@@ -64,7 +64,7 @@ servers:
     group: visualizer
     bokeh: action_visualizer
     params:
-      doc_name: ECHE11 Visualizer
+      doc_name: test Visualizer
 
   # ANA:
   #   host: hte-eche-11.htejcap.caltech.edu
