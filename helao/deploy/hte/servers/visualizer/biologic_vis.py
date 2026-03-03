@@ -3,7 +3,7 @@ import asyncio
 from functools import partial
 from copy import deepcopy
 
-import numpy as np
+import pandas as pd
 from bokeh.models import (
     RadioButtonGroup,
     TextInput,
@@ -263,12 +263,12 @@ class C_biovis:
                             if data_label in self.data_dict_keys:
                                 if isinstance(data_val, list):
                                     nanfiltered = [
-                                        "NaN" if np.isnan(x) else x for x in data_val
+                                        "NaN" if pd.isna(x) else x for x in data_val
                                     ]
                                     data_dict[data_label] += nanfiltered
                                 else:
                                     data_dict[data_label].append(
-                                        "NaN" if np.isnan(data_val) else data_val
+                                        "NaN" if pd.isna(data_val) else data_val
                                     )
 
                         # check for missing I_A in OCV
