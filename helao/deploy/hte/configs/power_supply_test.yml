@@ -58,6 +58,14 @@ servers:
       resource_name:  'ASRL/dev/cu.usbmodem0031012B04581::INSTR'
       timeout_ms: 10000
 
+  VIS:
+    host: 127.0.0.1
+    port: 8003
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: ECHE11 Visualizer
+
   # ANA:
   #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8014
@@ -172,13 +180,7 @@ servers:
   #   hlo_postprocess_libs: 
   #     - hispec_process_all
   #   verbose: true
-  # VIS:
-  #   host: hte-eche-11.htejcap.caltech.edu
-  #   port: 5001
-  #   group: visualizer
-  #   bokeh: action_visualizer
-  #   params:
-  #     doc_name: ECHE11 Visualizer
+  
   # DB:
   #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8010
