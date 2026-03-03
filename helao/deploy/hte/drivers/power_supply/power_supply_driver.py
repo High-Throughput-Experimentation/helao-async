@@ -213,7 +213,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
-                message=f"apply_voltage failed",
+                message=f"apply_Current failed",
             )
 
 

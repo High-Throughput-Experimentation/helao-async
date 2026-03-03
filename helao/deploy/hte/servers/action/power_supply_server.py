@@ -169,8 +169,10 @@ class ConstantCurrentSquareWaveExecutor(Executor):
 
     async def _exec(self):
         " apply the voltage to the power supply"
-        current_a = self.action_params["current_a"]
+        current_a = self.action_params["current"]
         sleep_time = self.action_params["sleep_time"]
+        sleep_time1 = self.action_params["sleep_time1"]
+        sleep_time2 = self.action_params["sleep_time2"]
         resp = self.driver.set_output(output_on=False)
         time.sleep(sleep_time)
         if resp.response != DriverResponseType.success:
@@ -178,11 +180,11 @@ class ConstantCurrentSquareWaveExecutor(Executor):
         resp = self.driver.set_output(output_on=True)
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
-        resp = await self.driver.apply_current_async(current=current_a, sleep_time=sleep_time)
+        resp = await self.driver.apply_current_async(current=current_a, sleep_time=sleep_time1)
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
         resp = self.driver.set_output(output_on=False)
-        time.sleep(sleep_time)
+        time.sleep(sleep_time2)
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
         
@@ -272,6 +274,46 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
 
         # Start executor
         executor = SquareWaveExecutor(active=active, oneoff=False)
+        active_action_dict = active.start_executor(executor)
+        
+
+        return active_action_dict
+
+
+    @app.post(f"/{server_key}/constant_current_square_wave", tags=["action"])
+    async def constant_current_square_wave(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        current: float = 0.01,
+        sleep_time: float = 0.05,
+        sleep_time1: float = 1,
+        sleep_time2: float = 1,
+    ):
+        """Apply constant current square wave to the power supply asynchronously."""
+
+        # Prepare json_data_keys for logging/serialization (for example: ["elapsed_time_s", "voltage_v", "current_a"])
+        data_keys = ["elapsed_time_s", "voltage_v", "current_a"]  # Adjust as needed
+
+        active = await app.base.setup_and_contain_action(
+            json_data_keys=data_keys,
+            file_type="power_supply_helao__file",
+            hloheader=HloHeaderModel(
+                action_name=action.action_name,
+                column_headings=data_keys,
+                optional={},
+            ),
+        )
+
+        # Abbreviate action for clarity
+        active.action.action_abbr = "SQUAREWAVE"
+        # Save parameters to action_params
+        active.action.action_params["current"] = current
+        active.action.action_params["sleep_time"] = sleep_time
+        active.action.action_params["sleep_time1"] = sleep_time1
+        active.action.action_params["sleep_time2"] = sleep_time2
+
+        # Start executor
+        executor = ConstantCurrentSquareWaveExecutor(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
         
 
