@@ -521,7 +521,7 @@ class Base:
         for key, val in paramdict.items():
             if key not in action.action_params:
                 LOGGER.info(
-                    f"local var '{key}' not found in action.action_params, addding it."
+                    f"local var '{key}' not found in action.action_params, adding it."
                 )
                 action.action_params.update({key: val})
 
