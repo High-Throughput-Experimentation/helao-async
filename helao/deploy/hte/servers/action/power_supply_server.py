@@ -126,7 +126,7 @@ class SquareWaveExecutor(Executor):
 
     async def _poll(self):
         " poll the voltage of the power supply"
-        resp = await self.driver.get_current_async(sleep_time=self.poll_rate)
+        resp = await self.driver.get_current_async(sleep_time=0.1)
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
         return {"error": ErrorCodes.none, "data": resp.data}
