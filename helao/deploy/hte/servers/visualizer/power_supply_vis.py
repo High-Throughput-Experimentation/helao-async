@@ -1,0 +1,238 @@
+"""Live visualizer for power supply server"""
+
+import time
+import asyncio
+from datetime import datetime
+from functools import partial
+
+from bokeh.models import TextInput
+from bokeh.plotting import figure
+from bokeh.models.widgets import Div
+from bokeh.models.widgets import DataTable, TableColumn
+from bokeh.layouts import layout, Spacer
+from bokeh.models import ColumnDataSource, DatetimeTickFormatter
+
+from helao.helpers import helao_logging as logging
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+from helao.core.servers.vis import Vis
+from helao.helpers.ws_subscriber import WsSubscriber as Wss
+
+
+class C_powersupplyvis:
+    """Power supply visualizer module class"""
+
+    def __init__(self, vis_serv: Vis, serv_key: str):
+        self.vis = vis_serv
+        self.config_dict = self.vis.server_cfg.get("params", {})
+        self.update_rate = self.config_dict.get("update_rate", 0.5)
+        self.max_points = 500
+        self.last_update_time = time.time()
+
+        self.live_key = serv_key
+        pws_config = self.vis.world_cfg["servers"].get(self.live_key, None)
+        if pws_config is None:
+            return
+        pws_host = pws_config.get("host", None)
+        pws_port = pws_config.get("port", None)
+        self.wss = Wss(pws_host, pws_port, "ws_live")
+
+        self.data_url = (
+            f"ws://{pws_config['host']}:{pws_config['port']}/ws_live"
+        )
+
+        self.IOloop_data_run = False
+        self.IOloop_stat_run = False
+
+        # Common variables to monitor: voltage, current, power, status (if available)
+        self.data_dict_keys = [
+            "datetime",
+            "voltage",
+            "current",
+            "status",
+        ]
+        self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
+        self.datasource_table = ColumnDataSource(
+            data={k: [] for k in ["name", "value"]}
+        )
+
+        # create visual elements
+        self.layout = []
+
+        self.input_max_points = TextInput(
+            value=f"{self.max_points}",
+            title="max datapoints",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        self.input_max_points.on_change(
+            "value",
+            partial(self.callback_input_max_points, sender=self.input_max_points),
+        )
+
+        self.input_update_rate = TextInput(
+            value=f"{self.update_rate}",
+            title="update sec",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        self.input_update_rate.on_change(
+            "value",
+            partial(self.callback_input_update_rate, sender=self.input_update_rate),
+        )
+
+        self.plot = figure(height=300, width=500)
+        self.plot.xaxis.formatter = DatetimeTickFormatter(
+            minsec="%T",
+            minutes="%T",
+            hourmin="%T",
+            hours="%T",
+        )
+        self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
+        self.plot.yaxis.axis_label = "Voltage (V) / Current (A)"
+
+        self.table = DataTable(
+            source=self.datasource_table,
+            columns=[
+                TableColumn(field="name", title="name"),
+                TableColumn(field="value", title="value"),
+            ],
+            height=300,
+            width=400,
+        )
+        # combine all sublayouts into a single one
+        docs_url = f"http://{pws_host}:{pws_port}/docs#/"
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.live_key}\'</a>'
+        headerbar = f"<b>Live vis module for server {server_link}</b>"
+        self.layout = layout(
+            [
+                [Div(text=headerbar, width=1004, height=15)],
+                [self.input_max_points, self.input_update_rate],
+                Spacer(height=10),
+                [self.plot, Spacer(width=20), self.table],
+                Spacer(height=10),
+            ],
+            background="#D6DBDF",
+            width=1024,
+        )
+
+        self.vis.doc.add_root(self.layout)
+        self.vis.doc.add_root(Spacer(height=10))
+        self.IOtask = asyncio.create_task(self.IOloop_data())
+        self.vis.doc.on_session_destroyed(self.cleanup_session)
+
+    def cleanup_session(self, session_context):
+        LOGGER.info(f"'{self.live_key}' Bokeh session closed")
+        self.IOloop_data_run = False
+        self.IOtask.cancel()
+
+    def callback_input_max_points(self, attr, old, new, sender):
+        """callback for input_max_points"""
+
+        def to_int(val):
+            try:
+                return int(val)
+            except ValueError:
+                return None
+
+        newpts = to_int(new)
+        oldpts = to_int(old)
+
+        if newpts is None:
+            if oldpts is not None:
+                newpts = oldpts
+            else:
+                newpts = 500
+
+        if newpts < 2:
+            newpts = 2
+        if newpts > 10000:
+            newpts = 10000
+
+        self.max_points = newpts
+
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_input_value, sender, f"{self.max_points}")
+        )
+
+    def update_input_value(self, sender, value):
+        sender.value = value
+
+    def callback_input_update_rate(self, attr, old, new, sender):
+        """callback for input_update_rate"""
+
+        def to_float(val):
+            try:
+                return float(val)
+            except ValueError:
+                return 0.5
+
+        newpts = to_float(new)
+
+        self.update_rate = newpts
+
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_input_value, sender, f"{self.update_rate}")
+        )
+
+    def add_points(self, datapackage_list: list):
+        latest_epoch = 0
+        data_dict = {k: [] for k in self.data_dict_keys}
+        for datapackage in datapackage_list:
+            # expected datapackage: dict with keys like voltage, current_a, power_w, status, each has (value, epoch)
+            for datalab, (dataval, epochsec) in datapackage.items():
+                if datalab == "sim_dict":
+                    for k, v in dataval.items():
+                        data_dict[k].append(v)
+                elif isinstance(dataval, list):
+                    data_dict[datalab] += dataval
+                else:
+                    if datalab in data_dict:
+                        data_dict[datalab].append(dataval)
+                latest_epoch = max([epochsec, latest_epoch])
+            data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
+
+        self.datasource.stream(data_dict, rollover=self.max_points)
+        keys = list(data_dict.keys())
+        values = [data_dict[k][-1] if len(data_dict[k]) > 0 else None for k in keys]
+        table_data_dict = {"name": keys, "value": values}
+        self.datasource_table.stream(table_data_dict, rollover=len(keys))
+        self._add_plots()
+
+    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+        LOGGER.info(f" ... Power supply visualizer subscribing to: {self.data_url}")
+        while True:
+            if time.time() - self.last_update_time >= self.update_rate:
+                messages = await self.wss.read_messages()
+                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
+                self.last_update_time = time.time()
+            await asyncio.sleep(0.01)
+
+    def _add_plots(self):
+        # clear legend
+        if self.plot.renderers:
+            self.plot.legend.items = []
+
+        # remove all old lines
+        self.plot.renderers = []
+
+        # Plot voltage and current on the same plot
+        self.plot.line(
+            x="datetime",
+            y="voltage",
+            line_color="blue",
+            legend_label="Voltage (V)",
+            source=self.datasource,
+        )
+        self.plot.line(
+            x="datetime",
+            y="current_a",
+            line_color="green",
+            legend_label="Current (A)",
+            source=self.datasource,
+        )
+
+    def reset_plot(self, forceupdate: bool = False):
+        self._add_plots()

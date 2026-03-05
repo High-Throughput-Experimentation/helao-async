@@ -24,7 +24,8 @@ def nan2None(obj):
 
 
 class HelaoDict:
-    """implements dict and serialization methods for helao"""
+    """implements dict and serialization methods for helao - this cleans up things that are
+    not serializable such as np arrays etc"""
 
     def _serialize_dict(self, dict_in: dict):
         clean = {}

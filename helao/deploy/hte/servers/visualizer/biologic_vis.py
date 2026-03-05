@@ -70,7 +70,8 @@ class C_biovis:
 
         self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "P_W", "R_ohm", "X_ohm"]
 
-        # separate data sources for each channel
+        # separate data sources for each channel (biologic channel) 
+        # this is the important part - we don't redefine the data sources, we just stream into it
         self.channel_datasources = {
             ch: ColumnDataSource(data={key: [] for key in self.data_dict_keys})
             for ch in range(self.num_channels)
@@ -236,7 +237,7 @@ class C_biovis:
         LOGGER.info(f" ... potentiostat visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
-                messages = await self.wss.read_messages()
+                messages = await self.wss.read_messages() # where the data is coming from - reads messages in websocket
                 self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
                 self.last_update_time = time.time()
             await asyncio.sleep(0.01)
@@ -244,7 +245,7 @@ class C_biovis:
     def add_points(self, datapackage_list: list):
         for data_package in datapackage_list:
             if (
-                data_package.datamodel.status in VALID_DATA_STATUS
+                data_package.datamodel.status in VALID_DATA_STATUS 
                 and data_package.action_name in VALID_ACTION_NAME
             ):
                 for _, uuid_dict in data_package.datamodel.data.items():
