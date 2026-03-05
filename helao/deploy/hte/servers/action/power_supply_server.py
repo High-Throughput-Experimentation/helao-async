@@ -107,29 +107,44 @@ class SquareWaveExecutor(Executor):
         " apply the voltage to the power supply"
         voltage = self.action_params["voltage"]
         sleep_time = self.action_params["sleep_time"]
-        resp = self.driver.set_output(output_on=False)
-        time.sleep(sleep_time)
-        if resp.response != DriverResponseType.success:
+        try:
+            resp = self.driver.set_output(output_on=False)
+            time.sleep(sleep_time)
+            if resp.response != DriverResponseType.success:
+                logging.error(f"SquareWaveExecutor set_output(output_on=False) failed:", exc_info=True)
+                return {"error": ErrorCodes.critical_error}
+            resp = self.driver.set_output(output_on=True)
+            if resp.response != DriverResponseType.success:
+                logging.error(f"SquareWaveExecutor set_output(output_on=True) failed:", exc_info=True)
+                return {"error": ErrorCodes.critical_error}
+            resp = await self.driver.apply_voltage_async(voltage=voltage, sleep_time=sleep_time)
+            if resp.response != DriverResponseType.success:
+                logging.error(f"SquareWaveExecutor apply_voltage_async failed:", exc_info=True)
+                return {"error": ErrorCodes.critical_error}
+            resp = self.driver.set_output(output_on=False)
+            time.sleep(sleep_time)
+            if resp.response != DriverResponseType.success:
+                logging.error(f"SquareWaveExecutor set_output(output_on=False) failed:", exc_info=True)
+                return {"error": ErrorCodes.critical_error}
+            
+            return {"error": ErrorCodes.none}
+        except Exception:
+            LOGGER.error(f"SquareWaveExecutor failed:", exc_info=True)
             return {"error": ErrorCodes.critical_error}
-        resp = self.driver.set_output(output_on=True)
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        resp = await self.driver.apply_voltage_async(voltage=voltage, sleep_time=sleep_time)
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        resp = self.driver.set_output(output_on=False)
-        time.sleep(sleep_time)
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        
-        return {"error": ErrorCodes.none}
 
     async def _poll(self):
         " poll the voltage of the power supply"
-        resp = await self.driver.get_current_async(sleep_time=0.1)
-        if resp.response != DriverResponseType.success:
+        try:
+            resp = await self.driver.get_current_async(sleep_time=0.1)
+            logging.info(f"SquareWaveExecutor poll response: {resp}")
+            if resp.response != DriverResponseType.success:
+                logging.error(f"SquareWaveExecutor poll response not success:", exc_info=True)
+                return {"error": ErrorCodes.critical_error}
+            
+            return {"error": ErrorCodes.none, "data": resp.data}
+        except Exception:
+            LOGGER.error(f"SquareWaveExecutor poll failed:", exc_info=True)
             return {"error": ErrorCodes.critical_error}
-        return {"error": ErrorCodes.none, "data": resp.data}
 
     async def _post_exec(self):
         " disconnect from the power supply"
