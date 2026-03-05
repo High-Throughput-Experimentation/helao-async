@@ -228,7 +228,7 @@ class C_powersupplyvis:
         )
         self.plot.line(
             x="datetime",
-            y="current_a",
+            y="current",
             line_color="green",
             legend_label="Current (A)",
             source=self.datasource,
