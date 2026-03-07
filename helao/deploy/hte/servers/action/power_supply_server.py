@@ -4,6 +4,7 @@ __all__ = ["makeApp"]
 
 import time
 import asyncio
+from tracemalloc import start
 from fastapi import Body
 
 from helao.core.error import ErrorCodes
@@ -19,7 +20,137 @@ from ...drivers.power_supply.power_supply_driver import PowerSupplyDriver, Drive
 global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
+from enum import Enum
 
+
+class ConstantCurrentSquareWaveExecutor(Executor):
+    driver: PowerSupplyDriver
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            self.poll_rate = 0.2  # pump events every 100 millisecond
+            self.start_time = time.time()
+
+            class PollFlag(Enum):
+                PRE = "pre"
+                OFF_0 = "off_0"
+                ON = "on"
+                OFF_1 = "off1"
+            self.PollFlag=PollFlag
+            self.poll_flag = PollFlag.PRE
+            # link attrs for convenience
+            self.action_params = self.active.action.action_params
+            self.driver = self.active.driver
+
+            # no external timer, event sink signals end of measurement
+            self.duration = -1
+        except Exception:
+            LOGGER.error(f"Failed to initialize apply_voltage executor:", exc_info=True)
+          # init should never return for any python class!
+
+    async def _pre_exec(self):
+        " connect to the power supply and set the output to on"
+        resp = self.driver.connect()
+
+        if resp.response != DriverResponseType.success:
+            LOGGER.error(f"ConstantCurrentSquareWaveExecutor connect failed:", exc_info=True)
+            return {"error": ErrorCodes.critical_error}
+        resp = self.driver.set_output(True)
+        if resp.response != DriverResponseType.success:
+            LOGGER.error(f"ConstantCurrentSquareWaveExecutor set_output(True) failed:", exc_info=True)
+            return {"error": ErrorCodes.critical_error}
+        else:
+            LOGGER.info(f"power supply is connected")
+        return {"error": ErrorCodes.none}
+
+    async def _exec(self):
+        self.start_time = time.time()
+        " apply the voltage to the power supply"
+        
+        resp = await self.driver.apply_current_async(current=0, sleep_time=0.1)
+        resp = self.driver.set_output(output_on=False)
+        if resp.response != DriverResponseType.success:
+            LOGGER.warning("failed to set current to 0")
+
+        self.poll_flag = self.PollFlag.OFF_0
+        return {"error": ErrorCodes.none, }
+
+    async def _poll(self):
+        current_a = self.action_params['current']
+        # to do  - speed up the polling and add an exit condition. make errored reads ok
+        sleep_time = self.action_params["sleep_time"]
+        sleep_time1 = self.action_params["sleep_time1"]
+        sleep_time2 = self.action_params["sleep_time2"]
+        
+        time_now = time.time()- self.start_time
+
+        if time_now >sleep_time2:
+
+            resp = await self.driver.apply_current_async(current=0, sleep_time=0.1)
+            resp = self.driver.set_output(output_on=False)
+            LOGGER.warning('poll completed')
+            return {"status": HloStatus.finished}
+            
+        elif time_now > sleep_time1:
+            if self.poll_flag == self.PollFlag.ON:
+                LOGGER.warning('changing poll flag from ON to OFF_1')
+                resp = await self.driver.apply_current_async(current=0, sleep_time=0.1)
+                time.sleep(0.1)
+                resp = self.driver.set_output(output_on=False)
+                if resp.response != DriverResponseType.success:
+                    LOGGER.warning("failed to set current to 0")
+
+                self.poll_flag = self.PollFlag.OFF_1
+                time.sleep(0.1)
+                if resp.response != DriverResponseType.success:
+                        LOGGER.error(f"set output failed in poll:", exc_info=True) 
+                LOGGER.info(f'poll, at time {time_now}, which is after the second time of {sleep_time1}')
+            
+            
+                    
+        
+        elif time_now > sleep_time:
+            if self.poll_flag == self.PollFlag.OFF_0:
+                resp = self.driver.set_output(output_on=True)
+                LOGGER.warning(f'output set for ON time, response is {resp.response}')
+                time.sleep(0.1)
+                if resp.response != DriverResponseType.success:
+                        LOGGER.error(f"set output failed in poll:", exc_info=True) 
+                resp = await self.driver.apply_current_async(current=current_a, sleep_time=0.1)   
+                LOGGER.warning(f'Current for ON applied, response is {resp.response}')
+                            
+                self.poll_flag = self.PollFlag.ON
+            LOGGER.info(f'poll, at time {time_now}, which is after {sleep_time}')
+
+        else:
+
+            LOGGER.info(f'poll, at time {time_now}, which is before {sleep_time}')
+
+       
+        resp=await self.driver.get_voltage_async(sleep_time=0.05)
+        LOGGER.info(f'polled voltage is {resp.data['voltage_v']}')
+        resp.data['t_s']=time_now
+        return {'data': resp.data, "status": HloStatus.active}
+
+
+        
+            
+
+                
+            
+        
+            
+
+        
+
+        
+    async def _post_exec(self):
+        " disconnect from the power supply"
+        resp = self.driver.disconnect()
+        if resp.response != DriverResponseType.success:
+            return {"error": ErrorCodes.critical_error}
+        return {"error": ErrorCodes.none}
 class ApplyVoltageExecutor(Executor):
     driver: PowerSupplyDriver
 
@@ -62,9 +193,12 @@ class ApplyVoltageExecutor(Executor):
     async def _poll(self):
         " poll the voltage of the power supply"
         resp = await self.driver.get_current_async(sleep_time=self.poll_rate)
+        LOGGER.info(f"_poll response is {resp}")
+        status = HloStatus.active
         if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        return {"error": ErrorCodes.none, "data": resp.data}
+            status = HloStatus.errored
+            return {"error": ErrorCodes.critical_error, "status": status}
+        return {"error": ErrorCodes.none, "data": resp.data, "status": status}
 
     async def _post_exec(self):
         " disconnect from the power supply"
@@ -111,20 +245,20 @@ class SquareWaveExecutor(Executor):
             resp = self.driver.set_output(output_on=False)
             time.sleep(sleep_time)
             if resp.response != DriverResponseType.success:
-                logging.error(f"SquareWaveExecutor set_output(output_on=False) failed:", exc_info=True)
+                LOGGER.error(f"SquareWaveExecutor set_output(output_on=False) failed:", exc_info=True)
                 return {"error": ErrorCodes.critical_error}
             resp = self.driver.set_output(output_on=True)
             if resp.response != DriverResponseType.success:
-                logging.error(f"SquareWaveExecutor set_output(output_on=True) failed:", exc_info=True)
+                LOGGER.error(f"SquareWaveExecutor set_output(output_on=True) failed:", exc_info=True)
                 return {"error": ErrorCodes.critical_error}
             resp = await self.driver.apply_voltage_async(voltage=voltage, sleep_time=sleep_time)
             if resp.response != DriverResponseType.success:
-                logging.error(f"SquareWaveExecutor apply_voltage_async failed:", exc_info=True)
+                LOGGER.error(f"SquareWaveExecutor apply_voltage_async failed:", exc_info=True)
                 return {"error": ErrorCodes.critical_error}
             resp = self.driver.set_output(output_on=False)
             time.sleep(sleep_time)
             if resp.response != DriverResponseType.success:
-                logging.error(f"SquareWaveExecutor set_output(output_on=False) failed:", exc_info=True)
+                LOGGER.error(f"SquareWaveExecutor set_output(output_on=False) failed:", exc_info=True)
                 return {"error": ErrorCodes.critical_error}
             
             return {"error": ErrorCodes.none}
@@ -136,9 +270,9 @@ class SquareWaveExecutor(Executor):
         " poll the voltage of the power supply"
         try:
             resp = await self.driver.get_current_async(sleep_time=0.1)
-            logging.info(f"SquareWaveExecutor poll response: {resp}")
+            LOGGER.info(f"SquareWaveExecutor poll response: {resp}")
             if resp.response != DriverResponseType.success:
-                logging.error(f"SquareWaveExecutor poll response not success:", exc_info=True)
+                LOGGER.error(f"SquareWaveExecutor poll response not success:", exc_info=True)
                 return {"error": ErrorCodes.critical_error}
             
             return {"error": ErrorCodes.none, "data": resp.data}
@@ -153,71 +287,6 @@ class SquareWaveExecutor(Executor):
             return {"error": ErrorCodes.critical_error}
         return {"error": ErrorCodes.none}
 
-class ConstantCurrentSquareWaveExecutor(Executor):
-    driver: PowerSupplyDriver
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        try:
-            self.poll_rate = 5  # pump events every 100 millisecond
-            self.start_time = time.time()
-
-            # link attrs for convenience
-            self.action_params = self.active.action.action_params
-            self.driver = self.active.driver
-
-            # no external timer, event sink signals end of measurement
-            self.duration = -1
-        except Exception:
-            LOGGER.error(f"Failed to initialize apply_voltage executor:", exc_info=True)
-          # init should never return for any python class!
-
-    async def _pre_exec(self):
-        " connect to the power supply and set the output to on"
-        resp = self.driver.connect()
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        resp = self.driver.set_output(True)
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        return {"error": ErrorCodes.none}
-
-    async def _exec(self):
-        " apply the voltage to the power supply"
-        current_a = self.action_params["current"]
-        sleep_time = self.action_params["sleep_time"]
-        sleep_time1 = self.action_params["sleep_time1"]
-        sleep_time2 = self.action_params["sleep_time2"]
-        resp = self.driver.set_output(output_on=False)
-        time.sleep(sleep_time)
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        resp = self.driver.set_output(output_on=True)
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        resp = await self.driver.apply_current_async(current=current_a, sleep_time=sleep_time1)
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        resp = self.driver.set_output(output_on=False)
-        time.sleep(sleep_time2)
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        
-        return {"error": ErrorCodes.none}
-
-    async def _poll(self):
-        " poll the voltage of the power supply"
-        resp = await self.driver.get_current_async(sleep_time=self.poll_rate)
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        return {"error": ErrorCodes.none, "data": resp.data}
-
-    async def _post_exec(self):
-        " disconnect from the power supply"
-        resp = self.driver.disconnect()
-        if resp.response != DriverResponseType.success:
-            return {"error": ErrorCodes.critical_error}
-        return {"error": ErrorCodes.none}
 
 
 async def power_supply_dyn_endpoints(app: BaseAPI):
