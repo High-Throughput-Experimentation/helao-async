@@ -35,10 +35,10 @@ class C_powersupplyvis:
             return
         pws_host = pws_config.get("host", None)
         pws_port = pws_config.get("port", None)
-        self.wss = Wss(pws_host, pws_port, "ws_live")
+        self.wss = Wss(pws_host, pws_port, "ws_data")
 
         self.data_url = (
-            f"ws://{pws_config['host']}:{pws_config['port']}/ws_live"
+            f"ws://{pws_host}:{pws_port}/ws_data"
         )
 
         self.IOloop_data_run = False
@@ -46,10 +46,10 @@ class C_powersupplyvis:
 
         # Common variables to monitor: voltage, current, power, status (if available)
         self.data_dict_keys = [
-            "datetime",
-            "voltage",
-            "current",
-            "status",
+            "t_s",
+            # "voltage",
+            "current_a",
+            # "status",
         ]
         self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
         self.datasource_table = ColumnDataSource(
