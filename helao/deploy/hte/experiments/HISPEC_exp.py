@@ -194,7 +194,7 @@ def HISPEC_sub_engage(
     # raise z (engage)
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
+    # apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
     # close vent valves
     for item in ("we_vent", "ce_vent"):
         apm.add(
@@ -267,7 +267,7 @@ def HISPEC_sub_disengage(
             )
     apm.add(ORCH_server, "wait", {"waittime": vent_wait})
     # lower z (disengage)
-    apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
+    # apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
     for i, item in enumerate(["we_vent", "we_pump", "ce_vent", "ce_pump"]):
         apm.add(
             IO_server,
@@ -336,18 +336,18 @@ def HISPEC_sub_startup(
     )
 
     # move to position
-    apm.add(
-        MOTOR_server,
-        "move",
-        {
-            # "d_mm": [x_mm, y_mm],
-            "axis": ["x", "y"],
-            "mode": MoveModes.absolute,
-            "transformation": TransformationModes.platexy,
-        },
-        from_global_act_params={"_platexy": "d_mm"},
-        start_condition=ActionStartCondition.wait_for_all,
-    )
+    # apm.add(
+    #     MOTOR_server,
+    #     "move",
+    #     {
+    #         # "d_mm": [x_mm, y_mm],
+    #         "axis": ["x", "y"],
+    #         "mode": MoveModes.absolute,
+    #         "transformation": TransformationModes.platexy,
+    #     },
+    #     from_global_act_params={"_platexy": "d_mm"},
+    #     start_condition=ActionStartCondition.wait_for_all,
+    # )
 
     return apm.planned_actions  # returns complete action list to orch
 
