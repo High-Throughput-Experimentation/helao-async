@@ -115,6 +115,7 @@ class XrfsAnalysis(BaseAnalysis):
         self.run_type = self.inputs.xrfs.meta_dict.get("run_type", "xrfs")
         self.run_use = self.inputs.xrfs.meta_dict["run_use"]
         self.technique_name = self.inputs.xrfs.technique_name
+        self.sequence_uuid = self.inputs.xrfs.meta_dict.get("sequence_uuid", None)
 
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
         self.analysis_codepath = sys._getframe().f_code.co_filename
