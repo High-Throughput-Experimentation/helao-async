@@ -67,6 +67,7 @@ class AnalysisModel(ShortAnalysisModel):
     data_request_id: Optional[UUID] = None
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
+    sequence_uuid: Optional[UUID] = None
     # TODO: include run_type, process_timestamp, technique_name
 
 

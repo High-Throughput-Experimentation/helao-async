@@ -102,6 +102,7 @@ class IcpmsAnalysis(BaseAnalysis):
         self.process_name = self.inputs.icpms.technique_name
         self.run_type = self.inputs.icpms.meta_dict.get("run_type", "icpm")
         self.technique_name = self.inputs.icpms.technique_name
+        self.sequence_uuid = self.inputs.icpms.meta_dict.get("sequence_uuid", None)
 
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
         self.analysis_codepath = sys._getframe().f_code.co_filename
