@@ -105,9 +105,7 @@ class C_mfc:
 
         self.plot = figure(height=300, width=500)
         self.plot.xaxis.formatter = DatetimeTickFormatter(
-            minsec="%T",
             minutes="%T",
-            hourmin="%T",
             hours="%T",
         )
         self.plot.xaxis.axis_label = "Time (HH:MM:SS)"

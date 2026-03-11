@@ -1,7 +1,9 @@
 import os
+from socket import gethostname
 from fastapi import FastAPI
 from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
+from helao.core.models.machine import MachineModel
 
 CONFIG = config_loader.CONFIG
 
@@ -60,6 +62,12 @@ class HelaoFastAPI(FastAPI):
                 log_dir=os.path.join(self.helao_cfg["root"], "LOGS"),
                 show_debug_console=self.helao_cfg.get("show_debug", False),
             )
+        self.server = MachineModel(
+            server_name=self.helao_srv,
+            machine_name=gethostname().lower(),
+            hostname=self.server_cfg["host"],
+            port=self.server_cfg["port"],
+        )
 
 
 class HelaoBokehAPI:
@@ -90,6 +98,12 @@ class HelaoBokehAPI:
                 log_dir=os.path.join(self.helao_cfg["root"], "LOGS"),
                 show_debug_console=self.helao_cfg.get("show_debug", False),
             )
+        self.server = MachineModel(
+            server_name=self.helao_srv,
+            machine_name=gethostname().lower(),
+            hostname=self.server_cfg["host"],
+            port=self.server_cfg["port"],
+        )
         self.doc_name = self.server_params.get(
             "doc_name", f"{self.helao_srv} Bokeh App"
         )

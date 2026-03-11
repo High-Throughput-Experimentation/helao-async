@@ -7,7 +7,6 @@ from bokeh.models import (
     RadioButtonGroup,
     TextInput,
 )
-from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
@@ -114,7 +113,6 @@ class C_potvis:
             label="Stop measurement",
             button_type="danger",
             width=70,
-            align="end",
         )
         self.button_stop_measure.on_event(ButtonClick, self.callback_stop_measure)
 
@@ -151,8 +149,8 @@ class C_potvis:
                     self.button_stop_measure,
                 ],
                 [
-                    Paragraph(text="""x-axis:""", width=500, height=15),
-                    Paragraph(text="""y-axis:""", width=500, height=15),
+                    Div(text="""x-axis:""", width=500, height=15),
+                    Div(text="""y-axis:""", width=500, height=15),
                 ],
                 [self.xaxis_selector_group, self.yaxis_selector_group],
                 Spacer(height=10),
