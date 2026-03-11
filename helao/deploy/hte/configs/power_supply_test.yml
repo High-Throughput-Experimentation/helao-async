@@ -35,7 +35,7 @@ run_type: power_supply
 root: C:\INST_hlo
 servers:
   ORCH:
-    host: hte-eche-11.htejcap.caltech.edu
+    host: 127.0.0.1
     port: 8001
     group: orchestrator
     fast: async_orch2
@@ -47,6 +47,54 @@ servers:
       ignore_heartbeats:
         - ANDOR/acquire
     verbose: true
+
+
+  POWER_SUPPLY:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: power_supply_server
+    params:
+      resource_name:  'ASRL/dev/cu.usbmodem0031012B04581::INSTR'
+      timeout_ms: 10000
+
+  VIS:
+    host: 127.0.0.1
+    port: 8003
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: test Visualizer
+
+  # ANA:
+  #   host: hte-eche-11.htejcap.caltech.edu
+  #   port: 8014
+  #   group: action
+  #   fast: analysis_server
+  #   params:
+  #     local_only: false
+  # CAM:
+  #   host: hte-eche-11.htejcap.caltech.edu
+  #   port: 8013
+  #   group: action
+  #   fast: cam_server
+  #   params:
+  #     axis_ip: 192.168.200.210
+  # KMOTOR:
+  #   host: hte-eche-11.htejcap.caltech.edu
+  #   port: 8015
+  #   group: action
+  #   fast: kinesis_server
+  #   params:
+  #     axes:
+  #       z:
+  #         serial_no: "49437454"
+  #         pos_scale: 1228800.0  # device to mm
+  #         vel_scale: 65970697.6  # device to mm/s
+  #         acc_scale: 13518.2  # device to mm/s2
+  #         move_limit_mm: 5.0
+
+
   # MOTOR:
   #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8003
@@ -132,13 +180,7 @@ servers:
   #   hlo_postprocess_libs: 
   #     - hispec_process_all
   #   verbose: true
-  # VIS:
-  #   host: hte-eche-11.htejcap.caltech.edu
-  #   port: 5001
-  #   group: visualizer
-  #   bokeh: action_visualizer
-  #   params:
-  #     doc_name: ECHE11 Visualizer
+  
   # DB:
   #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8010
@@ -154,40 +196,3 @@ servers:
   #     fast: calc_server
   #     params: {}
   #     verbose: false
-
-POWER_SUPPLY:
-  host: hte-eche-11.htejcap.caltech.edu
-  port: 8006
-  group: action
-  fast: power_supply_server
-  params:
-    resource_name:  'ASRL/dev/cu.usbmodem0031012B04581::INSTR'
-    timeout_ms: 10000
-
-  # ANA:
-  #   host: hte-eche-11.htejcap.caltech.edu
-  #   port: 8014
-  #   group: action
-  #   fast: analysis_server
-  #   params:
-  #     local_only: false
-  # CAM:
-  #   host: hte-eche-11.htejcap.caltech.edu
-  #   port: 8013
-  #   group: action
-  #   fast: cam_server
-  #   params:
-  #     axis_ip: 192.168.200.210
-  KMOTOR:
-    host: hte-eche-11.htejcap.caltech.edu
-    port: 8015
-    group: action
-    fast: kinesis_server
-    params:
-      axes:
-        z:
-          serial_no: "49437454"
-          pos_scale: 1228800.0  # device to mm
-          vel_scale: 65970697.6  # device to mm/s
-          acc_scale: 13518.2  # device to mm/s2
-          move_limit_mm: 5.0
