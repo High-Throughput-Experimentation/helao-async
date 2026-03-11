@@ -17,7 +17,7 @@ dependencies:
   - anyio
   - anywidget
   - asyncua
-  - bokeh=2
+  - bokeh=3
   - boto3
   - botocore
   - colorama
