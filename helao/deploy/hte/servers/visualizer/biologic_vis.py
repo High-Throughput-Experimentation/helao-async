@@ -8,7 +8,6 @@ from bokeh.models import (
     RadioButtonGroup,
     TextInput,
 )
-from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
@@ -128,7 +127,6 @@ class C_biovis:
                 label=f"Stop channel {ch}",
                 button_type="danger",
                 width=70,
-                align="start",
             )
             for ch in range(self.num_channels)
         ]
@@ -172,8 +170,8 @@ class C_biovis:
                 [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
                 [self.input_max_points],
                 [
-                    Paragraph(text="""x-axis:""", width=500, height=15),
-                    Paragraph(text="""y-axis:""", width=500, height=15),
+                    Div(text="""x-axis:""", width=500, height=15),
+                    Div(text="""y-axis:""", width=500, height=15),
                 ],
                 [self.xaxis_selector_group, self.yaxis_selector_group],
                 Spacer(height=10),

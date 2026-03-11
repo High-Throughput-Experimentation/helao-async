@@ -38,7 +38,6 @@ import builtins
 
 from helao.helpers import helao_logging as logging
 
-LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.helpers.to_json import parse_bokeh_input
 from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.helpers.gen_uuid import md5_string
@@ -52,16 +51,17 @@ from bokeh.layouts import column
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 from bokeh.models import DataTable, TableColumn
-from bokeh.models.widgets import Paragraph
 from bokeh.models import Select
 from bokeh.models import Button
 from bokeh.models import CheckboxGroup
-from bokeh.models import Panel, Tabs
+from bokeh.models import TabPanel, Tabs
 from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput, TextAreaInput
-from bokeh.plotting import figure, Figure
+from bokeh.plotting import figure
 from bokeh.events import ButtonClick, DoubleTap
 from bokeh.models.widgets import FileInput
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 BUILTIN_TYPES = [
     getattr(builtins, d)
@@ -214,69 +214,24 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
         self.vis.doc.add_next_tick_callback(partial(self.get_orch_status_summary))
 
-        self.experiment_plan_source = ColumnDataSource(data=self.experiment_plan_lists)
-        self.columns_expplan = [
-            TableColumn(field=key, title=key) for key in self.experiment_plan_lists
-        ]
-        self.experiment_plan_table = DataTable(
-            source=self.experiment_plan_source,
-            columns=self.columns_expplan,
-            width=self.max_width - 20,
-            height=200,
-            autosize_mode="fit_columns",
+        self.experiment_plan_source, self.experiment_plan_table = self._make_table(
+            self.experiment_plan_lists
+        )
+        self.sequence_source, self.sequence_table = self._make_table(
+            self.sequence_lists
+        )
+        self.experiment_source, self.experiment_table = self._make_table(
+            self.experiment_lists
+        )
+        self.action_source, self.action_table = self._make_table(self.action_lists)
+        self.action_server_source, self.action_server_table = self._make_table(
+            self.action_server_lists
         )
 
-        self.sequence_source = ColumnDataSource(data=self.sequence_lists)
-        self.columns_seq = [
-            TableColumn(field=key, title=key) for key in self.sequence_lists
-        ]
-        self.sequence_table = DataTable(
-            source=self.sequence_source,
-            columns=self.columns_seq,
-            width=self.max_width - 20,
-            height=200,
-            autosize_mode="fit_columns",
-        )
-
-        self.experiment_source = ColumnDataSource(data=self.experiment_lists)
-        self.columns_exp = [
-            TableColumn(field=key, title=key) for key in self.experiment_lists
-        ]
-        self.experiment_table = DataTable(
-            source=self.experiment_source,
-            columns=self.columns_exp,
-            width=self.max_width - 20,
-            height=200,
-            autosize_mode="fit_columns",
-        )
-
-        self.action_source = ColumnDataSource(data=self.action_lists)
-        self.columns_act = [
-            TableColumn(field=key, title=key) for key in self.action_lists
-        ]
-        self.action_table = DataTable(
-            source=self.action_source,
-            columns=self.columns_act,
-            width=self.max_width - 20,
-            height=200,
-            autosize_mode="fit_columns",
-        )
-        self.action_server_source = ColumnDataSource(data=self.action_server_lists)
-        self.columns_actserv = [
-            TableColumn(field=key, title=key) for key in self.action_server_lists
-        ]
-        self.action_server_table = DataTable(
-            source=self.action_server_source,
-            columns=self.columns_actserv,
-            width=self.max_width - 20,
-            height=200,
-            autosize_mode="fit_columns",
-        )
-
-        self.sequence_tab = Panel(child=self.sequence_table, title="Sequences")
-        self.experiment_tab = Panel(child=self.experiment_table, title="Experiments")
-        self.action_tab = Panel(child=self.action_table, title="Actions")
-        self.action_server_tab = Panel(
+        self.sequence_tab = TabPanel(child=self.sequence_table, title="Sequences")
+        self.experiment_tab = TabPanel(child=self.experiment_table, title="Experiments")
+        self.action_tab = TabPanel(child=self.action_table, title="Actions")
+        self.action_server_tab = TabPanel(
             child=self.action_server_table, title="Action Servers"
         )
         self.queue_tabs = Tabs(
@@ -289,24 +244,15 @@ class BokehOperator:
             height_policy="min",
         )
 
-        self.active_action_source = ColumnDataSource(data=self.active_action_lists)
-        self.columns_active_action = [
-            TableColumn(field=key, title=key) for key in self.active_action_lists
-        ]
-        self.active_action_table = DataTable(
-            source=self.active_action_source,
-            columns=self.columns_active_action,
-            width=self.max_width - 20,
-            height=200,
-            autosize_mode="fit_columns",
-            fit_columns=False,
+        self.active_action_source, self.active_action_table = self._make_table(
+            self.active_action_lists, fit_columns=False
         )
 
-        self.planner_tab = Panel(
+        self.planner_tab = TabPanel(
             child=self.experiment_plan_table,
             title="Planned Experiments",
         )
-        self.active_tab = Panel(
+        self.active_tab = TabPanel(
             child=self.active_action_table,
             title="Active Actions",
         )
@@ -336,133 +282,87 @@ class BokehOperator:
             self.get_seqspec_lib()
 
         # buttons to control orch
-        self.button_start_orch = Button(
-            label="Start Orch", button_type="default", width=70
+        self.button_start_orch = self._make_button(
+            "Start Orch", "default", 70, self.callback_start_orch
         )
-        self.button_start_orch.on_event(ButtonClick, self.callback_start_orch)
-        self.button_estop_orch = Button(
-            label="ESTOP", button_type="danger", width=400, height=100
+        self.button_estop_orch = self._make_button(
+            "ESTOP", "danger", 400, self.callback_estop_orch, height=100
         )
-        self.button_estop_orch.on_event(ButtonClick, self.callback_estop_orch)
-        self.button_add_expplan = Button(
-            label="Add plan",
-            button_type="default",
-            width=100,
+        self.button_add_expplan = self._make_button(
+            "Add plan", "default", 100, self.callback_add_expplan
         )
-        self.button_add_expplan.on_event(ButtonClick, self.callback_add_expplan)
-        self.button_add_smpseqs = Button(
-            label="Split plan", button_type="default", width=100
+        self.button_add_smpseqs = self._make_button(
+            "Split plan", "default", 100, self.callback_add_split_sequences
         )
-        self.button_add_smpseqs.on_event(
-            ButtonClick, self.callback_add_split_sequences
+        self.button_stop_orch = self._make_button(
+            "Stop Orch", "default", 70, self.callback_stop_orch
         )
-        self.button_stop_orch = Button(
-            label="Stop Orch", button_type="default", width=70
+        self.button_skip_exp = self._make_button(
+            "Skip exp", "danger", 70, self.callback_skip_exp
         )
-        self.button_stop_orch.on_event(ButtonClick, self.callback_stop_orch)
-        self.button_skip_exp = Button(label="Skip exp", button_type="danger", width=70)
-        self.button_skip_exp.on_event(ButtonClick, self.callback_skip_exp)
-        self.button_update = Button(
-            label="Update tables", button_type="default", width=120
+        self.button_update = self._make_button(
+            "Update tables", "default", 120, self.callback_update_tables
         )
-        self.button_update.on_event(ButtonClick, self.callback_update_tables)
-        self.button_clear_expplan = Button(
-            label="Clear expplan", button_type="default", width=100
+        self.button_clear_expplan = self._make_button(
+            "Clear expplan", "default", 100, self.callback_clear_expplan
         )
-        self.button_clear_expplan.on_event(ButtonClick, self.callback_clear_expplan)
         self.orch_status_button = Button(
             label="Disabled", disabled=False, button_type="danger", width=400
         )  # success: green, danger: red
 
-        if self.orch.step_thru_actions:
-            self.orch_stepact_button = Button(
-                label="STEP-THRU actions", button_type="danger", width=170
-            )
-        else:
-            self.orch_stepact_button = Button(
-                label="RUN-THRU actions", button_type="success", width=170
-            )
-        self.orch_stepact_button.on_event(ButtonClick, self.callback_toggle_stepact)
+        self.orch_stepact_button = self._make_stepwise_button(
+            "step_thru_actions", "actions", self.callback_toggle_stepact
+        )
+        self.orch_stepexp_button = self._make_stepwise_button(
+            "step_thru_experiments", "experiments", self.callback_toggle_stepexp
+        )
+        # note: intentionally uses step_thru_experiments to match original behaviour
+        self.orch_stepseq_button = self._make_stepwise_button(
+            "step_thru_experiments", "sequences", self.callback_toggle_stepseq
+        )
 
-        if self.orch.step_thru_experiments:
-            self.orch_stepexp_button = Button(
-                label="STEP-THRU experiments", button_type="danger", width=170
-            )
-        else:
-            self.orch_stepexp_button = Button(
-                label="RUN-THRU experiments", button_type="success", width=170
-            )
-        self.orch_stepexp_button.on_event(ButtonClick, self.callback_toggle_stepexp)
+        self.button_clear_seqs = self._make_button(
+            "Clear seqs", "danger", 100, self.callback_clear_sequences
+        )
+        self.button_clear_exps = self._make_button(
+            "Clear exp", "danger", 100, self.callback_clear_experiments
+        )
+        self.button_clear_action = self._make_button(
+            "Clear act", "danger", 100, self.callback_clear_actions
+        )
 
-        if self.orch.step_thru_experiments:
-            self.orch_stepseq_button = Button(
-                label="STEP-THRU sequences", button_type="danger", width=170
-            )
-        else:
-            self.orch_stepseq_button = Button(
-                label="RUN-THRU sequences", button_type="success", width=170
-            )
-        self.orch_stepseq_button.on_event(ButtonClick, self.callback_toggle_stepseq)
+        self.button_prepend_exp = self._make_button(
+            "Prepend exp to exp plan", "default", 150, self.callback_prepend_exp
+        )
+        self.button_append_exp = self._make_button(
+            "Append exp to exp plan", "default", 150, self.callback_append_exp
+        )
+        self.button_prepend_seq = self._make_button(
+            "Prepend seq to exp plan", "default", 150, self.callback_prepend_seq
+        )
+        self.button_append_seq = self._make_button(
+            "Append seq to exp plan", "default", 150, self.callback_append_seq
+        )
 
-        self.button_clear_seqs = Button(
-            label="Clear seqs", button_type="danger", width=100
+        self.button_last_seq_pars = self._make_button(
+            "Load last seq params", "default", 150, self.get_last_seq_pars
         )
-        self.button_clear_seqs.on_event(ButtonClick, self.callback_clear_sequences)
-        self.button_clear_exps = Button(
-            label="Clear exp", button_type="danger", width=100
+        self.button_last_exp_pars = self._make_button(
+            "Load last exp params", "default", 150, self.get_last_exp_pars
         )
-        self.button_clear_exps.on_event(ButtonClick, self.callback_clear_experiments)
-        self.button_clear_action = Button(
-            label="Clear act", button_type="danger", width=100
-        )
-        self.button_clear_action.on_event(ButtonClick, self.callback_clear_actions)
-
-        self.button_prepend_exp = Button(
-            label="Prepend exp to exp plan", button_type="default", width=150
-        )
-        self.button_prepend_exp.on_event(ButtonClick, self.callback_prepend_exp)
-        self.button_append_exp = Button(
-            label="Append exp to exp plan", button_type="default", width=150
-        )
-        self.button_append_exp.on_event(ButtonClick, self.callback_append_exp)
-
-        self.button_prepend_seq = Button(
-            label="Prepend seq to exp plan",
-            button_type="default",
-            width=150,
-        )
-        self.button_prepend_seq.on_event(ButtonClick, self.callback_prepend_seq)
-        self.button_append_seq = Button(
-            label="Append seq to exp plan", button_type="default", width=150
-        )
-        self.button_append_seq.on_event(ButtonClick, self.callback_append_seq)
-
-        self.button_last_seq_pars = Button(
-            label="Load last seq params", button_type="default", width=150
-        )
-        self.button_last_seq_pars.on_event(ButtonClick, self.get_last_seq_pars)
-        self.button_last_exp_pars = Button(
-            label="Load last exp params", button_type="default", width=150
-        )
-        self.button_last_exp_pars.on_event(ButtonClick, self.get_last_exp_pars)
 
         self.save_last_exp_pars = CheckboxGroup(labels=["save exp params"], active=[0])
         self.save_last_seq_pars = CheckboxGroup(labels=["save seq params"], active=[0])
 
-        self.button_enqueue_seqspec = Button(
-            label="Enqueue specs sequence", button_type="default", width=150
+        self.button_enqueue_seqspec = self._make_button(
+            "Enqueue specs sequence", "default", 150, self.callback_enqueue_seqspec
         )
-        self.button_enqueue_seqspec.on_event(ButtonClick, self.callback_enqueue_seqspec)
-
-        self.button_reload_seqspec = Button(
-            label="Reload specs folder", button_type="default", width=150
+        self.button_reload_seqspec = self._make_button(
+            "Reload specs folder", "default", 150, self.callback_reload_seqspec
         )
-        self.button_reload_seqspec.on_event(ButtonClick, self.callback_reload_seqspec)
-
-        self.button_to_seqtab = Button(
-            label="To sequence selection", button_type="default", width=150
+        self.button_to_seqtab = self._make_button(
+            "To sequence selection", "default", 150, self.callback_to_seqtab
         )
-        self.button_to_seqtab.on_event(ButtonClick, self.callback_to_seqtab)
 
         self.sequence_descr_txt = Div(
             text="""select a sequence item""", width=600, height_policy="min"
@@ -474,11 +374,11 @@ class BokehOperator:
             text="""select a sequence specification""", width=600, height_policy="min"
         )
 
-        self.error_txt = Paragraph(
+        self.error_txt = Div(
             text="""no error""",
             width=600,
             height=30,
-            style={"font-size": "100%", "color": "black"},
+            styles={"font-size": "100%", "color": "black"},
         )
 
         self.input_sequence_label = TextInput(
@@ -488,8 +388,6 @@ class BokehOperator:
             width=150,
             height=40,
         )
-        self.input_sequence_label.on_change("value", self.callback_copy_sequence_label)
-
         self.input_sequence_label2 = TextInput(
             value="nolabel",
             title="sequence label",
@@ -497,10 +395,6 @@ class BokehOperator:
             width=150,
             height=40,
         )
-        self.input_sequence_label2.on_change(
-            "value", self.callback_copy_sequence_label2
-        )
-
         self.input_campaign_name = TextInput(
             value="",
             title="campaign name",
@@ -508,8 +402,6 @@ class BokehOperator:
             width=150,
             height=40,
         )
-        self.input_campaign_name.on_change("value", self.callback_copy_campaign_name)
-
         self.input_campaign_name2 = TextInput(
             value="",
             title="campaign name",
@@ -517,8 +409,6 @@ class BokehOperator:
             width=150,
             height=40,
         )
-        self.input_campaign_name2.on_change("value", self.callback_copy_campaign_name2)
-
         self.input_campaign_uuid = TextInput(
             value="",
             title="campaign uuid",
@@ -526,8 +416,6 @@ class BokehOperator:
             width=150,
             height=40,
         )
-        self.input_campaign_uuid.on_change("value", self.callback_copy_campaign_uuid)
-
         self.input_campaign_uuid2 = TextInput(
             value="",
             title="campaign uuid",
@@ -535,8 +423,6 @@ class BokehOperator:
             width=150,
             height=40,
         )
-        self.input_campaign_uuid2.on_change("value", self.callback_copy_campaign_uuid2)
-
         self.input_sequence_comment = TextAreaInput(
             value="",
             title="sequence comment",
@@ -545,10 +431,6 @@ class BokehOperator:
             height=90,
             rows=3,
         )
-        self.input_sequence_comment.on_change(
-            "value", self.callback_copy_sequence_comment
-        )
-
         self.input_sequence_comment2 = TextAreaInput(
             value="",
             title="sequence comment",
@@ -557,15 +439,50 @@ class BokehOperator:
             height=90,
             rows=3,
         )
+
+        # Wire mirrored inputs — each member of a pair keeps the other in sync.
+        self.input_sequence_label.on_change(
+            "value",
+            self._make_copy_callback("input_sequence_label", "input_sequence_label2"),
+        )
+        self.input_sequence_label2.on_change(
+            "value",
+            self._make_copy_callback("input_sequence_label2", "input_sequence_label"),
+        )
+        self.input_campaign_name.on_change(
+            "value",
+            self._make_copy_callback("input_campaign_name", "input_campaign_name2"),
+        )
+        self.input_campaign_name2.on_change(
+            "value",
+            self._make_copy_callback("input_campaign_name2", "input_campaign_name"),
+        )
+        self.input_campaign_uuid.on_change(
+            "value",
+            self._make_copy_callback("input_campaign_uuid", "input_campaign_uuid2"),
+        )
+        self.input_campaign_uuid2.on_change(
+            "value",
+            self._make_copy_callback("input_campaign_uuid2", "input_campaign_uuid"),
+        )
+        self.input_sequence_comment.on_change(
+            "value",
+            self._make_copy_callback(
+                "input_sequence_comment", "input_sequence_comment2"
+            ),
+        )
         self.input_sequence_comment2.on_change(
-            "value", self.callback_copy_sequence_comment2
+            "value",
+            self._make_copy_callback(
+                "input_sequence_comment2", "input_sequence_comment"
+            ),
         )
 
         self.orch_section = Div(
             text="<b>Orchestrator</b>",
             width=self.max_width - 20,
             height=32,
-            style={"font-size": "150%", "color": "#CB4335"},
+            styles={"font-size": "150%", "color": "#CB4335"},
         )
 
         self.layout0 = layout(
@@ -577,7 +494,7 @@ class BokehOperator:
                             text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
                             height=32,
-                            style={"font-size": "200%", "color": "#CB4335"},
+                            styles={"font-size": "200%", "color": "#CB4335"},
                         ),
                     ],
                     # background="#D6DBDF",
@@ -760,7 +677,7 @@ class BokehOperator:
                                 text="<b>Error message:</b>",
                                 width=200 + 50,
                                 height=15,
-                                style={"font-size": "100%", "color": "black"},
+                                styles={"font-size": "100%", "color": "black"},
                             ),
                         ],
                         [Spacer(width=10), self.error_txt],
@@ -824,11 +741,15 @@ class BokehOperator:
             height_policy="min",
         )
 
-        self.sequence_select_tab = Panel(child=self.layout1, title="Sequence Selection")
-        self.experiment_select_tab = Panel(
+        self.sequence_select_tab = TabPanel(
+            child=self.layout1, title="Sequence Selection"
+        )
+        self.experiment_select_tab = TabPanel(
             child=self.layout2, title="Experiment Selection"
         )
-        self.seqspec_select_tab = Panel(child=self.layout3, title="Specification Files")
+        self.seqspec_select_tab = TabPanel(
+            child=self.layout3, title="Specification Files"
+        )
         if self.seqspec_folder is not None and self.seqspec_parser is not None:
             self.select_tabs = Tabs(
                 tabs=[
@@ -850,7 +771,6 @@ class BokehOperator:
             self.layout0,
             layout(height_policy="min"),
             self.select_tabs,
-            layout(height_policy="min"),
             layout(height_policy="min"),
             self.layout4,  # placeholder  # placeholder
         )
@@ -876,124 +796,254 @@ class BokehOperator:
         self.IOloop_run = False
         self.IOtask.cancel()
 
-    def get_sequence_lib(self):
-        """Populates sequences (library) and sequence_list (dropdown selector)."""
-        self.sequences = []
-        LOGGER.info(f"found sequences: {list(self.sequence_lib)}")
-        for i, sequence in enumerate(self.sequence_lib):
-            tmpdoc = self.sequence_lib[sequence].__doc__
-            if tmpdoc is None:
-                tmpdoc = ""
+    # ------------------------------------------------------------------
+    # Private helpers — used to reduce repetition in __init__ and below
+    # ------------------------------------------------------------------
 
-            argspec = inspect.getfullargspec(self.sequence_lib[sequence])
-            tmpargs = argspec.args
-            tmpdefs = argspec.defaults
-            tmptypes = [
-                argspec.annotations.get(k, "unspecified") for k in list(tmpargs)
-            ]
+    def _make_table(self, data_dict: dict, **extra_kwargs) -> tuple:
+        """Create a (ColumnDataSource, DataTable) pair from a dict of lists."""
+        source = ColumnDataSource(data=data_dict)
+        columns = [TableColumn(field=k, title=k) for k in data_dict]
+        table = DataTable(
+            source=source,
+            columns=columns,
+            width=self.max_width - 20,
+            height=200,
+            autosize_mode="force_fit",
+            **extra_kwargs,
+        )
+        return source, table
 
-            if tmpdefs is None:
-                tmpdefs = []
+    def _make_button(
+        self, label: str, btn_type: str, width: int, callback, **kwargs
+    ) -> Button:
+        """Create a Button and register a ButtonClick event handler in one call."""
+        btn = Button(label=label, button_type=btn_type, width=width, **kwargs)
+        btn.on_event(ButtonClick, callback)
+        return btn
 
-            # filter the Sequence BaseModel
-            idxlist = []
-            # for idx, tmparg in enumerate(argspec.args):
-            #     if tmparg=="sequence_version":
-            #         idxlist.append(idx)
+    def _make_stepwise_button(self, flag_attr: str, kind: str, callback) -> Button:
+        """Create a STEP-THRU / RUN-THRU toggle button from an orch flag attribute."""
+        is_step = getattr(self.orch, flag_attr)
+        label = f"{'STEP' if is_step else 'RUN'}-THRU {kind}"
+        btn = Button(
+            label=label, button_type="danger" if is_step else "success", width=170
+        )
+        btn.on_event(ButtonClick, callback)
+        return btn
 
-            tmpargs = list(tmpargs)
-            tmpdefs = list(tmpdefs)
-            for j, idx in enumerate(idxlist):
-                if len(tmpargs) == len(tmpdefs):
-                    tmpargs.pop(idx - j)
-                    tmpdefs.pop(idx - j)
-                    tmptypes.pop(idx - j)
-                else:
-                    tmpargs.pop(idx - j)
-                    tmptypes.pop(idx - j)
-            # use defaults specified in config
-            seq_defs = self.orch.world_cfg.get("sequence_params", {})
-            tmpdefs = [seq_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
-            tmpargs = tuple(tmpargs)
-            tmpdefs = tuple(tmpdefs)
-            tmptypes = tuple(tmptypes)
+    def _make_copy_callback(self, source_attr: str, target_attr: str):
+        """Return an on_change callback that mirrors source to target via update_q."""
 
+        def _cb(attr, old, new):
+            self.vis.doc.add_next_tick_callback(
+                partial(
+                    self.update_input_value,
+                    getattr(self, target_attr),
+                    getattr(self, source_attr).value,
+                )
+            )
+
+        return _cb
+
+    def _build_lib(
+        self, lib: dict, filter_type, config_key: str, model_class, name_field: str
+    ):
+        """Shared logic for get_sequence_lib / get_experiment_lib.
+
+        Returns (items, select_list) where items is a list of model dicts and
+        select_list is the ordered list of names for the dropdown.
+        """
+        items = []
+        select_list = []
+        LOGGER.info(f"found {name_field.replace('_name', '')}s: {list(lib)}")
+        for i, name in enumerate(lib):
+            func = lib[name]
+            tmpdoc = func.__doc__ or ""
+            argspec = inspect.getfullargspec(func)
+            tmpargs = list(argspec.args)
+            tmpdefs = list(argspec.defaults or [])
+            tmptypes = [argspec.annotations.get(k, "unspecified") for k in tmpargs]
+
+            if filter_type is not None:
+                idxlist = [
+                    idx
+                    for idx, arg in enumerate(tmpargs)
+                    if argspec.annotations.get(arg) == filter_type
+                ]
+                for j, idx in enumerate(idxlist):
+                    if len(tmpargs) == len(tmpdefs):
+                        tmpargs.pop(idx - j)
+                        tmpdefs.pop(idx - j)
+                        tmptypes.pop(idx - j)
+                    else:
+                        tmpargs.pop(idx - j)
+                        tmptypes.pop(idx - j)
+
+            cfg_defs = self.orch.world_cfg.get(config_key, {})
+            tmpdefs = [cfg_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
             for t in tmpdefs:
                 try:
                     t = json.dumps(t)
                 except Exception:
                     t = ""
-
-            self.sequences.append(
-                return_sequence_lib(
+            items.append(
+                model_class(
                     index=i,
-                    sequence_name=sequence,
+                    **{name_field: name},
                     doc=tmpdoc,
-                    args=tmpargs,
-                    defaults=tmpdefs,
-                    argtypes=tmptypes,
+                    args=tuple(tmpargs),
+                    defaults=tuple(tmpdefs),
+                    argtypes=tuple(tmptypes),
                 ).model_dump()
             )
-        for item in self.sequences:
-            self.sequence_select_list.append(item["sequence_name"])
+            select_list.append(name)
+        return items, select_list
+
+    def _apply_sequence_to_orch(self, orch_method):
+        """Shared body for callback_add_expplan / callback_add_split_sequences."""
+        if self.sequence is None:
+            return
+        self.sequence.sequence_label = self.input_sequence_label.value
+        if self.input_sequence_comment.value != "":
+            self.sequence.sequence_comment = self.input_sequence_comment.value
+        campaign_name = self.input_campaign_name.value
+        if campaign_name != "":
+            self.sequence.campaign_name = campaign_name
+            if self.input_campaign_uuid.value.strip() == "":
+                self.sequence.campaign_uuid = md5_string(campaign_name)
+            else:
+                self.sequence.campaign_uuid = self.input_campaign_uuid.value.strip()
+        self.vis.doc.add_next_tick_callback(partial(orch_method, self.sequence))
+        self.sequence = None
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def _update_param_layout(
+        self, mode: str, idx: int, args=None, defaults=None, argtypes=None
+    ):
+        """Shared body for update_seq/exp/seqspec_param_layout."""
+        _cfg = {
+            "seq": {
+                "items_attr": "sequences",
+                "input_attr": "seq_param_input",
+                "types_attr": "seq_param_input_types",
+                "private_attr": "seq_private_input",
+                "layout_attr": "seq_param_layout",
+                "header": "<b>Optional sequence parameters:</b>",
+                "refresh": True,
+            },
+            "exp": {
+                "items_attr": "experiments",
+                "input_attr": "exp_param_input",
+                "types_attr": "exp_param_input_types",
+                "private_attr": "exp_private_input",
+                "layout_attr": "exp_param_layout",
+                "header": "<b>Optional experiment parameters:</b>",
+                "refresh": True,
+            },
+            "seqspec": {
+                "items_attr": None,
+                "input_attr": "seqspec_param_input",
+                "types_attr": "seqspec_param_input_types",
+                "private_attr": "seqspec_private_input",
+                "layout_attr": "seqspec_param_layout",
+                "header": "<b>Required sequence parameters:</b>",
+                "refresh": False,
+            },
+        }
+        cfg = _cfg[mode]
+
+        if args is None and cfg["items_attr"] is not None:
+            item = getattr(self, cfg["items_attr"])[idx]
+            args = list(item["args"])
+            defaults = list(item["defaults"])
+            argtypes = list(item["argtypes"])
+
+        self.dynamic_col.children.pop(3)
+
+        for _ in range(len(args) - len(defaults)):
+            defaults.insert(0, "")
+
+        setattr(self, cfg["input_attr"], [])
+        setattr(self, cfg["types_attr"], [])
+        setattr(self, cfg["private_attr"], [])
+        param_layout = [
+            Spacer(height=10),
+            layout(
+                [
+                    [
+                        Div(
+                            text=cfg["header"],
+                            width=200 + 50,
+                            height=15,
+                            styles={"font-size": "100%", "color": "black"},
+                        ),
+                    ],
+                ],
+                background=self.color_sq_param_inputs,
+                width=self.max_width,
+                height_policy="min",
+            ),
+        ]
+        setattr(self, cfg["layout_attr"], param_layout)
+
+        param_input = getattr(self, cfg["input_attr"])
+        private_input = getattr(self, cfg["private_attr"])
+        argtype_list = getattr(self, cfg["types_attr"])
+
+        self.add_dynamic_inputs(
+            param_input,
+            private_input,
+            param_layout,
+            args,
+            defaults,
+            argtypes,
+            argtype_list,
+        )
+
+        if not param_input:
+            param_layout.append(
+                layout(
+                    [
+                        [
+                            Spacer(width=10),
+                            Div(
+                                text="-- none --",
+                                width=200 + 50,
+                                height=15,
+                                styles={"font-size": "100%", "color": "black"},
+                            ),
+                        ],
+                    ],
+                    background=self.color_sq_param_inputs,
+                    width=self.max_width,
+                ),
+            )
+
+        self.dynamic_col.children.insert(3, layout(param_layout, height_policy="min"))
+
+        if cfg["refresh"]:
+            self.refresh_inputs(param_input, private_input)
+
+    def get_sequence_lib(self):
+        """Populates sequences (library) and sequence_list (dropdown selector)."""
+        self.sequences, self.sequence_select_list = self._build_lib(
+            self.sequence_lib,
+            None,
+            "sequence_params",
+            return_sequence_lib,
+            "sequence_name",
+        )
 
     def get_experiment_lib(self):
         """Populates experiments (library) and experiment_list (dropdown selector)."""
-        self.experiments = []
-        LOGGER.info(f"found experiment: {list(self.experiment_lib)}")
-        for i, experiment in enumerate(self.experiment_lib):
-            tmpdoc = self.experiment_lib[experiment].__doc__
-            if tmpdoc is None:
-                tmpdoc = ""
-
-            argspec = inspect.getfullargspec(self.experiment_lib[experiment])
-            tmpargs = argspec.args
-            tmpdefs = argspec.defaults
-            tmptypes = [
-                argspec.annotations.get(k, "unspecified") for k in list(tmpargs)
-            ]
-            if tmpdefs is None:
-                tmpdefs = []
-
-            # filter the Experiment BaseModel
-            idxlist = []
-            for idx, tmparg in enumerate(argspec.args):
-                # if argspec.annotations.get(tmparg, None) == Experiment or tmparg=="experiment_version":
-                if argspec.annotations.get(tmparg, None) == Experiment:
-                    idxlist.append(idx)
-
-            tmpargs = list(tmpargs)
-            tmpdefs = list(tmpdefs)
-            for j, idx in enumerate(idxlist):
-                if len(tmpargs) == len(tmpdefs):
-                    tmpargs.pop(idx - j)
-                    tmpdefs.pop(idx - j)
-                    tmptypes.pop(idx - j)
-                else:
-                    tmpargs.pop(idx - j)
-                    tmptypes.pop(idx - j)
-            # use defaults specified in config
-            exp_defs = self.orch.world_cfg.get("experiment_params", {})
-            tmpdefs = [exp_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
-            tmpargs = tuple(tmpargs)
-            tmpdefs = tuple(tmpdefs)
-            tmptypes = tuple(tmptypes)
-
-            for t in tmpdefs:
-                t = json.dumps(t)
-
-            self.experiments.append(
-                return_experiment_lib(
-                    index=i,
-                    experiment_name=experiment,
-                    doc=tmpdoc,
-                    args=tmpargs,
-                    defaults=tmpdefs,
-                    argtypes=tmptypes,
-                ).model_dump()
-            )
-        for item in self.experiments:
-            self.experiment_select_list.append(item["experiment_name"])
+        self.experiments, self.experiment_select_list = self._build_lib(
+            self.experiment_lib,
+            Experiment,
+            "experiment_params",
+            return_experiment_lib,
+            "experiment_name",
+        )
 
     def get_seqspec_lib(self):
         """Populates sequence specification library (preset params) and dropdown."""
@@ -1291,45 +1341,11 @@ class BokehOperator:
 
     def callback_add_expplan(self, event):
         """add experiment plan as new sequence to orch sequence_dq"""
-        if self.sequence is not None:
-            sellabel = self.input_sequence_label.value
-            self.sequence.sequence_label = sellabel
-            if self.input_sequence_comment.value != "":
-                self.sequence.sequence_comment = self.input_sequence_comment.value
-            campaign_name = self.input_campaign_name.value
-            if campaign_name != "":
-                self.sequence.campaign_name = campaign_name
-                if self.input_campaign_uuid.value.strip() == "":
-                    self.sequence.campaign_uuid = md5_string(campaign_name)
-                else:
-                    self.sequence.campaign_uuid = self.input_campaign_uuid.value.strip()
-            self.vis.doc.add_next_tick_callback(
-                partial(self.orch.add_sequence, self.sequence)
-            )
-            # clear current experiment_plan (sequence in operator)
-            self.sequence = None
-            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+        self._apply_sequence_to_orch(self.orch.add_sequence)
 
     def callback_add_split_sequences(self, event):
         """add experiment plan as sequences split by sample to orch sequence_dq"""
-        if self.sequence is not None:
-            sellabel = self.input_sequence_label.value
-            self.sequence.sequence_label = sellabel
-            if self.input_sequence_comment.value != "":
-                self.sequence.sequence_comment = self.input_sequence_comment.value
-            campaign_name = self.input_campaign_name.value
-            if campaign_name != "":
-                self.sequence.campaign_name = campaign_name
-                if self.input_campaign_uuid.value.strip() == "":
-                    self.sequence.campaign_uuid = md5_string(campaign_name)
-                else:
-                    self.sequence.campaign_uuid = self.input_campaign_uuid.value.strip()
-            self.vis.doc.add_next_tick_callback(
-                partial(self.orch.add_split_sequences, self.sequence)
-            )
-            # clear current experiment_plan (sequence in operator)
-            self.sequence = None
-            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+        self._apply_sequence_to_orch(self.orch.add_split_sequences)
 
     def callback_toggle_stepact(self, event):
         self.vis.doc.add_next_tick_callback(
@@ -1473,7 +1489,9 @@ class BokehOperator:
         else:
             self.sequence.planned_experiments += expplan_list
         end_time = time.time()
-        LOGGER.debug(f"Adding experiments to sequence took {end_time - start_time} seconds")
+        LOGGER.debug(
+            f"Adding experiments to sequence took {end_time - start_time} seconds"
+        )
 
     def populate_experimentmodel(self) -> Experiment:
         selected_experiment = self.experiment_dropdown.value
@@ -1563,213 +1581,27 @@ class BokehOperator:
             sbutton.label = sbutton.label.split("[")[0].strip() + f" [{numq}]"
 
     def update_seq_param_layout(self, idx):
-        args = self.sequences[idx]["args"]
-        defaults = self.sequences[idx]["defaults"]
-        argtypes = self.sequences[idx]["argtypes"]
-        self.dynamic_col.children.pop(4)
-
-        for _ in range(len(args) - len(defaults)):
-            defaults.insert(0, "")
-
-        self.seq_param_input = []
-        self.seq_param_input_types = []
-        self.seq_private_input = []
-        self.seq_param_layout = [
-            Spacer(height=10),
-            layout(
-                [
-                    [
-                        Div(
-                            text="<b>Optional sequence parameters:</b>",
-                            width=200 + 50,
-                            height=15,
-                            style={"font-size": "100%", "color": "black"},
-                        ),
-                    ],
-                ],
-                background=self.color_sq_param_inputs,
-                width=self.max_width,
-                height_policy="min",
-            ),
-        ]
-
-        self.add_dynamic_inputs(
-            self.seq_param_input,
-            self.seq_private_input,
-            self.seq_param_layout,
-            args,
-            defaults,
-            argtypes,
-            self.seq_param_input_types,
-        )
-
-        if not self.seq_param_input:
-            self.seq_param_layout.append(
-                layout(
-                    [
-                        [
-                            Spacer(width=10),
-                            Div(
-                                text="-- none --",
-                                width=200 + 50,
-                                height=15,
-                                style={"font-size": "100%", "color": "black"},
-                            ),
-                        ],
-                    ],
-                    background=self.color_sq_param_inputs,
-                    width=self.max_width,
-                ),
-            )
-
-        self.dynamic_col.children.insert(
-            4, layout(self.seq_param_layout, height_policy="min")
-        )
-
-        self.refresh_inputs(self.seq_param_input, self.seq_private_input)
+        self._update_param_layout("seq", idx)
 
     def update_exp_param_layout(self, idx):
-        args = self.experiments[idx]["args"]
-        defaults = self.experiments[idx]["defaults"]
-        argtypes = self.experiments[idx]["argtypes"]
-        self.dynamic_col.children.pop(4)
-
-        for _ in range(len(args) - len(defaults)):
-            defaults.insert(0, "")
-
-        self.exp_param_input = []
-        self.exp_param_input_types = []
-        self.exp_private_input = []
-        self.exp_param_layout = [
-            Spacer(height=10),
-            layout(
-                [
-                    [
-                        Div(
-                            text="<b>Optional experiment parameters:</b>",
-                            width=200 + 50,
-                            height=15,
-                            style={"font-size": "100%", "color": "black"},
-                        ),
-                    ],
-                ],
-                background=self.color_sq_param_inputs,
-                width=self.max_width,
-                height_policy="min",
-            ),
-        ]
-        self.add_dynamic_inputs(
-            self.exp_param_input,
-            self.exp_private_input,
-            self.exp_param_layout,
-            args,
-            defaults,
-            argtypes,
-            self.exp_param_input_types,
-        )
-
-        if not self.exp_param_input:
-            self.exp_param_layout.append(
-                layout(
-                    [
-                        [
-                            Spacer(width=10),
-                            Div(
-                                text="-- none --",
-                                width=200 + 50,
-                                height=15,
-                                style={"font-size": "100%", "color": "black"},
-                            ),
-                        ],
-                    ],
-                    background=self.color_sq_param_inputs,
-                    width=self.max_width,
-                    height_policy="min",
-                ),
-            )
-
-        self.dynamic_col.children.insert(
-            4, layout(self.exp_param_layout, height_policy="min")
-        )
-
-        self.refresh_inputs(self.exp_param_input, self.exp_private_input)
+        self._update_param_layout("exp", idx)
 
     def update_seqspec_param_layout(self, idx):
         args = []
         argtypes = []
         defaults = []
-
         seqspec_path = self.seqspecs[idx]
         try:
             seqfunc_params = self.seqspec_parser.list_params(seqspec_path, self.orch)
         except Exception:
             LOGGER.error(f"error parsing specfile {seqspec_path}", exc_info=True)
             seqfunc_params = {}
-
         for arg, argtype in self.seqspec_parser.PARAM_TYPES.items():
             if arg in seqfunc_params:
                 args.append(arg)
                 argtypes.append(argtype)
-
-        self.dynamic_col.children.pop(4)
-
-        for _ in range(len(args) - len(defaults)):
-            defaults.insert(0, "")
-
-        self.seqspec_param_input = []
-        self.seqspec_param_input_types = []
-        self.seqspec_private_input = []
-        self.seqspec_param_layout = [
-            Spacer(height=10),
-            layout(
-                [
-                    [
-                        Div(
-                            text="<b>Required sequence parameters:</b>",
-                            width=200 + 50,
-                            height=15,
-                            style={"font-size": "100%", "color": "black"},
-                        ),
-                    ],
-                ],
-                background=self.color_sq_param_inputs,
-                width=self.max_width,
-                height_policy="min",
-            ),
-        ]
-
-        self.add_dynamic_inputs(
-            self.seqspec_param_input,
-            self.seqspec_private_input,
-            self.seqspec_param_layout,
-            args,
-            defaults,
-            argtypes,
-            self.seqspec_param_input_types,
-        )
-
-        if not self.seqspec_param_input:
-            self.seqspec_param_layout.append(
-                layout(
-                    [
-                        [
-                            Spacer(width=10),
-                            Div(
-                                text="-- none --",
-                                width=200 + 50,
-                                height=15,
-                                style={"font-size": "100%", "color": "black"},
-                            ),
-                        ],
-                    ],
-                    background=self.color_sq_param_inputs,
-                    width=self.max_width,
-                    height_policy="min",
-                ),
-            )
-
-        self.dynamic_col.children.insert(
-            4, layout(self.seqspec_param_layout, height_policy="min")
+        self._update_param_layout(
+            "seqspec", idx, args=args, defaults=defaults, argtypes=argtypes
         )
 
     def add_dynamic_inputs(
@@ -1804,13 +1636,12 @@ class BokehOperator:
                     [
                         [
                             param_input[item],
-                            Paragraph(
+                            Div(
                                 text=str(argtypes[idx])
                                 .split()[-1]
                                 .strip("'<>]")
                                 .split(".")[-1]
                                 .replace("[", " of "),
-                                align=("start", "end"),
                             ),
                         ],
                         Spacer(height=10),
@@ -2066,7 +1897,7 @@ class BokehOperator:
 
     def find_plot(self, inputs, name):
         for inp in inputs:
-            if isinstance(inp, Figure):
+            if isinstance(inp, figure):
                 if inp.title.text == name:
                     return inp
         return None
@@ -2250,75 +2081,3 @@ class BokehOperator:
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_input_value, exp_input, str(v))
             )
-
-    def callback_copy_sequence_label(self, attr, old, new):
-        self.vis.doc.add_next_tick_callback(
-            partial(
-                self.update_input_value,
-                self.input_sequence_label2,
-                self.input_sequence_label.value,
-            )
-        )
-
-    def callback_copy_sequence_label2(self, attr, old, new):
-        self.vis.doc.add_next_tick_callback(
-            partial(
-                self.update_input_value,
-                self.input_sequence_label,
-                self.input_sequence_label2.value,
-            )
-        )
-
-    def callback_copy_campaign_name(self, attr, old, new):
-        self.vis.doc.add_next_tick_callback(
-            partial(
-                self.update_input_value,
-                self.input_campaign_name2,
-                self.input_campaign_name.value,
-            )
-        )
-
-    def callback_copy_campaign_name2(self, attr, old, new):
-        self.vis.doc.add_next_tick_callback(
-            partial(
-                self.update_input_value,
-                self.input_campaign_name,
-                self.input_campaign_name2.value,
-            )
-        )
-
-    def callback_copy_campaign_uuid(self, attr, old, new):
-        self.vis.doc.add_next_tick_callback(
-            partial(
-                self.update_input_value,
-                self.input_campaign_uuid2,
-                self.input_campaign_uuid.value,
-            )
-        )
-
-    def callback_copy_campaign_uuid2(self, attr, old, new):
-        self.vis.doc.add_next_tick_callback(
-            partial(
-                self.update_input_value,
-                self.input_campaign_uuid,
-                self.input_campaign_uuid2.value,
-            )
-        )
-
-    def callback_copy_sequence_comment(self, attr, old, new):
-        self.vis.doc.add_next_tick_callback(
-            partial(
-                self.update_input_value,
-                self.input_sequence_comment2,
-                self.input_sequence_comment.value,
-            )
-        )
-
-    def callback_copy_sequence_comment2(self, attr, old, new):
-        self.vis.doc.add_next_tick_callback(
-            partial(
-                self.update_input_value,
-                self.input_sequence_comment,
-                self.input_sequence_comment2.value,
-            )
-        )

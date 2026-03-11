@@ -7,9 +7,8 @@ from bokeh.models import (
     CheckboxButtonGroup,
     TextInput,
 )
-from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
-from bokeh.palettes import small_palettes
+from bokeh.palettes import Category10
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
@@ -103,7 +102,7 @@ class C_nidaqmxvis:
             partial(self.callback_input_max_points, sender=self.input_max_points),
         )
 
-        self.paragraph1 = Paragraph(text="""cells:""", width=50, height=15)
+        self.paragraph1 = Div(text="""cells:""", width=50, height=15)
         self.yaxis_selector_group = CheckboxButtonGroup(
             labels=[f"{i+1}" for i in range(9)], active=list(range(9))
         )
@@ -234,7 +233,7 @@ class C_nidaqmxvis:
         self.plot_VOLT_prev.title.text = f"action_uuid: {self.prev_action_uuid}"
         self.plot_CURRENT_prev.title.text = f"action_uuid: {self.prev_action_uuid}"
 
-        colors = small_palettes["Category10"][9]
+        colors = Category10[10]
         for i in self.yselect:
             _ = self.plot_VOLT.line(
                 x="t_s",
