@@ -55,7 +55,7 @@ dependencies:
   - pydantic
   - pydantic-core
   - pydantic-settings
-  - pyfiglet
+  - pyfiglet>=1
   - pyftdi
   - pylablib
   - pymodbus
