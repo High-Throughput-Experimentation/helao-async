@@ -130,7 +130,7 @@ class SampleModel(BaseModel, HelaoDict):
         return exp_dict
 
     def get_global_label(self):
-        pass
+        return self.global_label
 
     def zero_volume(self):
         if hasattr(self, "volume_ml"):
