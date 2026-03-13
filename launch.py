@@ -528,17 +528,7 @@ def launcher(confArg, confDict, helao_repo_root, extraopt=""):
                             continue
                         cmd = ["python", "bokeh_launcher.py", confArg, server]
                         p = subprocess.Popen(cmd, cwd=helao_repo_root)
-                        try:
-                            time.sleep(5)
-                            ppid = pidd.find_bokeh(servHost, servPort)
-                        except Exception:
-                            LAUNCH_LOGGER.warning(
-                                f"Could not find running bokeh server at {servHost}:{servPort}",
-                            )
-                            LAUNCH_LOGGER.warning(
-                                "Unable to manage bokeh action. See bokeh output for correct PID.",
-                            )
-                            ppid = p.pid
+                        ppid = p.pid
                     else:
                         LAUNCH_LOGGER.warning(
                             f"No launch method available for code type '{codeKey}', cannot launch {group}/{servPy}.py",
