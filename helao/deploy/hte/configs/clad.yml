@@ -209,7 +209,7 @@ servers:
       port: COM5
       pumps:
         one:
-          address: 1
+          address: 2
           diameter: 26.7
   LIVE:
     host: hte-adss-03.htejcap.caltech.edu
