@@ -307,7 +307,7 @@ class BokehOperator:
             "Clear expplan", "default", 100, self.callback_clear_expplan
         )
         self.orch_status_button = Button(
-            label="Disabled", disabled=False, button_type="danger", width=440
+            label="Disabled", disabled=False, button_type="danger", width=500
         )  # success: green, danger: red
 
         self.orch_stepact_button = self._make_stepwise_button(
