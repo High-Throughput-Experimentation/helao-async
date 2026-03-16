@@ -16,7 +16,7 @@ def CLAD_seq(
     electrolyte_ph: float = 1.24,
     reference_offset_V: float = -0.005,
     reference_position: str = "builtin_ref_motorxy_2",
-    drain_duration_s: float = 30.0,
+    drain_duration_s: float = 45.0,
     fill_volume_ul: float = 7000.0,
     fill_rate_ul_s: float = 300.0,
     fill_recirc_fwd_duration_s: float = 30.0,
