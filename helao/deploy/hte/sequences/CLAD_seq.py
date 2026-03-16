@@ -101,22 +101,27 @@ def CLAD_seq(
             epm.add(
                 "CLAD_sub_clean_cell",
                 {
-                    "Clean_volume_ul": clean_volume_ul,
+                    "nitric_volume_ul": rinse_volume_ul,
+                    "water_volume_ul": clean_volume_ul,
                     "ReturnLineWait_s": clean_recirc_duration_s,
                     "DrainWait_s": clean_drain_duration_s,
                 },
             )
-            # if working with more than 10mL cleaning V, then by default a precleaning with 6mL is done. This would also be needed to refill
-            if clean_volume_ul > 10000:
-                volume = 6000 + clean_volume_ul
-            else:
-                volume = clean_volume_ul
 
             epm.add(
                 "CLAD_sub_refill_syringe",
                 {
                     "syringe": "clean",
-                    "fill_volume_ul": volume,
+                    "fill_volume_ul": rinse_volume_ul,  # use rinse volume for nitric
+                    "Syringe_rate_ulsec": 300,
+                },
+            )
+
+            epm.add(
+                "CLAD_sub_refill_syringe",
+                {
+                    "syringe": "water",
+                    "fill_volume_ul": clean_volume_ul,  # use clean volume for water
                     "Syringe_rate_ulsec": 300,
                 },
             )

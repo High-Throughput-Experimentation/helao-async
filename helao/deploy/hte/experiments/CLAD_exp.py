@@ -429,7 +429,7 @@ def CLAD_sub_reference_setup(
     apm.add_actions(
         CLAD_sub_refill_syringe(
             experiment=experiment,
-            syringe="electrolyte",
+            syringe="work",
             fill_volume_ul=fill_volume_ul,
             Syringe_rate_ulsec=300.0,
         )
@@ -636,7 +636,6 @@ def CLAD_sub_clean_cell(
     ReturnLineWait_s: float = 60,
     DrainWait_s: float = 80,
     ReturnLineReverseWait_s: float = 15,
-    Watercleancycle: bool = True,
     lift: bool = False,
     #    ResidualWait_s: float = 15,
 ):
@@ -667,29 +666,28 @@ def CLAD_sub_clean_cell(
         )
     )
 
-    if Watercleancycle:
-        apm.add(
-            WATERSYRINGE_server,
-            "infuse",
-            {
-                "rate_uL_sec": Syringe_rate_ulsec,
-                "volume_uL": water_volume_ul,
-            },
-        )
+    apm.add(
+        WATERSYRINGE_server,
+        "infuse",
+        {
+            "rate_uL_sec": Syringe_rate_ulsec,
+            "volume_uL": water_volume_ul,
+        },
+    )
 
-        apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
-        apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
-        apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
-        apm.add_actions(
-            ADSS_sub_drain_cell(
-                experiment=experiment,
-                DrainWait_s=DrainWait_s,
-                ReturnLineReverseWait_s=ReturnLineReverseWait_s,
-                # ResidualWait_s=ResidualWait_s,
-            )
+    apm.add_actions(
+        ADSS_sub_drain_cell(
+            experiment=experiment,
+            DrainWait_s=DrainWait_s,
+            ReturnLineReverseWait_s=ReturnLineReverseWait_s,
+            # ResidualWait_s=ResidualWait_s,
         )
+    )
 
     if lift:
         apm.add(MOTOR_server, "z_move", {"z_position": "load"})
