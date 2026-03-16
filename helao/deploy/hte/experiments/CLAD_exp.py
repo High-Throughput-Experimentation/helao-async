@@ -702,50 +702,23 @@ def CLAD_sub_refill_syringe(
     experiment_version: int = 1,
     syringe: str = "clean",
     fill_volume_ul: float = 0,
-    Syringe_rate_ulsec: float = 1000,
+    Syringe_rate_ulsec: float = 300,
 ):
     apm = ActionPlanMaker()
-    if syringe == "clean":
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": 0.25})
-        apm.add(
-            CLEANSYRINGE_server,
-            "withdraw",
-            {
-                "rate_uL_sec": Syringe_rate_ulsec,
-                "volume_uL": fill_volume_ul,
-            },
-        )
-        apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 0})
 
-    if syringe == "water":
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "water_refill", "on": 1})  # need to assign new valve for water
-        apm.add(ORCH_server, "wait", {"waittime": 0.25})
-        apm.add(
-            WATERSYRINGE_server,
-            "withdraw",
-            {
-                "rate_uL_sec": Syringe_rate_ulsec,
-                "volume_uL": fill_volume_ul,
-            },
-        )
-        apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "water_refill", "on": 0})  # need to assign new valve for water
-
-    if syringe == "electrolyte":
-        # need valve for this soln
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": 0.25})
-        apm.add(
-            WORKSYRINGE_server,
-            "withdraw",
-            {
-                "rate_uL_sec": Syringe_rate_ulsec,
-                "volume_uL": fill_volume_ul,
-            },
-        )
-        apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
+    syringes = {"clean": CLEANSYRINGE_server, "water": WATERSYRINGE_server, "work": WORKSYRINGE_server}
+    
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": f"{syringe}_refill", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(
+        syringes[syringe],
+        "withdraw",
+        {
+            "rate_uL_sec": Syringe_rate_ulsec,
+            "volume_uL": fill_volume_ul,
+        },
+    )
+    apm.add(ORCH_server, "wait", {"waittime": 10})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": f"{syringe}_refill", "on": 0})
 
     return apm.planned_actions
