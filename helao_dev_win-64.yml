@@ -6,6 +6,7 @@ dependencies:
   - pip:
       - aiodebug
       - aioshutil
+      - nidaqmx
       - pydasher
       - uuid7
       - https://github.com/meerstetter/pyMeCom/archive/master.zip
@@ -37,7 +38,7 @@ dependencies:
   - mendeleev
   - mpltern
   - munch
-  - nidaqmx-python
+  # - nidaqmx-python
   - ntplib
   - numpy=1
   - orjson
