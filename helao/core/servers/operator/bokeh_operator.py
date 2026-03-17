@@ -2034,7 +2034,13 @@ class BokehOperator:
         self.experiment_plan_source.data = self.experiment_plan_lists
 
         if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
-            self.orch_status_button.label = f"running {str(self.orch.active_sequence.sequence_name)} / {str(self.orch.active_experiment.experiment_name)}"
+            if (
+                self.orch.active_sequence is not None
+                and self.orch.active_experiment is not None
+            ):
+                self.orch_status_button.label = f"running {str(self.orch.active_sequence.sequence_name)} / {str(self.orch.active_experiment.experiment_name)}"
+            else:
+                self.orch_status_button.label = "running"
             self.orch_status_button.button_type = "success"
         elif self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
             stop_msg = (
