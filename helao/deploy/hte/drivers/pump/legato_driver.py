@@ -393,7 +393,7 @@ class KDS100:
                 LOGGER.info(f"Server returned: {diameter_resp[0]}")
             self.update_status_from_response(diameter_resp)
 
-    async def shutdown(self):
+    async def async_shutdown(self):
         # this gets called when the server is shut down
         # or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
