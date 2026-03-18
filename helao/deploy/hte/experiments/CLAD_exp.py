@@ -1,5 +1,4 @@
-""" Experiment library for Closed Loop Accelerated Durability (CLAD)
-"""
+"""Experiment library for Closed Loop Accelerated Durability (CLAD)"""
 
 __all__ = [
     "CLAD_sub_recirculate_alternating",
@@ -11,6 +10,7 @@ __all__ = [
     "CLAD_sub_load_assembly",
     "CLAD_sub_clean_cell",
     "CLAD_sub_refill_syringe",
+    "CLAD_sub_standby",
 ]
 
 
@@ -38,23 +38,6 @@ from helao.core.models.run_use import RunUse
 
 EXPERIMENTS = __all__
 
-ORCH_HOST = gethostname()
-PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()
-MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict()
-NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
-ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
-PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
-WORKSYRINGE_server = MachineModel(
-    server_name="WORKSYRINGE", machine_name=ORCH_HOST
-).as_dict()
-WATERSYRINGE_server = MachineModel(
-    server_name="WATERSYRINGE", machine_name=ORCH_HOST
-).as_dict()
-CLEANSYRINGE_server = MachineModel(
-    server_name="CLEANSYRINGE", machine_name=ORCH_HOST
-).as_dict()
-
-
 # cannot save data without exp
 debug_save_act = True
 debug_save_data = True
@@ -70,25 +53,26 @@ def CLAD_sub_recirculate_alternating(
     reverse_duration_s: float = 15.0,
     final_duration_s: float = 5.0,
 ):
+    """Recirculates with pump alternating forward and reverse directions for specified durations."""
     apm = ActionPlanMaker()
 
     # RECIRCULATE FORWARD
-    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": forward_duration_s})
+    apm.add("NI", "gasvalve", {"gasvalve": "inlet", "on": 1})
+    apm.add("NI", "pump", {"pump": "direction", "on": 0})
+    apm.add("NI", "pump", {"pump": "peripump", "on": 1})
+    apm.add("ORCH", "wait", {"waittime": forward_duration_s})
 
     # RECIRCULATE REVERSE
-    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": reverse_duration_s})
+    apm.add("NI", "gasvalve", {"gasvalve": "inlet", "on": 1})
+    apm.add("NI", "pump", {"pump": "direction", "on": 1})
+    apm.add("NI", "pump", {"pump": "peripump", "on": 1})
+    apm.add("ORCH", "wait", {"waittime": reverse_duration_s})
 
     # RECIRCULATE FORWARD FINAL
-    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": final_duration_s})
+    apm.add("NI", "gasvalve", {"gasvalve": "inlet", "on": 1})
+    apm.add("NI", "pump", {"pump": "direction", "on": 0})
+    apm.add("NI", "pump", {"pump": "peripump", "on": 1})
+    apm.add("ORCH", "wait", {"waittime": final_duration_s})
 
     return apm.planned_actions
 
@@ -107,10 +91,11 @@ def CLAD_sub_load_sample(
     bubbler_gas: Optional[str] = None,
 ):
     apm = ActionPlanMaker()
+    """Registers solid, liquid, and gas into load_position."""
 
     if clear_position:
         apm.add(
-            PAL_server,
+            "PAL",
             "archive_custom_unloadall",
             {},
             start_condition=ActionStartCondition.wait_for_orch,
@@ -123,7 +108,7 @@ def CLAD_sub_load_sample(
 
     if solid_sample_no is not None and solid_plate_id is not None:
         apm.add(
-            PAL_server,
+            "PAL",
             "archive_custom_load",
             {
                 "custom": load_position,
@@ -136,7 +121,7 @@ def CLAD_sub_load_sample(
         )
     if liquid_sample_no is not None and liquid_volume_ul is not None:
         apm.add(
-            PAL_server,
+            "PAL",
             "archive_custom_add_liquid",
             {
                 "custom": load_position,
@@ -151,7 +136,7 @@ def CLAD_sub_load_sample(
         )
     if liquid_sample_no is not None and gas_volume_ml is not None:
         apm.add(
-            PAL_server,
+            "PAL",
             "archive_custom_add_gas",
             {
                 "custom": load_position,
@@ -179,11 +164,12 @@ def CLAD_sub_fill_cell(
     fill_rate_ul_s: float = 300,
     load_sample: bool = False,
 ):
+    """Fills cell with liquid from syringe, optionally loading sample from _fast_samples_in."""
     apm = ActionPlanMaker()
 
     if load_sample:
         apm.add(
-            PAL_server,
+            "PAL",
             "archive_custom_query_sample",
             {
                 "custom": "cell1_we",
@@ -194,13 +180,13 @@ def CLAD_sub_fill_cell(
         )
 
     apm.add(
-        NI_server,
+        "NI",
         "gasvalve",
         {"gasvalve": "inlet", "on": 0},
         start_condition=ActionStartCondition.wait_for_orch,
     )
     apm.add(
-        WORKSYRINGE_server,
+        "WORKSYRINGE",
         "infuse",
         {
             "rate_uL_sec": fill_rate_ul_s,
@@ -243,15 +229,15 @@ def CLAD_sub_setup_cell(
     apm = ActionPlanMaker()
 
     # MOVE TO CELL RINSE POSITION
-    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+    apm.add("MOTOR", "z_move", {"z_position": "load"})
     apm.add(
-        MOTOR_server,
+        "MOTOR",
         "solid_get_builtin_specref",
         {"ref_name": "builtin_ref_motorxy"},
         to_global_params={"_refxy": "_refxy"},
     )
     apm.add(
-        MOTOR_server,
+        "MOTOR",
         "move",
         {
             "axis": ["x", "y"],
@@ -260,7 +246,7 @@ def CLAD_sub_setup_cell(
         },
         from_global_act_params={"_refxy": "d_mm"},
     )
-    apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
+    apm.add("MOTOR", "z_move", {"z_position": "seal"})
 
     # FILL CELL WITHOUT SAMPLE LOAD
     apm.add_actions(
@@ -273,10 +259,10 @@ def CLAD_sub_setup_cell(
     )
 
     # RECIRCULATE RINSE SOLUTION FORWARD DIRECTION
-    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": rinse_recirc_duration_s})
+    apm.add("NI", "gasvalve", {"gasvalve": "inlet", "on": 1})
+    apm.add("NI", "pump", {"pump": "direction", "on": 0})
+    apm.add("NI", "pump", {"pump": "peripump", "on": 1})
+    apm.add("ORCH", "wait", {"waittime": rinse_recirc_duration_s})
 
     # DRAIN CELL
     apm.add_actions(
@@ -288,18 +274,18 @@ def CLAD_sub_setup_cell(
     )
 
     # REFILL SYRINGE
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add("NI", "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
+    apm.add("ORCH", "wait", {"waittime": 0.25})
     apm.add(
-        WORKSYRINGE_server,
+        "WORKSYRINGE",
         "withdraw",
         {
             "rate_uL_sec": fill_rate_ul_s,
             "volume_uL": rinse_volume_ul,
         },
     )
-    apm.add(ORCH_server, "wait", {"waittime": 10})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
+    apm.add("ORCH", "wait", {"waittime": 10})
+    apm.add("NI", "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
 
     return apm.planned_actions
 
@@ -345,15 +331,15 @@ def CLAD_sub_reference_setup(
     apm = ActionPlanMaker()
 
     # MOVE TO REFERENCE POSITION
-    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+    apm.add("MOTOR", "z_move", {"z_position": "load"})
     apm.add(
-        MOTOR_server,
+        "MOTOR",
         "solid_get_builtin_specref",
         {"ref_position_name": reference_position_name},
         to_global_params={"_refxy": "_refxy"},
     )
     apm.add(
-        MOTOR_server,
+        "MOTOR",
         "move",
         {
             "axis": ["x", "y"],
@@ -362,11 +348,11 @@ def CLAD_sub_reference_setup(
         },
         from_global_act_params={"_refxy": "d_mm"},
     )
-    apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
+    apm.add("MOTOR", "z_move", {"z_position": "seal"})
 
     # LOAD REFERENCE SAMPLE
     apm.add(
-        PAL_server,
+        "PAL",
         "archive_custom_unloadall",
         {},
         start_condition=ActionStartCondition.wait_for_orch,
@@ -377,7 +363,7 @@ def CLAD_sub_reference_setup(
     )
     # need to use custom solid label here, not supported by ADSS_sub_load
     apm.add(
-        PAL_server,
+        "PAL",
         "archive_custom_load",
         {
             "custom": load_position,
@@ -388,7 +374,7 @@ def CLAD_sub_reference_setup(
         start_condition=ActionStartCondition.wait_for_previous,
     )
     apm.add(
-        PAL_server,
+        "PAL",
         "archive_custom_add_liquid",
         {
             "custom": load_position,
@@ -413,7 +399,7 @@ def CLAD_sub_reference_setup(
     )
 
     # FLOW O2
-    apm.add(NI_server, "gasvalve", {"gasvalve": "O2N2toggle", "on": False})
+    apm.add("NI", "gasvalve", {"gasvalve": "O2N2toggle", "on": False})
 
     # RECIRCULATE
     apm.add_actions(
@@ -547,7 +533,7 @@ def CLAD_sub_load_assembly(
     apm = ActionPlanMaker()
 
     apm.add(
-        NI_server,
+        "NI",
         "pump",
         {
             "pump": "peripump",
@@ -558,7 +544,7 @@ def CLAD_sub_load_assembly(
 
     # set pump flow forward
     apm.add(
-        NI_server,
+        "NI",
         "pump",
         {
             "pump": "direction",
@@ -568,11 +554,11 @@ def CLAD_sub_load_assembly(
     )
 
     # move z to home
-    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+    apm.add("MOTOR", "z_move", {"z_position": "load"})
 
     # move to position
     apm.add(
-        MOTOR_server,
+        "MOTOR",
         "solid_get_samples_xy",
         {
             "plate_id": solid_plate_id,
@@ -583,7 +569,7 @@ def CLAD_sub_load_assembly(
     )
 
     apm.add(
-        MOTOR_server,
+        "MOTOR",
         "move",
         {
             "axis": ["x", "y"],
@@ -597,7 +583,7 @@ def CLAD_sub_load_assembly(
     )
 
     # seal cell
-    apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
+    apm.add("MOTOR", "z_move", {"z_position": "seal"})
 
     apm.add_actions(
         CLAD_sub_load_sample(
@@ -639,23 +625,24 @@ def CLAD_sub_clean_cell(
     lift: bool = False,
     #    ResidualWait_s: float = 15,
 ):
+    """Cleans cell with nitric acid and water, then refills syringes."""
     apm = ActionPlanMaker()
 
-    apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
+    apm.add("NI", "gasvalve", {"gasvalve": "inlet", "on": 0})
     apm.add(
-        CLEANSYRINGE_server,
+        "CLEANSYRINGE",
         "infuse",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
             "volume_uL": nitric_volume_ul,
         },
     )
-    apm.add(ORCH_server, "wait", {"waittime": 10})
+    apm.add("ORCH", "wait", {"waittime": 10})
 
-    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+    apm.add("NI", "pump", {"pump": "direction", "on": 0})
+    apm.add("NI", "pump", {"pump": "peripump", "on": 1})
+    apm.add("ORCH", "wait", {"waittime": ReturnLineWait_s})
+    apm.add("NI", "pump", {"pump": "peripump", "on": 0})
 
     apm.add_actions(
         ADSS_sub_drain_cell(
@@ -667,7 +654,7 @@ def CLAD_sub_clean_cell(
     )
 
     apm.add(
-        WATERSYRINGE_server,
+        "WATERSYRINGE",
         "infuse",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
@@ -675,10 +662,10 @@ def CLAD_sub_clean_cell(
         },
     )
 
-    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": ReturnLineWait_s})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+    apm.add("NI", "pump", {"pump": "direction", "on": 0})
+    apm.add("NI", "pump", {"pump": "peripump", "on": 1})
+    apm.add("ORCH", "wait", {"waittime": ReturnLineWait_s})
+    apm.add("NI", "pump", {"pump": "peripump", "on": 0})
 
     apm.add_actions(
         ADSS_sub_drain_cell(
@@ -690,7 +677,7 @@ def CLAD_sub_clean_cell(
     )
 
     if lift:
-        apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+        apm.add("MOTOR", "z_move", {"z_position": "load"})
 
     return apm.planned_actions
 
@@ -702,12 +689,13 @@ def CLAD_sub_refill_syringe(
     fill_volume_ul: float = 0,
     Syringe_rate_ulsec: float = 300,
 ):
+    """Refills syringe with specified volume and rate."""
     apm = ActionPlanMaker()
 
-    syringes = {"clean": CLEANSYRINGE_server, "water": WATERSYRINGE_server, "work": WORKSYRINGE_server}
-    
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": f"{syringe}_refill", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    syringes = {"clean": "CLEANSYRINGE", "water": "WATERSYRINGE", "work": "WORKSYRINGE"}
+
+    apm.add("NI", "liquidvalve", {"liquidvalve": f"{syringe}_refill", "on": 1})
+    apm.add("ORCH", "wait", {"waittime": 0.25})
     apm.add(
         syringes[syringe],
         "withdraw",
@@ -716,7 +704,18 @@ def CLAD_sub_refill_syringe(
             "volume_uL": fill_volume_ul,
         },
     )
-    apm.add(ORCH_server, "wait", {"waittime": 10})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": f"{syringe}_refill", "on": 0})
+    apm.add("ORCH", "wait", {"waittime": 10})
+    apm.add("NI", "liquidvalve", {"liquidvalve": f"{syringe}_refill", "on": 0})
 
+    return apm.planned_actions
+
+
+def CLAD_sub_standby(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+    """Turns off pumps and inlet gasvalve for safe standby."""
+    apm = ActionPlanMaker()
+    apm.add("NI", "pump", {"pump": "peripump", "on": 0})
+    apm.add("NI", "gasvalve", {"gasvalve": "inlet", "on": 0})
     return apm.planned_actions

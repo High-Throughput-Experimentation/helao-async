@@ -262,6 +262,7 @@ def CLAD_seq(
                 "run_use": "ref",
             },
         )
+        epm.add("CLAD_sub_standby", {})
 
     # sequence ends on filled cell, reference sample position
     return epm.planned_experiments
