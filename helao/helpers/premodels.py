@@ -8,6 +8,7 @@ __all__ = ["Sequence", "Experiment", "Action", "ActionPlanMaker", "ExperimentPla
 import os
 import inspect
 from copy import deepcopy
+from socket import gethostname
 from typing import Optional
 from pydantic import Field
 from typing import List
@@ -29,6 +30,7 @@ from helao.core.models.machine import MachineModel
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+HOST = gethostname()
 
 
 class Sequence(SequenceModel):
@@ -210,9 +212,10 @@ class Experiment(Sequence, ExperimentModel):
         #     LOGGER.error(f"samples_in labels: {in_labels}")
         #     LOGGER.error(f"samples_out labels: {out_labels}")
 
-# when a server is working on an action it is important to 
-# see what experiment the action belongs to. This turns the 
-# action model into an instance of an Action 
+
+# when a server is working on an action it is important to
+# see what experiment the action belongs to. This turns the
+# action model into an instance of an Action
 class Action(Experiment, ActionModel):
     "Sample-action identifier class."
 
@@ -351,11 +354,11 @@ class ActionPlanMaker:
 
     def add(
         self,
-        action_server: dict|MachineModel|str,
+        action_server: dict | MachineModel | str,
         action_name: str,
         action_params: dict,
         start_condition: ActionStartCondition = ActionStartCondition.wait_for_all,
-        to_global_params: dict|list = {},
+        to_global_params: dict | list = {},
         from_global_act_params: dict = {},
         **kwargs,
     ):
@@ -364,7 +367,9 @@ class ActionPlanMaker:
         if isinstance(action_server, MachineModel):
             action_server = action_server.as_dict()
         elif isinstance(action_server, str):
-            action_server = MachineModel(server_name=action_server).as_dict()
+            action_server = MachineModel(
+                server_name=action_server, machine_name=HOST
+            ).as_dict()
         action_dict.update(
             {
                 "action_server": action_server,
@@ -393,7 +398,9 @@ class ExperimentPlanMaker:
     ):
         self.planned_experiments = []
 
-    def add(self, experiment_name, experiment_params, from_global_exp_params={}, **kwargs):
+    def add(
+        self, experiment_name, experiment_params, from_global_exp_params={}, **kwargs
+    ):
         self.planned_experiments.append(
             ShortExperimentModel(
                 experiment_name=experiment_name,
