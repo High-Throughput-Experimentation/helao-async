@@ -253,7 +253,7 @@ class BokehOperator:
         )
 
         self.active_action_source, self.active_action_table = self._make_table(
-            self.active_action_lists, fit_columns=False
+            self.active_action_lists, fit_columns=True
         )
 
         self.planner_tab = TabPanel(
@@ -1139,7 +1139,7 @@ class BokehOperator:
 
     async def get_active_actions(self):
         """get action list from orch"""
-        action_tups = sorted(self.orch.action_history.items(), key=lambda x: x[0])
+        action_tups = sorted(self.orch.action_history.items(), key=lambda x: x[0])[::-1]
         for actuuid, actdict in action_tups:
             self.active_action_lists["action_uuid"].append(str(actuuid)[-8:])
             for k in [
@@ -1153,9 +1153,7 @@ class BokehOperator:
                     actdict[k][-1] if isinstance(k, list) else actdict[k]
                 )
 
-        self.active_action_source.stream(
-            self.active_action_lists, rollover=self.orch.action_history._maxlen
-        )
+        self.active_action_source.data = self.active_action_lists
 
     async def get_orch_status_summary(self):
         for key in self.action_server_lists:
