@@ -168,7 +168,15 @@ class BokehOperator:
         }
 
         self.active_action_lists = {
-            k: [] for k in ["action_name", "action_server", "action_uuid", "experiment_name", "sequence_name"]
+            k: []
+            for k in [
+                "action_name",
+                "action_server",
+                "action_status",
+                "action_uuid",
+                "experiment_name",
+                "sequence_name",
+            ]
         }
 
         self.action_server_lists = {
@@ -1131,38 +1139,23 @@ class BokehOperator:
 
     async def get_active_actions(self):
         """get action list from orch"""
-        actions = self.orch.list_active_actions()
-        for key in self.active_action_lists:
-            self.active_action_lists[key] = []
-        action_count = 0
-        for act in actions:
-            actdict = act.as_dict()
-            liquid_list, solid_list, gas_list = unpack_samples_helper(
-                samples=act.samples_in
-            )
-            # self.vis.print_message(
-            #     f"solids_in: {[s.get_global_label() for s in solid_list]}", sample=True
-            # )
-            self.active_action_lists["action_name"].append(
-                actdict["action_name"]
-            )
-            self.active_action_lists["action_server"].append(
-                act.action_server.disp_name()
-            )
-            self.active_action_lists["action_uuid"].append(
-                actdict["action_uuid"][:-8]
-            )
-            self.active_action_lists["experiment_name"].append(
-                self.orch.active_experiment.experiment_name
-            )
-            self.active_action_lists["sequence_name"].append(
-                self.orch.active_sequence.sequence_name
-            )
-            action_count += 1
+        action_tups = sorted(self.orch.action_history.items(), key=lambda x: x[0])
+        for actuuid, actdict in action_tups:
+            self.active_action_lists["action_uuid"].append(str(actuuid)[-8:])
+            for k in [
+                "action_name",
+                "action_server",
+                "action_status",
+                "experiment_name",
+                "sequence_name",
+            ]:
+                self.active_action_lists[k].append(
+                    actdict[k][-1] if isinstance(k, list) else actdict[k]
+                )
 
-        # self.active_action_source.stream(self.active_action_lists, rollover=action_count)
-        self.active_action_source.data = self.active_action_lists
-        # LOGGER.info(f"current active actions: {self.active_action_lists}")
+        self.active_action_source.stream(
+            self.active_action_lists, rollover=self.orch.action_history._maxlen
+        )
 
     async def get_orch_status_summary(self):
         for key in self.action_server_lists:
