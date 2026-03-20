@@ -795,15 +795,19 @@ def makeApp(server_key):
     ):
         """Stops measurement in a controlled way."""
         active = await app.base.setup_and_contain_action(action_abbr="stop")
-        await app.driver.stop()
+        for exec_key in app.base.executors.keys():
+            app.base.stop_executor(exec_key)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
     @app.post("/stop_private", tags=["private"])
     async def stop_private():
         """Stops measurement."""
-        response = await app.driver.stop()
-        return response
+        stopped_keys = []
+        for exec_key in app.base.executors.keys():
+            app.base.stop_executor(exec_key)
+            stopped_keys.append(exec_key)
+        return stopped_keys
 
     @app.post("/gamry_state", tags=["private"])
     def gamry_state():
