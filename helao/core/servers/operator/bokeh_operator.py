@@ -262,7 +262,7 @@ class BokehOperator:
         )
         self.active_tab = TabPanel(
             child=self.active_action_table,
-            title="Active Actions",
+            title="Action History",
         )
         self.planactive_tabs = Tabs(
             tabs=[self.planner_tab, self.active_tab], height_policy="min"
@@ -817,7 +817,7 @@ class BokehOperator:
             columns=columns,
             width=self.max_width - 20,
             height=200,
-            autosize_mode="force_fit" if "fit_columns" not in extra_kwargs else "fit_columns",
+            autosize_mode="force_fit" if "fit_columns" not in extra_kwargs else "none",
             **extra_kwargs,
         )
         return source, table
