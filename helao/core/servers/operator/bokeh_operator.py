@@ -295,7 +295,7 @@ class BokehOperator:
             title="Action History",
         )
         self.experiment_history_tab = TabPanel(
-            child=self.action_history_table,
+            child=self.experiment_history_table,
             title="Experiment History",
         )
         self.sequence_history_tab = TabPanel(
