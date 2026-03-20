@@ -1622,26 +1622,26 @@ class BokehOperator:
             # if args[idx] == "experiment":
             #     continue
             # disabled = False
+
+            initial_stylesheet = [".bk-input { color: black; }"]
             text_input = TextInput(
                 value=def_val,
                 title=args[idx],
                 disabled=True if args[idx].endswith("_version") else False,
                 width=400,
                 height=40,
+                stylesheets=initial_stylesheet
             )
-            color_default_js = f"""
-var value = cb_obj.value;
-
+            color_callback_js = CustomJS(args=dict(input=text_input), code=f"""
+var value = input.value;
+var input_color = "red";
 if (value === '{def_val}') {{
-    // Black color for default values
-    cb_obj.style.color = 'black';
-}} else {{
-    // Red color for non-default values
-    cb_obj.style.color = 'red';
+    new_color = "black";
 }}
+input.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 """
-            custom_js = CustomJS(args={}, code=color_default_js)
-            text_input.js_on_change("value", custom_js)
+            )
+            text_input.js_on_change("value", color_callback_js``)
             param_input.append(text_input)
             argtype_list.append(argtypes[idx])
             param_layout.append(
