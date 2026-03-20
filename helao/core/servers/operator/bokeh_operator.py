@@ -1139,6 +1139,8 @@ class BokehOperator:
 
     async def get_active_actions(self):
         """get action list from orch"""
+        for key in self.active_action_lists:
+            self.active_action_lists[key] = []
         action_tups = sorted(self.orch.action_history.items(), key=lambda x: x[0])[::-1]
         for actuuid, actdict in action_tups:
             self.active_action_lists["action_uuid"].append(str(actuuid)[-8:])
