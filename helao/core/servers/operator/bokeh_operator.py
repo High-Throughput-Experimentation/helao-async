@@ -1151,9 +1151,10 @@ class BokehOperator:
                 "experiment_name",
                 "sequence_name",
             ]:
-                self.active_action_lists[k].append(
-                    actdict[k][-1] if isinstance(k, list) else actdict[k]
-                )
+                if k in actdict:
+                    self.active_action_lists[k].append(
+                        actdict[k][-1] if isinstance(actdict[k], list) else actdict[k]
+                    )
 
         self.active_action_source.data = self.active_action_lists
 
