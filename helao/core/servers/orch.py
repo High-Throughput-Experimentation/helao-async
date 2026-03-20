@@ -901,12 +901,17 @@ class Orch(Base):
             LOGGER.info("getting new sequence from sequence_dq")
             self.active_sequence = self.sequence_dq.popleft()
 
-            self.sequence_history[self.active_sequence.sequence_uuid] = {
-                "sequence_name": self.active_sequence.sequence_name,
-                "sequence_label": self.active_sequence.sequence_label,
-                "sequence_timestamp": self.active_sequence.sequence_timestamp,
-                "sequence_status": "active",
-            }
+            self.register_obj_uuid(
+                self.active_sequence.sequence_uuid,
+                {
+                    "sequence_name": self.active_sequence.sequence_name,
+                    "sequence_timestamp": self.active_sequence.sequence_timestamp,
+                    "sequence_status": "active",
+                    "sequence_label": self.active_sequence.sequence_label,
+                    "campaign_name": self.active_sequence.campaign_name,
+                },
+                "sequence",
+            )
             LOGGER.info(f"new active sequence is {self.active_sequence.sequence_name}")
             await self.put_lbuf(
                 {
@@ -1053,12 +1058,17 @@ class Orch(Base):
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
 
-        self.experiment_history[self.active_experiment.experiment_uuid] = {
-            "experiment_name": self.active_experiment.experiment_name,
-            "experiment_timestamp": self.active_experiment.experiment_timestamp,
-            "experiment_status": "active",
-            "sequence_label": self.active_sequence.sequence_label,
-        }
+        self.register_obj_uuid(
+            self.active_experiment.experiment_uuid,
+            {
+                "experiment_name": self.active_experiment.experiment_name,
+                "experiment_timestamp": self.active_experiment.experiment_timestamp,
+                "experiment_status": "active",
+                "sequence_label": self.active_sequence.sequence_label,
+                "campaign_name": self.active_sequence.campaign_name,
+            },
+            "experiment",
+        )
         self.active_experiment.orch_key = self.orch_key
         self.active_experiment.orch_host = self.orch_host
         self.active_experiment.orch_port = self.orch_port
@@ -2553,13 +2563,18 @@ class Orch(Base):
                     }
                 }
             )
-            self.sequence_history[self.active_sequence.sequence_uuid] = {
-                "sequence_name": self.active_sequence.sequence_name,
-                "sequence_label": self.active_sequence.sequence_label,
-                "sequence_timestamp": self.active_sequence.sequence_timestamp,
-                "sequence_finished_timestamp": self.active_sequence.sequence_finished_timestamp,
-                "sequence_status": "finished",
-            }
+            self.register_obj_uuid(
+                self.active_sequence.sequence_uuid,
+                {
+                    "sequence_name": self.active_sequence.sequence_name,
+                    "sequence_timestamp": self.active_sequence.sequence_timestamp,
+                    "sequence_finished_timestamp": self.active_sequence.sequence_finished_timestamp,
+                    "sequence_status": "finished",
+                    "sequence_label": self.active_sequence.sequence_label,
+                    "campaign_name": self.active_sequence.campaign_name,
+                },
+                "sequence",
+            )
             self.active_sequence = None
             self.active_seq_exp_counter = 0
             self.globalstatusmodel.counter_dispatched_actions = {}
@@ -2648,13 +2663,18 @@ class Orch(Base):
 
             self.last_experiment = deepcopy(self.active_experiment)
 
-            self.experiment_history[self.active_experiment.experiment_uuid] = {
-                "experiment_name": self.active_experiment.experiment_name,
-                "experiment_timestamp": self.active_experiment.experiment_timestamp,
-                "experiment_finished_timestamp": self.active_experiment.experiment_finished_timestamp,
-                "experiment_status": "finished",
-                "sequence_label": self.active_sequence.sequence_label,
-            }
+            self.register_obj_uuid(
+                self.active_experiment.experiment_uuid,
+                {
+                    "experiment_name": self.active_experiment.experiment_name,
+                    "experiment_timestamp": self.active_experiment.experiment_timestamp,
+                    "experiment_finished_timestamp": self.active_experiment.experiment_finished_timestamp,
+                    "experiment_status": "finished",
+                    "sequence_label": self.active_sequence.sequence_label,
+                    "campaign_name": self.active_sequence.campaign_name,
+                },
+                "experiment",
+            )
             self.active_experiment = None
 
             # DB server call to finish_yml if DB exists

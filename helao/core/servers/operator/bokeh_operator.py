@@ -1194,6 +1194,7 @@ class BokehOperator:
                     self.action_history_lists[k].append(
                         actdict[k][-1] if isinstance(actdict[k], list) else actdict[k]
                     )
+
         for key in self.experiment_history_lists:
             self.experiment_history_lists[key] = []
         exp_tups = sorted(self.orch.experiment_history.items(), key=lambda x: x[0])[::-1]
@@ -1210,6 +1211,7 @@ class BokehOperator:
                     self.experiment_history_lists[k].append(
                         expdict[k][-1] if isinstance(expdict[k], list) else expdict[k]
                     )
+
         for key in self.sequence_history_lists:
             self.sequence_history_lists[key] = []
         seq_tups = sorted(self.orch.sequence_history.items(), key=lambda x: x[0])[::-1]
@@ -1220,6 +1222,7 @@ class BokehOperator:
             self.sequence_history_lists["finish"].append(seqdict.get("sequence_finished_timestamp", None))
             for k in [
                 "sequence_status",
+                "sequence_label",
             ]:
                 if k in seqdict:
                     self.sequence_history_lists[k].append(
