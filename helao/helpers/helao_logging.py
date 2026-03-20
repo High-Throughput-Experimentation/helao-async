@@ -11,12 +11,10 @@ Usage:
 
 import tempfile
 import os
-import sys
 import subprocess
 import logging
 import requests
-import json
-from urllib.parse import quote
+from socket import gethostname
 from queue import Queue
 from logging.handlers import (
     TimedRotatingFileHandler,
@@ -59,7 +57,7 @@ class TitledSMTPHandler(SMTPHandler):
             title = record.message.split("~")[0].strip()
         else:
             title = record.message.split()[0].strip()
-        return f"{record.levelname} - {title}"
+        return f"{record.levelname} - {title} on {gethostname()}"
 
 
 class HTTPPostHandler(logging.Handler):
