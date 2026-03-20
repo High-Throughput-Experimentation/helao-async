@@ -43,6 +43,7 @@ def alert(self, message, *args, **kws):
 setattr(logging.Logger, "alert", alert)
 
 LOGGER: logging.Logger = None
+HOST = gethostname()
 
 
 class GZipRotator:
@@ -57,7 +58,7 @@ class TitledSMTPHandler(SMTPHandler):
             title = record.message.split("~")[0].strip()
         else:
             title = record.message.split()[0].strip()
-        return f"{record.levelname} - {title} on {gethostname()}"
+        return f"{record.levelname} - {title} on {HOST}"
 
 
 class HTTPPostHandler(logging.Handler):
