@@ -606,11 +606,11 @@ class Orch(Base):
                 "action_server": actionmodel.action_server.server_name,
                 "action_timestamp": f"{actionmodel.action_timestamp: %m-%d %H:%M:%S}",
                 "action_finished_timestamp": f"{actionmodel.action_finished_timestamp: %m-%d %H:%M:%S}",
-                "experiment_name": self.active_experiment.experiment_name,
+                "experiment_name": self.active_experiment.experiment_name if self.active_experiment is not None else None,
                 "experiment_uuid": actionmodel.experiment_uuid,
-                "sequence_name": self.active_sequence.sequence_name,
-                "sequence_label": self.active_sequence.sequence_label,
-                "sequence_uuid": actionmodel.sequence_uuid,
+                "sequence_name": self.active_sequence.sequence_name if self.active_sequence is not None else None,
+                "sequence_uuid": self.active_sequence.sequence_uuid if self.active_sequence is not None else None,
+                "sequence_label": self.active_sequence.sequence_label if self.active_sequence is not None else None,
             },
         )
         server_key = actionmodel.action_server.server_name
@@ -705,11 +705,11 @@ class Orch(Base):
                                         "action_server": act_model.action_server.server_name,
                                         "action_timestamp": f"{act_model.action_timestamp: %m-%d %H:%M:%S}",
                                         "action_finished_timestamp": f"{act_model.action_finished_timestamp: %m-%d %H:%M:%S}",
-                                        "experiment_name": self.active_experiment.experiment_name,
+                                        "experiment_name": self.active_experiment.experiment_name if self.active_experiment is not None else None,
                                         "experiment_uuid": act_model.experiment_uuid,
-                                        "sequence_name": self.active_sequence.sequence_name,
-                                        "sequence_label": self.active_sequence.sequence_label,
-                                        "sequence_uuid": act_model.sequence_uuid,
+                                        "sequence_name": self.active_sequence.sequence_name if self.active_sequence is not None else None,
+                                        "sequence_label": self.active_sequence.sequence_label if self.active_sequence is not None else None,
+                                        "sequence_uuid": self.active_sequence.sequence_uuid if self.active_sequence is not None else None,
                                     },
                                 )
                                 break
@@ -901,17 +901,6 @@ class Orch(Base):
             LOGGER.info("getting new sequence from sequence_dq")
             self.active_sequence = self.sequence_dq.popleft()
 
-            self.register_obj_uuid(
-                self.active_sequence.sequence_uuid,
-                {
-                    "sequence_name": self.active_sequence.sequence_name,
-                    "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
-                    "sequence_status": "active",
-                    "sequence_label": self.active_sequence.sequence_label,
-                    "campaign_name": self.active_sequence.campaign_name,
-                },
-                "sequence",
-            )
             LOGGER.info(f"new active sequence is {self.active_sequence.sequence_name}")
             await self.put_lbuf(
                 {
@@ -926,6 +915,17 @@ class Orch(Base):
             if self.active_sequence.run_type is None:
                 self.active_sequence.run_type = self.run_type
             self.active_sequence.init_seq(time_offset=self.ntp_offset)
+            self.register_obj_uuid(
+                self.active_sequence.sequence_uuid,
+                {
+                    "sequence_name": self.active_sequence.sequence_name,
+                    "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
+                    "sequence_status": "active",
+                    "sequence_label": self.active_sequence.sequence_label,
+                    "campaign_name": self.active_sequence.campaign_name,
+                },
+                "sequence",
+            )
             self.active_sequence.orchestrator = self.server
 
             # from global params
@@ -1058,17 +1058,6 @@ class Orch(Base):
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
 
-        self.register_obj_uuid(
-            self.active_experiment.experiment_uuid,
-            {
-                "experiment_name": self.active_experiment.experiment_name,
-                "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
-                "experiment_status": "active",
-                "sequence_label": self.active_sequence.sequence_label,
-                "campaign_name": self.active_sequence.campaign_name,
-            },
-            "experiment",
-        )
         self.active_experiment.orch_key = self.orch_key
         self.active_experiment.orch_host = self.orch_host
         self.active_experiment.orch_port = self.orch_port
@@ -1115,6 +1104,17 @@ class Orch(Base):
             self.active_experiment.run_type = self.run_type
         self.active_experiment.orchestrator = self.server
         self.active_experiment.init_exp(time_offset=self.ntp_offset)
+        self.register_obj_uuid(
+            self.active_experiment.experiment_uuid,
+            {
+                "experiment_name": self.active_experiment.experiment_name,
+                "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
+                "experiment_status": "active",
+                "sequence_label": self.active_sequence.sequence_label,
+                "campaign_name": self.active_sequence.campaign_name,
+            },
+            "experiment",
+        )
 
         # attach run_id
         if self.active_run_id is not None:
