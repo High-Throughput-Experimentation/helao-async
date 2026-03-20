@@ -1198,7 +1198,7 @@ class BokehOperator:
         for key in self.experiment_history_lists:
             self.experiment_history_lists[key] = []
         exp_tups = sorted(self.orch.experiment_history.items(), key=lambda x: x[0])[::-1]
-        LOGGER.warning(f"Experiment tuples: {exp_tups}")
+        LOGGER.debug(f"Experiment tuples: {exp_tups}")
         for expuuid, expdict in exp_tups:
             self.experiment_history_lists["experiment_uuid"].append(str(expuuid)[-8:])
             self.experiment_history_lists["experiment_name"].append(expdict["experiment_name"])
@@ -1217,7 +1217,7 @@ class BokehOperator:
         for key in self.sequence_history_lists:
             self.sequence_history_lists[key] = []
         seq_tups = sorted(self.orch.sequence_history.items(), key=lambda x: x[0])[::-1]
-        LOGGER.warning(f"Sequence tuples: {seq_tups}")
+        LOGGER.debug(f"Sequence tuples: {seq_tups}")
         for sequuid, seqdict in seq_tups:
             self.sequence_history_lists["sequence_uuid"].append(str(sequuid)[-8:])
             self.sequence_history_lists["sequence_name"].append(seqdict["sequence_name"])
