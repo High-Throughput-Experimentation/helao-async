@@ -605,12 +605,32 @@ class Orch(Base):
                 "action_status": actionmodel.action_status,
                 "action_server": actionmodel.action_server.server_name,
                 "action_timestamp": f"{actionmodel.action_timestamp: %m-%d %H:%M:%S}",
-                "action_finished_timestamp": f"{actionmodel.action_finished_timestamp: %m-%d %H:%M:%S}",
-                "experiment_name": self.active_experiment.experiment_name if self.active_experiment is not None else None,
+                "action_finished_timestamp": (
+                    f"{actionmodel.action_finished_timestamp: %m-%d %H:%M:%S}"
+                    if actionmodel.action_finished_timestamp is not None
+                    else None
+                ),
+                "experiment_name": (
+                    self.active_experiment.experiment_name
+                    if self.active_experiment is not None
+                    else None
+                ),
                 "experiment_uuid": actionmodel.experiment_uuid,
-                "sequence_name": self.active_sequence.sequence_name if self.active_sequence is not None else None,
-                "sequence_uuid": self.active_sequence.sequence_uuid if self.active_sequence is not None else None,
-                "sequence_label": self.active_sequence.sequence_label if self.active_sequence is not None else None,
+                "sequence_name": (
+                    self.active_sequence.sequence_name
+                    if self.active_sequence is not None
+                    else None
+                ),
+                "sequence_uuid": (
+                    self.active_sequence.sequence_uuid
+                    if self.active_sequence is not None
+                    else None
+                ),
+                "sequence_label": (
+                    self.active_sequence.sequence_label
+                    if self.active_sequence is not None
+                    else None
+                ),
             },
         )
         server_key = actionmodel.action_server.server_name
@@ -704,12 +724,33 @@ class Orch(Base):
                                         "action_status": act_model.action_status,
                                         "action_server": act_model.action_server.server_name,
                                         "action_timestamp": f"{act_model.action_timestamp: %m-%d %H:%M:%S}",
-                                        "action_finished_timestamp": f"{act_model.action_finished_timestamp: %m-%d %H:%M:%S}",
-                                        "experiment_name": self.active_experiment.experiment_name if self.active_experiment is not None else None,
+                                        "action_finished_timestamp": (
+                                            f"{act_model.action_finished_timestamp: %m-%d %H:%M:%S}"
+                                            if act_model.action_finished_timestamp
+                                            is not None
+                                            else None
+                                        ),
+                                        "experiment_name": (
+                                            self.active_experiment.experiment_name
+                                            if self.active_experiment is not None
+                                            else None
+                                        ),
                                         "experiment_uuid": act_model.experiment_uuid,
-                                        "sequence_name": self.active_sequence.sequence_name if self.active_sequence is not None else None,
-                                        "sequence_label": self.active_sequence.sequence_label if self.active_sequence is not None else None,
-                                        "sequence_uuid": self.active_sequence.sequence_uuid if self.active_sequence is not None else None,
+                                        "sequence_name": (
+                                            self.active_sequence.sequence_name
+                                            if self.active_sequence is not None
+                                            else None
+                                        ),
+                                        "sequence_label": (
+                                            self.active_sequence.sequence_label
+                                            if self.active_sequence is not None
+                                            else None
+                                        ),
+                                        "sequence_uuid": (
+                                            self.active_sequence.sequence_uuid
+                                            if self.active_sequence is not None
+                                            else None
+                                        ),
                                     },
                                 )
                                 break
