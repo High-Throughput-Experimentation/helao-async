@@ -1627,6 +1627,7 @@ class BokehOperator:
                 disabled=True if args[idx].endswith("_version") else False,
                 width=400,
                 height=40,
+                wait_commit=False
             )
             color_default_js = f"""
 var input_element = cb_obj.input_element;
