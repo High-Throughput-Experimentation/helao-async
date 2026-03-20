@@ -604,9 +604,9 @@ class Orch(Base):
                 "action_name": actionmodel.action_name,
                 "action_status": actionmodel.action_status,
                 "action_server": actionmodel.action_server.server_name,
-                "experiment_name": actionmodel.experiment_name,
+                "experiment_name": self.active_experiment.experiment_name,
                 "experiment_uuid": actionmodel.experiment_uuid,
-                "sequence_name": actionmodel.sequence_name,
+                "sequence_name": self.active_sequence.sequence_name,
                 "sequence_uuid": actionmodel.sequence_uuid,
             },
         )
