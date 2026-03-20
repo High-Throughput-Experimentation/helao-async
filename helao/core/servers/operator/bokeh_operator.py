@@ -253,7 +253,7 @@ class BokehOperator:
         )
 
         self.active_action_source, self.active_action_table = self._make_table(
-            self.active_action_lists, 
+            self.active_action_lists, fit_columns=True
         )
 
         self.planner_tab = TabPanel(
@@ -817,7 +817,7 @@ class BokehOperator:
             columns=columns,
             width=self.max_width - 20,
             height=200,
-            autosize_mode="fit_columns",
+            autosize_mode="force_fit",
             **extra_kwargs,
         )
         return source, table
