@@ -607,6 +607,7 @@ class Orch(Base):
                 "experiment_name": self.active_experiment.experiment_name,
                 "experiment_uuid": actionmodel.experiment_uuid,
                 "sequence_name": self.active_sequence.sequence_name,
+                "sequence_label": self.active_sequence.sequence_label,
                 "sequence_uuid": actionmodel.sequence_uuid,
             },
         )

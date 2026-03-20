@@ -39,7 +39,6 @@ import builtins
 from helao.helpers import helao_logging as logging
 
 from helao.helpers.to_json import parse_bokeh_input
-from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.helpers.gen_uuid import md5_string
 from helao.core.servers.vis import Vis
 from helao.helpers.plate_api import HTEPlateAPI
@@ -170,12 +169,11 @@ class BokehOperator:
         self.active_action_lists = {
             k: []
             for k in [
-                "action_name",
-                "action_server",
+                "action_endpoint",
                 "action_status",
                 "action_uuid",
                 "experiment_name",
-                "sequence_name",
+                "sequence_label",
             ]
         }
 
@@ -258,7 +256,7 @@ class BokehOperator:
 
         self.planner_tab = TabPanel(
             child=self.experiment_plan_table,
-            title="Planned Experiments",
+            title="Plan",
         )
         self.active_tab = TabPanel(
             child=self.active_action_table,
@@ -1144,12 +1142,11 @@ class BokehOperator:
         action_tups = sorted(self.orch.action_history.items(), key=lambda x: x[0])[::-1]
         for actuuid, actdict in action_tups:
             self.active_action_lists["action_uuid"].append(str(actuuid)[-8:])
+            self.active_action_lists["action_endpoint"].append(f"{actdict['action_server']}/{actdict['action_name']}")
             for k in [
-                "action_name",
-                "action_server",
                 "action_status",
                 "experiment_name",
-                "sequence_name",
+                "sequence_label"
             ]:
                 if k in actdict:
                     self.active_action_lists[k].append(
