@@ -1195,10 +1195,8 @@ class BokehOperator:
                         actdict[k][-1] if isinstance(actdict[k], list) else actdict[k]
                     )
 
-        print(self.experiment_history_lists.keys())
         for key in self.experiment_history_lists:
             self.experiment_history_lists[key] = []
-        print(self.experiment_history_lists.keys())
         exp_tups = sorted(self.orch.experiment_history.items(), key=lambda x: x[0])[::-1]
         for expuuid, expdict in exp_tups:
             self.experiment_history_lists["experiment_uuid"].append(str(expuuid)[-8:])
