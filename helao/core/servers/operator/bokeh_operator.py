@@ -1637,7 +1637,7 @@ class BokehOperator:
                 code=f"""
 var value = input.value;
 var new_color = "red";
-if (value === '{def_val}') {{
+if (value == '{def_val}') {{
     new_color = "black";
 }}
 input.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
