@@ -5,10 +5,6 @@ import os
 from datetime import datetime
 from helao.helpers import helao_logging as logging
 
-LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from importlib.util import spec_from_file_location
-from importlib.util import module_from_spec
-from importlib.machinery import SourceFileLoader
 import asyncio
 import sys
 from copy import deepcopy
@@ -55,7 +51,9 @@ from helao.helpers.plate_api import HTEPlateAPI
 from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.helpers import config_loader
 from helao.helpers.meta_processor import MetaProcessor
+from helao.helpers.dequedict import DequeDict
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 CONFIG = config_loader.CONFIG
 
 # ANSI color codes converted to the Windows versions
@@ -83,7 +81,6 @@ class Orch(Base):
         dispatch_buffer (list): Buffer for dispatching actions.
         nonblocking (list): List of non-blocking actions.
         last_dispatched_action_uuid (UUID): UUID of the last dispatched action.
-        last_50_action_uuids (list): List of the last 50 action UUIDs.
         last_action_uuid (str): UUID of the last action.
         last_interrupt (float): Timestamp of the last interrupt.
         active_experiment (Experiment): Currently active experiment.
@@ -226,9 +223,9 @@ class Orch(Base):
 
         # holder for tracking dispatched action in status
         self.last_dispatched_action_uuid = None
-        self.last_50_action_uuids = []
-        self.last_50_experiment_uuids = []
-        self.last_50_sequence_uuids = []
+        self.action_history = DequeDict(maxlen=200)
+        self.experiment_history = DequeDict(maxlen=200)
+        self.sequence_history = DequeDict(maxlen=200)
         self.last_action_uuid = ""
         self.last_interrupt = time.time()
         # hold schema objects
@@ -373,7 +370,7 @@ class Orch(Base):
     #         if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
     #             self.endpoint_queues[urld["name"]] = zdeque([])
 
-    def register_obj_uuid(self, obj_uuid, obj_type: str):
+    def register_obj_uuid(self, obj_uuid_key, obj_uuid_dict, obj_type: str):
         """
         Registers a new object UUID in the list of the last 50 object UUIDs.
 
@@ -384,17 +381,17 @@ class Orch(Base):
             obj_uuid (str): The UUID of the object to be registered.
         """
         OBJ_MAP = {
-            "action": self.last_50_action_uuids,
-            "experiment": self.last_50_experiment_uuids,
-            "sequence": self.last_50_sequence_uuids,
+            "action": self.action_history,
+            "experiment": self.experiment_history,
+            "sequence": self.sequence_history,
         }
 
-        if obj_uuid not in OBJ_MAP[obj_type]:
-            while len(OBJ_MAP[obj_type]) >= 50:
-                OBJ_MAP[obj_type].pop(0)
-            OBJ_MAP[obj_type].append(obj_uuid)
+        if obj_uuid_key in OBJ_MAP[obj_type].keys():
+            OBJ_MAP[obj_type][obj_uuid_key].update(obj_uuid_dict)
+        else:
+            OBJ_MAP[obj_type][obj_uuid_key] = obj_uuid_dict
 
-    def register_action_uuid(self, action_uuid):
+    def register_action_uuid(self, action_uuid, action_dict):
         """
         Registers a new action UUID in the list of the last 50 action UUIDs.
 
@@ -404,7 +401,7 @@ class Orch(Base):
         Args:
             action_uuid (str): The UUID of the action to be registered.
         """
-        self.register_obj_uuid(action_uuid, "action")
+        self.register_obj_uuid(action_uuid, action_dict, "action")
 
     def track_action_uuid(self, action_uuid):
         """
@@ -601,7 +598,41 @@ class Orch(Base):
             dict: A dictionary indicating the success of the operation.
         """
         # print(actionmodel.clean_dict())
-        self.register_action_uuid(actionmodel.action_uuid)
+        self.register_action_uuid(
+            actionmodel.action_uuid,
+            {
+                "action_name": actionmodel.action_name,
+                "action_status": actionmodel.action_status,
+                "action_server": actionmodel.action_server.server_name,
+                "action_timestamp": f"{actionmodel.action_timestamp: %m-%d %H:%M:%S}",
+                "action_finished_timestamp": (
+                    f"{actionmodel.action_finished_timestamp: %m-%d %H:%M:%S}"
+                    if actionmodel.action_finished_timestamp is not None
+                    else None
+                ),
+                "experiment_name": (
+                    self.active_experiment.experiment_name
+                    if self.active_experiment is not None
+                    else None
+                ),
+                "experiment_uuid": actionmodel.experiment_uuid,
+                "sequence_name": (
+                    self.active_sequence.sequence_name
+                    if self.active_sequence is not None
+                    else None
+                ),
+                "sequence_uuid": (
+                    self.active_sequence.sequence_uuid
+                    if self.active_sequence is not None
+                    else None
+                ),
+                "sequence_label": (
+                    self.active_sequence.sequence_label
+                    if self.active_sequence is not None
+                    else None
+                ),
+            },
+        )
         server_key = actionmodel.action_server.server_name
         server_exec_id = (server_key, actionmodel.exec_id, server_host, server_port)
         if "active" in actionmodel.action_status:
@@ -678,7 +709,51 @@ class Orch(Base):
             # update GlobalStatusModel with new ActionServerModel
             # and sort the new status dict
             if actionservermodel.last_action_uuid is not None:
-                self.register_action_uuid(actionservermodel.last_action_uuid)
+                # find last action uuid in action server model:
+                for (
+                    endpoint_name,
+                    endpoint_model,
+                ) in actionservermodel.endpoints.items():
+                    for status, act_dict in endpoint_model.nonactive_dict.items():
+                        for act_uuid, act_model in act_dict.items():
+                            if act_uuid == actionservermodel.last_action_uuid:
+                                self.register_action_uuid(
+                                    act_uuid,
+                                    {
+                                        "action_name": act_model.action_name,
+                                        "action_status": act_model.action_status,
+                                        "action_server": act_model.action_server.server_name,
+                                        "action_timestamp": f"{act_model.action_timestamp: %m-%d %H:%M:%S}",
+                                        "action_finished_timestamp": (
+                                            f"{act_model.action_finished_timestamp: %m-%d %H:%M:%S}"
+                                            if act_model.action_finished_timestamp
+                                            is not None
+                                            else None
+                                        ),
+                                        "experiment_name": (
+                                            self.active_experiment.experiment_name
+                                            if self.active_experiment is not None
+                                            else None
+                                        ),
+                                        "experiment_uuid": act_model.experiment_uuid,
+                                        "sequence_name": (
+                                            self.active_sequence.sequence_name
+                                            if self.active_sequence is not None
+                                            else None
+                                        ),
+                                        "sequence_label": (
+                                            self.active_sequence.sequence_label
+                                            if self.active_sequence is not None
+                                            else None
+                                        ),
+                                        "sequence_uuid": (
+                                            self.active_sequence.sequence_uuid
+                                            if self.active_sequence is not None
+                                            else None
+                                        ),
+                                    },
+                                )
+                                break
 
             recent_nonactive = self.globalstatusmodel.update_global_with_acts(
                 actionservermodel=actionservermodel
@@ -867,7 +942,6 @@ class Orch(Base):
             LOGGER.info("getting new sequence from sequence_dq")
             self.active_sequence = self.sequence_dq.popleft()
 
-            self.last_50_sequence_uuids.append(self.active_sequence.sequence_uuid)
             LOGGER.info(f"new active sequence is {self.active_sequence.sequence_name}")
             await self.put_lbuf(
                 {
@@ -881,8 +955,20 @@ class Orch(Base):
             self.active_sequence.simulation = self.world_cfg.get("simulation", "False")
             if self.active_sequence.run_type is None:
                 self.active_sequence.run_type = self.run_type
-            self.active_sequence.init_seq(time_offset=self.ntp_offset)
             self.active_sequence.orchestrator = self.server
+            self.active_sequence.init_seq(time_offset=self.ntp_offset)
+            self.register_obj_uuid(
+                self.active_sequence.sequence_uuid,
+                {
+                    "sequence_name": self.active_sequence.sequence_name,
+                    "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
+                    "sequence_status": "active",
+                    "sequence_label": self.active_sequence.sequence_label,
+                    "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
+                },
+                "sequence",
+            )
+            LOGGER.debug("registered sequence uuid: " + str(self.active_sequence.sequence_uuid))
 
             # from global params
             for k, v in self.active_sequence.from_global_seq_params.items():
@@ -1014,7 +1100,6 @@ class Orch(Base):
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
 
-        self.last_50_experiment_uuids.append(self.active_experiment.experiment_uuid)
         self.active_experiment.orch_key = self.orch_key
         self.active_experiment.orch_host = self.orch_host
         self.active_experiment.orch_port = self.orch_port
@@ -1061,6 +1146,18 @@ class Orch(Base):
             self.active_experiment.run_type = self.run_type
         self.active_experiment.orchestrator = self.server
         self.active_experiment.init_exp(time_offset=self.ntp_offset)
+        self.register_obj_uuid(
+            self.active_experiment.experiment_uuid,
+            {
+                "experiment_name": self.active_experiment.experiment_name,
+                "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
+                "experiment_status": "active",
+                "sequence_label": self.active_sequence.sequence_label,
+                "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
+            },
+            "experiment",
+        )
+        LOGGER.debug("registered experiment uuid: " + str(self.active_experiment.experiment_uuid))
 
         # attach run_id
         if self.active_run_id is not None:
@@ -1615,7 +1712,7 @@ class Orch(Base):
                     error_code = await self.loop_task_dispatch_action()
                     while (
                         self.last_dispatched_action_uuid
-                        not in self.last_50_action_uuids
+                        not in self.action_history.keys()
                     ):
                         await asyncio.sleep(0.2)
                     if self.action_dq and self.step_thru_actions:
@@ -2509,6 +2606,18 @@ class Orch(Base):
                     }
                 }
             )
+            self.register_obj_uuid(
+                self.active_sequence.sequence_uuid,
+                {
+                    "sequence_name": self.active_sequence.sequence_name,
+                    "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
+                    "sequence_finished_timestamp": f"{self.active_sequence.sequence_finished_timestamp: %m-%d %H:%M:%S}",
+                    "sequence_status": "finished",
+                    "sequence_label": self.active_sequence.sequence_label,
+                    "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
+                },
+                "sequence",
+            )
             self.active_sequence = None
             self.active_seq_exp_counter = 0
             self.globalstatusmodel.counter_dispatched_actions = {}
@@ -2596,6 +2705,19 @@ class Orch(Base):
             await self.write_exp(self.active_experiment)
 
             self.last_experiment = deepcopy(self.active_experiment)
+
+            self.register_obj_uuid(
+                self.active_experiment.experiment_uuid,
+                {
+                    "experiment_name": self.active_experiment.experiment_name,
+                    "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
+                    "experiment_finished_timestamp": f"{self.active_experiment.experiment_finished_timestamp: %m-%d %H:%M:%S}",
+                    "experiment_status": "finished",
+                    "sequence_label": self.active_sequence.sequence_label,
+                    "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
+                },
+                "experiment",
+            )
             self.active_experiment = None
 
             # DB server call to finish_yml if DB exists
@@ -2869,9 +2991,6 @@ class Orch(Base):
             "active_counter": self.active_seq_exp_counter,
             "last_act": self.last_action_uuid,
             "last_dispatched_act": self.last_dispatched_action_uuid,
-            "last_50_act_uuids": self.last_50_action_uuids,
-            "last_50_exp_uuids": self.last_50_experiment_uuids,
-            "last_50_seq_uuids": self.last_50_sequence_uuids,
             "global_status_model": self.globalstatusmodel,
         }
         if self.active_run_id is not None:
@@ -2906,7 +3025,6 @@ class Orch(Base):
         - active_seq_exp_counter
         - last_action_uuid
         - last_dispatched_action_uuid
-        - last_50_action_uuids
 
         Returns:
             str: The path to the pickle file used for restoring the queues.
@@ -2940,9 +3058,6 @@ class Orch(Base):
             self.active_seq_exp_counter = queue_dict["active_counter"]
             self.last_action_uuid = queue_dict["last_act"]
             self.last_dispatched_action_uuid = queue_dict["last_dispatched_act"]
-            self.last_50_action_uuids = queue_dict["last_50_act_uuids"]
-            self.last_50_experiment_uuids = queue_dict["last_50_exp_uuids"]
-            self.last_50_sequence_uuids = queue_dict["last_50_seq_uuids"]
             self.globalstatusmodel = queue_dict["globalstatusmodel"]
             self.active_run_id = queue_dict.get("active_run_id", None)
         return save_path

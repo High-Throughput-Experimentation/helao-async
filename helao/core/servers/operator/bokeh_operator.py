@@ -39,7 +39,6 @@ import builtins
 from helao.helpers import helao_logging as logging
 
 from helao.helpers.to_json import parse_bokeh_input
-from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.helpers.gen_uuid import md5_string
 from helao.core.servers.vis import Vis
 from helao.helpers.plate_api import HTEPlateAPI
@@ -168,8 +167,41 @@ class BokehOperator:
             k: [] for k in ["action_name", "action_server", "action_uuid"]
         }
 
-        self.active_action_lists = {
-            k: [] for k in ["action_name", "action_server", "action_uuid"]
+        self.action_history_lists = {
+            k: []
+            for k in [
+                "action_endpoint",
+                "action_status",
+                "action_uuid",
+                "experiment_name",
+                "sequence_label",
+                "start",
+                "finish",
+            ]
+        }
+        self.experiment_history_lists = {
+            k: []
+            for k in [
+                "experiment_name",
+                "experiment_uuid",
+                "experiment_status",
+                "sequence_label",
+                "campaign_name",
+                "start",
+                "finish",
+            ]
+        }
+        self.sequence_history_lists = {
+            k: []
+            for k in [
+                "sequence_name",
+                "sequence_uuid",
+                "sequence_status",
+                "sequence_label",
+                "campaign_name",
+                "start",
+                "finish",
+            ]
         }
 
         self.action_server_lists = {
@@ -212,7 +244,7 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.get_sequences))
         self.vis.doc.add_next_tick_callback(partial(self.get_experiments))
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
-        self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
+        self.vis.doc.add_next_tick_callback(partial(self.get_history))
         self.vis.doc.add_next_tick_callback(partial(self.get_orch_status_summary))
 
         self.experiment_plan_source, self.experiment_plan_table = self._make_table(
@@ -245,20 +277,34 @@ class BokehOperator:
             height_policy="min",
         )
 
-        self.active_action_source, self.active_action_table = self._make_table(
-            self.active_action_lists, fit_columns=False
+        self.action_history_source, self.action_history_table = self._make_table(
+            self.action_history_lists, fit_columns=True
+        )
+        self.experiment_history_source, self.experiment_history_table = self._make_table(
+            self.experiment_history_lists, fit_columns=True
+        )
+        self.sequence_history_source, self.sequence_history_table = self._make_table(
+            self.sequence_history_lists, fit_columns=True
         )
 
         self.planner_tab = TabPanel(
             child=self.experiment_plan_table,
-            title="Planned Experiments",
+            title="Plan",
         )
-        self.active_tab = TabPanel(
-            child=self.active_action_table,
-            title="Active Actions",
+        self.action_history_tab = TabPanel(
+            child=self.action_history_table,
+            title="Action History",
         )
-        self.planactive_tabs = Tabs(
-            tabs=[self.planner_tab, self.active_tab], height_policy="min"
+        self.experiment_history_tab = TabPanel(
+            child=self.experiment_history_table,
+            title="Experiment History",
+        )
+        self.sequence_history_tab = TabPanel(
+            child=self.sequence_history_table,
+            title="Sequence History",
+        )
+        self.planhistory_tabs = Tabs(
+            tabs=[self.planner_tab, self.action_history_tab, self.experiment_history_tab, self.sequence_history_tab], height_policy="min"
         )
 
         self.sequence_dropdown = Select(
@@ -697,7 +743,7 @@ class BokehOperator:
                                 height=15,
                             ),
                         ],
-                        [self.planactive_tabs],
+                        [self.planhistory_tabs],
                         [
                             Div(
                                 text="<b>Queues:</b>",
@@ -810,7 +856,7 @@ class BokehOperator:
             columns=columns,
             width=self.max_width - 20,
             height=200,
-            autosize_mode="force_fit",
+            autosize_mode="force_fit" if "fit_columns" not in extra_kwargs else "none",
             **extra_kwargs,
         )
         return source, table
@@ -1130,34 +1176,67 @@ class BokehOperator:
         self.action_source.data = self.action_lists
         # LOGGER.info(f"current queued actions: ({len(self.orch.action_dq)})")
 
-    async def get_active_actions(self):
-        """get action list from orch"""
-        actions = self.orch.list_active_actions()
-        for key in self.active_action_lists:
-            self.active_action_lists[key] = []
-        action_count = 0
-        for act in actions:
-            actdict = act.as_dict()
-            liquid_list, solid_list, gas_list = unpack_samples_helper(
-                samples=act.samples_in
-            )
-            # self.vis.print_message(
-            #     f"solids_in: {[s.get_global_label() for s in solid_list]}", sample=True
-            # )
-            self.active_action_lists["action_name"].append(
-                actdict.get("action_name", None)
-            )
-            self.active_action_lists["action_server"].append(
-                act.action_server.disp_name()
-            )
-            self.active_action_lists["action_uuid"].append(
-                actdict.get("action_uuid", None)
-            )
-            action_count += 1
+    async def get_history(self):
+        """get history from orch"""
+        for key in self.action_history_lists:
+            self.action_history_lists[key] = []
+        action_tups = sorted(self.orch.action_history.items(), key=lambda x: x[0])[::-1]
+        for actuuid, actdict in action_tups:
+            self.action_history_lists["action_uuid"].append(str(actuuid)[-8:])
+            self.action_history_lists["action_endpoint"].append(f"{actdict['action_server']}/{actdict['action_name']}")
+            self.action_history_lists["start"].append(actdict.get("action_timestamp", None))
+            self.action_history_lists["finish"].append(actdict.get("action_finished_timestamp", None))
+            for k in [
+                "action_status",
+                "experiment_name",
+                "sequence_label"
+            ]:
+                if k in actdict:
+                    self.action_history_lists[k].append(
+                        actdict[k][-1] if isinstance(actdict[k], list) else actdict[k]
+                    )
 
-        # self.active_action_source.stream(self.active_action_lists, rollover=action_count)
-        self.active_action_source.data = self.active_action_lists
-        # LOGGER.info(f"current active actions: {self.active_action_lists}")
+        for key in self.experiment_history_lists:
+            self.experiment_history_lists[key] = []
+        exp_tups = sorted(self.orch.experiment_history.items(), key=lambda x: x[0])[::-1]
+        LOGGER.debug(f"Experiment tuples: {exp_tups}")
+        for expuuid, expdict in exp_tups:
+            self.experiment_history_lists["experiment_uuid"].append(str(expuuid)[-8:])
+            self.experiment_history_lists["experiment_name"].append(expdict["experiment_name"])
+            self.experiment_history_lists["start"].append(expdict.get("experiment_timestamp", None))
+            self.experiment_history_lists["finish"].append(expdict.get("experiment_finished_timestamp", None))
+            for k in [
+                "experiment_status",
+                "sequence_label",
+                "campaign_name",
+            ]:
+                if k in expdict:
+                    self.experiment_history_lists[k].append(
+                        expdict[k][-1] if isinstance(expdict[k], list) else expdict[k]
+                    )
+
+        for key in self.sequence_history_lists:
+            self.sequence_history_lists[key] = []
+        seq_tups = sorted(self.orch.sequence_history.items(), key=lambda x: x[0])[::-1]
+        LOGGER.debug(f"Sequence tuples: {seq_tups}")
+        for sequuid, seqdict in seq_tups:
+            self.sequence_history_lists["sequence_uuid"].append(str(sequuid)[-8:])
+            self.sequence_history_lists["sequence_name"].append(seqdict["sequence_name"])
+            self.sequence_history_lists["start"].append(seqdict.get("sequence_timestamp", None))
+            self.sequence_history_lists["finish"].append(seqdict.get("sequence_finished_timestamp", None))
+            for k in [
+                "sequence_status",
+                "sequence_label",
+                "campaign_name",
+            ]:
+                if k in seqdict:
+                    self.sequence_history_lists[k].append(
+                        seqdict[k][-1] if isinstance(seqdict[k], list) else seqdict[k]
+                    )
+
+        self.action_history_source.data = self.action_history_lists
+        self.experiment_history_source.data = self.experiment_history_lists
+        self.sequence_history_source.data = self.sequence_history_lists
 
     async def get_orch_status_summary(self):
         for key in self.action_server_lists:
@@ -2027,7 +2106,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         await self.get_sequences()
         await self.get_experiments()
         await self.get_actions()
-        await self.get_active_actions()
+        await self.get_history()
         await self.get_orch_status_summary()
         self.update_queuecount_labels()
         for key in self.experiment_plan_lists:
