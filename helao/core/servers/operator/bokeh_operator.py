@@ -1637,13 +1637,14 @@ class BokehOperator:
                 code=f"""
 var value = input.value;
 var new_color = "black";
-if (value != '{def_val}') {{
+if (value !== '{def_val}') {{
     new_color = "red";
 }}
 input.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 """,
             )
             text_input.js_on_change("value_input", color_callback_js)
+            text_input.js_on_change("value", color_callback_js)
             param_input.append(text_input)
             argtype_list.append(argtypes[idx])
             param_layout.append(
