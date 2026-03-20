@@ -964,7 +964,7 @@ class Orch(Base):
                     "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
                     "sequence_status": "active",
                     "sequence_label": self.active_sequence.sequence_label,
-                    "campaign_name": self.active_sequence.campaign_name,
+                    "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
                 },
                 "sequence",
             )
@@ -1153,7 +1153,7 @@ class Orch(Base):
                 "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
                 "experiment_status": "active",
                 "sequence_label": self.active_sequence.sequence_label,
-                "campaign_name": self.active_sequence.campaign_name,
+                "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
             },
             "experiment",
         )
@@ -2614,7 +2614,7 @@ class Orch(Base):
                     "sequence_finished_timestamp": f"{self.active_sequence.sequence_finished_timestamp: %m-%d %H:%M:%S}",
                     "sequence_status": "finished",
                     "sequence_label": self.active_sequence.sequence_label,
-                    "campaign_name": self.active_sequence.campaign_name,
+                    "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
                 },
                 "sequence",
             )
@@ -2714,7 +2714,7 @@ class Orch(Base):
                     "experiment_finished_timestamp": f"{self.active_experiment.experiment_finished_timestamp: %m-%d %H:%M:%S}",
                     "experiment_status": "finished",
                     "sequence_label": self.active_sequence.sequence_label,
-                    "campaign_name": self.active_sequence.campaign_name,
+                    "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
                 },
                 "experiment",
             )

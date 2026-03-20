@@ -1206,7 +1206,8 @@ class BokehOperator:
             self.experiment_history_lists["finish"].append(expdict.get("experiment_finished_timestamp", None))
             for k in [
                 "experiment_status",
-                "sequence_label"
+                "sequence_label",
+                "campaign_name",
             ]:
                 if k in expdict:
                     self.experiment_history_lists[k].append(
@@ -1225,6 +1226,7 @@ class BokehOperator:
             for k in [
                 "sequence_status",
                 "sequence_label",
+                "campaign_name",
             ]:
                 if k in seqdict:
                     self.sequence_history_lists[k].append(
