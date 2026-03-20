@@ -168,7 +168,7 @@ class BokehOperator:
         }
 
         self.active_action_lists = {
-            k: [] for k in ["action_name", "action_server", "action_uuid"]
+            k: [] for k in ["action_name", "action_server", "action_uuid", "experiment_name", "sequence_name"]
         }
 
         self.action_server_lists = {
@@ -1144,13 +1144,19 @@ class BokehOperator:
             #     f"solids_in: {[s.get_global_label() for s in solid_list]}", sample=True
             # )
             self.active_action_lists["action_name"].append(
-                actdict.get("action_name", None)
+                actdict["action_name"]
             )
             self.active_action_lists["action_server"].append(
                 act.action_server.disp_name()
             )
             self.active_action_lists["action_uuid"].append(
-                actdict.get("action_uuid", None)
+                actdict["action_uuid"][:-8]
+            )
+            self.active_action_lists["experiment_name"].append(
+                self.orch.active_experiment.experiment_name
+            )
+            self.active_action_lists["sequence_name"].append(
+                self.orch.active_sequence.sequence_name
             )
             action_count += 1
 

@@ -2,7 +2,6 @@ __all__ = ["Base", "ActiveParams", "Active", "DummyBase"]
 
 from helao.helpers import helao_logging as logging
 
-LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from importlib.util import spec_from_file_location
 from importlib.util import module_from_spec
 from importlib.machinery import SourceFileLoader
@@ -13,9 +12,8 @@ import os
 import sys
 import pickle
 import pathlib
-from random import randint
 from socket import gethostname
-from time import ctime, time, time_ns, sleep, perf_counter_ns
+from time import time, time_ns, sleep, perf_counter_ns
 from typing import List, Dict, Optional, Union
 from uuid import UUID, uuid1
 from glob import glob
@@ -28,11 +26,9 @@ import aiodebug.hang_inspection
 import aiodebug.log_slow_callbacks
 import aiofiles
 import colorama
-import ntplib
 import numpy as np
 import pyzstd
 
-from filelock import FileLock
 from fastapi import WebSocket
 from fastapi.dependencies.utils import get_flat_params
 
@@ -76,11 +72,12 @@ from helao.core.models.file import (
     FileInfo,
     HloHeaderModel,
 )
-from helao.helpers.file_in_use import file_in_use
 from helao.core.error import ErrorCodes
 from helao.helpers import config_loader
 from helao.helpers.hlo_postprocessor import HloPostProcessor
+from helao.helpers.dequedict import DequeDict
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 CONFIG = config_loader.CONFIG
 
 # ANSI color codes converted to the Windows versions
@@ -240,7 +237,7 @@ class Base:
             )
 
         self.actives: Dict[UUID, Active] = {}
-        self.last_10_active = []
+        self.history = DequeDict(maxlen=200)  # store history of active actions (contained)
         self.executors = {}  # shortcut to running Executors
         # basemodel to describe the full action server
         self.actionservermodel = ActionServerModel(action_server=self.server)
@@ -649,10 +646,8 @@ class Base:
             self, activeparams=activeparams
         )
         await self.actives[activeparams.action.action_uuid].myinit()
-        l10 = copy(self.actives[activeparams.action.action_uuid])
-        if len(self.last_10_active) == 10:
-            _ = self.last_10_active.pop(0)
-        self.last_10_active.append((l10.action.action_uuid, l10))
+        cact = copy(self.actives[activeparams.action.action_uuid].action)
+        self.history[cact.action_uuid] = cact
         # register action_uuid in local action task queue
         return self.actives[activeparams.action.action_uuid]
 
@@ -2887,22 +2882,12 @@ class Active:
             try:
                 l10 = self.base.actives.pop(self.active_uuid, None)
                 if l10 is not None:
-                    i10 = [
-                        i
-                        for i, (x, _) in enumerate(self.base.last_10_active)
-                        if x == self.active_uuid
-                    ]
-                    if i10:
-                        self.base.last_10_active.pop(i10[0])
-                    if len(self.base.last_10_active) > 10:
-                        self.base.last_10_active.pop(0)
-                    self.base.last_10_active.append((l10.action.action_uuid, l10))
+                    self.base.history[l10.action.action_uuid] = copy(l10.action)
             except Exception:
                 LOGGER.error(
                     "Failed to remove active from base.actives or last_10_active",
                     exc_info=True,
                 )
-
             LOGGER.info("all active action are done, closing active")
 
             # DB server call to finish_yml if DB exists
