@@ -1635,12 +1635,11 @@ class BokehOperator:
             color_callback_js = CustomJS(
                 args=dict(input=text_input),
                 code=f"""
-var value = input.value;
 var new_color = "black";
-if (value !== '{def_val}') {{
+if (cb_obj.value_input !== '{def_val}') {{
     new_color = "red";
 }}
-input.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
+cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 """,
             )
             # text_input.js_on_change("value", color_callback_js)
