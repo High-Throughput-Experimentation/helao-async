@@ -1616,6 +1616,7 @@ class BokehOperator:
         argtype_list,
     ):
         item = 0
+
         for idx in range(len(args)):
             def_val = f"{defaults[idx]}"
             # if args[idx] == "experiment":
@@ -1641,7 +1642,7 @@ if (value === '{def_val}') {{
 }}
 """
             custom_js = CustomJS(args={"cb_obj": text_input}, code=color_default_js)
-            text_input.js_on_change("change", custom_js)
+            text_input.js_on_change("value", custom_js)
             param_input.append(text_input)
             argtype_list.append(argtypes[idx])
             param_layout.append(
