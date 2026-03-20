@@ -1636,7 +1636,7 @@ class BokehOperator:
                 args=dict(input=text_input),
                 code=f"""
 var value = input.value;
-var input_color = "red";
+var new_color = "red";
 if (value === '{def_val}') {{
     new_color = "black";
 }}
