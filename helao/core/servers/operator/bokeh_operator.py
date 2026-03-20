@@ -55,6 +55,7 @@ from bokeh.models import Select
 from bokeh.models import Button
 from bokeh.models import CheckboxGroup
 from bokeh.models import TabPanel, Tabs
+from bokeh.models import CustomJS
 from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.plotting import figure
@@ -1620,16 +1621,27 @@ class BokehOperator:
             # if args[idx] == "experiment":
             #     continue
             # disabled = False
-
-            param_input.append(
-                TextInput(
-                    value=def_val,
-                    title=args[idx],
-                    disabled=True if args[idx].endswith("_version") else False,
-                    width=400,
-                    height=40,
-                )
+            text_input = TextInput(
+                value=def_val,
+                title=args[idx],
+                disabled=True if args[idx].endswith("_version") else False,
+                width=400,
+                height=40,
             )
+            color_default_js = f"""
+var input_element = cb_obj.input_element;
+var value = cb_obj.value;
+
+if (value === '{def_val}') {{
+    // Black color for default values
+    input_element.style.color = 'black';
+}} else {{
+    // Red color for non-default values
+    input_element.style.color = 'red';
+}}
+"""
+            text_input.js_on_change("change", color_default_js)
+            param_input.append(text_input)
             argtype_list.append(argtypes[idx])
             param_layout.append(
                 layout(
