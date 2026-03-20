@@ -817,7 +817,6 @@ class BokehOperator:
             columns=columns,
             width=self.max_width - 20,
             height=200,
-            autosize_mode=extra_kwargs.get("autosize_mode", "force_fit"),
             **extra_kwargs,
         )
         return source, table
