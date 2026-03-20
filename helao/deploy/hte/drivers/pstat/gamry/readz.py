@@ -57,6 +57,7 @@ class ReadZ:
         self.z_expected = z_expected
         self.events = None
         self.counter = 0
+        self.stopping = False
 
     def init_pstat(self):
         try:
