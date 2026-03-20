@@ -955,6 +955,7 @@ class Orch(Base):
             self.active_sequence.simulation = self.world_cfg.get("simulation", "False")
             if self.active_sequence.run_type is None:
                 self.active_sequence.run_type = self.run_type
+            self.active_sequence.orchestrator = self.server
             self.active_sequence.init_seq(time_offset=self.ntp_offset)
             self.register_obj_uuid(
                 self.active_sequence.sequence_uuid,
@@ -967,7 +968,7 @@ class Orch(Base):
                 },
                 "sequence",
             )
-            self.active_sequence.orchestrator = self.server
+            LOGGER.warning("registered sequence uuid: " + str(self.active_sequence.sequence_uuid))
 
             # from global params
             for k, v in self.active_sequence.from_global_seq_params.items():
@@ -1156,6 +1157,7 @@ class Orch(Base):
             },
             "experiment",
         )
+        LOGGER.warning("registered experiment uuid: " + str(self.active_experiment.experiment_uuid))
 
         # attach run_id
         if self.active_run_id is not None:
