@@ -1630,18 +1630,20 @@ class BokehOperator:
                 disabled=True if args[idx].endswith("_version") else False,
                 width=400,
                 height=40,
-                stylesheets=initial_stylesheet
+                stylesheets=initial_stylesheet,
             )
-            color_callback_js = CustomJS(args=dict(input=text_input), code=f"""
+            color_callback_js = CustomJS(
+                args=dict(input=text_input),
+                code=f"""
 var value = input.value;
 var input_color = "red";
 if (value === '{def_val}') {{
     new_color = "black";
 }}
 input.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
-"""
+""",
             )
-            text_input.js_on_change("value", color_callback_js``)
+            text_input.js_on_change("value", color_callback_js)
             param_input.append(text_input)
             argtype_list.append(argtypes[idx])
             param_layout.append(
