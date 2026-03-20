@@ -110,8 +110,8 @@ class C_potvis:
         )
 
         self.button_stop_measure = Button(
-            label="Stop measurement",
-            button_type="danger",
+            label="Stopped",
+            button_type="primary",
             width=70,
         )
         self.button_stop_measure.on_event(ButtonClick, self.callback_stop_measure)
@@ -184,6 +184,8 @@ class C_potvis:
                 json_dict={},
             )
         )
+        self.button_stop_measure.label = "Stopped"
+        self.button_stop_measure.button_type = "primary"
 
     def cleanup_session(self, session_context):
         LOGGER.info(f"'{self.potentiostat_key}' Bokeh session closed")
@@ -358,6 +360,7 @@ class C_potvis:
                     self.xselect = self.xaxis_selector_group.active
                     self.yselect = self.yaxis_selector_group.active
                 self.button_stop_measure.label = f"Stop {action_name}"
+                self.button_stop_measure.button_type = "danger"
                 self._add_plots()
         if (self.xselect != self.xaxis_selector_group.active) or (
             self.yselect != self.yaxis_selector_group.active
