@@ -1630,18 +1630,17 @@ class BokehOperator:
                 height=40,
             )
             color_default_js = f"""
-var input_element = cb_obj.input_element;
 var value = cb_obj.value;
 
 if (value === '{def_val}') {{
     // Black color for default values
-    input_element.style.color = 'black';
+    cb_obj.style.color = 'black';
 }} else {{
     // Red color for non-default values
-    input_element.style.color = 'red';
+    cb_obj.style.color = 'red';
 }}
 """
-            custom_js = CustomJS(args={"cb_obj": text_input}, code=color_default_js)
+            custom_js = CustomJS(args={}, code=color_default_js)
             text_input.js_on_change("value", custom_js)
             param_input.append(text_input)
             argtype_list.append(argtypes[idx])
