@@ -1183,8 +1183,8 @@ class BokehOperator:
         for actuuid, actdict in action_tups:
             self.action_history_lists["action_uuid"].append(str(actuuid)[-8:])
             self.action_history_lists["action_endpoint"].append(f"{actdict['action_server']}/{actdict['action_name']}")
-            self.action_history_lists["start"].append(actdict["action_timestamp"])
-            self.action_history_lists["finish"].append(actdict["action_finished_timestamp"])
+            self.action_history_lists["start"].append(actdict.get("action_timestamp", None))
+            self.action_history_lists["finish"].append(actdict.get("action_finished_timestamp", None))
             for k in [
                 "action_status",
                 "experiment_name",
@@ -1200,8 +1200,8 @@ class BokehOperator:
         for expuuid, expdict in exp_tups:
             self.experiment_history_lists["experiment_uuid"].append(str(expuuid)[-8:])
             self.experiment_history_lists["experiment_name"].append(expdict["experiment_name"])
-            self.experiment_history_lists["start"].append(expdict["experiment_timestamp"])
-            self.experiment_history_lists["finish"].append(expdict["experiment_finished_timestamp"])
+            self.experiment_history_lists["start"].append(expdict.get("experiment_timestamp", None))
+            self.experiment_history_lists["finish"].append(expdict.get("experiment_finished_timestamp", None))
             for k in [
                 "experiment_status",
                 "sequence_label"
@@ -1216,8 +1216,8 @@ class BokehOperator:
         for sequuid, seqdict in seq_tups:
             self.sequence_history_lists["sequence_uuid"].append(str(sequuid)[-8:])
             self.sequence_history_lists["sequence_name"].append(seqdict["sequence_name"])
-            self.sequence_history_lists["start"].append(seqdict["sequence_timestamp"])
-            self.sequence_history_lists["finish"].append(seqdict["sequence_finished_timestamp"])
+            self.sequence_history_lists["start"].append(seqdict.get("sequence_timestamp", None))
+            self.sequence_history_lists["finish"].append(seqdict.get("sequence_finished_timestamp", None))
             for k in [
                 "sequence_status",
             ]:
