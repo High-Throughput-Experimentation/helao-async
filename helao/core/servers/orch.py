@@ -968,7 +968,7 @@ class Orch(Base):
                 },
                 "sequence",
             )
-            LOGGER.warning("registered sequence uuid: " + str(self.active_sequence.sequence_uuid))
+            LOGGER.debug("registered sequence uuid: " + str(self.active_sequence.sequence_uuid))
 
             # from global params
             for k, v in self.active_sequence.from_global_seq_params.items():
@@ -1157,7 +1157,7 @@ class Orch(Base):
             },
             "experiment",
         )
-        LOGGER.warning("registered experiment uuid: " + str(self.active_experiment.experiment_uuid))
+        LOGGER.debug("registered experiment uuid: " + str(self.active_experiment.experiment_uuid))
 
         # attach run_id
         if self.active_run_id is not None:
