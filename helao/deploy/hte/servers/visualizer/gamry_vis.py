@@ -357,6 +357,7 @@ class C_potvis:
                     )
                     self.xselect = self.xaxis_selector_group.active
                     self.yselect = self.yaxis_selector_group.active
+                self.button_stop_measure.label = f"Stop {action_name}"
                 self._add_plots()
         if (self.xselect != self.xaxis_selector_group.active) or (
             self.yselect != self.yaxis_selector_group.active
