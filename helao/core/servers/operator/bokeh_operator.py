@@ -1640,7 +1640,8 @@ if (value === '{def_val}') {{
     input_element.style.color = 'red';
 }}
 """
-            text_input.js_on_change("change", color_default_js)
+            custom_js = CustomJS(args={"cb_obj": text_input}, code=color)
+            text_input.js_on_change("change", custom_js)
             param_input.append(text_input)
             argtype_list.append(argtypes[idx])
             param_layout.append(
