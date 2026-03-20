@@ -604,6 +604,8 @@ class Orch(Base):
                 "action_name": actionmodel.action_name,
                 "action_status": actionmodel.action_status,
                 "action_server": actionmodel.action_server.server_name,
+                "action_timestamp": actionmodel.action_timestamp,
+                "action_finished_timestamp": actionmodel.action_finished_timestamp,
                 "experiment_name": self.active_experiment.experiment_name,
                 "experiment_uuid": actionmodel.experiment_uuid,
                 "sequence_name": self.active_sequence.sequence_name,
@@ -700,7 +702,14 @@ class Orch(Base):
                                     {
                                         "action_name": act_model.action_name,
                                         "action_status": act_model.action_status,
-                                        "action_server": actionservermodel.action_server.server_name,
+                                        "action_server": act_model.action_server.server_name,
+                                        "action_timestamp": act_model.action_timestamp,
+                                        "action_finished_timestamp": act_model.action_finished_timestamp,
+                                        "experiment_name": self.active_experiment.experiment_name,
+                                        "experiment_uuid": act_model.experiment_uuid,
+                                        "sequence_name": self.active_sequence.sequence_name,
+                                        "sequence_label": self.active_sequence.sequence_label,
+                                        "sequence_uuid": act_model.sequence_uuid,
                                     },
                                 )
                                 break
@@ -894,7 +903,9 @@ class Orch(Base):
 
             self.sequence_history[self.active_sequence.sequence_uuid] = {
                 "sequence_name": self.active_sequence.sequence_name,
-                "status": "active",
+                "sequence_label": self.active_sequence.sequence_label,
+                "sequence_timestamp": self.active_sequence.sequence_timestamp,
+                "sequence_status": "active",
             }
             LOGGER.info(f"new active sequence is {self.active_sequence.sequence_name}")
             await self.put_lbuf(
@@ -1044,7 +1055,9 @@ class Orch(Base):
 
         self.experiment_history[self.active_experiment.experiment_uuid] = {
             "experiment_name": self.active_experiment.experiment_name,
-            "status": "active",
+            "experiment_timestamp": self.active_experiment.experiment_timestamp,
+            "experiment_status": "active",
+            "sequence_label": self.active_sequence.sequence_label,
         }
         self.active_experiment.orch_key = self.orch_key
         self.active_experiment.orch_host = self.orch_host
@@ -2542,6 +2555,9 @@ class Orch(Base):
             )
             self.sequence_history[self.active_sequence.sequence_uuid] = {
                 "sequence_name": self.active_sequence.sequence_name,
+                "sequence_label": self.active_sequence.sequence_label,
+                "sequence_timestamp": self.active_sequence.sequence_timestamp,
+                "sequence_finished_timestamp": self.active_sequence.sequence_finished_timestamp,
                 "sequence_status": "finished",
             }
             self.active_sequence = None
@@ -2634,7 +2650,10 @@ class Orch(Base):
 
             self.experiment_history[self.active_experiment.experiment_uuid] = {
                 "experiment_name": self.active_experiment.experiment_name,
+                "experiment_timestamp": self.active_experiment.experiment_timestamp,
+                "experiment_finished_timestamp": self.active_experiment.experiment_finished_timestamp,
                 "experiment_status": "finished",
+                "sequence_label": self.active_sequence.sequence_label,
             }
             self.active_experiment = None
 
