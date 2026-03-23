@@ -776,7 +776,12 @@ def main():
                             pidd.kill_server(sn)
                             LAUNCH_LOGGER.info(f"Successfully closed {sn} process.")
                             cmd = ["python", f"{codeKey}_launcher.py", confArg, sn]
-                            p = subprocess.Popen(cmd, cwd=helao_repo_root)
+                            p = subprocess.Popen(
+                                cmd,
+                                cwd=helao_repo_root,
+                                stdout=sys.stdout,
+                                stderr=sys.stderr,
+                            )
                             ppid = p.pid
                             pidd.store_pid(sn, S["host"], S["port"], ppid)
                             if sg == "action":
