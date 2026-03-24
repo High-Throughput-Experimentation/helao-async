@@ -13,6 +13,7 @@ from helao.core.models.server import ActionServerModel
 from helao.core.models.orchstatus import LoopStatus
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
+from helao.core.runners.status_client import StatusClient, RESTReceiver
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 
@@ -59,6 +60,8 @@ class OrchAPI(HelaoFastAPI):
         self.drivers = tuple()
         self.driver = None
         self.poller = None
+        self.status_client = StatusClient(lambda: self.orch)
+        RESTReceiver(self.status_client).register(self)
 
         self.middleware("http")(_make_app_entry_middleware(server_key, lambda: self.orch))
         self.exception_handler(StarletteHTTPException)(
@@ -320,28 +323,6 @@ class OrchAPI(HelaoFastAPI):
                 str: The path to the pickle file used for restoring the queues.
             """
             return self.orch.import_queues(pck_path)
-
-        @self.post("/update_status", tags=["private"])
-        async def update_status(
-            actionservermodel: ActionServerModel = Body({}, embed=True),
-            regular_task: str = "false",
-        ):
-            """
-            Asynchronously updates the status of an action server.
-
-            Args:
-                actionservermodel (ActionServerModel, optional): The model containing the action server's status information. Defaults to an empty dictionary.
-
-            Returns:
-                bool: Returns False if the actionservermodel is None, otherwise returns the result of the orch's update_status method.
-            """
-            if actionservermodel is None:
-                return False
-            if regular_task == "false":
-                LOGGER.debug(
-                    f"orch '{self.orch.server.server_name}' got status from '{actionservermodel.action_server.server_name}': {actionservermodel.endpoints}"
-                )
-            return await self.orch.update_status(actionservermodel=actionservermodel)
 
         @self.post("/clear_actives", tags=["private"])
         async def clear_actives():
