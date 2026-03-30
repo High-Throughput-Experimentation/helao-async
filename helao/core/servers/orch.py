@@ -2813,6 +2813,20 @@ class Orch(Base):
         await self.detach_subscribers()
         self.status_logger.cancel()
         self.status_subscriber.cancel()
+        if any(
+            [
+                len(x) > 0
+                for x in (
+                    self.sequence_dq,
+                    self.experiment_dq,
+                    self.action_dq,
+                )
+            ]
+        ):
+            export_path = self.export_queues(timestamp_pck=False)
+            LOGGER.info(
+                f"Orch queues are not empty, exported queues to {export_path}"
+            )
 
     async def update_operator(self, msg):
         """
