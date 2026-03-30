@@ -3112,6 +3112,7 @@ class Orch(Base):
                 self.action_history = DequeDict(queue_dict.get("action_history", []), maxlen=1000)
                 self.experiment_history = DequeDict(queue_dict.get("experiment_history", []), maxlen=1000)
                 self.sequence_history = DequeDict(queue_dict.get("sequence_history", []), maxlen=1000)
+                self.update_status({})
             except Exception:
                 LOGGER.warning("Error restoring queues from pck. Check if pck is compatible.", exc_info=True)
         return save_path
