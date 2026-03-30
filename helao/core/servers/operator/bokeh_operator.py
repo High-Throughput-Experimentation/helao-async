@@ -27,6 +27,7 @@ import json
 import os
 import sys
 import importlib
+from enum import Enum
 from typing import List, Optional
 from pybase64 import b64decode
 from socket import gethostname
@@ -910,6 +911,7 @@ class BokehOperator:
             argspec = inspect.getfullargspec(func)
             tmpargs = list(argspec.args)
             tmpdefs = list(argspec.defaults or [])
+            tmpdefs = [x.value if isinstance(x, Enum) else x for x in tmpdefs]
             tmptypes = [argspec.annotations.get(k, "unspecified") for k in tmpargs]
 
             if filter_type is not None:
