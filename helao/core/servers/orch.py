@@ -3037,9 +3037,9 @@ class Orch(Base):
             "last_act": self.last_action_uuid,
             "last_dispatched_act": self.last_dispatched_action_uuid,
             "globalstatusmodel": self.globalstatusmodel,
-            "action_history": list(self.action_history),
-            "experiment_history": list(self.experiment_history),
-            "sequence_history": list(self.sequence_history),
+            "action_history": list(self.action_history.items()),
+            "experiment_history": list(self.experiment_history.items()),
+            "sequence_history": list(self.sequence_history.items()),
         }
         if self.active_run_id is not None:
             queue_dict["active_run_id"] = self.active_run_id
