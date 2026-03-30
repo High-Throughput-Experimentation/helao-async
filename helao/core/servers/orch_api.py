@@ -247,13 +247,13 @@ class OrchAPI(HelaoFastAPI):
             return list(self.orch.executors.keys())
 
         @self.post("/shutdown", tags=["private"])
-        def post_shutdown():
+        async def post_shutdown():
             """
             Handles the shutdown event by calling the shutdown_event function.
             This function is typically used to perform any necessary cleanup
             operations before the application is terminated.
             """
-            shutdown_event()
+            await shutdown_event()
 
         # --- ORCH-specific endpoints ---
         @self.post("/global_status", tags=["private"])
@@ -1209,7 +1209,7 @@ class OrchAPI(HelaoFastAPI):
             return finished_action.as_dict()
 
         @self.on_event("shutdown")
-        def shutdown_event():
+        async def shutdown_event():
             """
             Shuts down the operator and the Bokeh application.
 
@@ -1219,23 +1219,10 @@ class OrchAPI(HelaoFastAPI):
             3. Logs a message indicating that the orchestrator has shut down.
             4. Waits for 0.75 seconds to ensure all processes have terminated properly.
             """
-            if any(
-                [
-                    len(x) > 0
-                    for x in (
-                        self.orch.sequence_dq,
-                        self.orch.experiment_dq,
-                        self.orch.action_dq,
-                    )
-                ]
-            ):
-                export_path = self.orch.export_queues(timestamp_pck=False)
-                LOGGER.info(
-                    f"Orch queues are not empty, exported queues to {export_path}"
-                )
             LOGGER.info("Stopping operator")
             self.orch.bokehapp.stop()
             LOGGER.info("orch shutdown")
+            await self.orch.shutdown()
             time.sleep(0.75)
 
 
