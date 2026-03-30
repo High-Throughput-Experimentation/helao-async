@@ -223,9 +223,9 @@ class Orch(Base):
 
         # holder for tracking dispatched action in status
         self.last_dispatched_action_uuid = None
-        self.action_history = DequeDict(maxlen=200)
-        self.experiment_history = DequeDict(maxlen=200)
-        self.sequence_history = DequeDict(maxlen=200)
+        self.action_history = DequeDict(maxlen=1000)
+        self.experiment_history = DequeDict(maxlen=1000)
+        self.sequence_history = DequeDict(maxlen=1000)
         self.last_action_uuid = ""
         self.last_interrupt = time.time()
         # hold schema objects
@@ -598,6 +598,15 @@ class Orch(Base):
             dict: A dictionary indicating the success of the operation.
         """
         # print(actionmodel.clean_dict())
+
+        if (
+            self.active_experiment is not None
+            and self.active_experiment.experiment_uuid
+            == actionmodel.experiment_uuid
+        ):
+            matching_experiment = True
+        else:
+            matching_experiment = False
         self.register_action_uuid(
             actionmodel.action_uuid,
             {
@@ -612,23 +621,26 @@ class Orch(Base):
                 ),
                 "experiment_name": (
                     self.active_experiment.experiment_name
-                    if self.active_experiment is not None
+                    if matching_experiment
                     else None
                 ),
                 "experiment_uuid": actionmodel.experiment_uuid,
                 "sequence_name": (
                     self.active_sequence.sequence_name
                     if self.active_sequence is not None
-                    else None
-                ),
-                "sequence_uuid": (
-                    self.active_sequence.sequence_uuid
-                    if self.active_sequence is not None
+                    and matching_experiment
                     else None
                 ),
                 "sequence_label": (
                     self.active_sequence.sequence_label
                     if self.active_sequence is not None
+                    and matching_experiment
+                    else None
+                ),
+                "sequence_uuid": (
+                    self.active_sequence.sequence_uuid
+                    if self.active_sequence is not None
+                    and matching_experiment
                     else None
                 ),
             },
@@ -716,7 +728,15 @@ class Orch(Base):
                 ) in actionservermodel.endpoints.items():
                     for status, act_dict in endpoint_model.nonactive_dict.items():
                         for act_uuid, act_model in act_dict.items():
-                            if act_uuid == actionservermodel.last_action_uuid:
+                            if act_uuid in self.action_history:
+                                if (
+                                    self.active_experiment is not None
+                                    and self.active_experiment.experiment_uuid
+                                    == act_model.experiment_uuid
+                                ):
+                                    matching_experiment = True
+                                else:
+                                    matching_experiment = False
                                 self.register_action_uuid(
                                     act_uuid,
                                     {
@@ -732,23 +752,26 @@ class Orch(Base):
                                         ),
                                         "experiment_name": (
                                             self.active_experiment.experiment_name
-                                            if self.active_experiment is not None
+                                            if matching_experiment
                                             else None
                                         ),
                                         "experiment_uuid": act_model.experiment_uuid,
                                         "sequence_name": (
                                             self.active_sequence.sequence_name
                                             if self.active_sequence is not None
+                                            and matching_experiment
                                             else None
                                         ),
                                         "sequence_label": (
                                             self.active_sequence.sequence_label
                                             if self.active_sequence is not None
+                                            and matching_experiment
                                             else None
                                         ),
                                         "sequence_uuid": (
                                             self.active_sequence.sequence_uuid
                                             if self.active_sequence is not None
+                                            and matching_experiment
                                             else None
                                         ),
                                     },
@@ -964,11 +987,17 @@ class Orch(Base):
                     "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
                     "sequence_status": "active",
                     "sequence_label": self.active_sequence.sequence_label,
-                    "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
+                    "campaign_name": (
+                        self.active_sequence.campaign_name
+                        if self.active_sequence.campaign_name
+                        else None
+                    ),
                 },
                 "sequence",
             )
-            LOGGER.debug("registered sequence uuid: " + str(self.active_sequence.sequence_uuid))
+            LOGGER.debug(
+                "registered sequence uuid: " + str(self.active_sequence.sequence_uuid)
+            )
 
             # from global params
             for k, v in self.active_sequence.from_global_seq_params.items():
@@ -1153,11 +1182,17 @@ class Orch(Base):
                 "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
                 "experiment_status": "active",
                 "sequence_label": self.active_sequence.sequence_label,
-                "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
+                "campaign_name": (
+                    self.active_sequence.campaign_name
+                    if self.active_sequence.campaign_name
+                    else None
+                ),
             },
             "experiment",
         )
-        LOGGER.debug("registered experiment uuid: " + str(self.active_experiment.experiment_uuid))
+        LOGGER.debug(
+            "registered experiment uuid: " + str(self.active_experiment.experiment_uuid)
+        )
 
         # attach run_id
         if self.active_run_id is not None:
@@ -1708,7 +1743,7 @@ class Orch(Base):
                 ):
                     await self.stop_loop()
                 elif self.action_dq:
-                    LOGGER.info("!!!dispatching next action")
+                    LOGGER.info("!!!checking conditions for next action")
                     error_code = await self.loop_task_dispatch_action()
                     while (
                         self.last_dispatched_action_uuid
@@ -2614,7 +2649,11 @@ class Orch(Base):
                     "sequence_finished_timestamp": f"{self.active_sequence.sequence_finished_timestamp: %m-%d %H:%M:%S}",
                     "sequence_status": "finished",
                     "sequence_label": self.active_sequence.sequence_label,
-                    "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
+                    "campaign_name": (
+                        self.active_sequence.campaign_name
+                        if self.active_sequence.campaign_name
+                        else None
+                    ),
                 },
                 "sequence",
             )
@@ -2714,7 +2753,11 @@ class Orch(Base):
                     "experiment_finished_timestamp": f"{self.active_experiment.experiment_finished_timestamp: %m-%d %H:%M:%S}",
                     "experiment_status": "finished",
                     "sequence_label": self.active_sequence.sequence_label,
-                    "campaign_name": self.active_sequence.campaign_name if self.active_sequence.campaign_name else None,
+                    "campaign_name": (
+                        self.active_sequence.campaign_name
+                        if self.active_sequence.campaign_name
+                        else None
+                    ),
                 },
                 "experiment",
             )
@@ -2992,6 +3035,9 @@ class Orch(Base):
             "last_act": self.last_action_uuid,
             "last_dispatched_act": self.last_dispatched_action_uuid,
             "global_status_model": self.globalstatusmodel,
+            "action_history": list(self.action_history),
+            "experiment_history": list(self.experiment_history),
+            "sequence_history": list(self.sequence_history),
         }
         if self.active_run_id is not None:
             queue_dict["active_run_id"] = self.active_run_id
@@ -3060,4 +3106,7 @@ class Orch(Base):
             self.last_dispatched_action_uuid = queue_dict["last_dispatched_act"]
             self.globalstatusmodel = queue_dict["globalstatusmodel"]
             self.active_run_id = queue_dict.get("active_run_id", None)
+            self.action_history = DequeDict(queue_dict.get("action_history", []), maxlen=1000)
+            self.experiment_history = DequeDict(queue_dict.get("experiment_history", []), maxlen=1000)
+            self.sequence_history = DequeDict(queue_dict.get("sequence_history", []), maxlen=1000)
         return save_path
