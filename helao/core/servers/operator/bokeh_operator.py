@@ -931,7 +931,10 @@ class BokehOperator:
             tmpdefs = [cfg_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
             for t in tmpdefs:
                 try:
-                    t = json.dumps(t)
+                    if isinstance(t, Enum):
+                        t = json.dumps(t.value)
+                    else:
+                        t = json.dumps(t)
                 except Exception:
                     t = ""
             items.append(
