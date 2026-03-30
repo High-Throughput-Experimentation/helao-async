@@ -3090,25 +3090,28 @@ class Orch(Base):
         if self.sequence_dq or self.experiment_dq or self.action_dq:
             LOGGER.info("Existing queues are not empty. Cannot restore.")
         else:
-            LOGGER.info("Restoring queues from saved pck.")
-            for x in queue_dict["act"]:
-                self.action_dq.append(x)
-            for x in queue_dict["exp"]:
-                self.experiment_dq.append(x)
-            for x in queue_dict["seq"]:
-                if len(self.sequence_dq) == 0:
-                    self.active_run_id = gen_uuid()
-                self.sequence_dq.append(x)
-            self.active_experiment = queue_dict["active_exp"]
-            self.last_experiment = queue_dict["last_exp"]
-            self.active_sequence = queue_dict["active_seq"]
-            self.last_sequence = queue_dict["last_seq"]
-            self.active_seq_exp_counter = queue_dict["active_counter"]
-            self.last_action_uuid = queue_dict["last_act"]
-            self.last_dispatched_action_uuid = queue_dict["last_dispatched_act"]
-            self.globalstatusmodel = queue_dict["globalstatusmodel"]
-            self.active_run_id = queue_dict.get("active_run_id", None)
-            self.action_history = DequeDict(queue_dict.get("action_history", []), maxlen=1000)
-            self.experiment_history = DequeDict(queue_dict.get("experiment_history", []), maxlen=1000)
-            self.sequence_history = DequeDict(queue_dict.get("sequence_history", []), maxlen=1000)
+            try:
+                LOGGER.info("Restoring queues from saved pck.")
+                for x in queue_dict["act"]:
+                    self.action_dq.append(x)
+                for x in queue_dict["exp"]:
+                    self.experiment_dq.append(x)
+                for x in queue_dict["seq"]:
+                    if len(self.sequence_dq) == 0:
+                        self.active_run_id = gen_uuid()
+                    self.sequence_dq.append(x)
+                self.active_experiment = queue_dict["active_exp"]
+                self.last_experiment = queue_dict["last_exp"]
+                self.active_sequence = queue_dict["active_seq"]
+                self.last_sequence = queue_dict["last_seq"]
+                self.active_seq_exp_counter = queue_dict["active_counter"]
+                self.last_action_uuid = queue_dict["last_act"]
+                self.last_dispatched_action_uuid = queue_dict["last_dispatched_act"]
+                self.globalstatusmodel = queue_dict["globalstatusmodel"]
+                self.active_run_id = queue_dict.get("active_run_id", None)
+                self.action_history = DequeDict(queue_dict.get("action_history", []), maxlen=1000)
+                self.experiment_history = DequeDict(queue_dict.get("experiment_history", []), maxlen=1000)
+                self.sequence_history = DequeDict(queue_dict.get("sequence_history", []), maxlen=1000)
+            except Exception:
+                LOGGER.warning("Error restoring queues from pck. Check if pck is compatible.", exc_info=True)
         return save_path
