@@ -3036,7 +3036,7 @@ class Orch(Base):
             "active_counter": self.active_seq_exp_counter,
             "last_act": self.last_action_uuid,
             "last_dispatched_act": self.last_dispatched_action_uuid,
-            "global_status_model": self.globalstatusmodel,
+            "globalstatusmodel": self.globalstatusmodel,
             "action_history": list(self.action_history),
             "experiment_history": list(self.experiment_history),
             "sequence_history": list(self.sequence_history),
