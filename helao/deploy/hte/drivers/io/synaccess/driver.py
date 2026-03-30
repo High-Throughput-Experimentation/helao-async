@@ -42,12 +42,13 @@ class NetbooterDriver(HelaoDriver):
             self.client = httpx.Client(auth=self.auth, timeout=30.0)
             self.host_url = f"http://{hostname}/cmd.cgi?"
 
-    def switch_outlet(self, outlet_number: int, on: bool):
-        resp = self.client.get(f"{self.host_url}$A3%20{outlet_number:d}%20{on:d}")
-        if resp.status_code == 200:
-            return DriverResponse(
-                response=DriverResponseType.success,
-                message=f"switched outlet {outlet_number:d} {'on' if on else 'off'}",
+    def switch_outlet(self, outlet_number: int, on: bool, repeat: int = 5):
+        for _ in range(repeat):
+            resp = self.client.get(f"{self.host_url}$A3%20{outlet_number:d}%20{on:d}")
+            if resp.status_code == 200:
+                return DriverResponse(
+                    response=DriverResponseType.success,
+                    message=f"switched outlet {outlet_number:d} {'on' if on else 'off'}",
                 status=DriverStatus.ok,
             )
         return DriverResponse(
@@ -56,12 +57,13 @@ class NetbooterDriver(HelaoDriver):
             status=DriverStatus.error,
         )
 
-    def switch_all(self, on: bool):
-        resp = self.client.get(f"{self.host_url}$A7%20{on:d}")
-        if resp.status_code == 200:
-            return DriverResponse(
-                response=DriverResponseType.success,
-                message=f"switched all outlets {'on' if on else 'off'}",
+    def switch_all(self, on: bool, repeat: int = 5):
+        for _ in range(repeat):
+            resp = self.client.get(f"{self.host_url}$A7%20{on:d}")
+            if resp.status_code == 200:
+                return DriverResponse(
+                    response=DriverResponseType.success,
+                    message=f"switched all outlets {'on' if on else 'off'}",
                 status=DriverStatus.ok,
             )
         return DriverResponse(
