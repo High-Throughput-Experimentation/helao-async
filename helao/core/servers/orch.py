@@ -357,6 +357,8 @@ class Orch(Base):
         self.heartbeat_monitor = asyncio.create_task(self.active_action_monitor())
         self.driver_monitor = asyncio.create_task(self.action_server_monitor())
 
+        self.import_queues()
+
     # def endpoint_queues_init(self):
     #     """
     #     Initializes endpoint queues for the server.
