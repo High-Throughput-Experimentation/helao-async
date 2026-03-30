@@ -1136,7 +1136,7 @@ def ADSS_sub_CV(
     previous_liquid_injected: str = "",
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here",
-    run_use: RunUse = "data",
+    run_use: RunUse = RunUse.data,
 ):
 
     washmod = washmod_in
@@ -1298,7 +1298,7 @@ def ADSS_sub_OCV(
     amplitude_threshold: float = 0.05,
     bubble_pump_reverse_time_s: float = 15,
     bubble_pump_forward_time_s: float = 10,
-    run_use: RunUse = "data",
+    run_use: RunUse = RunUse.data,
 ):
 
     washmod = washmod_in
