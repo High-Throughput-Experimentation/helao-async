@@ -728,7 +728,7 @@ class Orch(Base):
                 ) in actionservermodel.endpoints.items():
                     for status, act_dict in endpoint_model.nonactive_dict.items():
                         for act_uuid, act_model in act_dict.items():
-                            if act_uuid in self.action_history:
+                            if act_uuid in self.action_history.keys():
                                 if (
                                     self.active_experiment is not None
                                     and self.active_experiment.experiment_uuid
