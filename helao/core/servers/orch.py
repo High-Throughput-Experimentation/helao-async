@@ -976,8 +976,8 @@ class Orch(Base):
                     }
                 }
             )
-            self.active_sequence.dummy = self.world_cfg.get("dummy", "False")
-            self.active_sequence.simulation = self.world_cfg.get("simulation", "False")
+            self.active_sequence.dummy = self.world_cfg.get("dummy", False)
+            self.active_sequence.simulation = self.world_cfg.get("simulation", False)
             if self.active_sequence.run_type is None:
                 self.active_sequence.run_type = self.run_type
             self.active_sequence.orchestrator = self.server
@@ -1171,8 +1171,8 @@ class Orch(Base):
                 }
             }
         )
-        self.active_experiment.dummy = self.world_cfg.get("dummy", "False")
-        self.active_experiment.simulation = self.world_cfg.get("simulation", "False")
+        self.active_experiment.dummy = self.world_cfg.get("dummy", False)
+        self.active_experiment.simulation = self.world_cfg.get("simulation", False)
         if self.active_experiment.run_type is None:
             self.active_experiment.run_type = self.run_type
         self.active_experiment.orchestrator = self.server
