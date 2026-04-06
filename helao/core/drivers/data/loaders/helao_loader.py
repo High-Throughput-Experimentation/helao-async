@@ -199,18 +199,18 @@ class HelaoLoader:
 
     def __del__(self):
         self.cli.close()
-        self.tunnel.stop()
+        # self.tunnel.stop()
 
     def connect(self):
         self.hcred = HelaoCredentials(_env_file=self.env_file)
-        self.tunnel = sshtunnel.SSHTunnelForwarder(
-            self.hcred.JUMPBOX_HOST,
-            ssh_username=self.hcred.JUMPBOX_USER,
-            ssh_pkey=self.hcred.JUMPBOX_KEYFILE,
-            remote_bind_address=(self.hcred.API_HOST, int(self.hcred.API_PORT)),
-        )
-        self.tunnel.start()
-        self.hcred.set_api_port(self.tunnel.local_bind_port)
+        # self.tunnel = sshtunnel.SSHTunnelForwarder(
+        #     self.hcred.JUMPBOX_HOST,
+        #     ssh_username=self.hcred.JUMPBOX_USER,
+        #     ssh_pkey=self.hcred.JUMPBOX_KEYFILE,
+        #     remote_bind_address=(self.hcred.API_HOST, int(self.hcred.API_PORT)),
+        # )
+        # self.tunnel.start()
+        # self.hcred.set_api_port(self.tunnel.local_bind_port)
         self.sess = boto3.Session(
             aws_access_key_id=self.hcred.AWS_ACCESS_KEY_ID.get_secret_value(),
             aws_secret_access_key=self.hcred.AWS_SECRET_ACCESS_KEY.get_secret_value(),
@@ -224,7 +224,7 @@ class HelaoLoader:
     def reconnect(self):
         try:
             self.cli.close()
-            self.tunnel.stop()
+            # self.tunnel.stop()
         except Exception as e:
             print(f"!!! Error closing tunnel: {e}")
         finally:
