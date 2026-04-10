@@ -311,7 +311,7 @@ class Galil:
                 activeDict = A.as_dict()
             else:
                 self.blocked = True
-                self.aligner_plateid = A.action_params["plateid"]
+                self.aligner_plateid = A.action_params["plateid_or_pmpath"]
                 # A.error_code = ErrorCodes.none
                 self.aligner_active = await self.base.contain_action(
                     ActiveParams(
