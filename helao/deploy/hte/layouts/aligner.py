@@ -4,14 +4,13 @@ import json
 import os
 from socket import gethostname
 from functools import partial
-import traceback
 
 import numpy as np
 
 from bokeh.models import ColumnDataSource
-from bokeh.models.widgets import Paragraph
+from bokeh.models import Paragraph
 from bokeh.plotting import figure
-from bokeh.models.widgets import Div
+from bokeh.models import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import (
     Button,
@@ -25,7 +24,7 @@ from bokeh.events import ButtonClick, DoubleTap, MouseWheel, Pan
 
 # from bokeh.models import TapTool, PanTool
 from bokeh.layouts import gridplot
-from bokeh.models.widgets import FileInput
+from bokeh.models import FileInput
 
 from helao.helpers import helao_logging as logging
 from helao.core.servers.vis import Vis
@@ -289,7 +288,7 @@ class Aligner:
                                     self.calib_ymotor[0],
                                 ],
                                 Spacer(height=10),
-                                Spacer(height=5, background=(0, 0, 0)),
+                                Spacer(height=5),
                                 [
                                     [Spacer(height=20), self.calib_pt_del_button[1]],
                                     Spacer(width=10),
@@ -299,7 +298,7 @@ class Aligner:
                                     self.calib_ymotor[1],
                                 ],
                                 Spacer(height=10),
-                                Spacer(height=5, background=(0, 0, 0)),
+                                Spacer(height=5),
                                 [
                                     [Spacer(height=20), self.calib_pt_del_button[2]],
                                     Spacer(width=10),
@@ -506,7 +505,9 @@ class Aligner:
         self.motor_mousemove_check = CheckboxGroup(
             labels=["Mouse control motor"], width=40, active=[]
         )
-        self.motor_mousemove_check.on_click(partial(self.clicked_motor_mousemove_check))
+        self.motor_mousemove_check.on_change(
+            "active", partial(self.clicked_motor_mousemove_check)
+        )
 
         self.calib_file_input = FileInput(width=150, accept=".json")
         self.calib_file_input.on_change("value", self.callback_calib_file_input)
@@ -713,7 +714,6 @@ class Aligner:
             y_axis_label="Y (mm)",
             width=self.totalwidth,
             aspect_ratio=6 / 4,  # 1,
-            aspect_scale=1,
         )
 
         self.plot_mpmap.square(
@@ -803,11 +803,11 @@ class Aligner:
             )
         )
         self.vis.doc.add_root(
-            Spacer(height=5, width=self.totalwidth, background=(0, 0, 0))
+            Spacer(height=5, width=self.totalwidth)
         )
         self.vis.doc.add_root(self.layout_markers)
         self.vis.doc.add_root(
-            Spacer(height=5, width=self.totalwidth, background=(0, 0, 0))
+            Spacer(height=5, width=self.totalwidth)
         )
         self.vis.doc.add_root(self.plot_mpmap)
         self.vis.doc.add_root(self.divmanual)
@@ -863,7 +863,7 @@ class Aligner:
             )
         )
 
-    def clicked_motor_mousemove_check(self, new):
+    def clicked_motor_mousemove_check(self, attr, old, new):
         if new:
             self.mouse_control = True
         else:
@@ -874,9 +874,8 @@ class Aligner:
             filecontent = base64.b64decode(new.encode("ascii")).decode("ascii")
             try:
                 new_matrix = np.matrix(json.loads(filecontent))
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"error loading matrix ", exc_info=True)
+            except Exception:
+                LOGGER.error("error loading matrix", exc_info=True)
                 new_matrix = self.motor.dflt_matrix
 
             LOGGER.info(f"loaded matrix \n'{new_matrix}'")
@@ -1355,13 +1354,12 @@ class Aligner:
 
         try:
             M = np.dot(A, B.I)
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+        except Exception:
             # should not happen when all xyplate coordinates are unique
             # (previous function removes all duplicate xyplate points)
             # but can still produce a not valid Matrix
             # as xymotor plates might not be unique/faulty
-            LOGGER.error(f"Matrix singular ", exc_info=True)
+            LOGGER.error("Matrix singular", exc_info=True)
             M = TransferMatrix
         return M
 
@@ -1511,9 +1509,8 @@ class Aligner:
                         self.g_motor_ismoving = True
 
                 self.motorpos_q.task_done()
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"aligner IOloop error: ", exc_info=True)
+            except Exception:
+                LOGGER.error("aligner IOloop error", exc_info=True)
 
     def IOloop_helper(self):
         self.motor_readxmotor_text.value = (str)(self.g_motor_position[0])
