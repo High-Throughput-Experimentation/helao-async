@@ -1186,7 +1186,7 @@ class Aligner:
                     self.motor.aligner_plateid
                 )
             elif isinstance(self.motor.aligner_plateid, str):
-                self.pmdata = self.dataAPI.legacy_api.readsingleplatemaptxt(
+                self.pmdata, _ = self.dataAPI.legacy_api.readsingleplatemaptxt(
                     self.motor.aligner_plateid.strip("'").strip('"')
                 )
             if self.pmdata:
