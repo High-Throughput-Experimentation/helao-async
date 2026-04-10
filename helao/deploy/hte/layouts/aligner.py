@@ -802,13 +802,9 @@ class Aligner:
                 ]
             )
         )
-        self.vis.doc.add_root(
-            Spacer(height=5, width=self.totalwidth)
-        )
+        self.vis.doc.add_root(Spacer(height=5, width=self.totalwidth))
         self.vis.doc.add_root(self.layout_markers)
-        self.vis.doc.add_root(
-            Spacer(height=5, width=self.totalwidth)
-        )
+        self.vis.doc.add_root(Spacer(height=5, width=self.totalwidth))
         self.vis.doc.add_root(self.plot_mpmap)
         self.vis.doc.add_root(self.divmanual)
 
@@ -1184,7 +1180,15 @@ class Aligner:
     async def get_pm(self):
         """gets plate map"""
         if self.motor.aligning_enabled:
-            self.pmdata = self.dataAPI.get_platemap_plateid(self.motor.aligner_plateid)
+
+            if isinstance(self.motor.aligner_plateid, int):
+                self.pmdata = self.dataAPI.get_platemap_plateid(
+                    self.motor.aligner_plateid
+                )
+            elif isinstance(self.motor.aligner_plateid, str):
+                self.pmdata = self.dataAPI.legacy_api.readsingleplatemaptxt(
+                    self.motor.aligner_plateid.strip("'").strip('"')
+                )
             if self.pmdata:
                 self.vis.doc.add_next_tick_callback(
                     partial(self.update_pm_plot_title, self.motor.aligner_plateid)
