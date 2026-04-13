@@ -139,8 +139,6 @@ def UVIS_R_shutoff(
 def UVIS_GAIA_preset(
     sequence_version: int = 5,
     plate_id: int = 1,
-    # plate_sample_no_list: list = [2],
-    # reference_after_sample_list: list = [],
     reference_mode: str = "builtin",
     custom_position: str = "cell1_we",
     spec_n_avg: int = 30,
@@ -177,7 +175,7 @@ def UVIS_GAIA_preset(
         25285,
         27330,
     ]
-    REF = [14143, 27730]
+    REF = [14143, 27330]
     REMAP = [
         13977,
         13993,
