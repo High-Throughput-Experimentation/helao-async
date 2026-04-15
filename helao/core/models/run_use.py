@@ -15,3 +15,5 @@ class RunUse(str, Enum):
     pre_anneal = "pre_anneal"
     post_anneal = "post_anneal"
     shutter_closed = "shutter_closed"
+    izero = "izero"
+    energy_calib = "energy_calib"
