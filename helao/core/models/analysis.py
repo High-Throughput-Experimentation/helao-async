@@ -46,7 +46,7 @@ class AnalysisOutputModel(BaseModel, HelaoDict):
     output_type: str
     output_keys: Optional[List[str]] = None
     output_name: Optional[str] = None
-    output: Optional[Dict[str, Union[float, str, bool, int, None]]] = None
+    output: Optional[Dict[str, Union[float, str, bool, int, list, dict, None]]] = None
 
 
 class AnalysisModel(ShortAnalysisModel):
