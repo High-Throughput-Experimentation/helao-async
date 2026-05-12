@@ -15,6 +15,7 @@ from .sample import (
     GasSample,
     SolidSample,
     NoneSample,
+    SampleModel
 )
 from .file import FileInfo
 from .machine import MachineModel
@@ -127,10 +128,10 @@ class ActionModel(ShortActionModel):
     parent_action_uuid: Optional[UUID] = None
     child_action_uuid: Optional[UUID] = None
     samples_in: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample, SampleModel]
     ] = Field(default=[])
     samples_out: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample, SampleModel]
     ] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     manual_action: bool = False

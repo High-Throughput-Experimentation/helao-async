@@ -14,6 +14,7 @@ from .sample import (
     GasSample,
     SolidSample,
     NoneSample,
+    SampleModel
 )
 from .action import ShortActionModel
 from .file import FileInfo
@@ -102,10 +103,10 @@ class ExperimentModel(ShortExperimentModel):
     planned_actions: list = []
     dispatched_actions_abbr: List[ShortActionModel] = Field(default=[])
     samples_in: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample, SampleModel]
     ] = Field(default=[])
     samples_out: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample, SampleModel]
     ] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     aux_files: List[str] = Field(default=[])
