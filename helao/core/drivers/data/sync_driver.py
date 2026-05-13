@@ -792,6 +792,8 @@ class Progress:
             self.write_dict()
         else:
             self.read_dict()
+            if not hasattr(self, "yml"):
+                self.ymlpath = Path(self.dict["yml"])
 
     @property
     def yml(self):
