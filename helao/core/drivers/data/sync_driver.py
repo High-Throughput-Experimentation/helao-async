@@ -52,6 +52,7 @@ from helao.helpers.read_hlo import read_hlo
 from helao.helpers.parquet import hlo_to_parquet
 from helao.helpers.yml_tools import yml_dumps, yml_load
 from helao.helpers.zip_dir import zip_dir
+from helao.core.models.helaodirs import HelaoDirs
 
 from time import sleep
 from glob import glob
@@ -890,86 +891,9 @@ class Progress:
         self.prg.unlink()
 
 
-class HelaoSyncer:
-    """
-    HelaoSyncer is a class responsible for synchronizing YAML files to S3 and an API.
-    It manages tasks, handles file uploads, and ensures data consistency across different storage systems.
+class SyncDriver:
 
-    Attributes:
-        progress (Dict[str, Progress]): A dictionary to track the progress of tasks.
-        base (Base): The base server instance.
-        running_tasks (dict): A dictionary to keep track of currently running tasks.
-        config_dict (dict): Configuration parameters for the syncer.
-        world_config (dict): World configuration parameters.
-        max_tasks (int): Maximum number of concurrent tasks.
-        aws_session (boto3.Session): AWS session for S3 operations.
-        s3 (boto3.client): S3 client for file uploads.
-        s3r (boto3.resource): S3 resource for file operations.
-        bucket (str): S3 bucket name.
-        api_host (str): API host URL.
-        sequence_objs (dict): Dictionary to store sequence objects.
-        task_queue (asyncio.PriorityQueue): Priority queue for managing tasks.
-        aiolock (asyncio.Lock): Asyncio lock for synchronization.
-        syncer_loop (asyncio.Task): Asyncio task for the syncer loop.
-
-    Methods:
-        __init__(self, action_serv: Base, db_server_name: str = "DB"):
-            Initializes the HelaoSyncer instance with the given action server and database server name.
-
-        try_remove_empty(self, remove_target):
-            Attempts to remove an empty directory and returns success status.
-
-        cleanup_root(self):
-            Removes leftover empty directories from the root.
-
-        sync_exit_callback(self, task: asyncio.Task):
-            Callback function to handle the completion of a sync task.
-
-        syncer(self):
-            Coroutine that runs the syncer loop, consuming tasks from the task queue.
-
-        get_progress(self, yml_path: Path):
-            Returns progress from the global dictionary and updates the YAML path if not found.
-
-        enqueue_yml(self, upath: Union[Path, str], rank: int = 5, rank_limit: int = -5):
-            Adds a YAML file to the sync queue with the specified priority.
-
-        sync_yml(self, yml_path: Path, retries: int = 3, rank: int = 5, force_s3: bool = False, force_api: bool = False, compress: bool = False):
-            Coroutine for syncing a single YAML file.
-
-        update_process(self, act_yml: HelaoYml, act_meta: Dict):
-            Updates processes in the experiment parent based on the action YAML and metadata.
-
-        sync_process(self, exp_prog: Progress, force: bool = False):
-            Pushes unfinished processes to S3 and API from experiment progress.
-
-        to_s3(self, msg: Union[dict, Path], target: str, retries: int = 5, compress: bool = False):
-            Uploads data to S3, either as a JSON object or a file.
-
-        to_api(self, req_model: dict, meta_type: str, retries: int = 5):
-            Sends a POST or PATCH request to the Modelyst API.
-
-        list_pending(self, omit_manual_exps: bool = True):
-            Finds and queues YAML files from the RUNS_FINISHED directory.
-
-        finish_pending(self, omit_manual_exps: bool = True):
-            Finds and queues sequence YAML files from the RUNS_FINISHED directory.
-
-        reset_sync(self, sync_path: str):
-            Resets a synced sequence zip or partially-synced sequence folder.
-
-        shutdown(self):
-            Placeholder method for shutting down the syncer.
-
-        unsync_dir(self, sync_dir: str):
-            Reverts a synced directory back to the RUNS_FINISHED state.
-    """
-
-    progress: Dict[str, Progress]
-    base: Base
-    running_tasks: dict
-
-    def __init__(self, action_serv: Base, db_server_name: str = "DB"):
+    def __init__(self, config: dict, helaodirs: HelaoDirs):
         """
         Initializes the SyncDriver instance.
 
@@ -993,8 +917,8 @@ class HelaoSyncer:
             aiolock (asyncio.Lock): Asynchronous lock.
             syncer_loop (asyncio.Task): Asynchronous task for the syncer loop.
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
+        self.config_dict = config
+        self.helaodirs = helaodirs
         cparser = ConfigParser()
         if "AWS_CONFIG_PATH" in os.environ:
             with open(os.environ["AWS_CONFIG_PATH"]) as f:
@@ -1007,16 +931,7 @@ class HelaoSyncer:
                 self.config_dict["aws_profile"] = aws_profile
                 LOGGER.debug(self.config_dict)
 
-        self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 1)
-        # to load this driver on orch, we check the default "DB" key or take a manually-specified key
-        if (
-            not self.config_dict.get("aws_config_path", False)
-            and db_server_name in self.world_config["servers"]
-        ):
-            self.config_dict = self.world_config["servers"][db_server_name].get(
-                "params", {}
-            )
         if "aws_config_path" in self.config_dict:
             os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
             self.aws_session = boto3.Session(
@@ -1091,7 +1006,7 @@ class HelaoSyncer:
                 success = True
         return success
 
-    def cleanup_root(self):
+    def cleanup_root(self, root_path: str):
         today = datetime.strptime(datetime.now().strftime("%y%m%d"), "%y%m%d")
         """
         Cleans up the root directory by removing empty directories.
@@ -1109,7 +1024,7 @@ class HelaoSyncer:
         """
         chkdirs = ["RUNS_ACTIVE", "RUNS_FINISHED"]
         for cd in chkdirs:
-            seq_dates = glob(os.path.join(self.world_config["root"], cd, "*", "*"))
+            seq_dates = glob(os.path.join(root_path, cd, "*", "*"))
             for datedir in seq_dates:
                 if not os.path.isdir(datedir):
                     continue
@@ -1182,11 +1097,11 @@ class HelaoSyncer:
             if len(self.running_tasks) < self.max_tasks:
                 # LOGGER.info("Getting next yml_target from queue.")
                 rank, yml_path = await self.task_queue.get()
-                # self.base.print_message(
+                # LOGGER.info(
                 #     f"Acquired {yml_target.name} with priority {rank}."
                 # )
                 if yml_path.name not in self.running_tasks:
-                    # self.base.print_message(
+                    # LOGGER.info(
                     #     f"Creating sync task for {yml_target.name}."
                     # )
                     async with self.aiolock:
@@ -1198,7 +1113,7 @@ class HelaoSyncer:
                             self.sync_exit_callback
                         )
                 # else:
-                #     print_message(f"{yml_target} sync is already in progress.")
+                #     LOGGER.info(f"{yml_target} sync is already in progress.")
             await asyncio.sleep(0.1)
 
     def get_progress(self, yml_path: Path):
@@ -1267,7 +1182,7 @@ class HelaoSyncer:
                 f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request."
             )
         elif yml_path.name in self.task_set:
-            self.base.print_message(
+            LOGGER.info(
                 f"{str(yml_path)} is already queued, skipping enqueue request."
             )
         elif yml_path.name in self.running_tasks.keys():
@@ -1312,7 +1227,7 @@ class HelaoSyncer:
             dict: A dictionary containing the progress information, excluding 'process_metas'.
         """
         if not yml_path.exists():
-            # self.base.print_message(
+            # LOGGER.info(
             #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
             # )
             return True
@@ -1321,7 +1236,7 @@ class HelaoSyncer:
         #         self.task_set.remove(yml_path.name)
         prog = self.get_progress(yml_path)
         if not prog:
-            # self.base.print_message(
+            # LOGGER.info(
             #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
             # )
             return True
@@ -1329,17 +1244,17 @@ class HelaoSyncer:
         meta = copy(prog.yml.meta)
 
         if prog.yml.status == "synced":
-            # self.base.print_message(
+            # LOGGER.info(
             #     f"Cannot sync {str(prog.yml.target)}, status is already 'synced'."
             # )
             return True
 
-        # self.base.print_message(
+        # LOGGER.info(
         #     f"{str(prog.yml.target)} status is not synced, checking for finished."
         # )
 
         if prog.yml.status == "active":
-            # self.base.print_message(
+            # LOGGER.info(
             #     f"Cannot sync {str(prog.yml.target)}, status is not 'finished'."
             # )
             return False
@@ -1354,10 +1269,10 @@ class HelaoSyncer:
                 )
                 return False
             if prog.yml.finished_children:
-                # self.base.print_message(
+                # LOGGER.info(
                 #     f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
                 # )
-                # self.base.print_message(
+                # LOGGER.info(
                 #     "Adding 'finished' children to sync queue with highest priority."
                 # )
                 for child in prog.yml.finished_children:
@@ -1370,7 +1285,7 @@ class HelaoSyncer:
                             rank - 1,
                         )
                         LOGGER.info(str(child.target))
-                # self.base.print_message(
+                # LOGGER.info(
                 #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
                 # )
                 if prog.yml.target.name in self.running_tasks:
@@ -1576,7 +1491,7 @@ class HelaoSyncer:
                     # try:
                     #     self.progress.pop(childprog.yml.target.name)
                     # except Exception as err:
-                    #     self.base.print_message(
+                    #     LOGGER.error(
                     #         f"Could not remove {childprog.yml.target.name}: {err}"
                     #     )
                 self.try_remove_empty(str(prog.yml.finished_path.parent))
@@ -1590,7 +1505,9 @@ class HelaoSyncer:
                     f"Full sequence has synced, creating zip: {str(zip_target)}"
                 )
                 zip_dir(prog.yml.target.parent, zip_target)
-                self.cleanup_root()
+                path_parts = prog.yml.target.parts
+                root_path = Path(*path_parts[:path_parts.index("RUNS_FINISHED")]).as_posix()
+                self.cleanup_root(root_path)
                 # LOGGER.info(f"Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
 
@@ -1739,7 +1656,7 @@ class HelaoSyncer:
                             y for y in x["action_uuid"] if y in actuuid_order.keys()
                         ]
                         if not actuuid:
-                            # self.base.print_message(
+                            # LOGGER.warning(
                             #     "no action_uuid for {sample_label}, using listed order"
                             # )
                             actorder = si
@@ -1819,7 +1736,7 @@ class HelaoSyncer:
                 # write to local yml
                 save_dir = os.path.dirname(
                     os.path.join(
-                        self.base.helaodirs.process_root,
+                        self.helaodirs.process_root,
                         exp_prog.yml.relative_path,
                     )
                 )
@@ -2023,7 +1940,7 @@ class HelaoSyncer:
         Returns:
             list: A list of file paths to the pending sequence files.
         """
-        finished_dir = str(self.base.helaodirs.save_root).replace(
+        finished_dir = str(self.helaodirs.save_root).replace(
             "RUNS_ACTIVE", "RUNS_FINISHED"
         )
         pending = glob(os.path.join(finished_dir, "*", "*", "*", "*-seq.yml"))
@@ -2043,7 +1960,7 @@ class HelaoSyncer:
         Returns:
             list: A list of file paths to the pending action yaml files.
         """
-        finished_dir = str(self.base.helaodirs.save_root).replace(
+        finished_dir = str(self.helaodirs.save_root).replace(
             "RUNS_ACTIVE", "RUNS_FINISHED"
         )
         pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*", "*-act.yml"))
@@ -2068,7 +1985,7 @@ class HelaoSyncer:
         Returns:
             list: A list of file paths to the pending experiment files.
         """
-        finished_dir = str(self.base.helaodirs.save_root).replace(
+        finished_dir = str(self.helaodirs.save_root).replace(
             "RUNS_ACTIVE", "RUNS_FINISHED"
         )
         pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*-exp.yml"))
@@ -2274,3 +2191,96 @@ class HelaoSyncer:
                 os.makedirs(tp, exist_ok=True)
                 shutil.move(fp, tp)
         LOGGER.warning(f"Successfully reverted {sync_dir}")
+
+class HelaoSyncer(SyncDriver):
+    """
+    HelaoSyncer is a class responsible for synchronizing YAML files to S3 and an API.
+    It manages tasks, handles file uploads, and ensures data consistency across different storage systems.
+
+    Attributes:
+        progress (Dict[str, Progress]): A dictionary to track the progress of tasks.
+        base (Base): The base server instance.
+        running_tasks (dict): A dictionary to keep track of currently running tasks.
+        config_dict (dict): Configuration parameters for the syncer.
+        world_config (dict): World configuration parameters.
+        max_tasks (int): Maximum number of concurrent tasks.
+        aws_session (boto3.Session): AWS session for S3 operations.
+        s3 (boto3.client): S3 client for file uploads.
+        s3r (boto3.resource): S3 resource for file operations.
+        bucket (str): S3 bucket name.
+        api_host (str): API host URL.
+        sequence_objs (dict): Dictionary to store sequence objects.
+        task_queue (asyncio.PriorityQueue): Priority queue for managing tasks.
+        aiolock (asyncio.Lock): Asyncio lock for synchronization.
+        syncer_loop (asyncio.Task): Asyncio task for the syncer loop.
+
+    Methods:
+        __init__(self, action_serv: Base, db_server_name: str = "DB"):
+            Initializes the HelaoSyncer instance with the given action server and database server name.
+
+        try_remove_empty(self, remove_target):
+            Attempts to remove an empty directory and returns success status.
+
+        cleanup_root(self):
+            Removes leftover empty directories from the root.
+
+        sync_exit_callback(self, task: asyncio.Task):
+            Callback function to handle the completion of a sync task.
+
+        syncer(self):
+            Coroutine that runs the syncer loop, consuming tasks from the task queue.
+
+        get_progress(self, yml_path: Path):
+            Returns progress from the global dictionary and updates the YAML path if not found.
+
+        enqueue_yml(self, upath: Union[Path, str], rank: int = 5, rank_limit: int = -5):
+            Adds a YAML file to the sync queue with the specified priority.
+
+        sync_yml(self, yml_path: Path, retries: int = 3, rank: int = 5, force_s3: bool = False, force_api: bool = False, compress: bool = False):
+            Coroutine for syncing a single YAML file.
+
+        update_process(self, act_yml: HelaoYml, act_meta: Dict):
+            Updates processes in the experiment parent based on the action YAML and metadata.
+
+        sync_process(self, exp_prog: Progress, force: bool = False):
+            Pushes unfinished processes to S3 and API from experiment progress.
+
+        to_s3(self, msg: Union[dict, Path], target: str, retries: int = 5, compress: bool = False):
+            Uploads data to S3, either as a JSON object or a file.
+
+        to_api(self, req_model: dict, meta_type: str, retries: int = 5):
+            Sends a POST or PATCH request to the Modelyst API.
+
+        list_pending(self, omit_manual_exps: bool = True):
+            Finds and queues YAML files from the RUNS_FINISHED directory.
+
+        finish_pending(self, omit_manual_exps: bool = True):
+            Finds and queues sequence YAML files from the RUNS_FINISHED directory.
+
+        reset_sync(self, sync_path: str):
+            Resets a synced sequence zip or partially-synced sequence folder.
+
+        shutdown(self):
+            Placeholder method for shutting down the syncer.
+
+        unsync_dir(self, sync_dir: str):
+            Reverts a synced directory back to the RUNS_FINISHED state.
+    """
+
+    progress: Dict[str, Progress]
+    base: Base
+    running_tasks: dict
+
+    def __init__(self, action_serv: Base, db_server_name: str = "DB"):
+        self.base = action_serv
+        self.config_dict = action_serv.server_cfg.get("params", {})
+        self.world_config = action_serv.world_cfg
+        # to load this driver on orch, we check the default "DB" key or take a manually-specified key
+        if (
+            not self.config_dict.get("aws_config_path", False)
+            and db_server_name in self.world_config["servers"]
+        ):
+            self.config_dict = self.world_config["servers"][db_server_name].get(
+                "params", {}
+            )
+        super().__init__(self.config_dict, self.base.helaodirs)
