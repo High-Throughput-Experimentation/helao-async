@@ -1,14 +1,15 @@
 name: helao
 channels:
   - conda-forge
-  - defaults
+  - conda-pypi
+  # - defaults
 dependencies:
+  - aiodebug
+  - aioshutil
+  - nidaqmx
+  - pydasher
+  - uuid7
   - pip:
-      - aiodebug
-      - aioshutil
-      - nidaqmx
-      - pydasher
-      - uuid7
       - https://github.com/meerstetter/pyMeCom/archive/master.zip
       - https://github.com/onepunchdan/easy-biologic/archive/main.zip
   - aioboto3
@@ -33,12 +34,11 @@ dependencies:
   - ipywidgets
   - itables
   - joblib
-  - jupyterlab
+  - conda-forge::jupyterlab
   - matplotlib
   - mendeleev
   - mpltern
   - munch
-  # - nidaqmx-python
   - ntplib
   - numpy=1
   - orjson
