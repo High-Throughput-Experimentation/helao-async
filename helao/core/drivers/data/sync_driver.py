@@ -53,6 +53,7 @@ from helao.helpers.parquet import hlo_to_parquet
 from helao.helpers.yml_tools import yml_dumps, yml_load
 from helao.helpers.zip_dir import zip_dir
 from helao.core.models.helaodirs import HelaoDirs
+from helao.helpers.dispatcher import async_private_dispatcher
 
 from time import sleep
 from glob import glob
@@ -919,6 +920,7 @@ class SyncDriver:
         """
         self.config_dict = config
         self.helaodirs = helaodirs
+        self.auto_analyses = self.config_dict.get("auto_analyze_sequences", {})
         cparser = ConfigParser()
         if "AWS_CONFIG_PATH" in os.environ:
             with open(os.environ["AWS_CONFIG_PATH"]) as f:
@@ -1036,9 +1038,7 @@ class SyncDriver:
                         ).year
                     )
                 except ValueError:
-                    dateonly = datetime.strptime(
-                        os.path.basename(datedir), "%Y%m%d"
-                    )
+                    dateonly = datetime.strptime(os.path.basename(datedir), "%Y%m%d")
                 if dateonly <= today:
                     seq_dirs = glob(os.path.join(datedir, "*"))
                     if len(seq_dirs) == 0:
@@ -1182,9 +1182,7 @@ class SyncDriver:
                 f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request."
             )
         elif yml_path.name in self.task_set:
-            LOGGER.info(
-                f"{str(yml_path)} is already queued, skipping enqueue request."
-            )
+            LOGGER.info(f"{str(yml_path)} is already queued, skipping enqueue request.")
         elif yml_path.name in self.running_tasks.keys():
             LOGGER.debug(
                 f"{str(yml_path)} is already running, skipping enqueue request."
@@ -1506,10 +1504,31 @@ class SyncDriver:
                 )
                 zip_dir(prog.yml.target.parent, zip_target)
                 path_parts = prog.yml.target.parts
-                root_path = Path(*path_parts[:path_parts.index("RUNS_FINISHED")]).as_posix()
+                root_path = Path(
+                    *path_parts[: path_parts.index("RUNS_FINISHED")]
+                ).as_posix()
                 self.cleanup_root(root_path)
                 # LOGGER.info(f"Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
+
+                if (
+                    zip_target.exists()
+                    and prog.yml.meta["sequence_name"] in self.auto_analyses
+                ):
+                    ana_config = self.auto_analyses[prog.yml.meta["sequence_name"]]
+                    LOGGER.info(
+                        f"dispatching auto-analysis {ana_config['endpoint']} for {prog.yml.meta['sequence_name']}"
+                    )
+                    await async_private_dispatcher(
+                        server_key=ana_config["server_key"],
+                        host=ana_config["host"],
+                        port=ana_config["port"],
+                        private_action=ana_config["endpoint"],
+                        params_dict={
+                            "sequence_zip_path": str(zip_target),
+                            "params": ana_config.get("analysis_params", {}),
+                        },
+                    )
 
             if yml_target_name in self.running_tasks:
                 LOGGER.debug(f"Removing {yml_target_name} from running_tasks.")
@@ -2191,6 +2210,7 @@ class SyncDriver:
                 os.makedirs(tp, exist_ok=True)
                 shutil.move(fp, tp)
         LOGGER.warning(f"Successfully reverted {sync_dir}")
+
 
 class HelaoSyncer(SyncDriver):
     """
