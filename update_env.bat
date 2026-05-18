@@ -4,9 +4,9 @@ set HA_DIR=%REPO_PARENT_FOLDER%helao-async
 conda env list | findstr /r /c:"^helao.*envs\\helao$"
 if ERRORLEVEL 1 (
     echo 'helao' conda environment was not found, creating it now...
-    conda env create -f helao_dev_win-64.yml -n helao
+    conda env create --solver=rattler -f helao_dev_win-64.yml -n helao
 )
-conda env update -f helao_dev_win-64.yml
+conda env update --solver=rattler -f helao_dev_win-64.yml
 echo.
 call conda activate helao
 echo setting PYTHONPATH in 'helao' conda environment vars
