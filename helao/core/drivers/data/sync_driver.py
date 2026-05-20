@@ -1098,12 +1098,12 @@ class SyncDriver:
                 LOGGER.debug("Getting next yml_target from queue.")
                 rank, yml_path = await self.task_queue.get()
                 LOGGER.debug(
-                #     f"Acquired {yml_target.name} with priority {rank}."
-                # )
+                    f"Acquired {yml_target.name} with priority {rank}."
+                )
                 if yml_path.name not in self.running_tasks:
                     LOGGER.debug(
-                    #     f"Creating sync task for {yml_target.name}."
-                    # )
+                        f"Creating sync task for {yml_target.name}."
+                    )
                     async with self.aiolock:
                         self.running_tasks[yml_path.name] = asyncio.create_task(
                             self.sync_yml(yml_path=yml_path, rank=rank),
@@ -1226,8 +1226,8 @@ class SyncDriver:
         """
         if not yml_path.exists():
             LOGGER.debug(
-            #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
-            # )
+                f"{str(yml_path)} does not exist, assume yml has moved to synced."
+            )
             return True
         # if yml_path.name in self.task_set:
         #     async with self.aiolock:
@@ -1235,26 +1235,26 @@ class SyncDriver:
         prog = self.get_progress(yml_path)
         if not prog:
             LOGGER.debug(
-            #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
-            # )
+                f"{str(yml_path)} does not exist, assume yml has moved to synced."
+            )
             return True
 
         meta = copy(prog.yml.meta)
 
         if prog.yml.status == "synced":
             LOGGER.debug(
-            #     f"Cannot sync {str(prog.yml.target)}, status is already 'synced'."
-            # )
+                f"Cannot sync {str(prog.yml.target)}, status is already 'synced'."
+            )
             return True
 
         LOGGER.debug(
-        #     f"{str(prog.yml.target)} status is not synced, checking for finished."
-        # )
+            f"{str(prog.yml.target)} status is not synced, checking for finished."
+        )
 
         if prog.yml.status == "active":
             LOGGER.debug(
-            #     f"Cannot sync {str(prog.yml.target)}, status is not 'finished'."
-            # )
+                f"Cannot sync {str(prog.yml.target)}, status is not 'finished'."
+            )
             return False
 
         LOGGER.debug(f"{str(prog.yml.target)} status is finished, proceeding.")
@@ -1268,11 +1268,11 @@ class SyncDriver:
                 return False
             if prog.yml.finished_children:
                 LOGGER.debug(
-                #     f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
-                # )
+                    f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
+                )
                 LOGGER.debug(
-                #     "Adding 'finished' children to sync queue with highest priority."
-                # )
+                    "Adding 'finished' children to sync queue with highest priority."
+                )
                 for child in prog.yml.finished_children:
                     if (
                         child.target.name not in self.running_tasks
@@ -1284,8 +1284,8 @@ class SyncDriver:
                         )
                         LOGGER.info(str(child.target))
                 LOGGER.debug(
-                #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
-                # )
+                    f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
+                )
                 if prog.yml.target.name in self.running_tasks:
                     async with self.aiolock:
                         self.running_tasks.pop(prog.yml.target.name)
