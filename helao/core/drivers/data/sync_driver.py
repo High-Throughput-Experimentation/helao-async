@@ -1095,13 +1095,13 @@ class SyncDriver:
         """
         while True:
             if len(self.running_tasks) < self.max_tasks:
-                # LOGGER.info("Getting next yml_target from queue.")
+                LOGGER.debug("Getting next yml_target from queue.")
                 rank, yml_path = await self.task_queue.get()
-                # LOGGER.info(
+                LOGGER.debug(
                 #     f"Acquired {yml_target.name} with priority {rank}."
                 # )
                 if yml_path.name not in self.running_tasks:
-                    # LOGGER.info(
+                    LOGGER.debug(
                     #     f"Creating sync task for {yml_target.name}."
                     # )
                     async with self.aiolock:
@@ -1225,7 +1225,7 @@ class SyncDriver:
             dict: A dictionary containing the progress information, excluding 'process_metas'.
         """
         if not yml_path.exists():
-            # LOGGER.info(
+            LOGGER.debug(
             #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
             # )
             return True
@@ -1234,7 +1234,7 @@ class SyncDriver:
         #         self.task_set.remove(yml_path.name)
         prog = self.get_progress(yml_path)
         if not prog:
-            # LOGGER.info(
+            LOGGER.debug(
             #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
             # )
             return True
@@ -1242,22 +1242,22 @@ class SyncDriver:
         meta = copy(prog.yml.meta)
 
         if prog.yml.status == "synced":
-            # LOGGER.info(
+            LOGGER.debug(
             #     f"Cannot sync {str(prog.yml.target)}, status is already 'synced'."
             # )
             return True
 
-        # LOGGER.info(
+        LOGGER.debug(
         #     f"{str(prog.yml.target)} status is not synced, checking for finished."
         # )
 
         if prog.yml.status == "active":
-            # LOGGER.info(
+            LOGGER.debug(
             #     f"Cannot sync {str(prog.yml.target)}, status is not 'finished'."
             # )
             return False
 
-        # LOGGER.info(f"{str(prog.yml.target)} status is finished, proceeding.")
+        LOGGER.debug(f"{str(prog.yml.target)} status is finished, proceeding.")
 
         # first check if child objects are registered with API (non-actions)
         if prog.yml.type != "action":
@@ -1267,10 +1267,10 @@ class SyncDriver:
                 )
                 return False
             if prog.yml.finished_children:
-                # LOGGER.info(
+                LOGGER.debug(
                 #     f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
                 # )
-                # LOGGER.info(
+                LOGGER.debug(
                 #     "Adding 'finished' children to sync queue with highest priority."
                 # )
                 for child in prog.yml.finished_children:
@@ -1283,7 +1283,7 @@ class SyncDriver:
                             rank - 1,
                         )
                         LOGGER.info(str(child.target))
-                # LOGGER.info(
+                LOGGER.debug(
                 #     f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
                 # )
                 if prog.yml.target.name in self.running_tasks:
@@ -1294,12 +1294,12 @@ class SyncDriver:
                 LOGGER.debug(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
 
-        # LOGGER.info(f"{str(prog.yml.target)} children are synced, proceeding.")
+        LOGGER.debug(f"{str(prog.yml.target)} children are synced, proceeding.")
 
         # next push files to S3 (actions only)
         if prog.yml.type == "action":
             # re-check file lists
-            # LOGGER.info(f"Checking file lists for {prog.yml.target.name}")
+            LOGGER.debug(f"Checking file lists for {prog.yml.target.name}")
             prog.dict["files_pending"] += [
                 str(p)
                 for p in prog.yml.hlo_files + prog.yml.misc_files
@@ -1482,16 +1482,10 @@ class SyncDriver:
                 children = prog.yml.children
                 LOGGER.debug(f"Removing children from progress: {children}.")
                 for childyml in children:
-                    # LOGGER.info(f"Clearing {childprog.yml.target.name}")
+                    LOGGER.debug(f"Clearing {childprog.yml.target.name}")
                     finished_child_path = childyml.finished_path.parent
                     if finished_child_path.exists():
                         self.try_remove_empty(str(finished_child_path))
-                    # try:
-                    #     self.progress.pop(childprog.yml.target.name)
-                    # except Exception as err:
-                    #     LOGGER.error(
-                    #         f"Could not remove {childprog.yml.target.name}: {err}"
-                    #     )
                 self.try_remove_empty(str(prog.yml.finished_path.parent))
 
             if yml_type == "sequence":
@@ -1508,7 +1502,7 @@ class SyncDriver:
                     *path_parts[: path_parts.index("RUNS_FINISHED")]
                 ).as_posix()
                 self.cleanup_root(root_path)
-                # LOGGER.info(f"Removing sequence from progress.")
+                LOGGER.debug(f"Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
 
                 if (
@@ -1636,7 +1630,7 @@ class SyncDriver:
                 ShortActionModel(**act_meta).clean_dict(strip_private=True)
             )
 
-            # LOGGER.info(f"current experiment progress:\n{exp_prog.dict}")
+            LOGGER.debug(f"current experiment progress:\n{exp_prog.dict}")
             if act_idx == min(exp_prog.dict["process_groups"][pidx]):
                 process_meta["process_timestamp"] = act_meta["action_timestamp"]
             if "technique_name" in act_meta:
@@ -1675,9 +1669,6 @@ class SyncDriver:
                             y for y in x["action_uuid"] if y in actuuid_order.keys()
                         ]
                         if not actuuid:
-                            # LOGGER.warning(
-                            #     "no action_uuid for {sample_label}, using listed order"
-                            # )
                             actorder = si
                         else:
                             actorder = actuuid_order[actuuid[0]]
@@ -1867,81 +1858,6 @@ class SyncDriver:
             return True
         else:
             return True
-        # req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
-        # # LOGGER.info(f"preparing API push to {req_url}")
-        # # meta_name = req_model.get(
-        # #     f"{meta_type.replace('process', 'technique')}_name",
-        # #     req_model["experiment_name"],
-        # # )
-        # meta_uuid = req_model[f"{meta_type}_uuid"]
-        # LOGGER.debug(f"attempting API push for {meta_type}: {meta_uuid}")
-        # try_create = True
-        # api_success = False
-        # last_status = 0
-        # last_response = {}
-        # LOGGER.debug("creating async request session")
-        # async with aiohttp.ClientSession() as session:
-        #     for i in range(retries):
-        #         if not api_success:
-        #             LOGGER.debug(f"session attempt {i}")
-        #             req_method = session.post if try_create else session.patch
-        #             api_str = f"API {'POST' if try_create else 'PATCH'}"
-        #             try:
-        #                 LOGGER.debug("trying request")
-        #                 async with req_method(req_url, json=req_model) as resp:
-        #                     LOGGER.debug("response received")
-        #                     if resp.status == 200:
-        #                         api_success = True
-        #                     elif resp.status == 400:
-        #                         try_create = False
-        #                     LOGGER.debug(
-        #                         f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}"
-        #                     )
-        #                     last_response = await resp.json()
-        #                     LOGGER.debug(
-        #                         f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}"
-        #                     )
-        #                     last_status = resp.status
-        #             except Exception as e:
-        #                 LOGGER.info(f"[{i+1}/{retries}] an exception occurred: {e}")
-        #                 await asyncio.sleep(30)
-        #         else:
-        #             break
-        #     if not api_success:
-        #         meta_s3_key = f"{meta_type}/{meta_uuid}.json"
-        #         fail_model = {
-        #             "endpoint": f"https://{self.api_host}/{PLURALS[meta_type]}/",
-        #             "method": "POST" if try_create else "PATCH",
-        #             "status_code": last_status,
-        #             "detail": last_response.get("detail", ""),
-        #             "data": req_model,
-        #             "s3_files": [
-        #                 {
-        #                     "bucket_name": self.bucket,
-        #                     "key": meta_s3_key,
-        #                 }
-        #             ],
-        #         }
-        #         fail_url = f"https://{self.api_host}/failed"
-        #         for _ in range(retries):
-        #             try:
-        #                 async with aiohttp.ClientSession() as session:
-        #                     async with session.post(fail_url, json=fail_model) as resp:
-        #                         if resp.status == 200:
-        #                             LOGGER.info(
-        #                                 f"successful debug API push for {meta_type}: {meta_uuid}"
-        #                             )
-        #                             break
-        #                         LOGGER.info(
-        #                             f"failed debug API push for {meta_type}: {meta_uuid}"
-        #                         )
-        #                         LOGGER.info(f"response: {await resp.json()}")
-        #             except TimeoutError:
-        #                 LOGGER.info(
-        #                     f"unable to post failure model for {meta_type}: {meta_uuid}"
-        #                 )
-        #                 await asyncio.sleep(30)
-        # return api_success
 
     def list_pending(self, omit_manual_exps: bool = True):
         """
