@@ -1486,7 +1486,7 @@ class SyncDriver:
                 children = prog.yml.children
                 LOGGER.debug(f"Removing children from progress: {children}.")
                 for childyml in children:
-                    LOGGER.debug(f"Clearing {childprog.yml.target.name}")
+                    LOGGER.debug(f"Clearing {childyml.target.name}")
                     finished_child_path = childyml.finished_path.parent
                     if finished_child_path.exists():
                         self.try_remove_empty(str(finished_child_path))
@@ -1506,7 +1506,7 @@ class SyncDriver:
                     *path_parts[: path_parts.index("RUNS_FINISHED")]
                 ).as_posix()
                 self.cleanup_root(root_path)
-                LOGGER.debug(f"Removing sequence from progress.")
+                LOGGER.debug("Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
 
                 if (
