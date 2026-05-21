@@ -934,6 +934,7 @@ class SyncDriver:
                 LOGGER.debug(self.config_dict)
 
         self.max_tasks = self.config_dict.get("max_tasks", 1)
+        LOGGER.info("checking for aws_config_path")
         if "aws_config_path" in self.config_dict:
             os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
             self.aws_session = boto3.Session(
@@ -961,7 +962,7 @@ class SyncDriver:
         # pushing an exp before processes/actions have synced will first enqueue actions
         # then enqueue processes, then enqueue the exp again
         # exp progress must be in memory before actions are checked
-
+        LOGGER.info("creating syncer tasks")
         self.syncer_loops = {
             i: asyncio.create_task(self.syncer(), name=f"syncer_loop__{i}")
             for i in range(self.max_tasks)
@@ -2219,4 +2220,5 @@ class HelaoSyncer(SyncDriver):
             self.config_dict = self.world_config["servers"][db_server_name].get(
                 "params", {}
             )
+        LOGGER.info("initializing SyncDriver")
         super().__init__(self.config_dict, self.base.helaodirs)
