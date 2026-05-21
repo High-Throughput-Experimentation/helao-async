@@ -186,7 +186,7 @@ async def move_dir(
                 if os.path.exists(yml_dir):
                     try:
                         await aioshutil.rmtree(yml_dir)
-                    except Exception:
+                    except FileNotFoundError:
                         LOGGER.warning(
                             f"Error removing {yml_dir}, perhaps removed by another operation.",
                             exc_info=False,
