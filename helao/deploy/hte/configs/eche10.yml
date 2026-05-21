@@ -150,6 +150,7 @@ servers:
     port: 8010
     group: action
     fast: dbpack_server
+    log_level: 10
     params:
       aws_profile: default
       testing: false
