@@ -894,6 +894,9 @@ class Progress:
 
 class SyncDriver:
 
+    progress: Dict[str, Progress]
+    running_tasks: dict
+
     def __init__(self, config: dict, helaodirs: HelaoDirs):
         """
         Initializes the SyncDriver instance.
@@ -1099,11 +1102,11 @@ class SyncDriver:
                 LOGGER.debug("Getting next yml_target from queue.")
                 rank, yml_path = await self.task_queue.get()
                 LOGGER.debug(
-                    f"Acquired {yml_target.name} with priority {rank}."
+                    f"Acquired {yml_path.name} with priority {rank}."
                 )
                 if yml_path.name not in self.running_tasks:
                     LOGGER.debug(
-                        f"Creating sync task for {yml_target.name}."
+                        f"Creating sync task for {yml_path.name}."
                     )
                     async with self.aiolock:
                         self.running_tasks[yml_path.name] = asyncio.create_task(
@@ -1113,8 +1116,8 @@ class SyncDriver:
                         self.running_tasks[yml_path.name].add_done_callback(
                             self.sync_exit_callback
                         )
-                # else:
-                #     LOGGER.info(f"{yml_target} sync is already in progress.")
+                else:
+                    LOGGER.debug(f"{yml_path.name} sync is already in progress.")
             await asyncio.sleep(0.1)
 
     def get_progress(self, yml_path: Path):
@@ -2204,9 +2207,7 @@ class HelaoSyncer(SyncDriver):
             Reverts a synced directory back to the RUNS_FINISHED state.
     """
 
-    progress: Dict[str, Progress]
     base: Base
-    running_tasks: dict
 
     def __init__(self, action_serv: Base, db_server_name: str = "DB"):
         self.base = action_serv
