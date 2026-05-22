@@ -1101,13 +1101,9 @@ class SyncDriver:
             if len(self.running_tasks) < self.max_tasks:
                 LOGGER.debug("Getting next yml_target from queue.")
                 rank, yml_path = await self.task_queue.get()
-                LOGGER.debug(
-                    f"Acquired {yml_path.name} with priority {rank}."
-                )
+                LOGGER.debug(f"Acquired {yml_path.name} with priority {rank}.")
                 if yml_path.name not in self.running_tasks:
-                    LOGGER.debug(
-                        f"Creating sync task for {yml_path.name}."
-                    )
+                    LOGGER.debug(f"Creating sync task for {yml_path.name}.")
                     async with self.aiolock:
                         self.running_tasks[yml_path.name] = asyncio.create_task(
                             self.sync_yml(yml_path=yml_path, rank=rank),
@@ -1493,6 +1489,7 @@ class SyncDriver:
                 self.try_remove_empty(str(prog.yml.finished_path.parent))
 
             if yml_type == "sequence":
+                sequence_name = prog.yml.meta.get("sequence_name", "NA")
                 LOGGER.debug(f"Zipping {prog.yml.target.parent.name}.")
                 zip_target = prog.yml.target.parent.parent.joinpath(
                     f"{prog.yml.target.parent.name}.zip"
@@ -1500,8 +1497,8 @@ class SyncDriver:
                 LOGGER.info(
                     f"Full sequence has synced, creating zip: {str(zip_target)}"
                 )
-                zip_dir(prog.yml.target.parent, zip_target)
                 path_parts = prog.yml.target.parts
+                zip_dir(prog.yml.target.parent, zip_target)
                 root_path = Path(
                     *path_parts[: path_parts.index("RUNS_FINISHED")]
                 ).as_posix()
@@ -1509,13 +1506,10 @@ class SyncDriver:
                 LOGGER.debug("Removing sequence from progress.")
                 # self.progress.pop(prog.yml.target.name)
 
-                if (
-                    zip_target.exists()
-                    and prog.yml.meta["sequence_name"] in self.auto_analyses
-                ):
-                    ana_config = self.auto_analyses[prog.yml.meta["sequence_name"]]
+                if zip_target.exists() and sequence_name in self.auto_analyses:
+                    ana_config = self.auto_analyses[sequence_name]
                     LOGGER.info(
-                        f"dispatching auto-analysis {ana_config['endpoint']} for {prog.yml.meta['sequence_name']}"
+                        f"dispatching auto-analysis {ana_config['endpoint']} for {sequence_name}"
                     )
                     await async_private_dispatcher(
                         server_key=ana_config["server_key"],
