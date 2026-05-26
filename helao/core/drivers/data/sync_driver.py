@@ -1518,6 +1518,8 @@ class SyncDriver:
                         private_action=ana_config["endpoint"],
                         params_dict={
                             "sequence_zip_path": str(zip_target),
+                        },
+                        json_dict={
                             "params": ana_config.get("analysis_params", {}),
                         },
                     )
