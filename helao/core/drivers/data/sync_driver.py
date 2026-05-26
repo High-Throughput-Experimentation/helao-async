@@ -1521,11 +1521,11 @@ class SyncDriver:
                             action_server=MachineModel(
                                 server_name=ana_config["server_key"],
                             ),
+                            action_params={
+                                "sequence_zip_path": str(zip_target),
+                                "params": ana_config.get("analysis_params", {}),
+                            },
                         ),
-                        params={
-                            "sequence_zip_path": str(zip_target),
-                            "params": ana_config.get("analysis_params", {}),
-                        },
                     )
 
             if yml_target_name in self.running_tasks:
