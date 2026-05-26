@@ -1500,7 +1500,7 @@ class SyncDriver:
                 path_parts = prog.yml.target.parts
                 zip_dir(prog.yml.target.parent, zip_target)
                 root_path = Path(
-                    *path_parts[: path_parts.index("RUNS_FINISHED")]
+                    *path_parts[: path_parts.index("RUNS_SYNCED")]
                 ).as_posix()
                 self.cleanup_root(root_path)
                 LOGGER.debug("Removing sequence from progress.")
