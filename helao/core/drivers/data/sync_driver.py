@@ -53,7 +53,8 @@ from helao.helpers.parquet import hlo_to_parquet
 from helao.helpers.yml_tools import yml_dumps, yml_load
 from helao.helpers.zip_dir import zip_dir
 from helao.core.models.helaodirs import HelaoDirs
-from helao.helpers.dispatcher import async_private_dispatcher
+from helao.helpers.dispatcher import async_action_dispatcher
+from helao.core.models.machine import MachineModel
 
 from time import sleep
 from glob import glob
@@ -1511,15 +1512,18 @@ class SyncDriver:
                     LOGGER.info(
                         f"dispatching auto-analysis {ana_config['endpoint']} for {sequence_name}"
                     )
-                    await async_private_dispatcher(
-                        server_key=ana_config["server_key"],
-                        host=ana_config["host"],
-                        port=ana_config["port"],
-                        private_action=ana_config["endpoint"],
-                        params_dict={
-                            "sequence_zip_path": str(zip_target),
+                    await async_action_dispatcher(
+                        world_config_dict={
+                            "servers": {ana_config["server_key"]: ana_config}
                         },
-                        json_dict={
+                        A=Action(
+                            action_name=ana_config["endpoint"],
+                            action_server=MachineModel(
+                                server_name=ana_config["server_key"],
+                            ),
+                        ),
+                        params={
+                            "sequence_zip_path": str(zip_target),
                             "params": ana_config.get("analysis_params", {}),
                         },
                     )
