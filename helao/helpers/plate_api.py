@@ -48,9 +48,26 @@ class HTEPlateAPI:
             resp = httpx.get(
                 f"{self.loader.hcred.PLATE_API}/live/plate/id/{plateid}",
                 headers=headers,
-                timeout=30
+                timeout=30,
             )
             return resp.json()
+        except Exception:
+            LOGGER.error("Cannot find plateid info.", exc_info=True)
+            return None
+
+    def get_print_plateid(self, plateid: int) -> dict | None:
+        try:
+            headers = {"X-Api-Key": self.loader.hcred.PLATE_API_KEY}
+            resp = httpx.get(
+                f"{self.loader.hcred.PLATE_API}/live/pvd_printplate/{plateid}/list",
+                headers=headers,
+                timeout=30,
+            )
+            prints = resp.json()
+            latest_print = sorted(prints, key=lambda x: x["print_date"], reverse=True)[
+                0
+            ]
+            return latest_print
         except Exception:
             LOGGER.error("Cannot find plateid info.", exc_info=True)
             return None
@@ -169,7 +186,11 @@ class HTEPlateAPI:
         print_id: str | None = infofiled.get("screening_print_id", None)
         if print_id is None:
             return None
-        printd = self.get_print(print_id)
+
+        try:
+            printd = self.get_print(print_id)
+        except Exception:
+            printd = self.get_print_plateid(plateid)
 
         if printd is not None and self.loader is not None:
 
