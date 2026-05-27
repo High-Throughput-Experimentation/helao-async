@@ -679,16 +679,10 @@ class Base:
         """
         Asynchronously sends a status package to a specified client.
 
-        Args:
-            client_servkey (str): The service key of the client.
-            client_host (str): The host address of the client.
-            client_port (int): The port number of the client.
-            action_name (str, optional): The name of the action to include in the status package. Defaults to None.
-
-        Returns:
-            tuple: A tuple containing the response and error code from the private dispatcher.
+        Routed through :func:`async_private_dispatcher`, which transparently
+        prefers the ZMQ RPC fast-path and falls back to HTTP if the peer's
+        dispatcher isn't reachable.
         """
-        # needs private dispatcher
         json_dict = {
             "actionservermodel": self.actionservermodel.get_fastapi_json(
                 action_name=action_name,
