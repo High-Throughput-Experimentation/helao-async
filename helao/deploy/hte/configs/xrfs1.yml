@@ -35,6 +35,12 @@ servers:
     params:
       aws_profile: default
       testing: false
+      auto_analyze_sequences:
+        XRFS_noStandards:
+          server_key: ANA
+          host: hte-xrfs-01.htejcap.caltech.edu
+          port: 8014
+          endpoint: analyze_xrfs_local
   ANA:
     host: hte-xrfs-01.htejcap.caltech.edu
     port: 8014
