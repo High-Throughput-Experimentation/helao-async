@@ -36,6 +36,7 @@ dependencies:
   - matplotlib
   - mendeleev
   - mpltern
+  - msgspec
   - munch
   - ntplib
   - numpy=1
