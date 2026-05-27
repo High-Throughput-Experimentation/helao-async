@@ -25,6 +25,12 @@ import zmq
 import zmq.asyncio
 from pydantic import BaseModel
 
+try:
+    import numpy as _np_mod
+    _np: Any = _np_mod
+except ImportError:  # numpy is optional in some deployments
+    _np = None
+
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -61,9 +67,38 @@ class RPCError(RuntimeError):
 
 
 def _msgpack_enc_hook(obj: Any) -> Any:
-    """Convert types msgpack can't encode natively (e.g. pathlib paths)."""
+    """Convert non-msgpack-native types to native Python primitives.
+
+    msgspec matches types exactly, so subclasses of float/int/str/dict/list
+    (notably ruamel.yaml's ScalarFloat/ScalarInt/CommentedMap/etc.) and
+    NumPy's scalar/array types trip the encoder.  Unwrap them down to the
+    closest native primitive; msgspec then re-encodes the result.
+    """
     if isinstance(obj, pathlib.PurePath):
         return str(obj)
+    if _np is not None:
+        # ndarray.tolist() also recursively unwraps nested numpy scalars.
+        if isinstance(obj, _np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, _np.generic):
+            return obj.item()
+    # ruamel.yaml scalar wrappers (and any other builtin subclass).
+    # Order matters: bool before int (bool is an int subclass); numpy
+    # checks above already ran, so these only catch pure-Python subclasses.
+    if isinstance(obj, bool):
+        return bool(obj)
+    if isinstance(obj, int):
+        return int(obj)
+    if isinstance(obj, float):
+        return float(obj)
+    if isinstance(obj, str):
+        return str(obj)
+    if isinstance(obj, dict):
+        return dict(obj)
+    if isinstance(obj, (list, tuple, set, frozenset)):
+        return list(obj)
+    if isinstance(obj, bytes):
+        return bytes(obj)
     raise NotImplementedError(
         f"Objects of type {type(obj).__name__} are not msgpack-serializable"
     )
