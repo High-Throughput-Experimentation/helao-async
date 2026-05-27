@@ -134,6 +134,24 @@ def _coerce_args(fn: Callable, args: Dict[str, Any]) -> Dict[str, Any]:
         # Anything still left over is dropped (mirrors FastAPI ignoring
         # unknown body keys).
 
+    # Pass 3: Replace any Body({}) / Body([]) sentinel defaults for
+    # still-unfilled params with the empty container they wrap.
+    # Without this, fn(**out) falls through to Python's default-arg
+    # mechanism and the handler receives a fastapi.params.Body instance
+    # in place of an empty dict/list (which the FastAPI request layer
+    # would have supplied for an empty HTTP body).
+    for name, param in params.items():
+        if name in out:
+            continue
+        default = param.default
+        if type(default).__name__ != "Body":
+            continue
+        wrapped = getattr(default, "default", None)
+        if isinstance(wrapped, dict) and not wrapped:
+            out[name] = {}
+        elif isinstance(wrapped, list) and not wrapped:
+            out[name] = []
+
     return out
 
 
