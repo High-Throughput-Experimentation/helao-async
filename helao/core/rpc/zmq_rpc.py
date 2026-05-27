@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import itertools
+import pathlib
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 import msgspec
@@ -59,10 +60,19 @@ class RPCError(RuntimeError):
     """Raised on the client side when the server returned ``ok=False``."""
 
 
+def _msgpack_enc_hook(obj: Any) -> Any:
+    """Convert types msgpack can't encode natively (e.g. pathlib paths)."""
+    if isinstance(obj, pathlib.PurePath):
+        return str(obj)
+    raise NotImplementedError(
+        f"Objects of type {type(obj).__name__} are not msgpack-serializable"
+    )
+
+
 _REQ_DECODER = msgspec.msgpack.Decoder(RPCRequest)
-_REQ_ENCODER = msgspec.msgpack.Encoder()
+_REQ_ENCODER = msgspec.msgpack.Encoder(enc_hook=_msgpack_enc_hook)
 _RESP_DECODER = msgspec.msgpack.Decoder(RPCResponse)
-_RESP_ENCODER = msgspec.msgpack.Encoder()
+_RESP_ENCODER = msgspec.msgpack.Encoder(enc_hook=_msgpack_enc_hook)
 
 
 # ---------------------------------------------------------------------------
