@@ -44,8 +44,6 @@ from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.config_loader import read_config
 from helao.helpers.time_utils import get_ntp_time
 
-from helao.core.tests.unit_test_sample_models import sample_model_unit_test
-
 from logging import Logger
 from helao.helpers import helao_logging as logging
 
@@ -545,11 +543,11 @@ def main():
     """
     Main function to initialize and launch the HELAO application.
     This function performs the following tasks:
-    1. Runs unit tests for sample models.
-    2. Initializes colorama for colored terminal output.
-    3. Checks if the script is running in the 'helao' conda environment.
-    4. Validates the PYTHONPATH environment variable and retrieves paths for HELAO repositories.
-    5. Loads the configuration file based on the provided argument.
+    1. Initializes colorama for colored terminal output.
+    2. Checks if the script is running in the 'helao' conda environment.
+    3. Validates the PYTHONPATH environment variable and retrieves paths for HELAO repositories.
+    4. Loads the configuration file based on the provided argument.
+    5. Runs the full unit-test suite when ``run_unit_tests: true`` is set in the loaded config.
     6. Clears the terminal screen and prints the HELAO banner.
     7. Displays the current branch and status of each local HELAO repository.
     8. Compresses old log files.
@@ -558,10 +556,8 @@ def main():
     The function also defines helper functions for printing messages, stopping servers,
     and handling hotkey inputs for server management.
     Raises:
-        SystemExit: If unit tests fail or if PYTHONPATH is not defined.
+        SystemExit: If unit tests fail (when enabled in config) or if PYTHONPATH is not defined.
     """
-    if not sample_model_unit_test():
-        quit()
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
     if os.environ.get("CONDA_DEFAULT_ENV") != "helao":
         print(
@@ -592,6 +588,13 @@ def main():
     helao_repo_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
     config = read_config(confArg)
+
+    # Run the full unit-test suite only when the config opts in.
+    if config.get("run_unit_tests") is True:
+        from run_unit_tests import main as run_all_unit_tests
+
+        if run_all_unit_tests() != 0:
+            quit()
 
     # save ntp time offset
     helaodirs = helao_dirs(config, "launcher")
