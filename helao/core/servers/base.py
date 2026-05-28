@@ -19,7 +19,6 @@ from uuid import UUID, uuid1
 from glob import glob
 import hashlib
 from copy import deepcopy, copy
-import inspect
 import traceback
 
 import aiodebug.hang_inspection
@@ -150,7 +149,7 @@ class Base:
         print_message(self, *args, **kwargs): Print a message with server context.
         init_endpoint_status(self, dyn_endpoints=None): Initialize endpoint status.
         get_endpoint_urls(self): Get a list of all endpoints on this server.
-        _get_action(self, frame) -> Action: Get the action from the current frame.
+        _get_action(self) -> Action: Build the action from the per-request ACTION_CTX.
         setup_action(self) -> Action: Setup an action.
         setup_and_contain_action(self, json_data_keys: List[str], action_abbr: str, file_type: str, hloheader: HloHeaderModel): Setup and contain an action.
         contain_action(self, activeparams: ActiveParams): Contain an action.
@@ -472,74 +471,44 @@ class Base:
             url_list.append(routeD)
         return url_list
 
-    def _get_action(self, frame) -> Action:
+    def _get_action(self) -> Action:
         """
-        Extracts and constructs an Action object from the given frame.
+        Build the per-request ``Action`` from the current ``ACTION_CTX``.
 
-        This method inspects the local variables of the provided frame to find an
-        instance of the Action class. It also collects other parameters and updates
-        the action's parameters accordingly. If no Action instance is found, a blank
-        Action is created. The method also sets various attributes of the Action
-        object, such as action name, server key, and action parameters.
-
-        Args:
-            frame: The frame object from which to extract the Action.
+        ``ActionAPIRoute`` wraps every endpoint tagged ``"action"`` and
+        populates ``ACTION_CTX`` (in :mod:`helao.core.servers.base_api`)
+        with the parsed ``Action`` and the underlying endpoint function
+        before the route runs.  This method reads from that ContextVar
+        instead of walking ``sys._getframe()`` to recover the Action and
+        the endpoint identity.
 
         Returns:
             Action: The constructed or updated Action object.
         """
-        _args, _varargs, _keywords, _locals = inspect.getargvalues(frame)
-        action = None
-        paramdict = {}
+        from helao.core.servers.base_api import ACTION_CTX
 
-        for arg in _args:
-            argparam = _locals.get(arg, None)
-            if isinstance(argparam, Action):
-                if action is None:
-                    LOGGER.info(f"found Action BaseModel under parameter '{arg}'")
-                    action = argparam
-                else:
-                    LOGGER.error(
-                        f"critical error: found another Action BaseModel under parameter '{arg}', skipping it"
-                    )
-            else:
-                paramdict.update({arg: argparam})
-
-        if action is None:
+        ctx = ACTION_CTX.get()
+        if ctx is None:
             LOGGER.error(
-                "critical error: no Action BaseModel was found by setup_action, using blank Action."
+                "setup_action called outside an action endpoint context; "
+                "returning a blank Action."
             )
             action = Action()
+            endpoint_func = None
+        else:
+            action = ctx.action
+            endpoint_func = ctx.endpoint_func
 
-        for key, val in paramdict.items():
-            if key not in action.action_params:
-                LOGGER.info(
-                    f"local var '{key}' not found in action.action_params, adding it."
-                )
-                action.action_params.update({key: val})
+        if endpoint_func is not None:
+            try:
+                urlname = self.app.url_path_for(endpoint_func.__name__)
+                action_name = urlname.strip("/").split("/")[-1]
+            except Exception:
+                action_name = endpoint_func.__name__
+        else:
+            action_name = action.action_name or ""
 
-        LOGGER.info(f"Action.action_params: {action.action_params}")
-
-        # name of the caller function
-        calname = sys._getframe().f_back.f_back.f_code.co_name
-        # self.print_message(
-        #     f"this code's filename was: {sys._getframe(0).f_code.co_filename}"
-        # )
-        # self.print_message(
-        #     f"caller's filename was: {sys._getframe(1).f_code.co_filename}"
-        # )
-        # self.print_message(
-        #     f"callercaller's filename was: {sys._getframe(2).f_code.co_filename}"
-        # )
-        # TODO: build calname: urlname dict mapping during init_endpoint_status
-        # fastapi url for caller function
-        urlname = self.app.url_path_for(calname)
-
-        # action name should be the last one
-        action_name = urlname.strip("/").split("/")[-1]
-        # use the already known server_key, not the one from the url
         server_key = self.server.server_name
-
         action.action_server = MachineModel(
             server_name=server_key, machine_name=gethostname().lower()
         )
@@ -562,28 +531,28 @@ class Base:
             action.orchestrator = MachineModel(
                 server_name="MANUAL", machine_name=gethostname().lower()
             )
-        action.action_codehash = get_filehash(sys._getframe(2).f_code.co_filename)
-        action.action_codepath = "/".join(
-            sys._getframe(2)
-            .f_code.co_filename.replace(os.getcwd(), "")
-            .strip("\\")
-            .strip("/")
-            .split(os.sep)
-        )
-        action.action_funcname = sys._getframe(2).f_code.co_name
+
+        if endpoint_func is not None:
+            code = endpoint_func.__code__
+            action.action_codehash = get_filehash(code.co_filename)
+            action.action_codepath = "/".join(
+                code.co_filename.replace(os.getcwd(), "")
+                .strip("\\")
+                .strip("/")
+                .split(os.sep)
+            )
+            action.action_funcname = code.co_name
         return action
 
     def setup_action(self) -> Action:
         """
-        Sets up and returns an Action object.
+        Returns the ``Action`` for the current action-endpoint request.
 
-        This method retrieves the current frame's caller frame and uses it to
-        initialize and return an Action object.
-
-        Returns:
-            Action: The initialized Action object.
+        The Action is built by ``ActionAPIRoute``'s per-request wrapper
+        (see :mod:`helao.core.servers.base_api`) and stored in
+        ``ACTION_CTX``; this method just finalizes it.
         """
-        return self._get_action(frame=inspect.currentframe().f_back)
+        return self._get_action()
 
     async def setup_and_contain_action(
         self,
@@ -607,7 +576,7 @@ class Base:
         Returns:
             ActiveParams: The active parameters after containing the action.
         """
-        action = self._get_action(frame=inspect.currentframe().f_back)
+        action = self._get_action()
         if action_abbr is not None:
             action.action_abbr = action_abbr
         if file_type is None:
