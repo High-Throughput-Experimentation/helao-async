@@ -40,7 +40,7 @@ import builtins
 from helao.helpers import helao_logging as logging
 
 from helao.helpers.to_json import parse_bokeh_input
-from helao.helpers.gen_uuid import md5_string
+from helao.helpers.time_utils import md5_string
 from helao.core.servers.vis import Vis
 from helao.helpers.plate_api import HTEPlateAPI
 

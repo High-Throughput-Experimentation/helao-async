@@ -1,4 +1,4 @@
-from helao.helpers.meta_processor import MetaProcessor
+from helao.helpers.processors import MetaProcessor
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
