@@ -27,6 +27,12 @@ from helao.core.tests.unit_test_artifact_generation import (
 from helao.core.tests.unit_test_dispatcher import dispatcher_unit_test
 from helao.core.tests.unit_test_base_api import base_api_unit_test
 from helao.core.tests.unit_test_orch_status import orch_status_unit_test
+from helao.core.tests.unit_test_helaodict import helaodict_unit_test
+from helao.core.tests.unit_test_version import version_unit_test
+from helao.core.tests.unit_test_error_codes import error_codes_unit_test
+from helao.core.tests.unit_test_extra_models import extra_models_unit_test
+from helao.core.tests.unit_test_helao_driver import helao_driver_unit_test
+from helao.core.tests.unit_test_micro_orch import micro_orch_unit_test
 
 
 TESTS = [
@@ -38,6 +44,12 @@ TESTS = [
     ("dispatcher", dispatcher_unit_test),
     ("base_api", base_api_unit_test),
     ("orch_status", orch_status_unit_test),
+    ("helaodict", helaodict_unit_test),
+    ("version", version_unit_test),
+    ("error_codes", error_codes_unit_test),
+    ("extra_models", extra_models_unit_test),
+    ("helao_driver", helao_driver_unit_test),
+    ("micro_orch", micro_orch_unit_test),
 ]
 
 
