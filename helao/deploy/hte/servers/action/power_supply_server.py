@@ -1,3 +1,17 @@
+"""FastAPI action server for a generic programmable power supply.
+
+Defines three executors that share a :class:`PowerSupplyDriver`:
+
+* :class:`ApplyVoltageExecutor` writes a constant voltage and polls current.
+* :class:`SquareWaveExecutor` produces a single voltage square pulse and
+  polls current.
+* :class:`ConstantCurrentSquareWaveExecutor` produces a constant-current
+  square pulse using ``sleep_time``/``sleep_time1``/``sleep_time2`` to
+  define the OFF / ON / OFF phase boundaries.
+
+The ``power_supply_dyn_endpoints`` hook registers ``apply_voltage``,
+``square_wave``, and ``constant_current_square_wave`` action endpoints.
+"""
 
 __all__ = ["makeApp"]
 
@@ -24,9 +38,31 @@ from enum import Enum
 
 
 class ConstantCurrentSquareWaveExecutor(Executor):
+    """Executor that emits a constant-current square pulse with timed phases.
+
+    The executor tracks four states through a local ``PollFlag`` enum and
+    uses ``sleep_time``, ``sleep_time1``, and ``sleep_time2`` action params
+    as the elapsed-time boundaries between the OFF, ON, and final OFF
+    phases. Voltage is sampled at every poll and reported with the elapsed
+    time.
+
+    Attributes:
+        driver: The bound :class:`PowerSupplyDriver` instance.
+        poll_rate: Polling period in seconds.
+        start_time: Wall-clock start time of the active phase.
+        poll_flag: Current phase, one of the inner ``PollFlag`` values.
+        duration: Sentinel value (``-1``) indicating no external timer.
+    """
+
     driver: PowerSupplyDriver
 
     def __init__(self, *args, **kwargs):
+        """Initialise executor state, phase flag enum, and driver shortcut.
+
+        Args:
+            *args: Forwarded to :class:`Executor`.
+            **kwargs: Forwarded to :class:`Executor`.
+        """
         super().__init__(*args, **kwargs)
         try:
             self.poll_rate = 0.2  # pump events every 100 millisecond
@@ -49,8 +85,13 @@ class ConstantCurrentSquareWaveExecutor(Executor):
             LOGGER.error(f"Failed to initialize apply_voltage executor:", exc_info=True)
           # init should never return for any python class!
 
-    async def _pre_exec(self):
-        " connect to the power supply and set the output to on"
+    async def _pre_exec(self) -> dict:
+        """Open the power-supply connection and enable the output.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.critical_error` if any driver call fails.
+        """
         resp = self.driver.connect()
 
         if resp.response != DriverResponseType.success:
@@ -64,10 +105,16 @@ class ConstantCurrentSquareWaveExecutor(Executor):
             LOGGER.info(f"power supply is connected")
         return {"error": ErrorCodes.none}
 
-    async def _exec(self):
+    async def _exec(self) -> dict:
+        """Reset the supply to zero current and enter the first OFF phase.
+
+        Marks ``start_time`` and transitions the phase flag to ``OFF_0``.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none`.
+        """
         self.start_time = time.time()
-        " apply the voltage to the power supply"
-        
+
         resp = await self.driver.apply_current_async(current=0, sleep_time=0.1)
         resp = self.driver.set_output(output_on=False)
         if resp.response != DriverResponseType.success:
@@ -76,7 +123,19 @@ class ConstantCurrentSquareWaveExecutor(Executor):
         self.poll_flag = self.PollFlag.OFF_0
         return {"error": ErrorCodes.none, }
 
-    async def _poll(self):
+    async def _poll(self) -> dict:
+        """Advance the phase state machine and emit a voltage sample.
+
+        On each poll the elapsed time is compared against ``sleep_time``
+        (OFF_0 -> ON), ``sleep_time1`` (ON -> OFF_1), and ``sleep_time2``
+        (final stop). Voltage is read asynchronously and appended with the
+        elapsed time before returning.
+
+        Returns:
+            Dict containing the sampled ``data`` and an :class:`HloStatus`
+            of ``active`` until ``sleep_time2`` is exceeded, ``finished``
+            thereafter.
+        """
         current_a = self.action_params['current']
         # to do  - speed up the polling and add an exit condition. make errored reads ok
         sleep_time = self.action_params["sleep_time"]
@@ -145,16 +204,36 @@ class ConstantCurrentSquareWaveExecutor(Executor):
         
 
         
-    async def _post_exec(self):
-        " disconnect from the power supply"
+    async def _post_exec(self) -> dict:
+        """Disconnect from the supply on completion.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.critical_error` on disconnect failure.
+        """
         resp = self.driver.disconnect()
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
         return {"error": ErrorCodes.none}
 class ApplyVoltageExecutor(Executor):
+    """Executor that applies a constant voltage and polls current.
+
+    Attributes:
+        driver: The bound :class:`PowerSupplyDriver` instance.
+        poll_rate: Polling period in seconds.
+        start_time: Wall-clock start time of the active phase.
+        duration: Sentinel value (``-1``) indicating no external timer.
+    """
+
     driver: PowerSupplyDriver
 
     def __init__(self, *args, **kwargs):
+        """Initialise executor state and cache action params and driver.
+
+        Args:
+            *args: Forwarded to :class:`Executor`.
+            **kwargs: Forwarded to :class:`Executor`.
+        """
         super().__init__(*args, **kwargs)
         try:
             self.poll_rate = 5  # pump events every 100 millisecond
@@ -170,8 +249,13 @@ class ApplyVoltageExecutor(Executor):
             LOGGER.error(f"Failed to initialize apply_voltage executor:", exc_info=True)
           # init should never return for any python class!
 
-    async def _pre_exec(self):
-        " connect to the power supply and set the output to on"
+    async def _pre_exec(self) -> dict:
+        """Open the power-supply connection and enable the output.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.critical_error` on any driver failure.
+        """
         resp = self.driver.connect()
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
@@ -180,8 +264,13 @@ class ApplyVoltageExecutor(Executor):
             return {"error": ErrorCodes.critical_error}
         return {"error": ErrorCodes.none}
 
-    async def _exec(self):
-        " apply the voltage to the power supply"
+    async def _exec(self) -> dict:
+        """Apply the configured voltage and re-enable the output.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.critical_error` on failure.
+        """
         voltage = self.action_params["voltage"]
         sleep_time = self.action_params["sleep_time"]
         resp = await self.driver.apply_voltage_async(voltage=voltage, sleep_time=sleep_time)
@@ -190,8 +279,14 @@ class ApplyVoltageExecutor(Executor):
             return {"error": ErrorCodes.critical_error}
         return {"error": ErrorCodes.none}
 
-    async def _poll(self):
-        " poll the voltage of the power supply"
+    async def _poll(self) -> dict:
+        """Sample the supply current.
+
+        Returns:
+            Dict with the sampled ``data``, an :class:`HloStatus.active` on
+            a successful read, or :attr:`ErrorCodes.critical_error` and
+            :class:`HloStatus.errored` on a failed read.
+        """
         resp = await self.driver.get_current_async(sleep_time=self.poll_rate)
         LOGGER.info(f"_poll response is {resp}")
         status = HloStatus.active
@@ -200,8 +295,13 @@ class ApplyVoltageExecutor(Executor):
             return {"error": ErrorCodes.critical_error, "status": status}
         return {"error": ErrorCodes.none, "data": resp.data, "status": status}
 
-    async def _post_exec(self):
-        " disconnect from the power supply"
+    async def _post_exec(self) -> dict:
+        """Disconnect from the supply on completion.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.critical_error` on disconnect failure.
+        """
         resp = self.driver.disconnect()
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
@@ -209,9 +309,27 @@ class ApplyVoltageExecutor(Executor):
 
 
 class SquareWaveExecutor(Executor):
+    """Executor that emits a single voltage square pulse.
+
+    Pulses the output off then on around an ``apply_voltage_async`` call
+    spaced by ``sleep_time``, and polls current between cycles.
+
+    Attributes:
+        driver: The bound :class:`PowerSupplyDriver` instance.
+        poll_rate: Polling period in seconds.
+        start_time: Wall-clock start time of the active phase.
+        duration: Sentinel value (``-1``) indicating no external timer.
+    """
+
     driver: PowerSupplyDriver
 
     def __init__(self, *args, **kwargs):
+        """Initialise executor state and cache action params and driver.
+
+        Args:
+            *args: Forwarded to :class:`Executor`.
+            **kwargs: Forwarded to :class:`Executor`.
+        """
         super().__init__(*args, **kwargs)
         try:
             self.poll_rate = 5  # pump events every 100 millisecond
@@ -227,8 +345,13 @@ class SquareWaveExecutor(Executor):
             LOGGER.error(f"Failed to initialize apply_voltage executor:", exc_info=True)
           # init should never return for any python class!
 
-    async def _pre_exec(self):
-        " connect to the power supply and set the output to on"
+    async def _pre_exec(self) -> dict:
+        """Open the power-supply connection and enable the output.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.critical_error` on any driver failure.
+        """
         resp = self.driver.connect()
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
@@ -237,8 +360,17 @@ class SquareWaveExecutor(Executor):
             return {"error": ErrorCodes.critical_error}
         return {"error": ErrorCodes.none}
 
-    async def _exec(self):
-        " apply the voltage to the power supply"
+    async def _exec(self) -> dict:
+        """Emit the off-on-off voltage square pulse.
+
+        Sequence: disable output, sleep, re-enable, apply voltage, sleep,
+        disable. Any driver-call failure is logged and returns
+        :attr:`ErrorCodes.critical_error`.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.critical_error` on failure.
+        """
         voltage = self.action_params["voltage"]
         sleep_time = self.action_params["sleep_time"]
         try:
@@ -266,8 +398,13 @@ class SquareWaveExecutor(Executor):
             LOGGER.error(f"SquareWaveExecutor failed:", exc_info=True)
             return {"error": ErrorCodes.critical_error}
 
-    async def _poll(self):
-        " poll the voltage of the power supply"
+    async def _poll(self) -> dict:
+        """Sample the supply current.
+
+        Returns:
+            Dict with the sampled ``data`` on success, or
+            :attr:`ErrorCodes.critical_error` on failure.
+        """
         try:
             resp = await self.driver.get_current_async(sleep_time=0.1)
             LOGGER.info(f"SquareWaveExecutor poll response: {resp}")
@@ -280,8 +417,13 @@ class SquareWaveExecutor(Executor):
             LOGGER.error(f"SquareWaveExecutor poll failed:", exc_info=True)
             return {"error": ErrorCodes.critical_error}
 
-    async def _post_exec(self):
-        " disconnect from the power supply"
+    async def _post_exec(self) -> dict:
+        """Disconnect from the supply on completion.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.critical_error` on disconnect failure.
+        """
         resp = self.driver.disconnect()
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
@@ -290,6 +432,14 @@ class SquareWaveExecutor(Executor):
 
 
 async def power_supply_dyn_endpoints(app: BaseAPI):
+    """Register the power-supply action endpoints.
+
+    Disables concurrent actions on this server and attaches ``apply_voltage``,
+    ``square_wave``, and ``constant_current_square_wave`` endpoints.
+
+    Args:
+        app: The :class:`BaseAPI` instance being configured.
+    """
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
 
@@ -300,7 +450,17 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         voltage: float = 1.0,
         sleep_time: float = 0.05,
     ):
-        """Apply voltage to the power supply asynchronously."""
+        """Start an :class:`ApplyVoltageExecutor` to drive a constant voltage.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            voltage: Voltage setpoint in volts.
+            sleep_time: Delay forwarded to the driver between operations.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
 
         # Prepare json_data_keys for logging/serialization (for example: ["elapsed_time_s", "voltage_v", "current_a"])
         data_keys = ["elapsed_time_s", "voltage_v", "current_a"]  # Adjust as needed
@@ -335,7 +495,17 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         voltage: float = 1.0,
         sleep_time: float = 0.05,
     ):
-        """Apply voltage to the power supply asynchronously."""
+        """Start a :class:`SquareWaveExecutor` to emit a voltage square pulse.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            voltage: Pulse amplitude in volts.
+            sleep_time: Phase duration between output toggles in seconds.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
 
         # Prepare json_data_keys for logging/serialization (for example: ["elapsed_time_s", "voltage_v", "current_a"])
         data_keys = ["elapsed_time_s", "voltage_v", "current_a"]  # Adjust as needed
@@ -373,7 +543,23 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         sleep_time1: float = 1,
         sleep_time2: float = 1,
     ):
-        """Apply constant current square wave to the power supply asynchronously."""
+        """Start a :class:`ConstantCurrentSquareWaveExecutor` to emit a current pulse.
+
+        ``sleep_time``, ``sleep_time1``, and ``sleep_time2`` are elapsed-time
+        thresholds that define the OFF/ON/OFF phase transitions inside the
+        executor's poll loop.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            current: Constant current setpoint in amperes during the ON phase.
+            sleep_time: Elapsed time at which OFF_0 transitions to ON.
+            sleep_time1: Elapsed time at which ON transitions to OFF_1.
+            sleep_time2: Elapsed time at which polling finishes.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
 
         # Prepare json_data_keys for logging/serialization (for example: ["elapsed_time_s", "voltage_v", "current_a"])
         data_keys = ["elapsed_time_s", "voltage_v", "current_a"]  # Adjust as needed
@@ -404,7 +590,18 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the BaseAPI app for a generic programmable power supply.
+
+    Args:
+        server_key: Unique key identifying this server in the orchestration
+            group.
+
+    Returns:
+        The configured BaseAPI instance with power-supply action endpoints
+        attached via :func:`power_supply_dyn_endpoints` and a private
+        ``stop_private`` endpoint that disconnects the driver.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -417,7 +614,7 @@ def makeApp(server_key):
 
     @app.post("/stop_private", tags=["private"])
     def stop_private():
-        """Calls driver stop method."""
+        """Disconnect from the power supply via the driver."""
         app.driver.disconnect()
 
     return app

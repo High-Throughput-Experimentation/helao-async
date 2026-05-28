@@ -1,3 +1,11 @@
+"""FastAPI scaffolding for HELAO action servers.
+
+Provides the ``BaseAPI`` application class, the action-endpoint route wrapper
+that captures the per-request ``Action`` into a ``ContextVar``, the middleware
+that queues simultaneous action POSTs, and the shared private/utility
+endpoints registered on every Base- or Orch-style server.
+"""
+
 import os
 import json
 import time
@@ -67,7 +75,12 @@ ACTION_PARAM_KEYS = [
 
 @dataclass
 class ActionInvocation:
-    """Per-request snapshot of an action-tagged endpoint invocation."""
+    """Snapshot of an action-tagged endpoint invocation for one request.
+
+    Attributes:
+        action: The ``Action`` reconstructed from the request's kwargs.
+        endpoint_func: The underlying endpoint function being invoked.
+    """
 
     action: Action
     endpoint_func: Callable
@@ -79,12 +92,17 @@ ACTION_CTX: ContextVar[Optional[ActionInvocation]] = ContextVar(
 
 
 def _build_action_from_kwargs(kwargs: dict) -> Action:
-    """Reconstruct the Action that frame-inspection used to scrape from locals.
+    """Build an ``Action`` from an endpoint's parsed keyword arguments.
 
-    Picks the first ``Action``-typed kwarg (matching the historical
-    "found Action BaseModel under parameter '<name>'" behavior) and folds
-    every remaining kwarg into ``action.action_params`` unless that key is
-    already set (e.g. by the orchestrator dispatcher).
+    Picks the first ``Action``-typed kwarg as the base action and folds every
+    remaining kwarg into ``action.action_params`` unless that key has already
+    been provided (for example by the orchestrator dispatcher).
+
+    Args:
+        kwargs: Mapping of parameter name to value as resolved by FastAPI.
+
+    Returns:
+        The reconstructed ``Action`` instance.
     """
     action: Optional[Action] = None
     seen_action_param: Optional[str] = None
@@ -118,16 +136,20 @@ def _build_action_from_kwargs(kwargs: dict) -> Action:
 
 
 def wrap_action_endpoint(fn: Callable) -> Callable:
-    """Wrap *fn* so its invocation populates ``ACTION_CTX``.
+    """Wrap an action endpoint so each invocation populates ``ACTION_CTX``.
 
-    The wrapper mirrors the original signature exactly, which keeps both
-    FastAPI's parameter resolution and the ZMQ-RPC fast-path
-    (``_coerce_args`` in ``helao.core.rpc.zmq_rpc``) working unchanged.
-    Inside the wrapper, the parsed kwargs are rebuilt into an ``Action``
-    (matching what ``_get_action``'s frame-walk used to do) and stored in
-    a ContextVar so ``Base.setup_action`` and
-    ``Base.setup_and_contain_action`` can read it without inspecting
-    caller frames.
+    The wrapper preserves ``fn``'s original signature so FastAPI parameter
+    resolution and the ZMQ-RPC fast-path continue to work. The parsed kwargs
+    are rebuilt into an ``Action`` and stored in a ``ContextVar`` so
+    ``Base.setup_action`` and ``Base.setup_and_contain_action`` can recover
+    the action without inspecting caller frames.
+
+    Args:
+        fn: The action endpoint function to wrap.
+
+    Returns:
+        A wrapper with the same signature as ``fn`` that sets ``ACTION_CTX``
+        for the duration of the call.
     """
     sig = inspect.signature(fn)
     is_async = asyncio.iscoroutinefunction(fn)
@@ -163,14 +185,16 @@ def wrap_action_endpoint(fn: Callable) -> Callable:
 
 
 class ActionAPIRoute(APIRoute):
-    """APIRoute that auto-wraps endpoints tagged ``"action"``.
+    """``APIRoute`` subclass that auto-wraps endpoints tagged ``"action"``.
 
     Installing this as the router's ``route_class`` means every
-    ``@app.post(..., tags=["action"])`` handler is transparently wrapped
-    at registration time, with no churn in deployment endpoint files.
+    ``@app.post(..., tags=["action"])`` handler is transparently passed
+    through :func:`wrap_action_endpoint` at registration time, with no
+    changes needed in deployment endpoint files.
     """
 
     def __init__(self, *args, **kwargs):
+        """Wrap the registered endpoint with ``wrap_action_endpoint`` when tagged ``"action"``."""
         tags = kwargs.get("tags") or []
         if "action" in tags:
             endpoint = kwargs.get("endpoint")
@@ -179,15 +203,24 @@ class ActionAPIRoute(APIRoute):
         super().__init__(*args, **kwargs)
 
 
-def _make_app_entry_middleware(server_key: str, get_srv):
-    """Return an ``app_entry`` middleware function bound to *get_srv*.
+def _make_app_entry_middleware(server_key: str, get_srv) -> Callable:
+    """Build the per-request ``app_entry`` middleware for an action server.
 
-    *get_srv* is a zero-argument callable that returns the live Base/Orch
-    instance.  Using a callable lets us register the middleware at
-    construction time before the instance exists.
+    The middleware queues incoming action POSTs when the endpoint is busy
+    or when concurrency is disabled, dispatches HEAD requests to a no-op
+    response, and otherwise forwards to ``call_next``.
+
+    Args:
+        server_key: Server key used to recognize routed action endpoints.
+        get_srv: Zero-argument callable returning the live ``Base`` or
+            ``Orch`` instance (resolved lazily, after startup).
+
+    Returns:
+        The middleware coroutine to register with the FastAPI app.
     """
 
     async def app_entry(request: Request, call_next):
+        """Queue colliding action POSTs and pass other requests through."""
         srv = get_srv()
         endpoint = request.url.path.strip("/").split("/")[-1]
         if request.method == "HEAD":  # comes from endpoint checker, session.head()
@@ -273,10 +306,23 @@ def _make_app_entry_middleware(server_key: str, get_srv):
     return app_entry
 
 
-def _make_http_exception_handler(server_key: str, get_srv):
-    """Return a ``custom_http_exception_handler`` bound to *get_srv*."""
+def _make_http_exception_handler(server_key: str, get_srv) -> Callable:
+    """Build the Starlette HTTP exception handler for an action server.
+
+    The returned handler triggers an emergency stop on all active actions
+    and stops all executors when a routed action endpoint raises.
+
+    Args:
+        server_key: Server key used to recognize routed action endpoints.
+        get_srv: Zero-argument callable returning the live ``Base`` or
+            ``Orch`` instance.
+
+    Returns:
+        The exception handler coroutine to register with the FastAPI app.
+    """
 
     async def custom_http_exception_handler(request, exc):
+        """E-stop active work, then delegate to FastAPI's default handler."""
         if request.url.path.strip("/").startswith(f"{server_key}/"):
             print(f"Could not process request: {repr(exc)}")
             srv = get_srv()
@@ -290,7 +336,7 @@ def _make_http_exception_handler(server_key: str, get_srv):
 
 
 def _add_default_head_endpoints(app) -> None:
-    """Copy every POST route as a HEAD route (used by the endpoint checker)."""
+    """Mirror every POST route as a HEAD route used by the endpoint checker."""
     for route in app.routes:
         if isinstance(route, APIRoute) and "POST" in route.methods:
             new_route = copy(route)
@@ -300,20 +346,16 @@ def _add_default_head_endpoints(app) -> None:
 
 
 def _register_utility_endpoints(fastapp) -> None:
-    """Register the four utility/debug private endpoints on *fastapp*.
-
-    These endpoints are identical for BaseAPI and OrchAPI; extracting them
-    here removes the duplication.
-    """
+    """Register the shared debug/private endpoints used by Base and Orch APIs."""
 
     @fastapp.post("/_raise_exception", tags=["private"])
     def _raise_exception():
-        """Raise a test exception for error-recovery debugging."""
+        """Raise a synchronous test exception for error-recovery debugging."""
         raise Exception("test exception for error recovery debugging")
 
     @fastapp.post("/_raise_async_exception", tags=["private"])
     async def _raise_async_exception():
-        """Schedule an async exception after 10 s for debugging."""
+        """Schedule a coroutine that raises after a 10-second delay."""
 
         async def sleep_then_error():
             print(f"Start time: {time.time()}")
@@ -327,7 +369,7 @@ def _register_utility_endpoints(fastapp) -> None:
 
     @fastapp.post("/test_alert", tags=["private"])
     async def test_alert():
-        """Trigger a test LOGGER alert."""
+        """Emit a test alert through the HELAO logger."""
         try:
             LOGGER.alert("TEST ALERT: this is a test alert.")
             return True
@@ -337,7 +379,7 @@ def _register_utility_endpoints(fastapp) -> None:
 
     @fastapp.post("/test_receive", tags=["private"])
     async def test_receive(text: Annotated[str, Body(..., embed=True)]):
-        """Echo *text* to the logger."""
+        """Echo ``text`` to the logger at INFO level."""
         try:
             LOGGER.info("TEST RECEIVE: " + text)
             return True
@@ -347,79 +389,21 @@ def _register_utility_endpoints(fastapp) -> None:
 
 
 class BaseAPI(HelaoFastAPI):
-    """
-    BaseAPI class extends HelaoFastAPI to provide additional functionality for handling
-    middleware, exception handling, startup and shutdown events, WebSocket connections,
-    and various endpoints for configuration, status, and control.
+    """FastAPI application class used by every HELAO action server.
+
+    Wires up the ``Base`` controller as a startup event, installs the
+    action-queueing middleware and HTTP exception handler, exposes the
+    status/data/live WebSocket endpoints, and registers the standard
+    private endpoints (config, status, client attach/detach, executor
+    control, debug utilities, emergency stop, shutdown).
 
     Attributes:
-        base (Base): An instance of the Base class.
-        driver (Optional[HelaoDriver]): An optional driver instance.
-        poller (Optional[DriverPoller]): An optional poller instance.
-
-    Methods:
-        __init__(config, server_key, server_title, description, version, driver_classes=None, dyn_endpoints=None, poller_class=None):
-            Initializes the BaseAPI instance with the given configuration and parameters.
-
-        app_entry(request: Request, call_next):
-            Middleware function to handle incoming HTTP requests and manage action queuing.
-
-        custom_http_exception_handler(request, exc):
-            Custom exception handler for HTTP exceptions.
-
-        startup_event():
-            Event handler for application startup.
-
-        add_default_head_endpoints():
-            Adds default HEAD endpoints for all POST routes.
-
-        websocket_status(websocket: WebSocket):
-            WebSocket endpoint to broadcast status messages.
-
-        websocket_data(websocket: WebSocket):
-            WebSocket endpoint to broadcast status dictionaries.
-
-        websocket_live(websocket: WebSocket):
-            WebSocket endpoint to broadcast live buffer dictionaries.
-
-        get_config():
-            Endpoint to retrieve the server configuration.
-
-        get_status():
-            Endpoint to retrieve the server status.
-
-        attach_client(client_servkey: str, client_host: str, client_port: int):
-            Endpoint to attach a client to the server.
-
-        stop_executor(executor_id: str):
-            Endpoint to stop a specific executor.
-
-        get_all_urls():
-            Endpoint to retrieve all URLs on the server.
-
-        get_lbuf():
-            Endpoint to retrieve the live buffer.
-
-        list_executors():
-            Endpoint to list all executors.
-
-        _raise_exception():
-            Endpoint to raise a test exception for debugging.
-
-        _raise_async_exception():
-            Endpoint to raise a test asynchronous exception for debugging.
-
-        resend_active(action_uuid: str):
-            Endpoint to resend the last active action.
-
-        post_shutdown():
-            Endpoint to initiate server shutdown.
-
-        shutdown_event():
-            Event handler for application shutdown.
-
-        estop(action: Action, switch: bool):
-            Endpoint to handle emergency stop (estop) actions.
+        base: The ``Base`` controller instance bound to this app.
+        driver: First entry of ``drivers`` if any, else ``None``.
+        poller: Optional ``DriverPoller`` instance.
+        drivers: Named-tuple of constructed driver instances.
+        root_dir: Resolved root directory for outputs.
+        fault_dir: Directory used for fault dumps and logs.
     """
 
     base: Base
@@ -437,18 +421,20 @@ class BaseAPI(HelaoFastAPI):
         dyn_endpoints=None,
         poller_class=None,
     ):
-        """
-        Initialize the BaseAPI server.
+        """Initialize the BaseAPI app and register its routes and events.
 
-            config (dict): Configuration dictionary for the server.
-            server_key (str): Unique key identifying the server.
-            server_title (str): Title of the server.
-            description (str): Description of the server.
-            version (str): Version of the server.
-            driver_class (type, optional): Class of the driver to be used. Defaults to None.
-            dyn_endpoints (list, optional): List of dynamic endpoints. Defaults to None.
-            poller_class (type, optional): Class of the poller to be used. Defaults to None.
-
+        Args:
+            server_key: Unique key identifying the server in the world config.
+            server_title: Title of the server, surfaced to the OpenAPI docs.
+            description: OpenAPI description of the server.
+            version: Server/version string.
+            driver_classes: Optional iterable of driver classes to instantiate
+                on startup; ``HelaoDriver`` subclasses receive ``server_params``,
+                others receive the ``Base`` instance.
+            dyn_endpoints: Optional callable invoked with the app instance to
+                register additional routes at startup.
+            poller_class: Optional ``DriverPoller`` subclass attached to the
+                first driver if a poller is desired.
         """
         super().__init__(
             helao_srv=server_key,
@@ -467,18 +453,7 @@ class BaseAPI(HelaoFastAPI):
 
         @self.on_event("startup")
         def startup_event():
-            """
-            Initializes the server during startup.
-
-            This method performs the following actions:
-            - Creates an instance of the Base class with the current FastAPI app and dynamic endpoints.
-            - Retrieves the root directory from the world configuration and sets up the fault directory and fault file if the root directory is specified.
-            - Initializes the base instance.
-            - If a driver class is provided and it is a subclass of HelaoDriver, it initializes the driver with the server parameters.
-            - If a poller class is provided, it initializes the poller with the driver and polling time from the server configuration.
-            - If the driver class is not a subclass of HelaoDriver, it initializes the driver with the base instance.
-            - Initializes dynamic endpoints for the base instance.
-            """
+            """Construct the ``Base`` controller, drivers, poller and fault dir on startup."""
             self.base = Base(app=self, dyn_endpoints=dyn_endpoints)
 
             self.root_dir = self.base.world_cfg.get("root", None)
@@ -512,20 +487,7 @@ class BaseAPI(HelaoFastAPI):
 
         @self.websocket("/ws_status")
         async def websocket_status(websocket: WebSocket):
-            """
-            Handles the WebSocket connection for status updates.
-
-            This asynchronous method manages the WebSocket connection for status updates.
-            It connects the WebSocket to the status publisher, broadcasts status updates,
-            and handles disconnections.
-
-            Args:
-                websocket (WebSocket): The WebSocket connection to be managed.
-
-            Raises:
-                WebSocketDisconnect: If the WebSocket connection is disconnected.
-                ConnectionClosedOK: If the WebSocket connection is closed normally.
-            """
+            """Subscribe the client to the status publisher and stream updates until disconnect."""
             await self.base.status_publisher.connect(websocket)
             try:
                 await self.base.status_publisher.broadcast(websocket)
@@ -536,20 +498,7 @@ class BaseAPI(HelaoFastAPI):
 
         @self.websocket("/ws_data")
         async def websocket_data(websocket: WebSocket):
-            """
-            Handles websocket data connection and broadcasting.
-
-            This asynchronous function manages the connection of a websocket to the
-            data publisher, handles broadcasting of data, and ensures proper
-            disconnection in case of websocket disconnection or closure.
-
-            Args:
-                websocket (WebSocket): The websocket connection to be managed.
-
-            Raises:
-                WebSocketDisconnect: If the websocket gets disconnected.
-                ConnectionClosedOK: If the websocket connection is closed properly.
-            """
+            """Subscribe the client to the data publisher and stream packets until disconnect."""
             await self.base.data_publisher.connect(websocket)
             try:
                 await self.base.data_publisher.broadcast(websocket)
@@ -560,20 +509,7 @@ class BaseAPI(HelaoFastAPI):
 
         @self.websocket("/ws_live")
         async def websocket_live(websocket: WebSocket):
-            """
-            Handle live websocket connections.
-
-            This asynchronous function manages the lifecycle of a websocket connection.
-            It connects the websocket to the live publisher, broadcasts messages, and
-            handles disconnections.
-
-            Args:
-                websocket (WebSocket): The websocket connection to manage.
-
-            Raises:
-                WebSocketDisconnect: If the websocket is disconnected unexpectedly.
-                ConnectionClosedOK: If the websocket connection is closed normally.
-            """
+            """Subscribe the client to the live-buffer publisher and stream until disconnect."""
             await self.base.live_publisher.connect(websocket)
             try:
                 await self.base.live_publisher.broadcast(websocket)
@@ -584,26 +520,12 @@ class BaseAPI(HelaoFastAPI):
 
         @self.post("/get_config", tags=["private"])
         def get_config():
-            """
-            Retrieve the world configuration.
-
-            Returns:
-                dict: The world configuration dictionary.
-            """
+            """Return the world configuration dictionary."""
             return self.base.world_cfg
 
         @self.post("/get_status", tags=["private"])
         def get_status():
-            """
-            Retrieve the current status of the action server and its driver.
-
-            Returns:
-                dict: A dictionary containing the status of the action server and the driver.
-                  The dictionary includes the following keys:
-                  - All keys from the action server model dump.
-                  - '_driver_status': The status of the driver, which can be "not_implemented",
-                    DriverStatus.ok, or the status returned by the driver's get_status method.
-            """
+            """Return the action server status with the driver/poller status appended."""
             status_dict = self.base.actionservermodel.model_dump()
             driver_status = "not_implemented"
             # first check if poller is available
@@ -621,16 +543,15 @@ class BaseAPI(HelaoFastAPI):
         async def attach_client(
             client_servkey: str, client_host: str, client_port: int
         ):
-            """
-            Asynchronously attaches a client to the base server.
+            """Subscribe a remote client to this server's status updates.
 
             Args:
-                client_servkey (str): The service key of the client.
-                client_host (str): The hostname of the client.
-                client_port (int): The port number of the client.
+                client_servkey: Service key of the client to subscribe.
+                client_host: Hostname of the client.
+                client_port: Port the client listens on.
 
             Returns:
-                The result of the base server's attach_client method.
+                Result of ``Base.attach_client`` (True on success).
             """
             return await self.base.attach_client(
                 client_servkey, client_host, client_port
@@ -638,73 +559,34 @@ class BaseAPI(HelaoFastAPI):
 
         @self.post("/detach_client", tags=["private"])
         def detach_client(client_servkey: str, client_host: str, client_port: int):
-            """
-            Detach a client from the base server.
-
-            Args:
-                client_servkey (str): The service key of the client to detach.
-
-            Returns:
-                The result of the base server's detach_client method.
-            """
+            """Remove a client from this server's status subscriber list."""
             return self.base.detach_client(client_servkey, client_host, client_port)
 
         @self.post("/stop_executor", tags=["private"])
         def stop_executor(executor_id: str):
-            """
-            Stops the executor with the given executor ID.
-
-            Args:
-                executor_id (str): The ID of the executor to stop.
-
-            Returns:
-                The result of the stop operation from the base.
-            """
+            """Signal the executor with ``executor_id`` to stop its polling loop."""
             return self.base.stop_executor(executor_id)
 
         @self.post("/endpoints", tags=["private"])
         def get_all_urls():
-            """
-            Retrieve all URLs.
-
-            Returns:
-                list: A list of URLs from the `fast_urls` attribute of the `base` object.
-            """
+            """Return the list of endpoints registered on this server."""
             return self.base.fast_urls
 
         @self.post("/get_lbuf", tags=["private"])
         def get_lbuf():
-            """
-            Retrieve the live buffer from the base.
-
-            Returns:
-                The live buffer object from the base.
-            """
+            """Return the current contents of the live buffer."""
             return self.base.live_buffer
 
         @self.post("/list_executors", tags=["private"])
         def list_executors():
-            """
-            List the keys of the executors in the base.
-
-            Returns:
-                list: A list of keys from the executors dictionary.
-            """
+            """Return the keys of all currently running executors."""
             return list(self.base.executors.keys())
 
         _register_utility_endpoints(self)
 
         @self.post("/resend_active", tags=["private"])
         def resend_active(action_uuid: str):
-            """
-            Resends the most recent active action or creates a new action if none exist.
-
-            Args:
-                action_uuid (str): The UUID of the action to be created if no active actions are found.
-
-            Returns:
-                dict: A dictionary representation of the most recent active action or a new action.
-            """
+            """Return the most recent active action or a fresh ``Action`` if none exist."""
             l10 = [y for x, y in self.base.last_10_active]
             if l10:
                 return l10[0].action.as_dict()
@@ -713,27 +595,16 @@ class BaseAPI(HelaoFastAPI):
 
         @self.post("/shutdown", tags=["private"])
         async def post_shutdown():
-            """
-            Asynchronously handles the shutdown process by awaiting the shutdown_event.
-
-            This function is intended to be called when a shutdown signal is received,
-            ensuring that the shutdown_event coroutine is executed properly.
-            """
+            """Trigger the FastAPI shutdown handler via an HTTP request."""
             await shutdown_event()
 
         @self.on_event("shutdown")
         async def shutdown_event():
-            """
-            Handles the shutdown event for the server.
-
-            This method performs the following steps:
-            1. Logs the shutdown action.
-            2. Calls the base shutdown method.
-            3. Checks if the driver has `shutdown` and `async_shutdown` methods and calls them if they exist.
-            4. Disables the fault handler and closes the fault file if `root_dir` is set.
+            """Shut down the ``Base`` controller, invoke driver shutdown hooks, and close fault logs.
 
             Returns:
-                dict: A dictionary containing the return values of the `shutdown` and `async_shutdown` methods, if they exist.
+                A dict with the return values of the driver's ``shutdown`` and
+                ``async_shutdown`` methods (or ``None`` if not implemented).
             """
             LOGGER.info("action shutdown")
             await self.base.shutdown()
@@ -765,21 +636,9 @@ class BaseAPI(HelaoFastAPI):
             action: Action = Body({}, embed=True),
             switch: bool = True,
         ):
-            """
-            Emergency stop (estop) action handler.
-
-            This asynchronous function handles the emergency stop action. It sets up
-            and contains the action, checks if the driver has an estop function, and
-            either calls it or sets the estop switch accordingly. It also updates the
-            action status and stops all executors.
-
-            Args:
-                action (Action): The action object containing parameters for the estop action.
-                switch (bool): A flag indicating whether to switch the estop on or off.
-                       Defaults to True.
-
-            Returns:
-                dict: A dictionary representation of the finished action.
+            """Trigger an emergency stop: call the driver's estop hook (if any), latch the
+            E-STOP flag when ``switch`` is True, mark the action as estopped, and stop all
+            running executors. Returns the finished action as a dict.
             """
             active = await self.base.setup_and_contain_action(
                 json_data_keys=["estop"], action_abbr="estop"

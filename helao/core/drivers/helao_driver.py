@@ -1,20 +1,10 @@
-"""
-This module defines the core classes and methods for the Helao driver framework.
+"""Abstract driver contract used by every HELAO device backend.
 
-Classes:
-    DriverStatus (StrEnum): Enumerated driver status strings for DriverResponse objects.
-    DriverResponseType (StrEnum): Success or failure flag for a public driver method's response.
-    DriverResponse (dataclass): Standardized response for all public driver methods.
-    HelaoDriver (ABC): Generic class for Helao drivers without base.py dependency.
-    DriverPoller: Generic class for Helao driver polling with optional base dependency.
-
-Functions:
-    HelaoDriver.connect(self) -> DriverResponse: Open connection to resource.
-    HelaoDriver.get_status(self) -> DriverResponse: Return current driver status.
-    HelaoDriver.stop(self) -> DriverResponse: General stop method, abort all active methods e.g. motion, I/O, compute.
-    HelaoDriver.reset(self) -> DriverResponse: Reinitialize driver, force-close old connection if necessary.
-    HelaoDriver.disconnect(self) -> DriverResponse: Release connection to resource.
-    DriverPoller.get_data(self) -> DriverResponse: Method to be implemented by subclasses to return a dictionary of polled values.
+Defines the response envelope (``DriverResponse``), status/result enums
+(``DriverStatus``, ``DriverResponseType``), the ``HelaoDriver`` ABC that all
+drivers implement (``connect``/``get_status``/``stop``/``reset``/``disconnect``),
+and ``DriverPoller`` which runs a periodic ``get_data`` loop on a driver and
+mirrors the result into a live dictionary.
 """
 
 import asyncio
@@ -29,15 +19,15 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class DriverStatus(StrEnum):
-    """
-    DriverStatus is an enumeration representing the various states a driver can be in.
+    """Operational state of a driver, reported on every ``DriverResponse``.
 
     Attributes:
-        ok (str): Indicates the driver is working as expected.
-        busy (str): Indicates the driver is operating or using a resource.
-        error (str): Indicates the driver returned a low-level error.
-        uninitialized (str): Indicates the driver connection to the device has not been established.
-        unknown (str): Indicates the driver is in an unknown state.
+        ok: Driver is working as expected.
+        busy: Driver is operating or holding a resource.
+        error: Driver returned a low-level error.
+        uninitialized: Connection to the device has not been established.
+        unknown: Driver is in an unknown state.
+        retry: Last operation failed and the driver suggests retrying.
     """
 
     ok = "ok"  # driver is working as expected
@@ -51,13 +41,12 @@ class DriverStatus(StrEnum):
 
 
 class DriverResponseType(StrEnum):
-    """
-    DriverResponseType is an enumeration that represents the possible outcomes of a method execution in the driver.
+    """Success/failure flag attached to a driver method's response.
 
     Attributes:
-        success (str): Indicates that the method executed successfully.
-        failed (str): Indicates that the method did not execute successfully.
-        not_implemented (str): Indicates that the method is not implemented.
+        success: Method executed successfully.
+        failed: Method did not execute successfully.
+        not_implemented: Method is not implemented for this driver.
     """
 
     success = "success"  # method executed successfully
@@ -67,19 +56,14 @@ class DriverResponseType(StrEnum):
 
 @dataclass
 class DriverResponse:
-    """
-    DriverResponse class encapsulates the response from a driver operation.
+    """Standardized return value of every public driver method.
 
     Attributes:
-        response (DriverResponseType): The type of response from the driver.
-        message (str): A message associated with the response.
-        data (dict): Additional data related to the response.
-        status (DriverStatus): The status of the driver response.
-        timestamp (datetime): The timestamp when the response was created.
-
-    Methods:
-        __post_init__(): Initializes the timestamp attribute after the object is created.
-        timestamp_str(): Returns the timestamp as a formatted string.
+        response: Success/failure/not-implemented flag for the call.
+        message: Optional human-readable message.
+        data: Method-specific payload.
+        status: Operational state of the driver at the time of the response.
+        timestamp: When the response object was constructed (set automatically).
     """
 
     response: DriverResponseType = DriverResponseType.not_implemented
@@ -89,137 +73,86 @@ class DriverResponse:
     timestamp: datetime = field(init=False)
 
     def __post_init__(self):
+        """Stamp the response with the current wall-clock time."""
         self.timestamp = datetime.now()
 
     @property
-    def timestamp_str(self):
+    def timestamp_str(self) -> str:
+        """Timestamp formatted as ``YYYY-MM-DD HH:MM:SS,mmm``."""
         return self.timestamp.strftime("%F %T,%f")[:-3]
 
 
 class HelaoDriver(ABC):
-    """
-    HelaoDriver is an abstract base class that defines the interface for a driver in the Helao system.
+    """Abstract base class every HELAO device driver implements.
+
+    Subclasses must implement five public methods that each return a
+    ``DriverResponse``: ``connect``, ``get_status``, ``stop``, ``reset``, and
+    ``disconnect``. Construction records a creation timestamp and stores the
+    caller-supplied config dict.
 
     Attributes:
-        timestamp (datetime): The timestamp when the driver instance was created.
-        config (dict): Configuration dictionary for the driver.
-
-    Methods:
-        connect() -> DriverResponse:
-            Open connection to resource.
-        get_status() -> DriverResponse:
-            Return current driver status.
-        stop() -> DriverResponse:
-            General stop method, abort all active methods e.g. motion, I/O, compute.
-        reset() -> DriverResponse:
-            Reinitialize driver, force-close old connection if necessary.
-        disconnect() -> DriverResponse:
-            Release connection to resource.
-
-    Properties:
-        _created_at (str):
-            Instantiation timestamp formatted as "YYYY-MM-DD HH:MM:SS,mmm".
-        _uptime (str):
-            Driver uptime formatted as "YYYY-MM-DD HH:MM:SS,mmm".
+        timestamp: When the driver instance was created.
+        config: Configuration dictionary supplied at construction.
     """
 
     timestamp: datetime
     config: dict
 
     def __init__(self, config: dict = {}):
-        """
-        Initializes the HelaoDriver instance.
+        """Record the creation timestamp and store the driver config.
 
         Args:
-            config (dict, optional): Configuration dictionary for the driver. Defaults to an empty dictionary.
-
-        Attributes:
-            timestamp (datetime): The timestamp when the instance is created.
-            config (dict): The configuration dictionary for the driver.
+            config: Driver-specific configuration. Defaults to an empty dict.
         """
         self.timestamp = datetime.now()
         self.config = config
 
     @property
-    def _created_at(self):
-        """
-        Returns the creation timestamp formatted as a string.
-
-        The timestamp is formatted as "YYYY-MM-DD HH:MM:SS,mmm" where "mmm"
-        represents milliseconds.
-
-        Returns:
-            str: The formatted timestamp string.
-        """
+    def _created_at(self) -> str:
+        """Instantiation timestamp formatted as ``YYYY-MM-DD HH:MM:SS,mmm``."""
         return self.timestamp.strftime("%F %T,%f")[:-3]
 
     @property
-    def _uptime(self):
-        """
-        Calculate the uptime of the driver.
-
-        Returns:
-            str: The uptime formatted as "YYYY-MM-DD HH:MM:SS,mmm".
-        """
+    def _uptime(self) -> str:
+        """Time since instantiation formatted as ``YYYY-MM-DD HH:MM:SS,mmm``."""
         return (datetime.now() - self.timestamp).strftime("%F %T,%f")[:-3]
 
     @abstractmethod
     def connect(self) -> DriverResponse:
-        """Open connection to resource."""
+        """Open the connection to the underlying resource."""
 
     @abstractmethod
     def get_status(self) -> DriverResponse:
-        """Return current driver status."""
+        """Return the current operational state of the driver."""
 
     @abstractmethod
     def stop(self) -> DriverResponse:
-        """General stop method, abort all active methods e.g. motion, I/O, compute."""
+        """Abort all active activity (motion, I/O, computation)."""
 
     @abstractmethod
     def reset(self) -> DriverResponse:
-        """Reinitialize driver, force-close old connection if necessary."""
+        """Reinitialize the driver, force-closing any existing connection."""
 
     @abstractmethod
     def disconnect(self) -> DriverResponse:
-        """Release connection to resource."""
+        """Release the connection to the underlying resource."""
 
 
 class DriverPoller:
-    """
-    A class to handle polling of a HelaoDriver at regular intervals.
+    """Runs a periodic ``get_data`` loop against a ``HelaoDriver``.
+
+    On construction the poller schedules two background asyncio tasks on the
+    running loop: one waits on a signal queue to toggle the ``polling`` flag,
+    the other repeatedly calls :meth:`get_data` (which subclasses override)
+    and merges the returned data into ``live_dict``. When a ``_base_hook`` is
+    attached the data is also forwarded to ``base_hook.put_lbuf``.
 
     Attributes:
-    -----------
-    driver : HelaoDriver
-        The driver instance to be polled.
-    wait_time : float
-        The time interval (in seconds) between each poll.
-    last_update : datetime
-        The timestamp of the last successful poll.
-    live_dict : dict
-        A dictionary to store the live data from the driver.
-    polling : bool
-        A flag indicating whether polling is currently active.
-
-    Methods:
-    --------
-    __init__(driver: HelaoDriver, wait_time: float = 0.05) -> None
-        Initializes the DriverPoller with the given driver and wait time.
-
-    async _start_polling()
-        Starts the polling process by raising a signal.
-
-    async _stop_polling()
-        Stops the polling process by raising a signal.
-
-    async _poll_signal_loop()
-        An internal loop that waits for polling signals to start or stop polling.
-
-    async _poll_sensor_loop()
-        An internal loop that performs the actual polling of the driver at regular intervals.
-
-    get_data() -> DriverResponse
-        A placeholder method to retrieve data from the driver. Should be implemented by subclasses.
+        driver: The driver being polled.
+        wait_time: Sleep interval between polls, in seconds.
+        last_update: Timestamp of the most recent non-empty data response.
+        live_dict: Latest polled values, plus a ``last_updated`` entry.
+        polling: Whether the polling loop is currently active.
     """
 
     driver: HelaoDriver
@@ -229,24 +162,11 @@ class DriverPoller:
     polling: bool
 
     def __init__(self, driver: HelaoDriver, wait_time: float = 0.05) -> None:
-        """
-        Initializes the HelaoDriver instance.
+        """Bind to ``driver`` and start the signal and polling background tasks.
 
         Args:
-            driver (HelaoDriver): The driver instance to be used.
-            wait_time (float, optional): The wait time between polling operations. Defaults to 0.05 seconds.
-
-        Attributes:
-            driver (HelaoDriver): The driver instance to be used.
-            wait_time (float): The wait time between polling operations.
-            aloop (asyncio.AbstractEventLoop): The running event loop.
-            live_dict (dict): A dictionary to store live data.
-            last_update (datetime.datetime): The timestamp of the last update.
-            polling (bool): A flag indicating whether polling is active.
-            poll_signalq (asyncio.Queue): A queue for polling signals.
-            poll_signal_task (asyncio.Task): The task for the polling signal loop.
-            polling_task (asyncio.Task): The task for the polling sensor loop.
-            _base_hook (Optional[Callable]): A base hook for additional functionality.
+            driver: Driver instance to poll.
+            wait_time: Seconds to sleep between polls. Defaults to ``0.05``.
         """
         self.driver = driver
         self.wait_time = wait_time
@@ -260,17 +180,7 @@ class DriverPoller:
         self._base_hook = None
 
     async def _start_polling(self):
-        """
-        Asynchronously starts the polling process by raising a signal and waiting for the polling loop to begin.
-
-        This method performs the following steps:
-        1. Logs the receipt of a 'start_polling' request.
-        2. Puts a True value into the poll_signalq queue to signal the start of polling.
-        3. Enters a loop that waits for the polling process to start, logging the status and sleeping for 0.1 seconds between checks.
-
-        Returns:
-            None
-        """
+        """Signal the polling loop to start and wait until it does."""
         LOGGER.info("got 'start_polling' request, raising signal")
         await self.poll_signalq.put(True)
         while not self.polling:
@@ -278,15 +188,7 @@ class DriverPoller:
             await asyncio.sleep(0.1)
 
     async def _stop_polling(self):
-        """
-        Asynchronously stops the polling process.
-
-        This method logs a 'stop_polling' request, signals the polling loop to stop,
-        and waits until the polling loop has completely stopped.
-
-        Raises:
-            asyncio.QueueFull: If the queue is full when attempting to put the stop signal.
-        """
+        """Signal the polling loop to stop and wait until it does."""
         LOGGER.info("got 'stop_polling' request, raising signal")
         await self.poll_signalq.put(False)
         while self.polling:
@@ -294,41 +196,17 @@ class DriverPoller:
             await asyncio.sleep(0.1)
 
     async def _poll_signal_loop(self):
-        """
-        Asynchronous loop that continuously polls for signals.
-
-        This method runs an infinite loop that waits for a signal from the
-        `poll_signalq` queue. When a signal is received, it sets the `polling`
-        attribute and logs the event.
-
-        Returns:
-            None
-        """
+        """Background loop that updates ``self.polling`` from the signal queue."""
         while True:
             self.polling = await self.poll_signalq.get()
             LOGGER.info("polling signal received")
 
     async def _poll_sensor_loop(self):
-        """
-        Asynchronous loop that continuously polls a sensor for data.
+        """Background loop that calls :meth:`get_data` and updates ``live_dict``.
 
-        This method runs indefinitely, checking if polling is enabled and, if so,
-        retrieves data from the sensor. If data is received, it updates the
-        `live_dict` with the new data and the timestamp of the last update. If a
-        base hook is defined, it also sends the data to the base hook.
-
-        The loop sleeps for a duration specified by `self.wait_time` between each
-        polling attempt.
-
-        Attributes:
-            polling (bool): Flag indicating whether polling is enabled.
-            wait_time (float): Time to wait between polling attempts.
-            last_update (datetime): Timestamp of the last data update.
-            live_dict (dict): Dictionary to store live data and the last update timestamp.
-            _base_hook (object): Optional hook to send data to an external buffer.
-
-        Logs:
-            Logs an info message when the polling task starts.
+        While ``polling`` is true, the driver is polled every ``wait_time``
+        seconds; non-empty responses update ``live_dict`` (with ``last_updated``)
+        and are forwarded to ``_base_hook.put_lbuf`` when a hook is attached.
         """
         LOGGER.info("polling task has started")
         while True:
@@ -343,16 +221,11 @@ class DriverPoller:
             await asyncio.sleep(self.wait_time)
 
     def get_data(self) -> DriverResponse:
-        """
-        Retrieves data from the driver.
+        """Return one polled sample from the driver.
 
-        This method is intended to be overridden by subclasses to provide
-        specific data retrieval functionality. By default, it logs a message
-        indicating that the method has not been implemented and returns an
-        empty `DriverResponse` object.
-
-        Returns:
-            DriverResponse: An empty response object indicating no data.
+        Subclasses must override this to populate ``DriverResponse.data`` with
+        the values to merge into ``live_dict``. The default implementation logs
+        a notice and returns an empty response.
         """
         LOGGER.info("DriverPoller.get_data() has not been implemented")
         return DriverResponse()

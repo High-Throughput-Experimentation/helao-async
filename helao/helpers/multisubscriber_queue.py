@@ -1,3 +1,10 @@
+"""Fan-out asyncio queue allowing multiple subscribers per producer.
+
+Each subscriber receives its own ``asyncio.Queue`` so producers can ``put``
+data once and have it delivered to every active subscriber. Adapted from
+Kyle Smith's ``asyncio-multisubscriber-queue``.
+"""
+
 __all__ = ["MultisubscriberQueue"]
 
 
@@ -8,88 +15,36 @@ from typing import Any
 # multisubscriber queue by Kyle Smith
 # https://github.com/smithk86/asyncio-multisubscriber-queue
 class MultisubscriberQueue:
-    """
-    MultisubscriberQueue is a class that allows multiple subscribers to receive data from a single source asynchronously.
+    """Producer-side dispatcher that fans data out to many subscriber queues.
 
-    Methods:
-        __init__(**kwargs):
-            Initializes the MultisubscriberQueue instance.
-
-        __len__():
-            Returns the number of subscribers.
-
-        __contains__(q):
-            Checks if a queue is in the list of subscribers.
-
-        async subscribe():
-            Subscribes to data using an async generator. Instead of working with the Queue directly, the client can subscribe to data and have it yielded directly.
-
-        queue():
-            Gets a new async Queue and adds it to the list of subscribers.
-
-        queue_context():
-            Gets a new queue context wrapper. The queue context wrapper allows the queue to be automatically removed from the subscriber pool when the context is exited.
-
-        remove(q):
-            Removes a queue from the pool of subscribers. Raises a KeyError if the queue does not exist.
-
-        async put(data: Any):
-            Puts new data on all subscriber queues.
-                data: The data to be put on the queues.
-
-        put_nowait(data: Any):
-            Puts new data on all subscriber queues without waiting.
-                data: The data to be put on the queues.
-
-        async close():
-            Forces clients using MultisubscriberQueue.subscribe() to end iteration.
+    Each call to ``subscribe`` (or to ``queue``) registers a fresh
+    ``asyncio.Queue``. Every ``put``/``put_nowait`` writes the same item
+    onto every registered queue, and ``close`` terminates all subscribers.
     """
 
     def __init__(self, **kwargs):
-        """
-        Initializes a new instance of the class.
+        """Initialise an empty subscriber list.
 
-        Keyword Args:
-            **kwargs: Arbitrary keyword arguments.
+        Args:
+            **kwargs: Accepted for forward compatibility; currently ignored.
         """
         super().__init__()
         self.subscribers = []
 
-    def __len__(self):
-        """
-        Return the number of subscribers.
-
-        Returns:
-            int: The number of subscribers in the queue.
-        """
+    def __len__(self) -> int:
+        """Return the current subscriber count."""
         return len(self.subscribers)
 
-    def __contains__(self, q):
-        """
-        Check if a given queue is in the list of subscribers.
-
-        Args:
-            q: The queue to check for membership in the subscribers list.
-
-        Returns:
-            bool: True if the queue is in the subscribers list, False otherwise.
-        """
+    def __contains__(self, q) -> bool:
+        """Return ``True`` when ``q`` is one of the registered subscribers."""
         return q in self.subscribers
 
     async def subscribe(self):
-        """
-        Asynchronously subscribes to a queue and yields values from it.
-
-        This coroutine function enters a queue context and continuously retrieves
-        values from the queue. It yields each value until it encounters a
-        StopAsyncIteration, at which point it breaks the loop and stops the
-        subscription.
+        """Async-iterate values delivered to a freshly registered queue.
 
         Yields:
-            Any: The next value from the queue.
-
-        Raises:
-            StopAsyncIteration: When the queue signals the end of iteration.
+            Each value put on the dedicated subscriber queue, until a
+            ``StopAsyncIteration`` sentinel is received (sent by ``close``).
         """
         with self.queue_context() as q:
             while True:
@@ -99,35 +54,24 @@ class MultisubscriberQueue:
                 else:
                     yield val
 
-    def queue(self):
-        """
-        Creates a new Queue instance, appends it to the subscribers list, and returns the Queue.
-
-        Returns:
-            Queue: A new Queue instance that has been added to the subscribers list.
-        """
+    def queue(self) -> Queue:
+        """Register and return a new subscriber ``asyncio.Queue``."""
         q = Queue()
         self.subscribers.append(q)
         return q
 
-    def queue_context(self):
-        """
-        Provides a context manager for the queue.
-
-        Returns:
-            _QueueContext: A context manager instance for the queue.
-        """
+    def queue_context(self) -> "_QueueContext":
+        """Return a context manager that auto-removes its subscriber queue."""
         return _QueueContext(self)
 
     def remove(self, q):
-        """
-        Removes a subscriber queue from the list of subscribers.
+        """Remove a previously registered subscriber queue.
 
         Args:
-            q: The subscriber queue to be removed.
+            q: The queue to remove.
 
         Raises:
-            KeyError: If the subscriber queue does not exist in the list of subscribers.
+            KeyError: If ``q`` is not currently registered.
         """
         if q in self.subscribers:
             self.subscribers.remove(q)
@@ -135,92 +79,45 @@ class MultisubscriberQueue:
             raise KeyError("subscriber queue does not exist")
 
     async def put(self, data: Any):
-        """
-        Asynchronously puts data into all subscriber queues.
-
-        Args:
-            data (Any): The data to be put into the subscriber queues.
-
-        Returns:
-            None
-        """
+        """Await-put ``data`` on every subscriber queue."""
         for q in self.subscribers:
             await q.put(data)
 
     def put_nowait(self, data: Any):
-        """
-        Put data into all subscriber queues without blocking.
-
-        Args:
-            data (Any): The data to be put into the subscriber queues.
-        """
+        """Non-blocking put of ``data`` on every subscriber queue."""
         for q in self.subscribers:
             q.put_nowait(data)
 
     async def close(self):
-        """
-        Asynchronously closes the queue by putting a StopAsyncIteration exception into it.
+        """Terminate every active ``subscribe`` iterator.
 
-        This method should be called to signal that no more items will be added to the queue.
+        Sends ``StopAsyncIteration`` as a sentinel on every subscriber queue.
         """
         await self.put(StopAsyncIteration)
 
 
 class _QueueContext:
-    """
-    _Context manager for handling queue operations within a parent context.
+    """Context manager that registers a subscriber queue and removes it on exit.
 
     Attributes:
-        parent: The parent object that manages the queue.
-        queue: The queue instance created within the context.
-
-    Methods:
-        __enter__:
-            Initializes and returns a new queue instance from the parent.
-        __exit__:
-            Removes the queue instance from the parent upon exiting the context.
-
-    Args:
-        parent: The parent object that provides the queue management methods.
+        parent: The owning ``MultisubscriberQueue``.
+        queue: The subscriber queue created on ``__enter__``.
     """
 
     def __init__(self, parent):
-        """
-        Initializes the instance of the class.
+        """Store the parent ``MultisubscriberQueue``.
 
         Args:
-            parent: The parent object that this instance is associated with.
+            parent: The owning ``MultisubscriberQueue``.
         """
         self.parent = parent
         self.queue = None
 
-    def __enter__(self):
-        """
-        Enter the runtime context related to this object.
-
-        This method is called when the 'with' statement is used. It initializes
-        the queue attribute by calling the parent object's queue method and
-        returns the queue.
-
-        Returns:
-            queue.Queue: The queue instance created by the parent object.
-        """
+    def __enter__(self) -> Queue:
+        """Register a fresh subscriber queue and return it."""
         self.queue = self.parent.queue()
         return self.queue
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Exit the runtime context related to this object.
-
-        This method is called when the 'with' statement is used. It removes the
-        queue from the parent object.
-
-        Parameters:
-        exc_type (type): The exception type.
-        exc_val (Exception): The exception instance.
-        exc_tb (traceback): The traceback object.
-
-        Returns:
-        None
-        """
+        """Unregister the subscriber queue from the parent."""
         self.parent.remove(self.queue)

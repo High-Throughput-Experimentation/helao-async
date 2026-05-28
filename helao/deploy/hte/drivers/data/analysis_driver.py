@@ -1,7 +1,13 @@
-"""Data analysis driver
+"""Driver that runs HELAO analyses and uploads results to S3.
 
-Handles Helao analyses uploads to S3.
-
+Provides :class:`HelaoAnalysisSyncer`, a :class:`HelaoSyncer` subclass that
+maintains a queue of analysis tuples (process UUID, query DataFrame,
+parameters, analysis class, and parent action UUID), runs each analysis
+in parallel worker coroutines, writes the resulting model and outputs to
+the local analyses tree, and (unless ``local_only`` is set) uploads them
+to S3 and optionally to the Modelyst API. Also defines
+:class:`LocalAnalysisExecutor`, an :class:`Executor` that loads a local
+sequence zip and enqueues one analysis per contained process.
 """
 
 __all__ = ["HelaoAnalysisSyncer"]
@@ -39,79 +45,42 @@ from ...drivers.data.analyses.xrfs_local import XrfsAnalysis
 
 
 class HelaoAnalysisSyncer(HelaoSyncer):
-    """
-    HelaoAnalysisSyncer is a class that handles the synchronization of analysis tasks to S3 and API. It inherits from HelaoSyncer and manages a queue of analysis tasks, ensuring they are processed and uploaded to the appropriate storage and API endpoints.
+    """Queue-based worker that runs analyses and syncs outputs to S3/API.
+
+    Pulls ``(process_uuid, query_df, params, analysis_class,
+    analysis_action_uuid)`` tuples from an ``asyncio.Queue``, instantiates
+    the analysis class, exports the resulting model and outputs to the
+    local ANALYSES tree, and (when not running in ``local_only`` mode)
+    uploads them to the configured S3 bucket. ``max_tasks`` worker
+    coroutines run in parallel.
 
     Attributes:
-        base (Base): The base server instance.
-        running_tasks (dict): A dictionary to keep track of running tasks.
-        config_dict (dict): Configuration dictionary from the server configuration.
-        world_config (dict): World configuration dictionary.
-        local_ana_root (str): Local directory path for storing analysis results.
-        max_tasks (int): Maximum number of concurrent tasks.
-        task_queue (asyncio.Queue): FIFO queue for managing tasks.
-        task_set (set): Set of task identifiers.
-        syncer_loop (asyncio.Task): The main loop task for processing the queue.
-        s3 (pgs3.Client): S3 client for uploading data.
-        s3r (pgs3.Resource): S3 resource for managing data.
-        bucket (str): S3 bucket name.
-        region (str): S3 region name.
-
-    Methods:
-        __init__(self, action_serv: Base):
-            Initializes the HelaoAnalysisSyncer instance with the given action server.
-
-        get_loader(self):
-            Initializes the loader for analysis models used by the driver.batch_* methods.
-
-        sync_exit_callback(self, task: asyncio.Task):
-            Callback function to handle task completion and cleanup.
-
-        async enqueue_calc(self, calc_tup: Tuple[UUID, pd.DataFrame, dict, str]):
-            Adds a calculation tuple to the task queue.
-
-        async syncer(self):
-            Main loop coroutine that processes the task queue and manages task execution.
-
-        async sync_ana(self, calc_tup: Tuple[UUID, pd.DataFrame, dict, str], retries: int = 3):
-            Performs the analysis and handles the synchronization of results to S3 and API.
-
-        async to_api(self, req_model: dict, retries: int = 3):
-            Sends the analysis model to the API via POST or PATCH requests.
-
-        async batch_calc_echeuvis(self, plate_id: Optional[int] = None, sequence_uuid: Optional[UUID] = None, params: dict = {}, recent: bool = True):
-            Generates a list of EcheUvisAnalysis tasks from a sequence or plate_id.
-
-        async batch_calc_dryuvis(self, plate_id: Optional[int] = None, sequence_uuid: Optional[UUID] = None, params: dict = {}, recent: bool = True):
-            Generates a list of DryUvisAnalysis tasks from a sequence or plate_id.
-
-        async batch_calc_icpms_local(self, sequence_zip_path: str = "", params: dict = {}):
-            Generates a list of IcpmsAnalysis tasks from a local sequence zip file.
-
-        shutdown(self):
-            Placeholder method for handling shutdown procedures.
+        base: Owning action server.
+        running_tasks: Mapping from process UUID string to the worker
+            asyncio.Task currently processing it.
+        config_dict: ``params`` block from the server config.
+        world_config: Full world config dict.
+        local_ana_root: Local ``ANALYSES`` root path.
+        max_tasks: Number of concurrent worker coroutines.
+        task_queue: FIFO queue of pending analysis tuples.
+        task_set: Set of enqueued process UUIDs used to deduplicate.
+        syncer_loops: Mapping from worker index to its
+            :class:`asyncio.Task`.
+        s3: S3 client from the shared ``pgs3`` loader.
+        s3r: S3 resource from the shared ``pgs3`` loader.
+        bucket: S3 bucket name.
+        region: S3 region.
     """
 
     base: Base
     running_tasks: dict
 
     def __init__(self, action_serv: Base):
-        """
-        Initializes the AnalysisDriver instance.
+        """Initialise queues, loader, and worker coroutines.
 
         Args:
-            action_serv (Base): The base action server instance.
-
-        Attributes:
-            base (Base): The base action server instance.
-            config_dict (dict): Configuration parameters from the server configuration.
-            world_config (dict): World configuration from the action server.
-            local_ana_root (str): Path to the local analysis root directory.
-            max_tasks (int): Maximum number of tasks allowed.
-            task_queue (asyncio.Queue): FIFO queue for managing tasks.
-            task_set (set): Set of tasks.
-            running_tasks (dict): Dictionary of currently running tasks.
-            syncer_loop (asyncio.Task): Asynchronous task for the syncer loop.
+            action_serv: Hosting action server, used for its
+                ``server_cfg`` ``params`` and the ``world_cfg``.
         """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
@@ -133,19 +102,11 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         }
 
     def get_loader(self):
-        """
-        Initializes the loader for the EcheUvis data and sets up the S3 client and resources.
+        """Install the shared :class:`pgs3.EcheUvisLoader` and cache its handles.
 
-        This method sets up the `pgs3.LOADER` with the `EcheUvisLoader` using the provided
-        configuration dictionary. It initializes the S3 client and resources, and sets the
-        S3 bucket and region.
-
-        Attributes:
-            pgs3.LOADER (EcheUvisLoader): The loader instance for EcheUvis data.
-            self.s3 (S3Client): The S3 client instance.
-            self.s3r (S3Resource): The S3 resource instance.
-            self.bucket (str): The S3 bucket name.
-            self.region (str): The S3 region name.
+        Populates ``pgs3.LOADER`` so that ``batch_calc_*`` and analysis
+        classes share one configured loader, then stores its S3 client,
+        resource, bucket and region on ``self``.
         """
         pgs3.LOADER = pgs3.EcheUvisLoader(
             self.config_dict["env_file"],
@@ -162,16 +123,11 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self.region = pgs3.LOADER.s3_region
 
     def sync_exit_callback(self, task: asyncio.Task):
-        """
-        Callback function to handle the completion of an asynchronous task.
-
-        This function is intended to be used as a callback for when an asyncio.Task
-        completes. It removes the task from the running_tasks dictionary and the
-        task_set set if they exist.
+        """Drop the completed ``task`` from ``running_tasks`` and ``task_set``.
 
         Args:
-            task (asyncio.Task): The completed asyncio task.
-
+            task: The completed :class:`asyncio.Task` whose name is used
+                as the lookup key.
         """
         task_name = task.get_name()
         if task_name in self.running_tasks:
@@ -185,18 +141,12 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self,
         calc_tup: Tuple[UUID, pd.DataFrame, dict, BaseAnalysis, Optional[UUID]],
     ):
-        """
-        Adds a calculation task to the queue.
+        """Push a single analysis tuple onto :attr:`task_queue`.
 
         Args:
-            calc_tup (Tuple[UUID, pd.DataFrame, dict, str]): A tuple containing:
-                - process_uuid (UUID): Unique identifier for the process.
-                - query_df (pd.DataFrame): DataFrame containing the query data.
-                - ana_params (dict): Dictionary of analysis parameters.
-                - str: Additional string parameter.
-
-        Returns:
-            None
+            calc_tup: ``(process_uuid, query_df, ana_params,
+                analysis_class, analysis_action_uuid)`` describing one
+                analysis to run.
         """
         self.task_set.add(calc_tup[0])
         await self.task_queue.put(calc_tup)
@@ -236,21 +186,24 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self,
         calc_tup: Tuple[UUID, pd.DataFrame, dict, BaseAnalysis, UUID],
         retries: int = 3,
-    ):
-        """
-        Asynchronously performs analysis synchronization.
+    ) -> bool:
+        """Run one analysis and push its model and outputs to disk and S3.
 
-        This method takes a tuple containing a UUID, a pandas DataFrame, a dictionary of analysis parameters,
-        and a function name. It performs the analysis using the provided function and parameters, exports the
-        analysis results, and uploads them to an S3 bucket if configured to do so.
+        Instantiates the analysis class, calls ``calc_output`` then
+        ``export_analysis``, attaches sequence/campaign metadata pulled
+        from the corresponding process, writes the YAML model and JSON
+        outputs under ``local_ana_root/<yy.ww>/<mmdd>/<HHMMSS>__<name>``,
+        and uploads them to S3 unless ``local_only`` is set.
 
         Args:
-            calc_tup (Tuple[UUID, pd.DataFrame, dict, str]): A tuple containing the process UUID, the DataFrame
-                to be analyzed, the analysis parameters, and the analysis function name.
-            retries (int, optional): The number of retries for the synchronization. Defaults to 3.
+            calc_tup: Analysis tuple as accepted by :meth:`enqueue_calc`.
+            retries: Number of retry attempts available for downstream
+                uploads. Unused for this method's own logic but kept for
+                signature symmetry.
 
         Returns:
-            bool: True if the synchronization was successful, False otherwise.
+            ``True`` when the analysis and all uploads succeed,
+            otherwise ``False``.
         """
         process_uuid, process_df, analysis_params, ana_func, action_uuid = calc_tup
         # LOGGER.info(f"performing analysis {analysis_name}")
@@ -356,18 +309,20 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         )
         return False
 
-    async def to_api(self, req_model: dict, retries: int = 3):
-        """
-        Asynchronously sends a request to the API to push analysis data. If the initial request fails,
-        it retries up to a specified number of times. If all retries fail, it sends a failure report
-        to a debug endpoint.
+    async def to_api(self, req_model: dict, retries: int = 3) -> bool:
+        """POST/PATCH ``req_model`` to the Modelyst analyses endpoint.
+
+        Tries ``POST`` first, switches to ``PATCH`` on a ``400`` response,
+        and on persistent failure pushes a debug payload to the
+        ``/failed`` endpoint.
 
         Args:
-            req_model (dict): The request model containing analysis data to be sent to the API.
-            retries (int, optional): The number of times to retry the request in case of failure. Defaults to 3.
+            req_model: Analysis model dict to submit.
+            retries: Number of attempts per HTTP method.
 
         Returns:
-            bool: True if the API push was successful, False otherwise.
+            ``True`` on a successful push, otherwise ``False``. Returns
+            ``True`` immediately if ``api_host`` is not configured.
         """
         if self.api_host is None:
             LOGGER.info("Modelyst API is not configured. Skipping to API push.")
@@ -438,17 +393,21 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         recent: bool = True,
         analysis_action_uuid: Optional[UUID] = None,
     ):
-        """
-        Asynchronously calculates ECHEUVIS analysis for a batch of processes.
+        """Enqueue :class:`EcheUvisAnalysis` tasks for the matching sequence.
+
+        Filters the SDC-UVIS query by ``plate_id`` and/or ``sequence_uuid``,
+        keeps only ``acquire_spec_extrig`` actions in ``ECHEUVIS_sub_CA_led``
+        experiments, applies a known ``ZnSbO`` plate-id correction, and
+        enqueues one analysis per process UUID.
 
         Args:
-            plate_id (Optional[int]): The ID of the plate to filter the sequences. Defaults to None.
-            sequence_uuid (Optional[UUID]): The UUID of the sequence to filter. Defaults to None.
-            params (dict): Additional parameters for the analysis. Defaults to an empty dictionary.
-            recent (bool): If True, filters sequences based on the most recent date. Defaults to True.
-
-        Returns:
-            None
+            plate_id: Plate id to filter on, or ``None`` for any plate.
+            sequence_uuid: Sequence UUID to filter on, or ``None``.
+            params: Per-analysis parameter overrides.
+            recent: Currently unused selector flag kept for parity with
+                :meth:`batch_calc_dryuvis`.
+            analysis_action_uuid: UUID of the action that requested this
+                batch, propagated into each analysis tuple.
         """
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
         # min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2024-01-01"
@@ -502,25 +461,21 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         recent: bool = True,
         analysis_action_uuid: Optional[UUID] = None,
     ):
-        """
-        Asynchronously calculates dry UV-Vis analysis for a batch of data.
+        """Enqueue :class:`DryUvisAnalysis` tasks for the matching sequence.
+
+        Pulls processes via :func:`pgs3.LOADER.get_recent` (retrying up to
+        three times on empty results), filters to
+        ``acquire_spec_adv`` actions in ``UVIS_sub_measure`` experiments,
+        and enqueues one analysis per matching process UUID.
 
         Args:
-            plate_id (Optional[int]): The ID of the plate to filter the data. Defaults to None.
-            sequence_uuid (Optional[UUID]): The UUID of the sequence to filter the data. Defaults to None.
-            params (dict): Additional parameters for the analysis. Defaults to an empty dictionary.
-            recent (bool): If True, only recent data is considered. Defaults to True.
-
-        Returns:
-            None
-
-        Raises:
-            None
-
-        Notes:
-            - The function retrieves recent data based on the provided parameters and filters it.
-            - It retries the data retrieval up to 3 times if no data is returned initially.
-            - The filtered data is then processed and enqueued for dry UV-Vis analysis.
+            plate_id: Plate id filter, or ``None`` for any plate.
+            sequence_uuid: Sequence UUID filter, or ``None``.
+            params: Per-analysis parameter overrides.
+            recent: When ``True`` use today's date as the lower bound,
+                otherwise fall back to ``2023-04-26``.
+            analysis_action_uuid: UUID of the action that requested this
+                batch, propagated into each analysis tuple.
         """
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
         min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2023-04-26"
@@ -569,16 +524,13 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         params: dict = {},
         analysis_action_uuid: Optional[UUID] = None,
     ):
-        """
-        Asynchronously calculates ICP-MS (Inductively Coupled Plasma Mass Spectrometry) analysis for a batch of processes
-        from a local sequence zip file.
+        """Enqueue :class:`IcpmsAnalysis` for each process in a local zip.
 
         Args:
-            sequence_zip_path (str): The path to the sequence zip file containing the processes.
-            params (dict): A dictionary of parameters to be used in the ICP-MS analysis.
-
-        Returns:
-            None
+            sequence_zip_path: Path to a sequence zip parseable by
+                :class:`LocalLoader`.
+            params: Per-analysis parameter overrides.
+            analysis_action_uuid: UUID of the requesting action.
         """
         local_loader = LocalLoader(sequence_zip_path)
         pdf = local_loader.processes
@@ -600,16 +552,13 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         params: dict = {},
         analysis_action_uuid: Optional[UUID] = None,
     ):
-        """
-        Asynchronously calculates XRF (X-Ray Fluorescence) calibration analysis for a batch of processes
-        from a local sequence zip file.
+        """Enqueue :class:`XrfsAnalysis` for each process in a local zip.
 
         Args:
-            sequence_zip_path (str): The path to the sequence zip file containing the processes.
-            params (dict): A dictionary of parameters to be used in the XRF analysis.
-
-        Returns:
-            None
+            sequence_zip_path: Path to a sequence zip parseable by
+                :class:`LocalLoader`.
+            params: Per-analysis parameter overrides.
+            analysis_action_uuid: UUID of the requesting action.
         """
         local_loader = LocalLoader(sequence_zip_path)
         pdf = local_loader.processes
@@ -648,13 +597,30 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         # )
 
     def shutdown(self):
+        """Hook for graceful shutdown (no-op)."""
         pass
 
 
 class LocalAnalysisExecutor(Executor):
+    """Executor that enqueues local analyses from a sequence zip.
+
+    Reads the ``sequence_zip_path`` action parameter, builds a
+    :class:`LocalLoader`, and enqueues one ``analysis_class`` task per
+    process found in the loader onto the parent
+    :class:`HelaoAnalysisSyncer`.
+    """
+
     driver: HelaoAnalysisSyncer
 
     def __init__(self, analysis_class: BaseAnalysis, *args, **kwargs):
+        """Capture executor context and the target analysis class.
+
+        Args:
+            analysis_class: :class:`BaseAnalysis` subclass to instantiate
+                for each enqueued process.
+            *args: Positional arguments for :class:`Executor`.
+            **kwargs: Keyword arguments for :class:`Executor`.
+        """
         super().__init__(*args, **kwargs)
         try:
             self.poll_rate = 0.1
@@ -666,6 +632,7 @@ class LocalAnalysisExecutor(Executor):
             LOGGER.error("Failed to initialize LocalAnalysisExecutor.", exc_info=True)
 
     async def _pre_exec(self):
+        """Build a :class:`LocalLoader` from the action's ``sequence_zip_path``."""
         try:
             self.loader = LocalLoader(self.action_params["sequence_zip_path"])
             LOGGER.info("Initialized LocalLoader in LocalAnalysisExecutor.")
@@ -676,6 +643,7 @@ class LocalAnalysisExecutor(Executor):
         return {"error": error}
 
     async def _exec(self):
+        """Enqueue one analysis tuple per process found in the loaded zip."""
         try:
             processes = self.loader.processes
             for puuid in processes.process_uuid:

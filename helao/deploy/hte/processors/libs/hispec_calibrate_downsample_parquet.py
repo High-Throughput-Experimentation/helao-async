@@ -1,3 +1,13 @@
+"""HISPEC spectral-to-CV calibration and voltage downsampling pipeline.
+
+Helpers that pair an Andor spectroscopy parquet (or HLO) file with the
+parent CV.hlo trace, fit a sawtooth to the CV voltage waveform, label
+each spectrum by cycle/scan direction, merge in the spectral data,
+downsample to a fixed voltage precision and interpolate current onto
+the spectral time axis. Used by
+:mod:`helao.deploy.hte.processors.hispec_process_all`.
+"""
+
 from helao.helpers.hlo_data import read_hlo
 import pandas as pd
 import numpy as np
@@ -13,22 +23,17 @@ import matplotlib.pyplot as plt
 
 
 def yml_load(input: Union[str, Path]):
-    """
-    Load a YAML file or string.
-
-    This function loads a YAML file or string using the ruamel.yaml library.
-    It supports loading from a file path, a Path object, or a YAML string.
+    """Parse a YAML document from a file path, a :class:`Path`, or a string.
 
     Args:
-        input (Union[str, Path]): The input YAML data. This can be a file path (str),
-                                  a Path object, or a YAML string.
+        input: Either a path-like pointing at an existing YAML file or
+            the raw YAML text itself.
 
     Returns:
-        obj: The loaded YAML data as a Python object.
+        The parsed YAML document as ruamel.yaml round-trip objects.
 
     Raises:
-        FileNotFoundError: If the input is a file path that does not exist.
-        ruamel.yaml.YAMLError: If there is an error parsing the YAML data.
+        ruamel.yaml.YAMLError: If the YAML content cannot be parsed.
     """
     yaml = ruamel.yaml.YAML(typ="rt")
     yaml.version = (1, 2)
@@ -52,19 +57,29 @@ def read_CV_hlo(
     return_additional_headers: list[str] = None,
     return_metadata: bool = False,
 ) -> pd.DataFrame:
-    """This function reads a CV.hlo file and returns a pandas dataframe with the data
-    from the headers 'Ewe_V', 't_s' and 'cycle'. Additional headers may also be entered
-     as a list of strings to be returned in the dataframe. If no additional headers are
-     entered, only the default headers are returned. If the return_metadata flag is set
-     the metadata dict is also returned - this allows the user to see the full data associated
-     with the CV measurment.
+    """Load a CV ``.hlo`` file into a DataFrame keeping only the chosen headers.
 
-     inputs:
-            default_U_header: the default collumn header for the voltage data in the hlo
-            default_t_header: the default collumn header for the time data in the hlo
-            default_cycle_header: the default collumn header for the cycle data in the hlo
-            return_additional_headers: a list of additional headers to be returned in the dataframe
-            return_metadata: a flag to return the metadata"""
+    Falls back through ``RUNS_ACTIVE`` -> ``RUNS_FINISHED`` -> ``RUNS_SYNCED``
+    when the supplied path is missing.
+
+    Args:
+        hlo_path: Path to the CV HLO file.
+        default_U_header: Column name to keep for the voltage trace.
+        default_t_header: Column name to keep for the time trace.
+        default_cycle_header: Column name to keep for the cycle index.
+        default_current_header: Column name to keep for the current trace.
+        return_additional_headers: Extra column names to include.
+        return_metadata: If ``True``, also return the column-headings
+            metadata dict.
+
+    Returns:
+        ``pandas.DataFrame``, or ``(metadata, DataFrame)`` when
+        ``return_metadata`` is ``True``.
+
+    Raises:
+        FileNotFoundError: If the HLO file cannot be located after the
+            fallback substitutions.
+    """
     # combine the default headers with the areturn_additional_headers by adding them to a list
     if return_additional_headers is not None:
         headers = [
@@ -98,11 +113,16 @@ def read_CV_hlo(
 
 
 def read_spec_times_from_hlo(spec_file_path: str) -> pd.DataFrame:
-    """This function returns only the times from a raw ANDORSPEC.hlo file - much faster than reading the whole file
-    inputs:
-    spec_file_path: the path to the spec file
-    outputs:
-    data: a pandas dataframe with the time data as the collumn with header 't_s'"""
+    """Read only the ``tick_time`` column from an Andor spectroscopy HLO.
+
+    The values are zero-shifted to the first sample and renamed to ``t_s``.
+
+    Args:
+        spec_file_path: Path to the spectroscopy HLO file.
+
+    Returns:
+        DataFrame with a single ``t_s`` column.
+    """
     data = pd.DataFrame(read_hlo(spec_file_path, keep_keys=["tick_time"])[1])
     data.iloc[:, 0] = data.iloc[:, 0] - data.iloc[0, 0]
     # name the collumn t_s
@@ -111,16 +131,17 @@ def read_spec_times_from_hlo(spec_file_path: str) -> pd.DataFrame:
 
 
 def read_spectra_from_hlo(spec_file_path: str) -> pd.DataFrame:
-    """
-    This function reads the entire ANDORSPEC.hlo file and returns a pandas dataframe with the data.
-    The time is not imported as this is dealt with separatley.  metadata['optinal]['wl']
-    from the HLO is used to create the collumn headers for the spectra data.
+    """Read all spectral channels from an Andor spectroscopy HLO file.
 
-    inputs:
-    spec_file_path: the path to the spec file
+    Skips the ``tick_time`` column and names the remaining columns by
+    the wavelength array stored under ``metadata['optional']['wl']``.
 
-    outputs:
-    data: a pandas dataframe with the spectra data
+    Args:
+        spec_file_path: Path to the spectroscopy HLO file.
+
+    Returns:
+        DataFrame whose columns are wavelengths and whose rows are
+        spectra.
     """
     meta, data = read_hlo(spec_file_path, omit_keys=["tick_time"])
     # get the tick time from the metadata
@@ -135,18 +156,14 @@ def read_spectra_from_hlo(spec_file_path: str) -> pd.DataFrame:
 def read_spec_times_from_parquet(
     spec_file_path: str, default_time_header: str = "t_s"
 ) -> pd.DataFrame:
-    """ "
-    This function reads the parquet file generated from anlysing the ANDORSPEC.hlo file. It reads only the time data
-    which by default has the header 't_s'. If the header is different this can be changed using the default_time_header.
-    the fucntion returns a pandas dataframe with the time data as the only collumn with header 't_s'.
+    """Read only the time column from a spectroscopy parquet file.
 
-    inputs:
-    spec_file_path: the path the to parquet file
-    defulat_time_header: the header of the time collumn in the parquet file
+    Args:
+        spec_file_path: Path to the parquet file.
+        default_time_header: Name of the time column to load.
 
-    outputs:
-    data: a pandas dataframe of one collumn which is the times of the SpEC experiment.
-
+    Returns:
+        Single-column DataFrame, or ``None`` if reading fails.
     """
     try:
         data = pd.DataFrame(
@@ -163,9 +180,13 @@ def read_spec_times_from_parquet(
 
 
 def read_spectra_parquet(spec_file_path: str) -> pd.DataFrame:
-    """
-    This function reads the sectra parquet file generated from the ANDORSPEC.hlo file. It reads the entire file.
-    t_s is dropped from the dataframe as this is dealt with separatley by read_spec_times_from_parquet.
+    """Read a spectroscopy parquet file with the ``t_s`` column removed.
+
+    Args:
+        spec_file_path: Path to the spectroscopy parquet file.
+
+    Returns:
+        DataFrame of spectra without the time column.
     """
     data = pd.read_parquet(spec_file_path)
     data.drop(columns=["t_s"], inplace=True)
@@ -182,27 +203,27 @@ def generate_interpolation_function(
     default_CV_U_header: str = "Ewe_V",
     defult_CV_cycle_header: str = "cycle",
     plotbl: bool = False,
-):
-    """
-    This function works on takes in dataframe of CV data and fits a sawtooth function to the data by
-    reading the collumns which by default have headers  't_s' and 'Ewe_V' and fits these functions
-    to Sawtooth2 (defined below). It returns the parameters needed to interpolate t to U using sawtooth2. This can
-    then be used to convert time to voltage in spectral data. If the fit is poor
-    the user can adjust the starting amplitude and phase, most likley the issue
-    is the amplitude - change this from -1 to 1
+) -> tuple:
+    """Fit a :func:`sawtooth2` voltage waveform to the CV ``U(t)`` data.
 
-    inputs: CV a pd.DataFrame
-    optional inputs:
-    starting amplitude(float): the amount that the sawtooth wave is shifted up or down by to use as a starting point for the fit
-    fit the U(t) data of the CV. Default is 1
-    starting_phase(float): the phase of the sawtooth wave to use as a starting point for the fit. Default is 0
-    starting_offset(float): the offset of the sawtooth wave to use as a starting point for the fit. Default is 0
-    biologic(bool): a flag to indicate if the data is from a biologic potentiostat, which are zero indexed.
-    Default is True which will add 1 to the max cycle number to account for this.
-    default_CV_t_header(str): the default collumn header for the time data in the CVs. Default is 't_s'
-    default_CV_U_header(str): the default collumn header for the voltage data in the CVs Default is 'Ewe_V'
-    defult_CV_cycle_header(str): the default collumn header for the cycle data in the CVs Default is 'cycle'
-    outputs: an tupple of fit values for sawtooth2
+    Also writes the fitted parameters to ``interpolation.json`` and
+    optionally renders a comparison plot.
+
+    Args:
+        CV: DataFrame containing time, voltage and cycle columns.
+        starting_amp: Initial amplitude guess (flip sign if the fit
+            converges poorly).
+        starting_phase: Initial phase guess.
+        starting_offset: Initial offset guess.
+        biologic: When ``True``, treats cycle counts as zero-indexed.
+        default_CV_t_header: Column header for time.
+        default_CV_U_header: Column header for voltage.
+        defult_CV_cycle_header: Column header for cycle index.
+        plotbl: When ``True``, draws and saves a fit-vs-data plot.
+
+    Returns:
+        tuple: Fitted ``(amplitude, period, phase, offset)`` for
+        :func:`sawtooth2`.
     """
 
     # extract the time and voltage data from the collumns 't_s' and 'Ewe_V'
@@ -270,16 +291,17 @@ def generate_interpolation_function(
 
 
 def sawtooth2(time, amplitude, period, phase, offset):
-    """This helper function generates a sawtooth wave with the following parameters:
-    Once, fitted is used to generate an interpolation function from t-->V.
-    time: time array
-    amplitude: amplitude of the wave
-    period: period of the wave
-    phase: phase of the wave (i.e. x offset)
-    offset: Y offset of the wave
+    """Evaluate a phase/offset-shifted symmetric sawtooth wave.
 
-    returns: a voltage value or a voltage array
+    Args:
+        time: Scalar or array of times.
+        amplitude: Peak amplitude.
+        period: Wave period.
+        phase: Phase shift along time.
+        offset: Vertical offset.
 
+    Returns:
+        Voltage value(s) matching the shape of ``time``.
     """
     return amplitude * sawtooth((2 * np.pi * time) / (period) - phase, 0.5) + offset
 
@@ -287,16 +309,16 @@ def sawtooth2(time, amplitude, period, phase, offset):
 def interpolate_spec_time_to_U(
     spec_times: pd.DataFrame, interp_tup: tuple, default_time_header: str = "t_s"
 ) -> pd.DataFrame:
-    """
-    Interpolates the time column of the spec data to the time column of the U data using sawtooth2.
-    Requires a dataframe with a time collumn and a tuple of interpolation values. The header of the time
-    collumn can be changed using the default_spec_times_header argument.
+    """Add an ``Ewe_V`` column to ``spec_times`` using a fitted sawtooth.
 
-    inputs: spec_times dataframe generated from one of the read times fucntions
-    interp_tup: the fitted values from  generate_interpolation_function
-    default_spec_times_header: the header of the time collumn in spec_times
+    Args:
+        spec_times: DataFrame containing a time column.
+        interp_tup: ``(amp, period, phase, offset)`` from
+            :func:`generate_interpolation_function`.
+        default_time_header: Name of the time column in ``spec_times``.
 
-    outputs:
+    Returns:
+        The input DataFrame mutated with a new ``Ewe_V`` column.
     """
 
     spec_times["Ewe_V"] = sawtooth2(spec_times[default_time_header], *interp_tup)
@@ -305,8 +327,16 @@ def interpolate_spec_time_to_U(
 
 
 def round_10ms(time) -> float:
-    """
-    Rounds a time to the nearest 1ms
+    """Round a time (or list of times) to 3 decimal places.
+
+    Args:
+        time: A ``float``, ``int`` or list of either.
+
+    Returns:
+        The rounded value or list of rounded values.
+
+    Raises:
+        ValueError: If ``time`` is not a number or list of numbers.
     """
     if isinstance(time, list):
         return [np.round(x, 3) for x in time]
@@ -323,17 +353,19 @@ def generate_min_max_list_for_cycles(
     default_time_header: str = "t_s",
     default_cycle_header="cycle",
 ) -> dict:
-    """
-    This function groups by cycle and Loops through each cycle it finds the min and max time associated with that cycle.
-    It then stores the min and max times in a dictionary with the cycle number as the key. It returns this dictionary.
+    """Return per-cycle ``[start_time, end_time]`` bounds from CV data.
 
-    inputs:
-    CV_data: a dataframe with the CV data
-    default_time_header: the header of the time collumn in the CV data
-    default_cycle_header: the header of the cycle collumn in the CV data
+    For cycle 0 the bounds are ``[min, max]``; for later cycles the
+    start is the previous cycle's end so the intervals tile the time
+    axis.
 
-    outputs:
-    min_max_dict: a dictionary with the min and max times of each cycle
+    Args:
+        CV_data: DataFrame containing time and cycle columns.
+        default_time_header: Name of the time column.
+        default_cycle_header: Name of the cycle column.
+
+    Returns:
+        dict: Mapping of cycle index to ``[start, end]`` rounded times.
     """
     min_max_dict = {}
     previous_max = None
@@ -355,16 +387,21 @@ def generate_min_max_list_for_cycles(
 
 
 def return_cycle_for_time(time: float, min_max_dict: dict) -> int:
-    """
-    This function takes a time and returns the cycle it belongs to. If the time is 0, zero is alwyas returned
-    if the time is greater than the max time of the last cycle, the last cycle is returned.
+    """Look up which cycle interval a given time falls into.
 
-    inputs:
-    time: a float of the time to be checked
-    min_max_dict: a dictionary of the min and max times of each cycle
+    Times under ~20 ms are treated as cycle 0; times beyond the final
+    interval's upper bound are clamped to the last cycle.
 
-    outputs:
-    cycle: the cycle number the time belongs to.
+    Args:
+        time: Time value to classify.
+        min_max_dict: Mapping built by
+            :func:`generate_min_max_list_for_cycles`.
+
+    Returns:
+        Cycle index containing ``time``.
+
+    Raises:
+        ValueError: If ``time`` cannot be placed in any interval.
     """
     max_cycle = max([int(x) for x in min_max_dict.keys()])
     for cycle, min_max in min_max_dict.items():
@@ -395,13 +432,16 @@ def get_cycles_for_spec_times(
     default_time_header1="t_s",
     default_cycle_header1="cycle",
 ) -> pd.DataFrame:
-    """
-    This function takes a spec times dataframe and returns a dataframe with the cycle number using the return_cycle_for_time function.
+    """Tag each spectroscopy time row with its parent CV cycle.
 
-    inputs:
-    calibration_df: a dataframe with the spec times
-    CV_data: a dataframe with the CV data
+    Args:
+        calibration_df: DataFrame with a time column to annotate.
+        CV_data: DataFrame providing per-cycle time intervals.
+        default_time_header1: Time column name (shared by both frames).
+        default_cycle_header1: Cycle column name to write.
 
+    Returns:
+        ``calibration_df`` with the cycle column populated.
     """
     min_max_dict = generate_min_max_list_for_cycles(
         CV_data,
@@ -417,6 +457,17 @@ def get_cycles_for_spec_times(
 def calcualte_scan_direction_for_spec_times(
     calibration_df: pd.DataFrame, interp_tup: tuple, default_time_header: str = "t_s"
 ) -> pd.DataFrame:
+    """Label each spectroscopy time as ``anodic`` or ``cathodic`` scan direction.
+
+    Args:
+        calibration_df: DataFrame with a time column to annotate.
+        interp_tup: Fitted sawtooth parameters from
+            :func:`generate_interpolation_function`.
+        default_time_header: Name of the time column.
+
+    Returns:
+        ``calibration_df`` with a new ``direction`` column inserted.
+    """
     # calculate the derivative of the sawtooth2 function
     time_array = np.array(calibration_df[default_time_header])
     deriv = np.diff(sawtooth2(time_array, *interp_tup)) > 0
@@ -439,10 +490,17 @@ def calcualte_scan_direction_for_spec_times(
 
 
 def error_correct_scan(scan_df: pd.DataFrame) -> pd.DataFrame:
-    """This function loops through the the index of the scan_df dataframe. If the difference between the index and the
-    previos index is greater than 1 the rows of scan_df are split at this point. The dataframe with the most rows is
-    assumed to be correct. The rows of the 'ditection' collumn in the other dataframe are set to be the opposite of what
-    they are in the correct dataframe. The two dataframes are then concatinated and returned without distubring the index.
+    """Flip mislabeled scan directions inside one cycle/direction group.
+
+    Detects index gaps inside ``scan_df``; the smaller side of each
+    gap is assumed misclassified and has its ``direction`` value
+    swapped to the opposite label.
+
+    Args:
+        scan_df: DataFrame for a single cycle and nominal direction.
+
+    Returns:
+        ``scan_df`` with the corrected ``direction`` column.
     """
     num_errors = 0
     for i in range(scan_df.shape[0]):
@@ -478,16 +536,14 @@ def error_correct_scan(scan_df: pd.DataFrame) -> pd.DataFrame:
 def error_correct_scan_direction_for_all_cycles(
     calibration_df: pd.DataFrame,
 ) -> pd.DataFrame:
-    """
-    This function takes a dataframe with the cycle number and the scan direction and corrects the scan direction
-    for all cycles. It does this by calling the error_correct_scan function for each cycle and concatinating the results
-    into a single dataframe.
+    """Apply :func:`error_correct_scan` to every (cycle, direction) group.
 
-    inputs:
-    calibration_df: a dataframe with the cycle number and the scan direction
+    Args:
+        calibration_df: DataFrame containing ``cycle`` and
+            ``direction`` columns.
 
-    outputs:
-    calibration_df: a dataframe with the corrected scan direction for all cycles
+    Returns:
+        ``calibration_df`` with all groups corrected in place.
     """
     for cycle, frame in calibration_df.groupby("cycle"):
         for scan, sub_frame in frame.groupby("direction"):
@@ -499,18 +555,16 @@ def error_correct_scan_direction_for_all_cycles(
 def read_in_spectra_calibrate(
     calibration_df: pd.DataFrame, spec_path: str, read_hlo: bool = False
 ) -> pd.DataFrame:
-    """
-    This function reads in spectra from either an ANDORSPEC.hlo file or a parquet file. It combines this data with calibration_df and returns
-    a horizontally concatinated dataframe. The read_hlo flag is used to determine which file type to read in. If read_hlo is True the function
-    uses the read_spectra_from_hlo function to read in the spectra, if it is False a parqet reader is used.
+    """Horizontally concatenate calibration metadata and spectra.
 
-    inputs:
-    calibration_df: a dataframe with collumns of t_s, Ewe_V, cycle and direction for the spectral data.
-    spec_path: the path to the spectral data
-    read_hlo: a flag to indicate if the data is in an hlo format or parquet format
+    Args:
+        calibration_df: DataFrame with ``t_s``, ``Ewe_V``, ``cycle``
+            and ``direction`` columns.
+        spec_path: Path to the spectra file.
+        read_hlo: When ``True``, parse an HLO file; otherwise parquet.
 
-    outputs:
-    calibration_df: a dataframe with the spectral data added to it.
+    Returns:
+        ``calibration_df`` concatenated with the spectral columns.
     """
     if read_hlo:
         spectra_df = read_spectra_from_hlo(spec_path)
@@ -524,17 +578,15 @@ def drop_times_larger_than_CV_max_time(
     CV_data: pd.DataFrame,
     default_time_header: str = "t_s",
 ) -> pd.DataFrame:
-    """
-    This function takes in the calibrated spectral dataframe and drops all times that are larger than the max time of the CV data.
-    It does this by getting the max time from the CV data and dropping all rows in the calibrated_spectra dataframe that are greater
-    than this time.
+    """Drop spectral rows whose timestamp exceeds the CV's final time.
 
-    inputs:
-    calibrated_spectra: a dataframe with t_s, Ewe_V, cycle, direction and spectral data
-    CV_data: a dataframe with the CV data
+    Args:
+        calibrated_spectra: DataFrame holding the calibrated spectra.
+        CV_data: DataFrame whose time column defines the cutoff.
+        default_time_header: Time column name in both frames.
 
-    outputs:
-    calibrated_spectra: a dataframe with the times larger than the max time of the CV data dropped
+    Returns:
+        ``calibrated_spectra`` filtered to the CV time window.
     """
     max_time = CV_data[default_time_header].max()
 
@@ -549,16 +601,19 @@ def drop_times_larger_than_CV_max_time(
 def downsample_to_1mV_precision(
     calibrated_spectra: pd.DataFrame, precision: float = 0.001
 ) -> pd.DataFrame:
-    """
-    This function takes in the calibrated spectral dataframe and loops using grouby operations, first by cycle, then by direction
-    On each iteration of the loop (i.e. linear sweep) the scan direction collumn is temporarily dropped. The function then groups by
-    Ewe_V//0.001 and rounds the result to 3 decimal places.
+    """Bin spectra to a fixed voltage precision and average within bins.
 
-    inputs:
-    calibrated_spectra: a dataframe with t_s, Ewe_V, cycle, direction and spectral data
+    Iterates each (cycle, direction) group, rounds ``Ewe_V`` to the
+    nearest multiple of ``precision`` and averages all rows sharing a
+    bin. Final columns are renamed to ``U (V)`` and ``t (s)``.
 
-    outputs:
-    calibrated_spectra: a dataframe with the voltage values rounded to the nearest 1mV
+    Args:
+        calibrated_spectra: Calibrated spectral DataFrame with
+            ``cycle`` and ``direction`` columns.
+        precision: Voltage bin width in volts.
+
+    Returns:
+        Concatenated DataFrame indexed by ``U (V)``.
     """
     totaldf = pd.DataFrame()
     for cycle, frame in calibrated_spectra.groupby("cycle"):
@@ -609,16 +664,18 @@ def fit_current_time_to_univariate_spline(
     default_t_header: str = "t_s",
     default_J_header: str = "I_A",
     plotbl: bool = False,
-):
-    """
-    This function takes in a voltage and current array
-      and fits a univariate spline to the data.
-    It plots the fit and the original data to compare
-    and returns the spline object.
+) -> UnivariateSpline:
+    """Fit a smoothing :class:`UnivariateSpline` to current vs. time.
 
-    inputs: U - voltage array
-    J - current array
-    smoothing_factor - the smoothing factor of the spline
+    Args:
+        CV: DataFrame containing time and current columns.
+        smoothing_factor: Spline smoothing factor.
+        default_t_header: Time column name.
+        default_J_header: Current column name.
+        plotbl: When ``True``, plot the fit against the raw data.
+
+    Returns:
+        Fitted spline object callable as ``spl(t)``.
     """
 
     # create a univariate spline object
@@ -654,17 +711,18 @@ def interpolate_spectral_time_to_current(
     default_time_header_spec: str = "t (s)",
     smoothing_weight: float = 0.000000001,
 ) -> pd.DataFrame:
-    """
-    This function uses the fit_current_time_to_univariate_spline to interpolate the time of the spectra to current using the CV data.
+    """Add a ``J (A)`` column to ``spectral_df_calib`` from a CV spline fit.
 
-    inputs:
-    spectral_df_calib: a dataframe with the spectral data
-    CV_dataframe: a dataframe with the CV data
-    default_time_header_CV: the header of the time collumn in the CV data
-    default_J_header_CV: the header of the current collumn in the CV data
-    default_time_header_spec: the header of the time collumn in the spectral data
+    Args:
+        spectral_df_calib: DataFrame with a spectral time column.
+        CV_dataframe: DataFrame providing time/current for the spline.
+        default_time_header_CV: Time column name in the CV data.
+        default_J_header_CV: Current column name in the CV data.
+        default_time_header_spec: Time column name in the spectra.
+        smoothing_weight: Spline smoothing factor.
 
-    outputs: interpolated_df: a dataframe with the current values interpolated from the CV data
+    Returns:
+        ``spectral_df_calib`` with the interpolated ``J (A)`` column.
     """
     spl = fit_current_time_to_univariate_spline(
         CV_dataframe,
@@ -697,7 +755,35 @@ def fully_read_and_calibrate_parquet(
     output_path: str = None,
     precision: float = 0.001,
 ) -> pd.DataFrame:
+    """Run the full HISPEC calibration pipeline on a spectra parquet file.
 
+    Steps performed: load spectral times, fit a sawtooth to the CV's
+    ``U(t)``, interpolate spectra time to voltage, label cycles and
+    scan directions (with error correction), merge in the spectra,
+    drop times beyond the CV window, downsample to a fixed voltage
+    precision and interpolate current onto the spectra time axis.
+
+    Args:
+        cv_dataframe: Either a CV DataFrame or a path to a CV HLO file.
+        spec_path: Path to the spectra parquet file.
+        default_time_header: Time column name shared across inputs.
+        default_U_header: CV voltage column name.
+        default_current_header: CV current column name.
+        default_cycle_header: CV cycle column name.
+        biologic: Whether the CV came from a Biologic potentiostat
+            (zero-indexed cycles).
+        starting_amp: Initial sawtooth amplitude guess.
+        starting_phase: Initial sawtooth phase guess.
+        starting_offset: Initial sawtooth offset guess.
+        spline_strength: Current-spline smoothing factor.
+        read_hlo: Reserved flag toggling HLO-based spectra reads.
+        write_file: When ``True``, also write the result to parquet.
+        output_path: Optional output prefix/directory for the parquet.
+        precision: Voltage bin width for downsampling.
+
+    Returns:
+        Calibrated, downsampled spectra DataFrame sorted by ``t (s)``.
+    """
     calibration_df = read_spec_times_from_parquet(
         spec_file_path=spec_path, default_time_header=default_time_header
     )

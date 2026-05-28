@@ -1,51 +1,50 @@
+"""Parser for legacy RCP/EXP/ANA hierarchical key-value files."""
+
 __all__ = ["rcp_to_dict"]
 
 import os
 import zipfile
 
 
-def rcp_to_dict(rcppath: str):
-    """
-    Convert a structured text file or a file within a zip archive into a nested dictionary.
+def rcp_to_dict(rcppath: str) -> dict:
+    """Parse an indented ``key: value`` file into a nested dict.
 
-    The function reads a file with a specific structure where each line contains a key-value pair
-    separated by a colon and indented with tabs to indicate hierarchy levels. It supports reading
-    from both plain text files and zip archives containing the file. The resulting dictionary
-    reflects the hierarchical structure of the input file.
+    Lines use four-space indentation to encode nesting depth and a single
+    colon to separate keys from values. When ``rcppath`` points to a zip
+    archive, the inner file extension (``.ana``, ``.exp``, or ``.rcp``) is
+    derived from the archive's parent directory name.
 
     Args:
-        rcppath (str): The path to the input file. It can be a plain text file or a zip archive
-                       containing the file.
+        rcppath: Path to either a plain text file or a zip archive
+            containing one such file.
 
     Returns:
-        dict: A nested dictionary representing the hierarchical structure of the input file.
+        Nested dictionary mirroring the indentation hierarchy. Repeated keys
+        at the same level are collapsed into a list.
     """
 
     dlist = []
 
-    def _tab_level(astr):
-        """
-        Calculate the tab level of a given string.
+    def _tab_level(astr) -> float:
+        """Return the indentation depth of ``astr`` in units of four spaces.
 
         Args:
-            astr (str): The input string to evaluate.
+            astr: A single line whose leading four-space groups are counted.
 
         Returns:
-            float: The tab level, calculated as the number of leading spaces divided by 4.
+            Number of leading four-space blocks as a float.
         """
         return (len(astr) - len(astr.lstrip("    "))) / 4
 
-    def _ttree_to_json(ttree, level=0):
-        """
-        Converts a tree structure (list of dictionaries) into a nested JSON-like dictionary.
+    def _ttree_to_json(ttree, level=0) -> dict:
+        """Recursively fold a flat indented-token list into a nested dict.
 
         Args:
-            ttree (list): A list of dictionaries representing the tree structure. Each dictionary
-                          should have at least 'level', 'name', and 'value' keys.
-            level (int, optional): The current level of the tree being processed. Defaults to 0.
+            ttree: Token entries with ``level``, ``name``, and ``value`` keys.
+            level: Current depth being assembled.
 
         Returns:
-            dict: A nested dictionary representing the JSON structure of the input tree.
+            Nested dict for the requested level.
         """
         result = {}
         for i in range(0, len(ttree)):
@@ -72,8 +71,12 @@ def rcp_to_dict(rcppath: str):
         return result
 
     def _dict_insert_or_append(adict, key, val):
-        """Insert a value in dict at key if one does not exist
-        Otherwise, convert value to list and append
+        """Set ``adict[key] = val``, promoting to a list on repeat assignment.
+
+        Args:
+            adict: Mapping to mutate.
+            key: Target key.
+            val: Value to insert or append.
         """
         if key in adict:
             if type(adict[key]) != list:

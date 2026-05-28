@@ -1,16 +1,16 @@
-"""A device class for the Galil motion controller, used by a FastAPI server instance.
+"""Galil IO driver used by a HELAO FastAPI action server.
 
-The 'galil' device class exposes motion and I/O functions from the underlying 'gclib'
-library. Class methods are specific to Galil devices. Device configuration is read from
-config/config.py.
+Wraps the digital/analog IO portion of the `gclib` library: reads `dev_ai`,
+`dev_ao`, `dev_di`, `dev_do` port maps from the server config, opens a TCP
+connection to the Galil controller at `galil_ip_str`, and exposes async helpers
+for reading/setting digital and analog channels plus a `set_digital_cycle`
+routine that uploads a DMC toggling program. A background polling task pushes
+scaled analog-input readings to the action-server live buffer.
 
-This driver requires gclib to be installed. After installation, activate the helao
-environment and run:
+Requires gclib (Windows). After installing the Galil toolkit, install the
+Python module from the helao environment:
 
-`python "c:\Program Files (x86)\Galil\gclib\source\wrappers\python\setup.py" install`
-
-to install the python module.
-
+`python "c:\\Program Files (x86)\\Galil\\gclib\\source\\wrappers\\python\\setup.py" install`
 """
 
 __all__ = [
@@ -48,13 +48,30 @@ import gclib
 
 
 class cmd_exception(ValueError):
+    """Raised for invalid Galil command sequences."""
+
     def __init__(self, arg):
+        """Store the offending argument(s) on the exception."""
         self.args = arg
 
 
 class Galil:
-    def __init__(self, action_serv: Base):
+    """IO portion of a Galil controller exposed to the HELAO action server.
 
+    Reads its `params` block from the action server config: `galil_ip_str`,
+    `dev_ai`/`dev_ao`/`dev_di`/`dev_do` port maps, and the `monitor_ai` scaling
+    dict. Opens a `gclib.py()` connection on construction and starts background
+    polling/signal tasks. Public coroutines mirror digital and analog IO
+    operations and (`set_digital_cycle`) upload a DMC program to the controller.
+    """
+
+    def __init__(self, action_serv: Base):
+        """Connect to the Galil controller and start the polling tasks.
+
+        Args:
+            action_serv: Owning HELAO action server, used for config access
+                and for pushing readings to the live buffer.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
 
@@ -112,6 +129,11 @@ class Galil:
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
 
     async def poll_sensor_loop(self, frequency: int = 4):
+        """Background task that reads `monitor_ai` channels at `frequency` Hz.
+
+        Each successful read is scaled per `monitor_ai` and pushed to the
+        action-server live buffer.
+        """
         LOGGER.info("polling background task has started")
         waittime = 1.0 / frequency
         lastupdate = 0
@@ -135,9 +157,11 @@ class Galil:
             await asyncio.sleep(0.01)
 
     async def reset(self):
+        """Placeholder reset; no controller-level reset is currently performed."""
         pass
 
     async def start_polling(self):
+        """Signal the polling loop to resume and block until it has restarted."""
         LOGGER.info("got 'start_polling' request, raising signal")
         async with self.base.aiolock:
             await self.poll_signalq.put(True)
@@ -146,6 +170,7 @@ class Galil:
             await asyncio.sleep(0.1)
 
     async def stop_polling(self):
+        """Signal the polling loop to pause and block until it has stopped."""
         LOGGER.info("got 'stop_polling' request, raising signal")
         async with self.base.aiolock:
             await self.poll_signalq.put(False)
@@ -154,14 +179,21 @@ class Galil:
             await asyncio.sleep(0.1)
 
     async def poll_signal_loop(self):
+        """Consume signals from `poll_signalq` and update `self.polling`."""
         while True:
             self.polling = await self.poll_signalq.get()
             LOGGER.info("polling signal received")
 
-    async def estop(self, switch: bool, *args, **kwargs):
-        # this will estop the io
-        # set estop: switch=true
-        # release estop: switch=false
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Engage or release the IO emergency stop.
+
+        Args:
+            switch: True to assert estop (drives every configured AO/DO low
+                and sets the action server estop flag), False to release.
+
+        Returns:
+            The `switch` value passed in.
+        """
         LOGGER.info("IO Estop")
         if switch:
             for ao_name in self.dev_ao.keys():
@@ -182,7 +214,16 @@ class Galil:
             self.base.actionservermodel.estop = False
         return switch
 
-    async def get_analog_in(self, ai_name: str = "analog_in", *args, **kwargs):
+    async def get_analog_in(self, ai_name: str = "analog_in", *args, **kwargs) -> dict:
+        """Read a configured analog input by name.
+
+        Args:
+            ai_name: Key in `dev_ai` identifying the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("analog_in"), and
+            the raw `value` returned by the controller.
+        """
         err_code = ErrorCodes.none
         ret = None
         ai_port = -1
@@ -202,7 +243,16 @@ class Galil:
             "value": ret,
         }
 
-    async def get_digital_in(self, di_name: str = "digital_in", *args, **kwargs):
+    async def get_digital_in(self, di_name: str = "digital_in", *args, **kwargs) -> dict:
+        """Read a configured digital input by name.
+
+        Args:
+            di_name: Key in `dev_di` identifying the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("digital_in"),
+            and `value`.
+        """
         err_code = ErrorCodes.none
         ret = None
         di_port = -1
@@ -222,7 +272,16 @@ class Galil:
             "value": ret,
         }
 
-    async def get_digital_out(self, do_name: str = "digital_out", *args, **kwargs):
+    async def get_digital_out(self, do_name: str = "digital_out", *args, **kwargs) -> dict:
+        """Read the current state of a configured digital output by name.
+
+        Args:
+            do_name: Key in `dev_do` identifying the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("digital_out"),
+            and `value`.
+        """
         err_code = ErrorCodes.none
         ret = None
         do_port = -1
@@ -245,7 +304,16 @@ class Galil:
     # def set_analog_out(self, ports, handle: int, module: int, bitnum: int, multi_value):
     async def set_analog_out(
         self, value: float, ao_name: str = "analog_out", *args, **kwargs
-    ):
+    ) -> dict:
+        """Placeholder for analog-out writes; the DMC-4143 does not support AO.
+
+        Args:
+            value: Requested analog-out value (unused).
+            ao_name: Channel name (unused).
+
+        Returns:
+            Dict with `error_code` set to `not_available` and a null `value`.
+        """
         err_code = ErrorCodes.not_available
         ao_port = -1
         # this is essentially a placeholder for now since the DMC-4143 does not support
@@ -264,7 +332,17 @@ class Galil:
             "value": None,
         }
 
-    async def set_digital_out(self, on: bool, do_name: str = "", *args, **kwargs):
+    async def set_digital_out(self, on: bool, do_name: str = "", *args, **kwargs) -> dict:
+        """Set a configured digital output high or low.
+
+        Args:
+            on: True to set the bit (`SB`), False to clear it (`CB`).
+            do_name: Key in `dev_do` identifying the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("digital_out"), and
+            the post-set readback `value`.
+        """
         err_code = ErrorCodes.none
         on = bool(on)
         ret = None
@@ -292,6 +370,11 @@ class Galil:
         }
 
     async def upload_DMC(self, DMC_prog):
+        """Download a DMC program string to the Galil controller.
+
+        Args:
+            DMC_prog: DMC program text. A null terminator is appended.
+        """
         # self.galilcmd("UL;")  # begin upload
         # upload line by line from DMC_prog
         self.galilprgdownload("DL;")
@@ -312,7 +395,32 @@ class Galil:
         stop_via_ttl: Optional[bool] = True,
         *args,
         **kwargs,
-    ):
+    ) -> dict:
+        """Build and upload a DMC program that toggles one or more outputs on a trigger.
+
+        Generates a main thread that waits on `trigger_name` (with edge type
+        `triggertype`) and one sub-thread per output that toggles the output
+        according to `toggle_init_delay`, `toggle_duty`, `toggle_period`, and
+        `toggle_duration` (all in seconds). Either a single `out_name`/Gamry
+        pair or a list of outputs (with parallel parameter lists) is supported.
+
+        Args:
+            trigger_name: Key in `dev_di` used as the start trigger.
+            triggertype: Edge type to wait for.
+            out_name: Output name (or list of names) in `dev_do` to toggle.
+            toggle_init_delay: Pre-toggle delay (seconds).
+            toggle_duty: On-fraction of `toggle_period`.
+            toggle_period: Cycle period (seconds).
+            toggle_duration: Total run time (seconds).
+            out_name_gamry: Optional companion DO for Gamry trigger output.
+            req_out_name: Optional DO that indicates a request line.
+            stop_via_ttl: If True, use the variant of the main DMC that halts
+                on TTL; otherwise use the no-stop variant.
+
+        Returns:
+            Dict with `error_code` reflecting whether the program was
+            successfully built and started.
+        """
         # rewrite params for consistency w/jcap eche runs
         t_duration = (
             [int(round(x * 1e3)) for x in toggle_duration]
@@ -450,7 +558,12 @@ class Galil:
 
         return {"error_code": err_code}
 
-    async def stop_digital_cycle(self):
+    async def stop_digital_cycle(self) -> dict:
+        """Halt any running digital-cycle DMC threads and clear their outputs.
+
+        Returns:
+            Dict with `error_code` set to `none`.
+        """
         if self.digital_cycle_out is not None:
             self.galilcmd(f"HX{self.digital_cycle_mainthread}")  # stops main routine
             self.digital_cycle_mainthread = None
@@ -469,9 +582,12 @@ class Galil:
 
         return {"error_code": ErrorCodes.none}
 
-    def shutdown(self):
-        # this gets called when the server is shut down or reloaded to ensure a clean
-        # disconnect ... just restart or terminate the server
+    def shutdown(self) -> set:
+        """Close the Galil connection. Invoked when the action server shuts down.
+
+        Returns:
+            A single-element set containing "shutdown".
+        """
         LOGGER.info("shutting down galil io")
         self.galil_enabled = False
         try:
@@ -483,15 +599,27 @@ class Galil:
 
 
 class AiMonExec(Executor):
+    """Executor that streams the monitored analog inputs from the live buffer.
+
+    Reads `duration` (seconds; -1 for no limit) from the action params and
+    finishes when the elapsed time exceeds it.
+    """
+
     def __init__(self, *args, **kwargs):
+        """Initialize the executor and capture the start time and duration."""
         super().__init__(*args, **kwargs)
         LOGGER.info("AiMonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
         LOGGER.info("AiMonExec init complete.")
 
-    async def _poll(self):
-        """Read analog inputs from live buffer."""
+    async def _poll(self) -> dict:
+        """Read each monitored analog input from the live buffer.
+
+        Returns:
+            Dict with `error`, `status` (active/finished based on duration),
+            and `data` containing per-channel values plus `epoch_s`.
+        """
         data_dict = {}
         times = []
         for ai_name in self.active.driver.monitor_ai.keys():

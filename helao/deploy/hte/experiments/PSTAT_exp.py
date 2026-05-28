@@ -1,3 +1,5 @@
+"""Experiment library exposing a looping chronopotentiometry run."""
+
 from socket import gethostname
 
 from helao.core.models.machine import MachineModel
@@ -27,19 +29,34 @@ def PSTAT_exp_CP(
     stop_voltage_min_delay_pts: str = "",
     stop_voltage_max_delay_pts: str = "",
     num_repeats: int = 1,
-):
-    """Run a looping CP experiment for num_repeats times.
+) -> list:
+    """Queue ``num_repeats`` PSTAT ``run_CP`` actions sharing the same params.
+
+    Builds a single CP parameter dict (including optional voltage stop limits)
+    and appends one ``run_CP`` action per iteration of ``num_repeats``.
 
     Args:
-        cp_current (float, optional): _description_. Defaults to 0.0.
-        cp_duration_s (float, optional): _description_. Defaults to 60.
-        acqinterval_s (float, optional): _description_. Defaults to 0.1.
-        gamry_i_range (str, optional): _description_. Defaults to "auto".
-        comment (str, optional): _description_. Defaults to "".
-        num_repeats (int): number of loops. Defaults to 1.0
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        current: Applied current (A).
+        duration_s: Duration of each CP step (s).
+        acqinterval_s: Sample interval (s).
+        gamry_i_range: Gamry current range string.
+        comment: Free-form comment passed through to the driver.
+        alert_duration_sec: Alert duration (s); ``-1`` disables.
+        alert_above: True to alert when Ewe rises above the threshold.
+        alert_sleep_sec: Sleep between alert checks (s); ``-1`` disables.
+        alert_thresh_Ewe_V: Alert threshold Ewe (V).
+        stop_voltage_min: Optional lower voltage stop (string; empty disables).
+        stop_voltage_max: Optional upper voltage stop (string; empty disables).
+        stop_voltage_min_delay_pts: Points the signal must dwell below
+            ``stop_voltage_min`` before stopping (string; empty disables).
+        stop_voltage_max_delay_pts: Points the signal must dwell above
+            ``stop_voltage_max`` before stopping (string; empty disables).
+        num_repeats: Number of times to queue the CP action.
 
     Returns:
-        list: a list of Action premodels
+        List of planned PSTAT ``run_CP`` actions.
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars

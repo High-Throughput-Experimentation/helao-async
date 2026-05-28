@@ -1,3 +1,5 @@
+"""Pydantic container describing the parameters of an in-flight action."""
+
 __all__ = ["ActiveParams"]
 
 from typing import List, Dict
@@ -12,19 +14,15 @@ from helao.core.helaodict import HelaoDict
 
 
 class ActiveParams(BaseModel, HelaoDict):
-    """
-    ActiveParams is a model that represents the parameters for an active action.
+    """Bundle of state passed to :class:`Base.contain_action` when an action becomes active.
 
     Attributes:
-        action (Action): The Action object for this action.
-        file_conn_params_dict (Dict[UUID, FileConnParams]): A dictionary keyed by file_conn_key of FileConnParams for all files of active.
-        aux_listen_uuids (List[UUID]): A list of UUIDs for auxiliary listeners.
-
-    Config:
-        arbitrary_types_allowed (bool): Allows arbitrary types for model attributes.
-
-    Methods:
-        validate_action(cls, v): Validator method for the action attribute.
+        action: The :class:`Action` instance currently being executed.
+        file_conn_params_dict: Per-file connection parameters keyed by the
+            file connection UUID; one entry per output file the action will
+            produce.
+        aux_listen_uuids: UUIDs of auxiliary actions whose status/data
+            streams should be subscribed to alongside the primary action.
     """
 
     # the Action object for this action
@@ -39,13 +37,5 @@ class ActiveParams(BaseModel, HelaoDict):
 
     @validator("action")
     def validate_action(cls, v):
-        """
-        Validates the given action.
-
-        Args:
-            v: The action to be validated.
-
-        Returns:
-            The validated action.
-        """
+        """Pydantic validator hook for the ``action`` field; returns the value unchanged."""
         return v

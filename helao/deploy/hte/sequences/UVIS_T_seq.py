@@ -1,6 +1,4 @@
-"""
-Sequence library for UVIS
-"""
+"""Sequence library exposing UV-Vis transmission programs and a post-analysis."""
 
 __all__ = ["UVIS_T", "UVIS_T_postseq"]
 
@@ -30,7 +28,41 @@ def UVIS_T(
     use_z_motor: bool = False,
     cell_engaged_z: float = 1.5,
     cell_disengaged_z: float = 0,
-):
+) -> list:
+    """Build a UV-Vis transmission sequence over plate samples.
+
+    Optionally disengages the cell via the z-motor, sets up the reference,
+    captures dark and light transmission references, then for each sample
+    in ``plate_sample_no_list`` moves to the sample (engaging/disengaging
+    the z-motor as configured) and captures transmission data. A second
+    reference block and the shutdown experiment finish the sequence.
+
+    Args:
+        sequence_version: Version tag for the sequence definition.
+        plate_id: Material library plate identifier.
+        plate_sample_no_list: Sample numbers on the plate to measure.
+        reference_mode: Reference mode passed to UVIS sub-experiments.
+        custom_position: Solid custom position name to address the cell.
+        spec_n_avg: Number of spectra averaged per acquisition.
+        spec_int_time_ms: Spectrometer integration time in milliseconds.
+        duration_sec: Per-measurement duration in seconds; negative uses
+            the action's default.
+        specref_code: Spectral reference code for ``UVIS_sub_setup_ref``.
+        led_type: Illumination side label.
+        led_date: Date string for the LED intensity calibration.
+        led_names: Names of LEDs/sources used (first element drives toggle).
+        led_wavelengths_nm: Wavelengths in nm corresponding to ``led_names``.
+        led_intensities_mw: Intensities in mW corresponding to ``led_names``.
+        toggle_is_shutter: Whether the toggle source acts as a shutter.
+        analysis_seq_uuid: Optional analysis sequence UUID retained for
+            downstream consumers.
+        use_z_motor: Use the z-motor to engage/disengage the cell.
+        cell_engaged_z: Cell engaged z-height in mm.
+        cell_disengaged_z: Cell disengaged z-height in mm.
+
+    Returns:
+        list: Ordered list of planned ``Experiment`` objects.
+    """
     epm = ExperimentPlanMaker()
     epm.add("UVIS_sub_unloadall_customs", {})
     if use_z_motor:
@@ -207,7 +239,18 @@ def UVIS_T_postseq(
     analysis_seq_uuid: str = "",
     plate_id: int = 0,
     recent: bool = False,
-):
+) -> list:
+    """Build a post-sequence that runs the dry UVIS analysis.
+
+    Args:
+        sequence_version: Version tag for the sequence definition.
+        analysis_seq_uuid: UUID of the source sequence to analyze.
+        plate_id: Plate identifier scoping the analysis.
+        recent: Restrict to the most recent matching run when True.
+
+    Returns:
+        list: Ordered list of planned ``Experiment`` objects.
+    """
     epm = ExperimentPlanMaker()
     epm.add(
         "UVIS_analysis_dry",

@@ -1,3 +1,13 @@
+"""Inter-server RPC/HTTP dispatch primitives.
+
+Provides async and sync helpers for invoking action endpoints and private
+admin endpoints on peer HELAO servers. Each helper tries a ZMQ RPC fast
+path first and transparently falls back to HTTP if the peer's RPC
+dispatcher is unreachable. Module-level caches keep one DEALER and one
+REQ client per ``(host, port)`` peer and are torn down via
+:func:`aclose_all_rpc_clients` and :func:`close_all_sync_rpc_clients`.
+"""
+
 __all__ = [
     "async_action_dispatcher",
     "async_private_dispatcher",
@@ -48,7 +58,16 @@ _RPC_PROBE_TIMEOUT = 3.0
 
 
 async def _get_rpc_client(host: str, port: int) -> RPCClient:
-    """Return a cached :class:`RPCClient` for ``host:derive_rpc_port(port)``."""
+    """Return (or lazily create) the cached async RPC client for one peer.
+
+    Args:
+        host: Hostname or IP of the peer server.
+        port: HTTP port; the matching RPC port is derived via
+            :func:`derive_rpc_port`.
+
+    Returns:
+        The shared :class:`RPCClient` for ``(host, port)``.
+    """
     key = (host, port)
     client = _RPC_CLIENTS.get(key)
     if client is not None:
@@ -65,7 +84,7 @@ async def _get_rpc_client(host: str, port: int) -> RPCClient:
 
 
 async def aclose_all_rpc_clients() -> None:
-    """Close every cached RPC client.  Idempotent."""
+    """Close and discard every cached async RPC client. Idempotent."""
     clients = list(_RPC_CLIENTS.values())
     _RPC_CLIENTS.clear()
     for client in clients:
@@ -81,32 +100,31 @@ async def async_action_dispatcher(
     params: dict = {},
     timeout: int = 60,
     retries: int = 5,
-):
-    """
-    Asynchronously dispatches an action to the specified server and handles the response.
+) -> tuple:
+    """Dispatch an action to its action server, trying RPC then HTTP.
 
-    Tries the ZMQ RPC fast-path first; on failure falls back to HTTP.
-
-    .. note::
-
-       RPC bypasses the action-queuing middleware in BaseAPI (which
-       intercepts HTTP requests to ``/<server>/<action>`` and queues them
-       when the endpoint is busy).  In normal HELAO operation the
-       orchestrator's ``globalstatusmodel.endpoint_free()`` check prevents
-       dispatching to busy endpoints, so the middleware is defense-in-depth
-       that rarely fires; the RPC path relies on that orchestrator-side
-       coordination rather than the per-request middleware.
+    Resolves the destination from ``world_config_dict['servers'][A.action_server.server_name]``,
+    attempts a ZMQ RPC call to ``<server>/<action>``, and on any RPC error
+    or timeout retries over HTTP. The HTTP fallback is the legacy path
+    that runs through the action-queuing middleware in
+    :class:`BaseAPI`; the RPC fast path bypasses that middleware and
+    relies on orchestrator-side endpoint coordination instead.
 
     Args:
-        world_config_dict (dict): A dictionary containing the configuration of the world, including server details.
-        A (Action): An instance of the Action class containing details about the action to be dispatched.
-        params (dict, optional): Additional parameters to be sent with the request. Defaults to an empty dictionary.
+        world_config_dict: Loaded HELAO config dict containing the
+            ``servers`` mapping.
+        A: Action to dispatch; its ``action_server`` and ``action_name``
+            select the destination endpoint.
+        params: Extra query parameters merged into the RPC kwargs and the
+            HTTP query string.
+        timeout: Per-request timeout in seconds; capped by the RPC probe
+            timeout when used for the fast path.
+        retries: Maximum HTTP retry attempts before giving up.
 
     Returns:
-        tuple: A tuple containing the response from the server (or None if an error occurred) and an error code indicating the status of the request.
-
-    Raises:
-        Exception: If there is an issue with the request or response handling, an exception is caught and logged.
+        ``(response, error_code)`` where ``response`` is the decoded JSON
+        body (or ``None`` on failure) and ``error_code`` is an
+        :class:`ErrorCodes` value.
     """
     actd = world_config_dict["servers"][A.action_server.server_name]
     act_addr = actd["host"]
@@ -193,26 +211,28 @@ async def async_private_dispatcher(
     json_dict: dict = {},
     timeout: int = 60,
     retries: int = 5,
-):
-    """
-    Asynchronously dispatches a private action to a specified server.
+) -> tuple:
+    """Call a private (non-action) endpoint on a peer server with RPC-then-HTTP fallback.
 
-    Tries the ZMQ RPC fast-path first; on failure (peer not listening, the
-    method isn't registered, timeout, decode error) falls back to the legacy
-    aiohttp HTTP path.  Callers don't need to do anything to opt in -- the
-    fast path is taken whenever the peer's :class:`HelaoFastAPI` has an
-    ``RPCDispatcher`` bound on ``derive_rpc_port(port)``.
+    The ZMQ RPC fast path is used when the peer's :class:`HelaoFastAPI`
+    has an RPC dispatcher bound on ``derive_rpc_port(port)``; otherwise
+    or on any RPC error the call is retried over HTTP. ``params_dict``
+    and ``json_dict`` are merged into a single kwargs map for the RPC
+    handler; the HTTP path sends them as query string and JSON body
+    respectively.
 
     Args:
-        server_key (str): The key identifying the server.
-        host (str): The host address of the server.
-        port (int): The port number of the server.
-        private_action (str): The private action to be dispatched.
-        params_dict (dict, optional): The dictionary of parameters to be sent in the request. Defaults to {}.
-        json_dict (dict, optional): The dictionary of JSON data to be sent in the request. Defaults to {}.
+        server_key: Logging identifier for the destination server.
+        host: Hostname or IP of the destination.
+        port: HTTP port of the destination (the RPC port is derived from it).
+        private_action: Endpoint path (without leading slash).
+        params_dict: Query-parameter dict for the HTTP path / kwargs for RPC.
+        json_dict: JSON body for the HTTP path / kwargs for RPC.
+        timeout: Per-request timeout in seconds.
+        retries: Maximum HTTP retry attempts before giving up.
 
     Returns:
-        tuple: A tuple containing the response from the server and an error code.
+        ``(response, error_code)`` mirroring :func:`async_action_dispatcher`.
     """
     # --- ZMQ RPC fast-path ----------------------------------------------
     # Merge HTTP-style query params + body dict into one kwargs map for the
@@ -289,7 +309,16 @@ async def async_private_dispatcher(
 
 
 def _get_sync_rpc_client(host: str, port: int) -> RPCSyncClient:
-    """Return a cached :class:`RPCSyncClient` for ``host:derive_rpc_port(port)``."""
+    """Return (or lazily create) the cached sync RPC client for one peer.
+
+    Args:
+        host: Hostname or IP of the peer server.
+        port: HTTP port; the matching RPC port is derived via
+            :func:`derive_rpc_port`.
+
+    Returns:
+        The shared :class:`RPCSyncClient` for ``(host, port)``.
+    """
     key = (host, port)
     client = _SYNC_RPC_CLIENTS.get(key)
     if client is None:
@@ -302,7 +331,7 @@ def _get_sync_rpc_client(host: str, port: int) -> RPCSyncClient:
 
 
 def close_all_sync_rpc_clients() -> None:
-    """Close every cached sync RPC client.  Idempotent."""
+    """Close and discard every cached sync RPC client. Idempotent."""
     clients = list(_SYNC_RPC_CLIENTS.values())
     _SYNC_RPC_CLIENTS.clear()
     for client in clients:
@@ -320,23 +349,25 @@ def private_dispatcher(
     params_dict: dict = {},
     json_dict: dict = {},
     timeout: int = 180,
-):
-    """
-    Sends a POST request to a specified server and handles the response.
+) -> tuple:
+    """Synchronous variant of :func:`async_private_dispatcher`.
 
-    Tries the ZMQ RPC fast-path first via a synchronous ``zmq.REQ`` socket;
-    on failure falls back to the legacy ``requests`` HTTP path.
+    Tries a synchronous ZMQ REQ-socket RPC call first and falls back to
+    blocking :mod:`requests` HTTP if the RPC call fails.
 
     Args:
-        server_key (str): Identifier for the server.
-        server_host (str): Hostname or IP address of the server.
-        server_port (int): Port number of the server.
-        private_action (str): The action to be performed on the server.
-        params_dict (dict, optional): Dictionary of URL parameters to append to the URL. Defaults to {}.
-        json_dict (dict, optional): Dictionary to send in the body of the POST request as JSON. Defaults to {}.
+        server_key: Logging identifier for the destination server.
+        server_host: Hostname or IP of the destination.
+        server_port: HTTP port of the destination.
+        private_action: Endpoint path (without leading slash).
+        params_dict: Query-parameter dict.
+        json_dict: JSON body dict.
+        timeout: Request timeout in seconds.
 
     Returns:
-        tuple: A tuple containing the response (either as a JSON object or string) and an error code.
+        ``(response, error_code)``. ``response`` is the decoded JSON body
+        (or ``None`` if decoding failed); ``error_code`` is an
+        :class:`ErrorCodes` value.
     """
     # --- ZMQ RPC fast-path ----------------------------------------------
     rpc_args: dict = {}
@@ -384,46 +415,36 @@ def private_dispatcher(
             return response, error_code
 
 
-async def check_endpoint(url: str):
-    """
-    Asynchronously checks the status of an endpoint by sending a HEAD request.
+async def check_endpoint(url: str) -> int:
+    """Send a HEAD request to ``url`` and return its HTTP status code.
 
     Args:
-        url (str): The URL of the endpoint to check.
+        url: Absolute URL of the endpoint to probe.
 
     Returns:
-        int: The HTTP status code of the response.
+        The HTTP status code returned by the server.
     """
     async with aiohttp.ClientSession() as session:
         async with session.head(url) as resp:
             return resp.status
 
 
-async def endpoints_available(req_list: list):
-    """
-    Check the availability of a list of endpoints.
+async def endpoints_available(req_list: list) -> tuple:
+    """Probe a list of endpoint URLs and report which are unreachable.
 
-    This function takes a list of endpoint requests, checks their availability,
-    and returns a tuple indicating whether all endpoints are available and a list
-    of unavailable endpoints with their respective error states.
+    Each URL is HEAD-requested via :func:`check_endpoint`; the HTTP status
+    is classified into ``success``, ``client error``, ``server error``,
+    ``no success``, ``cert failure``, ``could not connect``, or
+    ``timeout``.
 
     Args:
-        req_list (list): A list of endpoint requests to check.
+        req_list: Endpoint URLs to probe.
 
     Returns:
-        tuple: A tuple containing:
-            - bool: True if all endpoints are available, False otherwise.
-            - list: A list of tuples, each containing an unavailable endpoint request
-                    and a list of error states.
-
-    Error States:
-        - 'success': The endpoint is available (HTTP status code 2xx).
-        - 'client error': The endpoint returned a client error (HTTP status code 4xx).
-        - 'server error': The endpoint returned a server error (HTTP status code 5xx).
-        - 'no success': The endpoint returned a non-success status code.
-        - 'cert failure': SSL certificate validation failed.
-        - 'could not connect': Failed to connect to the endpoint.
-        - 'timeout': The request to the endpoint timed out.
+        ``(all_available, unavailable)``. ``all_available`` is ``True`` when
+        every URL returned a 2xx status. ``unavailable`` is a list of
+        ``(url, [state])`` pairs for the URLs that failed; empty when all
+        succeeded.
     """
     responses = []
     states = []

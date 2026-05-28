@@ -1,7 +1,10 @@
-"""
-Action library for ANEC
+"""Experiment library for the ANEC station.
 
-server_key must be a FastAPI action server defined in config
+Defines sub-experiments that build action lists for an orchestrator. Each
+function takes an ``Experiment`` and returns the list of actions to enqueue.
+Action targets are referenced by ``server_key`` strings (e.g. ``PSTAT``,
+``MOTOR``, ``NI``, ``PAL``, ``IO``, ``TEC``, ``ORCH``) that must be present
+in the orchestration config.
 """
 
 __all__ = [
@@ -84,9 +87,19 @@ def ANEC_sub_startup(
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
     z_move_mm: float = 3.5,
-):
-    """Sub experiment
-    last functionality test: -"""
+) -> list:
+    """Lower Z, move XY to a plate sample, then raise Z to the engage position.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+        z_move_mm: Final absolute Z (motorxy frame).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -147,9 +160,16 @@ def ANEC_sub_startup(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def ANEC_sub_disengage(experiment: Experiment, experiment_version: int = 1):
-    """Sub experiment
-    Disengages and seals electrochemical cell."""
+def ANEC_sub_disengage(experiment: Experiment, experiment_version: int = 1) -> list:
+    """Lower Z to disengage the electrochemical cell.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -174,7 +194,18 @@ def ANEC_sub_load_solid(
     experiment_version: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
-):
+) -> list:
+    """Load a legacy solid sample into the ``cell1_we`` PAL custom position.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(
@@ -198,11 +229,15 @@ def ANEC_sub_load_solid(
 def ANEC_sub_alloff(
     experiment: Experiment,
     experiment_version: int = 4,
-):
-    """
+) -> list:
+    """Turn off both peristaltic pumps and close every NI gas/liquid valve.
 
     Args:
-        experiment (Experiment): Experiment object provided by Orch
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -227,11 +262,15 @@ def ANEC_sub_alloff(
 def ANEC_sub_heatoff(
     experiment: Experiment,
     experiment_version: int = 2,
-):
-    """
+) -> list:
+    """Cancel TEC recording and disable the TEC controller.
 
     Args:
-        experiment (Experiment): Experiment object provided by Orch
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -246,11 +285,16 @@ def ANEC_sub_setheat(
     experiment: Experiment,
     experiment_version: int = 2,
     target_temperature_degc: float = 25.0,
-):
-    """
+) -> list:
+    """Set a TEC setpoint, start non-blocking recording, enable TEC, wait until stable.
 
     Args:
-        experiment (Experiment): Experiment object provided by Orch
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        target_temperature_degc: TEC setpoint in degrees Celsius.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -275,21 +319,23 @@ def ANEC_sub_setheat(
 def ANEC_sub_normal_state(
     experiment: Experiment,
     experiment_version: int = 2,
-):
-    """Set ANEC to 'normal' state.
+) -> list:
+    """Drive the ANEC valves and pumps to the canonical idle/normal state.
 
-    All experiments begin and end in the following 'normal' state:
-    - Counter electrode (CE) chamber recirculation pump is ON.
-    - Working electrode (WE) chamber outlet pump is ON.
-    - CE chamber recirculation pump direction is ON (forward).
-    - WE chamber liquid drain valve is ON (open).
-    - WE chamber liquid fill valve is OFF (closed).
-    - Liquid reservoir valve is OFF (closed).
-    - WE chamber gas flow-through valve is OFF (closed).
-    - WE chamber CO2 inlet valve is ON (open).
+    Resulting configuration:
+        - Counter-electrode recirculation pump ON.
+        - Working-electrode outlet pump ON.
+        - Recirculation direction forward.
+        - WE drain valve open, WE fill valve closed.
+        - Liquid reservoir and gas flow-through valves closed.
+        - WE CO2 inlet open.
 
     Args:
-        experiment (Experiment): Experiment object provided by Orch
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -313,10 +359,24 @@ def ANEC_sub_flush_fill_cell(
     equilibration_time: float = 1.0,
     reservoir_liquid_sample_no: int = 1511,
     volume_ul_cell_liquid: int = 1000,
-):
-    """Add liquid volume to cell position.
+) -> list:
+    """Flush the cell with liquid, purge with CO2, then register an added liquid sample.
 
-    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    Opens the fill path, reverses pump direction, flushes for
+    ``liquid_flush_time`` seconds, switches to a CO2 purge, equilibrates,
+    then archives a combined+diluted liquid into ``cell1_we``.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        liquid_flush_time: Liquid flush duration (s).
+        co2_purge_time: CO2 purge duration (s).
+        equilibration_time: Post-purge equilibration time (s).
+        reservoir_liquid_sample_no: Liquid sample number in the reservoir.
+        volume_ul_cell_liquid: Volume archived into the cell (uL).
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -359,8 +419,16 @@ def ANEC_sub_flush_fill_cell(
     return apm.planned_actions
 
 
-def ANEC_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
-    """Unload Sample at 'cell1_we' position."""
+def ANEC_sub_unload_cell(experiment: Experiment, experiment_version: int = 1) -> list:
+    """Unload every sample currently tracked at the ``cell1_we`` PAL custom position.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add(PAL_server, "archive_custom_unloadall", {})
@@ -370,8 +438,16 @@ def ANEC_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
 def ANEC_sub_unload_liquid(
     experiment: Experiment,
     experiment_version: int = 1,
-):
-    """Unload liquid sample at 'cell1_we' position and reload solid sample."""
+) -> list:
+    """Unload all samples then re-load the previously tracked solid at ``cell1_we``.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add(
@@ -393,8 +469,17 @@ def ANEC_sub_drain_cell(
     experiment: Experiment,
     experiment_version: int = 3,
     drain_time: float = 60.0,
-):
-    """Drain liquid from cell and unload liquid sample."""
+) -> list:
+    """Return ANEC to normal state, unload the liquid, and wait for the cell to drain.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        drain_time: Drain wait time (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add_actions(ANEC_sub_normal_state(experiment))
@@ -408,17 +493,16 @@ def ANEC_sub_cleanup(
     experiment: Experiment,
     experiment_version: int = 1,
     reservoir_liquid_sample_no: int = 1511,
-):
-    """Flush and purge ANEC cell.
-
-    (1) Flush/fill cell
-    (2) Drain cell
+) -> list:
+    """Flush+fill the cell and then drain it.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        reservoir_liquid_sample_no: Liquid sample number used to flush the cell.
 
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -437,14 +521,17 @@ def ANEC_sub_GC_headspacealiquot_nomixing(
     experiment_version: int = 1,
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
-):
-    """Sample headspace in cell1_we and inject into GC
+) -> list:
+    """Stop PeriPump1 and sample the cell1_we headspace into the GC (no mixing pass).
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        toolGC: PAL headspace tool identifier.
+        volume_ul_GC: GC injection volume (uL).
 
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -474,14 +561,21 @@ def ANEC_sub_GC_preparation(
     experiment_version: int = 1,
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
-):
-    """Sample headspace in cell1_we and inject into GC
+) -> list:
+    """Cycle pump direction to mix cell contents and then sample headspace into GC.
+
+    Performs two reverse/forward direction cycles with intervening waits to
+    mix, stops PeriPump1, and runs ``PAL_ANEC_GC`` for the GC headspace
+    injection.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        toolGC: PAL headspace tool identifier.
+        volume_ul_GC: GC injection volume (uL).
 
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -519,8 +613,18 @@ def ANEC_sub_load_solid_only(
     experiment_version: int = 1,
     solid_plate_id: int = 1,
     solid_sample_no: int = 1,
-):
-    """Load solid and clean cell."""
+) -> list:
+    """Unload the cell and load a legacy solid sample into ``cell1_we``.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add_actions(ANEC_sub_unload_cell(experiment))
@@ -548,8 +652,22 @@ def ANEC_sub_load_solid_and_clean_cell(
     recirculation_time: float = 60,
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
-):
-    """Load solid and clean cell."""
+) -> list:
+    """Unload, load solid, drain+flush, recirculate, run GC, then drain again.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+        reservoir_liquid_sample_no: Liquid sample number used for flushing.
+        recirculation_time: Recirculation duration (s) before GC.
+        toolGC: PAL headspace tool identifier (resolved through ``PALtools``).
+        volume_ul_GC: GC injection volume (uL).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add_actions(ANEC_sub_unload_cell(experiment))
@@ -605,7 +723,22 @@ def ANEC_sub_liquidarchive(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
-):
+) -> list:
+    """Stop PeriPump1, archive a liquid aliquot from the cell to a PAL tray, restart pump.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        toolarchive: PAL liquid syringe tool identifier.
+        volume_ul_archive: Archived volume (uL).
+        wash1: Enable PAL wash slot 1.
+        wash2: Enable PAL wash slot 2.
+        wash3: Enable PAL wash slot 3.
+        wash4: Enable PAL wash slot 4.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # first circulate the liquid back and forth
@@ -651,7 +784,24 @@ def ANEC_sub_aliquot_nomixing(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
-):
+) -> list:
+    """Take a combined GC + liquid-archive aliquot from the cell without pre-mixing.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        toolGC: PAL headspace tool identifier.
+        toolarchive: PAL liquid archive tool identifier.
+        volume_ul_GC: GC injection volume (uL).
+        volume_ul_archive: Archived liquid volume (uL).
+        wash1: Enable PAL wash slot 1.
+        wash2: Enable PAL wash slot 2.
+        wash3: Enable PAL wash slot 3.
+        wash4: Enable PAL wash slot 4.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # first circulate the liquid back and forth
@@ -700,7 +850,24 @@ def ANEC_sub_aliquot(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
-):
+) -> list:
+    """Mix the cell by reversing the pump, then take a GC + liquid-archive aliquot.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        toolGC: PAL headspace tool identifier.
+        toolarchive: PAL liquid archive tool identifier.
+        volume_ul_GC: GC injection volume (uL).
+        volume_ul_archive: Archived liquid volume (uL).
+        wash1: Enable PAL wash slot 1.
+        wash2: Enable PAL wash slot 2.
+        wash3: Enable PAL wash slot 3.
+        wash4: Enable PAL wash slot 4.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # first circulate the liquid back and forth
@@ -756,8 +923,23 @@ def ANEC_sub_CP(
     SampleRate: float = 0.01,
     CP_duration_sec: float = 60,
     IErange: str = "auto",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a chronopotentiometry (CP) experiment with the cell sample tracked.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_versus: Reference frame label.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH.
+        CP_current: Applied current (A).
+        SampleRate: Acquisition interval (s).
+        CP_duration_sec: CP duration (s).
+        IErange: Gamry current-range setting.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -806,7 +988,24 @@ def ANEC_sub_CA(
     ref_offset__V: float = 0.0,
     ref_type: str = "leakless",
     pH: float = 6.8,
-):
+) -> list:
+    """Run a chronoamperometry (CA) experiment versus REF or RHE.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: ``"ref"`` or ``"rhe"``.
+        CA_duration_sec: CA duration (s).
+        SampleRate: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+        ref_offset__V: Reference offset (V).
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH (used in RHE conversion).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
         potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
@@ -857,7 +1056,25 @@ def ANEC_sub_HeatCA(
     ref_type: str = "leakless",
     pH: float = 6.8,
     target_temperature_degc: float = 25.0,
-):
+) -> list:
+    """Stabilize TEC at a target temperature then run a CA experiment.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: ``"ref"`` or ``"rhe"``.
+        CA_duration_sec: CA duration (s).
+        SampleRate: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+        ref_offset__V: Reference offset (V).
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH (used in RHE conversion).
+        target_temperature_degc: TEC setpoint (deg C).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
         potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
@@ -914,7 +1131,18 @@ def ANEC_sub_OCV(
     experiment_version: int = 1,
     Tval__s: float = 900.0,
     IErange: str = "auto",
-):
+) -> list:
+    """Run an open-circuit voltage measurement with the cell sample tracked.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Tval__s: OCV duration (s).
+        IErange: Gamry current-range setting.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
@@ -974,7 +1202,39 @@ def ANEC_sub_photo_CA(
     toggle_illum_duty: float = 0.5,
     toggle_illum_period: float = 2.0,
     toggle_illum_time: float = -1,
-):
+) -> list:
+    """Run a CA experiment with hardware-triggered LED toggling via the Galil IO.
+
+    Programs a digital cycle on ``gamry_ttl0`` to drive the configured LED
+    source for ``toggle_illum_time`` seconds (defaulting to the CA duration
+    when ``-1``), runs CA with TTL handshake, then stops the digital cycle.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: ``"ref"`` or ``"rhe"``.
+        CA_duration_sec: CA duration (s).
+        SampleRate: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        ref_offset__V: Reference offset (V).
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH (used in RHE conversion).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Toggle period (s).
+        toggle_illum_time: Total toggle duration (s); ``-1`` matches CA.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if int(round(toggle_illum_time)) == -1:
         toggle_illum_time = CA_duration_sec
@@ -1058,7 +1318,28 @@ def ANEC_sub_CV(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
-):
+) -> list:
+    """Run a cyclic voltammetry (CV) experiment versus REF or RHE.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_versus: ``"ref"`` or ``"rhe"``.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH (used in RHE conversion).
+        WE_potential_init__V: Initial potential (V).
+        WE_potential_apex1__V: Apex 1 potential (V).
+        WE_potential_apex2__V: Apex 2 potential (V).
+        WE_potential_final__V: Final potential (V).
+        ScanRate_V_s: Scan rate (V/s).
+        Cycles: CV cycle count.
+        SampleRate: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+        ref_offset__V: Reference offset (V).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
         potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
@@ -1143,7 +1424,29 @@ def ANEC_sub_HeatCV(
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
     target_temperature_degc: float = 25.0,
-):
+) -> list:
+    """Stabilize TEC at a target temperature then run a CV experiment.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_versus: ``"ref"`` or ``"rhe"``.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH (used in RHE conversion).
+        WE_potential_init__V: Initial potential (V).
+        WE_potential_apex1__V: Apex 1 potential (V).
+        WE_potential_apex2__V: Apex 2 potential (V).
+        WE_potential_final__V: Final potential (V).
+        ScanRate_V_s: Scan rate (V/s).
+        Cycles: CV cycle count.
+        SampleRate: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+        ref_offset__V: Reference offset (V).
+        target_temperature_degc: TEC setpoint (deg C).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
         potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
@@ -1254,7 +1557,43 @@ def ANEC_sub_photo_CV(
     toggle_illum_duty: float = 0.5,
     toggle_illum_period: float = 2.0,
     toggle_illum_time: float = -1,
-):
+) -> list:
+    """Run a CV experiment with hardware-triggered LED toggling via the Galil IO.
+
+    Computes the CV total duration from the four vertices and ``Cycles`` to
+    set the default ``toggle_illum_time`` when it is ``-1``, programs a
+    digital cycle, runs CV with TTL handshake, then stops the digital cycle.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_versus: ``"ref"`` or ``"rhe"``.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH.
+        WE_potential_init__V: Initial potential (V).
+        WE_potential_apex1__V: Apex 1 potential (V).
+        WE_potential_apex2__V: Apex 2 potential (V).
+        WE_potential_final__V: Final potential (V).
+        ScanRate_V_s: Scan rate (V/s).
+        Cycles: CV cycle count.
+        SampleRate: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        ref_offset__V: Reference offset (V).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Toggle period (s).
+        toggle_illum_time: Total toggle duration (s); ``-1`` matches the CV.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     CV_duration_sec = abs(WE_potential_apex1__V - WE_potential_init__V) / ScanRate_V_s
     CV_duration_sec += abs(WE_potential_final__V - WE_potential_apex2__V) / ScanRate_V_s
@@ -1383,14 +1722,26 @@ def ANEC_sub_GCLiquid_analysis(
     wash3: bool = True,
     wash4: bool = False,
     GC_analysis_time: float = 520.0,
-):
-    """Sample headspace in cell1_we and inject into GC
+) -> list:
+    """Inject a liquid aliquot from a PAL tray vial into the GC injector and wait.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        tool: PAL liquid syringe tool identifier.
+        source_tray: PAL tray index.
+        source_slot: PAL slot index.
+        source_vial: PAL vial index.
+        dest: GC injector custom-position name.
+        volume_ul: Injection volume (uL).
+        wash1: Enable PAL wash slot 1.
+        wash2: Enable PAL wash slot 2.
+        wash3: Enable PAL wash slot 3.
+        wash4: Enable PAL wash slot 4.
+        GC_analysis_time: Post-injection wait (s).
 
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -1438,14 +1789,26 @@ def ANEC_sub_HPLCLiquid_analysis(
     wash3: bool = True,
     wash4: bool = False,
     HPLC_analysis_time: float = 1800,
-):
-    """Sample headspace in cell1_we and inject into GC
+) -> list:
+    """Inject a liquid aliquot from a PAL tray vial into the HPLC injector and wait.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        tool: PAL liquid syringe tool identifier.
+        source_tray: PAL tray index.
+        source_slot: PAL slot index.
+        source_vial: PAL vial index.
+        dest: HPLC injector custom-position name.
+        volume_ul: Injection volume (uL).
+        wash1: Enable PAL wash slot 1.
+        wash2: Enable PAL wash slot 2.
+        wash3: Enable PAL wash slot 3.
+        wash4: Enable PAL wash slot 4.
+        HPLC_analysis_time: Post-injection wait (s).
 
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -1500,7 +1863,41 @@ def ANEC_sub_photo_LSV(
     toggle_illum_duty: float = 0.5,
     toggle_illum_period: float = 2.0,
     toggle_illum_time: float = -1,
-):
+) -> list:
+    """Run a linear sweep voltammetry (LSV) experiment with hardware-triggered LED toggling.
+
+    Estimates the LSV duration from the init/apex potentials and the scan
+    rate to default ``toggle_illum_time`` when it is ``-1``, programs the
+    Galil digital cycle, runs ``run_LSV`` with TTL handshake, and stops the
+    digital cycle.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_versus: ``"ref"`` or ``"rhe"``.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH.
+        WE_potential_init__V: Initial potential (V).
+        WE_potential_apex1__V: Final potential (V).
+        ScanRate_V_s: Scan rate (V/s).
+        SampleRate: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        ref_offset__V: Reference offset (V).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Toggle period (s).
+        toggle_illum_time: Total toggle duration (s); ``-1`` matches the sweep.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     CV_duration_sec = abs(WE_potential_apex1__V - WE_potential_init__V) / ScanRate_V_s
 
@@ -1605,8 +2002,38 @@ def ANEC_sub_photo_CP(
     toggle_illum_duty: float = 0.5,
     toggle_illum_period: float = 2.0,
     toggle_illum_time: float = -1,
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a chronopotentiometry (CP) experiment with hardware-triggered LED toggling.
+
+    Programs a digital cycle on ``gamry_ttl0`` to drive the LED for the CP
+    duration (or for ``toggle_illum_time`` when explicitly set), runs CP
+    with TTL handshake, and stops the digital cycle.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_versus: Reference frame label.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH.
+        CP_current: Applied current (A).
+        SampleRate: Acquisition interval (s).
+        CP_duration_sec: CP duration (s).
+        IErange: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Toggle period (s).
+        toggle_illum_time: Total toggle duration (s); ``-1`` matches CP.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 

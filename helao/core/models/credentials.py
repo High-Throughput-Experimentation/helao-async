@@ -1,3 +1,5 @@
+"""Credential settings loaded from a `.env` file for AWS, DB, and plate APIs."""
+
 from pydantic import SecretStr, PostgresDsn
 from pydantic_settings import BaseSettings
 from textwrap import dedent
@@ -6,6 +8,31 @@ from pathlib import Path
 
 
 class HelaoCredentials(BaseSettings):
+    """Environment-backed credentials for AWS, the API DB, and plate services.
+
+    Loads from the `.env` file passed at construction. Secret-typed fields
+    keep their values out of standard `repr`/`str`.
+
+    Attributes:
+        AWS_ACCESS_KEY_ID (SecretStr): AWS access key id.
+        AWS_SECRET_ACCESS_KEY (SecretStr): AWS secret access key.
+        AWS_REGION (SecretStr): AWS region.
+        AWS_BUCKET (SecretStr): Default S3 bucket name.
+        API_USER (str): Postgres user.
+        API_PASSWORD (SecretStr): Postgres password.
+        API_HOST (str): Postgres host.
+        API_PORT (int): Postgres port.
+        API_DB (str): Postgres database name.
+        API_SCHEMA (str): Postgres schema used for search_path.
+        JUMPBOX_HOST (str): SSH jumpbox host.
+        JUMPBOX_USER (str): SSH jumpbox user.
+        JUMPBOX_KEYFILE (str): SSH private key file.
+        OPENAPI_JSON (str): Path/URL of an OpenAPI JSON definition.
+        PLATE_API_JSON (str): Path/URL of the plate API definition.
+        PLATE_API_KEY (str): API key for the plate service.
+        PLATE_API (str): Base URL for the plate service.
+    """
+
     AWS_ACCESS_KEY_ID: SecretStr = SecretStr("")
     AWS_SECRET_ACCESS_KEY: SecretStr = SecretStr("")
     AWS_REGION: SecretStr = SecretStr("")
@@ -25,15 +52,23 @@ class HelaoCredentials(BaseSettings):
     PLATE_API: str = ""
 
     def __init__(self, _env_file: str | Path, **kwargs):
+        """Load settings from `_env_file`.
+
+        Args:
+            _env_file: Path (string or `Path`) to the `.env` file to read.
+            **kwargs: Forwarded to `BaseSettings.__init__`.
+        """
         if not isinstance(_env_file, Path):
             _env_file = Path(_env_file)
         super().__init__(_env_file=_env_file, **kwargs)
 
     def set_api_port(self, port: int):
+        """Override the API port (e.g. when tunneling)."""
         self.API_PORT = port
 
     @property
-    def api_dsn(self):
+    def api_dsn(self) -> str:
+        """Return a Postgres DSN string for the API DB with the schema set on search_path."""
         pgdsn = PostgresDsn.build(
             scheme="postgresql",
             username=self.API_USER,
@@ -54,7 +89,17 @@ class HelaoCredentials(BaseSettings):
         show_defaults: bool = False,
         show_passwords: bool = False,
         simple: bool = False,
-    ):
+    ) -> str:
+        """Render the credentials as an MPS-style config block.
+
+        Args:
+            show_defaults: If True, include fields left at their defaults.
+            show_passwords: If True, unmask `*PASSWORD*`/`*KEY*` fields.
+            simple: If True, restrict the output to `_simple_params` keys.
+
+        Returns:
+            Multiline configuration text.
+        """
         params = []
         for key, val in self.model_dump().items():
             if simple and key not in self._simple_params:
@@ -77,7 +122,10 @@ class HelaoCredentials(BaseSettings):
         return dedent(output)
 
     def __str__(self) -> str:
+        """Return the default `display()` rendering."""
         return self.display()
 
     class Config:
+        """Pydantic settings config: default env file location."""
+
         env_file = ".env"

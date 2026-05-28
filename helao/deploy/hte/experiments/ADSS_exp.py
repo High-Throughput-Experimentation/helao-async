@@ -1,6 +1,11 @@
-"""
-Experiment library for ADSS
-server_key must be a FastAPI action server defined in config
+"""Experiment library for the ADSS (Anodic Dissolution Sampling System) station.
+
+Defines sub-experiments that build action lists for an orchestrator. Each
+function takes an ``Experiment`` instance plus experiment-specific keyword
+arguments and returns the list of actions to enqueue. Action targets are
+referenced by ``server_key`` strings (e.g. ``PSTAT``, ``MOTOR``, ``NI``,
+``PAL``, ``WORKSYRINGE``, ``CLEANSYRINGE``, ``ORCH``) that must be present
+in the orchestration config.
 """
 
 __all__ = [
@@ -98,8 +103,15 @@ debug_save_act = True
 debug_save_data = True
 
 
-def ADSS_sub_unloadall_customs(experiment: Experiment):
-    """last functionality test: 11/29/2021"""
+def ADSS_sub_unloadall_customs(experiment: Experiment) -> list:
+    """Unload every custom-position sample currently tracked by PAL.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -118,8 +130,16 @@ def ADSS_sub_unloadall_customs(experiment: Experiment):
 def ADSS_sub_unload_liquid(
     experiment: Experiment,
     experiment_version: int = 2,  # newer unload via keep, also no_wait
-):
-    # """Unload liquid sample at 'cell1_we' position and reload solid sample."""
+) -> list:
+    """Unload the liquid sample at ``cell1_we`` while keeping the solid in place.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add(
@@ -144,8 +164,16 @@ def ADSS_sub_unload_liquid(
 def ADSS_sub_unload_solid(
     experiment: Experiment,
     experiment_version: int = 2,  # newer via keep
-):
-    # """Unload solid sample at 'cell1_we' position and reload liquid sample."""
+) -> list:
+    """Unload the solid sample at ``cell1_we`` while keeping the liquid in place.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     # apm.add(
@@ -173,8 +201,21 @@ def ADSS_sub_load_solid(
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
-):
-    """last functionality test: 11/29/2021"""
+) -> list:
+    """Unload all customs and load the specified solid plate sample to ``cell1_we``.
+
+    Re-loads any previously unloaded liquid back into the same cell position.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_custom_position: PAL custom position the solid is loaded into.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
@@ -218,7 +259,21 @@ def ADSS_sub_load_liquid(
     volume_ul_cell_liquid: int = 1000,
     combine_liquids: bool = False,
     dilute_liquids: bool = False,
-):
+) -> list:
+    """Add a liquid sample to a custom cell position.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        liquid_custom_position: Target PAL custom position.
+        liquid_sample_no: Liquid sample number registered to this host.
+        volume_ul_cell_liquid: Volume to add in microliters.
+        combine_liquids: Forwarded to PAL to combine with the existing liquid.
+        dilute_liquids: Forwarded to PAL to dilute the existing liquid.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
         PAL_server,
@@ -248,7 +303,21 @@ def ADSS_sub_load_liquid_only(
     liquid_sample_volume_ul: float = 4000,
     combine_liquids: bool = False,
     dilute_liquids: bool = False,
-):
+) -> list:
+    """Add a liquid sample to a custom cell position and finish a liquid-addition process.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        liquid_custom_position: Target PAL custom position.
+        liquid_sample_no: Liquid sample number registered to this host.
+        liquid_sample_volume_ul: Volume to add in microliters.
+        combine_liquids: Forwarded to PAL to combine with the existing liquid.
+        dilute_liquids: Forwarded to PAL (ignored — call passes ``False``).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     # add liquid to cell position
@@ -288,8 +357,20 @@ def ADSS_sub_PAL_load_gas(
     bubbled_gas: str = "N2",
     reservoir_gas_sample_no: int = 1,
     volume_ul_cell_gas: int = 1,
-):
-    """Add gas volume to cell position."""
+) -> list:
+    """Add gas volume to a cell position and finish a bubbling-gas process.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        custom_position: Target PAL custom position.
+        bubbled_gas: Label for the bubbled gas.
+        reservoir_gas_sample_no: Gas sample number in the source reservoir.
+        volume_ul_cell_gas: Volume to add in microliters.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add(
@@ -319,8 +400,16 @@ def ADSS_sub_PAL_load_gas(
 def ADSS_sub_unload_gas_only(
     experiment: Experiment,
     experiment_version: int = 1,  # newer via keep? need testing
-):
-    # """Unload gas sample at 'cell1_we' position and reload solid and liquid sample."""
+) -> list:
+    """Unload only the gas sample at ``cell1_we`` while keeping liquid and solid.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     # apm.add(
@@ -356,7 +445,26 @@ def ADSS_sub_load(
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     liquid_sample_volume_ul: float = 4000,
-):
+) -> list:
+    """Clear customs, load a solid plate sample, then add liquid to the cell.
+
+    When ``previous_liquid`` is True the previously unloaded liquid is reused
+    instead of a freshly resolved liquid sample.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_custom_position: PAL custom position for the solid.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+        previous_liquid: Reuse the prior unloaded liquid if True.
+        liquid_custom_position: Target PAL custom position for added liquid.
+        liquid_sample_no: Liquid sample number on this host.
+        liquid_sample_volume_ul: Liquid volume to add in microliters.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     # clear cell position and track unloaded liquid
@@ -429,7 +537,22 @@ def ADSS_sub_move_to_sample(
     solid_sample_no: int = 1,
     #    x_mm: float = 0.0,
     #    y_mm: float = 0.0,
-):
+) -> list:
+    """Lift cell, move XY to the plate sample, and seal the cell.
+
+    Turns the peristaltic pump off, sets forward direction, moves Z to load,
+    resolves plate XY for the sample, moves there, and lowers to seal.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_custom_position: PAL custom position label (informational).
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # turn pump off
@@ -503,15 +626,26 @@ def ADSS_sub_sample_start(
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     liquid_sample_volume_ul: float = 4000,
-):
-    """Sub experiment
-    (1) Unload all custom position samples
-    (2) Load solid sample to cell
-    (3) Load liquid sample to reservoir
-    (4) Move to position
-    (5) Engages cell
+) -> list:
+    """Full sample start: unload, load solid+liquid, move to position, seal cell.
 
-    last functionality test: 11/29/2021"""
+    Wraps ``ADSS_sub_load`` then turns the pump off (forward direction), lifts
+    Z to load, moves to the plate XY for the sample, and lowers to seal.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_custom_position: PAL custom position for the solid.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+        previous_liquid: Reuse the previously unloaded liquid if True.
+        liquid_custom_position: Target PAL custom position for the liquid.
+        liquid_sample_no: Liquid sample number on this host.
+        liquid_sample_volume_ul: Liquid volume to add in microliters.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -587,14 +721,15 @@ def ADSS_sub_sample_start(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def ADSS_sub_shutdown(experiment: Experiment):
-    """Sub experiment
-    (1) Deep clean PAL tool
-    (2) pump liquid out off cell
-    (3) Drain cell
-    (4) Disengages cell (TBD)
+def ADSS_sub_shutdown(experiment: Experiment) -> list:
+    """Run a shutdown sequence: deep-clean PAL, reverse pump, wait, then stop pump.
 
-    last functionality test: 11/29/2021"""
+    Args:
+        experiment: Orchestrator-provided experiment context.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -656,10 +791,15 @@ def ADSS_sub_shutdown(experiment: Experiment):
     return apm.planned_actions  # returns complete action list to orch
 
 
-def ADSS_sub_drain(experiment: Experiment):
-    """DUMMY Sub experiment
-    Drains electrochemical cell.
-    last functionality test: 11/29/2021"""
+def ADSS_sub_drain(experiment: Experiment) -> list:
+    """Placeholder drain sub-experiment that currently emits no actions.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+
+    Returns:
+        Empty list of planned actions.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # TODO
     return apm.planned_actions  # returns complete action list to orch
@@ -670,11 +810,18 @@ def ADSS_sub_clean_PALtool(
     experiment_version: int = 1,
     clean_tool: str = PALtools.LS3,
     clean_volume_ul: int = 500,
-):
-    """Sub experiment
-    Performs deep clean of selected PAL tool.
+) -> list:
+    """Perform a deep clean of the selected PAL tool.
 
-    last functionality test: 11/29/2021"""
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        clean_tool: PAL tool identifier (e.g. ``PALtools.LS3``).
+        clean_volume_ul: Cleaning volume per wash in microliters.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -698,7 +845,19 @@ def ADSS_sub_fillfixed(
     fill_vol_ul: int = 10000,
     filltime_sec: float = 10.0,
     PAL_Injector: str = "PALtools.LS3",
-):
+) -> list:
+    """Fill ``cell1_we`` from ``elec_res1`` using PAL fixed-volume fill, then run pump.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        fill_vol_ul: Fixed fill volume in microliters.
+        filltime_sec: Time the peristaltic pump runs after the PAL fill.
+        PAL_Injector: PAL tool identifier.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # fill liquid, no wash (assume it was cleaned before)
@@ -758,7 +917,18 @@ def ADSS_sub_fill(
     experiment_version: int = 1,
     fill_vol_ul: int = 1000,
     PAL_Injector: str = "PALtools.LS3",
-):
+) -> list:
+    """Fill ``cell1_we`` from ``elec_res1`` using PAL variable fill (no wash).
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        fill_vol_ul: Fill volume in microliters.
+        PAL_Injector: PAL tool identifier.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # fill liquid, no wash (assume it was cleaned before)
@@ -806,17 +976,42 @@ def ADSS_sub_CA(
     washmod_in: int = 0,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here",
-):
-    """Primary CA experiment with optional PAL sampling.
+) -> list:
+    """Run a chronoamperometry (CA) experiment with optional PAL aliquots.
 
-    aliquot_intervals_sec is an optional list of intervals aftedf
-    r which an aliquot
-    is sampled from the cell, e.g. [600, 600, 600] will take 3 aliquots at 10-minute
-    intervals; note due to PAL overhead, intervals must be longer than 4 minutes
+    Queries the current cell sample, optionally takes a pre-CA aliquot,
+    applies a referenced potential for the configured duration, then
+    optionally runs in-situ aliquot/electrolyte insertion and a post-CA
+    aliquot.
 
-    aliquot_insitu flags whether the sampling interval timer begins at the start of the
-    PSTAT action (True) or after the PSTAT action (False)
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CA_potential: Applied potential before reference correction (V).
+        ph: Solution pH used for Nernst conversion.
+        potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        ref_offset__V: Calibration offset of the reference electrode (V).
+        gamry_i_range: Gamry current-range setting.
+        samplerate_sec: Acquisition interval (s).
+        CA_duration_sec: Total CA duration (s).
+        insert_electrolyte_bool: Insert electrolyte mid-CA when True.
+        insert_electrolyte_volume_ul: Volume to insert (uL).
+        insert_electrolyte_time_sec: Time after CA start to insert (s).
+        electrolyte_sample_no: Liquid sample number of the electrolyte.
+        bubbler_gas: Informational label for bubbled gas.
+        previous_liquid_injected: Informational label for prior injection.
+        aliquot_volume_ul: Aliquot volume (uL).
+        aliquot_times_sec: Aliquot timestamps (s) relative to CA start.
+        aliquot_insitu: Take aliquots concurrent with CA when True.
+        aliquot_pre: Take an aliquot before CA when True.
+        aliquot_post: Take an aliquot after CA when True.
+        washmod_in: Starting wash counter used to cycle PAL washes.
+        PAL_Injector: PAL injector tool identifier.
+        PAL_Injector_id: PAL injector serial-number string.
 
+    Returns:
+        List of planned actions for the orchestrator.
     """
     washmod = washmod_in
 
@@ -968,17 +1163,43 @@ def ADSS_sub_CA_photo(
     washmod_in: int = 0,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here",
-):
-    """Primary CA experiment with optional PAL sampling.
+) -> list:
+    """Run a CA experiment with LED illumination and optional PAL aliquots.
 
-    aliquot_intervals_sec is an optional list of intervals aftedf
-    r which an aliquot
-    is sampled from the cell, e.g. [600, 600, 600] will take 3 aliquots at 10-minute
-    intervals; note due to PAL overhead, intervals must be longer than 4 minutes
+    Same as ``ADSS_sub_CA`` but turns the NI LED on before CA and off after
+    in-situ actions. The pre/post aliquot timing and reference correction
+    match the non-photo CA variant.
 
-    aliquot_insitu flags whether the sampling interval timer begins at the start of the
-    PSTAT action (True) or after the PSTAT action (False)
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CA_potential: Applied potential before reference correction (V).
+        ph: Solution pH used for Nernst conversion.
+        potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        ref_offset__V: Calibration offset of the reference electrode (V).
+        gamry_i_range: Gamry current-range setting.
+        samplerate_sec: Acquisition interval (s).
+        CA_duration_sec: Total CA duration (s).
+        led_wavelength: LED wavelength label.
+        toggle_illum_duty: Illumination duty cycle parameter.
+        insert_electrolyte_bool: Insert electrolyte mid-CA when True.
+        insert_electrolyte_volume_ul: Volume to insert (uL).
+        insert_electrolyte_time_sec: Time after CA start to insert (s).
+        electrolyte_sample_no: Liquid sample number of the electrolyte.
+        bubbler_gas: Informational label for bubbled gas.
+        previous_liquid_injected: Informational label for prior injection.
+        aliquot_volume_ul: Aliquot volume (uL).
+        aliquot_times_sec: Aliquot timestamps (s).
+        aliquot_insitu: Take aliquots concurrent with CA when True.
+        aliquot_pre: Take an aliquot before CA when True.
+        aliquot_post: Take an aliquot after CA when True.
+        washmod_in: Starting wash counter used to cycle PAL washes.
+        PAL_Injector: PAL injector tool identifier.
+        PAL_Injector_id: PAL injector serial-number string.
 
+    Returns:
+        List of planned actions for the orchestrator.
     """
     washmod = washmod_in
 
@@ -1138,7 +1359,46 @@ def ADSS_sub_CV(
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here",
     run_use: RunUse = "data",
-):
+) -> list:
+    """Run a cyclic voltammetry (CV) experiment with optional PAL aliquots.
+
+    Reference-corrects the four CV vertices versus the chosen reference at
+    the given pH, queries the cell sample, optionally takes pre/post and
+    in-situ aliquots, and dispatches ``run_CV`` to the potentiostat.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Vinit_vsRHE: Initial potential vs RHE (V).
+        Vapex1_vsRHE: First apex potential vs RHE (V).
+        Vapex2_vsRHE: Second apex potential vs RHE (V).
+        Vfinal_vsRHE: Final potential vs RHE (V).
+        scanrate_voltsec: Scan rate (V/s).
+        samplerate_sec: Acquisition interval (s).
+        cycles: Number of CV cycles.
+        gamry_i_range: Gamry current-range setting.
+        ph: Solution pH used for Nernst conversion.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        ref_offset__V: Calibration offset of the reference electrode (V).
+        insert_electrolyte_bool: Insert electrolyte during CV when True.
+        insert_electrolyte_volume_ul: Volume to insert (uL).
+        insert_electrolyte_time_sec: Time after CV start to insert (s).
+        electrolyte_sample_no: Liquid sample number of the electrolyte.
+        aliquot_volume_ul: Aliquot volume (uL).
+        aliquot_times_sec: Aliquot timestamps (s).
+        aliquot_insitu: Take aliquots concurrent with CV when True.
+        aliquot_pre: Take an aliquot before CV when True.
+        aliquot_post: Take an aliquot after CV when True.
+        washmod_in: Starting wash counter used to cycle PAL washes.
+        bubbler_gas: Informational label for bubbled gas.
+        previous_liquid_injected: Informational label for prior injection.
+        PAL_Injector: PAL injector tool identifier.
+        PAL_Injector_id: PAL injector serial-number string.
+        run_use: ``RunUse`` tag forwarded to the potentiostat action.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     washmod = washmod_in
 
@@ -1288,7 +1548,47 @@ def ADSS_sub_OCV(
     bubble_pump_reverse_time_s: float = 15,
     bubble_pump_forward_time_s: float = 10,
     run_use: RunUse = "data",
-):
+) -> list:
+    """Run an open-circuit voltage (OCV) experiment with optional PAL aliquots.
+
+    Queries the cell sample, optionally takes a pre-OCV aliquot, dispatches
+    ``run_OCV`` with bubble-detection thresholds, and on ``check_bubble``
+    queues a conditional ``ADSS_sub_remove_bubble`` experiment when a
+    bubble is detected.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Tval__s: OCV duration (s).
+        gamry_i_range: Gamry current-range setting.
+        samplerate_sec: Acquisition interval (s).
+        ph: Solution pH (used by the conditional bubble removal).
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        ref_offset__V: Calibration offset of the reference electrode (V).
+        bubbler_gas: Informational label for bubbled gas.
+        previous_liquid_injected: Informational label for prior injection.
+        aliquot_volume_ul: Aliquot volume (uL).
+        aliquot_times_sec: Aliquot timestamps (s).
+        aliquot_insitu: Take aliquots concurrent with OCV when True.
+        aliquot_pre: Take an aliquot before OCV when True.
+        aliquot_post: Take an aliquot after OCV when True.
+        washmod_in: Starting wash counter used to cycle PAL washes.
+        PAL_Injector: PAL injector tool identifier.
+        PAL_Injector_id: PAL injector serial-number string.
+        rinse_1: PAL wash slot 1 setting (unused outside conditional path).
+        rinse_4: PAL wash slot 4 setting (unused outside conditional path).
+        check_bubble: Queue conditional bubble removal when True.
+        RSD_threshold: Bubble-detection RSD threshold.
+        simple_threshold: Bubble-detection simple threshold.
+        signal_change_threshold: Bubble-detection signal-change threshold.
+        amplitude_threshold: Bubble-detection amplitude threshold.
+        bubble_pump_reverse_time_s: Pump-reverse time for bubble removal (s).
+        bubble_pump_forward_time_s: Pump-forward time for bubble removal (s).
+        run_use: ``RunUse`` tag forwarded to the potentiostat action.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     washmod = washmod_in
 
@@ -1444,7 +1744,39 @@ def ADSS_sub_OCV_photo(
     PAL_Injector_id: str = "fill serial number here",
     rinse_1: int = 1,
     rinse_4: int = 0,
-):
+) -> list:
+    """Run an OCV experiment with LED illumination and optional PAL aliquots.
+
+    Same as ``ADSS_sub_OCV`` but turns the LED on before the OCV action and
+    off after any in-situ aliquots.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Tval__s: OCV duration (s).
+        gamry_i_range: Gamry current-range setting.
+        samplerate_sec: Acquisition interval (s).
+        ph: Solution pH.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        ref_offset__V: Calibration offset of the reference electrode (V).
+        led_wavelength: LED wavelength label.
+        toggle_illum_duty: Illumination duty cycle parameter.
+        bubbler_gas: Informational label for bubbled gas.
+        previous_liquid_injected: Informational label for prior injection.
+        aliquot_volume_ul: Aliquot volume (uL).
+        aliquot_times_sec: Aliquot timestamps (s).
+        aliquot_insitu: Take aliquots concurrent with OCV when True.
+        aliquot_pre: Take an aliquot before OCV when True.
+        aliquot_post: Take an aliquot after OCV when True.
+        washmod_in: Starting wash counter used to cycle PAL washes.
+        PAL_Injector: PAL injector tool identifier.
+        PAL_Injector_id: PAL injector serial-number string.
+        rinse_1: PAL wash slot 1 setting (informational).
+        rinse_4: PAL wash slot 4 setting (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     washmod = washmod_in
 
@@ -1561,8 +1893,31 @@ def ADSS_sub_insitu_actions(
     washmod_in: int = 0,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here",
-):
-    """in situ actions-- aliquots or injections"""
+) -> list:
+    """Build a timeline of in-situ aliquot draws and/or electrolyte injections.
+
+    Computes interval gaps between aliquot times and an optional electrolyte
+    insertion time, schedules gas-valve toggles around each PAL aliquot, and
+    interleaves electrolyte additions via ``ADSS_sub_cellfill_prefilled``.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        insert_electrolyte_bool: Insert electrolyte at ``insert_electrolyte_time_sec``.
+        insert_electrolyte_volume_ul: Volume to insert (uL).
+        insert_electrolyte_time_sec: Insertion time after start (s).
+        electrolyte_sample_no: Liquid sample number of the electrolyte.
+        aliquot_volume_ul: Aliquot volume (uL).
+        aliquot_times_sec: Aliquot timestamps (s) relative to the start.
+        aliquot_insitu: Schedule aliquots when True; else inject only.
+        injector_wash_one: If True, fix washes to ``[1, 0, 0, 0]``.
+        washmod_in: Starting wash counter used to cycle PAL washes.
+        PAL_Injector: PAL injector tool identifier.
+        PAL_Injector_id: PAL injector serial-number string.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     """
@@ -1750,7 +2105,19 @@ def ADSS_sub_add_liquid(
     virtual_add: bool = False,
     added_liquid_volume_ul: int = 0,
     liquid_sample_no: int = 1,
-):
+) -> list:
+    """Add liquid to ``cell1_we`` and optionally infuse via the work syringe.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        virtual_add: Skip the syringe infusion when True (archive-only update).
+        added_liquid_volume_ul: Volume to add (uL).
+        liquid_sample_no: Liquid sample number on this host.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1791,17 +2158,20 @@ def ADSS_sub_tray_unload(
     survey_runs: int = 1,
     main_runs: int = 3,
     rack: int = 2,
-):
-    """Unloads a selected tray from PAL position tray-slot and creates
-    (1) json
-    (2) csv
-    (3) icpms
-    exports.
+) -> list:
+    """Export a PAL tray (JSON, CSV, ICPMS) and then unload it.
 
-    Parameters for ICPMS export are
-    survey_runs: rough sweep over the whole partial_molarity range
-    main_runs: sweep channel centered on element partial_molarity
-    rack: position of the tray in the icpms instrument, usually 2.
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        tray: PAL tray index.
+        slot: PAL slot index on that tray.
+        survey_runs: ICPMS rough sweep count over the partial-molarity range.
+        main_runs: ICPMS sweeps centered on the element partial molarity.
+        rack: ICPMS instrument tray rack position.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -1861,7 +2231,22 @@ def ADSS_sub_tray_icpms_export(
     main_runs: int = 3,
     rack: int = 2,
     dilution_factor: float = 10,
-):
+) -> list:
+    """Export a single PAL tray to ICPMS without unloading it.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        tray: PAL tray index.
+        slot: PAL slot index.
+        survey_runs: ICPMS rough sweep count.
+        main_runs: ICPMS centered sweeps count.
+        rack: ICPMS rack position.
+        dilution_factor: Sample dilution factor.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1885,9 +2270,17 @@ def ADSS_sub_z_move(
     experiment: Experiment,
     experiment_version: int = 1,
     offset_z_mm: float = -8.0,
-):
-    """Sub experiment
-    last functionality test: -"""
+) -> list:
+    """Move the motor Z axis by a relative offset (platexy transformation).
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        offset_z_mm: Relative Z displacement (mm).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1914,9 +2307,19 @@ def ADSS_sub_rel_move(
     offset_x_mm: float = 1.0,
     offset_y_mm: float = 1.0,
     offset_z_mm: float = 0.0,
-):
-    """Sub experiment
-    last functionality test: -"""
+) -> list:
+    """Move the motor X/Y/Z axes by relative offsets (platexy transformation).
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        offset_x_mm: Relative X displacement (mm).
+        offset_y_mm: Relative Y displacement (mm).
+        offset_z_mm: Relative Z displacement (mm).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1943,9 +2346,18 @@ def ADSS_sub_abs_move(
     x_mm: float = 80.0,
     y_mm: float = 50.0,
     #    offset_z_mm: float = 0.0,
-):
-    """Sub experiment
-    last functionality test: -"""
+) -> list:
+    """Lift Z to load and move X/Y to an absolute position (platexy frame).
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        x_mm: Absolute X position (mm).
+        y_mm: Absolute Y position (mm).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -1975,7 +2387,21 @@ def ADSS_sub_heat(
     celltemp_max_C: float = 75.5,
     reservoir2_min_C: float = 84.5,
     reservoir2_max_C: float = 85.5,
-):
+) -> list:
+    """Start the NI monitoring loop and a temperature-control heat loop.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        duration_hrs: Heat-loop duration (hours).
+        celltemp_min_C: Cell low-temperature setpoint (deg C).
+        celltemp_max_C: Cell high-temperature setpoint (deg C).
+        reservoir2_min_C: Reservoir 2 low-temperature setpoint (deg C).
+        reservoir2_max_C: Reservoir 2 high-temperature setpoint (deg C).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
@@ -2005,7 +2431,16 @@ def ADSS_sub_heat(
 def ADSS_sub_stopheat(
     experiment: Experiment,
     experiment_version: int = 1,
-):
+) -> list:
+    """Stop the heat loop and the monitoring loop.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
@@ -2030,7 +2465,22 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
     #    deadvolume_ul: int = 0,
     #    PurgeWait_s: float = 2,
     ReturnLineWait_s: float = 0,
-):
+) -> list:
+    """Infuse the work syringe into a prefilled cell without querying the sample.
+
+    Closes the gas inlet, infuses, and optionally runs the peristaltic pump
+    forward for ``ReturnLineWait_s`` seconds to clear the return line.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Solution_volume_ul: Volume to infuse (uL).
+        Syringe_rate_ulsec: Syringe infuse rate (uL/s).
+        ReturnLineWait_s: Optional pump-forward time after infusion (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(
@@ -2104,7 +2554,19 @@ def ADSS_sub_cellfill_prefilled(
     #    deadvolume_ul: int = 0,
     #    PurgeWait_s: float = 2,
     ReturnLineWait_s: float = 0,
-):
+) -> list:
+    """Query the cell sample, close gas inlet, infuse the work syringe, run return-line pump.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Solution_volume_ul: Volume to infuse (uL).
+        Syringe_rate_ulsec: Syringe infuse rate (uL/s).
+        ReturnLineWait_s: Optional pump-forward time after infusion (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(
         PAL_server,
@@ -2188,7 +2650,19 @@ def ADSS_sub_cellfill_flush(
     #    deadvolume_ul: int = 0,
     #    PurgeWait_s: float = 2,
     ReturnLineWait_s: float = 0,
-):
+) -> list:
+    """Close gas inlet, infuse the work syringe (no process tagging), run return-line pump.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Solution_volume_ul: Volume to infuse (uL).
+        Syringe_rate_ulsec: Syringe infuse rate (uL/s).
+        ReturnLineWait_s: Optional pump-forward time after infusion (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
     # apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
@@ -2226,7 +2700,19 @@ def ADSS_sub_drain_cell(
     DrainWait_s: float = 60,
     ReturnLineReverseWait_s: float = 5,
     #    ResidualWait_s: float = 15,
-):
+) -> list:
+    """Drain the cell: reverse the return line, switch to drain valve, gas purge.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        DrainWait_s: Total drain time, split before/after gas inlet purge (s).
+        ReturnLineReverseWait_s: Time to run the pump in reverse to clear the
+            return line (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
@@ -2257,7 +2743,17 @@ def ADSS_sub_keep_electrolyte(
     experiment_version: int = 1,
     ReturnLineReverseWait_s: float = 5,
     #    ResidualWait_s: float = 15,
-):
+) -> list:
+    """Reverse the return line briefly then interrupt to save electrolyte in reservoir.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        ReturnLineReverseWait_s: Reverse-pump duration (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
@@ -2300,7 +2796,26 @@ def ADSS_sub_clean_cell(
     ReturnLineReverseWait_s: float = 5,
     lift: bool = False,
     #    ResidualWait_s: float = 15,
-):
+) -> list:
+    """Run a clean-water flush through the cell followed by a drain.
+
+    If ``Clean_volume_ul`` exceeds 10000 uL the cycle is split into two
+    infuse/drain passes. Optionally lifts Z to load at the end.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Clean_volume_ul: Total clean-syringe volume (uL).
+        Syringe_rate_ulsec: Clean syringe infuse rate (uL/s).
+        PurgeWait_s: Gas purge wait between infuse and drain (s).
+        ReturnLineWait_s: Pump-forward time to clear the return line (s).
+        DrainWait_s: Drain duration forwarded to ``ADSS_sub_drain_cell`` (s).
+        ReturnLineReverseWait_s: Reverse pump time during drain (s).
+        lift: Lift Z to load after cleaning when True.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
@@ -2368,7 +2883,16 @@ def ADSS_sub_clean_cell(
 def ADSS_sub_move_to_clean_cell(
     experiment: Experiment,
     experiment_version: int = 1,
-):
+) -> list:
+    """Lift Z, query the built-in clean-cell reference XY, move there, then seal.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(MOTOR_server, "z_move", {"z_position": "load"})
     apm.add(
@@ -2397,7 +2921,20 @@ def ADSS_sub_move_to_ref_measurement(
     experiment: Experiment,
     experiment_version: int = 1,
     reference_position_name: str = "builtin_ref_motorxy_2",
-):
+) -> list:
+    """Move to a named built-in reference position and seal the cell.
+
+    Uses the platexy transformation when ``reference_position_name`` is
+    ``"builtin_ref_motorxy"``; otherwise uses the motorxy transformation.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        reference_position_name: Name of the builtin specref position.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(MOTOR_server, "z_move", {"z_position": "load"})
     apm.add(
@@ -2495,7 +3032,28 @@ def ADSS_sub_sample_aliquot(
     rinse_2: int = 0,
     rinse_3: int = 0,
     rinse_4: int = 0,
-):
+) -> list:
+    """Take a single PAL aliquot from ``cell1_we`` with pump equilibration and washes.
+
+    Queries the cell sample, closes the gas inlet, runs the peristaltic pump
+    forward to equilibrate, dispatches ``PAL_archive``, and re-opens the gas
+    inlet.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        aliquot_volume_ul: Aliquot volume (uL).
+        EquilibrationTime_s: Pump equilibration time before sampling (s).
+        PAL_Injector: PAL injector tool identifier.
+        PAL_Injector_id: PAL injector serial-number string.
+        rinse_1: PAL wash slot 1 count.
+        rinse_2: PAL wash slot 2 count.
+        rinse_3: PAL wash slot 3 count.
+        rinse_4: PAL wash slot 4 count.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(
         PAL_server,
@@ -2548,7 +3106,18 @@ def ADSS_sub_recirculate(
     experiment_version: int = 2,
     direction_forward_or_reverse: str = "forward",
     wait_time_s: float = 10,
-):
+) -> list:
+    """Open the gas inlet and run the peristaltic pump for a fixed duration.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        direction_forward_or_reverse: ``"forward"`` (0) or any other value (1).
+        wait_time_s: Recirculation duration (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     if direction_forward_or_reverse == "forward":
         dir = 0
@@ -2566,7 +3135,18 @@ def ADSS_sub_cell_illumination(
     experiment_version: int = 1,
     led_wavelength: str = "385",
     illumination_on: bool = False,
-):
+) -> list:
+    """Turn the NI LED on or off and tag the action with a process technique.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        led_wavelength: Informational wavelength label.
+        illumination_on: Set the LED on when True, off otherwise.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     if illumination_on:
         apm.add(
@@ -2598,7 +3178,17 @@ def ADSS_sub_interrupt(
     experiment: Experiment,
     experiment_version: int = 1,
     reason: str = "wait",
-):
+) -> list:
+    """Emit a single orchestrator interrupt action with the given reason.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        reason: Human-readable reason string for the interrupt.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "interrupt", {"reason": reason})
     return apm.planned_actions
@@ -2610,7 +3200,20 @@ def ADSS_sub_refill_syringe(
     syringe: str = "waterclean",
     fill_volume_ul: float = 0,
     Syringe_rate_ulsec: float = 1000,
-):
+) -> list:
+    """Refill the clean or electrolyte (work) syringe via its refill liquid valve.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        syringe: ``"waterclean"`` for the clean syringe or ``"electrolyte"``
+            for the work syringe; other values produce no actions.
+        fill_volume_ul: Withdraw volume (uL).
+        Syringe_rate_ulsec: Withdraw rate (uL/s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     if syringe == "waterclean":
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 1})
@@ -2648,7 +3251,17 @@ def ADSS_sub_gasvalve_toggle(
     experiment: Experiment,
     experiment_version: int = 1,
     open: bool = True,
-):
+) -> list:
+    """Toggle the gas-inlet valve open or closed.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        open: True to open, False to close.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     # true for N2 flow
     apm = ActionPlanMaker()
     apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": open})
@@ -2660,7 +3273,17 @@ def ADSS_sub_gasvalve_N2flow(
     experiment: Experiment,
     experiment_version: int = 1,
     open: bool = True,
-):
+) -> list:
+    """Toggle the O2/N2 selector valve (True selects N2 flow).
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        open: True selects N2, False selects O2.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     # true for N2 flow
     apm = ActionPlanMaker()
     apm.add(NI_server, "gasvalve", {"gasvalve": "O2N2toggle", "on": open})
@@ -2683,7 +3306,28 @@ def ADSS_sub_transfer_liquid_in(
     rinse_2: int = 0,
     rinse_3: int = 0,
     rinse_4: int = 0,
-):
+) -> list:
+    """Archive an added liquid then PAL-transfer it from a tray vial to a cell.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        liquid_sample_no: Liquid sample number to register in the archive.
+        aliquot_volume_ul: Transfer volume (uL).
+        source_tray: PAL source tray index.
+        source_slot: PAL source slot index.
+        source_vial: PAL source vial index.
+        destination: PAL destination custom position.
+        PAL_Injector: PAL injector tool identifier.
+        PAL_Injector_id: PAL injector serial-number string.
+        rinse_1: PAL wash slot 1 count.
+        rinse_2: PAL wash slot 2 count.
+        rinse_3: PAL wash slot 3 count.
+        rinse_4: PAL wash slot 4 count.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(
         PAL_server,
@@ -2747,7 +3391,31 @@ def ADSS_sub_remove_bubble(
     bubble_pump_reverse_time_s: float = 15,
     bubble_pump_forward_time_s: float = 10,
     run_use: RunUse = RunUse.data,
-):
+) -> list:
+    """Reverse-then-forward the pump to dislodge a bubble, then re-check via OCV.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        pump_reverse_time_s: Reverse-pump duration (s).
+        pump_forward_time_s: Forward-pump duration after reverse (s).
+        Tval__s: Duration of the follow-up OCV (s).
+        gamry_i_range: Gamry current-range setting.
+        samplerate_sec: Acquisition interval (s).
+        ph: Solution pH.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        ref_offset__V: Calibration offset of the reference electrode (V).
+        check_bubble: Forwarded to follow-up OCV.
+        RSD_threshold: Bubble-detection RSD threshold.
+        simple_threshold: Bubble-detection simple threshold.
+        signal_change_threshold: Bubble-detection signal-change threshold.
+        amplitude_threshold: Bubble-detection amplitude threshold.
+        bubble_pump_reverse_time_s: Reverse time used by the follow-up OCV (s).
+        bubble_pump_forward_time_s: Forward time used by the follow-up OCV (s).
+        run_use: ``RunUse`` tag forwarded to OCV.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
@@ -2785,7 +3453,22 @@ def ADSS_sub_PAL_deep_clean(
     rinse_2: int = 0,
     rinse_3: int = 0,
     rinse_4: int = 0,
-):
+) -> list:
+    """Deep-clean the PAL injector with configurable wash counts.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        clean_volume_ul: Cleaning volume per wash (uL).
+        PAL_Injector: PAL injector tool identifier.
+        rinse_1: PAL wash slot 1 count.
+        rinse_2: PAL wash slot 2 count.
+        rinse_3: PAL wash slot 3 count.
+        rinse_4: PAL wash slot 4 count.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(
@@ -2820,7 +3503,29 @@ def ADSS_sub_PAL_tray_to_tray(
     rinse_2: int = 0,
     rinse_3: int = 0,
     rinse_4: int = 0,
-):
+) -> list:
+    """Transfer liquid between two PAL tray vials.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        volume_ul: Transfer volume (uL).
+        source_tray: PAL source tray index.
+        source_slot: PAL source slot index.
+        source_vial: PAL source vial index.
+        dest_tray: PAL destination tray index.
+        dest_slot: PAL destination slot index.
+        dest_vial: PAL destination vial index.
+        PAL_Injector: PAL injector tool identifier.
+        PAL_Injector_id: PAL injector serial-number string.
+        rinse_1: PAL wash slot 1 count.
+        rinse_2: PAL wash slot 2 count.
+        rinse_3: PAL wash slot 3 count.
+        rinse_4: PAL wash slot 4 count.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(
@@ -2854,7 +3559,22 @@ def ADSS_sub_PAL_export_icpms(
     main_runs: int = 3,
     rack: int = 2,
     dilution_factor: float = 10,
-):
+) -> list:
+    """Export a PAL tray slot to ICPMS without unloading it.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        tray: PAL tray index.
+        slot: PAL slot index.
+        survey_runs: ICPMS rough sweep count.
+        main_runs: ICPMS centered sweeps count.
+        rack: ICPMS rack position.
+        dilution_factor: Sample dilution factor.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(

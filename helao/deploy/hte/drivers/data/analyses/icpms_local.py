@@ -1,3 +1,11 @@
+"""Local-zip ICP-MS concentration extractor.
+
+Reads ICP-MS HLO files inside a sequence zip via :class:`LocalLoader`,
+selects the concentration column named by ``analysis_params["fom_key"]``
+(defaulting to ``"ExtCal.Concentration_ppb"``), and emits
+:class:`IcpmsOutputs` records suitable for the analysis syncer.
+"""
+
 import sys
 from copy import copy
 from uuid import UUID
@@ -22,12 +30,29 @@ ANALYSIS_DEFAULTS = {
 
 
 class IcpmsInputs(AnalysisInput):
+    """Process/action pair backing a single ICP-MS analysis.
+
+    Attributes:
+        icpms: Process row carrying the ICP-MS json/meta.
+        icpms_act: Action row whose HLO holds the mass-spectrum data.
+        global_sample_label: Liquid-sample global label discovered in
+            the process file list.
+        process_params: ``process_params`` dict from the process row.
+    """
+
     icpms: HelaoProcess
     icpms_act: HelaoAction
     global_sample_label: str
     process_params: dict
 
     def __init__(self, process_uuid: UUID, local_loader: LocalLoader):
+        """Locate the ICP-MS process file and the action that produced it.
+
+        Args:
+            process_uuid: Target process UUID inside the zip.
+            local_loader: :class:`LocalLoader` bound to the sequence
+                zip.
+        """
         self.icpms = local_loader.get_prc(
             local_loader.processes.query("process_uuid==@process_uuid").index[0]
         )
@@ -53,9 +78,11 @@ class IcpmsInputs(AnalysisInput):
 
     @property
     def mass_spec(self):
+        """Loaded HLO payload for the ICP-MS action."""
         return self.icpms_act.hlo
 
     def get_datamodels(self, *args, **kwargs) -> List[AnalysisDataModel]:
+        """Return a one-element list describing the ICP-MS HLO file."""
         filename, filetype, datakeys = self.icpms_act.hlo_file_tup
         adm = AnalysisDataModel(
             action_uuid=self.icpms_act.action_uuid,
@@ -70,6 +97,16 @@ class IcpmsInputs(AnalysisInput):
 
 
 class IcpmsOutputs(AnalysisOutput):
+    """ICP-MS concentration payload emitted by :class:`IcpmsAnalysis`.
+
+    Attributes:
+        element: Element labels per row.
+        isotope: Isotope labels per row.
+        value: Concentration value per row pulled from ``fom_key``.
+        fom_key: Name of the figure-of-merit column.
+        global_sample_label: Liquid sample the values belong to.
+    """
+
     element: list
     isotope: list
     value: list
@@ -78,7 +115,14 @@ class IcpmsOutputs(AnalysisOutput):
 
 
 class IcpmsAnalysis(BaseAnalysis):
-    """Dry UVIS Analysis for GCLD demonstration."""
+    """ICP-MS concentration analysis sourced from a local sequence zip.
+
+    Attributes:
+        inputs: Resolved :class:`IcpmsInputs`.
+        outputs: Populated :class:`IcpmsOutputs` after
+            :meth:`calc_output`.
+        global_sample_label: Liquid sample under analysis.
+    """
 
     inputs: IcpmsInputs
     outputs: IcpmsOutputs
@@ -90,6 +134,14 @@ class IcpmsAnalysis(BaseAnalysis):
         local_loader: LocalLoader,
         analysis_params: dict,
     ):
+        """Build inputs and generate the analysis UUID.
+
+        Args:
+            process_uuid: Target ICP-MS process UUID.
+            local_loader: Zip-backed :class:`LocalLoader`.
+            analysis_params: Overrides merged into
+                :data:`ANALYSIS_DEFAULTS`.
+        """
         self.analysis_name = "ICPMS_Concentration"
         self.analysis_timestamp = datetime.now()
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
@@ -110,8 +162,8 @@ class IcpmsAnalysis(BaseAnalysis):
         self.global_sample_label = self.inputs.global_sample_label
         self.analysis_uuid = self.gen_uuid(self.inputs.global_sample_label)
 
-    def calc_output(self):
-        """Calculate stability FOMs and intermediate vectors."""
+    def calc_output(self) -> bool:
+        """Populate :attr:`outputs` from the ICP-MS HLO ``fom_key`` column."""
 
         fom_key = self.analysis_params["fom_key"]
         _, hlo_data = self.inputs.mass_spec

@@ -1,3 +1,5 @@
+"""Lightweight client for issuing requests to a HELAO orchestrator server."""
+
 import os
 
 from helao.core.error import ErrorCodes
@@ -7,61 +9,29 @@ from helao.helpers.config_loader import CONFIG, read_config
 
 
 class HelaoOperator:
-    """
-    HelaoOperator class to interact with the orchestrator server.
+    """Programmatic client for talking to an orchestrator server's private endpoints.
+
+    Resolves the orchestrator's host/port from a HELAO config and exposes
+    convenience methods that wrap ``private_dispatcher`` calls for starting,
+    stopping, querying state, and enqueuing sequences/experiments.
 
     Attributes:
-        helao_config (dict): Configuration loaded for Helao.
-        orch_key (str): Key for the orchestrator server.
-        orch_host (str): Host address of the orchestrator server.
-        orch_port (int): Port number of the orchestrator server.
-
-    Methods:
-        __init__(config_arg, orch_key):
-            Initializes the HelaoOperator with the given configuration and orchestrator key.
-
-        request(endpoint: str, path_params: dict = {}, json_params: dict = {}):
-            Sends a request to the orchestrator server and returns the response.
-
-        start():
-            Dispatches a start request to the orchestrator server.
-
-        stop():
-            Dispatches a stop request to the orchestrator server.
-
-        orch_state():
-            Retrieves the current state of the orchestrator.
-
-        get_active_experiment():
-            Retrieves the currently active experiment.
-
-        get_active_sequence():
-            Retrieves the currently active sequence.
-
-        add_experiment(experiment: Experiment, index: int = -1):
-            Adds an experiment to the active sequence or creates a new sequence.
-
-        add_sequence(sequence: Sequence):
-            Adds a sequence to the orchestrator queue.
+        helao_config: Resolved HELAO configuration dictionary.
+        orch_key: Server key identifying the orchestrator in the config.
+        orch_host: Host address of the orchestrator server.
+        orch_port: Port number of the orchestrator server.
     """
 
     def __init__(self, config_arg: str, orch_key: str = "ORCH"):
-        """
-        Initializes the HelaoOperator instance.
+        """Load the configuration and resolve the orchestrator endpoint.
 
         Args:
-            config_arg (str): The configuration argument to load the configuration.
-            orch_key (str): The key to identify the orchestrator server in the configuration.
+            config_arg: A config prefix or path accepted by ``read_config``.
+            orch_key: Key of the orchestrator server within the config.
 
         Raises:
-            Exception: If the orchestrator server is not found in the configuration.
-            Exception: If the orchestrator host or port is not fully specified.
-
-        Attributes:
-            helao_config (dict): The loaded configuration for Helao.
-            orch_key (str): The key for the orchestrator server.
-            orch_host (str): The host address of the orchestrator server.
-            orch_port (int): The port number of the orchestrator server.
+            Exception: If the orchestrator server is not present in the config
+                or its host/port are not fully specified.
         """
         helao_repo_root = os.path.dirname(os.path.realpath(__file__))
         while "launch.py" not in os.listdir(helao_repo_root):
@@ -81,18 +51,18 @@ class HelaoOperator:
             f"HelaoOperator initialized for orchestrator {self.orch_key} on {self.orch_host}:{self.orch_port}"
         )
 
-    def request(self, endpoint: str, path_params: dict = {}, json_params: dict = {}):
-        """
-        Sends a request to the specified endpoint with given path and JSON parameters.
+    def request(self, endpoint: str, path_params: dict = {}, json_params: dict = {}) -> dict:
+        """Dispatch a request to the orchestrator and return its response.
 
         Args:
-            endpoint (str): The endpoint to send the request to.
-            path_params (dict, optional): The path parameters to include in the request. Defaults to {}.
-            json_params (dict, optional): The JSON parameters to include in the request. Defaults to {}.
+            endpoint: Orchestrator endpoint name to invoke.
+            path_params: Mapping of path parameters to include in the URL.
+            json_params: Mapping of JSON-body parameters to include.
 
         Returns:
-            dict: The response from the request. If an exception occurs, returns a dictionary with
-                  "orch_state", "loop_state", and "loop_intent" set to "unreachable".
+            The decoded response from the orchestrator. If the orchestrator
+            is unreachable, returns a dictionary marking ``orch_state``,
+            ``loop_state`` and ``loop_intent`` as ``"unreachable"``.
         """
         try:
             resp, error_code = private_dispatcher(
@@ -112,71 +82,36 @@ class HelaoOperator:
             print("HelaoOperator request got non-200 response.")
         return resp
 
-    def start(self):
-        """
-        Initiates the 'start' request to the operator server.
-
-        Returns:
-            Response from the 'start' request.
-        """
+    def start(self) -> dict:
+        """Request the orchestrator to start its dispatch loop."""
         return self.request("start")
 
-    def stop(self):
-        """
-        Sends a request to stop the current operation.
-
-        Returns:
-            Response from the "stop" request.
-        """
+    def stop(self) -> dict:
+        """Request the orchestrator to stop its dispatch loop."""
         return self.request("stop")
 
-    def orch_state(self):
-        """
-        Retrieve the current state of the orchestrator.
-
-        This method sends a request to get the current state of the orchestrator
-        and returns the response.
-
-        Returns:
-            The current state of the orchestrator.
-        """
+    def orch_state(self) -> dict:
+        """Return the orchestrator's current state summary."""
         return self.request("get_orch_state")
 
-    def get_active_experiment(self):
-        """
-        Retrieve the currently active experiment.
-
-        This method sends a request to obtain the active experiment.
-
-        Returns:
-            The active experiment data.
-        """
+    def get_active_experiment(self) -> dict:
+        """Return the orchestrator's currently active experiment."""
         return self.request("get_active_experiment")
 
-    def get_active_sequence(self):
-        """
-        Retrieve the currently active sequence.
-
-        This method sends a request to obtain the active sequence.
-
-        Returns:
-            The active sequence.
-        """
+    def get_active_sequence(self) -> dict:
+        """Return the orchestrator's currently active sequence."""
         return self.request("get_active_sequence")
 
-    def add_experiment(self, experiment: Experiment, index: int = -1):
-        """
-        Adds an experiment to the operator's experiment list.
-
-        If the index is -1, the experiment is appended to the end of the list.
-        Otherwise, the experiment is inserted at the specified index.
+    def add_experiment(self, experiment: Experiment, index: int = -1) -> dict:
+        """Append or insert an experiment into the orchestrator's active sequence.
 
         Args:
-            experiment (Experiment): The experiment to be added.
-            index (int, optional): The position at which to insert the experiment. Defaults to -1.
+            experiment: Experiment to enqueue.
+            index: Insertion index. ``-1`` appends to the end; any other value
+                inserts at that index.
 
         Returns:
-            Response: The response from the request to add the experiment.
+            The orchestrator's response to the enqueue request.
         """
         if index == -1:
             return self.request(
@@ -188,50 +123,27 @@ class HelaoOperator:
             json_params={"experiment": experiment.as_dict()},
         )
 
-    def add_sequence(self, sequence: Sequence):
-        """
-        Adds a sequence to the operator.
+    def add_sequence(self, sequence: Sequence) -> dict:
+        """Append a sequence to the orchestrator's sequence queue.
 
         Args:
-            sequence (Sequence): The sequence object to be added. It should have a method `as_dict`
-                                  that converts the sequence to a dictionary format.
+            sequence: Sequence object to enqueue.
 
         Returns:
-            Response: The response from the request to append the sequence.
+            The orchestrator's response to the enqueue request.
         """
         return self.request(
             "append_sequence", json_params={"sequence": sequence.as_dict()}
         )
 
-    def get_latest_sequences(self):
-        """
-        Retrieve list of most recent sequence uuids.
-
-        This method sends a request to obtain dispatched sequence uuids.
-
-        Returns:
-            List of 50 most recently dispatched sequence uuids.
-        """
+    def get_latest_sequences(self) -> dict:
+        """Return the most recently dispatched sequence UUIDs from the orchestrator."""
         return self.request("latest_sequence_uuids")
 
-    def get_latest_experiments(self):
-        """
-        Retrieve list of most recent experiment uuids.
-
-        This method sends a request to obtain dispatched experiment uuids.
-
-        Returns:
-            List of 50 most recently dispatched experiment uuids.
-        """
+    def get_latest_experiments(self) -> dict:
+        """Return the most recently dispatched experiment UUIDs from the orchestrator."""
         return self.request("latest_experiment_uuids")
 
-    def get_latest_actions(self):
-        """
-        Retrieve list of most recent action uuids.
-
-        This method sends a request to obtain dispatched action uuids.
-
-        Returns:
-            List of 50 most recently dispatched action uuids.
-        """
+    def get_latest_actions(self) -> dict:
+        """Return the most recently dispatched action UUIDs from the orchestrator."""
         return self.request("latest_action_uuids")

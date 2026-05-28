@@ -1,4 +1,10 @@
-"""Dataclass and instances for Gamry potentiostat techniques."""
+"""Dataclass and instances for Gamry potentiostat techniques.
+
+Pairs a ``GamryDtaq`` (data acquisition class) with a ``GamrySignal``
+(excitation waveform) plus range-handling flags to fully describe a single
+electrochemical technique. Pre-built instances cover LSV, LSA, CA, CP, CV,
+OCV, and RCA.
+"""
 
 from dataclasses import dataclass
 from typing import Optional, List
@@ -28,12 +34,37 @@ from .signal import (
 
 
 class OnMethod(StrEnum):
+    """``SetCell`` mode used to energize the cell for a technique.
+
+    Attributes:
+        CellMon: Cell-monitor (passive, e.g. OCV) — no driven excitation.
+        CellOn: Cell on (actively driven by the configured signal).
+    """
+
     CellMon = "CellMon"
     CellOn = "CellOn"
 
 
 @dataclass
 class GamryTechnique:
+    """Description of a Gamry electrochemical technique.
+
+    Attributes:
+        name: Short technique label (e.g. ``"LSV"``).
+        on_method: ``SetCell`` mode used when starting the measurement.
+        dtaq: ``GamryDtaq`` descriptor for the data acquisition object.
+        signal: ``GamrySignal`` descriptor for the excitation waveform.
+        set_decimation: Optional value passed to ``dtaq.SetDecimation``.
+        set_vchrangemode: Optional override of voltage channel auto-range
+            mode applied via ``SetVchRangeMode``.
+        set_ierangemode: Optional override of current range auto-range
+            mode applied via ``SetIERangeMode``.
+        vchrange_keys: Signal parameter names whose maximum absolute value
+            sets the voltage channel range.
+        ierange_keys: Signal parameter names whose maximum absolute value
+            sets the current channel range.
+    """
+
     name: str
     on_method: OnMethod
     dtaq: GamryDtaq

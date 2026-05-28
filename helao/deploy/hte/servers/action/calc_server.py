@@ -1,7 +1,9 @@
-"""General calculation server
+"""In-sequence calculation action server.
 
-Calc server is used for in-sequence data processing.
-
+Wraps :class:`Calc` and exposes endpoints used to derive intermediate values
+from data already produced earlier in an experiment (UVIS absorbance,
+CO2-purge checks, syringe-fill checks, OCV clamping, CP Ewe bounds). Unlike
+``analysis_server`` it does not produce :class:`Analysis` records.
 """
 
 __all__ = ["makeApp"]
@@ -21,7 +23,20 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the calculation FastAPI app.
+
+    Constructs a :class:`BaseAPI` backed by the :class:`Calc` driver and
+    registers the ``calc_uvis_abs``, ``check_co2_purge``,
+    ``fill_syringe_volume_check``, ``keep_min_ocv`` and
+    ``check_CP_Ewe_bounds`` action endpoints.
+
+    Args:
+        server_key: Key identifying this server in the orchestration group.
+
+    Returns:
+        The configured :class:`BaseAPI` application.
+    """
     app = BaseAPI(
         server_key=server_key,
         server_title=server_key,
@@ -46,6 +61,12 @@ def makeApp(server_key):
         min_limit: float = 0.01,
         delta: float = 1.0,
     ):
+        """Compute UVIS absorbance and per-energy bin metrics for the active sample.
+
+        Calls :meth:`Calc.calc_uvis_abs`, enqueues the scalar results and
+        writes one ``helao_calc__file`` per array key with the wavelength
+        vector embedded in the file header.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="calcAbs")
         datadict, arraydict = app.driver.calc_uvis_abs(active)
         await active.enqueue_data_dflt(datadict=datadict)
@@ -96,6 +117,11 @@ def makeApp(server_key):
         repeat_experiment_params: dict = {},
         repeat_experiment_kwargs: dict = {},
     ):
+        """Check the CO2 purge level against ``co2_ppm_thresh`` for headspace purge logic.
+
+        Delegates to :meth:`Calc.check_co2_purge_level`; the returned dict is
+        used by the experiment to decide whether to schedule a repeat purge.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="checkCO2")
         result = await app.driver.check_co2_purge_level(active)
         LOGGER.info(f"result dict was: {result}")
@@ -114,6 +140,11 @@ def makeApp(server_key):
         repeat_experiment_params: dict = {},
         repeat_experiment_kwargs: dict = {},
     ):
+        """Verify the syringe fill volume against target/check setpoints.
+
+        Delegates to :meth:`Calc.fill_syringe_volume_check`; the returned dict
+        is used by the experiment to decide whether to schedule a repeat fill.
+        """
         active = await app.base.setup_and_contain_action(
             action_abbr="syringefillvolume"
         )
@@ -133,9 +164,14 @@ def makeApp(server_key):
         upper_limit: float = 1.2,
         offset_value: float = -0.2,
     ):
-        """
-        min_offset_ocv and new_ocv should be set by a previous run_OCV action and inherited
-        through global_params, else the default False will yield a high value
+        """Return the smaller of an inherited OCV minimum and a freshly measured OCV.
+
+        ``min_offset_ocv`` and ``new_ocv`` are expected to be propagated from a
+        prior ``run_OCV`` via the orchestrator's global params. Missing values
+        (``False``) are replaced with a high fallback so the comparison still
+        produces a usable result. The output is clamped to
+        ``[lower_limit, upper_limit]`` and stored back on the action params as
+        ``min_offset_ocv``.
         """
 
         active = await app.base.setup_and_contain_action(action_abbr="keepMinOCV")
@@ -184,7 +220,13 @@ def makeApp(server_key):
         lower_limit: float = -1,
         upper_limit: float = 3,
 
-            ): 
+            ):
+        """Clamp the trailing-mean CP Ewe to ``[lower_limit, upper_limit]``.
+
+        Reads ``CP_Ewe_V__mean_final`` from the inherited action params,
+        substitutes ``0.4`` when missing, clamps it to the configured bounds
+        and stores the clamped value back as ``CP_Ewe_V__mean_final``.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="CheckCPEweBounds")
 
         try:

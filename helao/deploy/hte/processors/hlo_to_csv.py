@@ -1,3 +1,12 @@
+"""Post-processor that exports HLO action data as CSV.
+
+For each ``*helao__file`` ending in ``.hlo``, reads the data,
+optionally suffixes the filename with the action's ``comment``
+parameter, and writes a sibling ``.csv`` file. The new file is
+registered with its file type renamed from ``helao__file`` to
+``csv__file``.
+"""
+
 import os
 from typing import List
 from copy import copy
@@ -13,8 +22,15 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class PostProcess(HloPostProcessor):
+    """Convert HLO data files to CSV and register the new files."""
 
     def process(self) -> List[FileInfo]:
+        """Write a CSV copy of each ``.hlo`` data file in the action output.
+
+        Returns:
+            List[FileInfo]: Original files plus one ``*_csv__file``
+            entry per converted HLO file.
+        """
         processed_file_list = []
         for act_file in self.files:
             try:

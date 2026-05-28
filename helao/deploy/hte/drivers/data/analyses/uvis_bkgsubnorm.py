@@ -1,3 +1,11 @@
+"""Dry UV-Vis background-subtraction + normalisation analysis.
+
+Pulls UV-Vis spectrometer actions (query :data:`DRYUVIS_QUERY`),
+averages start/end dark and light reference spectra, normalises the
+sample spectrum, bins, smooths and reference-adjusts the result, and
+emits :class:`DryUvisOutputs` via :class:`DryUvisAnalysis`.
+"""
+
 import sys
 from copy import copy
 from typing import List
@@ -75,6 +83,17 @@ WHERE
 
 
 class DryUvisInputs(AnalysisInput):
+    """Reference darks/lights and the sample acquisition for one dry UV-Vis run.
+
+    Attributes:
+        ref_darks: Processes whose ``run_use=='ref_dark'``.
+        ref_dark_spec_acts: Corresponding spectrometer actions.
+        ref_lights: Processes whose ``run_use=='ref_light'``.
+        ref_light_spec_acts: Corresponding spectrometer actions.
+        insitu_spec_act: Sample-acquisition spectrometer action.
+        process_params: ``process_params`` from the in-situ process.
+    """
+
     ref_darks: List[HelaoProcess]
     ref_dark_spec_acts: List[HelaoAction]
     ref_lights: List[HelaoProcess]
@@ -89,6 +108,14 @@ class DryUvisInputs(AnalysisInput):
         sample_no: int,
         query_df: pd.DataFrame,
     ):
+        """Resolve ref-dark/light/sample actions from the sequence frame.
+
+        Args:
+            insitu_process_uuid: Process UUID of the sample acquisition.
+            plate_id: Plate id of the sample.
+            sample_no: Sample number on that plate.
+            query_df: Result frame produced by :data:`DRYUVIS_QUERY`.
+        """
         self.plate_id = plate_id
         self.sample_no = sample_no
         suuid = (
@@ -132,20 +159,30 @@ class DryUvisInputs(AnalysisInput):
         )
 
     @property
-    def ref_dark_spec(self):
+    def ref_dark_spec(self) -> list:
+        """List of loaded HLO payloads for the dark-reference actions."""
         return [x.hlo for x in self.ref_dark_spec_acts]
 
     @property
-    def ref_light_spec(self):
+    def ref_light_spec(self) -> list:
+        """List of loaded HLO payloads for the light-reference actions."""
         return [x.hlo for x in self.ref_light_spec_acts]
 
     @property
     def insitu_spec(self):
+        """Loaded HLO payload for the sample-acquisition action."""
         return self.insitu_spec_act.hlo
 
     def get_datamodels(
         self, global_sample_label: str, *args, **kwargs
     ) -> List[AnalysisDataModel]:
+        """Emit :class:`AnalysisDataModel` entries for every spec action.
+
+        Args:
+            global_sample_label: Override label; falls back to
+                ``legacy__solid__<plate>_<sample>`` for ``data`` and
+                ``baseline`` run uses.
+        """
         action_keys = [k for k in vars(self).keys() if "spec_act" in k]
         inputs = []
         for ak in action_keys:
@@ -178,6 +215,24 @@ class DryUvisInputs(AnalysisInput):
 
 
 class DryUvisOutputs(BaseModel):
+    """Output payload for :class:`DryUvisAnalysis`.
+
+    Attributes:
+        wavelength: Full wavelength axis.
+        lower_wl_idx: Index of the lower wavelength cutoff.
+        upper_wl_idx: Index of the upper wavelength cutoff.
+        mean_ref_dark: Mean dark-reference spectrum.
+        mean_ref_light: Mean light-reference spectrum.
+        agg_method: Aggregation method (``"mean"`` or ``"median"``).
+        agg_insitu: Aggregated in-situ spectrum.
+        bin_wavelength: Binned wavelength axis.
+        bin_insitu: Binned in-situ spectrum.
+        smth_insitu: Smoothed binned spectrum.
+        rscl_insitu: Reference-rescaled spectrum.
+        insitu_min_rescaled: Whether the spectrum minimum was rescaled.
+        insitu_max_rescaled: Whether the spectrum maximum was rescaled.
+    """
+
     wavelength: list
     lower_wl_idx: int
     upper_wl_idx: int
@@ -194,7 +249,28 @@ class DryUvisOutputs(BaseModel):
 
 
 class DryUvisAnalysis(BaseAnalysis):
-    """Dry UVIS Analysis for GCLD demonstration."""
+    """Dry UV-Vis background-subtraction + normalisation analysis.
+
+    Attributes:
+        analysis_name: Fixed analysis name string.
+        analysis_timestamp: Time the analysis instance was built.
+        analysis_uuid: Generated analysis UUID.
+        analysis_params: Effective parameters (defaults merged with
+            caller overrides).
+        plate_id: Plate id under analysis.
+        sample_no: Sample number on that plate.
+        process_uuid: UUID of the sample-acquisition process.
+        process_timestamp: Timestamp of that process.
+        process_name: Technique name from the row.
+        run_type: Run type string.
+        technique_name: Technique-name string.
+        inputs: Resolved :class:`DryUvisInputs`.
+        outputs: Populated :class:`DryUvisOutputs` after
+            :meth:`calc_output`.
+        action_attr: Attribute name used to find spec actions
+            (``"spec_act"``).
+        analysis_codehash: Hash of the analysis source file.
+    """
 
     analysis_name: str
     analysis_timestamp: datetime
@@ -218,6 +294,14 @@ class DryUvisAnalysis(BaseAnalysis):
         query_df: pd.DataFrame,
         analysis_params: dict,
     ):
+        """Build inputs from the query frame and stamp analysis metadata.
+
+        Args:
+            process_uuid: Target sample-acquisition process UUID.
+            query_df: Frame produced by :data:`DRYUVIS_QUERY`.
+            analysis_params: Overrides merged into
+                :data:`ANALYSIS_DEFAULTS`.
+        """
         self.analysis_name = "UVIS_BkgSubNorm"
         self.action_attr = "spec_act"
         self.analysis_timestamp = datetime.now()
@@ -242,8 +326,15 @@ class DryUvisAnalysis(BaseAnalysis):
         self.analysis_classname = self.__class__.__name__
         self.analysis_uuid = self.gen_uuid()
 
-    def calc_output(self):
-        """Calculate stability FOMs and intermediate vectors."""
+    def calc_output(self) -> bool:
+        """Run the background-subtraction/normalisation pipeline.
+
+        Aggregates the last ``agg_last_secs`` seconds of dark/light
+        references and the sample spectrum, subtracts and normalises,
+        bins, smooths and rescales, and finally writes
+        :attr:`outputs`. Returns ``False`` if any spectrometer parse
+        fails.
+        """
         rdtups = [parse_spechlo(x) for x in self.inputs.ref_dark_spec]
         rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
         btup = parse_spechlo(self.inputs.insitu_spec)

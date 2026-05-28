@@ -1,3 +1,15 @@
+"""Standalone unit test for the sample pydantic models.
+
+Exercises :class:`LiquidSample`, :class:`GasSample`, :class:`SolidSample`,
+:class:`AssemblySample`, :class:`NoneSample`, and :class:`SampleList` to
+verify their type tags, default ``machine_name`` values, and that a
+``SampleList`` constructed from either model instances or their
+``model_dump`` dicts preserves the per-sample concrete subclass.
+
+The single public entry point is :func:`sample_model_unit_test`, invoked
+by ``run_unit_tests.py``.
+"""
+
 __all__ = ["sample_model_unit_test"]
 
 import colorama
@@ -18,7 +30,18 @@ from helao.core.models.sample import (
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 
 
-def sample_model_unit_test():
+def sample_model_unit_test() -> bool:
+    """Run the sample-model assertions and report pass/fail.
+
+    Each individual check prints a numbered line describing whether it
+    passed or failed; failures clear the cumulative success flag instead
+    of aborting. A fatal exception while building a ``SampleList`` causes
+    an early ``False`` return.
+
+    Returns:
+        ``True`` if every individual assertion passed, ``False``
+        otherwise.
+    """
     success = True
     try:
         fail_msg = f"{Style.BRIGHT}{Fore.RED}failed:{Style.RESET_ALL}"

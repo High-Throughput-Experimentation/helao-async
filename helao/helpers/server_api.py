@@ -6,6 +6,14 @@ from helao.helpers import config_loader
 from helao.core.models.machine import MachineModel
 from helao.core.rpc import RPCDispatcher, derive_rpc_port
 
+"""FastAPI and Bokeh application base classes used by every HELAO server.
+
+Provides :class:`HelaoFastAPI`, a FastAPI subclass that wires in the HELAO
+config, logger, machine model, action-aware route class, and co-located ZMQ
+RPC dispatcher; and :class:`HelaoBokehAPI`, the equivalent helper for Bokeh
+visualizer/operator apps.
+"""
+
 CONFIG = config_loader.CONFIG
 
 __all__ = ["HelaoBokehAPI", "HelaoFastAPI"]
@@ -21,36 +29,29 @@ TAGS = [
 
 
 class HelaoFastAPI(FastAPI):
-    """
-    HelaoFastAPI is a subclass of FastAPI that initializes with specific configuration
-    parameters for the Helao server.
+    """FastAPI app preconfigured for a HELAO server group entry.
+
+    Installs the action-aware ``ActionAPIRoute`` route class, attaches the
+    server's HELAO config slice, builds a :class:`MachineModel`, ensures the
+    process-wide logger is initialized, and creates a co-located ZMQ
+    :class:`RPCDispatcher` that mirrors every POST route at startup.
 
     Attributes:
-        helao_cfg (dict): Configuration dictionary for Helao.
-        helao_srv (str): Name of the Helao server.
-        server_cfg (dict): Configuration dictionary for the specific server.
-        server_params (dict): Additional parameters for the server.
-
-    Methods:
-        __init__(helao_srv: str, *args, **kwargs):
-            Initializes the HelaoFastAPI instance with the given configuration and server name.
+        helao_cfg: Full HELAO configuration dict.
+        helao_srv: Server key in ``helao_cfg["servers"]``.
+        server_cfg: Per-server config slice.
+        server_params: Optional ``params`` block from the server config.
+        server: :class:`MachineModel` describing this server's identity.
+        rpc_dispatcher: ZMQ dispatcher mirroring POST endpoints.
     """
 
     def __init__(self, helao_srv: str, *args, **kwargs):
-        """
-        Initializes the server API with the given configuration.
+        """Initialize the FastAPI app and register startup/shutdown hooks.
 
         Args:
-            helao_cfg (dict): Configuration dictionary for helao.
-            helao_srv (str): Server name.
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-
-        Attributes:
-            helao_cfg (dict): Stores the helao configuration.
-            helao_srv (str): Stores the server name.
-            server_cfg (dict): Configuration for the specific server.
-            server_params (dict): Parameters for the server configuration.
+            helao_srv: Server key used to look up this server's configuration.
+            *args: Forwarded to :class:`fastapi.FastAPI`.
+            **kwargs: Forwarded to :class:`fastapi.FastAPI`.
         """
         super().__init__(*args, **kwargs, openapi_tags=TAGS)
         # Install the action-aware route class so endpoints tagged
@@ -112,23 +113,31 @@ class HelaoFastAPI(FastAPI):
 
 
 class HelaoBokehAPI:
-    """
-    A class to represent the Helao Bokeh API.
+    """Bokeh application wrapper that mirrors :class:`HelaoFastAPI` setup.
+
+    Attaches the HELAO config slice, ensures the logger is initialized, builds
+    a :class:`MachineModel`, sets the Bokeh document title from
+    ``params.doc_name``, and stores a placeholder ``vis`` attribute for the
+    concrete visualizer to overwrite.
 
     Attributes:
-    -----------
-    helao_srv : str
-        Name of the Helao server.
-    doc : Document
-        Bokeh document object.
-
-    Methods:
-    --------
-    __init__(self, helao_srv: str, doc):
-        Initializes the HelaoBokehAPI with the given configuration, server name, and Bokeh document.
+        helao_srv: Server key in ``helao_cfg["servers"]``.
+        helao_cfg: Full HELAO configuration dict.
+        server_cfg: Per-server config slice.
+        server_params: Optional ``params`` block from the server config.
+        server: :class:`MachineModel` describing this server's identity.
+        doc_name: Title applied to the Bokeh document.
+        doc: The Bokeh ``Document`` for this app.
+        vis: Placeholder object overwritten by the concrete visualizer.
     """
 
     def __init__(self, helao_srv: str, doc):
+        """Initialize logging, machine identity, and the Bokeh document title.
+
+        Args:
+            helao_srv: Server key used to look up this server's configuration.
+            doc: The Bokeh ``Document`` to populate.
+        """
         self.helao_srv = helao_srv
         self.helao_cfg = CONFIG
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]

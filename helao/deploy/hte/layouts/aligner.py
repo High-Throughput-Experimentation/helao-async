@@ -1,3 +1,11 @@
+"""Bokeh-based plate alignment panel for the HTE motion server.
+
+Provides the :class:`Aligner` class, a Bokeh layout that lets the
+operator pick marker points on a plate map, drive the motion stage to
+those points, compute the plate-to-motor transfer matrix, and submit
+the resulting calibration back to the motion action server.
+"""
+
 import asyncio
 import base64
 import json
@@ -38,7 +46,23 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class Aligner:
+    """Bokeh UI controller for plate-to-motor calibration.
+
+    Builds the alignment panel (status controls, marker buttons, motor
+    jog pad, plate-map plot) and wires user interactions back to the
+    motion driver to compute and persist a new plate transfer matrix.
+    """
+
     def __init__(self, vis_serv: Vis, motor):
+        """Initialize state, build the Bokeh layout and start the IO loop.
+
+        Args:
+            vis_serv: The visualizer :class:`Vis` server hosting the
+                Bokeh document.
+            motor: The motion driver instance backing the aligner; must
+                expose the ``plate_transfermatrix``, ``aligner_active``
+                and related attributes used by this class.
+        """
         self.vis = vis_serv
         self.motor = motor
         self.config_dict = self.vis.server_cfg.get("params", {})
@@ -83,11 +107,13 @@ class Aligner:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def cleanup_session(self, session_context):
+        """Stop the IO loop when the Bokeh session ends."""
         LOGGER.info("Aligner Bokeh session closed")
         self.IOloop_run = False
         self.IOtask.cancel()
 
     def create_layout(self):
+        """Construct all Bokeh widgets and add them to the document."""
 
         self.MarkerColors = [
             (255, 0, 0),
@@ -812,26 +838,31 @@ class Aligner:
         self.init_mapaligner()
 
     def clicked_move_up(self):
+        """Jog the motor one ``manual_step`` in +y."""
         asyncio.gather(
             self.motor_move(mode=MoveModes.relative, x=0, y=self.manual_step)
         )
 
     def clicked_move_down(self):
+        """Jog the motor one ``manual_step`` in -y."""
         asyncio.gather(
             self.motor_move(mode=MoveModes.relative, x=0, y=-self.manual_step)
         )
 
     def clicked_move_left(self):
+        """Jog the motor one ``manual_step`` in -x."""
         asyncio.gather(
             self.motor_move(mode=MoveModes.relative, x=-self.manual_step, y=0)
         )
 
     def clicked_move_right(self):
+        """Jog the motor one ``manual_step`` in +x."""
         asyncio.gather(
             self.motor_move(mode=MoveModes.relative, x=self.manual_step, y=0)
         )
 
     def clicked_move_upright(self):
+        """Jog the motor one ``manual_step`` diagonally in +x/+y."""
         asyncio.gather(
             self.motor_move(
                 mode=MoveModes.relative, x=self.manual_step, y=self.manual_step
@@ -839,6 +870,7 @@ class Aligner:
         )
 
     def clicked_move_downright(self):
+        """Jog the motor one ``manual_step`` diagonally in +x/-y."""
         asyncio.gather(
             self.motor_move(
                 mode=MoveModes.relative, x=self.manual_step, y=-self.manual_step
@@ -846,6 +878,7 @@ class Aligner:
         )
 
     def clicked_move_upleft(self):
+        """Jog the motor one ``manual_step`` diagonally in -x/+y."""
         asyncio.gather(
             self.motor_move(
                 mode=MoveModes.relative, x=-self.manual_step, y=self.manual_step
@@ -853,6 +886,7 @@ class Aligner:
         )
 
     def clicked_move_downleft(self):
+        """Jog the motor one ``manual_step`` diagonally in -x/-y."""
         asyncio.gather(
             self.motor_move(
                 mode=MoveModes.relative, x=-self.manual_step, y=-self.manual_step
@@ -860,12 +894,14 @@ class Aligner:
         )
 
     def clicked_motor_mousemove_check(self, attr, old, new):
+        """Toggle mouse-driven motor control based on the checkbox state."""
         if new:
             self.mouse_control = True
         else:
             self.mouse_control = False
 
     def callback_calib_file_input(self, attr, old, new):
+        """Load a plate transfer matrix from the JSON file upload widget."""
         if self.motor.aligning_enabled:
             filecontent = base64.b64decode(new.encode("ascii")).decode("ascii")
             try:
@@ -882,7 +918,7 @@ class Aligner:
             )
 
     def callback_changed_motorstep(self, attr, old, new, sender):
-        """callback for motor_step input"""
+        """Validate and clamp the manual jog step entered by the user."""
 
         def to_float(val):
             try:
@@ -911,14 +947,19 @@ class Aligner:
         )
 
     def update_input_value(self, sender, value):
+        """Assign ``value`` to the ``value`` attribute of the Bokeh input ``sender``."""
         sender.value = value
 
     def clicked_reset(self):
-        """resets aligner to initial params"""
+        """Reset the aligner state to its initial parameters."""
         self.init_mapaligner()
 
     def clicked_addpoint(self, event):
-        """Add new point to calibration point list and removing last point"""
+        """Add the currently selected marker as a new calibration point.
+
+        Appends the marker's plate XY and the current motor XY to the
+        calibration lists and rolls off the oldest point.
+        """
         # (1) get selected marker
         selMarker = self.MarkerNames.index(self.calib_sel_motor_loc_marker.value)
         # (2) add new platexy point to end of plate point list
@@ -945,13 +986,13 @@ class Aligner:
             self.vis.doc.add_next_tick_callback(partial(self.update_calpointdisplay, i))
 
     def clicked_submit(self):
-        """submit final results back to aligner server"""
+        """Submit the current transfer matrix back to the motion server."""
         asyncio.gather(
             self.finish_alignment(self.plate_transfermatrix, ErrorCodes.none)
         )
 
     def clicked_go_align(self):
-        """start a new alignment procedure"""
+        """Start a new alignment procedure by loading the plate map."""
         # init the aligner
         self.init_mapaligner()
 
@@ -963,7 +1004,7 @@ class Aligner:
             )
 
     def clicked_moveabs(self):
-        """move motor to abs position"""
+        """Move the motor to the absolute XY entered in the UI."""
         asyncio.gather(
             self.motor_move(
                 mode=MoveModes.absolute,
@@ -973,7 +1014,7 @@ class Aligner:
         )
 
     def clicked_moverel(self):
-        """move motor by relative amount"""
+        """Move the motor by the relative XY entered in the UI."""
         asyncio.gather(
             self.motor_move(
                 mode=MoveModes.relative,
@@ -983,30 +1024,31 @@ class Aligner:
         )
 
     def clicked_readmotorpos(self):
-        """gets current motor position"""
+        """Query and refresh the displayed motor XY position."""
         asyncio.gather(self.motor_getxy())  # updates g_motor_position
 
     def clicked_calc(self):
-        """wrapper for async calc call"""
+        """Trigger the asynchronous transfer-matrix calculation."""
         asyncio.gather(self.align_calc())
 
     def clicked_skipstep(self):
-        """Calculate Transformation Matrix from given points"""
+        """Finish alignment using the original transfer matrix (skip calibration)."""
         asyncio.gather(
             self.finish_alignment(self.initial_plate_transfermatrix, ErrorCodes.none)
         )
 
     def stop_align(self):
+        """Abort the alignment and report a stop error to the motion server."""
         asyncio.gather(
             self.finish_alignment(self.motor.plate_transfermatrix, ErrorCodes.stop)
         )
 
     def clicked_buttonsel(self, idx):
-        """Selects the Marker by clicking on colored buttons"""
+        """Select a marker by index when its colored button is clicked."""
         self.calib_sel_motor_loc_marker.value = self.MarkerNames[idx]
 
     def clicked_calib_del_pt(self, idx):
-        """remove cal point"""
+        """Remove the calibration point at ``idx`` and shift the list."""
         # remove first point from calib list
         self.calib_ptsplate.pop(idx)
         self.calib_ptsmotor.pop(idx)
@@ -1017,7 +1059,7 @@ class Aligner:
             self.vis.doc.add_next_tick_callback(partial(self.update_calpointdisplay, i))
 
     def clicked_button_marker_move(self, idx):
-        """move motor to maker position"""
+        """Move the motor to the plate XY of the marker at ``idx``."""
         if (
             not self.marker_x[idx].value == "None"
             and not self.marker_y[idx].value == "None"
@@ -1031,6 +1073,7 @@ class Aligner:
             )
 
     def clicked_pmplot_mousepan(self, event):
+        """Translate a plot pan gesture into a relative motor move."""
         if self.mouse_control:
             asyncio.gather(
                 self.motor_move(
@@ -1041,6 +1084,7 @@ class Aligner:
             )
 
     def clicked_pmplot_mousewheel(self, event):
+        """Adjust the manual step size from a mouse-wheel event."""
         if self.mouse_control:
             if event.delta > 0:
                 new_manual_step = self.manual_step * (2 * abs(event.delta) / 1000)
@@ -1060,7 +1104,12 @@ class Aligner:
             )
 
     def clicked_pmplot(self, event):
-        """double click/tap on PM plot to add/move marker"""
+        """Place/move the active marker at the double-tapped plate position.
+
+        Snaps the clicked plate coordinate to the nearest plate-map
+        sample and updates that marker's stored XY, sample number,
+        code and fraction display.
+        """
         # get selected Marker
         selMarker = self.MarkerNames.index(self.calib_sel_motor_loc_marker.value)
         # get coordinates of doubleclick
@@ -1106,7 +1155,18 @@ class Aligner:
             self.update_Markerdisplay(selMarker)
 
     async def finish_alignment(self, newTransfermatrix, errorcode):
-        """sends finished alignment back to FastAPI server"""
+        """Persist the new transfer matrix and finalize the aligner action.
+
+        Updates the motor driver, writes the calibration JSON, enqueues
+        the result on the active action's data channel and clears the
+        aligner's running state.
+
+        Args:
+            newTransfermatrix: Numpy matrix to install as the new plate
+                transfer matrix.
+            errorcode: The :class:`ErrorCodes` value to report on the
+                active action.
+        """
         if self.motor.aligner_active:
             self.motor.update_plate_transfermatrix(newtransfermatrix=newTransfermatrix)
             # state is now saved within update
@@ -1156,7 +1216,13 @@ class Aligner:
             )
 
     async def motor_move(self, mode, x, y):
-        """moves the motor by submitting a request to aligner server"""
+        """Move the X/Y motor axes through the motion driver.
+
+        Args:
+            mode: A :class:`MoveModes` value (absolute or relative).
+            x: Target/delta x in millimetres.
+            y: Target/delta y in millimetres.
+        """
         if self.motor.aligning_enabled and not self.motor.motor_busy:
             _ = await self.motor._motor_move(
                 d_mm=[x, y],
@@ -1169,7 +1235,7 @@ class Aligner:
             LOGGER.error("motor is busy")
 
     async def motor_getxy(self):
-        """gets current motor position from alignment server"""
+        """Query the current X/Y motor position from the motion driver."""
         if self.motor.aligning_enabled:
             _ = await self.motor.query_axis_position(axis=["x", "y"])
         else:
@@ -1178,7 +1244,7 @@ class Aligner:
             )
 
     async def get_pm(self):
-        """gets plate map"""
+        """Load the plate map for the active plate id and refresh the plot."""
         if self.motor.aligning_enabled:
 
             if isinstance(self.motor.aligner_plateid, int):
@@ -1214,7 +1280,16 @@ class Aligner:
             )
 
     def xy_to_sample(self, xy, pmapxy):
-        """get point from pmap closest to xy"""
+        """Return the platemap index closest to ``xy``.
+
+        Args:
+            xy: A 2-element sequence ``(x, y)`` in plate coordinates.
+            pmapxy: ``(N, 2)`` array of platemap XY coordinates.
+
+        Returns:
+            Optional[int]: Row index into ``pmapxy`` of the nearest
+            point, or ``None`` if ``pmapxy`` is empty.
+        """
         if len(pmapxy):
             diff = pmapxy - xy
             sumdiff = (diff**2).sum(axis=1)
@@ -1223,7 +1298,15 @@ class Aligner:
             return None
 
     def get_samples(self, X, Y):
-        """get list of samples row number closest to xy"""
+        """Return the platemap row index closest to each ``(X[i], Y[i])``.
+
+        Args:
+            X: Iterable of plate x coordinates.
+            Y: Iterable of plate y coordinates.
+
+        Returns:
+            list: One platemap row index (or ``None``) per input point.
+        """
         # X and Y are vectors
         xyarr = np.array((X, Y)).T
         pmxy = np.array([[col["x"], col["y"]] for col in self.pmdata])
@@ -1231,7 +1314,7 @@ class Aligner:
         return samples
 
     def remove_allMarkerpoints(self):
-        """Removes all Markers from plot"""
+        """Remove every non-cell marker glyph from the plate-map plot."""
         for idx in range(len(self.MarkerNames) - 1):
             # remove old Marker point
             old_point = self.plot_mpmap.select(name=self.MarkerNames[idx + 1])
@@ -1239,7 +1322,15 @@ class Aligner:
                 self.plot_mpmap.renderers.remove(old_point[0])
 
     def align_1p(self, xyplate, xymotor):
-        """One point alignment"""
+        """Compute the offset-only transfer matrix from one matched point.
+
+        Args:
+            xyplate: Single plate coordinate as ``[(x, y, 1)]``.
+            xymotor: Matching motor coordinate as ``[(x, y, 1)]``.
+
+        Returns:
+            numpy.matrix: 3x3 translation-only transfer matrix.
+        """
         # can only calculate the xy offset
         xoff = xymotor[0][0] - xyplate[0][0]
         yoff = xymotor[0][1] - xyplate[0][1]
@@ -1247,7 +1338,12 @@ class Aligner:
         return M
 
     async def align_calc(self):
-        """Calculate Transformation Matrix from given points"""
+        """Compute the new plate-to-motor transfer matrix from valid points.
+
+        Filters duplicate/None points and dispatches to the 1, 2, or 3
+        point alignment routine depending on how many valid pairs are
+        available. Updates the displayed matrix on the UI.
+        """
         global calib_ptsplate, calib_ptsmotor
         global TransferMatrix
         global cutoff
@@ -1331,7 +1427,15 @@ class Aligner:
     #    return M
 
     def align_3p(self, xyplate, xymotor):
-        """Three point alignment"""
+        """Compute the full affine transfer matrix from three matched points.
+
+        Args:
+            xyplate: List of three plate coordinates ``(x, y, 1)``.
+            xymotor: Matching list of three motor coordinates.
+
+        Returns:
+            numpy.matrix: 3x3 transfer matrix solving ``xyMotor = M*xyPlate``.
+        """
 
         LOGGER.info("Solving: xyMotor = M * xyPlate")
         # can calculate the full transfer matrix
@@ -1368,10 +1472,19 @@ class Aligner:
         return M
 
     def align_test_point(self, test_list):
-        """Test if point is valid for aligning procedure"""
+        """Return the indices in ``test_list`` whose entries are ``None``."""
         return [i for i in range(len(test_list)) if test_list[i] is None]
 
     def align_uniquepts(self, x, y):
+        """Drop duplicates from ``x`` while keeping the paired ``y`` entries.
+
+        Args:
+            x: Iterable of point keys to deduplicate against.
+            y: Iterable paired with ``x``.
+
+        Returns:
+            tuple: ``(unique_x, unique_y)`` lists with duplicates removed.
+        """
         unique_x = []
         unique_y = []
         for i in range(len(x)):
@@ -1381,6 +1494,7 @@ class Aligner:
         return unique_x, unique_y
 
     def cutoffdigits(self, M, digits):
+        """Round every entry of matrix ``M`` to ``digits`` decimal places."""
         for i in range(len(M)):
             for j in range(len(M)):
                 M[i, j] = round(M[i, j], digits)
@@ -1390,14 +1504,14 @@ class Aligner:
     #
     ################################################################################
     def update_calpointdisplay(self, ptid):
-        """Updates the calibration point display"""
+        """Refresh the four text inputs for calibration point ``ptid``."""
         self.calib_xplate[ptid].value = (str)(self.calib_ptsplate[ptid][0])
         self.calib_yplate[ptid].value = (str)(self.calib_ptsplate[ptid][1])
         self.calib_xmotor[ptid].value = (str)(self.calib_ptsmotor[ptid][0])
         self.calib_ymotor[ptid].value = (str)(self.calib_ptsmotor[ptid][1])
 
     def update_status(self, updatestr, reset=0):
-        """updates the web interface status field"""
+        """Prepend ``updatestr`` to the status field, or replace it when ``reset`` is truthy."""
         if reset:
             self.status_align.value = updatestr
         else:
@@ -1405,7 +1519,7 @@ class Aligner:
             self.status_align.value = updatestr + "\n######\n" + oldstatus
 
     def update_pm_plot(self):
-        """plots the plate map"""
+        """Redraw the platemap sample grid on the alignment plot."""
         x = [col["x"] for col in self.pmdata]
         y = [col["y"] for col in self.pmdata]
         # remove old Pmplot
@@ -1417,7 +1531,7 @@ class Aligner:
         )
 
     def update_Markerdisplay(self, selMarker):
-        """updates the Marker display elements"""
+        """Refresh the text inputs for marker ``selMarker`` from stored state."""
         self.marker_x[selMarker].value = (str)(self.MarkerXYplate[selMarker][0])
         self.marker_y[selMarker].value = (str)(self.MarkerXYplate[selMarker][1])
         self.marker_index[selMarker].value = (str)((self.MarkerIndex[selMarker]))
@@ -1426,6 +1540,7 @@ class Aligner:
         self.marker_fraction[selMarker].value = (str)(self.MarkerFraction[selMarker])
 
     def update_TranferMatrixdisplay(self):
+        """Refresh the scale, translation and rotation text inputs from the current matrix."""
         self.calib_xscale_text.value = f"{self.plate_transfermatrix[0, 0]:.1E}"
         self.calib_yscale_text.value = f"{self.plate_transfermatrix[1, 1]:.1E}"
         self.calib_xtrans_text.value = f"{self.plate_transfermatrix[0, 2]:.1E}"
@@ -1434,10 +1549,11 @@ class Aligner:
         self.calib_roty_text.value = f"{self.plate_transfermatrix[1, 0]:.1E}"
 
     def update_pm_plot_title(self, plateid):
+        """Set the plate-map plot title to show ``plateid``."""
         self.plot_mpmap.title.text = f"PlateMap: {plateid}"
 
     def init_mapaligner(self):
-        """resets all parameters"""
+        """Reset all aligner state, clear markers and redraw the UI."""
         self.initial_plate_transfermatrix = self.motor.plate_transfermatrix
         self.plate_transfermatrix = self.initial_plate_transfermatrix
         self.calib_ptsplate = [(None, None, 1), (None, None, 1), (None, None, 1)]
@@ -1477,7 +1593,7 @@ class Aligner:
         self.gbuf_plate_position = -1 * self.gbuf_plate_position
 
     async def IOloop_aligner(self):  # non-blocking coroutine, updates data source
-        """IOloop for updating web interface"""
+        """Consume motor-position messages and refresh the UI in a loop."""
         self.IOloop_run = True
         while self.IOloop_run:
             try:
@@ -1517,6 +1633,7 @@ class Aligner:
                 LOGGER.error("aligner IOloop error", exc_info=True)
 
     def IOloop_helper(self):
+        """Push the latest motor position and aligner status to all Bokeh widgets."""
         self.motor_readxmotor_text.value = (str)(self.g_motor_position[0])
         self.motor_readymotor_text.value = (str)(self.g_motor_position[1])
         if self.g_motor_ismoving:

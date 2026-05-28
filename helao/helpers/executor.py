@@ -1,3 +1,13 @@
+"""Base class for action-server execution lifecycles.
+
+The :class:`Executor` defines the four-phase contract used by
+:class:`Base.contain_action` and its action handlers: ``_pre_exec``
+(setup), ``_exec`` (one-shot work), ``_poll`` (repeated work returning
+status), and ``_post_exec`` (cleanup), plus a ``_manual_stop`` hook for
+abort. Drivers and action implementations either subclass this or use
+the ``set_*`` setters to attach custom phase callables at runtime.
+"""
+
 import time
 from types import MethodType
 from typing import Optional
@@ -10,51 +20,26 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class Executor:
-    """
-    Executor class for managing and executing asynchronous tasks with customizable setup, execution, polling, and cleanup methods.
+    """Lifecycle host that wraps a driver call against the active action.
+
+    Subclasses (or callers using the ``set_*`` setters) supply the actual
+    setup/execute/poll/cleanup behaviour; the default implementations are
+    no-ops that simply return ``ErrorCodes.none``. The ``oneoff`` flag
+    selects single-shot ``_exec`` execution; otherwise ``_poll`` is
+    called repeatedly until it reports a terminal :class:`HloStatus`.
 
     Attributes:
-        active: The active task or action to be executed.
-        poll_rate (float): The rate at which polling occurs, in seconds.
-        oneoff (bool): Indicates if the task is a one-time execution.
-        exec_id (str): Unique identifier for the executor instance.
-        concurrent (bool): Indicates if multiple executors can run concurrently.
-        start_time (float): The start time of the execution.
-        duration (float): The duration of the action, default is -1 (indefinite).
-
-    Methods:
-        __init__(self, active, poll_rate=0.2, oneoff=True, exec_id=None, concurrent=True, **kwargs):
-            Initializes the Executor instance with the given parameters.
-
-        async _pre_exec(self):
-            Performs setup methods before execution. Returns error state.
-
-        set_pre_exec(self, pre_exec_func):
-            Overrides the generic setup method with a custom function.
-
-        async _exec(self):
-            Performs the main execution of the task. Returns data and error state.
-
-        set_exec(self, exec_func):
-            Overrides the generic execute method with a custom function.
-
-        async _poll(self):
-            Performs one polling iteration. Returns data, error state, and status.
-
-        set_poll(self, poll_func):
-            Overrides the generic polling method with a custom function.
-
-        async _post_exec(self):
-            Performs cleanup methods after execution. Returns error state.
-
-        set_post_exec(self, post_exec_func):
-            Overrides the generic cleanup method with a custom function.
-
-        async _manual_stop(self):
-            Performs manual stop of the device. Returns error state.
-
-        set_manual_stop(self, manual_stop_func):
-            Overrides the generic manual stop method with a custom function.
+        active: The :class:`Active` (or equivalent) action wrapper this
+            executor runs against.
+        oneoff: When true, run ``_exec`` once; otherwise loop ``_poll``.
+        poll_rate: Seconds between successive ``_poll`` invocations.
+        exec_id: Unique identifier for this executor; defaults to
+            ``"<action_name> <action_uuid>"``.
+        start_time: Wall-clock time (``time.time()``) at construction.
+        duration: Requested duration in seconds taken from
+            ``action.action_params['duration']``; ``-1`` means indefinite.
+        concurrent: Whether this executor tolerates other executors
+            running simultaneously on the same server.
     """
 
     def __init__(
@@ -66,25 +51,18 @@ class Executor:
         concurrent: bool = True,
         **kwargs,
     ):
-        """
-        Initializes the Executor.
+        """Initialize the executor and stamp the action with ``exec_id``.
 
         Args:
-            active: The active action to be executed.
-            poll_rate (float, optional): The rate at which to poll for updates. Defaults to 0.2.
-            oneoff (bool, optional): Whether the executor is a one-off execution. Defaults to True.
-            exec_id (str, optional): The unique identifier for the executor. If None, it will be generated. Defaults to None.
-            concurrent (bool, optional): Whether multiple executors can run concurrently. Defaults to True.
-            **kwargs: Additional keyword arguments.
-
-        Attributes:
-            active: The active action to be executed.
-            oneoff (bool): Whether the executor is a one-off execution.
-            poll_rate (float): The rate at which to poll for updates.
-            exec_id (str): The unique identifier for the executor.
-            start_time (float): The start time of the execution.
-            duration (float): The duration of the action.
-            concurrent (bool): Whether multiple executors can run concurrently.
+            active: Active action wrapper this executor will drive.
+            poll_rate: Seconds between successive ``_poll`` invocations.
+            oneoff: When true, only ``_exec`` runs; otherwise ``_poll`` is
+                looped until it returns a terminal status.
+            exec_id: Optional override for the executor identifier;
+                defaults to ``"<action_name> <action_uuid>"``.
+            concurrent: Whether multiple executors can coexist on the
+                same server.
+            **kwargs: Subclass-specific keyword arguments (ignored here).
         """
         self.active = active
         self.oneoff = oneoff
@@ -99,114 +77,93 @@ class Executor:
         # whether or not we can run multiple executors concurrently, regardless of executor type
         self.concurrent = concurrent
 
-    async def _pre_exec(self):
-        """
-        Asynchronous method to run setup procedures for the executor.
-
-        This method prints a message indicating that the generic executor is running
-        setup methods and initializes the setup error code to `ErrorCodes.none`.
+    async def _pre_exec(self) -> dict:
+        """Setup phase hook invoked once before ``_exec`` / ``_poll``.
 
         Returns:
-            dict: A dictionary containing the setup error code with the key "error".
+            ``{"error": ErrorCodes.none}`` for the no-op default.
         """
         LOGGER.info("generic Executor running setup methods.")
         return {"error": ErrorCodes.none}
 
-    def set_pre_exec(self, pre_exec_func):
-        """
-        Sets the pre-execution function.
-
-        This method assigns a function to be executed before the main execution.
+    def set_pre_exec(self, pre_exec_func) -> None:
+        """Bind ``pre_exec_func`` as the executor's setup phase.
 
         Args:
-            pre_exec_func (function): A function to be executed before the main execution.
+            pre_exec_func: Async callable with ``self`` as its first
+                argument, returning the same dict shape as
+                :meth:`_pre_exec`.
         """
         self._pre_exec = MethodType(pre_exec_func, self)
 
-    async def _exec(self):
-        """
-        Asynchronous method to execute a task.
+    async def _exec(self) -> dict:
+        """One-shot execution phase; runs when ``oneoff`` is true.
 
         Returns:
-            dict: A dictionary containing the keys "data" and "error".
-                  "data" is an empty dictionary, and "error" is set to ErrorCodes.none.
+            ``{"data": {}, "error": ErrorCodes.none}`` for the no-op default.
         """
         return {"data": {}, "error": ErrorCodes.none}
 
-    def set_exec(self, exec_func):
-        """
-        Sets the execution function for the instance.
+    def set_exec(self, exec_func) -> None:
+        """Bind ``exec_func`` as the executor's one-shot execution phase.
 
         Args:
-            exec_func (function): The function to be set as the execution method.
+            exec_func: Async callable with ``self`` as its first argument,
+                returning the same dict shape as :meth:`_exec`.
         """
         self._exec = MethodType(exec_func, self)
 
-    async def _poll(self):
-        """
-        Asynchronously polls for a status update.
+    async def _poll(self) -> dict:
+        """Single polling iteration; called repeatedly when ``oneoff`` is false.
 
         Returns:
-            dict: A dictionary containing the following keys:
-                - "data" (dict): An empty dictionary.
-                - "error" (ErrorCodes): The error code, set to ErrorCodes.none.
-                - "status" (HloStatus): The status, set to HloStatus.finished.
+            ``{"data": {}, "error": ErrorCodes.none, "status": HloStatus.finished}``
+            for the no-op default; the loop terminates on a terminal
+            :class:`HloStatus`.
         """
         return {"data": {}, "error": ErrorCodes.none, "status": HloStatus.finished}
 
-    def set_poll(self, poll_func):
-        """
-        Sets the polling function for the executor.
+    def set_poll(self, poll_func) -> None:
+        """Bind ``poll_func`` as the executor's polling phase.
 
         Args:
-            poll_func (function): A function to be used for polling. This function
-                                  should accept no arguments and will be bound to
-                                  the instance of the executor.
+            poll_func: Async callable with ``self`` as its first argument,
+                returning the same dict shape as :meth:`_poll`.
         """
         self._poll = MethodType(poll_func, self)
 
-    async def _post_exec(self):
-        """
-        Asynchronous method to perform post-execution cleanup.
-
-        This method sets the cleanup error code to `ErrorCodes.none` and returns
-        a dictionary containing an empty data dictionary and the cleanup error code.
+    async def _post_exec(self) -> dict:
+        """Cleanup phase hook invoked once after ``_exec`` / ``_poll`` finishes.
 
         Returns:
-            dict: A dictionary with keys "data" (an empty dictionary) and "error"
-                  (the cleanup error code set to `ErrorCodes.none`).
+            ``{"data": {}, "error": ErrorCodes.none}`` for the no-op default.
         """
         return {"data": {}, "error": ErrorCodes.none}
 
-    def set_post_exec(self, post_exec_func):
-        """
-        Sets the post-execution function.
-
-        This method assigns a given function to be executed after the main execution.
+    def set_post_exec(self, post_exec_func) -> None:
+        """Bind ``post_exec_func`` as the executor's cleanup phase.
 
         Args:
-            post_exec_func (function): A function to be set as the post-execution function.
+            post_exec_func: Async callable with ``self`` as its first
+                argument, returning the same dict shape as
+                :meth:`_post_exec`.
         """
         self._post_exec = MethodType(post_exec_func, self)
 
-    async def _manual_stop(self):
-        """
-        Asynchronously stops the current operation manually.
-
-        This method sets the stop error code to `ErrorCodes.none` and returns a dictionary
-        containing the error code.
+    async def _manual_stop(self) -> dict:
+        """Hook invoked when the action is aborted by the orchestrator.
 
         Returns:
-            dict: A dictionary with the key "error" and the value set to `self.stop_err`.
+            ``{"error": ErrorCodes.none}`` for the no-op default.
         """
         return {"error": ErrorCodes.none}
 
-    def set_manual_stop(self, manual_stop_func):
-        """
-        Sets a manual stop function for the executor.
+    def set_manual_stop(self, manual_stop_func) -> None:
+        """Bind ``manual_stop_func`` as the executor's abort hook.
 
         Args:
-            manual_stop_func (function): A function that will be used to manually stop the executor.
-                                         This function should take no arguments.
+            manual_stop_func: Async callable with ``self`` as its first
+                argument, returning the same dict shape as
+                :meth:`_manual_stop`.
         """
         self._manual_stop = MethodType(manual_stop_func, self)

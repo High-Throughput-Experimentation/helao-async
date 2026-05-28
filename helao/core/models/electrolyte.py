@@ -1,8 +1,16 @@
+"""Enum of named electrolyte formulations used by HTE experiments."""
+
 __all__ = ["Electrolyte"]
 from enum import Enum
 
 
 class Electrolyte(str, Enum):
+    """Catalog of supported electrolyte identifiers.
+
+    Member values are the canonical short names used in configs and file
+    headers; the `other` member is the escape hatch for one-off mixtures.
+    """
+
     slf10 = "SLF10"
     oer10 = "OER10"
     pslf10 = "PSLF10"

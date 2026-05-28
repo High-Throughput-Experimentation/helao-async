@@ -1,4 +1,9 @@
-"""Action visualizer for the websocket simulator: WIP"""
+"""Bokeh visualizer module for the OER CP simulator action server.
+
+Subscribes to a CP simulator's ``ws_data`` websocket and renders the
+in-flight CP trace alongside the previous trace as the action UUID
+changes.
+"""
 
 import time
 import asyncio
@@ -31,9 +36,32 @@ VALID_ACTION_NAME = ("measure_cp",)
 
 
 class C_oersimvis:
-    """spectrometer visualizer module class"""
+    """Live OER CP visualizer for the CP simulator action server.
+
+    Subscribes to the action server's ``ws_data`` websocket and maintains
+    a "current" plot for the in-flight trace plus a "previous" plot
+    holding the most recent prior action's trace, switching whenever the
+    streamed ``action_uuid`` changes.
+
+    Attributes:
+        vis: Hosting visualizer server.
+        max_points: Rolling buffer size for the streamed datasource.
+        server_key: Name of the action server being visualized.
+        wss: ``WsSubscriber`` consumer for ``ws_data`` packages.
+        datasource: ``ColumnDataSource`` backing the live plot.
+        prev_datasources: Per-uuid snapshots backing the previous plot.
+        cur_action_uuid: Currently-streamed action UUID.
+        cur_comp: Currently-streamed composition string.
+        layout: Top-level Bokeh layout.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Build the layout and start the websocket polling task.
+
+        Args:
+            vis_serv: Hosting visualizer server.
+            serv_key: Name of the action server to visualize.
+        """
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.max_points = 500
@@ -115,12 +143,24 @@ class C_oersimvis:
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
     def cleanup_session(self, session_context):
+        """Cancel the IO loop when the Bokeh session ends.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.server_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def callback_input_max_points(self, attr, old, new, sender):
-        """callback for input_max_points"""
+        """Validate and apply a new ``max_points`` input, then echo it back.
+
+        Args:
+            attr: Bokeh attribute name (unused).
+            old: Previous string value.
+            new: New string value.
+            sender: The source widget.
+        """
 
         def to_int(val):
             try:
@@ -149,9 +189,16 @@ class C_oersimvis:
         )
 
     def update_input_value(self, sender, value):
+        """Push ``value`` back into the source widget.
+
+        Args:
+            sender: Bokeh widget to update.
+            value: New value to assign.
+        """
         sender.value = value
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
+        """Poll the data websocket and schedule UI updates on the document."""
         LOGGER.info(f" ... potentiostat visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
@@ -161,6 +208,16 @@ class C_oersimvis:
             await asyncio.sleep(0.001)
 
     def add_points(self, datapackage_list: list):
+        """Stream a batch of websocket data packages into the live plot.
+
+        Resets to a new ``action_uuid`` when one appears, accumulates
+        ``t_s``/``erhe_v`` samples, derives a composition string from
+        ``elements``/``atfracs``, pads short series with ``"NaN"``, and
+        streams the result into the datasource with rollover.
+
+        Args:
+            datapackage_list: List of data packages from the websocket.
+        """
         for data_package in datapackage_list:
             data_dict = {k: [] for k in self.data_dict_keys}
             if (
@@ -196,6 +253,7 @@ class C_oersimvis:
             self.datasource.stream(data_dict, rollover=self.max_points)
 
     def _add_plots(self):
+        """Redraw the current and previous CP plots from cached datasources."""
         # clear legend
         if self.plot.renderers:
             self.plot.legend.items = []
@@ -231,6 +289,12 @@ class C_oersimvis:
             self.plot_prev.legend.location = "bottom_right"
 
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
+        """Move the active trace to the "previous" plot when the UUID changes.
+
+        Args:
+            new_action_uuid: UUID of the newly active action.
+            forceupdate: If True, redraw even when the UUID has not changed.
+        """
         if self.cur_action_uuid != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
                 LOGGER.info(" ... reseting CP graph")

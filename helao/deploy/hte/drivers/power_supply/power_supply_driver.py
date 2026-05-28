@@ -1,3 +1,11 @@
+"""Generic VISA-controlled power supply driver.
+
+Wraps a `pyvisa` serial resource that speaks the common `VSET1:`/`ISET1:`/
+`VOUT1?`/`IOUT1?`/`OUT1`/`OUT0` command set used by bench supplies (e.g.
+Korad/RND). Implements the HELAO `HelaoDriver` interface (`connect`,
+`get_status`, `stop`, `reset`, `disconnect`) plus synchronous and async
+helpers for setting/reading voltage and current.
+"""
 
 import time
 from typing import Optional
@@ -26,7 +34,21 @@ from helao.core.drivers.helao_driver import (
 
 
 class PowerSupplyDriver(HelaoDriver):
+    """HelaoDriver wrapping a VISA serial-controlled bench power supply.
+
+    Reads `resource_name` and `timeout_ms` from `config`. Holds a single
+    `pyvisa` `SerialInstrument` and provides both synchronous and async
+    voltage/current set/get helpers. Async methods sleep `sleep_time` after
+    issuing the command to give the supply time to settle.
+    """
+
     def __init__(self, config: dict = {}):
+        """Capture the VISA resource name and timeout from `config`.
+
+        Args:
+            config: Driver configuration; must include `resource_name`.
+                `timeout_ms` defaults to 10000.
+        """
         super().__init__(config=config)
         self.resource_name = self.config.get("resource_name")
         self.timeout_ms = int(self.config.get("timeout_ms", 10000))
@@ -35,6 +57,7 @@ class PowerSupplyDriver(HelaoDriver):
         self.ready = False
 
     def connect(self) -> DriverResponse:
+        """Open the VISA resource, query `*IDN?`, and mark the driver ready."""
         try:
             self.rm = pv.ResourceManager()
             self.instrument = self.rm.open_resource(self.resource_name)
@@ -56,6 +79,11 @@ class PowerSupplyDriver(HelaoDriver):
             )
 
     def setup(self, voltage_v: float = 0.0, output_on: bool = True) -> DriverResponse:
+        """Zero `VSET1` and enable or disable the output.
+
+        Note: `voltage_v` is currently logged but not used in the `VSET1:`
+        command (which writes the literal `0`).
+        """
         if self.instrument is None:
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.uninitialized, message="not connected")
         try:
@@ -67,6 +95,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"setup failed: {e}")
 
     def get_status(self) -> DriverResponse:
+        """Issue `STATUS?` and return the write-call result as `data["status"]`."""
         if self.instrument is None:
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.uninitialized, message="not connected")
         try:
@@ -76,6 +105,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"get_status failed: {e}")
 
     def set_output(self, output_on: bool = True) -> DriverResponse:
+        """Send `OUT1` or `OUT0` to enable or disable the supply output."""
         if self.instrument is None:
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.uninitialized, message="not connected")
         try:
@@ -86,6 +116,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"set_output_on failed:")
 
     def set_voltage(self, voltage_v: float = 0.0) -> DriverResponse:
+        """Send `VSET1:<voltage_v>` to update the voltage setpoint."""
         if self.instrument is None:
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.uninitialized, data={})
         try:
@@ -96,6 +127,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"set_voltage failed:")
     
     def set_current(self, current_a: float = 0.0) -> DriverResponse:
+        """Send `ISET1:<current_a>` to update the current limit."""
         if self.instrument is None:
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.uninitialized, data={})
         try:
@@ -106,6 +138,7 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"set_current failed:")
 
     def get_voltage(self) -> DriverResponse:
+        """Query `VOUT1?` and return the parsed float in `data["voltage_v"]`."""
         if self.instrument is None:
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.uninitialized, message="not connected")
         try:
@@ -116,8 +149,14 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok, message=f"get_voltage failed:")
     
     async def get_voltage_async(self, sleep_time: float = 0.05) -> 'DriverResponse':
-        """
-        Asynchronously reads the output voltage of the power supply.
+        """Asynchronously read `VOUT1?` after sleeping `sleep_time` seconds.
+
+        Args:
+            sleep_time: Delay applied before the query to throttle requests.
+
+        Returns:
+            `DriverResponse` whose `data["voltage_v"]` is the parsed float
+            (or NaN if the query raised).
         """
         if self.instrument is None:
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.uninitialized, message="not connected")
@@ -145,8 +184,15 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok, data={'voltage_v':np.nan}, message=f"get_voltage_async failed:")
 
     async def get_current_async(self, sleep_time: float = 0.05) -> 'DriverResponse':
-        """
-        Asynchronously reads the output current of the power supply.
+        """Asynchronously read `IOUT1?` and return the parsed current in amps.
+
+        Args:
+            sleep_time: Delay applied after a successful query to throttle requests.
+
+        Returns:
+            `DriverResponse` whose `data["current_a"]` is the parsed float,
+            NaN if the response was non-numeric, or the response is success
+            with no `data` if the query itself raised.
         """
         if self.instrument is None:
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.uninitialized, message="not connected")
@@ -168,14 +214,14 @@ class PowerSupplyDriver(HelaoDriver):
 
             
     async def apply_voltage_async(self, voltage: float, sleep_time: float = 0.05) -> 'DriverResponse':
-        """
-        Asynchronously sets the output voltage of the power supply to the specified value.
+        """Asynchronously write `VSET1:<voltage>` and sleep `sleep_time` seconds.
 
         Args:
-            voltage (float): The voltage value to set.
+            voltage: Voltage setpoint to apply.
+            sleep_time: Delay applied after the write to give the supply time to settle.
 
         Returns:
-            DriverResponse: Result of the operation.
+            `DriverResponse` carrying the applied setpoint in `data["set_voltage"]`.
         """
         if self.instrument is None:
             return DriverResponse(
@@ -207,15 +253,14 @@ class PowerSupplyDriver(HelaoDriver):
 
 
     async def apply_current_async(self, current: float, sleep_time: float = 0.05) -> 'DriverResponse':
-        """
-        Asynchronously sets the output voltage of the power supply to the specified value.
+        """Asynchronously write `ISET1:<current>` and sleep `sleep_time` seconds.
 
         Args:
-            current (float): The current value to set.
-            sleep_time (float): The time to sleep between commands.
+            current: Current limit to apply.
+            sleep_time: Delay applied after the write to give the supply time to settle.
 
         Returns:
-            DriverResponse: Result of the operation.
+            `DriverResponse` carrying the applied setpoint in `data["set_current"]`.
         """
         if self.instrument is None:
             return DriverResponse(
@@ -241,9 +286,7 @@ class PowerSupplyDriver(HelaoDriver):
             )
 
     def stop(self) -> DriverResponse:
-        """
-        Stops the power supply. This is just a dummy method to satisfy the interface.
-        """
+        """Stub stop method satisfying the `HelaoDriver` interface; performs no action."""
         if self.instrument is None:
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.uninitialized, message="not connected")
         try:
@@ -256,6 +299,7 @@ class PowerSupplyDriver(HelaoDriver):
 
 
     def disconnect(self) -> DriverResponse:
+        """Close the VISA instrument and resource manager, clearing `self.instrument`."""
         try:
             if self.instrument is not None:
                 self.instrument.close()
@@ -270,5 +314,6 @@ class PowerSupplyDriver(HelaoDriver):
             return DriverResponse(response=DriverResponseType.failed, status=DriverStatus.error, message=f"disconnect failed:")
 
     def reset(self) -> DriverResponse:
+        """Disconnect and immediately reconnect to the VISA resource."""
         self.disconnect()
         return self.connect()

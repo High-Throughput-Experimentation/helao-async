@@ -1,9 +1,9 @@
 # shell: uvicorn motion_server:app --reload
-"""A FastAPI service definition for a potentiostat device server, e.g. Gamry.
+"""Andor spectrograph/camera action server.
 
-andor_server uses the Executor model with helao.drivers.spec.andor.driver which decouples
-the hardware driver class from the action server base class.
-
+Wraps :class:`AndorDriver` and exposes acquisition, cooling and ND-filter
+adjustment endpoints. Uses the :class:`Executor` model so the hardware driver
+remains decoupled from the action-server base class.
 """
 
 __all__ = ["makeApp"]
@@ -28,11 +28,21 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class AndorCooling(Executor):
-    """Handle cooling and warmup of Andor camera."""
+    """Executor that drives the Andor sensor to its cool or warm setpoint.
+
+    Sets ``SensorCooling`` on the camera in ``_exec`` and polls the temperature
+    in ``_poll`` until the sensor reports ``Stabilised`` (and is sufficiently
+    cold when cooling). Has no fixed duration; ``_poll`` terminates the run.
+    """
 
     driver: AndorDriver
 
     def __init__(self, *args, **kwargs):
+        """Initialise the cooling executor from the active action parameters.
+
+        Reads ``timeout`` and ``cooldown`` from ``action_params`` and links
+        convenience handles to the driver and its camera object.
+        """
         super().__init__(*args, **kwargs)
         try:
             self.poll_rate = 5  # pump events every 100 millisecond
@@ -54,7 +64,7 @@ class AndorCooling(Executor):
             LOGGER.error("AndorCooling was not initialized.", exc_info=True)
 
     async def _exec(self) -> dict:
-        """Set SensorCooling flag and wait for stabilization."""
+        """Toggle ``SensorCooling`` on the camera to the requested state."""
         LOGGER.debug(f"setting cam.SensorCooling = {self.cooldown}")
         resp = self.driver.set_cooldown(self.cooldown)
         error = (
@@ -63,7 +73,12 @@ class AndorCooling(Executor):
         return {"error": error}
 
     async def _poll(self) -> dict:
-        """Return data and status from dtaq event sink."""
+        """Read the current sensor temperature and decide when to finish.
+
+        Returns finished status once the camera reports ``Stabilised`` and the
+        temperature is below 20C (when cooling) or as soon as it is stabilised
+        when warming up; faults are surfaced as errored status.
+        """
         resp = self.driver.check_temperature()
 
         if not resp.data:
@@ -91,12 +106,16 @@ class AndorCooling(Executor):
 
 
 class AndorAdjustND(Executor):
-    """Auto-select ND filter with maximum optimality."""
+    """Executor that runs the driver's ND-filter auto-selection routine.
+
+    One-shot executor: ``_exec`` invokes :meth:`AndorDriver.adjust_ND` and
+    returns its result data.
+    """
 
     driver: AndorDriver
 
     async def _exec(self) -> dict:
-        """Run ND filter adjustment routine."""
+        """Call :meth:`AndorDriver.adjust_ND` and forward its data payload."""
         LOGGER.debug("Running driver.adjust_ND()")
         resp = self.driver.adjust_ND()
         error = (
@@ -106,11 +125,23 @@ class AndorAdjustND(Executor):
 
 
 class AndorAcquire(Executor):
-    """Acquire data with external start trigger."""
+    """Executor that acquires spectra from the Andor camera.
+
+    Configures exposure/framerate in ``_pre_exec``, arms the trigger in
+    ``_exec``, pulls frames in ``_poll`` until either the requested duration
+    elapses or the driver reports completion, and tears down via
+    ``_post_exec``. Supports external triggering.
+    """
 
     driver: AndorDriver
 
     def __init__(self, *args, **kwargs):
+        """Initialise acquisition executor from the active action parameters.
+
+        Reads ``external_trigger``, ``duration``, ``timeout``,
+        ``frames_per_poll``, ``buffer_count``, ``exp_time`` and ``framerate``
+        from ``action_params`` and records the action output directory.
+        """
         super().__init__(*args, **kwargs)
         try:
             self.poll_rate = 0.1  # pump events every 100 millisecond
@@ -139,13 +170,13 @@ class AndorAcquire(Executor):
             LOGGER.error("AndorAcquire was not initialized.", exc_info=True)
 
     async def _pre_exec(self) -> dict:
-        """Setup potentiostat device for given technique."""
+        """Configure exposure time and framerate on the camera."""
         resp = self.driver.setup(exp_time=self.exp_time, framerate=self.framerate)
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
         return {"error": error}
 
     async def _exec(self) -> dict:
-        """Set trigger to wait for measurement start."""
+        """Arm the camera trigger (external or internal) to start acquisition."""
         try:
             LOGGER.debug("setting trigger")
             resp = self.driver.set_trigger(self.external_trigger)
@@ -160,7 +191,11 @@ class AndorAcquire(Executor):
         return {"error": error}
 
     async def _poll(self) -> dict:
-        """Return data and status from dtaq event sink."""
+        """Pull a batch of frames from the camera and decide whether to finish.
+
+        Finished status is returned when the driver reports ``ok`` or when the
+        elapsed tick interval exceeds ``duration``.
+        """
         resp = self.driver.get_data(
             frames=self.frames_per_poll,
             total_duration=self.duration,
@@ -187,7 +222,8 @@ class AndorAcquire(Executor):
             )
         return {"error": error, "status": status, "data": resp.data}
 
-    async def _post_exec(self):
+    async def _post_exec(self) -> dict:
+        """Run :meth:`AndorDriver.cleanup` to release camera resources."""
         resp = self.driver.cleanup()
 
         error = (
@@ -197,6 +233,14 @@ class AndorAcquire(Executor):
 
 
 async def andor_dyn_endpoints(app: BaseAPI):
+    """Register Andor action endpoints on ``app`` after the driver is ready.
+
+    Disables concurrent actions on this server and attaches the ``acquire``,
+    ``cancel_acquire``, ``cooling`` and ``adjust_nd`` POST routes.
+
+    Args:
+        app: The :class:`BaseAPI` instance being constructed by ``makeApp``.
+    """
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
 
@@ -212,6 +256,11 @@ async def andor_dyn_endpoints(app: BaseAPI):
         framerate: float = 98,
         timeout: float = 5000,
     ):
+        """Start a spectrum acquisition via :class:`AndorAcquire`.
+
+        Channel columns ``ch_0000..ch_NNNN`` carry per-pixel intensities and the
+        ``wl`` array from the driver is embedded in the file header.
+        """
         data_keys = ["elapsed_time_s"] + [
             f"ch_{i:04}" for i in range(app.driver.wl_arr.shape[0])
         ]
@@ -238,7 +287,7 @@ async def andor_dyn_endpoints(app: BaseAPI):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stop sleep action."""
+        """Stop any running ``acquire`` executor on this server."""
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():
             if exec_id.split()[0] == "acquire":
@@ -253,6 +302,7 @@ async def andor_dyn_endpoints(app: BaseAPI):
         cooldown: bool = True,
         timeout: int = 600,
     ):
+        """Cool or warm the Andor sensor using :class:`AndorCooling`."""
         active = await app.base.setup_and_contain_action()
         executor = AndorCooling(
             active=active, oneoff=False, cooldown=cooldown, timeout=timeout
@@ -265,13 +315,26 @@ async def andor_dyn_endpoints(app: BaseAPI):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
+        """Run the ND-filter auto-selection routine via :class:`AndorAdjustND`."""
         active = await app.base.setup_and_contain_action()
         executor = AndorAdjustND(active=active, oneoff=True)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the Andor camera FastAPI app.
+
+    Constructs a :class:`BaseAPI` backed by :class:`AndorDriver` and uses
+    :func:`andor_dyn_endpoints` to register the action endpoints once the
+    driver finishes initialising.
+
+    Args:
+        server_key: Key identifying this server in the orchestration group.
+
+    Returns:
+        The configured :class:`BaseAPI` application.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -281,10 +344,11 @@ def makeApp(server_key):
         driver_classes=[AndorDriver],
         dyn_endpoints=andor_dyn_endpoints,
     )
+    app.driver: AndorDriver  # type hint for convenience
 
     @app.post("/stop_private", tags=["private"])
     def stop_private():
-        """Calls driver stop method."""
+        """Invoke :meth:`AndorDriver.stop` to halt the camera."""
         app.driver.stop()
 
     return app

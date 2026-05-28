@@ -1,6 +1,4 @@
-"""
-Sequence library for UVIS
-"""
+"""Sequence library exposing UV-Vis reflectance programs and a GAIA preset."""
 
 __all__ = ["UVIS_R", "UVIS_R_postseq", "UVIS_R_shutoff", "UVIS_GAIA_preset"]
 
@@ -28,7 +26,38 @@ def UVIS_R(
     led_wavelengths_nm: list = [-1],
     led_intensities_mw: list = [-1],
     toggle_is_shutter: bool = False,
-):
+) -> list:
+    """Build a UV-Vis reflectance sequence over plate samples.
+
+    Runs an initial ``UVIS_measure_references`` block, then for each
+    sample in ``plate_sample_no_list`` unloads customs, moves to the
+    sample, and performs a reflectance measurement. Whenever the current
+    sample is contained in ``reference_after_sample_list`` an additional
+    references block is inserted before continuing.
+
+    Args:
+        sequence_version: Version tag for the sequence definition.
+        plate_id: Material library plate identifier.
+        plate_sample_no_list: Sample numbers on the plate to measure.
+        reference_after_sample_list: Samples after which another
+            reference block should be re-acquired.
+        reference_mode: Reference mode passed to UVIS sub-experiments.
+        custom_position: Solid custom position name to address the cell.
+        spec_n_avg: Number of spectra averaged per acquisition.
+        spec_int_time_ms: Spectrometer integration time in milliseconds.
+        duration_sec: Per-measurement duration in seconds; negative uses
+            the action's default.
+        specref_code: Spectral reference code for the references block.
+        led_type: Illumination side label.
+        led_date: Date string for the LED intensity calibration.
+        led_names: Names of LEDs/sources used (first element drives toggle).
+        led_wavelengths_nm: Wavelengths in nm corresponding to ``led_names``.
+        led_intensities_mw: Intensities in mW corresponding to ``led_names``.
+        toggle_is_shutter: Whether the toggle source acts as a shutter.
+
+    Returns:
+        list: Ordered list of planned ``Experiment`` objects.
+    """
     epm = ExperimentPlanMaker()
     epm.add(
         "UVIS_measure_references",
@@ -108,7 +137,18 @@ def UVIS_R_postseq(
     analysis_seq_uuid: str = "",
     plate_id: int = 0,
     recent: bool = False,
-):
+) -> list:
+    """Build a post-sequence that runs the dry UVIS analysis.
+
+    Args:
+        sequence_version: Version tag for the sequence definition.
+        analysis_seq_uuid: UUID of the source sequence to analyze.
+        plate_id: Plate identifier scoping the analysis.
+        recent: Restrict to the most recent matching run when True.
+
+    Returns:
+        list: Ordered list of planned ``Experiment`` objects.
+    """
     epm = ExperimentPlanMaker()
     epm.add(
         "UVIS_analysis_dry",
@@ -125,7 +165,16 @@ def UVIS_R_postseq(
 def UVIS_R_shutoff(
     sequence_version: int = 1,
     outlet_number: int = 1,
-):
+) -> list:
+    """Build a sequence that powers off the UVIS lamp at the given outlet.
+
+    Args:
+        sequence_version: Version tag for the sequence definition.
+        outlet_number: Power outlet number to switch off.
+
+    Returns:
+        list: Ordered list of planned ``Experiment`` objects.
+    """
     epm = ExperimentPlanMaker()
     epm.add(
         "UVIS_sub_shutoff_lamp",
@@ -152,7 +201,35 @@ def UVIS_GAIA_preset(
     led_wavelengths_nm: list = [-1],
     led_intensities_mw: list = [-1],
     toggle_is_shutter: bool = False,
-):
+) -> list:
+    """Dispatch ``UVIS_R`` with a GAIA preset sample map for the given plate.
+
+    Queries the elements present on the plate via ``PAPI`` and selects
+    one of two precomputed sample and reference-after-sample maps based on
+    whether the plate is in the ``REMAPPED_PLATES`` list and whether fewer
+    than three elements are present (top-row map) or three or more
+    elements are present (full map).
+
+    Args:
+        sequence_version: Version tag for the sequence definition.
+        plate_id: Material library plate identifier.
+        reference_mode: Reference mode passed to ``UVIS_R``.
+        custom_position: Solid custom position name to address the cell.
+        spec_n_avg: Number of spectra averaged per acquisition.
+        spec_int_time_ms: Spectrometer integration time in milliseconds.
+        duration_sec: Per-measurement duration in seconds.
+        specref_code: Spectral reference code for the references block.
+        led_type: Illumination side label.
+        led_date: Date string for the LED intensity calibration.
+        led_names: Names of LEDs/sources used.
+        led_wavelengths_nm: Wavelengths in nm corresponding to ``led_names``.
+        led_intensities_mw: Intensities in mW corresponding to ``led_names``.
+        toggle_is_shutter: Whether the toggle source acts as a shutter.
+
+    Returns:
+        list: Ordered list of planned ``Experiment`` objects produced by
+            the delegated ``UVIS_R`` call.
+    """
     MAP = [
         13983,
         13999,

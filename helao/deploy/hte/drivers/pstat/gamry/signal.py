@@ -1,8 +1,12 @@
-"""Dataclass and instances for Gamry potentiostat signals.
+"""Dataclass and instances for Gamry potentiostat excitation signals.
 
-Parameter keys are ordered according to GamryCOM.GamrySignal* Init() args, and names are
-modified as little as possible with the exception of ScanRate -> AcqInterval__s.
-
+Each ``GamrySignal`` describes one of the ``GamryCOM.GamrySignal*`` COM
+classes (ramp, constant, ramp-up-down, array) by ProgID, control mode, and
+the list of parameter keys consumed by its ``Init`` method. Parameter keys
+are ordered to match the underlying ``Init`` argument order and named to
+mirror the GamryCOM API except that ``ScanRate`` is renamed to
+``ScanRate__V_s`` / ``ScanRate__A_s`` and ``AcqInterval`` is suffixed with
+its unit.
 """
 
 from dataclasses import dataclass, field
@@ -11,12 +15,33 @@ from enum import StrEnum
 
 
 class ControlMode(StrEnum):
+    """Potentiostat control mode passed to ``SetCtrlMode``.
+
+    Attributes:
+        PstatMode: Potentiostatic (voltage-controlled) operation.
+        GstatMode: Galvanostatic (current-controlled) operation.
+    """
+
     PstatMode = "PstatMode"
     GstatMode = "GstatMode"
 
 
 @dataclass
 class GamrySignal:
+    """Description of a GamryCOM signal COM class and its parameters.
+
+    Attributes:
+        name: GamryCOM ProgID (e.g. ``"GamryCOM.GamrySignalRamp"``).
+        mode: Required potentiostat control mode for this signal.
+        param_keys: Ordered list of parameter keys consumed by the signal
+            ``Init`` method, after the ``pstat`` and control-mode arguments.
+        init_keys: Additional keys consumed by some dtaq ``Init`` methods
+            (e.g. EIS ``Freq``/``RMS``/``Precision``).
+        map_keys: Optional default fill-ins for ``param_keys``. A value can be
+            a numeric literal (used directly) or a string naming another
+            action-parameter key whose value is copied in during setup.
+    """
+
     name: str
     mode: ControlMode
     param_keys: List[str] = field(default_factory=list)

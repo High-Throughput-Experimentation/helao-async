@@ -1,9 +1,9 @@
-"""Synaccess Netbooter driver using HelaoDriver abstract base class
+"""Synaccess Netbooter PDU driver.
 
-Synaccess driver has zero dependencies on action server base object, and all
-exposed methods are intended to be blocking. Async should be handled in the server.
-All public methods must return a DriverResponse.
-
+Wraps the Netbooter HTTP cgi command interface (`cmd.cgi`) and exposes outlet
+switching as blocking methods. The driver has no dependency on the action server
+base object; async handling is the server's responsibility. All public methods
+return a `DriverResponse`.
 """
 
 import httpx
@@ -23,8 +23,23 @@ from helao.core.drivers.helao_driver import (
 
 
 class NetbooterDriver(HelaoDriver):
+    """HelaoDriver wrapping the Synaccess Netbooter CGI HTTP interface.
+
+    The driver reads `hostname`, `username`, and `password` from `config` and
+    builds an authenticated `httpx.Client` pointed at `http://<hostname>/cmd.cgi?`.
+    Public methods send `$A3`/`$A7` outlet commands and return a `DriverResponse`.
+    The `connect`/`get_status`/`stop`/`reset`/`disconnect` overrides are no-ops
+    because every call is an independent HTTP request.
+    """
 
     def __init__(self, config: dict = {}):
+        """Initialize the HTTP client from `config`.
+
+        Args:
+            config: Driver configuration dict. Required keys: `hostname`,
+                `username`, `password`. Missing keys cause the client to be left
+                unconfigured and an error to be logged.
+        """
         super().__init__(config=config)
         # get params from config or use defaults
         hostname = self.config.get("hostname", None)
@@ -42,7 +57,18 @@ class NetbooterDriver(HelaoDriver):
             self.client = httpx.Client(auth=self.auth, timeout=30.0)
             self.host_url = f"http://{hostname}/cmd.cgi?"
 
-    def switch_outlet(self, outlet_number: int, on: bool, repeat: int = 5):
+    def switch_outlet(self, outlet_number: int, on: bool, repeat: int = 5) -> DriverResponse:
+        """Switch a single outlet on or off, retrying on non-200 responses.
+
+        Args:
+            outlet_number: 1-indexed outlet number on the Netbooter.
+            on: True to power the outlet on, False to power it off.
+            repeat: Maximum number of HTTP attempts before reporting failure.
+
+        Returns:
+            A `DriverResponse` reporting success on any HTTP 200, or failure
+            after `repeat` unsuccessful attempts.
+        """
         for _ in range(repeat):
             resp = self.client.get(f"{self.host_url}$A3%20{outlet_number:d}%20{on:d}")
             if resp.status_code == 200:
@@ -57,7 +83,17 @@ class NetbooterDriver(HelaoDriver):
             status=DriverStatus.error,
         )
 
-    def switch_all(self, on: bool, repeat: int = 5):
+    def switch_all(self, on: bool, repeat: int = 5) -> DriverResponse:
+        """Switch every outlet on or off, retrying on non-200 responses.
+
+        Args:
+            on: True to power all outlets on, False to power them off.
+            repeat: Maximum number of HTTP attempts before reporting failure.
+
+        Returns:
+            A `DriverResponse` reporting success on any HTTP 200, or failure
+            after `repeat` unsuccessful attempts.
+        """
         for _ in range(repeat):
             resp = self.client.get(f"{self.host_url}$A7%20{on:d}")
             if resp.status_code == 200:
@@ -73,7 +109,7 @@ class NetbooterDriver(HelaoDriver):
         )
 
     def connect(self) -> DriverResponse:
-        """Open connection to resource."""
+        """No-op connect for the HTTP API pass-through; always reports success."""
         return DriverResponse(
             response=DriverResponseType.success,
             message="no connection method for HTTP API pass-thru",
@@ -81,7 +117,7 @@ class NetbooterDriver(HelaoDriver):
         )
 
     def get_status(self) -> DriverResponse:
-        """Return current driver status."""
+        """No-op status query for the HTTP API pass-through; always reports ok."""
         return DriverResponse(
             response=DriverResponseType.success,
             message="no status method for HTTP API pass-thru",
@@ -89,7 +125,7 @@ class NetbooterDriver(HelaoDriver):
         )
 
     def stop(self) -> DriverResponse:
-        """General stop method, abort all active methods e.g. motion, I/O, compute."""
+        """No-op stop for the HTTP API pass-through; always reports success."""
         return DriverResponse(
             response=DriverResponseType.success,
             message="no stop method for HTTP API pass-thru",
@@ -97,7 +133,7 @@ class NetbooterDriver(HelaoDriver):
         )
 
     def reset(self) -> DriverResponse:
-        """Reinitialize driver, force-close old connection if necessary."""
+        """No-op reset for the HTTP API pass-through; always reports success."""
         return DriverResponse(
             response=DriverResponseType.success,
             message="no reset method for HTTP API pass-thru",
@@ -105,7 +141,7 @@ class NetbooterDriver(HelaoDriver):
         )
 
     def disconnect(self) -> DriverResponse:
-        """Release connection to resource."""
+        """No-op disconnect for the HTTP API pass-through; always reports success."""
         return DriverResponse(
             response=DriverResponseType.success,
             message="no disconnection method for HTTP API pass-thru",

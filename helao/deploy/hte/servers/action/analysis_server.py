@@ -1,8 +1,11 @@
 # shell: uvicorn motion_server:app --reload
-"""Analysis server
+"""Analysis action server.
 
-The analysis server produces and uploads ESAMP-style analyses to S3 and API,
-it differs from calc_server.py which does not produce Analysis models.
+Wraps :class:`HelaoAnalysisSyncer` and exposes endpoints that compute
+ESAMP-style ``Analysis`` records (UVIS, ICPMS, XRFS) from prior HELAO
+sequences and synchronise them to S3 / the analysis API. Distinct from
+``calc_server`` which performs in-sequence calculations without producing
+:class:`Analysis` models.
 """
 
 __all__ = ["makeApp"]
@@ -21,7 +24,20 @@ from ...drivers.data.analysis_driver import (
 )
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the analysis FastAPI app.
+
+    Constructs a :class:`BaseAPI` backed by :class:`HelaoAnalysisSyncer` and
+    registers public action endpoints (``analyze_*``) as well as private
+    endpoints (``batch_calc_*``, ``list_running_tasks``, ``list_queued_tasks``)
+    used by the syncer.
+
+    Args:
+        server_key: Key identifying this server in the orchestration group.
+
+    Returns:
+        The configured :class:`BaseAPI` application.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -30,6 +46,7 @@ def makeApp(server_key):
         version=0.1,
         driver_classes=[HelaoAnalysisSyncer],
     )
+    app.driver: HelaoAnalysisSyncer  # type hint for driver attribute
 
     @app.post("/batch_calc_echeuvis", tags=["private"])
     async def batch_calc_echeuvis(
@@ -37,8 +54,8 @@ def makeApp(server_key):
         plate_id: Union[int, None] = None,
         recent: bool = True,
         params: dict = {},
-    ):
-        """Generates ECHEUVIS stability analyses from sequence_uuid."""
+    ) -> str:
+        """Generate ECHEUVIS stability analyses for actions in ``sequence_uuid``."""
         await app.driver.batch_calc_echeuvis(
             plate_id=plate_id,
             sequence_uuid=UUID(sequence_uuid),
@@ -53,8 +70,8 @@ def makeApp(server_key):
         plate_id: Union[int, None] = None,
         recent: bool = True,
         params: dict = {},
-    ):
-        """Generates dry UVIS-T analyses from sequence_uuid."""
+    ) -> Union[str, None]:
+        """Generate dry UVIS-T analyses for actions in ``sequence_uuid``."""
         await app.driver.batch_calc_dryuvis(
             plate_id=plate_id,
             sequence_uuid=UUID(sequence_uuid),
@@ -72,7 +89,11 @@ def makeApp(server_key):
         recent: bool = False,
         params: dict = {},
     ):
-        """Generates dry UVIS-T analyses from sequence_uuid."""
+        """Action endpoint: generate dry UVIS-T analyses for a prior sequence.
+
+        Wraps ``batch_calc_dryuvis`` inside an active action so the run is
+        recorded in HELAO's action history.
+        """
         active = await app.base.setup_and_contain_action()
 
         await app.driver.batch_calc_dryuvis(
@@ -93,7 +114,11 @@ def makeApp(server_key):
         recent: bool = False,
         params: dict = {},
     ):
-        """Generates ECHEUVIS stability analyses from sequence_uuid."""
+        """Action endpoint: generate ECHEUVIS stability analyses for a prior sequence.
+
+        Wraps ``batch_calc_echeuvis`` inside an active action so the run is
+        recorded in HELAO's action history.
+        """
         active = await app.base.setup_and_contain_action()
 
         await app.driver.batch_calc_echeuvis(
@@ -113,7 +138,10 @@ def makeApp(server_key):
         sequence_zip_path: str = "",
         params: dict = {},
     ):
-        """Generates ICPMS concentration analyses from sequence zip path."""
+        """Action endpoint: run a local ICPMS concentration analysis on a sequence zip.
+
+        Starts a :class:`LocalAnalysisExecutor` bound to :class:`IcpmsAnalysis`.
+        """
         active = await app.base.setup_and_contain_action()
 
         executor = LocalAnalysisExecutor(
@@ -129,7 +157,10 @@ def makeApp(server_key):
         sequence_zip_path: str = "",
         params: dict = {},
     ):
-        """Generates XRFS calibration analyses from sequence zip path."""
+        """Action endpoint: run a local XRFS calibration analysis on a sequence zip.
+
+        Starts a :class:`LocalAnalysisExecutor` bound to :class:`XrfsAnalysis`.
+        """
         active = await app.base.setup_and_contain_action()
 
         executor = LocalAnalysisExecutor(
@@ -139,11 +170,13 @@ def makeApp(server_key):
         return active_action_dict
 
     @app.post("/list_running_tasks", tags=["private"])
-    def list_current_tasks():
+    def list_current_tasks() -> list:
+        """Return identifiers of analysis tasks currently executing in the syncer."""
         return list(app.driver.running_tasks.keys())
 
     @app.post("/list_queued_tasks", tags=["private"])
-    def list_queued_tasks():
+    def list_queued_tasks() -> list:
+        """Return identifiers of analysis tasks queued but not yet running."""
         return list(app.driver.task_set)
 
     return app

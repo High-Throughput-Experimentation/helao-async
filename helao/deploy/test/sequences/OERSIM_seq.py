@@ -1,4 +1,4 @@
-"""Sequence library for CCSI"""
+"""Sequence library for the OER active-learning simulator."""
 
 __all__ = [
     "OERSIM_activelearn",
@@ -16,8 +16,23 @@ def OERSIM_activelearn(
     init_random_points: int = 5,
     stop_condition: str = "max_iters",  # {"none", "max_iters", "max_stdev", "max_ei"}
     thresh_value: Union[float, int] = 10,
-):
-    """Active-learning sequence using EI acquisition with various stop conditions."""
+) -> list:
+    """Plan one ``OERSIM_sub_activelearn`` experiment that self-requeues.
+
+    The single planned experiment uses Expected-Improvement acquisition and
+    inserts further copies of itself until the stop condition is met.
+
+    Args:
+        sequence_version: Library version tag.
+        init_random_points: Number of random initial compositions before the
+            first EI iteration on a fresh plate.
+        stop_condition: One of ``"none"``, ``"max_iters"``, ``"max_stdev"``,
+            ``"max_ei"``.
+        thresh_value: Threshold compared against the chosen stop condition.
+
+    Returns:
+        Planned experiments for the orchestrator to enqueue.
+    """
     epm = ExperimentPlanMaker()
     epm.add(
         "OERSIM_sub_activelearn",

@@ -1,8 +1,10 @@
 # shell: uvicorn motion_server:app --reload
-"""Spectrometer server
+"""FastAPI action server for the SM303 spectrometer.
 
-Spec server handles setup and configuration for spectrometer devices. Hardware triggers
-are the preferred method for synchronizing spectral capture with illumination source.
+Provides endpoints for single and averaged spectrum acquisition, intensity
+calibration that adjusts integration time toward a target peak window, and
+externally-triggered captures. Hardware triggers are the preferred method
+for synchronising spectral capture with an illumination source.
 """
 
 __all__ = ["makeApp"]
@@ -31,12 +33,21 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 async def sm303_dyn_endpoints(app: BaseAPI):
+    """Register SM303 spectrometer endpoints.
+
+    Disables concurrent actions on this server and attaches private and
+    action endpoints for wavelength retrieval, single/averaged acquisition,
+    intensity calibration, and external trigger control.
+
+    Args:
+        app: The :class:`BaseAPI` instance being configured.
+    """
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
 
     @app.post("/get_wl", tags=["private"])
     def get_wl():
-        """Return spectrometer wavelength array; shape = (num_pixels)"""
+        """Return the spectrometer wavelength array with shape ``(num_pixels,)``."""
         return app.driver.pxwl  # type: ignore
 
     @app.post(f"/{server_key}/acquire_spec", tags=["action"])
@@ -51,7 +62,23 @@ async def sm303_dyn_endpoints(app: BaseAPI):
             float
         ] = -1,  # measurements longer than HTTP timeout should use acquire_spec_extrig
     ):
-        """Acquire one or more spectrum if duration is positive."""
+        """Acquire one spectrum, optionally looping until ``duration_sec`` elapses.
+
+        Each spectrum is enqueued to the default data sink with the wavelength
+        array attached to the HLO header.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            int_time_ms: Integration time per spectrum in milliseconds.
+            duration_sec: Total acquisition window in seconds; non-positive
+                acquires a single spectrum. Long acquisitions should use
+                ``acquire_spec_extrig`` to avoid HTTP timeouts.
+
+        Returns:
+            The finished action dictionary.
+        """
         LOGGER.info("!!! Starting acquire_spec action.")
         spec_header = {"wl": app.driver.pxwl}  # type: ignore
         active = await app.base.setup_and_contain_action(
@@ -88,7 +115,27 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         peak_lower_wl: Optional[float] = None,
         peak_upper_wl: Optional[float] = None,
     ):
-        """Acquire N spectra and average."""
+        """Acquire averaged spectra with optional FFT smoothing.
+
+        Delegates to ``driver.acquire_spec_adv``, optionally repeating until
+        ``duration_sec`` elapses. The peak intensity in the optional
+        ``[peak_lower_wl, peak_upper_wl]`` window is recorded back into
+        ``action_params``.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            int_time_ms: Integration time per spectrum in milliseconds.
+            duration_sec: Total acquisition window in seconds.
+            n_avg: Number of acquisitions to average per output spectrum.
+            fft: FFT smoothing parameter forwarded to the driver.
+            peak_lower_wl: Lower wavelength bound for peak detection.
+            peak_upper_wl: Upper wavelength bound for peak detection.
+
+        Returns:
+            The finished action dictionary.
+        """
         spec_header = {"wl": app.driver.pxwl}
         active = await app.base.setup_and_contain_action(
             action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
@@ -124,7 +171,29 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         max_iters: int = 5,
         max_integration_time: int = 150,
     ):
-        """Calibrate integration time to achieve peak intensity window."""
+        """Iteratively adjust integration time until the peak falls in range.
+
+        Scales the integration time toward the centre of
+        ``[target_peak_min, target_peak_max]`` and re-acquires until the peak
+        intensity is in range, ``max_iters`` is reached, or the integration
+        time saturates at ``max_integration_time``. The final integration
+        time and peak intensity are written back to ``action_params``.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            int_time_ms: Initial integration time in milliseconds.
+            n_avg: Number of acquisitions averaged per iteration.
+            peak_lower_wl: Lower wavelength bound for peak detection.
+            peak_upper_wl: Upper wavelength bound for peak detection.
+            target_peak_min: Lower bound of the desired peak intensity window.
+            target_peak_max: Upper bound of the desired peak intensity window.
+            max_iters: Maximum number of adjustment iterations.
+            max_integration_time: Hard ceiling on integration time in ms.
+
+        Returns:
+            The finished action dictionary.
+        """
         spec_header = {"wl": app.driver.pxwl}
         active = await app.base.setup_and_contain_action(
             action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
@@ -185,7 +254,26 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         fft: int = 0,
         duration: float = -1,
     ):
-        """Acquire spectra based on external trigger."""
+        """Arm the spectrometer for externally triggered acquisitions.
+
+        The driver waits on the configured trigger edge and captures spectra
+        as triggers arrive; results are streamed through the driver's
+        internal active-action management.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            edge_mode: Trigger edge type used to gate acquisition.
+            int_time: Integration time per spectrum in milliseconds.
+            n_avg: Number of acquisitions averaged per output spectrum.
+            fft: FFT smoothing parameter forwarded to the driver.
+            duration: Total run duration in seconds; negative runs until
+                stopped.
+
+        Returns:
+            The active action dictionary returned by the driver.
+        """
         A = app.base.setup_action()
         A.action_abbr = "OPT"
         LOGGER.info("Setting up external trigger.")
@@ -199,14 +287,33 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         action_version: int = 1,
         delay: int = 0,
     ):
-        """Acquire spectra based on external trigger."""
+        """Schedule a delayed stop of any running external-trigger capture.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            delay: Seconds to wait before stopping the acquisition.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action()
         await app.driver.stop(delay=active.action.action_params["delay"])  # type: ignore
         finished_action = await active.finish()  # type: ignore
         return finished_action.as_dict()
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the BaseAPI app for the SM303 spectrometer.
+
+    Args:
+        server_key: Unique key identifying this server in the orchestration
+            group.
+
+    Returns:
+        The configured BaseAPI instance with spectrometer endpoints attached
+        via :func:`sm303_dyn_endpoints`.
+    """
 
     app = BaseAPI(
         server_key=server_key,

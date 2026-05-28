@@ -30,7 +30,21 @@ valid_data_status = (
 
 
 def async_partial(f, *args):
+    """Build an async wrapper that pre-binds ``args`` to ``f``.
+
+    The returned coroutine function accepts further positional arguments and
+    invokes ``f`` with the combined argument list, awaiting it when ``f`` is
+    itself a coroutine function.
+
+    Args:
+        f: Callable (sync or async) to be partially applied.
+        *args: Positional arguments bound ahead of any later call arguments.
+
+    Returns:
+        Coroutine function: ``async def`` wrapper around ``f``.
+    """
     async def f2(*args2):
+        """Inner coroutine that forwards ``args + args2`` to ``f``."""
         result = f(*args, *args2)
         if asyncio.iscoroutinefunction(f):
             result = await result
@@ -40,9 +54,46 @@ def async_partial(f, *args):
 
 
 class C_palvis:
-    """PAL/archive visualizer module class"""
+    """Bokeh visualizer for a PAL/archive sample server.
+
+    Polls the PAL server's ``list_new_samples`` private endpoint whenever
+    new data is observed on the ``ws_data`` WebSocket and renders one
+    Bokeh ``DataTable`` per sample type (solid, liquid, gas, assembly)
+    showing the newest entries.
+
+    Attributes:
+        vis: Host :class:`Vis` instance providing the Bokeh document.
+        config_dict: ``params`` block from the visualizer's server config.
+        max_width: Maximum layout width in pixels.
+        max_smps: Number of latest samples to request per type.
+        pal_key: Server key of the PAL action server.
+        palserv_config: Mapping with ``host``/``port`` for the PAL server.
+        palserv_host: PAL server hostname.
+        palserv_port: PAL server port.
+        data_url: Fully formed ``ws://`` URL for the data WebSocket.
+        IOloop_data_run: Liveness flag for the data ingestion task.
+        IOloop_stat_run: Liveness flag for the status ingestion task.
+        data_dict_keys: Column names rendered per sample table.
+        data_dict: Backing dict-of-dicts keyed by sample type.
+        datasource: :class:`ColumnDataSource` per sample type.
+        sample_tables: :class:`DataTable` per sample type.
+        layout: Composed Bokeh layout mounted on the document.
+        input_max_smps: Widget setting ``max_smps``.
+        inheritance_selector_group: Checkbox controlling the ``give_only``
+            filter on the PAL request.
+        inheritance_select: Cached active list of the inheritance selector.
+        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Wire up data sources, tables, widgets, and start the WS ingest task.
+
+        Args:
+            vis_serv: Host :class:`Vis` server providing the Bokeh document.
+            serv_key: Configuration key of the PAL action server. If the
+                server is not in the config, ``__init__`` returns early
+                without registering any roots.
+        """
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.max_width = 1024
@@ -182,12 +233,28 @@ class C_palvis:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def cleanup_session(self, session_context):
+        """Cancel the data ingest task when the Bokeh session is torn down.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.pal_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def callback_input_max_smps(self, attr, old, new, sender):
-        """callback for input_max_smps"""
+        """Validate the ``num latest samples`` input and refresh the tables.
+
+        Parses ``new`` as an int, stores it as ``self.max_smps``, refreshes
+        the widget value, and triggers :meth:`reset_plot` to re-query the
+        PAL server.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_int(val):
             try:
@@ -203,17 +270,38 @@ class C_palvis:
         self.reset_plot()
 
     def update_input_value(self, sender, value):
+        """Write ``value`` back onto a Bokeh input widget on the document thread.
+
+        Args:
+            sender: Bokeh input widget whose ``value`` is being updated.
+            value: New string value to assign.
+        """
         sender.value = value
 
     def update_inheritance_selector(self):
+        """Cache the current state of the ``give_only`` checkbox selector."""
         self.inheritance_select = self.inheritance_selector_group.active
 
     def callback_inheritance(self, attr, old, new, sender):
-        """callback for inheritance_select"""
+        """Sync the cached inheritance filter and reload sample tables.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Previous selection list.
+            new: Updated selection list.
+            sender: The checkbox group that emitted the change.
+        """
         self.vis.doc.add_next_tick_callback(partial(self.update_inheritance_selector))
         self.reset_plot()
 
     async def add_points(self):
+        """Query the PAL server for the newest samples and refresh every table.
+
+        Issues a ``list_new_samples`` private dispatch with the current
+        ``max_smps`` and inheritance filter, formats the creation timestamps
+        as human-readable strings, and assigns the resulting per-type lists
+        to each ``ColumnDataSource``.
+        """
         # pull latest sample lists from PAL server and populate self.datasource.data
         # keep global_label, sample_creation_timecode, comment, volume, ph, electrolyte
         resp, err = await async_private_dispatcher(
@@ -237,7 +325,15 @@ class C_palvis:
                 ]
                 self.datasource[smptype].data = self.data_dict[smptype]
 
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+    async def IOloop_data(self):
+        """Subscribe to the PAL data WebSocket and refresh tables on activity.
+
+        Connects directly with :mod:`websockets`, re-attempting up to five
+        times on connection failure with a one second back-off. Each frame
+        is parsed as a :class:`DataPackageModel`; if its status is in
+        ``valid_data_status`` the visualizer schedules an async
+        :meth:`add_points` call to pull the newest samples.
+        """
         LOGGER.info(f" ... PAL visualizer subscribing to: {self.data_url}")
         retry_limit = 5
         for _ in range(retry_limit):
@@ -269,5 +365,6 @@ class C_palvis:
                 break
 
     def reset_plot(self):
+        """Schedule a fresh PAL sample query on the next document tick."""
         # copy old data to "prev" plot
         self.vis.doc.add_next_tick_callback(partial(self.add_points))

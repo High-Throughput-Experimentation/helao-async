@@ -1,6 +1,10 @@
-"""
-Experiment library for ECHE+UVIS
-server_key must be a FastAPI action server defined in config
+"""Experiment library for the combined ECHE + UVIS station.
+
+Defines sub-experiments that build action lists for an orchestrator. Each
+function takes an ``Experiment`` and returns the list of actions to enqueue.
+Action targets are referenced by ``server_key`` strings (e.g. ``PSTAT``,
+``MOTOR``, ``KMOTOR``, ``IO``, ``SPEC_T``, ``SPEC_R``, ``PAL``, ``CAM``,
+``ANA``, ``ORCH``).
 """
 
 __all__ = [
@@ -64,16 +68,30 @@ TOGGLE_TRIGGERTYPE = TriggerType.risingedge
 # lowspec sequence: no XYZ; no pump
 
 
-def ECHEUVIS_sub_startup(experiment: Experiment):
-    """Unload custom position and enable IR emitter."""
+def ECHEUVIS_sub_startup(experiment: Experiment) -> list:
+    """Unload PAL custom position samples and enable the IR emitter.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
     apm.add(IO_server, "set_digital_out", {"do_item": "ir_emitter", "on": True})
     return apm.planned_actions  # returns complete action list to orch
 
 
-def ECHEUVIS_sub_shutdown(experiment: Experiment):
-    """Unload custom position and disable IR emitter."""
+def ECHEUVIS_sub_shutdown(experiment: Experiment) -> list:
+    """Unload PAL custom position samples and disable the IR emitter.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
     apm.add(IO_server, "set_digital_out", {"do_item": "ir_emitter", "on": False})
@@ -120,8 +138,56 @@ def ECHEUVIS_sub_CV_led(
     spec_n_avg: int = 10,
     spec_technique: str = "T_UVVIS",
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a CV experiment with hardware-triggered LED + spec triggering and spectroscopy.
+
+    Computes the CV total duration to default ``toggle_illum_time`` and
+    ``toggle2_time`` when they are ``-1``, programs a two-channel digital
+    cycle on the Galil IO, kicks off camera + spectrometer acquisitions
+    in parallel, and dispatches ``run_CV`` to the potentiostat.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Vinit_vsRHE: Initial CV potential vs RHE (V).
+        Vapex1_vsRHE: Apex 1 vs RHE (V).
+        Vapex2_vsRHE: Apex 2 vs RHE (V).
+        Vfinal_vsRHE: Final vs RHE (V).
+        scanrate_voltsec: Scan rate (V/s).
+        samplerate_sec: Acquisition interval (s).
+        cycles: CV cycle count.
+        gamry_i_range: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        solution_ph: Solution pH used for the Nernst conversion.
+        reservoir_electrolyte: ``Electrolyte`` enum label (informational).
+        reservoir_liquid_sample_no: Liquid sample number (informational).
+        solution_bubble_gas: Bubbled gas label (informational).
+        measurement_area: Droplet contact area (informational).
+        ref_electrode_type: Reference electrode label (informational).
+        ref_vs_nhe: Reference offset vs NHE (V).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Illumination toggle period (s).
+        toggle_illum_time: Total illumination duration (s); ``-1`` matches CV.
+        toggle2_source: IO output for the second toggle channel.
+        toggle2_init_delay: Initial delay for the second channel (s).
+        toggle2_duty: Duty cycle for the second channel.
+        toggle2_period: Period for the second channel (s).
+        toggle2_time: Total duration for the second channel; ``-1`` matches CV.
+        spec_int_time_ms: Spec integration time (ms).
+        spec_n_avg: Spec averaging count.
+        spec_technique: Spec technique key into ``SPECSRV_MAP``.
+        comment: Free-form comment (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -307,8 +373,47 @@ def ECHEUVIS_sub_CA_led(
     spec_n_avg: int = 10,
     spec_technique: str = "T_UVVIS",
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a CA experiment with hardware-triggered LED + spec triggering and spectroscopy.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CA_potential_vsRHE: Applied potential vs RHE (V).
+        solution_ph: Solution pH used for the Nernst conversion.
+        reservoir_electrolyte: ``Electrolyte`` enum label (informational).
+        reservoir_liquid_sample_no: Liquid sample number (informational).
+        solution_bubble_gas: Bubbled gas label (informational).
+        measurement_area: Droplet contact area (informational).
+        ref_electrode_type: Reference electrode label (informational).
+        ref_vs_nhe: Reference offset vs NHE (V).
+        samplerate_sec: Acquisition interval (s).
+        CA_duration_sec: CA duration (s).
+        gamry_i_range: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Illumination toggle period (s).
+        toggle_illum_time: Total illumination duration (s); ``-1`` matches CA.
+        toggle2_source: IO output for the second toggle channel.
+        toggle2_init_delay: Initial delay for the second channel (s).
+        toggle2_duty: Duty cycle for the second channel.
+        toggle2_period: Period for the second channel (s).
+        toggle2_time: Total duration for the second channel; ``-1`` matches CA.
+        spec_int_time_ms: Spec integration time (ms).
+        spec_n_avg: Spec averaging count.
+        spec_technique: Spec technique key into ``SPECSRV_MAP``.
+        comment: Free-form comment (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -489,8 +594,47 @@ def ECHEUVIS_sub_CP_led(
     spec_n_avg: int = 10,
     spec_technique: str = "T_UVVIS",
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a CP experiment with hardware-triggered LED + spec triggering and spectroscopy.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CP_current: Applied current (A).
+        solution_ph: Solution pH (informational here).
+        reservoir_electrolyte: ``Electrolyte`` enum label (informational).
+        reservoir_liquid_sample_no: Liquid sample number (informational).
+        solution_bubble_gas: Bubbled gas label (informational).
+        measurement_area: Droplet contact area (informational).
+        ref_electrode_type: Reference electrode label (informational).
+        ref_vs_nhe: Reference offset vs NHE (informational here).
+        samplerate_sec: Acquisition interval (s).
+        CP_duration_sec: CP duration (s).
+        gamry_i_range: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Illumination toggle period (s).
+        toggle_illum_time: Total illumination duration (s); ``-1`` matches CP.
+        toggle2_source: IO output for the second toggle channel.
+        toggle2_init_delay: Initial delay for the second channel (s).
+        toggle2_duty: Duty cycle for the second channel.
+        toggle2_period: Period for the second channel (s).
+        toggle2_time: Total duration for the second channel; ``-1`` matches CP.
+        spec_int_time_ms: Spec integration time (ms).
+        spec_n_avg: Spec averaging count.
+        spec_technique: Spec technique key into ``SPECSRV_MAP``.
+        comment: Free-form comment (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -634,7 +778,17 @@ def ECHEUVIS_sub_interrupt(
     experiment: Experiment,
     experiment_version: int = 1,
     reason: str = "wait",
-):
+) -> list:
+    """Emit a single orchestrator interrupt action with the given reason.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        reason: Human-readable reason string for the interrupt.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "interrupt", {"reason": reason})
     return apm.planned_actions
@@ -673,8 +827,46 @@ def ECHEUVIS_sub_OCV_led(
     spec_n_avg: int = 10,
     spec_technique: str = "T_UVVIS",
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run an OCV experiment with hardware-triggered LED + spec triggering and spectroscopy.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solution_ph: Solution pH (informational here).
+        reservoir_electrolyte: ``Electrolyte`` enum label (informational).
+        reservoir_liquid_sample_no: Liquid sample number (informational).
+        solution_bubble_gas: Bubbled gas label (informational).
+        measurement_area: Droplet contact area (informational).
+        ref_electrode_type: Reference electrode label (informational).
+        ref_vs_nhe: Reference offset vs NHE (informational here).
+        samplerate_sec: Acquisition interval (s).
+        OCV_duration_sec: OCV duration (s).
+        gamry_i_range: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Illumination toggle period (s).
+        toggle_illum_time: Total illumination duration (s); ``-1`` matches OCV.
+        toggle2_source: IO output for the second toggle channel.
+        toggle2_init_delay: Initial delay for the second channel (s).
+        toggle2_duty: Duty cycle for the second channel.
+        toggle2_period: Period for the second channel (s).
+        toggle2_time: Total duration for the second channel; ``-1`` matches OCV.
+        spec_int_time_ms: Spec integration time (ms).
+        spec_n_avg: Spec averaging count.
+        spec_technique: Spec technique key into ``SPECSRV_MAP``.
+        comment: Free-form comment (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -823,7 +1015,20 @@ def ECHEUVIS_sub_disengage(
     clear_ce: bool = False,
     z_height: float = 0,
     vent_wait: float = 10.0,
-):
+) -> list:
+    """Vent/pump the CE and WE chambers, lower Z to disengage, then turn vent and pumps off.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        clear_we: Run the WE chamber vent + pump.
+        clear_ce: Run the CE chamber vent + pump.
+        z_height: Absolute Z position to lower to (mm).
+        vent_wait: Vent/pump-on duration before lowering (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     for clear_flag, items in (
         (clear_ce, ("ce_vent", "ce_pump")),
@@ -863,7 +1068,23 @@ def ECHEUVIS_sub_engage(
     calibrate_intensity: bool = False,
     max_integration_time: int = 150,
     illumination_source: str = "doric_wled",
-):
+) -> list:
+    """Raise Z to engage, pull electrolyte through WE/CE chambers, optionally calibrate the spec.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        flow_we: Flow the WE chamber.
+        flow_ce: Flow the CE chamber.
+        z_height: Absolute Z position to raise to (mm).
+        fill_wait: Time to run the high-speed flow (s).
+        calibrate_intensity: Run a spec intensity calibration when True.
+        max_integration_time: Maximum integration time for the calibration (ms).
+        illumination_source: IO output name driving the LED during calibration.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     # raise z (engage)
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
@@ -938,7 +1159,20 @@ def ECHEUVIS_analysis_stability(
     plate_id: int = 0,
     recent: bool = True,
     params: dict = {},
-):
+) -> list:
+    """Dispatch an ECHE+UVIS stability analysis action to the analysis server.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        sequence_uuid: UUID of the sequence to analyze.
+        plate_id: Plate identifier.
+        recent: Operate on the most recent sequence when True.
+        params: Additional parameters forwarded to ``analyze_echeuvis``.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
         ANA_server,

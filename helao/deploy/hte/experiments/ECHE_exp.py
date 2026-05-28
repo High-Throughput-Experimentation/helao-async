@@ -1,6 +1,9 @@
-"""
-Experiment library for ECHE
-server_key must be a FastAPI action server defined in config
+"""Experiment library for the ECHE station.
+
+Defines sub-experiments that build action lists for an orchestrator. Each
+function takes an ``Experiment`` and returns the list of actions to enqueue.
+Action targets are referenced by ``server_key`` strings (e.g. ``PSTAT``,
+``MOTOR``, ``IO``, ``PAL``, ``ORCH``).
 """
 
 __all__ = [
@@ -59,8 +62,15 @@ PAL_server = MachineModel(
 toggle_triggertype = TriggerType.fallingedge
 
 
-def ECHE_sub_unloadall_customs(experiment: Experiment):
-    """last functionality test: -"""
+def ECHE_sub_unloadall_customs(experiment: Experiment) -> list:
+    """Unload every sample from PAL custom positions and destroy any tracked liquid.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -83,7 +93,20 @@ def ECHE_sub_add_liquid(
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "O2",
     liquid_volume_ml: float = 1.0,
-):
+) -> list:
+    """Add liquid (combined + diluted) to the ECHE cell position.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_custom_position: PAL custom position name.
+        reservoir_liquid_sample_no: Liquid sample number in the reservoir.
+        solution_bubble_gas: Bubbler-gas label passed to PAL.
+        liquid_volume_ml: Volume to add (mL).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
@@ -114,8 +137,19 @@ def ECHE_sub_load_solid(
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
-):
-    """last functionality test: -"""
+) -> list:
+    """Load a legacy solid plate sample into a PAL custom position.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_custom_position: PAL custom position name.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -147,9 +181,22 @@ def ECHE_sub_startup(
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "N2",
     liquid_volume_ml: float = 1.0,
-):
-    """Sub experiment
-    last functionality test: -"""
+) -> list:
+    """Unload customs, load a solid sample, add liquid, then move to that sample.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_custom_position: PAL custom position name.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+        reservoir_liquid_sample_no: Liquid sample number in the reservoir.
+        solution_bubble_gas: Bubbler-gas label passed to PAL.
+        liquid_volume_ml: Liquid volume to add (mL).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -208,10 +255,15 @@ def ECHE_sub_startup(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def ECHE_sub_shutdown(experiment: Experiment):
-    """Sub experiment
+def ECHE_sub_shutdown(experiment: Experiment) -> list:
+    """Unload all samples from PAL custom positions.
 
-    last functionality test: -"""
+    Args:
+        experiment: Orchestrator-provided experiment context.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -248,8 +300,40 @@ def ECHE_sub_CA_led(
     toggle_illum_period: float = 2.0,
     toggle_illum_time: float = -1,
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a CA experiment with hardware-triggered LED toggling.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CA_potential: Applied potential before reference correction (V).
+        potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        ref_offset__V: Calibration offset of the reference electrode (V).
+        solution_ph: Solution pH used for the Nernst conversion.
+        reservoir_electrolyte: ``Electrolyte`` enum label (informational).
+        reservoir_liquid_sample_no: Liquid sample number (informational).
+        solution_bubble_gas: Bubbled gas label (informational).
+        measurement_area: Droplet contact area (informational).
+        samplerate_sec: Acquisition interval (s).
+        CA_duration_sec: CA duration (s).
+        gamry_i_range: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Illumination toggle period (s).
+        toggle_illum_time: Total illumination duration (s); ``-1`` matches CA.
+        comment: Free-form comment (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -336,7 +420,18 @@ def ECHE_sub_OCV(
     experiment_version: int = 1,
     Tval__s: float = 1,
     SampleRate: float = 0.05,
-):
+) -> list:
+    """Run an OCV experiment and store the mean final Ewe to ``HISPEC_OCV`` globals.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Tval__s: OCV duration (s).
+        SampleRate: Acquisition interval (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
         PAL_server,
@@ -379,8 +474,19 @@ def ECHE_sub_preCV(
     CA_potential: float = 0.0,  # need to get from CV initial
     samplerate_sec: float = 0.05,
     CA_duration_sec: float = 3,  # adjustable pre_CV time
-):
-    """last functionality test: 11/29/2021"""
+) -> list:
+    """Run a short CA pre-conditioning step before a CV.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CA_potential: Applied potential (V).
+        samplerate_sec: Acquisition interval (s).
+        CA_duration_sec: Pre-CV CA duration (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -437,8 +543,29 @@ def ECHE_sub_CA(
     CA_duration_sec: float = 60,
     gamry_i_range: str = "auto",
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a CA experiment without illumination.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CA_potential: Applied potential before reference correction (V).
+        potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        ref_offset__V: Calibration offset of the reference electrode (V).
+        solution_ph: Solution pH used for the Nernst conversion.
+        reservoir_electrolyte: ``Electrolyte`` enum label (informational).
+        reservoir_liquid_sample_no: Liquid sample number (informational).
+        solution_bubble_gas: Bubbled gas label (informational).
+        measurement_area: Droplet contact area (informational).
+        samplerate_sec: Acquisition interval (s).
+        CA_duration_sec: CA duration (s).
+        gamry_i_range: Gamry current-range setting.
+        comment: Free-form comment (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -530,8 +657,47 @@ def ECHE_sub_CV_led(
     toggle_illum_period: float = 2.0,
     toggle_illum_time: float = -1,
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a CV experiment with hardware-triggered LED toggling.
+
+    Computes the CV total duration from the four vertices and ``cycles`` to
+    default ``toggle_illum_time`` when it is ``-1``, programs the Galil
+    digital cycle, dispatches ``run_CV``, and stops the digital cycle.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Vinit_vsRHE: Initial CV potential vs RHE (V).
+        Vapex1_vsRHE: Apex 1 vs RHE (V).
+        Vapex2_vsRHE: Apex 2 vs RHE (V).
+        Vfinal_vsRHE: Final vs RHE (V).
+        scanrate_voltsec: Scan rate (V/s).
+        samplerate_sec: Acquisition interval (s).
+        cycles: CV cycle count.
+        gamry_i_range: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        solution_ph: Solution pH used for the Nernst conversion.
+        reservoir_electrolyte: ``Electrolyte`` enum label (informational).
+        reservoir_liquid_sample_no: Liquid sample number (informational).
+        solution_bubble_gas: Bubbled gas label (informational).
+        measurement_area: Droplet contact area (informational).
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        ref_offset__V: Calibration offset of the reference electrode (V).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Illumination toggle period (s).
+        toggle_illum_time: Total illumination duration (s); ``-1`` matches CV.
+        comment: Free-form comment (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -649,8 +815,32 @@ def ECHE_sub_CV(
     ref_type: str = "inhouse",
     ref_offset__V: float = 0.0,
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a CV experiment without illumination.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Vinit_vsRHE: Initial CV potential vs RHE (V).
+        Vapex1_vsRHE: Apex 1 vs RHE (V).
+        Vapex2_vsRHE: Apex 2 vs RHE (V).
+        Vfinal_vsRHE: Final vs RHE (V).
+        scanrate_voltsec: Scan rate (V/s).
+        samplerate_sec: Acquisition interval (s).
+        cycles: CV cycle count.
+        gamry_i_range: Gamry current-range setting.
+        solution_ph: Solution pH used for the Nernst conversion.
+        reservoir_electrolyte: ``Electrolyte`` enum label (informational).
+        reservoir_liquid_sample_no: Liquid sample number (informational).
+        solution_bubble_gas: Bubbled gas label (informational).
+        measurement_area: Droplet contact area (informational).
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        ref_offset__V: Calibration offset of the reference electrode (V).
+        comment: Free-form comment (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -722,8 +912,28 @@ def ECHE_sub_CP(
     CP_duration_sec: float = 60,
     gamry_i_range: str = "auto",
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a CP experiment without illumination.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CP_current: Applied current (A).
+        solution_ph: Solution pH (informational here).
+        reservoir_electrolyte: ``Electrolyte`` enum label (informational).
+        reservoir_liquid_sample_no: Liquid sample number (informational).
+        solution_bubble_gas: Bubbled gas label (informational).
+        measurement_area: Droplet contact area (informational).
+        ref_type: Reference electrode label (informational).
+        ref_offset__V: Reference offset (informational here).
+        samplerate_sec: Acquisition interval (s).
+        CP_duration_sec: CP duration (s).
+        gamry_i_range: Gamry current-range setting.
+        comment: Free-form comment (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -794,8 +1004,39 @@ def ECHE_sub_CP_led(
     toggle_illum_period: float = 2.0,
     toggle_illum_time: float = -1,
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a CP experiment with hardware-triggered LED toggling.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CP_current: Applied current (A).
+        solution_ph: Solution pH (informational here).
+        reservoir_electrolyte: ``Electrolyte`` enum label (informational).
+        reservoir_liquid_sample_no: Liquid sample number (informational).
+        solution_bubble_gas: Bubbled gas label (informational).
+        measurement_area: Droplet contact area (informational).
+        ref_type: Reference electrode label (informational).
+        ref_offset__V: Reference offset (informational here).
+        samplerate_sec: Acquisition interval (s).
+        CP_duration_sec: CP duration (s).
+        gamry_i_range: Gamry current-range setting.
+        gamrychannelwait: TTL channel to wait on (-1 disables).
+        gamrychannelsend: TTL channel to send on (-1 disables).
+        illumination_source: IO output name driving the LED.
+        illumination_wavelength: LED wavelength (nm).
+        illumination_intensity: LED intensity setting.
+        illumination_intensity_date: Provenance date string for intensity.
+        illumination_side: ``"front"`` or ``"back"``.
+        toggle_dark_time_init: Initial dark delay (s).
+        toggle_illum_duty: Illumination duty cycle.
+        toggle_illum_period: Illumination toggle period (s).
+        toggle_illum_time: Total illumination duration (s); ``-1`` matches CP.
+        comment: Free-form comment (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -869,9 +1110,18 @@ def ECHE_sub_movetosample(
     experiment_version: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
-):
-    """Sub experiment
-    last functionality test: -"""
+) -> list:
+    """Resolve plate XY for a sample and move there in platexy frame.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -911,9 +1161,18 @@ def ECHE_sub_rel_move(
     experiment_version: int = 1,
     offset_x_mm: float = 1.0,
     offset_y_mm: float = 1.0,
-):
-    """Sub experiment
-    last functionality test: -"""
+) -> list:
+    """Move X/Y by relative offsets (platexy transformation).
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        offset_x_mm: Relative X displacement (mm).
+        offset_y_mm: Relative Y displacement (mm).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 

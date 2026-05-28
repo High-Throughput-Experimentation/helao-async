@@ -1,4 +1,10 @@
-"""Sequence library for CCSI"""
+"""Sequence library for CCSI (CO2 capture / sorbent infrastructure).
+
+Each public ``CCSI_*`` function builds an experiment list via
+``ExperimentPlanMaker``. Sequences chain initialization, headspace purges,
+clean injects, KOH/co2 testing routines, and shutdown sub-experiments from
+the CCSI experiment library.
+"""
 
 __all__ = [
     # "CCSI_initialization_bysteps",
@@ -48,7 +54,36 @@ def CCSI_initialization(
     clean_injects: bool = True,
     drainrecirc: bool = True,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Run the CCSI gas-stream initialization purges.
+
+    Performs the main headspace/aux probe/PCO2 sensor purges, a dilution-and-measure step, optional clean injects, optional cell fill check, and the final shutdown.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        added clean inject/made cleaninjects optional
+    headspace_purge_cycles: Parameter passed through to the sub-experiments.
+        HSpurge1_duration: Parameter passed through to the sub-experiments.
+        Manpurge1_duration: Parameter passed through to the sub-experiments.
+        Alphapurge1_duration: Parameter passed through to the sub-experiments.
+        Probepurge1_duration: Parameter passed through to the sub-experiments.
+        Sensorpurge1_duration: Parameter passed through to the sub-experiments.
+        DeltaDilute1_duration: Parameter passed through to the sub-experiments.
+        HSpurge_duration: Parameter passed through to the sub-experiments.
+        CO2measure_duration: Parameter passed through to the sub-experiments.
+        CO2measure_acqrate: Parameter passed through to the sub-experiments.
+        CO2threshold: Parameter passed through to the sub-experiments.
+        Syringe_rate_ulsec: Parameter passed through to the sub-experiments.
+        LiquidCleanWait_s: Parameter passed through to the sub-experiments.
+        use_co2_check: Parameter passed through to the sub-experiments.
+        need_fill: Parameter passed through to the sub-experiments.
+        clean_injects: Parameter passed through to the sub-experiments.
+        drainrecirc: Parameter passed through to the sub-experiments.
+        recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -673,7 +708,39 @@ def CCSI_Solution_testing(  # assumes initialization performed previously
     drainrecirc: bool = True,
     recirculation_rate_uL_min: int = 10000,
     need_fill: bool = False,
-):
+) -> list:
+    """Solution-testing protocol with co2 monitoring and clean cycles.
+
+    Cleans the cell, fills the syringe, then iterates over ``Solution_volume_ul`` running fills, CO2 measurements, headspace purges, and clean injects.
+
+    Args:
+        Solution_volume_ul: Parameter passed through to the sub-experiments.
+        Solution_reservoir_sample_no: Parameter passed through to the sub-experiments.
+        Solution_name: Parameter passed through to the sub-experiments.
+        total_sample_volume_ul: Parameter passed through to the sub-experiments.
+        Clean_reservoir_sample_no: Parameter passed through to the sub-experiments.
+        syringe_rate_ulsec: Parameter passed through to the sub-experiments.
+        LiquidFillWait_s: Parameter passed through to the sub-experiments.
+        co2measure_duration: Parameter passed through to the sub-experiments.
+        co2measure_acqrate: Parameter passed through to the sub-experiments.
+        drainclean_volume_ul: Parameter passed through to the sub-experiments.
+        headspace_purge_cycles: Parameter passed through to the sub-experiments.
+        headspace_co2measure_duration: Parameter passed through to the sub-experiments.
+        clean_co2measure_duration: Parameter passed through to the sub-experiments.
+        SamplePurge_duration: Parameter passed through to the sub-experiments.
+        LiquidCleanPurge_duration: Parameter passed through to the sub-experiments.
+        clean_co2_ppm_thresh: Parameter passed through to the sub-experiments.
+        max_repeats: Parameter passed through to the sub-experiments.
+        purge_if: Parameter passed through to the sub-experiments.
+        HSpurge_duration: Parameter passed through to the sub-experiments.
+        DeltaDilute1_duration: Parameter passed through to the sub-experiments.
+        drainrecirc: Parameter passed through to the sub-experiments.
+        recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
+        need_fill: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
     # for _ in range(initcleans):
@@ -1007,7 +1074,90 @@ def CCSI_Solution_co2maintainconcentration(  # assumes initialization performed 
     max_repeats: int = 5,
     purge_if: Union[str, float] = "above",
     temp_monitor_time: int = 0,
-):
+) -> list:
+    """Maintain a target CO2 concentration during solution testing.
+
+    Loop variant of :func:`CCSI_Solution_testing` that re-injects when the CO2 signal drifts outside the configured bounds.
+
+    Args:
+        10 co2check cleans: Parameter passed through to the sub-experiments.
+        11 initialization included 13 measure delay
+    #                   v 14: Parameter passed through to the sub-experiments.
+        list for solution/total sample volumes+ extra clean 15 added rinses/16agitation
+    #                   17 repeat cleans/rinses/flushes
+    #                   18 water injection options
+    #                   19 co2 measurement duration now list for flexibility
+    #                   20 renaming water addition to secondliquid // adding secondliquid prerinse #21 second liquid rinse volume
+    initial_gas_sample_no: Parameter passed through to the sub-experiments.
+        pureco2_sample_no: Parameter passed through to the sub-experiments.
+        Solution_volume_ul: Parameter passed through to the sub-experiments.
+        Solution_reservoir_sample_no: Parameter passed through to the sub-experiments.
+        Solution_name: Parameter passed through to the sub-experiments.
+        total_sample_volume_ul: Parameter passed through to the sub-experiments.
+        total_cell_volume_ul: Parameter passed through to the sub-experiments.
+        secondliquid_injection: Parameter passed through to the sub-experiments.
+        secondliquid_injection_before_IL: Parameter passed through to the sub-experiments.
+        secondliquid_injection_reservoir_sample_no: Parameter passed through to the sub-experiments.
+        secondliquid_injection_syringe_rate_ulsec: Parameter passed through to the sub-experiments.
+        secondliquid_injection_volume_ul: Parameter passed through to the sub-experiments.
+        secondliquid_injection_FillWait: Parameter passed through to the sub-experiments.
+        Clean_reservoir_sample_no: Parameter passed through to the sub-experiments.
+        Clean_syringe_rate_ulsec: Parameter passed through to the sub-experiments.
+        Clean_FillWait_s: Parameter passed through to the sub-experiments.
+        syringe_rate_ulsec: Parameter passed through to the sub-experiments.
+        LiquidFillWait_s: Parameter passed through to the sub-experiments.
+        SyringePushWait_s: Parameter passed through to the sub-experiments.
+        n2_push: Parameter passed through to the sub-experiments.
+        co2_filltime_s: Parameter passed through to the sub-experiments.
+        co2measure_duration: Parameter passed through to the sub-experiments.
+        co2measure_acqrate: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flowramp_sccm: Parameter passed through to the sub-experiments.
+        target_co2_ppm: Parameter passed through to the sub-experiments.
+        maintain_fill_freq_s: Parameter passed through to the sub-experiments.
+        recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
+        clean_recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
+        drainrecirc: Parameter passed through to the sub-experiments.
+        SamplePurge_duration: Parameter passed through to the sub-experiments.
+        recirculation_duration: Parameter passed through to the sub-experiments.
+        drainclean_volume_ul: Parameter passed through to the sub-experiments.
+        n2flowrate_sccm: Parameter passed through to the sub-experiments.
+        perform_init: Parameter passed through to the sub-experiments.
+        fixed_flushes: Parameter passed through to the sub-experiments.
+        LiquidClean_rinse_agitation: Parameter passed through to the sub-experiments.
+        LiquidClean_rinse_agitation_wait: Parameter passed through to the sub-experiments.
+        LiquidClean_rinse_agitation_duration: Parameter passed through to the sub-experiments.
+        LiquidClean_rinse_agitation_rate: Parameter passed through to the sub-experiments.
+        rinsePurge_duration: Parameter passed through to the sub-experiments.
+        secondary_prerinse_cycles: Parameter passed through to the sub-experiments.
+        secondary_prerinse_volume: Parameter passed through to the sub-experiments.
+        rinse_recirc: Parameter passed through to the sub-experiments.
+        rinsePurge_recirc_duration: Parameter passed through to the sub-experiments.
+        LiquidCleanPurge_duration: Parameter passed through to the sub-experiments.
+        LiquidCleanPurge_recirc_duration: Parameter passed through to the sub-experiments.
+        FlushPurge_duration: Parameter passed through to the sub-experiments.
+        flush_Manpurge1_duration: Parameter passed through to the sub-experiments.
+        flush_Alphapurge1_duration: Parameter passed through to the sub-experiments.
+        flush_Probepurge1_duration: Parameter passed through to the sub-experiments.
+        flush_Sensorpurge1_duration: Parameter passed through to the sub-experiments.
+        init_HSpurge1_duration: Parameter passed through to the sub-experiments.
+        init_Manpurge1_duration: Parameter passed through to the sub-experiments.
+        init_Alphapurge1_duration: Parameter passed through to the sub-experiments.
+        init_Probepurge1_duration: Parameter passed through to the sub-experiments.
+        init_Sensorpurge1_duration: Parameter passed through to the sub-experiments.
+        init_DeltaDilute1_duration: Parameter passed through to the sub-experiments.
+        init_HSpurge_duration: Parameter passed through to the sub-experiments.
+        use_co2_check: Parameter passed through to the sub-experiments.
+        check_co2measure_duration: Parameter passed through to the sub-experiments.
+        clean_co2_ppm_thresh: Parameter passed through to the sub-experiments.
+        clean_co2measure_delay: Parameter passed through to the sub-experiments.
+        max_repeats: Parameter passed through to the sub-experiments.
+        purge_if: Parameter passed through to the sub-experiments.
+        temp_monitor_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
     for i, solnvolume in enumerate(Solution_volume_ul):
@@ -1271,7 +1421,60 @@ def CCSI_cleancycles(
     max_repeats: int = 5,
     purge_if: Union[str, float] = "above",
     temp_monitor_time: int = 0,
-):
+) -> list:
+    """Repeat clean-inject cycles N times with optional headspace purges.
+
+    Useful as a standalone cell-cleaning routine between long campaigns.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        drain_first: Parameter passed through to the sub-experiments.
+        prerinse_cleans: Parameter passed through to the sub-experiments.
+        LiquidClean_full_rinses: Parameter passed through to the sub-experiments.
+        perform_init: Parameter passed through to the sub-experiments.
+        fixed_flushes: Parameter passed through to the sub-experiments.
+        Clean_syringe_rate_ulsec: Parameter passed through to the sub-experiments.
+        Clean_FillWait_s: Parameter passed through to the sub-experiments.
+        co2measure_acqrate: Parameter passed through to the sub-experiments.
+        recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
+        clean_recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
+        drainrecirc: Parameter passed through to the sub-experiments.
+        SamplePurge_duration: Parameter passed through to the sub-experiments.
+        recirculation_duration: Parameter passed through to the sub-experiments.
+        drainclean_volume_ul: Parameter passed through to the sub-experiments.
+        n2flowrate_sccm: Parameter passed through to the sub-experiments.
+        LiquidClean_rinse_agitation: Parameter passed through to the sub-experiments.
+        LiquidClean_rinse_agitation_wait: Parameter passed through to the sub-experiments.
+        LiquidClean_rinse_agitation_duration: Parameter passed through to the sub-experiments.
+        LiquidClean_rinse_agitation_rate: Parameter passed through to the sub-experiments.
+        rinsePurge_duration: Parameter passed through to the sub-experiments.
+        rinse_recirc: Parameter passed through to the sub-experiments.
+        rinsePurge_recirc_duration: Parameter passed through to the sub-experiments.
+        LiquidCleanPurge_duration: Parameter passed through to the sub-experiments.
+        LiquidCleanPurge_recirc_duration: Parameter passed through to the sub-experiments.
+        FlushPurge_duration: Parameter passed through to the sub-experiments.
+        flush_Manpurge1_duration: Parameter passed through to the sub-experiments.
+        flush_Alphapurge1_duration: Parameter passed through to the sub-experiments.
+        flush_Probepurge1_duration: Parameter passed through to the sub-experiments.
+        flush_Sensorpurge1_duration: Parameter passed through to the sub-experiments.
+        init_HSpurge1_duration: Parameter passed through to the sub-experiments.
+        init_Manpurge1_duration: Parameter passed through to the sub-experiments.
+        init_Alphapurge1_duration: Parameter passed through to the sub-experiments.
+        init_Probepurge1_duration: Parameter passed through to the sub-experiments.
+        init_Sensorpurge1_duration: Parameter passed through to the sub-experiments.
+        init_DeltaDilute1_duration: Parameter passed through to the sub-experiments.
+        init_HSpurge_duration: Parameter passed through to the sub-experiments.
+        use_co2_check: Parameter passed through to the sub-experiments.
+        check_co2measure_duration: Parameter passed through to the sub-experiments.
+        clean_co2_ppm_thresh: Parameter passed through to the sub-experiments.
+        clean_co2measure_delay: Parameter passed through to the sub-experiments.
+        max_repeats: Parameter passed through to the sub-experiments.
+        purge_if: Parameter passed through to the sub-experiments.
+        temp_monitor_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1427,7 +1630,35 @@ def CCSI_Solution_testing_fixed_cleans(  # assumes initialization performed prev
     cleanloops: int = 2,
     initcleans: int = 2,
     drainrecirc: bool = True,
-):
+) -> list:
+    """Solution-testing protocol with a fixed number of clean injections.
+
+    Same general flow as :func:`CCSI_Solution_testing` but uses a fixed clean-cycle count instead of CO2-threshold based decisions.
+
+    Args:
+        Solution_volume_ul: Parameter passed through to the sub-experiments.
+        Solution_reservoir_sample_no: Parameter passed through to the sub-experiments.
+        Solution_name: Parameter passed through to the sub-experiments.
+        total_sample_volume_ul: Parameter passed through to the sub-experiments.
+        Clean_reservoir_sample_no: Parameter passed through to the sub-experiments.
+        syringe_rate_ulsec: Parameter passed through to the sub-experiments.
+        LiquidFillWait_s: Parameter passed through to the sub-experiments.
+        co2measure_duration: Parameter passed through to the sub-experiments.
+        co2measure_acqrate: Parameter passed through to the sub-experiments.
+        drainclean_volume_ul: Parameter passed through to the sub-experiments.
+        headspace_purge_cycles: Parameter passed through to the sub-experiments.
+        headspace_co2measure_duration: Parameter passed through to the sub-experiments.
+        clean_co2measure_duration: Parameter passed through to the sub-experiments.
+        LiquidCleanPurge_duration: Parameter passed through to the sub-experiments.
+        HSpurge_duration: Parameter passed through to the sub-experiments.
+        DeltaDilute1_duration: Parameter passed through to the sub-experiments.
+        cleanloops: Parameter passed through to the sub-experiments.
+        initcleans: Parameter passed through to the sub-experiments.
+        drainrecirc: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
     for _ in range(initcleans):
@@ -1568,7 +1799,38 @@ def CCSI_priming(  # assumes initialization performed previously
     drainrecirc: bool = True,
     recirculation_rate_uL_min: int = 10000,
     need_fill: bool = False,
-):
+) -> list:
+    """Prime the CCSI fluidic system with the working solution.
+
+    Fills syringes and runs forward/reverse recirculation steps to remove air and seat the seals before measurements begin.
+
+    Args:
+        Solution_volume_ul: Parameter passed through to the sub-experiments.
+        Solution_reservoir_sample_no: Parameter passed through to the sub-experiments.
+        Solution_name: Parameter passed through to the sub-experiments.
+        total_sample_volume_ul: Parameter passed through to the sub-experiments.
+        Clean_reservoir_sample_no: Parameter passed through to the sub-experiments.
+        syringe_rate_ulsec: Parameter passed through to the sub-experiments.
+        LiquidFillWait_s: Parameter passed through to the sub-experiments.
+        co2measure_duration: Parameter passed through to the sub-experiments.
+        co2measure_acqrate: Parameter passed through to the sub-experiments.
+        drainclean_volume_ul: Parameter passed through to the sub-experiments.
+        headspace_purge_cycles: Parameter passed through to the sub-experiments.
+        headspace_co2measure_duration: Parameter passed through to the sub-experiments.
+        clean_co2measure_duration: Parameter passed through to the sub-experiments.
+        LiquidCleanPurge_duration: Parameter passed through to the sub-experiments.
+        clean_co2_ppm_thresh: Parameter passed through to the sub-experiments.
+        max_repeats: Parameter passed through to the sub-experiments.
+        purge_if: Parameter passed through to the sub-experiments.
+        HSpurge_duration: Parameter passed through to the sub-experiments.
+        DeltaDilute1_duration: Parameter passed through to the sub-experiments.
+        drainrecirc: Parameter passed through to the sub-experiments.
+        recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
+        need_fill: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
     for solnvolume in Solution_volume_ul:

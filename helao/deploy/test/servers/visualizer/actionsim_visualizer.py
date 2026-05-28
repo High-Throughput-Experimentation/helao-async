@@ -1,3 +1,10 @@
+"""Bokeh application that mounts per-server CP visualizers.
+
+Scans the loaded config for action servers whose ``fast`` key matches
+``cpsim_server`` and instantiates an :class:`oersim_vis.C_oersimvis`
+visualizer for each one, attached to the Bokeh document.
+"""
+
 __all__ = ["makeBokehApp"]
 
 import os
@@ -19,7 +26,15 @@ else:
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:
-    """finds server name for a given fast driver"""
+    """Return action-server names whose ``fast``/``demo`` key matches ``fast_key``.
+
+    Args:
+        vis: Visualizer context exposing the loaded ``world_cfg``.
+        fast_key: Action-server module name to match.
+
+    Returns:
+        List of ``(server_name, sorted_params)`` tuples.
+    """
     server_names = []
     for server_name, server_config in vis.world_cfg["servers"].items():
         if server_config.get("fast", server_config.get("demo", "")) == fast_key:
@@ -29,7 +44,20 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
 
 
 def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
+    """Build the action-simulator Bokeh app.
 
+    Adds a header to the document and instantiates an OER CP visualizer
+    against every ``cpsim_server`` action server in the loaded config.
+
+    Args:
+        doc: Bokeh document to attach to.
+        confPrefix: Config prefix used to launch the group.
+        server_key: This visualizer's server name in the config.
+        helao_repo_root: Repository root path.
+
+    Returns:
+        The same Bokeh document with the layout attached.
+    """
     app = HelaoVis(
         server_key=server_key,
         doc=doc,

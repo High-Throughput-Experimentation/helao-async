@@ -1,3 +1,11 @@
+"""Local-zip XRF spectroscopy quantification analysis.
+
+Reads XRF count files from a sequence zip, looks up the matching
+calibration library (by voltage, current and spot size), fits a
+per-transition OLS model relating element density to counts, and emits
+atomic-fraction figures of merit per sample via :class:`XrfsAnalysis`.
+"""
+
 import os
 import re
 import sys
@@ -24,12 +32,29 @@ CM_SCALE = {"nm": 1e-7, "um": 1e-4, "mm": 0.1, "cm": 1}
 
 
 class XrfsInputs(AnalysisInput):
+    """Process/action pair backing a single XRF analysis.
+
+    Attributes:
+        xrfs: Process row carrying the XRF metadata.
+        xrfs_act: Action row whose HLO holds the count spectra.
+        global_sample_label: Solid-sample global label discovered in
+            the process file list.
+        process_params: ``process_params`` dict from the process row
+            (used to look up spot size, voltage and current).
+    """
+
     xrfs: HelaoProcess
     xrfs_act: HelaoAction
     global_sample_label: str
     process_params: dict
 
     def __init__(self, process_uuid: UUID, local_loader: LocalLoader):
+        """Locate the XRF process and the action that produced its counts.
+
+        Args:
+            process_uuid: Target process UUID inside the zip.
+            local_loader: Zip-backed :class:`LocalLoader`.
+        """
         self.xrfs = local_loader.get_prc(
             local_loader.processes.query("process_uuid==@process_uuid").index[0]
         )
@@ -60,9 +85,11 @@ class XrfsInputs(AnalysisInput):
 
     @property
     def counts(self):
+        """Loaded HLO payload for the XRF action."""
         return self.xrfs_act.hlo
 
     def get_datamodels(self, *args, **kwargs) -> List[AnalysisDataModel]:
+        """Return a one-element list describing the XRF count file."""
         filename, filetype, datakeys = self.xrfs_act.hlo_file_tup_type(
             "xrfcount_helao__file"
         )
@@ -79,6 +106,20 @@ class XrfsInputs(AnalysisInput):
 
 
 class XrfsOutputs(AnalysisOutput):
+    """XRF quantification payload emitted by :class:`XrfsAnalysis`.
+
+    Attributes:
+        element: Element symbols per row.
+        transition: Transition labels (``"<el>.<line>"``) per row.
+        counts: Raw counts per row.
+        nanomoles: Nanomoles per row (over the spot area).
+        nanomoles_2sig: 2-sigma uncertainty on ``nanomoles``.
+        nanomoles_per_cm2: Areal density per row.
+        atomic_fraction: Per-row atomic fraction renormalised over
+            ``norm_elements`` (NaN for transitions outside that set).
+        global_sample_label: Solid sample under analysis.
+    """
+
     element: list
     transition: list
     counts: list
@@ -90,7 +131,14 @@ class XrfsOutputs(AnalysisOutput):
 
 
 class XrfsAnalysis(BaseAnalysis):
-    """XRF quantification with calibration standards."""
+    """XRF quantification with per-acquisition calibration libraries.
+
+    Attributes:
+        inputs: Resolved :class:`XrfsInputs`.
+        outputs: Populated :class:`XrfsOutputs` after
+            :meth:`calc_output`.
+        global_sample_label: Solid sample under analysis.
+    """
 
     inputs: XrfsInputs
     outputs: XrfsOutputs
@@ -102,6 +150,15 @@ class XrfsAnalysis(BaseAnalysis):
         local_loader: LocalLoader,
         analysis_params: dict,
     ):
+        """Build inputs and generate the analysis UUID.
+
+        Args:
+            process_uuid: Target XRF process UUID.
+            local_loader: Zip-backed :class:`LocalLoader`.
+            analysis_params: Optional overrides; supports
+                ``norm_elements``, ``calibration_file_path`` and
+                ``force_latest_calibration``.
+        """
         self.analysis_name = "XRFS_quantification_analysis"
         self.analysis_timestamp = datetime.now()
         self.analysis_params = analysis_params
@@ -123,8 +180,20 @@ class XrfsAnalysis(BaseAnalysis):
         self.global_sample_label = self.inputs.global_sample_label
         self.analysis_uuid = self.gen_uuid(self.inputs.global_sample_label)
 
-    def calc_output(self):
-        """Calculate stability FOMs and intermediate vectors."""
+    def calc_output(self) -> bool:
+        """Quantify each transition against the chosen calibration library.
+
+        Locates a calibration CSV matching the run's
+        ``voltage_kv``/``current_ma``/``spot_size`` (preferring the
+        latest one older than the data, unless
+        ``force_latest_calibration`` is set), fits an OLS model per
+        transition to predict ug/cm^2 from counts, converts to
+        nanomoles using the spot area, and computes atomic fractions
+        over the requested ``norm_elements``.
+
+        Returns:
+            ``True`` once :attr:`outputs` has been populated.
+        """
 
         _, hlo_data = self.inputs.counts
         hlo_els = hlo_data["element"]

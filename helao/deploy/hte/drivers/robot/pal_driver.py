@@ -1,3 +1,16 @@
+"""PAL liquid-handler robot driver.
+
+Implements the :class:`PAL` driver that builds joblists from one or more
+``microcam`` definitions, dispatches them to the PAL program (locally or via
+SSH/Cygwin to a remote host), monitors NI-DAQ trigger lines for start/
+continue/done events, and reconciles the resulting sample movements against
+the archive's sample database.
+
+Also defines the Pydantic models used to describe positions, micro-cams and
+full cam jobs (:class:`PALposition`, :class:`PalAction`, :class:`PalMicroCam`,
+:class:`PalCam`).
+"""
+
 # TODO: for NH3 synthesis experiment, add option run PAL commands locally instead of ssh
 
 __all__ = ["Spacingmethod", "PALtools", "PALposition", "PAL", "GCsampletype"]
@@ -51,11 +64,30 @@ from nidaqmx.constants import LineGrouping
 
 
 class _palcmd(BaseModel):
+    """Single ``/loadmethod`` entry forwarded to the PAL program.
+
+    Attributes:
+        method: Path to the ``.cam`` method file.
+        params: Semicolon-separated parameter string for the method.
+    """
+
     method: str = ""
     params: str = ""
 
 
 class PALposition(BaseModel, HelaoDict):
+    """Source or destination position resolved against the archive.
+
+    Attributes:
+        position: Position kind (custom name or ``tray``).
+        samples_initial: Samples present in the position before the action.
+        samples_final: Samples present in the position after the action.
+        tray: Tray index when ``position`` is a tray.
+        slot: Slot index within the tray.
+        vial: Vial index within the slot.
+        error: Result of position checks.
+    """
+
     position: Optional[str] = None  # dest can be cust. or tray
     samples_initial: List[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
@@ -74,6 +106,21 @@ class PALposition(BaseModel, HelaoDict):
 
 
 class PalAction(BaseModel, HelaoDict):
+    """One concrete execution of a microcam, capturing samples and trigger times.
+
+    Attributes:
+        samples_in: Resolved input samples for this run.
+        samples_out: Output samples (initially references; resolved when stored).
+        dest: Final destination position descriptor.
+        source: Final source position descriptor.
+        dilute: Per-input flag indicating whether the sample is being diluted.
+        dilute_type: Sample type associated with each dilution entry.
+        samples_in_delta_vol_ml: Volume change in mL applied to each input sample.
+        start_time: PAL ``start`` trigger timestamp.
+        continue_time: PAL ``continue`` trigger timestamp.
+        done_time: PAL ``done`` trigger timestamp.
+    """
+
     samples_in: List[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])
@@ -104,6 +151,25 @@ class PalAction(BaseModel, HelaoDict):
 
 
 class PalMicroCam(BaseModel, HelaoDict):
+    """A single PAL method invocation, optionally repeated.
+
+    Attributes:
+        method: Name of the ``CAMS`` member to invoke.
+        tool: PAL tool string (e.g. ``"LS 1"``).
+        volume_ul: Aspirate/dispense volume in microliters.
+        requested_dest: Caller-supplied destination position.
+        requested_source: Caller-supplied source position.
+        wash1: Whether to perform wash stage 1 after the action.
+        wash2: Whether to perform wash stage 2.
+        wash3: Whether to perform wash stage 3.
+        wash4: Whether to perform wash stage 4.
+        path_methodfile: Resolved absolute path to the method ``.cam`` file.
+        rshs_pal_logfile: Path of the PAL auxiliary log file.
+        cam: Resolved :class:`_cam` descriptor for the method.
+        repeat: Number of additional repeats beyond the first run.
+        run: Per-repeat list of :class:`PalAction` results.
+    """
+
     # scalar values which are the same for each repetition of the PAL method
     method: Optional[str] = None  # name of methods
     tool: Optional[str] = None
@@ -127,6 +193,23 @@ class PalMicroCam(BaseModel, HelaoDict):
 
 
 class PalCam(BaseModel, HelaoDict):
+    """Composite PAL job: a list of microcams executed ``totalruns`` times.
+
+    Attributes:
+        samples_in: Input samples carried at the job level.
+        samples_out: Output samples accumulated from microcams.
+        microcams: Ordered list of :class:`PalMicroCam` invocations.
+        totalruns: Number of full repetitions of the microcam list.
+        sampleperiod: Per-run scheduling offsets in seconds.
+        spacingmethod: Spacing strategy across runs.
+        spacingfactor: Factor for geometric spacing.
+        timeoffset: Offset (s) subtracted from the requested per-run delay.
+        cur_run: Current run index during execution.
+        joblist: Internal list of ``/loadmethod`` PAL commands.
+        joblist_time: Timestamp when the joblist was submitted.
+        aux_output_filepath: Path used for the PAL auxiliary log.
+    """
+
     samples_in: List[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])
@@ -149,7 +232,22 @@ class PalCam(BaseModel, HelaoDict):
 
 
 class PAL:
+    """Driver for the PAL liquid-handler robot.
+
+    Initialization opens the archive sample database, reads SSH and NI-DAQ
+    trigger settings from configuration, builds the in-memory ``CAMS`` table
+    from cam-file paths, and spawns ``_PAL_IOloop`` which awaits job
+    submissions. Hardware triggers (``start``, ``continue``, ``done``) are
+    optionally read via NI-DAQmx when ``dev_trigger`` is ``"NImax"``.
+    """
+
     def __init__(self, action_serv: Base):
+        """Configure SSH/trigger ports, build the CAM table, and start the IO loop.
+
+        Args:
+            action_serv: Action server providing the configuration dict and
+                world configuration used to bootstrap the archive driver.
+        """
 
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
@@ -251,7 +349,16 @@ class PAL:
         self.IO_trigger_continueq = asyncio.Queue()
         self.IO_trigger_doneq = asyncio.Queue()
 
-    def check_tool(self, req_tool=None):
+    def check_tool(self, req_tool=None) -> Optional[str]:
+        """Resolve a tool name or value to its canonical :class:`PALtools` value.
+
+        Args:
+            req_tool: Either a ``PALtools`` member name (e.g. ``"LS1"``) or
+                its associated value (e.g. ``"LS 1"``).
+
+        Returns:
+            Canonical value string, or ``None`` if ``req_tool`` is unknown.
+        """
         names = [e.name for e in PALtools]
         vals = [e.value for e in PALtools]
         idx = None
@@ -266,16 +373,27 @@ class PAL:
             return PALtools(vals[idx]).value
 
     def set_IO_signalq_nowait(self, val: bool) -> None:
+        """Push ``val`` onto the IO signal queue without awaiting, discarding any pending value.
+
+        Args:
+            val: ``True`` to request a measurement, ``False`` to stop.
+        """
         if self.IO_signalq.full():
             _ = self.IO_signalq.get_nowait()
         self.IO_signalq.put_nowait(val)
 
     async def set_IO_signalq(self, val: bool) -> None:
+        """Async counterpart of :meth:`set_IO_signalq_nowait` that awaits queue space.
+
+        Args:
+            val: Signal value to enqueue.
+        """
         if self.IO_signalq.full():
             _ = await self.IO_signalq.get()
         await self.IO_signalq.put(val)
 
     async def _clear_trigger_qs(self):
+        """Drain the start/continue/done trigger queues, logging any stale entries."""
         while not self.IO_trigger_startq.empty():
             timecode = await self.IO_trigger_startq.get()
             LOGGER.error(f"startq was not empty: '{timecode}'")
@@ -287,6 +405,7 @@ class PAL:
             LOGGER.error(f"doneq was not empty: '{timecode}'")
 
     async def _poll_trigger_task(self):
+        """Poll NI-DAQ trigger lines while measuring and post rising edges to the queues."""
         prev_start = False
         prev_continue = False
         prev_done = False
@@ -353,7 +472,19 @@ class PAL:
             LOGGER.error(f"_poll_trigger_task excited with error: {repr(e), tb,}")
 
     async def _sendcommand_main(self, palcam: PalCam) -> ErrorCodes:
-        """PAL takes liquid from sample_in and puts it in sample_out"""
+        """Run a full PAL job: pre-checks, joblist submission, and per-microcam updates.
+
+        For every microcam and each of its runs this method waits for the
+        three PAL triggers, refreshes input/output samples from the archive
+        database, writes the corresponding HLO row, and updates archive
+        position state.
+
+        Args:
+            palcam: Job descriptor with resolved microcams.
+
+        Returns:
+            :class:`ErrorCodes` representing the final outcome of the job.
+        """
         error = ErrorCodes.none
 
         # check if we have free vial slots
@@ -662,6 +793,18 @@ class PAL:
         int,
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
     ]:
+        """Locate the next full vial after a given tray/slot/vial.
+
+        Args:
+            after_tray: Tray index to search after.
+            after_slot: Slot index to search after.
+            after_vial: Vial index to search after.
+
+        Returns:
+            Tuple ``(error, tray, slot, vial, sample)``. Position fields are
+            ``None`` and ``sample`` is a :class:`NoneSample` if no vial is
+            available.
+        """
         error = ErrorCodes.none
         tray_pos = None
         slot_pos = None
@@ -710,7 +853,15 @@ class PAL:
     async def _sendcommand_check_source_tray(
         self, microcam: PalMicroCam
     ) -> PALposition:
-        """checks for a valid sample in tray source position"""
+        """Return the tray-source :class:`PALposition`, with an error if no sample.
+
+        Args:
+            microcam: Microcam carrying the requested tray/slot/vial.
+
+        Returns:
+            Resolved :class:`PALposition` whose ``error`` indicates whether
+            a sample was found.
+        """
         source = (
             _positiontype.tray
         )  # should be the same as microcam.requested_source.position
@@ -742,7 +893,11 @@ class PAL:
     async def _sendcommand_check_source_custom(
         self, microcam: PalMicroCam
     ) -> PALposition:
-        """checks for a valid sample in custom source position"""
+        """Return the custom-source :class:`PALposition`, with an error if no sample.
+
+        Args:
+            microcam: Microcam carrying the requested custom position name.
+        """
         source = microcam.requested_source.position  # custom position name
 
         if source is None:
@@ -767,15 +922,22 @@ class PAL:
     async def _sendcommand_check_source_next_empty(
         self, microcam: PalMicroCam
     ) -> PALposition:
-        """source can never be empty, throw an error"""
+        """Reject ``next_empty_vial`` as a PAL source position.
+
+        Args:
+            microcam: Unused; included for signature parity with siblings.
+        """
         LOGGER.error("PAL_source: PAL source cannot be 'next_empty_vial'")
         return PALposition(error=ErrorCodes.not_available)
 
     async def _sendcommand_check_source_next_full(
         self, microcam: PalMicroCam
     ) -> PALposition:
-        """find the next full vial in a tray AFTER the requested
-        source position"""
+        """Find the next full vial after the requested tray/slot/vial source.
+
+        Args:
+            microcam: Microcam carrying the requested tray-relative cursor.
+        """
 
         source = _positiontype.tray
         (
@@ -809,11 +971,19 @@ class PAL:
         )
 
     async def _sendcommand_check_source(self, microcam: PalMicroCam) -> ErrorCodes:
-        """Checks if a sample is present in the source position.
-        An error is returned if no sample is found.
-        Else the sample in the source postion is added to sample in.
-        'Inheritance' and 'status' are set later when the destination
-        is determined."""
+        """Resolve the source position and append a :class:`PalAction` run entry.
+
+        Dispatches to the position-specific source checker based on
+        ``microcam.cam.source``, sets the resolved tray/slot/vial back on
+        ``microcam.requested_source``, and records the source sample on the
+        microcam's runs list.
+
+        Args:
+            microcam: Microcam whose source is being validated.
+
+        Returns:
+            ``ErrorCodes.none`` on success, otherwise the relevant error.
+        """
 
         palposition = PALposition()
 
@@ -898,7 +1068,16 @@ class PAL:
         PALposition,
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
-        """checks for a valid sample in tray destination position"""
+        """Resolve a tray destination, creating a new sample ref if the vial is empty.
+
+        Args:
+            microcam: Microcam carrying the requested tray/slot/vial dest.
+
+        Returns:
+            Tuple ``(palposition, samples_out_list)`` where ``samples_out_list``
+            contains the newly created reference sample (or is empty if the
+            vial already held a sample and is being diluted).
+        """
         samples_out_list: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
@@ -988,7 +1167,18 @@ class PAL:
         PALposition,
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
-        """checks for a valid sample in custom destination position"""
+        """Resolve a custom destination, creating a new sample, diluting, or assembling.
+
+        Handles the cases where the destination is empty, holds an assembly,
+        holds the same sample type (dilute), or holds a different type
+        (create an assembly when allowed).
+
+        Args:
+            microcam: Microcam carrying the requested custom destination name.
+
+        Returns:
+            Tuple of the resolved :class:`PALposition` and the new output samples.
+        """
         samples_out_list: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
@@ -1260,7 +1450,11 @@ class PAL:
         PALposition,
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
-        """find the next empty vial in a tray"""
+        """Find the next empty vial with enough volume capacity and create a sample ref.
+
+        Args:
+            microcam: Microcam supplying the volume requirement.
+        """
         samples_out_list: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
@@ -1330,8 +1524,11 @@ class PAL:
         PALposition,
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
-        """find the next full vial in a tray AFTER the requested
-        destination position"""
+        """Find the next full vial after the requested tray cursor as the destination.
+
+        Args:
+            microcam: Microcam carrying the requested tray-relative cursor.
+        """
         samples_out_list: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
@@ -1398,11 +1595,19 @@ class PAL:
         )
 
     async def _sendcommand_check_dest(self, microcam: PalMicroCam) -> ErrorCodes:
-        """Checks if the destination position is empty or contains a sample.
-        If it finds a sample, it either creates an assembly or
-        will dilute it (if liquid is added to liquid).
-        If no sample is found it will create a reference sample of the
-        correct type."""
+        """Resolve the destination position and update the microcam's run entry.
+
+        Dispatches to the destination-specific checker based on
+        ``microcam.cam.dest``, marks samples as destroyed when the
+        destination is configured as destructive, and accumulates input
+        inheritance/status for samples not already assigned.
+
+        Args:
+            microcam: Microcam whose destination is being validated.
+
+        Returns:
+            ``ErrorCodes.none`` on success.
+        """
 
         samples_out_list: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
@@ -1483,6 +1688,17 @@ class PAL:
         return ErrorCodes.none
 
     async def _sendcommand_prechecks(self, palcam: PalCam) -> ErrorCodes:
+        """Build the PAL joblist by validating source/dest of every microcam.
+
+        Also creates the PAL auxiliary log file via the active action and
+        records resolved cam descriptors on each microcam.
+
+        Args:
+            palcam: Job descriptor being prepared.
+
+        Returns:
+            ``ErrorCodes.none`` on success or the first failure encountered.
+        """
         error = ErrorCodes.none
         palcam.joblist = []
 
@@ -1570,6 +1786,18 @@ class PAL:
         return error
 
     async def _sendcommand_triggerwait(self, palaction: PalAction) -> ErrorCodes:
+        """Wait for PAL ``start``, ``continue``, and ``done`` triggers in sequence.
+
+        Each wait is bounded by ``self.timeout``. ``start_time``,
+        ``continue_time`` and ``done_time`` are populated on ``palaction``.
+
+        Args:
+            palaction: Current execution to annotate with trigger timestamps.
+
+        Returns:
+            ``ErrorCodes.none``, or one of the ``*_timeout`` codes if a
+            trigger does not arrive in time.
+        """
         error = ErrorCodes.none
         # only wait if triggers are configured
         if not self.triggers:
@@ -1616,10 +1844,28 @@ class PAL:
         return error
 
     async def _sendcommand_write_local_rshs_aux_header(self, auxheader, output_file):
+        """Asynchronously create or overwrite the auxiliary log with the column header.
+
+        Args:
+            auxheader: Header string to write.
+            output_file: Path of the auxiliary log file.
+        """
         async with aiofiles.open(output_file, mode="w+") as f:
             await f.write(auxheader)
 
     async def _sendcommand_submitjoblist_helper(self, palcam: PalCam) -> ErrorCodes:
+        """Kill any running PAL instance and submit the joblist locally or via SSH.
+
+        Selects the local or Cygwin/SSH submission path based on
+        ``self.sshhost`` and starts ``_poll_trigger_task`` to monitor the
+        hardware triggers.
+
+        Args:
+            palcam: Job descriptor whose ``joblist`` will be dispatched.
+
+        Returns:
+            ``ErrorCodes.none`` on success or an SSH/CMD error code on failure.
+        """
 
         error = ErrorCodes.none
         # kill PAL if program is open
@@ -1753,6 +1999,12 @@ class PAL:
     async def _sendcommand_check_for_assemblytypes(
         self, sample_type: str, assembly: AssemblySample
     ) -> bool:
+        """Return whether ``assembly`` already contains a part of ``sample_type``.
+
+        Args:
+            sample_type: Sample type to search for.
+            assembly: Assembly whose ``parts`` are inspected.
+        """
         for part in assembly.parts:
             if part.sample_type == sample_type:
                 return True
@@ -1761,6 +2013,19 @@ class PAL:
     async def _sendcommand_update_archive_helper(
         self, palaction: PalAction
     ) -> ErrorCodes:
+        """Push final source/dest samples for ``palaction`` back into the archive.
+
+        Resolves ``samples_final`` against the unified sample DB (or the
+        last sample in ``samples_out`` for unassigned reference samples) and
+        updates tray or custom position entries accordingly.
+
+        Args:
+            palaction: Finished execution to write back.
+
+        Returns:
+            ``ErrorCodes.none`` on success or ``ErrorCodes.not_available``
+            if an archive update fails.
+        """
 
         # update source and dest final samples
         palaction.source.samples_final = await self.archive.unified_db.get_samples(
@@ -1829,8 +2094,16 @@ class PAL:
         return error
 
     async def _sendcommand_update_sample_volume(self, palaction: PalAction) -> None:
-        """updates sample volume only for input (sample_in)
-        samples, output (sample_out) are always new samples"""
+        """Apply per-input dilution volumes to input samples (or assembly parts).
+
+        Output samples are skipped because they are always created fresh by
+        the PAL action.
+
+        Args:
+            palaction: Execution carrying ``samples_in`` and the parallel
+                ``dilute``, ``dilute_type`` and ``samples_in_delta_vol_ml``
+                lists.
+        """
         if len(palaction.samples_in_delta_vol_ml) != len(palaction.samples_in):
             LOGGER.error("len(samples_in) != len(delta_vol)")
             return
@@ -1857,7 +2130,19 @@ class PAL:
                 )
 
     async def _init_PAL_IOloop(self, A: Action, palcam: PalCam) -> dict:
-        """initializes the main PAL IO loop after an action was submitted"""
+        """Validate state and tools, create the active action, and signal the IO loop.
+
+        Returns immediately with an error-carrying dict if the PAL is busy,
+        in estop, or no SSH host is configured. Otherwise it stores ``palcam``
+        on ``self.IO_palcam`` and pushes ``True`` into the IO signal queue.
+
+        Args:
+            A: HELAO action carrying ``error_code``.
+            palcam: Job descriptor to execute.
+
+        Returns:
+            Dict representation of the active (or failed) action.
+        """
         activeDict = {}
         try:
             if (
@@ -1924,9 +2209,12 @@ class PAL:
         return activeDict
 
     async def _PAL_IOloop(self) -> None:
-        """This is the main dispatch loop for the PAL.
-        Its start when self.IO_do_meas is set to True
-        and works on the current content of self.IO_palcam."""
+        """Long-running task that schedules ``totalruns`` of ``IO_palcam``.
+
+        Waits for ``IO_do_meas``, applies the configured spacing method
+        between runs, calls :meth:`_sendcommand_main` for each run, and
+        clears trigger tasks on completion.
+        """
         self.IOloop_run = True
         while self.IOloop_run:
             try:
@@ -2050,8 +2338,7 @@ class PAL:
                 LOGGER.error("_PAL_IOloop failed", exc_info=True)
 
     async def _PAL_IOloop_meas_start_helper(self) -> None:
-        """sets active object and
-        checks samples_in"""
+        """Finalize the HLO header and refresh ``samples_in`` from the archive."""
         self.IO_action_run_counter = 0
 
         LOGGER.info(f"Active action uuid is {self.active.action.action_uuid}")
@@ -2069,8 +2356,7 @@ class PAL:
         )
 
     async def _PAL_IOloop_meas_end_helper(self) -> None:
-        """resets all IO variables
-        and updates exp samples in and out"""
+        """Wait for the PAL process to exit, cancel trigger task, and finish the action."""
 
         if self.PAL_pid is not None:
             LOGGER.info("waiting for PAL pid to finish")
@@ -2106,11 +2392,17 @@ class PAL:
             _ = await last_active.finish()
 
     async def method_arbitrary(self, A: Action) -> dict:
+        """Run a PAL job whose :class:`PalCam` is supplied directly via action params.
+
+        Args:
+            A: Action whose ``action_params`` is unpacked into :class:`PalCam`.
+        """
         palcam = PalCam(**A.action_params)
         palcam.samples_in = A.samples_in
         return await self._init_PAL_IOloop(A=A, palcam=palcam)
 
     async def method_transfer_tray_tray(self, A: Action) -> dict:
+        """Transfer liquid between two tray vials using the ``transfer_tray_tray`` cam."""
         palcam = PalCam(
             samples_in=A.samples_in,
             totalruns=len(A.action_params.get("sampleperiod", [])),
@@ -2154,6 +2446,7 @@ class PAL:
         )
 
     async def method_transfer_custom_tray(self, A: Action) -> dict:
+        """Transfer liquid from a custom position into a tray vial."""
         palcam = PalCam(
             samples_in=A.samples_in,
             totalruns=len(A.action_params.get("sampleperiod", [])),
@@ -2194,6 +2487,7 @@ class PAL:
         )
 
     async def method_transfer_tray_custom(self, A: Action) -> dict:
+        """Transfer liquid from a tray vial to a custom position."""
         palcam = PalCam(
             samples_in=A.samples_in,
             totalruns=len(A.action_params.get("sampleperiod", [])),
@@ -2234,6 +2528,7 @@ class PAL:
         )
 
     async def method_transfer_custom_custom(self, A: Action) -> dict:
+        """Transfer liquid between two custom positions."""
         palcam = PalCam(
             samples_in=A.samples_in,
             totalruns=len(A.action_params.get("sampleperiod", [])),
@@ -2271,6 +2566,7 @@ class PAL:
         )
 
     async def method_archive(self, A: Action) -> dict:
+        """Archive a sample from a custom position into the next empty tray vial."""
         palcam = PalCam(
             samples_in=A.samples_in,
             totalruns=len(A.action_params.get("sampleperiod", [])),
@@ -2361,6 +2657,7 @@ class PAL:
     #     )
 
     async def method_deepclean(self, A: Action) -> dict:
+        """Run the PAL ``deepclean`` cam with all four wash stages enabled by default."""
         palcam = PalCam(
             samples_in=A.samples_in,
             totalruns=1,
@@ -2446,6 +2743,11 @@ class PAL:
     #     )
 
     async def method_injection_tray_GC(self, A: Action) -> dict:
+        """Inject a tray sample into the GC, optionally starting the GC method.
+
+        The action parameter ``startGC`` selects between ``start`` and ``wait``
+        cam variants for the configured ``sampletype`` (gas or liquid).
+        """
         start = A.action_params.get("startGC", "start")
 
         if start == True:
@@ -2497,6 +2799,7 @@ class PAL:
         )
 
     async def method_injection_custom_GC(self, A: Action) -> dict:
+        """Inject a custom-position sample into the GC, optionally starting the GC method."""
         start = A.action_params.get("startGC", None)
 
         if start == True:
@@ -2545,6 +2848,7 @@ class PAL:
         )
 
     async def method_injection_tray_HPLC(self, A: Action) -> dict:
+        """Inject a tray sample into the HPLC."""
         palcam = PalCam(
             samples_in=A.samples_in,
             totalruns=1,
@@ -2585,6 +2889,7 @@ class PAL:
         )
 
     async def method_injection_custom_HPLC(self, A: Action) -> dict:
+        """Inject a custom-position sample into the HPLC."""
         palcam = PalCam(
             samples_in=A.samples_in,
             totalruns=1,
@@ -2622,6 +2927,7 @@ class PAL:
         )
 
     async def method_ANEC_GC(self, A: Action) -> dict:
+        """ANEC GC injection: wait at Injector 2 then start at Injector 1."""
         palcam = PalCam(
             samples_in=A.samples_in,
             totalruns=1,
@@ -2680,6 +2986,7 @@ class PAL:
         )
 
     async def method_ANEC_aliquot(self, A: Action) -> dict:
+        """ANEC GC injection followed by an archival aliquot from the same source."""
         palcam = PalCam(
             samples_in=A.samples_in,
             totalruns=1,
@@ -2754,6 +3061,7 @@ class PAL:
         )
 
     def shutdown(self):
+        """Cancel any active job, stop the IO loop, and wait for the active action to clear."""
         LOGGER.info("shutting down pal")
         self.set_IO_signalq_nowait(False)
         retries = 0
@@ -2767,13 +3075,22 @@ class PAL:
         self.IOloop_run = False
 
     async def stop(self):
-        """stops measurement, writes all data and returns from meas loop"""
+        """Stop the current measurement loop by signalling ``False`` on the IO queue."""
         # turn off cell and run before stopping meas loop
         if self.IO_do_meas:
             await self.set_IO_signalq(False)
 
-    async def estop(self, switch: bool, *args, **kwargs):
-        """same as estop, but also sets flag"""
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Toggle the emergency stop flag and abort any active PAL action.
+
+        Args:
+            switch: Truthy to engage estop, falsy to clear.
+            *args: Unused positional args.
+            **kwargs: Unused keyword args.
+
+        Returns:
+            Coerced boolean form of ``switch``.
+        """
         switch = bool(switch)
         self.base.actionservermodel.estop = switch
         if self.IO_do_meas:
@@ -2784,7 +3101,7 @@ class PAL:
         return switch
 
     async def kill_PAL(self) -> ErrorCodes:
-        """kills PAL program if its still open"""
+        """Terminate any running PAL software process (locally or on the SSH host)."""
         error_code = ErrorCodes.none
         LOGGER.info("killing PAL")
 
@@ -2801,6 +3118,12 @@ class PAL:
         return error_code
 
     async def kill_PAL_cygwin(self) -> bool:
+        """Kill the PAL Windows process via SSH/Cygwin ``taskkill``.
+
+        Returns:
+            ``ErrorCodes.none`` on success, ``ErrorCodes.ssh_error`` if SSH
+            command execution fails.
+        """
         ssh_connected = False
         while not ssh_connected:
             try:
@@ -2838,6 +3161,12 @@ class PAL:
         return ErrorCodes.none
 
     async def kill_PAL_local(self) -> bool:
+        """Terminate any local ``PAL*`` processes found via ``psutil``.
+
+        Returns:
+            ``ErrorCodes.none`` on success or ``ErrorCodes.critical_error``
+            if a process could not be terminated after three attempts.
+        """
         pyPids = {
             p.pid: p
             for p in psutil.process_iter(["name"])

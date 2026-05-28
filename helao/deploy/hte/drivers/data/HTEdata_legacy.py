@@ -1,3 +1,10 @@
+"""Thin wrapper around :class:`HTEPlateAPI` for the HTE data action server.
+
+Exposes the subset of legacy plate-database queries (platemap, info,
+print/anneal records) used by the HTE deployment, delegating each call
+to a shared :class:`helao.core.drivers.data.HTEPlateAPI` instance.
+"""
+
 __all__ = ["HTEdata"]
 
 # import os
@@ -106,37 +113,59 @@ from helao.core.drivers.data import HTEPlateAPI
 
 
 class HTEdata:
+    """Driver wrapper exposing legacy HTE plate-database queries.
+
+    Holds a reference to the owning action server and a single
+    :class:`HTEPlateAPI` instance, then proxies plate-info lookups so
+    they can be served from FastAPI endpoints.
+    """
+
     def __init__(self, action_serv: Base):
+        """Capture the action server and build the underlying plate API.
+
+        Args:
+            action_serv: The hosting :class:`Base` action server, used
+                for access to its ``server_cfg`` ``params`` dict.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
 
         self.dataAPI = HTEPlateAPI()
 
     def get_platexycalibration(self, plateid: int, *args, **kwargs):
+        """Return the stored XY calibration for ``plateid`` (stub, returns ``None``)."""
         return None
 
     def save_platexycalibration(self, plateid: int, *args, **kwargs):
+        """Persist an XY calibration for ``plateid`` (stub, returns ``None``)."""
         return None
 
     def get_rcp_plateid(self, plateid: int, *args, **kwargs):
+        """Return the run-config (``.rcp``) record for ``plateid``."""
         return self.dataAPI.get_rcp_plateid(plateid)
 
     def get_info_plateid(self, plateid: int, *args, **kwargs):
+        """Return the info-file contents associated with ``plateid``."""
         return self.dataAPI.get_info_plateid(plateid)
 
     def check_annealrecord_plateid(self, plateid: int, *args, **kwargs):
+        """Check whether ``plateid`` has an anneal record on disk."""
         return self.dataAPI.check_annealrecord_plateid(plateid)
 
     def check_printrecord_plateid(self, plateid: int, *args, **kwargs):
+        """Check whether ``plateid`` has a print record on disk."""
         return self.dataAPI.check_printrecord_plateid(plateid)
 
     def check_plateid(self, plateid: int, *args, **kwargs):
+        """Check that ``plateid`` exists in the plate database."""
         return self.dataAPI.check_plateid(plateid)
 
     def get_platemap_plateid(self, plateid: int, *args, **kwargs):
+        """Return the parsed platemap rows for ``plateid``."""
         return self.dataAPI.get_platemap_plateid(plateid)
 
     def get_elements_plateid(self, plateid: int, *args, **kwargs) -> list:
+        """Return the element list for ``plateid`` using screening-print defaults."""
         return self.dataAPI.get_elements_plateid(
             plateid=plateid,
             multielementink_concentrationinfo_bool=False,

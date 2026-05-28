@@ -1,10 +1,17 @@
-"""A device class for the SprintIR-6S CO2 sensor."""
+"""SprintIR-6S CO2 sensor driver.
+
+Provides :class:`SprintIR`, a serial driver that polls CO2 ppm values into the
+action server's live buffer and exposes a triggered recording workflow
+(:meth:`SprintIR.acquire_co2`), plus :class:`CO2MonExec` which exposes the
+live-buffer value as a HELAO action over a fixed duration.
+"""
 
 __all__ = []
 
 import re
 import time
 import asyncio
+from typing import Any
 
 import serial
 
@@ -33,7 +40,22 @@ TODO: send CO2 reading to bokeh visualizer w/o writing data
 
 
 class SprintIR:
+    """Serial driver for the SprintIR-6S NDIR CO2 sensor.
+
+    Opens the serial port, sets the sensor into polling mode, reads the
+    firmware scaling factor and initial filtered CO2 value, and starts two
+    background tasks: ``poll_sensor_loop`` (continually publishes ``co2_ppm``
+    into the live buffer) and ``IOloop`` (services trigger-driven recording
+    requests started via :meth:`acquire_co2`).
+    """
+
     def __init__(self, action_serv: Base):
+        """Open the serial port and start polling and recording tasks.
+
+        Args:
+            action_serv: Action server providing configuration (including
+                ``port``) and the live buffer.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.unified_db = UnifiedSampleDataAPI(self.base)
@@ -131,17 +153,32 @@ class SprintIR:
         self.recording_task = self.event_loop.create_task(self.IOloop())
 
     def set_IO_signalq_nowait(self, val: bool) -> None:
+        """Set the IO signal queue without awaiting, dropping any pending value.
+
+        Args:
+            val: Signal value to push (``True`` to start recording).
+        """
         if self.IO_signalq.full():
             _ = self.IO_signalq.get_nowait()
         self.IO_signalq.put_nowait(val)
 
     async def set_IO_signalq(self, val: bool) -> None:
+        """Async version of :meth:`set_IO_signalq_nowait` that awaits queue space.
+
+        Args:
+            val: Signal value to push.
+        """
         if self.IO_signalq.full():
             _ = await self.IO_signalq.get()
         await self.IO_signalq.put(val)
 
     async def IOloop(self):
-        """This is trigger-acquire-read loop which always runs."""
+        """Long-running task that services measurement requests from ``IO_signalq``.
+
+        On each ``True`` signal it runs :meth:`continuous_record` until the
+        configured duration elapses, observes estop status, finishes the
+        active action, and resets per-action state.
+        """
         self.IOloop_run = True
         try:
             while self.IOloop_run:
@@ -190,7 +227,16 @@ class SprintIR:
             self.IO_continue = True
             LOGGER.info("IOloop task was cancelled")
 
-    def send(self, command_str: str):
+    def send(self, command_str: str) -> tuple:
+        """Send a command to the sensor and split the response into echo and aux lines.
+
+        Args:
+            command_str: Raw command string; a trailing CRLF is added if missing.
+
+        Returns:
+            Tuple ``(cmd_resp, aux_resp)`` of lines beginning with the command
+            character versus everything else.
+        """
         if not command_str.endswith("\r\n"):
             command_str = command_str + "\r\n"
         self.com.write(command_str.encode("utf8"))
@@ -218,7 +264,13 @@ class SprintIR:
         #     time.sleep(0.1)
         return cmd_resp, aux_resp
 
-    def read_stream(self):
+    def read_stream(self) -> Any:
+        """Read the most recent filtered CO2 value (``Z`` response).
+
+        Returns:
+            The latest filtered CO2 value as a string, or ``False`` if no
+            valid reading was found.
+        """
         self.com.flush()
         lines, _ = self.send("Z")
         for line in lines[::-1]:
@@ -230,6 +282,16 @@ class SprintIR:
         return False
 
     async def poll_sensor_loop(self, frequency: int = 4, reset_after: int = 5):
+        """Continuously read CO2 ppm and publish to the live buffer.
+
+        Resets the sensor into polling mode if ``reset_after`` consecutive
+        reads return no value.
+
+        Args:
+            frequency: Target polling rate in Hz.
+            reset_after: Number of consecutive empty reads that trigger a
+                polling-mode reset.
+        """
         waittime = 1.0 / frequency
         LOGGER.info("Starting polling loop")
         blanks = 0
@@ -259,13 +321,15 @@ class SprintIR:
                 blanks += 1
             await asyncio.sleep(waittime)
 
-    async def continuous_record(self):
-        """Async polling task.
+    async def continuous_record(self) -> dict:
+        """Sample CO2 from the live buffer at ``recording_rate`` until duration elapses.
 
-        'start_margin' is the number of seconds to extend the trigger acquisition window
-        to account for the time delay between SPEC and PSTAT actions
+        ``start_margin`` is added to the acquisition window to absorb timing
+        skew between coordinated actions. The loop exits when ``IO_do_meas``
+        is cleared by ``IOloop``.
 
-        The 'while self.IO_do_meas' loop is exited by IOloop
+        Returns:
+            Dict reporting the final ``co2-measure`` state.
         """
         # first_print = True
         # await asyncio.sleep(0.01)
@@ -317,10 +381,19 @@ class SprintIR:
 
         return {"co2-measure": "done"}
 
-    async def acquire_co2(self, A: Action):
-        """Perform async acquisition of co2 level for set duration.
+    async def acquire_co2(self, A: Action) -> dict:
+        """Start a triggered CO2 acquisition for the duration in the action params.
 
-        Return active dict.
+        Validates samples_in, creates the active action with the appropriate
+        HLO header, signals ``IOloop`` to start measuring, and waits for the
+        loop to acknowledge before returning.
+
+        Args:
+            A: HELAO :class:`Action` carrying ``duration`` and
+                ``acquisition_rate`` action params.
+
+        Returns:
+            Dict representation of the active action.
         """
 
         params = A.action_params
@@ -384,6 +457,7 @@ class SprintIR:
         return activeDict
 
     def shutdown(self):
+        """Cancel polling and recording tasks and close the serial port."""
         try:
             self.polling_task.cancel()
         except asyncio.CancelledError:
@@ -396,7 +470,15 @@ class SprintIR:
 
 
 class CO2MonExec(Executor):
+    """Executor that mirrors live-buffer CO2 readings for a fixed duration."""
+
     def __init__(self, *args, **kwargs):
+        """Capture start time, action duration, and running accumulators.
+
+        Args:
+            *args: Positional args forwarded to :class:`Executor`.
+            **kwargs: Keyword args forwarded to :class:`Executor`.
+        """
         super().__init__(*args, **kwargs)
         LOGGER.info("CO2MonExec initialized.")
         self.start_time = time.time()
@@ -404,8 +486,13 @@ class CO2MonExec(Executor):
         self.total = 0
         self.num_acqs = 0
 
-    async def _poll(self):
-        """Read CO2 ppm from live buffer."""
+    async def _poll(self) -> dict:
+        """Read CO2 ppm from the live buffer and report active/finished status.
+
+        Returns:
+            Dict with ``error``, ``status`` and ``data`` keys; status is
+            ``finished`` once ``duration`` has elapsed.
+        """
         live_dict = {}
         co2_ppm, epoch_s = self.active.base.get_lbuf("co2_ppm")
         # LOGGER.info(f"got from live buffer: {co2_ppm}")
@@ -428,8 +515,8 @@ class CO2MonExec(Executor):
             "data": live_dict,
         }
 
-    async def _post_exec(self):
-        "Cleanup methods, return error state."
+    async def _post_exec(self) -> dict:
+        """Write the mean CO2 ppm back to the action params at the end of the run."""
         if self.num_acqs > 0:
             self.active.action.action_params["mean_co2_ppm"] = (
                 self.total / self.num_acqs

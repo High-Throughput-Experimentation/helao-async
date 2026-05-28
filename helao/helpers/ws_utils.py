@@ -1,6 +1,9 @@
-"""WebSocket pub/sub helpers.
+"""WebSocket publisher/subscriber helpers used by HELAO server fan-out.
 
-Consolidates the former ws_publisher and ws_subscriber modules.
+Messages are pickled and zstd-compressed on the wire. :class:`WsPublisher`
+fans an in-process queue out to many WebSocket clients, :class:`WsSubscriber`
+asynchronously buffers received messages, and :class:`WsSyncClient` is a
+blocking one-shot reader.
 """
 
 __all__ = ["WsPublisher", "WsSubscriber", "WsSyncClient"]
@@ -18,30 +21,40 @@ from websockets.sync.client import connect
 
 
 class WsPublisher:
-    """
-    WsPublisher manages WebSocket connections and broadcasts messages from a source queue to all active connections.
+    """Broadcast messages from a multi-subscriber queue to WebSocket clients.
+
+    Each message is run through ``xform_func``, pickled, and zstd-compressed
+    before being written to a connected WebSocket.
 
     Attributes:
-        active_connections (List[WebSocket]): A list of currently active WebSocket connections.
-        source_queue: The queue from which messages are sourced.
-        xform_func (function): A transformation function applied to each message before broadcasting.
+        active_connections: WebSocket connections that have completed handshake.
+        source_queue: Multi-subscriber queue producing source messages.
+        xform_func: Callable applied to each message before serialization.
     """
 
     active_connections: List[WebSocket]
 
     def __init__(self, source_queue, xform_func=lambda x: x):
+        """Capture the source queue and optional message transform."""
         self.active_connections = []
         self.source_queue = source_queue
         self.xform_func = xform_func
 
     async def connect(self, websocket: WebSocket):
+        """Accept a new WebSocket handshake and track the connection."""
         await websocket.accept()
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
+        """Remove ``websocket`` from the active set."""
         self.active_connections.remove(websocket)
 
     async def broadcast(self, websocket: WebSocket):
+        """Subscribe to the source queue and forward messages to ``websocket``.
+
+        Runs until the client closes the connection; on close the subscriber
+        is removed from the source queue.
+        """
         src_sub = self.source_queue.subscribe()
         try:
             async for source_msg in self.source_queue.subscribe():
@@ -55,12 +68,21 @@ class WsPublisher:
 
 
 class WsSyncClient:
-    """A synchronous WebSocket client for reading messages from a server."""
+    """Blocking single-shot WebSocket reader for HELAO publisher streams."""
 
     def __init__(self, host, port, path):
+        """Build the ``ws://`` URL for the target endpoint."""
         self.data_url = f"ws://{host}:{port}/{path}"
 
-    def read_messages(self):
+    def read_messages(self) -> dict:
+        """Connect, receive one message, and return the decoded payload.
+
+        Retries up to five times on connection failure, sleeping two seconds
+        between attempts.
+
+        Returns:
+            Decoded message dict, or ``{}`` if all retries fail.
+        """
         retry_limit = 5
         for retry_idx in range(retry_limit):
             try:
@@ -75,14 +97,24 @@ class WsSyncClient:
 
 
 class WsSubscriber:
-    """Asynchronous WebSocket subscriber that buffers incoming messages."""
+    """Async WebSocket subscriber that buffers decoded messages in a deque.
+
+    A background task connects to the target URL and pushes every decoded
+    message into ``recv_queue`` (bounded by ``max_qlen``).
+    """
 
     def __init__(self, host, port, path, max_qlen=500):
+        """Start the background subscriber task targeting ``ws://host:port/path``."""
         self.data_url = f"ws://{host}:{port}/{path}"
         self.recv_queue = collections.deque(maxlen=max_qlen)
         self.subscriber_task = asyncio.create_task(self.subscriber_loop())
 
     async def subscriber_loop(self):
+        """Connect to the publisher and feed decoded messages into ``recv_queue``.
+
+        Retries up to five times on connection failure with a two-second
+        sleep between attempts.
+        """
         retry_limit = 5
         for retry_idx in range(retry_limit):
             try:
@@ -95,7 +127,8 @@ class WsSubscriber:
                 print(f"Could not connect, retrying {retry_idx+1}/{retry_limit}")
                 time.sleep(2)
 
-    async def read_messages(self):
+    async def read_messages(self) -> list:
+        """Drain and return every buffered message in FIFO order."""
         messages = []
         while self.recv_queue:
             messages.append(self.recv_queue.popleft())

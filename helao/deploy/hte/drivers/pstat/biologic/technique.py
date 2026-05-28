@@ -1,4 +1,11 @@
-"""Dataclass and instances for Biologic potentiostat techniques."""
+"""Dataclass and instances for Biologic potentiostat techniques.
+
+Defines the ``BiologicTechnique`` dataclass that pairs an easy-biologic
+program class with the action-parameter and data-field name remaps used by
+``BiologicDriver``, plus pre-built instances for OCV, CA, CP, CV, PEIS, GEIS,
+and CAOCV. The ``BIOTECHS`` dict at module bottom indexes the instances by
+technique name.
+"""
 
 from dataclasses import dataclass
 from typing import Optional, Dict
@@ -33,12 +40,30 @@ from enum import StrEnum
 
 
 class SweepMode(StrEnum):
+    """Frequency sweep direction for EIS techniques.
+
+    Attributes:
+        LINEAR: Linear sweep between initial and final frequency.
+        LOG: Logarithmic sweep.
+    """
+
     LINEAR = "lin"
     LOG = "log"
 
 
 @dataclass
 class BiologicTechnique:
+    """Description of a Biologic technique runnable through easy-biologic.
+
+    Attributes:
+        technique_name: Short name used as the lookup key in ``BIOTECHS``.
+        easy_class: easy-biologic ``BiologicProgram`` subclass to instantiate.
+        parameter_map: Mapping from action-server parameter keys to the
+            easy-biologic program parameter names.
+        field_map: Mapping from easy-biologic data field names to the HELAO
+            canonical column names used in the emitted data dict.
+    """
+
     technique_name: str
     easy_class: BiologicProgram
     parameter_map: Optional[Dict[str, str]] = None

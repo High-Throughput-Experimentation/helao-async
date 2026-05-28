@@ -1,15 +1,16 @@
+"""Best-effort coercion of string-encoded scalars to native Python types."""
+
 __all__ = ["eval_array", "eval_val"]
 
 
-def eval_array(x):
-    """
-    Evaluates each element in the input array using the eval_val function and returns a new array with the evaluated values.
+def eval_array(x) -> list:
+    """Apply :func:`eval_val` element-wise to a list.
 
     Args:
-        x (list): A list of elements to be evaluated.
+        x: Iterable of values to coerce.
 
     Returns:
-        list: A list containing the evaluated values of the input elements.
+        New list with each element passed through :func:`eval_val`.
     """
     ret = []
     for y in x:
@@ -19,18 +20,19 @@ def eval_array(x):
 
 
 def eval_val(x):
-    """
-    Evaluates and converts a given value based on its type.
+    """Coerce a value to a native Python type, recursing into containers.
 
-    Parameters:
-    x (any): The value to be evaluated. It can be of type list, dict, str, or any other type.
+    Lists are processed via :func:`eval_array`. Dicts are walked
+    recursively, coercing each value. Strings that look like signed
+    integers or decimals become ``int`` or ``float``; ``"NaN"`` becomes a
+    float NaN; ``"true"`` / ``"false"`` (any case) become ``bool``. All
+    other inputs are returned unchanged.
+
+    Args:
+        x: Value to coerce.
 
     Returns:
-    any: The evaluated value. The return type depends on the input:
-        - If the input is a list, it calls eval_array on the list.
-        - If the input is a dict, it recursively evaluates each value in the dict.
-        - If the input is a str, it attempts to convert it to an int, float, boolean, or NaN if applicable.
-        - Otherwise, it returns the input value as is.
+        The coerced value, or ``x`` unchanged if no rule matched.
     """
     if isinstance(x, list):
         nv = eval_array(x)

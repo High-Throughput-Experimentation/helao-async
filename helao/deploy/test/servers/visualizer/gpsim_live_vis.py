@@ -1,3 +1,10 @@
+"""Bokeh visualizer module for the GP-simulator live data stream.
+
+Subscribes to the GP simulator's ``ws_live`` websocket and renders the
+running acquisition table together with predicted-vs-acquired histograms
+per plate.
+"""
+
 import time
 import asyncio
 from functools import partial
@@ -21,9 +28,30 @@ from helao.helpers.ws_utils import WsSubscriber as Wss
 
 
 class C_gpsimlivevis:
-    """GP simulator visualizer module class"""
+    """Live Bokeh visualizer for the GP-simulator action server.
+
+    Builds a layout with an update-rate input, a status toggle, a
+    predicted-vs-ground-truth histogram plot, and a recent-acquisitions
+    table. A background coroutine reads from the action server's
+    ``ws_live`` websocket and streams new entries to the document.
+
+    Attributes:
+        vis: Hosting visualizer server.
+        update_rate: Polling period (seconds) between websocket reads.
+        live_key: Name of the action server being visualized.
+        wss: ``WsSubscriber`` consumer for ``ws_live`` messages.
+        datasource_table: ``ColumnDataSource`` backing the table.
+        hists: Per-plate cached histogram quads (predicted/ground truth).
+        layout: Top-level Bokeh layout.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Set up subscriber, widgets, plot, and table; start the IO loop.
+
+        Args:
+            vis_serv: Hosting visualizer server.
+            serv_key: Name of the action server to visualize.
+        """
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.update_rate = self.config_dict.get("update_rate", 0.5)
@@ -129,15 +157,33 @@ class C_gpsimlivevis:
         self._add_plots()
 
     def cleanup_session(self, session_context):
+        """Cancel the IO loop when the Bokeh session ends.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.live_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def update_input_value(self, sender, value):
+        """Push ``value`` back into the source widget.
+
+        Args:
+            sender: Bokeh widget to update.
+            value: New value to assign.
+        """
         sender.value = value
 
     def callback_input_update_rate(self, attr, old, new, sender):
-        """callback for input_update_rate"""
+        """Validate and apply a new update-rate input, then echo it back.
+
+        Args:
+            attr: Bokeh attribute name (unused).
+            old: Previous string value.
+            new: New string value.
+            sender: The source widget.
+        """
 
         def to_float(val):
             try:
@@ -154,6 +200,15 @@ class C_gpsimlivevis:
         )
 
     def add_points(self, datapackage_list: list):
+        """Stream a batch of websocket messages into the table and histograms.
+
+        Updates the status toggle, recomputes per-plate predicted and
+        acquired histograms, streams new rows to the table, and refreshes
+        the plot.
+
+        Args:
+            datapackage_list: List of message dicts from the websocket.
+        """
         latest_epoch = 0
         data_dict = {}
         hist_dict = {}
@@ -209,6 +264,7 @@ class C_gpsimlivevis:
             self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
+        """Poll the live websocket and schedule UI updates on the document."""
         LOGGER.info(" ... Live visualizer receiving messages.")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
@@ -218,6 +274,7 @@ class C_gpsimlivevis:
             await asyncio.sleep(0.001)
 
     def _add_plots(self):
+        """Redraw the histogram plot from the cached per-plate quads."""
         # clear legend
         if self.plot.renderers:
             self.plot.legend.items = []

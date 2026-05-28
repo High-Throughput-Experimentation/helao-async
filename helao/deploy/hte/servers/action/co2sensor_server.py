@@ -1,5 +1,9 @@
 # shell: uvicorn motion_server:app --reload
-"""Serial sensor server"""
+"""SprintIR CO2 sensor action server.
+
+Wraps the serial-connected :class:`SprintIR` driver and exposes endpoints to
+start and cancel CO2 ppm acquisition via the :class:`CO2MonExec` executor.
+"""
 
 __all__ = ["makeApp"]
 
@@ -17,7 +21,18 @@ from helao.core.models.sample import (
 from ...drivers.sensor.sprintir_driver import SprintIR, CO2MonExec
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the CO2 sensor FastAPI app.
+
+    Constructs a :class:`BaseAPI` backed by :class:`SprintIR` and registers the
+    ``acquire_co2`` and ``cancel_acquire_co2`` endpoints.
+
+    Args:
+        server_key: Key identifying this server in the orchestration group.
+
+    Returns:
+        The configured :class:`BaseAPI` application.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -37,7 +52,11 @@ def makeApp(server_key):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
     ):
-        """Record CO2 ppm level."""
+        """Start CO2 ppm acquisition from the SprintIR sensor.
+
+        Starts a :class:`CO2MonExec` polling at ``acquisition_rate`` Hz for up
+        to ``duration`` seconds (``-1`` runs until cancelled).
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CO2"
         executor = CO2MonExec(
@@ -53,7 +72,7 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stop running CO2 acquisition."""
+        """Stop any active ``acquire_co2`` executors on this server."""
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():
             if exec_id.split()[0] == "acquire_co2":

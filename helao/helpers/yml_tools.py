@@ -1,3 +1,11 @@
+"""YAML serialization helpers and post-run directory promotion logic.
+
+Wraps :mod:`ruamel.yaml` with HELAO conventions (2/4/2 indent, ``null`` for
+None, duplicate keys allowed) and provides the asynchronous :func:`move_dir`
+that promotes ``RUNS_ACTIVE`` directories to ``RUNS_FINISHED`` (or
+``RUNS_DIAG`` for manual actions) and notifies the DB server.
+"""
+
 import os
 import asyncio
 from glob import glob
@@ -10,21 +18,18 @@ import aioshutil
 import ruamel.yaml
 
 
-def yml_dumps(obj, options=None):
-    """
-    Serializes a Python object to a YAML-formatted string.
+def yml_dumps(obj, options=None) -> str:
+    """Serialize ``obj`` to a YAML string using HELAO formatting conventions.
+
+    The dumper is configured for 2/4/2 indentation, allows duplicate keys,
+    and renders ``None`` as the literal ``null``.
 
     Args:
-        obj (Any): The Python object to serialize.
-        options (dict, optional): Additional options to pass to the YAML dumper. Defaults to None.
+        obj: Python object to serialize.
+        options: Extra keyword arguments forwarded to ``yaml.dump``.
 
     Returns:
-        str: The YAML-formatted string representation of the input object.
-
-    Note:
-        - The YAML dumper is configured to indent mappings by 2 spaces, sequences by 4 spaces, and offset by 2 spaces.
-        - Duplicate keys are allowed in the YAML output.
-        - `None` values are represented as "null" in the YAML output.
+        YAML-formatted string.
     """
     yaml = ruamel.yaml.YAML(typ="rt")
     yaml.indent(mapping=2, sequence=4, offset=2)
@@ -32,6 +37,7 @@ def yml_dumps(obj, options=None):
 
     # show null
     def my_represent_none(self, data):
+        """Render ``None`` as the literal scalar ``null``."""
         return self.represent_scalar("tag:yaml.org,2002:null", "null")
 
     yaml.representer.add_representer(type(None), my_represent_none)
@@ -48,22 +54,16 @@ def yml_dumps(obj, options=None):
 
 
 def yml_load(input: Union[str, Path]):
-    """
-    Load a YAML file or string.
-
-    This function loads a YAML file or string using the ruamel.yaml library.
-    It supports loading from a file path, a Path object, or a YAML string.
+    """Load YAML from a path, :class:`pathlib.Path`, or raw string.
 
     Args:
-        input (Union[str, Path]): The input YAML data. This can be a file path (str),
-                                  a Path object, or a YAML string.
+        input: Filesystem path, ``Path`` object, or YAML string.
 
     Returns:
-        obj: The loaded YAML data as a Python object.
+        Parsed Python object (typically a dict).
 
     Raises:
-        FileNotFoundError: If the input is a file path that does not exist.
-        ruamel.yaml.YAMLError: If there is an error parsing the YAML data.
+        ruamel.yaml.YAMLError: If the YAML is malformed.
     """
     yaml = ruamel.yaml.YAML(typ="rt")
     yaml.version = (1, 2)
@@ -78,17 +78,18 @@ def yml_load(input: Union[str, Path]):
     return obj
 
 
-async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
-    """
-    Asynchronously attempts to finish processing a YAML file by sending a request to a specified database server.
+async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3) -> bool:
+    """POST a finished YAML path to the DB server's ``/finish_yml`` endpoint.
 
     Args:
-        yml_path (str): The file path to the YAML file.
-        db_config (dict, optional): A dictionary containing the database configuration with keys "host" and "port". Defaults to an empty dictionary.
-        retry (int, optional): The number of retry attempts if the request fails. Defaults to 3.
+        yml_path: Filesystem path to the finalized YAML.
+        db_config: Mapping with at least ``host`` and ``port`` for the DB
+            server; missing keys cause an immediate False return.
+        retry: Maximum number of attempts on non-200 responses.
 
     Returns:
-        bool: True if the YAML file was successfully processed, False otherwise.
+        True on a 200 response, False on missing config, missing file, or
+        repeated failure.
     """
     from helao.helpers import helao_logging as logging
     LOGGER = logging.LOGGER if logging.LOGGER is not None else logging.make_logger(__file__)
@@ -129,19 +130,22 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3):
 
 
 async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
-    """
-    Move directory from RUNS_ACTIVE to RUNS_FINISHED or RUNS_DIAG based on the type and attributes of the provided object.
+    """Promote an Action/Experiment/Sequence's directory out of ``RUNS_ACTIVE``.
 
-    Parameters:
-    hobj (Union[Sequence, Experiment, Action]): The object whose directory is to be moved. Can be of type Sequence, Experiment, or Action.
-    base (object, optional): The base object that provides the print_message method. Defaults to None.
-    retry_delay (int, optional): The delay in seconds between retries for copying and removing files. Defaults to 5.
+    The destination is ``RUNS_DIAG`` for manual actions or ``RUNS_FINISHED``
+    otherwise; ``.hlo`` data files for objects with ``sync_data=False`` are
+    diverted to ``RUNS_NOSYNC``. Copy and removal are retried up to 60 and 30
+    times respectively, sleeping ``retry_delay`` seconds between attempts. On
+    success of a non-manual move, :func:`yml_finisher` is invoked.
+
+    Args:
+        hobj: An ``Action``, ``Experiment``, or ``Sequence`` instance whose
+            on-disk directory should be promoted.
+        base: Server object providing ``helaodirs.save_root`` and config.
+        retry_delay: Sleep between copy/remove retry rounds, in seconds.
 
     Returns:
-    dict: An empty dictionary if an invalid object type is provided.
-
-    Raises:
-    Exception: If there are issues with directory creation, file copying, or file removal.
+        Empty dict when ``hobj`` is not a supported type; otherwise None.
     """
     from helao.helpers import helao_logging as logging
     LOGGER = logging.LOGGER if logging.LOGGER is not None else logging.make_logger(__file__)

@@ -1,3 +1,5 @@
+"""Pydantic models describing analyses, their inputs, and their outputs."""
+
 __all__ = [
     "AnalysisModel",
     "ShortAnalysisModel",
@@ -18,17 +20,40 @@ from .s3locator import S3Locator
 
 
 class ShortAnalysisModel(BaseModel, HelaoDict):
+    """Minimal identifying record for an analysis.
+
+    Attributes:
+        hlo_version (Optional[str]): HELAO version stamped at construction.
+        analysis_uuid (Optional[UUID]): Unique identifier for the analysis.
+        analysis_timestamp (Optional[datetime]): When the analysis was created;
+            populated with the current time if omitted.
+    """
+
     hlo_version: Optional[str] = Field(default_factory=get_hlo_version)
     analysis_uuid: Optional[UUID] = None
     analysis_timestamp: Optional[datetime] = None
 
     def __init__(self, *args, **kwargs):
+        """Construct the model and default `analysis_timestamp` to now if unset."""
         super().__init__(*args, **kwargs)
         if self.analysis_timestamp is None:
             self.analysis_timestamp = datetime.now()
 
 
 class AnalysisDataModel(BaseModel, HelaoDict):
+    """Reference to an action's raw-data payload used as analysis input.
+
+    Attributes:
+        action_uuid (UUID): UUID of the source action.
+        run_use (RunUse): How the source data is being used.
+        raw_data_path (str): Storage path to the raw data file.
+        global_sample_label (Optional[str]): Global label of the sample, if known.
+        composition (Optional[dict]): Optional composition metadata for the sample.
+        file_name (Optional[str]): Name of the source file.
+        file_type (Optional[str]): Type tag of the source file.
+        data_keys (List[str]): Keys within the file consumed by the analysis.
+    """
+
     action_uuid: UUID
     run_use: RunUse = RunUse.data
     raw_data_path: str
@@ -40,6 +65,18 @@ class AnalysisDataModel(BaseModel, HelaoDict):
 
 
 class AnalysisOutputModel(BaseModel, HelaoDict):
+    """One output artifact produced by an analysis.
+
+    Attributes:
+        analysis_output_path (S3Locator): S3 location of the output artifact.
+        content_type (str): MIME or content type of the artifact.
+        content_encoding (Optional[str]): Optional content encoding.
+        output_type (str): Type tag classifying the output.
+        output_keys (Optional[List[str]]): Keys produced by the analysis, if applicable.
+        output_name (Optional[str]): Display name for the output.
+        output (Optional[Dict[str, ...]]): Inline scalar/structured output values.
+    """
+
     analysis_output_path: S3Locator
     content_type: str
     content_encoding: Optional[str] = None
@@ -50,6 +87,29 @@ class AnalysisOutputModel(BaseModel, HelaoDict):
 
 
 class AnalysisModel(ShortAnalysisModel):
+    """Full record of an analysis run with its inputs and outputs.
+
+    Attributes:
+        access (str): Access tier identifier (e.g. ``"hte"``).
+        dummy (bool): True if this is a dummy/test analysis.
+        simulation (bool): True if produced from simulated data.
+        analysis_name (str): Name of the analysis routine.
+        analysis_params (dict): Parameters supplied to the analysis.
+        analysis_codehash (Optional[str]): Git hash of the analysis source.
+        analysis_codepath (Optional[str]): Source path for the analysis.
+        analysis_classname (Optional[str]): Implementing class name.
+        analysis_action_uuid (Optional[UUID]): UUID of an action that triggered the analysis.
+        global_sample_label (Optional[str]): Global sample label, if relevant.
+        process_uuid (Optional[UUID]): Associated process UUID.
+        process_params (Optional[dict]): Associated process parameters.
+        inputs (List[AnalysisDataModel]): Input data references.
+        outputs (List[AnalysisOutputModel]): Output artifacts.
+        data_request_id (Optional[UUID]): Optional data-request linkage.
+        campaign_name (Optional[str]): Campaign label.
+        campaign_uuid (Optional[UUID]): Campaign UUID.
+        sequence_uuid (Optional[UUID]): Sequence UUID under which the analysis ran.
+    """
+
     access: str = "hte"
     dummy: bool = False
     simulation: bool = False
@@ -72,25 +132,27 @@ class AnalysisModel(ShortAnalysisModel):
 
 
 class AnalysisInput(ABC):
+    """Abstract base for objects that supply input data to an analysis.
+
+    Attributes:
+        process_params (dict): Process parameters associated with the input.
+    """
+
     process_params: dict
 
     @abstractmethod
     def get_datamodels(self, *args, **kwargs) -> List[AnalysisDataModel]:
+        """Return the `AnalysisDataModel` instances representing this input."""
         return NotImplemented
 
 
 class AnalysisOutput(BaseModel):
-    """
-    Base class for analysis output models in the analysis framework.
+    """Base model for typed analysis output payloads.
 
-    This class serves as a template for defining the structure of analysis outputs.
-    It should be extended by specific output models to include additional fields
-    relevant to the analysis results. The `output_type` attribute specifies the
-    type of output produced by the analysis.
+    Subclass to add fields specific to a given analysis type.
 
-    Usage:
-        Subclass this base class to define custom analysis output models
-        with additional attributes as needed for your analysis workflow.
+    Attributes:
+        output_type (str): Tag identifying the concrete output flavor.
     """
 
     output_type: str

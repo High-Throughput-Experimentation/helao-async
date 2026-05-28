@@ -1,6 +1,4 @@
-"""
-Sequence library for UVIS
-"""
+"""Sequence library exposing a combined transmission-and-reflectance program."""
 
 __all__ = ["UVIS_TR"]
 
@@ -33,7 +31,43 @@ def UVIS_TR(
     calc_poly_order: int = 4,
     calc_lower_wl: float = 370.0,
     calc_upper_wl: float = 1020.0,
-):
+) -> list:
+    """Build a combined transmission+reflectance UV-Vis sequence over samples.
+
+    Both ``T`` and ``R`` spectra are captured at every measurement step.
+    The sequence sets up the reference, takes dark and light references
+    for both spec types, then for each sample in ``plate_sample_no_list``
+    moves to the sample and captures both T and R data. A second reference
+    block, an absorbance calculation, and the shutdown experiment finish
+    the sequence.
+
+    Args:
+        sequence_version: Version tag for the sequence definition.
+        plate_id: Material library plate identifier.
+        plate_sample_no_list: Sample numbers on the plate to measure.
+        reference_mode: Reference mode passed to UVIS sub-experiments.
+        custom_position: Solid custom position name to address the cell.
+        spec_n_avg: Number of spectra averaged per acquisition.
+        spec_int_time_ms: Spectrometer integration time in milliseconds.
+        duration_sec: Per-measurement duration in seconds; negative uses
+            the action's default.
+        specref_code: Spectral reference code for ``UVIS_sub_setup_ref``.
+        led_type: Illumination side label.
+        led_date: Date string for the LED intensity calibration.
+        led_names: Names of LEDs/sources used (first element drives toggle).
+        led_wavelengths_nm: Wavelengths in nm corresponding to ``led_names``.
+        led_intensities_mw: Intensities in mW corresponding to ``led_names``.
+        toggle_is_shutter: Whether the toggle source acts as a shutter.
+        calc_ev_parts: Energy partitions for the absorbance calculator.
+        calc_bin_width: Bin width for the absorbance calculator.
+        calc_window_length: Smoothing window length for the calculator.
+        calc_poly_order: Polynomial order for the absorbance calculator.
+        calc_lower_wl: Lower wavelength bound for the calculator, nm.
+        calc_upper_wl: Upper wavelength bound for the calculator, nm.
+
+    Returns:
+        list: Ordered list of planned ``Experiment`` objects.
+    """
     specs = ["T", "R"]
     epm = ExperimentPlanMaker()
     epm.add("UVIS_sub_unloadall_customs", {})

@@ -1,12 +1,10 @@
-"""Local data calculation server
+"""In-sequence calculation driver for the HTE local-data server.
 
-This server performs calculations on locally saved data for in-situ amendment of running
-sequences, i.e. repeated experiment looping, thresholding, etc.
-
-TODO:
-Calc.fill_syringe_volume_check() and Calc.check_co2_purge_level() need to be updated to
-handle orchestrator requests originating outside of the config launch group.
-
+Provides UV-Vis figure-of-merit calculations and loop-control helpers
+(CO2 purge thresholding and syringe-volume top-up) that read locally
+saved ``.hlo``/``.yml`` data through :class:`FileMapper` and, when
+appropriate, request additional experiments from the orchestrator via
+:func:`async_private_dispatcher`.
 """
 
 import time
@@ -28,8 +26,20 @@ from helao.helpers.dispatcher import async_private_dispatcher
 
 def handlenan_savgol_filter(
     d_arr, window_length, polyorder, delta=1.0, deriv=0, replacenan_value=0.1
-):
-    """Custom savgol_filter from JCAPDataProcess uvis_basics.py, updated for array ops."""
+) -> np.ndarray:
+    """Savitzky-Golay filter that replaces NaNs before retrying on failure.
+
+    Args:
+        d_arr: Input array.
+        window_length: Savitzky-Golay window length.
+        polyorder: Polynomial order.
+        delta: Sample spacing.
+        deriv: Derivative order to return.
+        replacenan_value: Value substituted for NaNs on the retry pass.
+
+    Returns:
+        Filtered array.
+    """
     try:
         return savgol_filter(d_arr, window_length, polyorder, delta=delta, deriv=deriv)
     except Exception:
@@ -39,8 +49,16 @@ def handlenan_savgol_filter(
         return savgol_filter(d_arr, window_length, polyorder, delta=delta, deriv=deriv)
 
 
-def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit):
-    """Normalization func from JCAPDataProcess uvis_basics.py, updated for array ops."""
+def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit) -> tuple:
+    """Rescale rows of ``v`` that nearly violate min/max limits.
+
+    Rows whose minimum sits between ``min_mthd_allowed`` and
+    ``min_limit`` are shifted up; rows whose maximum sits between
+    ``max_limit`` and ``max_mthd_allowed`` are scaled down to one.
+
+    Returns:
+        ``(min_rescaled_mask, max_rescaled_mask, adjusted_array)``.
+    """
     w = copy(v)
     min_rescaled = np.bitwise_and(
         (w.min(axis=-1) >= min_mthd_allowed),
@@ -60,7 +78,13 @@ def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit):
     return min_rescaled, max_rescaled, w
 
 
-def squeeze_foms(d):
+def squeeze_foms(d) -> dict:
+    """Collapse 2-D figure-of-merit arrays to 1-D lists by row-mean.
+
+    Walks ``d``; ``numpy`` arrays with more than one dimension are
+    averaged along axis ``1``, 1-D arrays become plain lists, and other
+    values pass through untouched.
+    """
     sd = {}
     for k, v in d.items():
         if isinstance(v, np.ndarray):
@@ -75,16 +99,27 @@ def squeeze_foms(d):
 
 
 class Calc:
-    """In-sequence FOM calculation driver."""
+    """In-sequence figure-of-merit and loop-control driver."""
 
     def __init__(self, action_serv: Base):
+        """Capture the action server context and shared YAML loader.
+
+        Args:
+            action_serv: Hosting :class:`Base` action server.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.yaml = YAML(typ="safe")
         self.world_config = self.base.app.helao_cfg
 
-    def gather_seq_data(self, seq_reldir: str, action_name: str):
-        """Get all files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
+    def gather_seq_data(self, seq_reldir: str, action_name: str) -> dict:
+        """Load ``.hlo``/``.yml`` action results for one action name.
+
+        Uses :class:`FileMapper` to walk ACTIVE/FINISHED/SYNCED for the
+        given sequence and returns a dict keyed by ``.hlo`` path with
+        ``meta``, ``data``, ``actd`` (action yaml) and ``expd``
+        (experiment yaml) entries.
+        """
         active_save_dir = self.base.helaodirs.save_root.__str__()
         seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
@@ -122,8 +157,11 @@ class Calc:
 
         return hlo_dict
 
-    def gather_seq_exps(self, seq_reldir: str, exp_name: str):
-        """Get all exp dicts using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
+    def gather_seq_exps(self, seq_reldir: str, exp_name: str) -> dict:
+        """Return a ``{yml_path: experiment_dict}`` map for ``exp_name``.
+
+        Pass ``"*"`` for ``exp_name`` to include every ``exp.yml``.
+        """
         active_save_dir = self.base.helaodirs.save_root.__str__()
         seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
@@ -138,8 +176,8 @@ class Calc:
             yml_dict[ep] = expd
         return yml_dict
 
-    def get_seq_dict(self, seq_reldir: str):
-        """Get sequence dict."""
+    def get_seq_dict(self, seq_reldir: str) -> dict:
+        """Return the parsed ``seq.yml`` dict for the given sequence directory."""
         active_save_dir = self.base.helaodirs.save_root.__str__()
         seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
@@ -150,8 +188,19 @@ class Calc:
             yml_dict = seqd
         return yml_dict
 
-    def calc_uvis_abs(self, activeobj: Active):
-        """Figure of merit calculator for UVIS TR, DR, and T techniques."""
+    def calc_uvis_abs(self, activeobj: Active) -> tuple:
+        """Compute UV-Vis figures of merit for T, R or TR sequences.
+
+        Walks the spectra from ``acquire_spec`` actions in the current
+        sequence, performs dark/light background subtraction, binning,
+        Savitzky-Golay smoothing and reference adjustment, and produces
+        per-sample scalar FOMs plus binned/full-resolution arrays.
+
+        Returns:
+            ``(datadict, arraydict)`` containing scalar FOMs and the
+            intermediate array outputs respectively. Returns an empty
+            dict when references or data are missing.
+        """
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_spec")
 
@@ -695,7 +744,21 @@ class Calc:
 
         return datadict, arraydict
 
-    async def check_co2_purge_level(self, activeobj: Active):
+    async def check_co2_purge_level(self, activeobj: Active) -> dict:
+        """Decide whether to repeat a CO2-purge experiment.
+
+        Reads the latest ``acquire_co2`` HLO in the current sequence,
+        averages ``co2_ppm``, and compares to ``co2_ppm_thresh`` using
+        the ``purge_if`` flag (``"above"``/``"below"`` strings or a
+        numeric symmetric pct-difference threshold). When the condition
+        is satisfied (and ``max_repeats`` has not been hit) requests the
+        orchestrator to insert another ``repeat_experiment_name`` at the
+        head of the queue.
+
+        Returns:
+            ``{"epoch": <float>, "mean_co2_ppm": <float>, "redo_purge":
+            <bool>}``.
+        """
         params = activeobj.action.action_params
         co2_ppm_thresh = params["co2_ppm_thresh"]
         purge_if = params["purge_if"]
@@ -807,7 +870,17 @@ class Calc:
         }
         return return_dict
 
-    async def fill_syringe_volume_check(self, activeobj: Active):
+    async def fill_syringe_volume_check(self, activeobj: Active) -> dict:
+        """Insert a refill experiment if syringe volume is below ``check_volume_ul``.
+
+        When ``present_volume_ul`` is below the threshold (or
+        ``check_volume_ul`` is 0) the orchestrator is asked to insert
+        ``repeat_experiment_name`` with a ``fill_volume_ul`` parameter
+        that tops the syringe back to ``target_volume_ul``.
+
+        Returns:
+            ``{"epoch": <float>, "syringe_present_volume_ul": <float>}``.
+        """
         params = activeobj.action.action_params
         check_volume_ul = params["check_volume_ul"]
         target_volume_ul = params["target_volume_ul"]
@@ -863,4 +936,5 @@ class Calc:
         return return_dict
 
     def shutdown(self):
+        """Hook for graceful shutdown (no-op)."""
         pass

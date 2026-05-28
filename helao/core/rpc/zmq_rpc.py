@@ -1,15 +1,15 @@
 """ZeroMQ + msgspec RPC layer that runs alongside FastAPI on each HELAO server.
 
 Each ``BaseAPI`` / ``OrchAPI`` instance binds a ``zmq.ROUTER`` socket on
-``http_port + RPC_PORT_OFFSET`` at startup.  Every FastAPI POST route registered
-on the app is auto-mirrored into the dispatcher under the route's path
-(without leading slash) as its method name.  Callers reach the same handler
-via either HTTP (existing behavior) or a ``DEALER`` socket (new fast path).
+``http_port + RPC_PORT_OFFSET`` at startup. Every FastAPI POST route on the
+app is auto-mirrored into the dispatcher under the route's path (sans leading
+slash) so callers can reach the same handler over either HTTP or a ``DEALER``
+socket.
 
-The wire format is msgspec.msgpack with a fixed envelope (``RPCRequest`` and
-``RPCResponse``).  Dict args are coerced to the handler's declared pydantic
-model type via :func:`_coerce_args` so existing FastAPI-style signatures
-(e.g. ``actionservermodel: ActionServerModel = Body(...)``) work unchanged.
+The wire format is msgspec.msgpack with fixed ``RPCRequest`` / ``RPCResponse``
+envelopes. Dict args are coerced to the handler's declared pydantic model
+type via :func:`_coerce_args` so FastAPI-style signatures
+(``model: SomeModel = Body(...)``) work unchanged.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ RPC_PORT_OFFSET = 10000
 
 
 def derive_rpc_port(http_port: int) -> int:
-    """Return the RPC port co-located with *http_port*."""
+    """Return the RPC port paired with ``http_port`` (offset by ``RPC_PORT_OFFSET``)."""
     return http_port + RPC_PORT_OFFSET
 
 
@@ -50,12 +50,16 @@ def derive_rpc_port(http_port: int) -> int:
 
 
 class RPCRequest(msgspec.Struct, omit_defaults=True):
+    """Wire envelope for one RPC call: ``id``, ``method`` path, and kwargs dict."""
+
     id: int
     method: str
     args: Dict[str, Any] = {}
 
 
 class RPCResponse(msgspec.Struct, omit_defaults=True):
+    """Wire envelope for an RPC reply, correlated to a request by ``id``."""
+
     id: int
     ok: bool
     result: Any = None
@@ -63,16 +67,19 @@ class RPCResponse(msgspec.Struct, omit_defaults=True):
 
 
 class RPCError(RuntimeError):
-    """Raised on the client side when the server returned ``ok=False``."""
+    """Raised on the client side when the server replied with ``ok=False``."""
 
 
 def _msgpack_enc_hook(obj: Any) -> Any:
-    """Convert non-msgpack-native types to native Python primitives.
+    """Unwrap subclasses of native types and NumPy scalars to plain Python.
 
     msgspec matches types exactly, so subclasses of float/int/str/dict/list
-    (notably ruamel.yaml's ScalarFloat/ScalarInt/CommentedMap/etc.) and
-    NumPy's scalar/array types trip the encoder.  Unwrap them down to the
-    closest native primitive; msgspec then re-encodes the result.
+    (notably ruamel.yaml's ``ScalarFloat`` / ``ScalarInt`` / ``CommentedMap``
+    etc.) and NumPy scalar/array values trip the encoder. This hook unwraps
+    them to the closest native primitive (or a list for arrays).
+
+    Raises:
+        NotImplementedError: For any other unsupported type.
     """
     if isinstance(obj, pathlib.PurePath):
         return str(obj)
@@ -116,21 +123,24 @@ _RESP_ENCODER = msgspec.msgpack.Encoder(enc_hook=_msgpack_enc_hook)
 
 
 def _coerce_args(fn: Callable, args: Dict[str, Any]) -> Dict[str, Any]:
-    """Map a flat args dict onto the handler's parameters.
+    """Bind a flat caller-supplied args dict to ``fn``'s declared parameters.
 
-    FastAPI normally splits HTTP query params from the body and matches each
-    to its declared handler param at request time; the RPC dispatcher just
-    sees a single ``args`` dict from the caller and must figure out the
-    binding itself.  Two patterns appear in HELAO:
+    Handles three FastAPI-style patterns:
 
-    1. ``Body(embed=True)`` (or query params): keys in ``args`` line up with
-       parameter names, so a simple name-by-name pickup works.  Pydantic
-       model annotations are rehydrated from dicts here.
-    2. ``Body()`` with a single ``dict`` or ``BaseModel`` parameter: the
-       whole body IS that parameter's value, so the caller's ``args`` dict
-       contains the body's keys -- none of which match the param name.  In
-       this case we wrap the leftover args as the single unfilled
-       dict/model parameter's value.
+    1. ``Body(embed=True)`` / query params -- keys line up with parameter
+       names and pydantic models are rehydrated from dicts.
+    2. ``Body()`` with a single ``dict`` or ``BaseModel`` parameter -- the
+       caller's full ``args`` is wrapped as that parameter's value.
+    3. ``Body({})`` / ``Body([])`` sentinel defaults on still-unfilled
+       parameters are replaced with their wrapped empty container so the
+       handler sees ``{}`` / ``[]`` instead of a FastAPI ``Body`` instance.
+
+    Args:
+        fn: Target handler.
+        args: Flat dict of args supplied by the RPC caller.
+
+    Returns:
+        kwargs dict suitable for ``fn(**kwargs)``.
     """
     try:
         sig = inspect.signature(fn)
@@ -206,14 +216,14 @@ def _coerce_args(fn: Callable, args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 class RPCDispatcher:
-    """Holds a method registry and serves RPC requests over a ROUTER socket.
+    """Method registry plus a ROUTER-socket receive loop.
 
-    The dispatcher is created eagerly (so routes can be registered during
-    FastAPI startup) and bound lazily via :meth:`serve` once the event loop
-    is running.
+    Created eagerly so routes can register during FastAPI startup, then bound
+    lazily through :meth:`serve` once an event loop is running.
     """
 
     def __init__(self, server_key: str) -> None:
+        """Create an unbound dispatcher tagged with ``server_key`` for logging."""
         self.server_key = server_key
         self._methods: Dict[str, Callable[..., Awaitable[Any]]] = {}
         self._socket: Optional[zmq.asyncio.Socket] = None
@@ -221,17 +231,23 @@ class RPCDispatcher:
         self._endpoint: Optional[str] = None
 
     def register(self, name: str, fn: Callable[..., Any]) -> None:
-        """Register *fn* under *name*.  Last writer wins (mirrors FastAPI)."""
+        """Add ``fn`` to the dispatch table under ``name`` (last writer wins).
+
+        Args:
+            name: Route name (a leading slash is stripped).
+            fn: Sync or async callable to invoke for the method.
+        """
         # Strip a leading slash if the caller passed the raw route path.
         name = name.lstrip("/")
         self._methods[name] = fn
 
     @property
     def methods(self) -> Dict[str, Callable[..., Any]]:
+        """Read-only view of the registered method table."""
         return self._methods
 
     async def serve(self, host: str, port: int) -> None:
-        """Bind a ROUTER socket and start the receive loop as a background task."""
+        """Bind ``tcp://host:port`` and start the receive loop (idempotent)."""
         if self._task is not None:
             return  # idempotent
         ctx = zmq.asyncio.Context.instance()
@@ -245,6 +261,7 @@ class RPCDispatcher:
         LOGGER.info(f"RPC dispatcher for {self.server_key!r} listening on {endpoint}")
 
     async def close(self) -> None:
+        """Cancel the receive loop and close the ROUTER socket."""
         if self._task is not None:
             self._task.cancel()
             try:
@@ -257,6 +274,7 @@ class RPCDispatcher:
             self._socket = None
 
     async def _recv_loop(self) -> None:
+        """Receive multipart frames and spawn a ``_handle`` task per request."""
         assert self._socket is not None
         while True:
             try:
@@ -279,6 +297,7 @@ class RPCDispatcher:
             asyncio.create_task(self._handle(envelope, payload))
 
     async def _handle(self, envelope: list, payload: bytes) -> None:
+        """Decode one request, invoke the registered method, and send the reply."""
         req_id = 0
         try:
             req = _REQ_DECODER.decode(payload)
@@ -308,10 +327,11 @@ class RPCDispatcher:
 
 
 def _to_jsonable(value: Any) -> Any:
-    """Best-effort conversion of return values to msgpack-friendly primitives.
+    """Convert a handler return value to msgpack-friendly primitives.
 
-    Most HELAO endpoints already return dict / list / primitives, but a few
-    return pydantic models or objects with ``as_dict()`` / ``model_dump()``.
+    Pydantic models are dumped via ``model_dump(mode="json")``; objects with
+    an ``as_dict`` method are converted through it; anything else passes
+    through unchanged for the encoder hook to handle.
     """
     if isinstance(value, BaseModel):
         return value.model_dump(mode="json")
@@ -329,13 +349,20 @@ def _to_jsonable(value: Any) -> Any:
 
 
 class RPCClient:
-    """Persistent DEALER-socket client with id-correlated, concurrent requests.
+    """Persistent DEALER-socket RPC client with id-correlated concurrent calls.
 
-    Construction is cheap and synchronous; the background reader task is
-    started on the first call so it binds to the caller's running event loop.
+    Construction is cheap and synchronous; the background reader task starts
+    on the first call so it binds to the caller's running event loop.
     """
 
     def __init__(self, endpoint: str, default_timeout: float = 5.0) -> None:
+        """Configure the endpoint and per-call default timeout.
+
+        Args:
+            endpoint: ``tcp://host:port`` of the target RPC dispatcher.
+            default_timeout: Seconds to wait for a reply when ``call`` is
+                invoked without an explicit timeout.
+        """
         self.endpoint = endpoint
         self.default_timeout = default_timeout
         self._socket: Optional[zmq.asyncio.Socket] = None
@@ -345,6 +372,7 @@ class RPCClient:
         self._lock = asyncio.Lock()
 
     async def _ensure_started(self) -> None:
+        """Lazily connect the DEALER socket and spawn the reader task."""
         if self._socket is not None:
             return
         async with self._lock:
@@ -359,6 +387,7 @@ class RPCClient:
             )
 
     async def _read_loop(self) -> None:
+        """Decode incoming replies and resolve the matching pending future."""
         assert self._socket is not None
         while True:
             try:
@@ -384,10 +413,19 @@ class RPCClient:
         timeout: Optional[float] = None,
         **kwargs: Any,
     ) -> Any:
-        """Invoke *method* on the remote dispatcher and return its result.
+        """Invoke ``method`` on the remote dispatcher and return its result.
 
-        Raises ``RPCError`` if the server returned ``ok=False``, or
-        ``asyncio.TimeoutError`` if no response within *timeout* seconds.
+        Args:
+            method: Remote method name.
+            timeout: Override for the per-call wait, in seconds.
+            **kwargs: Forwarded to the remote method.
+
+        Returns:
+            The server's ``result`` payload.
+
+        Raises:
+            RPCError: If the server returned ``ok=False``.
+            asyncio.TimeoutError: If no response arrives within ``timeout``.
         """
         await self._ensure_started()
         assert self._socket is not None
@@ -411,6 +449,7 @@ class RPCClient:
         return resp.result
 
     async def close(self) -> None:
+        """Cancel the reader task and close the DEALER socket."""
         if self._reader is not None:
             self._reader.cancel()
             try:
@@ -430,22 +469,29 @@ class RPCClient:
 
 
 class RPCSyncClient:
-    """Blocking RPC client built on ``zmq.REQ``.
+    """Blocking RPC client over a ``zmq.REQ`` socket (one call in flight).
 
-    REQ is strictly request/reply -- one call in flight at a time -- which
-    matches how callers of the legacy ``private_dispatcher`` already behave.
-    On a poll timeout the socket enters an invalid state, so we close and
-    recreate it for the next call.  Construction is lazy: the socket is only
+    Used by operator scripts and Bokeh visualizers that have no asyncio loop.
+    A REQ socket enters an invalid state after a poll timeout, so the client
+    recreates the socket lazily before the next call. The socket is only
     created on the first :meth:`call`.
     """
 
     def __init__(self, endpoint: str, default_timeout: float = 5.0) -> None:
+        """Configure the endpoint and default per-call timeout.
+
+        Args:
+            endpoint: ``tcp://host:port`` of the target RPC dispatcher.
+            default_timeout: Seconds to wait for a reply when ``call`` is
+                invoked without an explicit timeout.
+        """
         self.endpoint = endpoint
         self.default_timeout = default_timeout
         self._socket: Optional["zmq.Socket"] = None
         self._ids = itertools.count(1)
 
     def _ensure_socket(self) -> "zmq.Socket":
+        """Return the cached REQ socket, creating and connecting it if needed."""
         if self._socket is not None:
             return self._socket
         ctx = zmq.Context.instance()
@@ -456,6 +502,7 @@ class RPCSyncClient:
         return sock
 
     def _reset_socket(self) -> None:
+        """Close and discard the cached REQ socket so the next call recreates it."""
         if self._socket is not None:
             try:
                 self._socket.close(linger=0)
@@ -469,6 +516,20 @@ class RPCSyncClient:
         timeout: Optional[float] = None,
         **kwargs: Any,
     ) -> Any:
+        """Send a single request and block for the reply.
+
+        Args:
+            method: Remote method name.
+            timeout: Override for the per-call wait, in seconds.
+            **kwargs: Forwarded to the remote method.
+
+        Returns:
+            The server's ``result`` payload.
+
+        Raises:
+            RPCError: If the server returned ``ok=False``.
+            TimeoutError: If no reply arrives within ``timeout``.
+        """
         sock = self._ensure_socket()
         req = RPCRequest(id=next(self._ids), method=method, args=kwargs)
         try:
@@ -488,4 +549,5 @@ class RPCSyncClient:
         return resp.result
 
     def close(self) -> None:
+        """Close the cached REQ socket if any."""
         self._reset_socket()

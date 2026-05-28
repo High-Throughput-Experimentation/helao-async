@@ -139,7 +139,29 @@ def seq_constructor(
     seq_name="UVIS_T",
     seq_label="gcld-mvp-demo",
     param_defaults={},
-):
+) -> Sequence:
+    """Build a measurement :class:`Sequence` for a single plate sample.
+
+    Merges ``param_defaults`` with caller-supplied ``params`` and the
+    introspected defaults of ``seq_func``, injects ``plate_id`` and
+    ``plate_sample_no_list``, then invokes ``seq_func`` to expand the planned
+    experiments before wrapping them in a ``Sequence`` model with the
+    module-level ``TEST`` flag forwarded as ``dummy``.
+
+    Args:
+        plate_id: Numeric plate identifier injected into the sequence params.
+        sample_no: Sample number on the plate; wrapped as a single-element list.
+        data_request_id: External data-request UUID associated with the sequence.
+        params: Caller overrides applied on top of ``param_defaults``.
+        seq_func: Sequence-builder function to call with the merged params.
+        seq_name: Human-readable name stored on the sequence.
+        seq_label: Tag used to group related sequences in the data store.
+        param_defaults: Baseline parameter mapping for ``seq_func``.
+
+    Returns:
+        Sequence: Populated sequence with ``planned_experiments`` ready to
+        dispatch to the orchestrator.
+    """
     argspec = inspect.getfullargspec(seq_func)
     seq_args = list(argspec.args)
     seq_defaults = list(argspec.defaults)
@@ -175,7 +197,26 @@ def ana_constructor(
     seq_name="UVIS_T_postseq",
     seq_label="gcld-mvp-demo-analysis",
     param_defaults={},
-):
+) -> Sequence:
+    """Build an analysis :class:`Sequence` tied to a prior measurement.
+
+    Same parameter-merging logic as :func:`seq_constructor` but adds
+    ``analysis_seq_uuid`` so the post-processing routine knows which
+    measurement sequence to load.
+
+    Args:
+        plate_id: Numeric plate identifier for the source measurement.
+        sequence_uuid: UUID of the upstream measurement sequence to analyze.
+        data_request_id: External data-request UUID to associate with the analysis.
+        params: Caller overrides applied on top of ``param_defaults``.
+        seq_func: Analysis sequence-builder function.
+        seq_name: Human-readable name stored on the sequence.
+        seq_label: Tag used to group related analyses in the data store.
+        param_defaults: Baseline parameter mapping for ``seq_func``.
+
+    Returns:
+        Sequence: Populated analysis sequence ready to dispatch.
+    """
     argspec = inspect.getfullargspec(seq_func)
     seq_args = list(argspec.args)
     seq_defaults = list(argspec.defaults)
@@ -211,7 +252,26 @@ def qc_constructor(
     seq_name="UVIS_T",
     seq_label="gcld-mvp-demo",
     param_defaults={},
-):
+) -> Sequence:
+    """Build a QC/diagnostic :class:`Sequence` for a reference sample.
+
+    Variant of :func:`seq_constructor` that injects ``solid_sample_no`` rather
+    than ``plate_sample_no_list``. Used to run periodic diagnostic CVs on a
+    reference electrode.
+
+    Args:
+        plate_id: Numeric plate identifier injected into the sequence params.
+        sample_no: Solid sample number to record on the QC sequence.
+        data_request_id: Data-request UUID currently being processed.
+        params: Caller overrides applied on top of ``param_defaults``.
+        seq_func: Sequence-builder function to call with the merged params.
+        seq_name: Human-readable name stored on the sequence.
+        seq_label: Tag used to group related QC sequences in the data store.
+        param_defaults: Baseline parameter mapping for ``seq_func``.
+
+    Returns:
+        Sequence: Populated QC sequence ready to dispatch.
+    """
     argspec = inspect.getfullargspec(seq_func)
     seq_args = list(argspec.args)
     seq_defaults = list(argspec.defaults)
@@ -238,13 +298,29 @@ def qc_constructor(
     return seq
 
 
-def gen_ts():
+def gen_ts() -> str:
+    """Return the current local time formatted as ``[HH:MM:SS]`` for log prefixes."""
     return f"[{time.strftime('%H:%M:%S')}]"
 
 
 def wait_for_orch(
     op: HelaoOperator, loop_state: LoopStatus = LoopStatus.started, polling_time=5.0
-):
+) -> tuple:
+    """Poll the orchestrator until it reaches ``loop_state`` or errors out.
+
+    Displays a ``tqdm`` progress indicator while polling at ``polling_time``
+    second intervals. Returns early if the orchestrator reports ``error`` or
+    ``estopped``.
+
+    Args:
+        op: Connected :class:`HelaoOperator` used to query orchestrator state.
+        loop_state: Target loop state to wait for.
+        polling_time: Sleep interval between state queries, in seconds.
+
+    Returns:
+        tuple: ``(current_loop, active_sequence, last_sequence)`` taken from
+        the most recent orchestrator state snapshot.
+    """
     current_state = op.orch_state()
     current_loop = current_state["loop_state"]
     active_seq = current_state["active_sequence"]
@@ -264,12 +340,32 @@ def wait_for_orch(
     return current_loop, active_seq, last_seq
 
 
-def num_uploads(db_cfg):
+def num_uploads(db_cfg) -> int:
+    """Return the total number of running plus queued upload tasks on the DB server.
+
+    Args:
+        db_cfg: Mapping with ``host`` and ``port`` keys identifying the
+            HELAO ``DB`` server.
+
+    Returns:
+        int: Sum of currently-running and queued task counts reported by the
+        ``tasks`` endpoint.
+    """
     resp, err = private_dispatcher("DB", db_cfg["host"], db_cfg["port"], "tasks")
     return len(resp.get("running", [])) + resp.get("num_queued", 0)
 
 
 def main():
+    """Run the gCLD operator loop indefinitely.
+
+    Pulls pending data requests from the data-request service, builds the
+    in-situ ECHEUVIS measurement sequence (optionally resuming an
+    ``acknowledged`` request via ``sys.argv[4]``), dispatches it to the
+    orchestrator, waits for completion, then dispatches the matching analysis
+    sequence. Every ``QC_EVERY`` iterations a diagnostic CV is also run.
+    Marks requests as ``failed`` and prompts the user on orchestrator errors,
+    and idles for 10 seconds between polls or when the service is unreachable.
+    """
 
     inst_config = sys.argv[1]
     PLATE_ID = int(sys.argv[2])

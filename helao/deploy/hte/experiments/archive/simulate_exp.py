@@ -13,11 +13,7 @@
 # extract FOMs
 
 
-"""
-Action library for simulator
-
-server_key must be a FastAPI action server defined in config
-"""
+"""Archived simulator experiment library for screening-style demo workflows."""
 
 __all__ = ["SIM_measure_CP"]
 
@@ -46,7 +42,24 @@ def SIM_measure_CP(
     solution_ph: int = 13,
     elements: List[str] = [],
     element_fracs: List[float] = [],
-):
+) -> list:
+    """Simulate sample selection and CP measurement at 3 and 10 mA/cm^2.
+
+    Builds an action plan that queries PAL for a matching plate, loads the
+    composition space, picks the sample closest to ``element_fracs``,
+    resolves the plate XY, moves the MOTOR stage there, then runs two
+    PSTAT ``run_CP`` steps with intervening CALC ``calc_cpfom`` calls.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        solution_ph: Target pH used in PAL ``query_plate`` and CP FOM calls.
+        elements: Element-space identifiers used when querying plates.
+        element_fracs: Target composition fractions for the sample acquire.
+
+    Returns:
+        List of planned PAL/MOTOR/PSTAT/ANA actions for the simulated screen.
+    """
     apm = ActionPlanMaker()
 
     # find plate matching element, pH space

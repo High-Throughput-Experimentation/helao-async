@@ -1,3 +1,14 @@
+"""Pack finished HELAO runs and push them to S3 and the Modelyst API.
+
+Wraps the on-disk sequence/experiment/action YAMLs into
+:class:`HelaoYml` subclasses (:class:`SeqYml`, :class:`ExpYml`,
+:class:`ActYml`), tracks per-target push state in ``.progress`` files,
+walks ``RUNS_ACTIVE`` -> ``RUNS_FINISHED`` -> ``RUNS_SYNCED``, uploads
+the matching JSON/HLO payloads to S3 and the metadata records to the
+configured REST API, then zips synced sequence directories. The
+top-level entry point is :class:`DBPack`.
+"""
+
 __all__ = ["DBPack", "ActYml", "ExpYml", "SeqYml", "HelaoPath", "YmlOps"]
 
 import os
@@ -9,7 +20,7 @@ from time import sleep
 from pathlib import Path
 from glob import glob
 from datetime import datetime
-from typing import Union, Optional
+from typing import Any, Union, Optional
 from collections import UserDict, defaultdict
 import traceback
 
@@ -47,8 +58,8 @@ plural = {
 }
 
 
-def dict2json(input_dict: dict):
-    """Converts dict to file-like object containing json."""
+def dict2json(input_dict: dict) -> io.BytesIO:
+    """Serialise ``input_dict`` as JSON in a UTF-8 BytesIO buffer."""
     bio = io.BytesIO()
     StreamWriter = codecs.getwriter("utf-8")
     wrapper_file = StreamWriter(bio)
@@ -57,7 +68,14 @@ def dict2json(input_dict: dict):
     return bio
 
 
-def wrap_sample_details(input_obj):
+def wrap_sample_details(input_obj) -> Any:
+    """Recursively repack sample dicts so non-core fields live under ``sample_details``.
+
+    Used so the public S3/API payloads keep ``hlo_version``,
+    ``global_label``, ``sample_type``, ``status`` and ``inheritance``
+    at the top level of each sample and everything else nested in
+    ``sample_details``.
+    """
     sample_root = [
         "hlo_version",
         "global_label",
@@ -95,39 +113,50 @@ def wrap_sample_details(input_obj):
 
 
 class HelaoPath(type(Path())):
-    """Helao data path helper attributes."""
+    """:class:`pathlib.Path` extension that knows about ``RUNS_*`` statuses."""
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Return the path rendered with the platform separator."""
         return os.path.join(*self.parts)
 
-    def rename(self, status: str):
+    def rename(self, status: str) -> "HelaoPath":
+        """Return a sibling path with the ``RUNS_*`` segment replaced by ``status``."""
         tempparts = list(self.parts)
         tempparts[self.status_idx] = status
         return HelaoPath(os.path.join(*tempparts))
 
     @property
-    def status_idx(self):
+    def status_idx(self) -> int:
+        """Index in ``self.parts`` of the ``RUNS_ACTIVE/FINISHED/SYNCED`` segment."""
         valid_statuses = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED")
         return [any([x in valid_statuses]) for x in self.parts].index(True)
 
     @property
-    def relative(self):
+    def relative(self) -> str:
+        """The portion of the path below the ``RUNS_*`` segment."""
         return "/".join(list(self.parts)[self.status_idx + 1 :])
 
     @property
-    def active(self):
+    def active(self) -> "HelaoPath":
+        """Same path under ``RUNS_ACTIVE``."""
         return self.rename("RUNS_ACTIVE")
 
     @property
-    def finished(self):
+    def finished(self) -> "HelaoPath":
+        """Same path under ``RUNS_FINISHED``."""
         return self.rename("RUNS_FINISHED")
 
     @property
-    def synced(self):
+    def synced(self) -> "HelaoPath":
+        """Same path under ``RUNS_SYNCED``."""
         return self.rename("RUNS_SYNCED")
 
     def cleanup(self):
-        """Remove empty directories in RUNS_ACTIVE or RUNS_FINISHED."""
+        """Walk upwards and remove empty parent directories until a non-empty one.
+
+        Returns ``"success"`` after a successful ``rmdir`` and the
+        :class:`PermissionError` if one is raised.
+        """
         tempparts = list(self.parts)
         steps = len(tempparts) - self.status_idx
         for i in range(1, steps):
@@ -144,12 +173,34 @@ class HelaoPath(type(Path())):
 
 
 class HelaoYml:
+    """Base wrapper around an on-disk action/experiment/sequence yaml.
+
+    Loads the file, extracts the file type, UUID and progress path, and
+    initialises a :class:`Progress` tracker. When the yaml is already
+    ``FINISHED`` (and it is not an experiment) the cleaned model dict is
+    cached in ``progress[<pkey>]["meta"]`` ready for upload.
+    """
+
     def __init__(self, path: Union[HelaoPath, str], uuid_test: Optional[dict] = None):
+        """Parse ``path`` and prime the progress tracker.
+
+        Args:
+            path: Yaml file path (string or :class:`HelaoPath`).
+            uuid_test: Optional dict used to override UUIDs during
+                testing (paths are mapped to fresh UUIDs).
+        """
         self.yml_path = path
         self.uuid_test = uuid_test  # regenerate uuid for testing
         self.parse_yml(path)
 
     def parse_yml(self, path):
+        """Load ``path`` into ``self.dict`` and rebuild derived attributes.
+
+        Populates ``target``, ``file_type``, ``uuid``, ``pkey``,
+        ``status``, ``data_dir``, ``data_files``, ``parent_dir``,
+        ``progress_path`` and ``progress``, and caches a cleaned meta
+        dict on FINISHED non-experiment ymls.
+        """
         # LOGGER.info(f"!!! parsing yml {path}")
         self.target = path if isinstance(path, HelaoPath) else HelaoPath(path)
         self.dict = yml_load(self.target)
@@ -221,7 +272,8 @@ class HelaoYml:
             self.progress.write()
 
     @property
-    def time(self):
+    def time(self) -> datetime:
+        """Parsed ``<file_type>_timestamp`` as a :class:`datetime`."""
         try:
             parsed_time = datetime.strptime(
                 self.dict[f"{self.file_type}_timestamp"], "%Y-%m-%d %H:%M:%S.%f"
@@ -233,12 +285,16 @@ class HelaoYml:
         return parsed_time
 
     @property
-    def name(self):
+    def name(self) -> str:
+        """Value of ``<file_type>_name`` in the yaml."""
         return self.dict[f"{self.file_type}_name"]
 
 
 class ActYml(HelaoYml):
+    """:class:`HelaoYml` for action ymls, exposing process-contribution metadata."""
+
     def __init__(self, path: Union[HelaoPath, str], **kwargs):
+        """Parse the action yaml and cache process-grouping flags."""
         super().__init__(path, **kwargs)
         self.finisher = self.dict.get("process_finish", False)
         self.run_type = self.dict.get("run_type", "MISSING")
@@ -251,11 +307,15 @@ class ActYml(HelaoYml):
 
 
 class ExpYml(HelaoYml):
+    """:class:`HelaoYml` for experiments, grouping their actions into processes."""
+
     def __init__(self, path: Union[HelaoPath, str], **kwargs):
+        """Parse the experiment yaml and load its actions."""
         super().__init__(path, **kwargs)
         self.parse_yml(path)
 
     def parse_yml(self, path: Union[HelaoPath, str]):
+        """Reload the yaml and rebuild the action groups."""
         super().parse_yml(path)
         self.get_actions()
         if self.grouped_actions:
@@ -265,7 +325,15 @@ class ExpYml(HelaoYml):
             self.max_group = 0
 
     def get_actions(self):
-        """Return a list of ActYml objects belonging to this experiment."""
+        """Discover this experiment's actions and group them into processes.
+
+        Walks ACTIVE/FINISHED/SYNCED for matching action ymls,
+        populates ``current_actions``, ``grouped_actions`` and
+        ``ungrouped_actions``, marks each process group ``ready`` once
+        all its actions have finished, and (for FINISHED experiments)
+        caches the cleaned meta dict and ``process_list`` in
+        ``progress[self.pkey]["meta"]``.
+        """
         self.grouped_actions = defaultdict(list)
         self.ungrouped_actions = []
         self.current_actions = []
@@ -348,7 +416,13 @@ class ExpYml(HelaoYml):
             self.progress.write()
 
     def create_process(self, group_idx: int):
-        """Create process group from finished actions in progress['meta']."""
+        """Build the :class:`ProcessModel` payload for one action group.
+
+        Aggregates ``samples_in``/``samples_out``/``files`` and other
+        contribution fields from each action that opted into the group,
+        deduplicates samples, and stores the cleaned meta dict in
+        ``progress[group_idx]["meta"]``.
+        """
         actions = self.grouped_actions[group_idx]
         base_process = {"access": self.dict.get("access", "hte")}
         base_process.update(
@@ -475,16 +549,24 @@ class ExpYml(HelaoYml):
 
 
 class SeqYml(HelaoYml):
+    """:class:`HelaoYml` for sequences, owning their experiments."""
+
     def __init__(self, path: Union[HelaoPath, str], **kwargs):
+        """Parse the sequence yaml and load its experiments."""
         super().__init__(path, **kwargs)
         self.parse_yml(path)
 
     def parse_yml(self, path: Union[HelaoPath, str]):
+        """Reload the yaml and refresh the experiment list."""
         super().parse_yml(path)
         self.get_experiments()
 
     def get_experiments(self):
-        """Return a list of ExpYml objects belonging to this experiment."""
+        """Populate ``current_experiments`` with :class:`ExpYml` children.
+
+        Walks ACTIVE/FINISHED/SYNCED for ``*/*.yml`` candidates and
+        sorts them by experiment timestamp.
+        """
         self.current_experiments = []
         all_experiment_paths = []
         # all_experiment_paths += self.progress[self.pkey]["synced_children"]
@@ -507,13 +589,19 @@ ymlmap = {
 
 
 class Progress(UserDict):
-    """Custom dict that wraps getter/setter ops with read/writes to progress file.
+    """File-backed dict tracking the S3/API push state for one yaml.
 
-    Note: getter-setter ops only work for root keys, setting a nested key-value requires
-    an additional call to Progress.write()
+    Reads on every access and writes on every mutation so concurrent
+    workers see a consistent view of which constituents are ``ready``,
+    ``done``, ``pending``, ``pushed``, ``api`` or ``s3``.
+
+    Note:
+        Only root-key getters/setters auto-flush; mutating a nested
+        dict still requires an explicit :meth:`write` call.
     """
 
     def __init__(self, yml: HelaoYml):
+        """Load (or initialise) the ``.progress`` file paired with ``yml``."""
         super().__init__()
         self.yml = yml
         self.pkey = yml.pkey
@@ -541,82 +629,107 @@ class Progress(UserDict):
         self.write()
 
     def read(self):
+        """Refresh ``self.data`` from the on-disk progress yaml."""
         if self.progress_path.exists():
             self.data = yml_load(self.progress_path)
 
     def write(self):
+        """Persist ``self.data`` to the progress yaml (creating dirs as needed)."""
         self.progress_path.parent.mkdir(parents=True, exist_ok=True)
         self.progress_path.write_text(yml_dumps(self.data))
 
     def __setitem__(self, key, item):
+        """Set ``data[key] = item`` and flush to disk."""
         self.data[key] = item
         self.write()
 
     def __getitem__(self, key):
+        """Refresh from disk and return ``data[key]``."""
         self.read()
         return self.data[key]
 
     def __repr__(self):
+        """Refresh from disk and return ``repr(data)``."""
         self.read()
         return repr(self.data)
 
     def __len__(self):
+        """Refresh from disk and return the number of entries."""
         self.read()
         return len(self.data)
 
     def __delitem__(self, key):
+        """Delete ``data[key]`` and flush to disk."""
         del self.data[key]
         self.write()
 
-    def has_key(self, k):
+    def has_key(self, k) -> bool:
+        """Return ``True`` if ``k`` is present in the (re-read) data."""
         self.read()
         return k in self.data
 
     def update(self, *args, **kwargs):
+        """Refresh from disk, apply :meth:`dict.update`, then flush."""
         self.read()
         self.data.update(*args, **kwargs)
         self.write()
 
     def keys(self):
+        """Refresh from disk and return the underlying dict's keys view."""
         self.read()
         return self.data.keys()
 
     def values(self):
+        """Refresh from disk and return the underlying dict's values view."""
         self.read()
         return self.data.values()
 
     def items(self):
+        """Refresh from disk and return the underlying dict's items view."""
         self.read()
         return self.data.items()
 
     def pop(self, *args):
+        """Refresh from disk and pop the requested key."""
         self.read()
         retval = self.data.pop(*args)
         return retval
 
     def __cmp__(self, dict_):
+        """Refresh from disk and compare with ``dict_``."""
         self.read()
         return self.__cmp__(self.data, dict_)
 
     def __contains__(self, item):
+        """Refresh from disk and test for membership."""
         self.read()
         return item in self.data
 
     def __iter__(self):
+        """Refresh from disk and iterate the underlying dict."""
         self.read()
         return iter(self.data)
 
 
 class DBPack:
-    """Driver class for API push and S3 upload operations.
+    """Top-level driver coordinating S3 and API uploads of completed runs.
 
-    config_dict = {
-        "aws_config_path": "path_to_AWS_CONFIG_PATH",
-        "aws_bucket": "helao.data.testing"
-    }
+    Configured via the action server's ``params`` block which must
+    provide ``aws_config_path``, ``aws_profile``, ``aws_bucket`` and
+    ``api_host``. Spawns a background task that drains a queue of
+    yaml-paths and processes them through :meth:`finish_yml`.
+
+    Example:
+        ``config_dict = {"aws_config_path": "...", "aws_bucket":
+        "helao.data.testing"}``.
     """
 
     def __init__(self, action_serv: Base):
+        """Initialise the AWS session, log file and background task queue.
+
+        Args:
+            action_serv: Hosting action server.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
@@ -650,6 +763,12 @@ class DBPack:
         self.cleanup_root()
 
     async def yml_task(self):
+        """Background worker: pull yaml paths off the queue and finish them.
+
+        Each entry is ``(yml_target, timeout)``; the worker delays one
+        second to let file handles release, calls :meth:`finish_yml`
+        under :func:`asyncio.wait_for` and logs any exceptions.
+        """
         while True:
             yml_target, timeout = await self.task_queue.get()
             if os.path.exists(yml_target):
@@ -673,6 +792,12 @@ class DBPack:
             self.task_queue.task_done()
 
     def cleanup_root(self):
+        """Remove empty per-day and per-week directories under RUNS_*.
+
+        Looks at ``RUNS_ACTIVE`` and ``RUNS_FINISHED`` for date
+        directories older than today and tries to remove any that
+        contain no sequence subdirectories, then walks up one level.
+        """
         today = datetime.strptime(datetime.now().strftime("%y%m%d"), "%y%m%d")
         chkdirs = ["RUNS_ACTIVE", "RUNS_FINISHED"]
         for cd in chkdirs:
@@ -709,12 +834,20 @@ class DBPack:
                             )
 
     def read_log(self):
+        """Reload the pending-uploads log from disk."""
         self.log_dict = yml_load(self.log_path)
 
     def write_log(self):
+        """Persist :attr:`log_dict` to ``db_pending.yml``."""
         self.log_path.write_text(yml_dumps(self.log_dict))
 
     def update_log(self, yml_path: str, flag_dict: dict):
+        """Merge ``flag_dict`` into the log entry for ``yml_path``.
+
+        Creates the entry with default ``{"s3": False, "api": False}``
+        if missing, writes the log to disk, and removes the entry once
+        both flags are ``True``.
+        """
         if yml_path not in self.log_dict.keys():
             self.log_dict[yml_path] = {"s3": False, "api": False}
         self.log_dict[yml_path].update(flag_dict)
@@ -724,6 +857,7 @@ class DBPack:
             self.rm(yml_path)
 
     def rm(self, yml_path: str):
+        """Drop ``yml_path`` from the log if all upload flags are set."""
         if all(self.log_dict[yml_path].values()):
             self.log_dict.pop(yml_path)
         else:
@@ -732,10 +866,12 @@ class DBPack:
             )
         self.write_log()
 
-    def list_pending(self):
+    def list_pending(self) -> dict:
+        """Return the in-memory pending-uploads log."""
         return self.log_dict
 
     async def finish_exps(self, seq_yml: SeqYml):
+        """Finish every non-synced experiment under ``seq_yml``."""
         seq_yml.get_experiments()
         for exp in seq_yml.current_experiments:
             if exp.status != "SYNCED":
@@ -744,12 +880,14 @@ class DBPack:
                 await self.finish_yml(exp.target)
 
     async def finish_acts(self, exp_yml: ExpYml):
+        """Finish every non-synced action under ``exp_yml``."""
         exp_yml.get_actions()
         for act in exp_yml.current_actions:
             if act.status != "SYNCED":
                 await self.finish_yml(act.target)
 
-    async def finish_pending(self):
+    async def finish_pending(self) -> dict:
+        """Retry every yaml left over in the pending-uploads log."""
         if len(self.log_dict) > 0:
             LOGGER.info(f"There are {len(self.log_dict)} ymls pending API or S3 push.")
             yml_paths = list(self.log_dict.keys())
@@ -763,16 +901,25 @@ class DBPack:
         return self.log_dict
 
     async def add_yml_task(self, yml_path: str, timeout: int = 300):
+        """Enqueue ``yml_path`` for background processing by :meth:`yml_task`."""
         resolved_path = Path(yml_path).resolve()
         await self.task_queue.put((resolved_path, timeout))
         LOGGER.info(f"Added {yml_path} to tasks.")
 
-    async def finish_yml(self, yml_path: Union[str, HelaoPath]):
-        """Primary function for processing ymls.
+    async def finish_yml(self, yml_path: Union[str, HelaoPath]) -> dict:
+        """Drive one yaml through ACTIVE -> FINISHED -> SYNCED uploads.
 
-        Args
-        yml_path[str]: local path to yml file
+        Recurses into experiments/actions for sequences/experiments,
+        moves files between RUNS_* directories, pushes per-target
+        payloads to S3 and the Modelyst API, marks completed entries
+        and zips fully-synced sequences.
 
+        Args:
+            yml_path: Path to the yaml file (string or :class:`HelaoPath`).
+
+        Returns:
+            Per-progress-key summary of the entries that became ``done``
+            during this call (without their ``meta`` dicts).
         """
         if isinstance(yml_path, str):
             yml_path_str = yml_path
@@ -930,6 +1077,7 @@ class DBPack:
         return return_dict
 
     def shutdown(self):
+        """Hook for graceful shutdown (no-op)."""
         # LOGGER.info("Checking for queued DB tasks.")
         # while not self.task_queue.empty():
         #     sleep(0.2)
@@ -938,12 +1086,27 @@ class DBPack:
 
 
 class YmlOps:
+    """Per-yaml helper that performs the S3, API and filesystem moves."""
+
     def __init__(self, dbp: DBPack, yml: Union[SeqYml, ActYml, ExpYml]):
+        """Bind a :class:`DBPack` and the yaml wrapper it operates on."""
         self.dbp = dbp
         self.yml = yml
 
     async def to_api(self, progress_key: Union[str, int], retry_num: int = 2):
-        """Submit to modelyst DB"""
+        """POST/PATCH the meta payload at ``progress_key`` to the Modelyst API.
+
+        Skips experiments/sequences whose constituents are not all done,
+        retries the request up to ``retry_num`` times, switches POST to
+        PATCH on a 400 response, and on terminal failure posts a debug
+        payload to ``/failed``.
+
+        Returns:
+            :attr:`ErrorCodes.none` on success,
+            :attr:`ErrorCodes.not_allowed` if S3 prerequisites are
+            unmet, :attr:`ErrorCodes.http` after exhausted retries, or
+            ``False`` when constituents are still pending.
+        """
         # init global log
 
         # no pending files, yml pushed to S3
@@ -1045,7 +1208,12 @@ class YmlOps:
                 self.dbp.update_log(self.yml.target.__str__(), {"api": False})
             return ErrorCodes.http
 
-    async def _to_s3(self, msg: Union[dict, str], target: str, retry_num: int):
+    async def _to_s3(self, msg: Union[dict, str], target: str, retry_num: int) -> bool:
+        """Upload ``msg`` (dict-as-JSON or file path) to ``target`` on the bucket.
+
+        Retries up to ``retry_num`` times on
+        :class:`botocore.exceptions.ClientError`.
+        """
         if isinstance(msg, dict):
             uploaded = dict2json(msg)
             uploader = self.dbp.s3.upload_fileobj
@@ -1068,7 +1236,13 @@ class YmlOps:
         return False
 
     async def to_s3(self, progress_key: Union[str, int], retry_num: int = 2):
-        """Upload data_files and yml/json to S3"""
+        """Push pending HLO and aux data plus the meta json for ``progress_key``.
+
+        HLO files are re-encoded as ``{"meta": ..., "data": ...}`` json
+        before upload; remaining files are uploaded as-is. Marks each
+        successful payload in ``pushed`` and updates the central log
+        once all uploads (including the meta record) complete.
+        """
 
         pdict = self.yml.progress[progress_key]
         if isinstance(progress_key, int):  # process group
@@ -1132,7 +1306,7 @@ class YmlOps:
                 self.dbp.update_log(self.yml.target.__str__(), {"s3": False})
 
     def to_finished(self):
-        """Moves yml and data folder from ACTIVE to FINISHED path."""
+        """Move the yaml and its data files from ``RUNS_ACTIVE`` to ``RUNS_FINISHED``."""
         if self.yml.status == "ACTIVE":
             for file_path in self.yml.data_files:
                 file_path.finished.parent.mkdir(parents=True, exist_ok=True)
@@ -1159,8 +1333,12 @@ class YmlOps:
         else:
             LOGGER.info("Yml status is not ACTIVE, cannot move.")
 
-    def to_synced(self):
-        """Moves yml and data folder from FINISHED to SYNCED path. Final state."""
+    def to_synced(self) -> HelaoPath:
+        """Move the yaml and its data files from ``RUNS_FINISHED`` to ``RUNS_SYNCED``.
+
+        Returns the new :class:`HelaoPath` target after the move. This
+        is the final on-disk state.
+        """
         if self.yml.status == "FINISHED":
             for file_path in self.yml.data_files:
                 file_path.synced.parent.mkdir(parents=True, exist_ok=True)

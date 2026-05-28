@@ -1,3 +1,12 @@
+"""HELAO orchestrator runtime.
+
+Implements the :class:`Orch` service that extends :class:`Base` with the
+sequence/experiment/action deques, the dispatch loop that drives them, the
+global status model used by the Bokeh operator UI, and the heartbeat /
+status-monitor tasks that keep the orchestrator aware of every action server
+in the world configuration.
+"""
+
 __all__ = ["Orch"]
 
 import pickle
@@ -65,115 +74,14 @@ PLATE_API = HTEPlateAPI()
 
 
 class Orch(Base):
-    """
-    Orch class is responsible for orchestrating sequences, experiments, and actions in a distributed system. It manages the lifecycle of these entities, handles exceptions, and communicates with various servers to dispatch and monitor actions.
+    """Long-lived orchestrator service that schedules sequences, experiments and actions.
 
-    Attributes:
-        experiment_lib (dict): Library of available experiments.
-        experiment_codehash_lib (dict): Library of experiment code hashes.
-        sequence_lib (dict): Library of available sequences.
-        sequence_codehash_lib (dict): Library of sequence code hashes.
-        use_db (bool): Flag indicating if a database is used.
-        syncer (HelaoSyncer): Syncer object for database synchronization.
-        sequence_dq (zdeque): Deque for sequences.
-        experiment_dq (zdeque): Deque for experiments.
-        action_dq (zdeque): Deque for actions.
-        dispatch_buffer (list): Buffer for dispatching actions.
-        nonblocking (list): List of non-blocking actions.
-        last_dispatched_action_uuid (UUID): UUID of the last dispatched action.
-        last_action_uuid (str): UUID of the last action.
-        last_interrupt (float): Timestamp of the last interrupt.
-        active_experiment (Experiment): Currently active experiment.
-        last_experiment (Experiment): Last executed experiment.
-        active_sequence (Sequence): Currently active sequence.
-        active_seq_exp_counter (int): Counter for active sequence experiments.
-        last_sequence (Sequence): Last executed sequence.
-        bokehapp (Server): Bokeh server instance.
-        orch_op (BokehOperator): Bokeh operator instance.
-        op_enabled (bool): Flag indicating if the operator is enabled.
-        heartbeat_interval (int): Interval for heartbeat monitoring.
-        globalstatusmodel (GlobalStatusModel): Global status model.
-        interrupt_q (asyncio.Queue): Queue for interrupts.
-        incoming_status (asyncio.Queue): Queue for incoming statuses.
-        incoming (GlobalStatusModel): Incoming status model.
-        init_success (bool): Flag indicating if initialization was successful.
-        loop_task (asyncio.Task): Task for the dispatch loop.
-        wait_task (asyncio.Task): Task for waiting.
-        current_wait_ts (float): Timestamp of the current wait.
-        last_wait_ts (float): Timestamp of the last wait.
-        globstat_q (MultisubscriberQueue): Queue for global status.
-        globstat_clients (set): Set of global status clients.
-        current_stop_message (str): Current stop message.
-        step_thru_actions (bool): Flag for stepping through actions.
-        step_thru_experiments (bool): Flag for stepping through experiments.
-        step_thru_sequences (bool): Flag for stepping through sequences.
-        status_summary (dict): Summary of statuses.
-        global_params (dict): Global parameters.
-
-    Methods:
-        exception_handler(loop, context): Handles exceptions in the event loop.
-        myinit(): Initializes the orchestrator.
-        endpoint_queues_init(): Initializes endpoint queues.
-        register_action_uuid(action_uuid): Registers an action UUID.
-        track_action_uuid(action_uuid): Tracks an action UUID.
-        start_operator(): Starts the Bokeh operator.
-        makeBokehApp(doc, orch): Creates a Bokeh application.
-        wait_for_interrupt(): Waits for an interrupt.
-        subscribe_all(retry_limit): Subscribes to all FastAPI servers.
-        update_nonblocking(actionmodel, server_host, server_port): Updates non-blocking actions.
-        clear_nonblocking(): Clears non-blocking actions.
-        update_status(actionservermodel): Updates the status.
-        ws_globstat(websocket): Subscribes to global status queue and sends messages to websocket client.
-        globstat_broadcast_task(): Consumes the global status queue.
-        unpack_sequence(sequence_name, sequence_params): Unpacks a sequence.
-        get_sequence_codehash(sequence_name): Gets the code hash of a sequence.
-        seq_unpacker(): Unpacks the sequence.
-        loop_task_dispatch_sequence(): Dispatches the sequence.
-        loop_task_dispatch_experiment(): Dispatches the experiment.
-        loop_task_dispatch_action(): Dispatches the action.
-        dispatch_loop_task(): Parses experiment and action queues and dispatches actions.
-        orch_wait_for_all_actions(): Waits for all actions to finish.
-        start(): Begins experimenting with experiment and action queues.
-        start_loop(): Starts the orchestrator loop.
-        estop_loop(reason): Emergency stops the orchestrator loop.
-        stop_loop(): Stops the orchestrator loop.
-        estop_actions(switch): Emergency stops all actions.
-        skip(): Clears the current action queue while running.
-        intend_skip(): Intends to skip the current action.
-        stop(): Stops experimenting with experiment and action queues.
-        intend_stop(): Intends to stop the orchestrator.
-        intend_estop(): Intends to emergency stop the orchestrator.
-        intend_none(): Resets the loop intent.
-        clear_estop(): Clears the emergency stop.
-        clear_error(): Clears the error statuses.
-        clear_sequences(): Clears the sequence queue.
-        clear_experiments(): Clears the experiment queue.
-        clear_actions(): Clears the action queue.
-        add_sequence(sequence): Adds a sequence to the queue.
-        add_experiment(seq, experimentmodel, prepend, at_index): Adds an experiment to the queue.
-        list_sequences(limit): Lists the sequences in the queue.
-        list_experiments(limit): Lists the experiments in the queue.
-        list_all_experiments(): Lists all experiments in the queue.
-        drop_experiment_inds(inds): Drops experiments by index.
-        get_experiment(last): Gets the active or last experiment.
-        get_sequence(last): Gets the active or last sequence.
-        list_active_actions(): Lists the active actions.
-        list_actions(limit): Lists the actions in the queue.
-        supplement_error_action(check_uuid, sup_action): Supplements an error action.
-        remove_experiment(by_index, by_uuid): Removes an experiment by index or UUID.
-        replace_action(sup_action, by_index, by_uuid, by_action_order): Replaces an action in the queue.
-        append_action(sup_action): Appends an action to the queue.
-        finish_active_sequence(): Finishes the active sequence.
-        finish_active_experiment(): Finishes the active experiment.
-        write_active_experiment_exp(): Writes the active experiment.
-        write_active_sequence_seq(): Writes the active sequence.
-        shutdown(): Shuts down the orchestrator.
-        update_operator(msg): Updates the operator.
-        start_wait(active): Starts a wait action.
-        dispatch_wait_task(active, print_every_secs): Dispatches a wait task.
-        active_action_monitor(): Monitors active actions.
-        ping_action_servers(): Pings action servers.
-        action_server_monitor(): Monitors action servers.
+    Builds on :class:`Base` by importing the deployment's experiment and
+    sequence libraries, running the dispatch loop, maintaining a
+    ``GlobalStatusModel`` of every action server, optionally hosting the Bokeh
+    operator UI, and emitting heartbeat/status pings so the queues react to
+    remote events. Database integration is enabled when a ``DB`` server is
+    present in the world config.
     """
 
     bokehapp: Server
@@ -184,11 +92,10 @@ class Orch(Base):
     driver_monitor: asyncio.Task
 
     def __init__(self, fastapp: HelaoFastAPI):
-        """
-        Initializes the orchestrator server.
+        """Wire the orchestrator into a FastAPI app and load its experiment/sequence libraries.
 
         Args:
-            fastapp: The FastAPI application instance.
+            fastapp: The ``HelaoFastAPI`` instance hosting the orchestrator.
         """
         super().__init__(fastapp)
         (
@@ -287,22 +194,7 @@ class Orch(Base):
         )
 
     def exception_handler(self, loop, context):
-        """
-        Handles exceptions raised by coroutines in the event loop.
-
-        This method is called when an exception is raised in a coroutine
-        that is being executed by the event loop. It logs the exception
-        details and sets the E-STOP flag on all active actions.
-
-        Args:
-            loop (asyncio.AbstractEventLoop): The event loop where the exception occurred.
-            context (dict): A dictionary containing information about the exception,
-                            including the exception object itself under the key "exception".
-
-        Logs:
-            - The exception message and traceback.
-            - A message indicating that the E-STOP flag is being set on active actions.
-        """
+        """Log uncaught coroutine exceptions caught by the orchestrator's event loop."""
         LOGGER.error(f"Got exception from coroutine: {context}")
         exc = context.get("exception")
         LOGGER.error(f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}")
@@ -311,31 +203,7 @@ class Orch(Base):
         #     active.stop_action_task()
 
     def myinit(self):
-        """
-        Initializes the asynchronous event loop and sets up various tasks and handlers.
-
-        This method performs the following actions:
-        - Retrieves the current running event loop.
-        - Sets a custom exception handler for the event loop.
-        - Initiates an NTP time synchronization if it hasn't been done yet.
-        - Creates and schedules tasks for NTP synchronization, live buffering, endpoint status initialization,
-          status logging, global status broadcasting, heartbeat monitoring, and action server monitoring.
-        - Retrieves and stores endpoint URLs.
-        - Starts the operator if the operation is enabled.
-        - Subscribes to all necessary status updates.
-
-        Attributes:
-            aloop (asyncio.AbstractEventLoop): The current running event loop.
-            sync_ntp_task_run (bool): Flag indicating if the NTP sync task is running.
-            ntp_syncer (asyncio.Task): Task for synchronizing NTP time.
-            bufferer (asyncio.Task): Task for live buffering.
-            fast_urls (list): List of endpoint URLs.
-            status_logger (asyncio.Task): Task for logging status.
-            status_subscriber (asyncio.Task): Task for subscribing to all status updates.
-            globstat_broadcaster (asyncio.Task): Task for broadcasting global status.
-            heartbeat_monitor (asyncio.Task): Task for monitoring active actions.
-            driver_monitor (asyncio.Task): Task for monitoring the action server.
-        """
+        """Start the orchestrator's background tasks (status, broadcasts, heartbeats) and Bokeh UI."""
         self.aloop = asyncio.get_running_loop()
         self.aloop.set_exception_handler(self.exception_handler)
 
@@ -373,14 +241,12 @@ class Orch(Base):
     #             self.endpoint_queues[urld["name"]] = zdeque([])
 
     def register_obj_uuid(self, obj_uuid_key, obj_uuid_dict, obj_type: str):
-        """
-        Registers a new object UUID in the list of the last 50 object UUIDs.
-
-        This method ensures that the list of object UUIDs does not exceed 50 entries.
-        If the list is full, the oldest UUID is removed before adding the new one.
+        """Insert or merge a UUID's metadata into the action/experiment/sequence history map.
 
         Args:
-            obj_uuid (str): The UUID of the object to be registered.
+            obj_uuid_key: UUID of the action, experiment, or sequence.
+            obj_uuid_dict: Metadata associated with the UUID.
+            obj_type: One of ``"action"``, ``"experiment"``, or ``"sequence"``.
         """
         OBJ_MAP = {
             "action": self.action_history,
@@ -394,42 +260,15 @@ class Orch(Base):
             OBJ_MAP[obj_type][obj_uuid_key] = obj_uuid_dict
 
     def register_action_uuid(self, action_uuid, action_dict):
-        """
-        Registers a new action UUID in the list of the last 50 action UUIDs.
-
-        This method ensures that the list of action UUIDs does not exceed 50 entries.
-        If the list is full, the oldest UUID is removed before adding the new one.
-
-        Args:
-            action_uuid (str): The UUID of the action to be registered.
-        """
+        """Record an action UUID and its metadata in the action history map."""
         self.register_obj_uuid(action_uuid, action_dict, "action")
 
     def track_action_uuid(self, action_uuid):
-        """
-        Tracks the last dispatched action UUID.
-
-        Args:
-            action_uuid (str): The UUID of the action to be tracked.
-        """
+        """Remember ``action_uuid`` as the most recently dispatched action."""
         self.last_dispatched_action_uuid = action_uuid
 
     def start_operator(self):
-        """
-        Starts the Bokeh server for the operator.
-
-        This method initializes and starts a Bokeh server instance using the
-        configuration specified in `self.server_cfg` and `self.server_params`.
-        It sets up the server to serve a Bokeh application at a specified port
-        and address, and optionally launches a web browser to display the
-        application.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-        """
+        """Start the Bokeh server hosting the operator UI and optionally open a browser."""
         servHost = self.server_cfg["host"]
         servPort = self.server_params.get("bokeh_port", self.server_cfg["port"] + 1000)
         servPy = "BokehOperator"
@@ -447,15 +286,11 @@ class Orch(Base):
         # bokehapp.io_loop.start()
 
     def makeBokehApp(self, doc, orch):
-        """
-        Initializes a Bokeh application for visualization and sets up a BokehOperator.
+        """Attach a :class:`BokehOperator` to ``doc`` and return the populated Bokeh document.
 
         Args:
-            doc (bokeh.document.Document): The Bokeh document to be used for the application.
-            orch (Orchestrator): The orchestrator instance to be used by the BokehOperator.
-
-        Returns:
-            bokeh.document.Document: The modified Bokeh document with the BokehOperator attached.
+            doc: The Bokeh ``Document`` being served.
+            orch: Orchestrator instance the operator should drive.
         """
         app = HelaoVis(
             server_key=self.server.server_name,
@@ -472,17 +307,16 @@ class Orch(Base):
 
         return doc
 
-    async def wait_for_interrupt(self, pending_action: Optional[Action] = None):
-        """
-        Asynchronously waits for an interrupt message from the interrupt queue.
+    async def wait_for_interrupt(self, pending_action: Optional[Action] = None) -> bool:
+        """Block until an interrupt message arrives and forward queued ``GlobalStatusModel``s.
 
-        This method retrieves at least one status message from the `interrupt_q` queue.
-        If the message is an instance of `GlobalStatusModel`, it updates the `incoming` attribute.
-        It then continues to clear the `interrupt_q` queue, processing any remaining messages
-        and putting their JSON representation into the `globstat_q` queue.
+        Args:
+            pending_action: Optional action to push back onto ``action_dq`` if a
+                stop intent arrives while waiting.
 
         Returns:
-            None
+            ``True`` if processing should continue, ``False`` if the pending
+            action was re-queued and the caller should bail out.
         """
 
         interrupt = await self.interrupt_q.get()
@@ -508,29 +342,10 @@ class Orch(Base):
         return True
 
     async def subscribe_all(self, retry_limit: int = 15):
-        """
-        Attempts to subscribe to all servers listed in the configuration, excluding
-        those with "bokeh" or "demovis" in their configuration.
-
-        This method tries to attach the client to each server by sending an
-        "attach_client" request. If the connection fails, it retries up to
-        `retry_limit` times with a 2-second delay between attempts.
+        """Subscribe this orchestrator to every non-Bokeh action server in the world config.
 
         Args:
-            retry_limit (int): The number of retry attempts for each server.
-                               Default is 15.
-
-        Side Effects:
-            Updates `self.init_success` to True if all subscriptions are successful.
-            Logs messages indicating the success or failure of each subscription attempt.
-
-        Raises:
-            aiohttp.client_exceptions.ClientConnectorError: If the connection to a server fails.
-
-        Notes:
-            - If any server fails to subscribe after the specified retries,
-              `self.init_success` is set to False.
-            - The method logs detailed messages about the subscription process.
+            retry_limit: Maximum subscription attempts per server.
         """
         fails = []
         for serv_key, serv_dict in self.world_cfg["servers"].items():
@@ -583,21 +398,17 @@ class Orch(Base):
 
     async def update_nonblocking(
         self, actionmodel: Action, server_host: str, server_port: int
-    ):
-        """
-        Asynchronously updates the non-blocking action list based on the action status.
-
-        This method registers the action UUID, constructs a server execution ID, and
-        updates the non-blocking list depending on the action status. It also triggers
-        the orchestrator dispatch loop by putting an empty object in the interrupt queue.
+    ) -> dict:
+        """Record a non-blocking action transition and nudge the dispatch loop.
 
         Args:
-            actionmodel (Action): The action model containing details of the action.
-            server_host (str): The host address of the server.
-            server_port (int): The port number of the server.
+            actionmodel: ``Action`` describing the non-blocking event.
+            server_host: Host of the action server reporting the event.
+            server_port: Port of the action server reporting the event.
 
         Returns:
-            dict: A dictionary indicating the success of the operation.
+            ``{"success": True}`` once the action's executor id has been
+            added or removed from ``self.nonblocking``.
         """
         # print(actionmodel.clean_dict())
 
@@ -657,16 +468,8 @@ class Orch(Base):
         await self.interrupt_q.put(self.globalstatusmodel)
         return {"success": True}
 
-    async def clear_nonblocking(self):
-        """
-        Asynchronously clears non-blocking action IDs by sending stop requests to the respective servers.
-
-        This method iterates over the non-blocking actions and sends a `stop_executor` request to each server
-        to stop the corresponding executor. It collects the responses and error codes from each request.
-
-        Returns:
-            list of tuples: A list of tuples where each tuple contains the response and error code from a server.
-        """
+    async def clear_nonblocking(self) -> list:
+        """Send ``stop_executor`` to every tracked non-blocking action and return their responses."""
         resp_tups = []
         for server_key, exec_id, server_host, server_port in self.nonblocking:
             LOGGER.info(
@@ -686,30 +489,19 @@ class Orch(Base):
 
     async def update_status(
         self, actionservermodel: Optional[ActionServerModel] = None
-    ):
-        """
-        Asynchronously updates the status of the action server and the global status model.
+    ) -> bool:
+        """Merge an action-server status into the global status model and react to errors/estops.
+
+        Updates the action history, tracks completed non-active actions in the
+        live buffer, transitions the orchestrator to ``estopped``, ``error``,
+        ``idle`` or ``busy`` as appropriate, and pushes the new status to the
+        interrupt queue and Bokeh operator.
 
         Args:
-            actionservermodel (ActionServerModel, optional): The model containing the status of the action server. Defaults to None.
+            actionservermodel: Reported status from a remote action server.
 
         Returns:
-            bool: True if the status was successfully updated, False otherwise.
-
-        This method performs the following steps:
-        1. Prints a message indicating the receipt of the status from the server.
-        2. If the actionservermodel is None, returns False.
-        3. Acquires an asynchronous lock to ensure thread safety.
-        4. Updates the global status model with the new action server model and sorts the new status dictionary.
-        5. Registers the action UUID from the action server model.
-        6. Updates the local buffer with the recent non-active actions.
-        7. Checks if any action is in an emergency stop (estop) state or has errored.
-        8. Updates the orchestration state based on the current status of actions.
-        9. Pushes the updated global status model to the interrupt queue.
-        10. Updates the operator with the new status.
-
-        Note:
-            The method assumes that `self.aiolock`, `self.globalstatusmodel`, `self.interrupt_q`, and `self.update_operator` are defined elsewhere in the class.
+            ``True`` if the model was applied, ``False`` if ``actionservermodel`` was ``None``.
         """
 
         # LOGGER.debug(
@@ -816,19 +608,7 @@ class Orch(Base):
             return True
 
     async def ws_globstat(self, websocket: WebSocket):
-        """
-        Handle WebSocket connections for global status updates.
-
-        This asynchronous method accepts a WebSocket connection, subscribes to global status updates,
-        and sends these updates to the connected WebSocket client in real-time. If an exception occurs,
-        it logs the error and removes the subscription.
-
-        Args:
-            websocket (WebSocket): The WebSocket connection instance.
-
-        Raises:
-            Exception: If an error occurs during the WebSocket communication or subscription handling.
-        """
+        """Stream global status updates over ``websocket`` until the client disconnects."""
         LOGGER.info("got new global status subscriber")
         await websocket.accept()
         gs_sub = self.globstat_q.subscribe()
@@ -844,30 +624,16 @@ class Orch(Base):
                 self.globstat_q.remove(gs_sub)
 
     async def globstat_broadcast_task(self):
-        """
-        Asynchronous task that subscribes to the `globstat_q` queue and
-        periodically sleeps for a short duration.
-
-        This method continuously listens to the `globstat_q` queue and
-        performs a non-blocking sleep for 0.01 seconds on each iteration.
-
-        Returns:
-            None
-        """
+        """Drain ``globstat_q`` indefinitely so subscribers can read messages eagerly."""
         async for _ in self.globstat_q.subscribe():
             await asyncio.sleep(0.01)
 
     def unpack_sequence(self, sequence_name: str, sequence_params) -> List[Experiment]:
-        """
-        Unpacks and returns a sequence of experiments based on the given sequence name and parameters.
+        """Invoke the named sequence factory and return the list of planned experiments.
 
         Args:
-            sequence_name (str): The name of the sequence to unpack.
-            sequence_params (dict): A dictionary of parameters to pass to the sequence function.
-
-        Returns:
-            List[Experiment]: A list of Experiment objects corresponding to the unpacked sequence.
-                              Returns an empty list if the sequence name is not found in the sequence library.
+            sequence_name: Sequence library entry to expand.
+            sequence_params: Keyword arguments forwarded to the sequence factory.
         """
         if sequence_name in self.sequence_lib:
             return self.sequence_lib[sequence_name](**sequence_params)
@@ -875,32 +641,11 @@ class Orch(Base):
             return []
 
     def get_sequence_codehash(self, sequence_name: str) -> UUID:
-        """
-        Retrieve the UUID code hash for a given sequence name.
-
-        Args:
-            sequence_name (str): The name of the sequence.
-
-        Returns:
-            UUID: The UUID code hash associated with the sequence name.
-        """
+        """Return the cached code hash for the named sequence library entry."""
         return self.sequence_codehash_lib[sequence_name]
 
     async def seq_unpacker(self):
-        """
-        Asynchronously unpacks and processes experiments from the active sequence.
-
-        Iterates through the list of experiments in the active sequence's experiment plan.
-        For each experiment, it assigns a data request ID if available and adds the experiment
-        to the sequence. Updates the global status model to indicate the loop state has started
-        after processing the first experiment.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
+        """Push every planned experiment from the active sequence onto the experiment deque."""
         for i, experimentmodel in enumerate(self.active_sequence.planned_experiments):
             # self.print_message(
             #     f"unpack experiment {experimentmodel.experiment_name}"
@@ -914,14 +659,13 @@ class Orch(Base):
                 self.globalstatusmodel.loop_state = LoopStatus.started
 
     def verify_plate_in_params(self, paramd: dict) -> bool:
-        """
-        Checks parameter dict if plate_id parameter has a valid screening print.
+        """Confirm that any ``plate_id``/``solid_plate_id`` parameter resolves to a valid platemap.
 
         Args:
-            paramd (dict): parameter dictionary
+            paramd: Parameter dictionary to inspect.
 
         Returns:
-            bool: True when parameter dict contains plate_id with a valid screening print
+            ``True`` if no plate parameter is present or a platemap was found.
         """
         plate_found = False
         if "solid_plate_id" in paramd or "plate_id" in paramd:
@@ -947,21 +691,11 @@ class Orch(Base):
         return plate_found
 
     async def loop_task_dispatch_sequence(self) -> ErrorCodes:
-        """
-        Asynchronously dispatches a sequence from the sequence queue and initializes it.
-
-        This method performs the following steps:
-        1. Retrieves a new sequence from the sequence queue (`sequence_dq`).
-        2. Sets the new sequence as the active sequence and updates its status to "active".
-        3. Configures the sequence based on the world configuration (`world_cfg`).
-        4. Initializes the sequence with a time offset and sets the orchestrator.
-        5. Populates the sequence parameters from global experiment parameters.
-        6. Unpacks the sequence into an experiment plan list if not already populated.
-        7. Writes the sequence to a local buffer and optionally uploads it to S3.
-        8. Creates a task to unpack the sequence and waits for a short duration.
+        """Pop the next sequence, make it active, validate it, and spawn its experiment unpacker.
 
         Returns:
-            ErrorCodes: The error code indicating the result of the operation.
+            ``ErrorCodes.none`` on success, or a non-zero code if the sequence
+            could not be started (for example because plate verification failed).
         """
         if self.sequence_dq:
             LOGGER.info("getting new sequence from sequence_dq")
@@ -1099,20 +833,11 @@ class Orch(Base):
         return ErrorCodes.none
 
     async def loop_task_dispatch_experiment(self) -> ErrorCodes:
-        """
-        Asynchronously dispatches a new experiment from the experiment queue and processes its actions.
-
-        This method performs the following steps:
-        1. Retrieves a new experiment from the experiment queue.
-        2. Copies global parameters to the experiment parameters.
-        3. Initializes the experiment and updates the global status model.
-        4. Unpacks the actions for the experiment and assigns necessary attributes.
-        5. Adds the unpacked actions to the action queue.
-        6. Writes the active experiment to a temporary storage.
-        7. Optionally uploads the initial active experiment JSON to S3.
+        """Pop the next experiment, expand its planned actions, and push them onto ``action_dq``.
 
         Returns:
-            ErrorCodes: The error code indicating the result of the operation.
+            ``ErrorCodes.none`` on success, or a non-zero code if the experiment
+            could not be processed (for example because plate verification failed).
         """
 
         # check again if experiment_dq is empty
@@ -1316,42 +1041,15 @@ class Orch(Base):
         return ErrorCodes.none
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
-        """
-        Asynchronously dispatches actions based on the current loop intent and action queue.
+        """Dispatch the next action from ``action_dq`` honouring start conditions and loop intent.
 
-        This method processes actions in the action queue (`action_dq`) according to the
-        current loop intent (`loop_intent`) and loop state (`loop_state`). It handles
-        different loop intents such as stop, skip, and estop, and dispatches actions
-        accordingly. The method also manages action start conditions and updates global
-        parameters based on action results.
+        Respects ``LoopIntent.stop``/``skip``/``estop``, waits according to the
+        action's ``ActionStartCondition``, copies requested values into and out
+        of ``global_params``, registers the dispatched action in the global
+        status model, and pauses the orchestrator if dispatch fails.
 
         Returns:
-            ErrorCodes: The error code indicating the result of the action dispatch process.
-
-        Loop Intents:
-            - LoopIntent.stop: Stops the orchestrator after all actions are finished.
-            - LoopIntent.skip: Clears the action queue and skips to the next experiment.
-            - LoopIntent.estop: Clears the action queue and sets the loop state to estopped.
-            - Default: Dispatches actions based on their start conditions.
-
-        Action Start Conditions:
-            - ActionStartCondition.no_wait: Dispatches the action unconditionally.
-            - ActionStartCondition.wait_for_endpoint: Waits for the endpoint to become available.
-            - ActionStartCondition.wait_for_server: Waits for the server to become available.
-            - ActionStartCondition.wait_for_orch: Waits for the orchestrator to become available.
-            - ActionStartCondition.wait_for_previous: Waits for the previous action to finish.
-            - ActionStartCondition.wait_for_all: Waits for all actions to finish.
-
-        Raises:
-            Exception: If an error occurs during action dispatching.
-            asyncio.exceptions.TimeoutError: If a timeout occurs during action dispatching.
-
-        Notes:
-            - This method uses an asyncio lock (`aiolock`) to ensure thread safety during
-              action dispatching.
-            - The method updates global parameters based on the results of dispatched actions.
-            - If an action dispatch fails, the method stops the orchestrator and re-queues
-              the action.
+            ``ErrorCodes`` summarising the dispatch outcome.
         """
         # check again if action_dq is empty
         if not self.action_dq:
@@ -1658,36 +1356,14 @@ class Orch(Base):
 
         return ErrorCodes.none
 
-    async def dispatch_loop_task(self):
-        """
-        The main dispatch loop task for the operator orchestrator. This asynchronous
-        method manages the dispatching of actions, experiments, and sequences based
-        on the current state of the orchestrator and the contents of the respective
-        queues.
+    async def dispatch_loop_task(self) -> bool:
+        """Drive the main orchestrator loop until the queues are exhausted or it is stopped.
 
-        The loop continues running as long as the orchestrator's loop state is
-        `LoopStatus.started` and there are items in the action, experiment, or
-        sequence queues. It handles the following tasks:
-
-        - Resuming paused action lists.
-        - Checking driver states and retrying if necessary.
-        - Dispatching actions, experiments, and sequences based on the current state.
-        - Handling emergency stops and step-through modes.
-        - Updating the operator with the current state and progress.
-
-        The loop will stop if:
-        - An emergency stop is triggered.
-        - All queues are empty.
-        - An error occurs during dispatching.
-
-        Upon stopping, it ensures that any active experiment or sequence is finished
-        properly.
-
-        Returns:
-            bool: True if the loop completes successfully, False if an exception occurs.
-
-        Raises:
-            Exception: If an unexpected error occurs during the loop execution.
+        Polls the action, experiment and sequence deques in priority order,
+        dispatches the next available item, observes step-through flags and
+        driver health, and finishes any still-active experiment/sequence at
+        the end. Returns ``True`` on a clean exit and ``False`` on a raised
+        exception (after triggering an E-STOP).
         """
         LOGGER.info("--- started operator orch ---")
         LOGGER.info(f"current orch status: {self.globalstatusmodel.orch_state}")
@@ -1851,16 +1527,7 @@ class Orch(Base):
             return False
 
     async def orch_wait_for_all_actions(self):
-        """
-        Waits for all actions to complete.
-
-        This asynchronous method continuously checks the status of actions and waits
-        until all actions are idle. If any actions are still active, it waits for a
-        status update and prints a message if the wait time exceeds 10 seconds.
-
-        Returns:
-            None
-        """
+        """Block until ``globalstatusmodel.actions_idle()`` reports no active actions."""
 
         # LOGGER.info("orch is waiting for all action_dq to finish")
 
@@ -1877,16 +1544,7 @@ class Orch(Base):
         # LOGGER.info("all actions are idle")
 
     async def start(self):
-        """
-        Starts the orchestration loop if it is currently stopped. If there are any
-        actions, experiments, or sequences in the queue, it resumes from a paused
-        state. Otherwise, it notifies that the experiment list is empty. If the loop
-        is already running, it notifies that it is already running. Finally, it clears
-        the current stop message and updates the operator status.
-
-        Returns:
-            None
-        """
+        """Resume or start the dispatch loop when queues are non-empty and the loop is stopped."""
         if self.globalstatusmodel.loop_state == LoopStatus.stopped:
             if (
                 self.action_dq
@@ -1902,18 +1560,13 @@ class Orch(Base):
         self.current_stop_message = ""
         await self.update_operator(True)
 
-    async def start_loop(self):
+    async def start_loop(self) -> LoopStatus:
+        """Start :meth:`dispatch_loop_task` if the loop is stopped, refusing to start under E-STOP.
+
+        Returns:
+            The current ``LoopStatus`` after the attempt.
+        """
         if self.globalstatusmodel.loop_state == LoopStatus.stopped:
-            """
-            Starts the orchestration loop if it is currently stopped.
-
-            This method checks the current state of the orchestration loop and starts it if it is in the 'stopped' state.
-            If the loop is in the 'estopped' state, it logs an error message indicating that the E-STOP flag must be cleared
-            before starting. If the loop is already running, it logs a message indicating that the loop is already started.
-
-            Returns:
-                LoopStatus: The current state of the orchestration loop after attempting to start it.
-            """
             LOGGER.info("starting orch loop")
             self.loop_task = asyncio.create_task(self.dispatch_loop_task())
         elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
@@ -1923,19 +1576,10 @@ class Orch(Base):
         return self.globalstatusmodel.loop_state
 
     async def estop_loop(self, reason: str = ""):
-        """
-        Asynchronously handles the emergency stop (E-STOP) procedure for the orchestrator.
-
-        This method performs the following actions:
-        1. Logs an emergency stop message with an optional reason.
-        2. Sets the global status model's loop state to 'estopped'.
-        3. Forces the stop of all running actions associated with this orchestrator.
-        4. Resets the loop intention to none.
-        5. Updates the current stop message with "E-STOP" and the optional reason.
-        6. Notifies the operator of the emergency stop status.
+        """Emergency-stop the orchestrator and fan out an ``estop`` to every action server.
 
         Args:
-            reason (str, optional): An optional reason for the emergency stop. Defaults to an empty string.
+            reason: Free-form text appended to the stop message and alert.
         """
         reason_suffix = f"{' ' + reason if reason else ''}"
         LOGGER.info("estopping orch")
@@ -1956,27 +1600,14 @@ class Orch(Base):
         await self.update_operator(True)
 
     async def stop_loop(self):
-        """
-        Asynchronously stops the loop by intending to stop.
-
-        This method calls the `intend_stop` coroutine to signal that the loop should stop.
-        """
+        """Signal the dispatch loop to stop after the current iteration via :meth:`intend_stop`."""
         await self.intend_stop()
 
     async def estop_actions(self, switch: bool):
-        """
-        Asynchronously sends an emergency stop (estop) command to all servers.
-
-        This method sends an estop command to all action servers registered in the global status model.
-        The estop command can be triggered during an active experiment or based on the last experiment.
-        If no experiment is active or available, a new experiment with estop status is created.
+        """Send an ``estop`` action to every registered action server.
 
         Args:
-            switch (bool): The state of the estop switch. True to activate estop, False to deactivate.
-
-        Raises:
-            Exception: If the estop command fails for any action server, an exception is caught and logged.
-
+            switch: ``True`` to latch estop, ``False`` to release it.
         """
         LOGGER.info("estopping all servers")
 
@@ -2031,15 +1662,7 @@ class Orch(Base):
                 )
 
     async def skip(self):
-        """
-        Asynchronously skips the current action in the orchestrator.
-
-        If the orchestrator's loop state is `LoopStatus.started`, it will attempt to skip the current action by calling `intend_skip()`.
-        Otherwise, it will print a message indicating that the orchestrator is not running and clear the action queue.
-
-        Returns:
-            None
-        """
+        """Request a skip while running, or clear ``action_dq`` if the loop is idle."""
         if self.globalstatusmodel.loop_state == LoopStatus.started:
             await self.intend_skip()
         else:
@@ -2047,27 +1670,12 @@ class Orch(Base):
             self.action_dq.clear()
 
     async def intend_skip(self):
-        """
-        Asynchronously sets the loop intent to 'skip' and puts this intent into the interrupt queue.
-
-        This method updates the global status model's loop intent to 'skip' and then places this intent
-        into the interrupt queue to signal that the current loop should be skipped.
-
-        Returns:
-            None
-        """
+        """Set ``LoopIntent.skip`` and post it to the interrupt queue."""
         self.globalstatusmodel.loop_intent = LoopIntent.skip
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def stop(self):
-        """
-        Stops the orchestrator based on its current loop state.
-
-        If the loop state is `LoopStatus.started`, it will attempt to stop the orchestrator
-        by calling `intend_stop()`. If the loop state is `LoopStatus.estopped`, it will
-        print a message indicating that the E-STOP flag was raised and there is nothing to stop.
-        Otherwise, it will print a message indicating that the orchestrator is not running.
-        """
+        """Request a graceful stop respecting the current loop state."""
         if self.globalstatusmodel.loop_state == LoopStatus.started:
             await self.intend_stop()
         elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
@@ -2076,61 +1684,22 @@ class Orch(Base):
             LOGGER.info("orchestrator is not running")
 
     async def intend_stop(self):
-        """
-        Asynchronously sets the loop intent to stop and puts this intent into the interrupt queue.
-
-        This method updates the `loop_intent` attribute of the `globalstatusmodel` to `LoopIntent.stop`
-        and then places this intent into the `interrupt_q` queue to signal that the loop should stop.
-
-        Returns:
-            None
-        """
+        """Set ``LoopIntent.stop`` and post it to the interrupt queue."""
         self.globalstatusmodel.loop_intent = LoopIntent.stop
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def intend_estop(self):
-        """
-        Asynchronously sets the loop intent to emergency stop (estop) and puts the
-        updated loop intent into the interrupt queue.
-
-        This method updates the `loop_intent` attribute of the `globalstatusmodel`
-        to `LoopIntent.estop` and then places this intent into the `interrupt_q`
-        queue to signal an emergency stop.
-
-        Returns:
-            None
-        """
+        """Set ``LoopIntent.estop`` and post it to the interrupt queue."""
         self.globalstatusmodel.loop_intent = LoopIntent.estop
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def intend_none(self):
-        """
-        Sets the loop intent to 'none' and puts this intent into the interrupt queue.
-
-        This method updates the global status model's loop intent to indicate that no
-        specific loop action is intended. It then places this updated intent into the
-        interrupt queue to signal other parts of the system.
-
-        Returns:
-            None
-        """
+        """Reset ``loop_intent`` to ``LoopIntent.none`` and post it to the interrupt queue."""
         self.globalstatusmodel.loop_intent = LoopIntent.none
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def clear_estop(self):
-        """
-        Asynchronously clears the emergency stop (estop) state.
-
-        This method performs the following actions:
-        1. Logs a message indicating that estopped UUIDs are being cleared.
-        2. Clears the estopped status from the global status model.
-        3. Releases the estop state for all action servers.
-        4. Sets the orchestration status from estopped back to stopped.
-        5. Puts a "cleared_estop" message into the interrupt queue.
-
-        Returns:
-            None
-        """
+        """Clear estopped UUIDs, release the estop on every action server, and resume to ``stopped``."""
         # which were estopped first
         LOGGER.info("clearing estopped uuids")
         self.globalstatusmodel.clear_in_finished(hlostatus=HloStatus.estopped)
@@ -2141,70 +1710,32 @@ class Orch(Base):
         await self.interrupt_q.put("cleared_estop")
 
     async def clear_error(self):
-        """
-        Asynchronously clears the error state.
-
-        This method resets the error dictionary by clearing errored UUIDs
-        and updates the global status model to reflect that the errors
-        have been cleared. It also sends a message to the interrupt queue
-        indicating that the errors have been cleared.
-
-        Returns:
-            None
-        """
+        """Clear errored UUIDs from the finished dict and signal the interrupt queue."""
         # currently only resets the error dict
         LOGGER.info("clearing errored uuids")
         self.globalstatusmodel.clear_in_finished(hlostatus=HloStatus.errored)
         await self.interrupt_q.put("cleared_errored")
 
     async def clear_sequences(self):
-        """
-        Asynchronously clears the sequence queue.
-
-        This method logs a message indicating that the sequence queue is being cleared
-        and then clears the sequence deque.
-
-        Returns:
-            None
-        """
+        """Empty the sequence deque."""
         LOGGER.info("clearing sequence queue")
         self.sequence_dq.clear()
 
     async def clear_experiments(self):
-        """
-        Asynchronously clears the experiment queue.
-
-        This method prints a message indicating that the experiment queue is being cleared
-        and then clears the deque containing the experiments.
-
-        Returns:
-            None
-        """
+        """Empty the experiment deque."""
         LOGGER.info("clearing experiment queue")
         self.experiment_dq.clear()
 
     async def clear_actions(self):
-        """
-        Asynchronously clears the action queue.
-
-        This method prints a message indicating that the action queue is being cleared
-        and then clears the action deque.
-
-        Returns:
-            None
-        """
+        """Empty the action deque."""
         LOGGER.info("clearing action queue")
         self.action_dq.clear()
 
-    async def add_sequence(self, sequence: Sequence):
-        """
-        Adds a sequence to the sequence deque and initializes its UUID and codehash if not already set.
-
-        Args:
-            sequence (Sequence): The sequence object to be added.
+    async def add_sequence(self, sequence: Sequence) -> UUID:
+        """Append ``sequence`` to the sequence deque, populating its UUID/code metadata.
 
         Returns:
-            str: The UUID of the added sequence.
+            The UUID of the added sequence.
         """
         # init uuid now for tracking later
         if sequence.sequence_uuid is None:
@@ -2228,14 +1759,14 @@ class Orch(Base):
         return sequence.sequence_uuid
 
     async def add_split_sequences(self, sequence: Sequence):
-        """
-        Splits a sequence on split_by_seq_params and group_by_seq_params as defined in ORCH params config, then adds to deque.
+        """Split ``sequence`` along the configured params and enqueue each sub-sequence.
 
         Args:
-            sequence (Sequence): The sequence object to be added.
+            sequence: Source sequence whose parameters trigger splitting.
 
         Returns:
-            list: List of UUIDs of the added sequences.
+            List of sub-sequence UUIDs, or the result of :meth:`add_sequence`
+            if no split parameter applied.
         """
         possible_splits = [
             x
@@ -2300,21 +1831,17 @@ class Orch(Base):
         experimentmodel: Experiment | ExperimentModel | ShortExperimentModel,
         prepend: bool = False,
         at_index: Optional[int] = None,
-    ):
-        """
-        Adds an experiment to the sequence.
+    ) -> UUID:
+        """Enqueue an experiment derived from ``experimentmodel`` and attached to ``seq``.
 
         Args:
-            seq (Sequence): The sequence to which the experiment will be added.
-            experimentmodel (Experiment): The experiment model to be added.
-            prepend (bool, optional): If True, the experiment will be added to the front of the queue. Defaults to False.
-            at_index (int, optional): If provided, the experiment will be inserted at the specified index. Defaults to None.
+            seq: Sequence whose fields are folded into the new experiment.
+            experimentmodel: Experiment definition to enqueue.
+            prepend: If True, push to the front of the deque.
+            at_index: Optional index to insert at; takes precedence over ``prepend``.
 
         Returns:
-            str: The UUID of the added experiment.
-
-        Raises:
-            TypeError: If the experimentmodel is not an instance of Experiment.
+            The UUID of the enqueued experiment.
         """
         seq_dict = seq.model_dump()
         if not isinstance(experimentmodel, Experiment):
@@ -2343,71 +1870,36 @@ class Orch(Base):
             # LOGGER.info(f"experiment {D.experiment_name} appended to queue")
         return D.experiment_uuid
 
-    def list_sequences(self, limit=10):
-        """
-        List sequences from the sequence deque up to a specified limit.
-
-        Args:
-            limit (int, optional): The maximum number of sequences to list. Defaults to 10.
-
-        Returns:
-            list: A list of sequences, each obtained by calling the `get_seq` method on the elements of the sequence deque.
-        """
+    def list_sequences(self, limit=10) -> list:
+        """Return at most ``limit`` sequence summaries from the sequence deque."""
         return [
             self.sequence_dq[i].get_seq()
             for i in range(min(len(self.sequence_dq), limit))
         ]
 
-    def list_experiments(self, limit=10):
-        """
-        List a limited number of experiments.
-
-        Args:
-            limit (int, optional): The maximum number of experiments to list. Defaults to 10.
-
-        Returns:
-            list: A list of experiments, each obtained by calling `get_exp()` on elements of `self.experiment_dq`.
-        """
+    def list_experiments(self, limit=10) -> list:
+        """Return at most ``limit`` experiment summaries from the experiment deque."""
         return [
             self.experiment_dq[i].get_exp()
             for i in range(min(len(self.experiment_dq), limit))
         ]
 
-    def list_all_experiments(self):
-        """
-        List all experiments with their indices.
-
-        Returns:
-            list of tuple: A list of tuples where each tuple contains the index of the
-            experiment and the experiment name.
-        """
+    def list_all_experiments(self) -> list:
+        """Return ``(index, experiment_name)`` tuples for every queued experiment."""
         return [
             (i, D.get_exp().experiment_name) for i, D in enumerate(self.experiment_dq)
         ]
 
-    def drop_experiment_inds(self, inds: List[int]):
-        """
-        Remove experiments from the experiment queue at the specified indices.
-
-        Args:
-            inds (List[int]): A list of indices of the experiments to be removed.
-
-        Returns:
-            List: A list of all remaining experiments after the specified experiments have been removed.
-        """
+    def drop_experiment_inds(self, inds: List[int]) -> list:
+        """Remove the queued experiments at ``inds`` and return :meth:`list_all_experiments`."""
         for i in sorted(inds, reverse=True):
             del self.experiment_dq[i]
         return self.list_all_experiments()
 
     def get_experiment(self, last=False) -> Experiment:
-        """
-        Retrieve the current or last experiment.
+        """Return the active (or, if ``last`` is True, most recent) experiment summary.
 
-        Args:
-            last (bool): If True, retrieve the last experiment. If False, retrieve the active experiment.
-
-        Returns:
-            Experiment: The experiment object if it exists, otherwise an empty dictionary.
+        Returns an empty dict when no experiment is available.
         """
         experiment = self.last_experiment if last else self.active_experiment
         if experiment is not None:
@@ -2415,61 +1907,34 @@ class Orch(Base):
         return {}
 
     def get_sequence(self, last=False) -> Sequence:
-        """
-        Retrieve the current or last sequence.
+        """Return the active (or, if ``last`` is True, most recent) sequence summary.
 
-        Args:
-            last (bool): If True, retrieve the last sequence. If False, retrieve the active sequence.
-
-        Returns:
-            Sequence: The sequence object if available, otherwise an empty dictionary.
+        Returns an empty dict when no sequence is available.
         """
         sequence = self.last_sequence if last else self.active_sequence
         if sequence is not None:
             return sequence.get_seq()
         return {}
 
-    def list_active_actions(self):
-        """
-        List all active actions.
-
-        Returns:
-            list: A list of status models representing the active actions.
-        """
+    def list_active_actions(self) -> list:
+        """Return the status model entries for every currently active action."""
         return [
             statusmodel
             for uuid, statusmodel in self.globalstatusmodel.active_dict.items()
         ]
 
-    def list_actions(self, limit=10):
-        """
-        List a limited number of actions from the action queue.
-
-        Args:
-            limit (int, optional): The maximum number of actions to list. Defaults to 10.
-
-        Returns:
-            list: A list of action models from the action queue, up to the specified limit.
-        """
+    def list_actions(self, limit=10) -> list:
+        """Return at most ``limit`` action summaries from the action deque."""
         return [
             self.action_dq[i].get_act() for i in range(min(len(self.action_dq), limit))
         ]
 
     def supplement_error_action(self, check_uuid: UUID, sup_action: Action):
-        """
-        Supplements an errored action with a new action.
-
-        This method checks if the provided UUID is in the list of errored actions.
-        If it is, it creates a new action based on the supplied action, updates its
-        order and retry count, and appends it to the action deque for reprocessing.
-        If the UUID is not found in the list of errored actions, it prints an error message.
+        """Retry an errored action by appending ``sup_action`` to the front of ``action_dq``.
 
         Args:
-            check_uuid (UUID): The UUID of the action to check.
-            sup_action (Action): The new action to supplement the errored action.
-
-        Returns:
-            None
+            check_uuid: UUID of the previously errored action.
+            sup_action: Replacement action whose order/retry counters get adjusted.
         """
 
         error_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
@@ -2496,20 +1961,7 @@ class Orch(Base):
     def remove_experiment(
         self, by_index: Optional[int] = None, by_uuid: Optional[UUID] = None
     ):
-        """
-        Removes an experiment from the experiment queue.
-
-        Parameters:
-        by_index (int, optional): The index of the experiment to remove.
-        by_uuid (UUID, optional): The UUID of the experiment to remove.
-
-        If both parameters are provided, `by_index` will take precedence.
-        If neither parameter is provided, a message will be printed and the method will return None.
-
-        Raises:
-        IndexError: If the index is out of range.
-        KeyError: If the UUID is not found in the experiment queue.
-        """
+        """Remove an experiment from the queue by index (preferred) or UUID."""
         if by_index is not None:
             i = by_index
         elif by_uuid is not None:
@@ -2532,18 +1984,7 @@ class Orch(Base):
         by_uuid: Optional[UUID] = None,
         by_action_order: Optional[int] = None,
     ):
-        """
-        Substitute a queued action with a new action.
-
-        Parameters:
-        sup_action (Action): The new action to replace the existing one.
-        by_index (int, optional): The index of the action to be replaced.
-        by_uuid (UUID, optional): The UUID of the action to be replaced.
-        by_action_order (int, optional): The action order of the action to be replaced.
-
-        Returns:
-        None
-        """
+        """Replace a queued action selected by index, UUID, or action order with ``sup_action``."""
         if by_index:
             i = by_index
         elif by_uuid:
@@ -2570,7 +2011,7 @@ class Orch(Base):
         del self.action_dq[i + 1]
 
     def append_action(self, sup_action: Action):
-        """Add action to end of current action queue."""
+        """Append ``sup_action`` to ``action_dq`` and assign it the next action order."""
         if len(self.action_dq) == 0:
             last_action_order = (
                 self.globalstatusmodel.counter_dispatched_actions[
@@ -2592,21 +2033,7 @@ class Orch(Base):
         self.action_dq.append(new_action)
 
     async def finish_active_sequence(self):
-        """
-        Completes the currently active sequence by performing the following steps:
-
-        1. Waits for all actions to complete using `orch_wait_for_all_actions`.
-        2. Updates the status of the active sequence from `HloStatus.active` to `HloStatus.finished`.
-        3. Writes the active sequence to a persistent storage using `write_seq`.
-        4. Deep copies the active sequence to `last_sequence`.
-        5. Updates the local buffer with the sequence UUID, name, and status.
-        6. Resets the active sequence and related counters.
-        7. Clears the dispatched actions counter in the global status model.
-        8. Initiates a task to move the sequence directory if a database server exists.
-
-        This method ensures that the sequence is properly finalized and all related
-        resources are cleaned up.
-        """
+        """Finalize the active sequence: mark finished, run postprocessors, persist, and roll over."""
         await self.orch_wait_for_all_actions()
         if self.active_sequence is not None:
             self.replace_status(
@@ -2666,19 +2093,7 @@ class Orch(Base):
             self.aloop.create_task(move_dir(self.last_sequence, base=self))
 
     async def finish_active_experiment(self):
-        """
-        Finalizes the currently active experiment by performing the following steps:
-
-        1. Waits for all actions to complete.
-        2. Stops any non-blocking action executors.
-        3. Updates the status of the active experiment to 'finished'.
-        4. Adds the finished experiment to the active sequence.
-        5. Writes the updated sequence and experiment data to storage.
-        6. Initiates a task to move the experiment directory if a database server exists.
-
-        This method ensures that all necessary cleanup and state updates are performed
-        before marking the experiment as finished and moving on to the next one.
-        """
+        """Finalize the active experiment after waiting for actions and stopping non-blockers."""
         # we need to wait for all actions to finish first
         await self.orch_wait_for_all_actions()
         while len(self.nonblocking) > 0:
@@ -2769,47 +2184,21 @@ class Orch(Base):
             self.aloop.create_task(move_dir(self.last_experiment, base=self))
 
     async def write_active_experiment_exp(self):
-        """
-        Asynchronously writes the active experiment data to the experiment log.
-
-        This method calls the `write_exp` method with the current active experiment
-        data to log it.
-
-        Returns:
-            None
-        """
+        """Persist the active experiment to disk after snapshotting initial global params."""
         self.active_experiment.initial_global_params = {
             k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
         }
         await self.write_exp(self.active_experiment)
 
     async def write_active_sequence_seq(self):
-        """
-        Asynchronously writes the active sequence to storage.
-
-        If the active sequence experiment counter is greater than 1, it appends
-        the current active experiment to the active sequence. Otherwise, it writes
-        the active sequence directly.
-
-        Returns:
-            None
-        """
+        """Persist the active sequence to disk after snapshotting initial global params."""
         self.active_sequence.initial_global_params = {
             k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
         }
         await self.write_seq(self.active_sequence)
 
     async def shutdown(self):
-        """
-        Asynchronously shuts down the server by performing the following actions:
-
-        1. Detaches all subscribers.
-        2. Cancels the status logger.
-        3. Cancels the NTP syncer.
-        4. Cancels the status subscriber.
-
-        This method ensures that all ongoing tasks are properly terminated and resources are released.
-        """
+        """Detach subscribers, cancel orchestrator tasks, and export queues if non-empty."""
         await self.detach_subscribers()
         self.status_logger.cancel()
         self.status_subscriber.cancel()
@@ -2829,44 +2218,23 @@ class Orch(Base):
             )
 
     async def update_operator(self, msg):
-        """
-        Asynchronously updates the operator with a given message.
-
-        Args:
-            msg: The message to be sent to the operator.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
+        """Forward ``msg`` to the Bokeh operator's update queue, if the operator is enabled."""
         if self.op_enabled and self.orch_op:
             await self.orch_op.update_q.put(msg)
 
     def start_wait(self, active: Active):
-        """
-        Initiates and starts an asynchronous wait task for the given active object.
-
-        Args:
-            active (Active): The active object for which the wait task is to be started.
-
-        Returns:
-            None
-        """
+        """Schedule :meth:`dispatch_wait_task` for ``active`` as a background task."""
         self.wait_task = asyncio.create_task(self.dispatch_wait_task(active))
 
     async def dispatch_wait_task(self, active: Active, print_every_secs: int = 5):
-        """
-        Handles long wait actions as a separate task to prevent HTTP timeout.
+        """Run a long wait action off the HTTP handler so the client doesn't time out.
 
         Args:
-            active (Active): The active action instance containing action parameters.
-            print_every_secs (int, optional): Interval in seconds to print wait status. Defaults to 5.
+            active: ``Active`` carrying the ``waittime`` parameter.
+            print_every_secs: Interval between progress log messages.
 
         Returns:
-            finished_action: The result of the finished action.
-
+            The finished action returned by ``active.finish()``.
         """
         # handle long waits as a separate task so HTTP timeout doesn't occur
         waittime = active.action.action_params["waittime"]
@@ -2888,31 +2256,7 @@ class Orch(Base):
         return finished_action
 
     async def active_action_monitor(self):
-        """
-        Monitors the status of active actions in a loop and stops the process if any
-        required endpoints become unavailable.
-
-        This asynchronous method continuously checks the status of active actions
-        and verifies the availability of required endpoints. If any endpoints are
-        found to be unavailable, it stops the process and updates the operator.
-
-        The method performs the following steps in a loop:
-        1. Checks if the loop state is started.
-        2. Retrieves the list of active endpoints.
-        3. Verifies the availability of unique active endpoints.
-        4. If any endpoints are unavailable, stops the process and updates the operator.
-        5. Sleeps for a specified heartbeat interval before repeating the loop.
-
-        Attributes:
-            globalstatusmodel (GlobalStatusModel): The global status model containing
-                the loop state and active actions.
-            heartbeat_interval (int): The interval (in seconds) to wait between each
-                iteration of the monitoring loop.
-            current_stop_message (str): The message to display when stopping the process.
-
-        Returns:
-            None
-        """
+        """Heartbeat loop that stops the orchestrator if any active action endpoint goes offline."""
         while True:
             if self.globalstatusmodel.loop_state == LoopStatus.started:
                 active_endpoints = [
@@ -2937,23 +2281,13 @@ class Orch(Base):
                         await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
 
-    async def ping_action_servers(self):
-        """
-        Periodically monitor all action servers and return their status.
-
-        This asynchronous method iterates through the configured action servers,
-        excluding those with "bokeh" or "demovis" in their configuration, and
-        attempts to retrieve their status using the `async_private_dispatcher`.
-        The status of each server is summarized and returned in a dictionary.
+    async def ping_action_servers(self) -> dict:
+        """Query every action server for its endpoint and driver status.
 
         Returns:
-            dict: A dictionary where the keys are server keys and the values are
-                  tuples containing the status string ("busy", "idle", or "unreachable")
-                  and the driver status.
-
-        Raises:
-            aiohttp.client_exceptions.ClientConnectorError: If there is an issue
-                                                            connecting to a server.
+            Mapping of ``server_key`` to ``(status_str, driver_status)`` where
+            ``status_str`` is ``"idle"``, ``"busy [<endpoints>]"`` or
+            ``"unreachable"``.
         """
         status_summary = {}
         for serv_key, serv_dict in self.world_cfg["servers"].items():
@@ -2998,45 +2332,20 @@ class Orch(Base):
         return status_summary
 
     async def action_server_monitor(self):
-        """
-        Monitors the status of action servers in a continuous loop.
-
-        This asynchronous method continuously pings action servers to update their status
-        and notifies the operator with the updated status summary at regular intervals
-        defined by `heartbeat_interval`.
-
-        The loop runs indefinitely, sleeping for `heartbeat_interval` seconds between
-        each iteration.
-
-        Returns:
-            None
-        """
+        """Heartbeat loop that refreshes ``status_summary`` via :meth:`ping_action_servers`."""
         while True:
             self.status_summary = await self.ping_action_servers()
             await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
 
-    def export_queues(self, timestamp_pck: bool = False):
-        """
-        Exports the current state of various queues and active elements in the orchestrator to a pickle file.
+    def export_queues(self, timestamp_pck: bool = False) -> str:
+        """Pickle the deques, active/last sequence and experiment, and histories under ``STATES/``.
 
-        The function collects the following data from the orchestrator:
-        - Sequence queue
-        - Experiment queue
-        - Action queue
-        - Active experiment
-        - Last experiment
-        - Active sequence
-        - Last sequence
-        - Active sequence-experiment counter
-        - Last action UUID
-        - Last dispatched action UUID
-        - Last 50 action UUIDs
-
-        The collected data is saved as a dictionary in a pickle file located in the "STATES" directory under the root path specified in the orchestrator's world configuration.
+        Args:
+            timestamp_pck: When True, embed a timestamp in the pickle filename.
 
         Returns:
-            str: The file path where the pickle file is saved.
+            Filesystem path of the written pickle file.
         """
         save_dir = self.world_cfg["root"]
         queue_dict = {
@@ -3065,31 +2374,15 @@ class Orch(Base):
         pickle.dump(queue_dict, open(save_path, "wb"))
         return save_path
 
-    def import_queues(self, pck_path: Optional[str] = None):
-        """
-        Imports and restores the state of various queues from a saved pickle file.
+    def import_queues(self, pck_path: Optional[str] = None) -> str:
+        """Restore deques/active/last state from a previously exported pickle.
 
-        This function attempts to load a previously saved state of action, experiment,
-        and sequence queues from a pickle file located at "STATES/queues.pck" within
-        the directory specified by `self.orch.world_cfg["root"]`. If the file does not
-        exist, or if any of the current queues are not empty, the function will print
-        an appropriate message and will not restore the queues.
-
-        Upon successful restoration, the function updates the following attributes of
-        `self.orch`:
-        - action_dq
-        - experiment_dq
-        - sequence_dq
-        - active_experiment
-        - last_experiment
-        - active_sequence
-        - last_sequence
-        - active_seq_exp_counter
-        - last_action_uuid
-        - last_dispatched_action_uuid
+        Args:
+            pck_path: Optional explicit path to the pickle; defaults to
+                ``<root>/STATES/queues.pck``.
 
         Returns:
-            str: The path to the pickle file used for restoring the queues.
+            The path that was loaded (or attempted).
         """
         save_dir = self.world_cfg["root"]
         if pck_path is None:

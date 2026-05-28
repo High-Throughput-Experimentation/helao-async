@@ -1,22 +1,13 @@
-"""
-This module defines the BokehOperator class, which is responsible for managing
-the Bokeh-based user interface for the HTE (High Throughput Experimentation)
-orchestrator. The BokehOperator class provides methods for interacting with
-the orchestrator, including adding sequences and experiments, updating tables,
-and handling user input.
+"""Bokeh operator UI for the HELAO orchestrator.
 
-Classes:
-    return_sequence_lib: A Pydantic BaseModel class representing a sequence
-        object with attributes such as index, sequence_name, doc, args,
-        defaults, and argtypes.
-    return_experiment_lib: A Pydantic BaseModel class representing an
-        experiment object with attributes such as index, experiment_name,
-        doc, args, defaults, and argtypes.
-    BokehOperator: A class that manages the Bokeh-based user interface for
-        the HTE orchestrator. It provides methods for interacting with the
-        orchestrator, updating tables, handling user input, and managing
-        sequences and experiments.
+Defines the :class:`BokehOperator` Bokeh application that displays sequence,
+experiment and action queues, drives the orchestrator's start/stop/skip
+controls, and lets a human pick sequences/experiments and edit their
+parameters before enqueueing them.
 
+Also exposes two small pydantic models (:class:`return_sequence_lib`,
+:class:`return_experiment_lib`) used to describe entries from the loaded
+sequence and experiment libraries.
 """
 
 import time
@@ -72,7 +63,7 @@ BUILTIN_TYPES = [
 
 
 class return_sequence_lib(BaseModel):
-    """Return class for queried sequence objects."""
+    """Summary record for one entry in the loaded sequence library."""
 
     index: int
     sequence_name: str
@@ -83,7 +74,7 @@ class return_sequence_lib(BaseModel):
 
 
 class return_experiment_lib(BaseModel):
-    """Return class for queried experiment objects."""
+    """Summary record for one entry in the loaded experiment library."""
 
     index: int
     experiment_name: str
@@ -94,9 +85,22 @@ class return_experiment_lib(BaseModel):
 
 
 class BokehOperator:
+    """Bokeh application that visualises an :class:`Orch` and lets a user drive it.
+
+    Builds the queue/history tables, sequence/experiment/spec selectors,
+    parameter inputs, and orchestrator control buttons, and wires them to the
+    orchestrator's APIs via the bound :class:`Vis` instance.
+    """
+
     sequence: Sequence
 
     def __init__(self, vis_serv: Vis, orch):
+        """Build the Bokeh layout and bind the operator UI to ``orch``.
+
+        Args:
+            vis_serv: ``Vis`` helper providing access to the Bokeh document and config.
+            orch: Orchestrator the UI is controlling.
+        """
         self.vis = vis_serv
         self.orch = orch
         self.dataAPI = HTEPlateAPI()
@@ -840,6 +844,7 @@ class BokehOperator:
         self.orch.orch_op = self
 
     def cleanup_session(self, session_context):
+        """Stop the IO loop and cancel the background task when the Bokeh session ends."""
         LOGGER.info("BokehOperator session closed")
         self.IOloop_run = False
         self.IOtask.cancel()
@@ -849,7 +854,7 @@ class BokehOperator:
     # ------------------------------------------------------------------
 
     def _make_table(self, data_dict: dict, **extra_kwargs) -> tuple:
-        """Create a (ColumnDataSource, DataTable) pair from a dict of lists."""
+        """Build a ``(ColumnDataSource, DataTable)`` pair backed by ``data_dict``."""
         source = ColumnDataSource(data=data_dict)
         columns = [TableColumn(field=k, title=k) for k in data_dict]
         table = DataTable(
@@ -865,13 +870,13 @@ class BokehOperator:
     def _make_button(
         self, label: str, btn_type: str, width: int, callback, **kwargs
     ) -> Button:
-        """Create a Button and register a ButtonClick event handler in one call."""
+        """Create a Bokeh ``Button`` already wired to ``callback`` on click."""
         btn = Button(label=label, button_type=btn_type, width=width, **kwargs)
         btn.on_event(ButtonClick, callback)
         return btn
 
     def _make_stepwise_button(self, flag_attr: str, kind: str, callback) -> Button:
-        """Create a STEP-THRU / RUN-THRU toggle button from an orch flag attribute."""
+        """Build a STEP/RUN toggle button reflecting the orchestrator flag named ``flag_attr``."""
         is_step = getattr(self.orch, flag_attr)
         label = f"{'STEP' if is_step else 'RUN'}-THRU {kind}"
         btn = Button(
@@ -881,7 +886,7 @@ class BokehOperator:
         return btn
 
     def _make_copy_callback(self, source_attr: str, target_attr: str):
-        """Return an on_change callback that mirrors source to target via update_q."""
+        """Return an ``on_change`` callback that mirrors the value of one input into another."""
 
         def _cb(attr, old, new):
             self.vis.doc.add_next_tick_callback(
@@ -896,11 +901,12 @@ class BokehOperator:
 
     def _build_lib(
         self, lib: dict, filter_type, config_key: str, model_class, name_field: str
-    ):
-        """Shared logic for get_sequence_lib / get_experiment_lib.
+    ) -> tuple:
+        """Inspect ``lib`` and return ``(items, select_list)`` for sequence/experiment dropdowns.
 
-        Returns (items, select_list) where items is a list of model dicts and
-        select_list is the ordered list of names for the dropdown.
+        Drops parameters whose annotation matches ``filter_type`` (e.g. the
+        ``Experiment`` arg of experiment functions) and overlays defaults
+        from the world config under ``config_key``.
         """
         items = []
         select_list = []
@@ -953,7 +959,7 @@ class BokehOperator:
         return items, select_list
 
     def _apply_sequence_to_orch(self, orch_method):
-        """Shared body for callback_add_expplan / callback_add_split_sequences."""
+        """Annotate the staged sequence with UI fields and dispatch it through ``orch_method``."""
         if self.sequence is None:
             return
         self.sequence.sequence_label = self.input_sequence_label.value
@@ -973,7 +979,7 @@ class BokehOperator:
     def _update_param_layout(
         self, mode: str, idx: int, args=None, defaults=None, argtypes=None
     ):
-        """Shared body for update_seq/exp/seqspec_param_layout."""
+        """Rebuild the parameter input panel for one of ``seq``/``exp``/``seqspec`` selections."""
         _cfg = {
             "seq": {
                 "items_attr": "sequences",
@@ -1078,7 +1084,7 @@ class BokehOperator:
             self.refresh_inputs(param_input, private_input)
 
     def get_sequence_lib(self):
-        """Populates sequences (library) and sequence_list (dropdown selector)."""
+        """Populate the sequence library list and the sequence-selector dropdown."""
         self.sequences, self.sequence_select_list = self._build_lib(
             self.sequence_lib,
             None,
@@ -1088,7 +1094,7 @@ class BokehOperator:
         )
 
     def get_experiment_lib(self):
-        """Populates experiments (library) and experiment_list (dropdown selector)."""
+        """Populate the experiment library list and the experiment-selector dropdown."""
         self.experiments, self.experiment_select_list = self._build_lib(
             self.experiment_lib,
             Experiment,
@@ -1098,7 +1104,7 @@ class BokehOperator:
         )
 
     def get_seqspec_lib(self):
-        """Populates sequence specification library (preset params) and dropdown."""
+        """Refresh the sequence-specification dropdown from the configured spec folder."""
         self.seqspec_select_list = []
         self.seqspecs = []
         specfiles = self.seqspec_parser.lister(self.seqspec_folder)
@@ -1109,7 +1115,7 @@ class BokehOperator:
         self.seqspec_dropdown.options = self.seqspec_select_list
 
     async def get_sequences(self):
-        """get experiment list from orch"""
+        """Refresh the queued-sequences table from the orchestrator."""
         sequences = self.orch.list_sequences()
         for key in self.sequence_lists:
             self.sequence_lists[key] = []
@@ -1141,7 +1147,7 @@ class BokehOperator:
         # )
 
     async def get_experiments(self):
-        """get experiment list from orch"""
+        """Refresh the queued-experiments table from the orchestrator."""
         experiments = self.orch.list_experiments()
         for key in self.experiment_lists:
             self.experiment_lists[key] = []
@@ -1164,7 +1170,7 @@ class BokehOperator:
         # )
 
     async def get_actions(self):
-        """get action list from orch"""
+        """Refresh the queued-actions table from the orchestrator."""
         actions = self.orch.list_actions()
         for key in self.action_lists:
             self.action_lists[key] = []
@@ -1182,7 +1188,7 @@ class BokehOperator:
         # LOGGER.info(f"current queued actions: ({len(self.orch.action_dq)})")
 
     async def get_history(self):
-        """get history from orch"""
+        """Refresh the action/experiment/sequence history tables from the orchestrator."""
         for key in self.action_history_lists:
             self.action_history_lists[key] = []
         action_tups = sorted(self.orch.action_history.items(), key=lambda x: x[0])[::-1]
@@ -1244,6 +1250,7 @@ class BokehOperator:
         self.sequence_history_source.data = self.sequence_history_lists
 
     async def get_orch_status_summary(self):
+        """Refresh the action-server status table from the orchestrator's heartbeat data."""
         for key in self.action_server_lists:
             self.action_server_lists[key] = []
 
@@ -1256,6 +1263,7 @@ class BokehOperator:
             )
 
     def update_selector_layout(self, attr, old, new):
+        """Switch the parameter panel to match the currently active selector tab."""
         if new == 2:
             self.seqspec_dropdown.value = self.seqspec_select_list[0]
             first_spec = self.seqspec_select_list[0]
@@ -1270,6 +1278,7 @@ class BokehOperator:
             self.callback_sequence_select("value", first_seq, first_seq)
 
     def callback_sequence_select(self, attr, old, new):
+        """Rebuild the sequence parameter panel and docstring for the newly selected sequence."""
         idx = self.sequence_select_list.index(new)
         self.update_seq_param_layout(idx)
         self.vis.doc.add_next_tick_callback(
@@ -1277,6 +1286,7 @@ class BokehOperator:
         )
 
     def callback_experiment_select(self, attr, old, new):
+        """Rebuild the experiment parameter panel and docstring for the newly selected experiment."""
         idx = self.experiment_select_list.index(new)
         self.update_exp_param_layout(idx)
         self.vis.doc.add_next_tick_callback(
@@ -1284,6 +1294,7 @@ class BokehOperator:
         )
 
     def callback_seqspec_select(self, attr, old, new):
+        """Rebuild the spec-file parameter panel and description for the newly selected spec."""
         idx = self.seqspec_select_list.index(new)
         self.update_seqspec_param_layout(idx)
         self.vis.doc.add_next_tick_callback(
@@ -1291,6 +1302,7 @@ class BokehOperator:
         )
 
     def callback_enqueue_seqspec(self, event):
+        """Parse the selected spec file and enqueue the resulting sequence on the orchestrator."""
         idx = self.seqspec_select_list.index(self.seqspec_dropdown.value)
         specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
@@ -1315,10 +1327,12 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_reload_seqspec(self, event):
+        """Re-read the spec folder to pick up newly added specification files."""
         if self.seqspec_parser is not None and self.seqspec_folder is not None:
             self.vis.doc.add_next_tick_callback(self.get_seqspec_lib)
 
     def callback_to_seqtab(self, event):
+        """Switch to the Sequence tab pre-populated with the selected spec's parameters."""
         idx = self.seqspec_select_list.index(self.seqspec_dropdown.value)
         specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
@@ -1341,7 +1355,7 @@ class BokehOperator:
                 self.seq_param_input[i].value = str(loaded_params[x.title])
 
     def callback_clicked_pmplot(self, event, sender):
-        """double click/tap on PM plot to add/move marker"""
+        """On a double-tap on the plate map, snap the marker to the nearest sample."""
         LOGGER.info(f"DOUBLE TAP PMplot: {event.x}, {event.y}")
         # get coordinates of doubleclick
         platex = event.x
@@ -1351,7 +1365,7 @@ class BokehOperator:
         self.get_sample_infos(PMnum, sender)
 
     def callback_changed_plateid(self, attr, old, new, sender):
-        """callback for plateid text input"""
+        """Refresh plate map and elements when the ``plate_id`` text input changes."""
 
         def to_int(val):
             try:
@@ -1387,6 +1401,7 @@ class BokehOperator:
             )
 
     def callback_plate_sample_no_list_file(self, attr, old, new, sender, inputfield):
+        """Load a text file of integer sample numbers and write them as JSON into ``inputfield``."""
         f = io.BytesIO(b64decode(sender.value))
         sample_nos = json.dumps(np.loadtxt(f).astype(int).tolist())
         self.vis.doc.add_next_tick_callback(
@@ -1394,7 +1409,7 @@ class BokehOperator:
         )
 
     def callback_changed_sampleno(self, attr, old, new, sender):
-        """callback for sampleno text input"""
+        """When the ``sample_no`` input changes, refresh the highlighted sample info on the plate map."""
 
         def to_int(val):
             try:
@@ -1411,10 +1426,12 @@ class BokehOperator:
             )
 
     def callback_estop_orch(self, event):
+        """Schedule an emergency stop of the orchestrator from the ESTOP button."""
         LOGGER.info("estop orch")
         self.vis.doc.add_next_tick_callback(partial(self.orch.estop_loop))
 
     def callback_start_orch(self, event):
+        """Start the orchestrator from the Start button when it is in the stopped state."""
         if self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
             LOGGER.info("starting orch")
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
@@ -1425,86 +1442,103 @@ class BokehOperator:
             LOGGER.info("Cannot start orch when not in a stopped state.")
 
     def callback_add_expplan(self, event):
-        """add experiment plan as new sequence to orch sequence_dq"""
+        """Send the current experiment plan to the orchestrator as a new sequence."""
         self._apply_sequence_to_orch(self.orch.add_sequence)
 
     def callback_add_split_sequences(self, event):
-        """add experiment plan as sequences split by sample to orch sequence_dq"""
+        """Send the current plan to the orchestrator using the split-by-sample helper."""
         self._apply_sequence_to_orch(self.orch.add_split_sequences)
 
     def callback_toggle_stepact(self, event):
+        """Flip the step-through-actions toggle."""
         self.vis.doc.add_next_tick_callback(
             partial(self.update_stepwise_toggle, self.orch_stepact_button)
         )
 
     def callback_toggle_stepexp(self, event):
+        """Flip the step-through-experiments toggle."""
         self.vis.doc.add_next_tick_callback(
             partial(self.update_stepwise_toggle, self.orch_stepexp_button)
         )
 
     def callback_toggle_stepseq(self, event):
+        """Flip the step-through-sequences toggle."""
         self.vis.doc.add_next_tick_callback(
             partial(self.update_stepwise_toggle, self.orch_stepseq_button)
         )
 
     def callback_stop_orch(self, event):
+        """Stop the orchestrator from the Stop button and refresh the tables."""
         LOGGER.info("stopping operator orch")
         self.vis.doc.add_next_tick_callback(partial(self.orch.stop))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_skip_exp(self, event):
+        """Skip the current experiment via the orchestrator."""
         LOGGER.info("skipping experiment")
         self.vis.doc.add_next_tick_callback(partial(self.orch.skip))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_expplan(self, event):
+        """Discard the staged experiment plan and refresh the tables."""
         LOGGER.info("clearing exp plan table")
         self.sequence = None
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_sequences(self, event):
+        """Clear the orchestrator's sequence queue."""
         LOGGER.info("clearing experiments")
         self.vis.doc.add_next_tick_callback(partial(self.orch.clear_sequences))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_experiments(self, event):
+        """Clear the orchestrator's experiment queue."""
         LOGGER.info("clearing experiments")
         self.vis.doc.add_next_tick_callback(partial(self.orch.clear_experiments))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_actions(self, event):
+        """Clear the orchestrator's action queue."""
         LOGGER.info("clearing actions")
         self.vis.doc.add_next_tick_callback(partial(self.orch.clear_actions))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_prepend_seq(self, event):
+        """Prepend the current sequence selection to the staged plan."""
         self.populate_sequence(prepend=True)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_append_seq(self, event):
+        """Append the current sequence selection to the staged plan."""
         self.populate_sequence(prepend=False)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_prepend_exp(self, event):
+        """Prepend the current experiment selection to the staged plan."""
         self.prepend_experiment()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_append_exp(self, event):
+        """Append the current experiment selection to the staged plan."""
         self.append_experiment()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_update_tables(self, event):
+        """Force a manual refresh of every queue/history table."""
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def append_experiment(self):
+        """Build the experiment model from the current inputs and append it to the staged plan."""
         experimentmodel = self.populate_experimentmodel()
         self.sequence.planned_experiments.append(experimentmodel)
 
     def prepend_experiment(self):
+        """Build the experiment model from the current inputs and prepend it to the staged plan."""
         experimentmodel = self.populate_experimentmodel()
         self.sequence.planned_experiments.insert(0, experimentmodel)
 
     def write_params(self, ptype: str, name: str, pars: dict):
+        """Persist the most recent sequence/experiment parameters to ``previous_params.json``."""
         param_file_path = os.path.join(
             self.orch.world_cfg["root"], "STATES", "previous_params.json"
         )
@@ -1521,7 +1555,8 @@ class BokehOperator:
             with open(param_file_path, "w", encoding="utf8") as f:
                 json.dump(pdict, f)
 
-    def read_params(self, ptype: str, name: str):
+    def read_params(self, ptype: str, name: str) -> dict:
+        """Return the most recently saved parameters for ``name`` of type ``ptype`` (``seq``/``exp``)."""
         param_file_path = os.path.join(
             self.orch.world_cfg["root"], "STATES", "previous_params.json"
         )
@@ -1534,6 +1569,7 @@ class BokehOperator:
         return pdict.get(ptype, {}).get(name, {})
 
     def populate_sequence(self, prepend: bool = False):
+        """Unpack the selected sequence with current parameters and merge it into the staged plan."""
         selected_sequence = self.sequence_dropdown.value
         LOGGER.info(f"selected sequence from list: {selected_sequence}")
 
@@ -1579,6 +1615,7 @@ class BokehOperator:
         )
 
     def populate_experimentmodel(self) -> Experiment:
+        """Build an ``Experiment`` from the experiment dropdown and current parameter inputs."""
         selected_experiment = self.experiment_dropdown.value
         LOGGER.info(f"selected experiment from list: {selected_experiment}")
         experiment_params = {
@@ -1606,6 +1643,7 @@ class BokehOperator:
         return experimentmodel
 
     def refresh_inputs(self, param_input, private_input):
+        """Re-fire ``solid_plate_id`` / ``solid_sample_no`` callbacks to refresh dependent widgets."""
         input_plate_id = self.find_input(param_input, "solid_plate_id")
         input_sample_no = self.find_input(param_input, "solid_sample_no")
         if input_plate_id is not None:
@@ -1630,9 +1668,11 @@ class BokehOperator:
             )
 
     def update_input_value(self, sender, value):
+        """Assign ``value`` to ``sender.value`` (Bokeh next-tick safe setter)."""
         sender.value = value
 
     def flip_stepwise_flag(self, sender_type):
+        """Toggle the orchestrator's step-through flag for actions/experiments/sequences."""
         if sender_type == "actions":
             self.orch.step_thru_actions = not self.orch.step_thru_actions
         elif sender_type == "experiments":
@@ -1641,6 +1681,7 @@ class BokehOperator:
             self.orch.step_thru_sequences = not self.orch.step_thru_sequences
 
     def update_stepwise_toggle(self, sender):
+        """Update a step-through button's label and colour after its flag flips."""
         sender_type = sender.label.split("[")[0].strip().split()[-1].strip()
         sender_map = {
             "actions": (self.orch_stepact_button, len(self.orch.action_dq)),
@@ -1657,6 +1698,7 @@ class BokehOperator:
             sbutton.button_type = "danger"
 
     def update_queuecount_labels(self):
+        """Refresh the queue-size counters shown on the step-through buttons."""
         stepwisebuttons = [
             (self.orch_stepseq_button, len(self.orch.sequence_dq)),
             (self.orch_stepexp_button, len(self.orch.experiment_dq)),
@@ -1666,12 +1708,15 @@ class BokehOperator:
             sbutton.label = sbutton.label.split("[")[0].strip() + f" [{numq}]"
 
     def update_seq_param_layout(self, idx):
+        """Rebuild the sequence-parameter panel for entry ``idx`` of the sequence library."""
         self._update_param_layout("seq", idx)
 
     def update_exp_param_layout(self, idx):
+        """Rebuild the experiment-parameter panel for entry ``idx`` of the experiment library."""
         self._update_param_layout("exp", idx)
 
     def update_seqspec_param_layout(self, idx):
+        """Rebuild the spec-parameter panel for entry ``idx`` using the spec parser's schema."""
         args = []
         argtypes = []
         defaults = []
@@ -1699,6 +1744,12 @@ class BokehOperator:
         argtypes,
         argtype_list,
     ):
+        """Generate Bokeh widgets for the given parameter ``args`` and append them to ``param_layout``.
+
+        Special-cases plate-related parameters (``solid_plate_id``,
+        ``solid_sample_no``, ``x_mm``/``y_mm``, custom positions, file
+        upload) by attaching the appropriate callbacks and extra inputs.
+        """
         item = 0
 
         for idx in range(len(args)):
@@ -1888,19 +1939,24 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 )
 
     def update_seq_doc(self, value):
+        """Render the selected sequence's docstring into the sequence description widget."""
         self.sequence_descr_txt.text = value.replace("\n", "<br>")
 
     def update_exp_doc(self, value):
+        """Render the selected experiment's docstring into the experiment description widget."""
         self.experiment_descr_txt.text = value.replace("\n", "<br>")
 
     def update_seqspec_doc(self, value):
+        """Show the parser path and spec file path in the seqspec description widget."""
         fp = value.replace("\n", "<br>")
         self.seqspec_descr_txt.text = f"Enqueue a sequence using parser:<br>{self.parser_path}<br><br>on specification file:<br>{fp}"
 
     def update_error(self, value):
+        """Set the error banner text."""
         self.error_txt.text = value
 
     def update_xysamples(self, xval, yval, sender):
+        """Write ``xval``/``yval`` into the ``x_mm``/``y_mm`` inputs associated with ``sender``."""
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
             return False
@@ -1912,7 +1968,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 paraminput.value = yval
 
     def update_pm_plot(self, plot_mpmap, pmdata):
-        """plots the plate map"""
+        """Re-render the plate map markers on ``plot_mpmap`` from ``pmdata``."""
         x = [col["x"] for col in pmdata]
         y = [col["y"] for col in pmdata]
         # remove old Pmplot
@@ -1924,7 +1980,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         )
 
     def get_pm(self, plateid: int, sender):
-        """gets plate map"""
+        """Look up the plate map for ``plateid`` and trigger a plate-map redraw."""
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
             return False
@@ -1943,7 +1999,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             )
 
     def xy_to_sample(self, xy, pmapxy):
-        """get point from pmap closest to xy"""
+        """Return the index of the entry in ``pmapxy`` closest to ``xy``, or ``None`` if empty."""
         if len(pmapxy):
             diff = pmapxy - xy
             sumdiff = (diff**2).sum(axis=1)
@@ -1952,7 +2008,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             return None
 
     def get_samples(self, X, Y, sender):
-        """get list of samples row number closest to xy"""
+        """Return the indices of plate-map entries closest to each ``(X[i], Y[i])`` pair."""
         # X and Y are vectors
 
         private_input, param_input = self.find_param_private_input(sender)
@@ -1973,7 +2029,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             return [None]
 
     def get_elements_plateid(self, plateid: int, sender):
-        """gets plate elements from aligner server"""
+        """Populate the ``elements`` widget with the element list for ``plateid``."""
 
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
@@ -1995,6 +2051,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 )
 
     def find_plot(self, inputs, name):
+        """Return the Bokeh ``figure`` in ``inputs`` whose title equals ``name``, or ``None``."""
         for inp in inputs:
             if isinstance(inp, figure):
                 if inp.title.text == name:
@@ -2002,6 +2059,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         return None
 
     def find_input(self, inputs, name):
+        """Return the ``TextInput`` in ``inputs`` whose title equals ``name``, or ``None``."""
         for inp in inputs:
             if isinstance(inp, TextInput):
                 if inp.title == name:
@@ -2009,6 +2067,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         return None
 
     def find_param_private_input(self, sender):
+        """Return the ``(private_input, param_input)`` lists that contain ``sender``, or ``(None, None)``."""
         private_input = None
         param_input = None
 
@@ -2023,6 +2082,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         return private_input, param_input
 
     def get_sample_infos(self, PMnum: Optional[List] = None, sender=None):
+        """Update sample-related widgets and the highlighted marker on the plate map for ``PMnum``."""
         LOGGER.info("updating samples")
 
         private_input, param_input = self.find_param_private_input(sender)
@@ -2104,9 +2164,11 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         return False
 
     async def add_experiment_to_sequence(self):
+        """Placeholder hook for future experiment-to-sequence integration."""
         pass
 
     async def update_tables(self):
+        """Refresh every queue/history table and update the orchestrator status banner/buttons."""
         start_time = time.time()
         await self.get_sequences()
         await self.get_experiments()
@@ -2162,6 +2224,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
 
     async def IOloop(self):
+        """Wait on ``update_q`` and refresh the UI tables whenever the orchestrator posts a message."""
         self.IOloop_run = True
         while self.IOloop_run:
             try:
@@ -2172,6 +2235,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 LOGGER.error(f"BokehOperator IOloop error: {repr(e), tb,}")
 
     def get_last_seq_pars(self):
+        """Pre-fill the sequence parameter inputs from the saved ``previous_params.json`` entry."""
         loaded_pars = self.read_params("seq", self.sequence_dropdown.value)
         for k, v in loaded_pars.items():
             seq_input = self.find_input(self.seq_param_input, k)
@@ -2180,6 +2244,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             )
 
     def get_last_exp_pars(self):
+        """Pre-fill the experiment parameter inputs from the saved ``previous_params.json`` entry."""
         loaded_pars = self.read_params("exp", self.experiment_dropdown.value)
         for k, v in loaded_pars.items():
             exp_input = self.find_input(self.exp_param_input, k)

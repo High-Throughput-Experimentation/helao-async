@@ -1,6 +1,4 @@
-"""
-Sequence library for ECHE
-"""
+"""Sequence library exposing a single looping chronopotentiometry program."""
 
 __all__ = [
     "CP_loop",
@@ -29,19 +27,36 @@ def CP_loop(
     stop_voltage_max: str = "",
     stop_voltage_min_delay_pts: str = "",
     stop_voltage_max_delay_pts: str = "",
-):
-    """Run a looping CP for num_repeats times.
+) -> list:
+    """Build a sequence that runs a single ``PSTAT_exp_CP`` experiment.
+
+    The added experiment internally loops chronopotentiometry for
+    ``num_repeats`` iterations and forwards all alert and stop-voltage
+    parameters to the underlying potentiostat action.
 
     Args:
-        CP_current (float, optional): CP current in amps. Defaults to 0.001.
-        CP_duration_sec (float, optional): Duration of one CP loop iteration in seconds. Defaults to 3600.
-        CP_samplerate_sec (float, optional): Data acquisition rate in seconds. Defaults to 0.1.
-        gamry_i_range (str, optional): _description_. Defaults to "auto".
-        comment (str, optional): User comment e.g. sample number. Defaults to "".
-        num_repeats (int): Number of loop iterations. Defaults to 1
+        sequence_version: Version tag for the sequence definition.
+        CP_current: CP current setpoint in amps.
+        CP_duration_sec: Duration of one CP loop iteration in seconds.
+        CP_samplerate_sec: Data acquisition interval in seconds.
+        gamry_i_range: Gamry current range string (e.g. ``"auto"``).
+        comment: User comment forwarded to the experiment.
+        num_repeats: Number of CP loop iterations to perform.
+        alert_duration_sec: Duration over which the alert threshold is
+            evaluated; negative disables.
+        alert_above: If True, alert when voltage stays above threshold,
+            else when below.
+        alert_sleep_sec: Sleep between alert checks in seconds.
+        alert_thresh_Ewe_V: Voltage threshold used to trigger an alert.
+        stop_voltage_min: Lower voltage stop limit (string-encoded).
+        stop_voltage_max: Upper voltage stop limit (string-encoded).
+        stop_voltage_min_delay_pts: Consecutive points below the min limit
+            required to stop.
+        stop_voltage_max_delay_pts: Consecutive points above the max limit
+            required to stop.
 
     Returns:
-        list: a list of Action premodels
+        list: Ordered list of planned ``Experiment`` objects.
     """
 
     epm = ExperimentPlanMaker()

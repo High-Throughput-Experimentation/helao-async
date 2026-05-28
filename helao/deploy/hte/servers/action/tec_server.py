@@ -1,5 +1,10 @@
 # shell: uvicorn motion_server:app --reload
-"""Thermoelectric cooler server"""
+"""FastAPI action server for a Meerstetter thermoelectric cooler (TEC).
+
+Wraps :class:`MeerstetterTEC` and the :class:`TECMonExec` / :class:`TECWaitExec`
+executors to expose endpoints that record TEC telemetry, set the temperature
+setpoint, enable/disable control, and wait for thermal stability.
+"""
 
 __all__ = ["makeApp"]
 
@@ -21,7 +26,17 @@ from ...drivers.temperature_control.mecom_driver import (
 )
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the BaseAPI app for the Meerstetter TEC.
+
+    Args:
+        server_key: Unique key identifying this server in the orchestration
+            group.
+
+    Returns:
+        The configured BaseAPI instance with TEC monitoring and control
+        endpoints registered.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -41,7 +56,21 @@ def makeApp(server_key):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
     ):
-        """Record TEC values (does not affect setpoint or control)."""
+        """Stream TEC telemetry through a :class:`TECMonExec`.
+
+        Does not change the setpoint or enable/disable the controller.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            duration: Recording duration in seconds; negative runs until
+                cancelled.
+            acquisition_rate: Polling period in seconds passed to the executor.
+            fast_samples_in: Sample references associated with this action.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "TEC"
         executor = TECMonExec(
@@ -57,7 +86,17 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stop recording TEC values (does not affect setpoint or control)."""
+        """Stop any running ``record_tec`` executors.
+
+        Does not change the setpoint or enable/disable the controller.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():
             if exec_id.split()[0] == "record_tec":
@@ -71,7 +110,18 @@ def makeApp(server_key):
         action_version: int = 1,
         target_temperature_degc: float = 25.0,
     ):
-        """Set target temperature without enabling/disabling control."""
+        """Write a new temperature setpoint to the TEC controller.
+
+        Does not toggle the enable state.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            target_temperature_degc: Setpoint in degrees Celsius.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="setTEC")
         app.driver.set_temp(active.action.action_params["target_temperature_degc"])
         finished_action = await active.finish()
@@ -82,7 +132,15 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        "Enable TEC control." ""
+        """Enable the TEC controller output.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="enableTEC")
         app.driver.enable()
         finished_action = await active.finish()
@@ -93,7 +151,15 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Disable TEC control."""
+        """Disable the TEC controller output.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="disableTEC")
         app.driver.disable()
         finished_action = await active.finish()
@@ -105,7 +171,19 @@ def makeApp(server_key):
         action_version: int = 1,
         acquisition_rate: float = 0.2,
     ):
-        """Wait until temperature_is_stable returns int 2 (stable)."""
+        """Start a :class:`TECWaitExec` that returns once the TEC is stable.
+
+        The executor polls the controller until ``temperature_is_stable``
+        reports the stable state (integer ``2``).
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            acquisition_rate: Polling period in seconds passed to the executor.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "waitTEC"
         executor = TECWaitExec(
@@ -121,7 +199,15 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stop waiting for temperature_is_stable."""
+        """Stop any running ``wait_till_stable`` executors.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():
             if exec_id.split()[0] == "wait_till_stable":

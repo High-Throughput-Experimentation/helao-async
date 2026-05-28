@@ -1,8 +1,10 @@
-"""HLO file reading and parquet conversion.
+"""Readers and conversion helpers for the HELAO ``.hlo`` data file format.
 
-Consolidates the former read_hlo and parquet modules.
-``HelaoData`` is re-exported from ``helao.helpers.helao_data`` for callers that
-imported it from ``read_hlo``.
+A ``.hlo`` file is a YAML header followed by a ``%%`` separator line and one
+JSON object per line of data. This module exposes utilities to read both
+header and body, to stream the body in chunks, and to convert a ``.hlo``
+file to Parquet (carrying the optional header as schema metadata).
+``HelaoData`` is lazily re-exported from ``helao.helpers.helao_data``.
 """
 
 __all__ = [
@@ -34,7 +36,18 @@ _yaml = YAML()
 def read_hlo(
     path: str, keep_keys: list = [], omit_keys: list = []
 ) -> Tuple[dict, dict]:
-    """Read a .hlo file and return its (meta, data) dictionaries."""
+    """Read a ``.hlo`` file and return its header and body as dicts.
+
+    Args:
+        path: Filesystem path to the ``.hlo`` file.
+        keep_keys: When non-empty, only these keys are kept from the body.
+        omit_keys: Keys to omit from the body (ignored when ``keep_keys`` is
+            populated, which takes precedence).
+
+    Returns:
+        A ``(meta, data)`` tuple where ``meta`` is the parsed YAML header
+        and ``data`` is a dict of column lists assembled from the body.
+    """
     if keep_keys and omit_keys:
         print(
             "Both keep_keys and omit_keys are provided. keep_keys will take precedence."
@@ -68,8 +81,17 @@ def read_hlo(
     return meta, data
 
 
-def read_hlo_header(file_path):
-    """Read the YAML header of an HLO file. Returns (header_dict, data_start_index)."""
+def read_hlo_header(file_path) -> tuple:
+    """Read the YAML header of an HLO file.
+
+    Args:
+        file_path: Path to the ``.hlo`` file.
+
+    Returns:
+        A ``(header_dict, data_start_index)`` tuple where
+        ``data_start_index`` is the zero-based index of the first body line
+        (or ``-1`` if no ``%%`` marker was found).
+    """
     yml_lines = []
     data_start_index = -1
     with open(file_path) as f:
@@ -84,7 +106,19 @@ def read_hlo_header(file_path):
 
 
 def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
-    """Yield (chunk_dict, max_chunk_len) tuples from an HLO file in chunks."""
+    """Yield successive chunks of the body of an HLO file.
+
+    Args:
+        file_path: Path to the ``.hlo`` file.
+        data_start_index: Line index of the first body line (as returned by
+            ``read_hlo_header``).
+        chunk_size: Maximum number of body lines per chunk.
+
+    Yields:
+        ``(chunk_dict, max_chunk_len)`` tuples where ``chunk_dict`` is a
+        dict of column lists for at most ``chunk_size`` lines and
+        ``max_chunk_len`` is the longest column length in that chunk.
+    """
     with open(file_path) as f:
         chunkd = defaultdict(list)
         for i, line in enumerate(f):
@@ -107,7 +141,20 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
 def hlo_to_parquet(
     input_hlo_path, output_parquet_path, chunk_size=100, HISPEC: bool = False
 ):
-    """Convert an HLO file to Parquet format."""
+    """Convert an HLO file to Parquet, embedding the header in schema metadata.
+
+    The ``optional`` section of the header is serialized as JSON and stored
+    under the ``helao_metadata`` schema metadata key. When ``HISPEC`` is set,
+    wavelength columns from ``header["optional"]["wl"]`` are used to label
+    the data columns and adjacent wavelengths are mean-aggregated.
+
+    Args:
+        input_hlo_path: Path to the source ``.hlo`` file.
+        output_parquet_path: Destination Parquet file path.
+        chunk_size: Number of body lines to read per write batch.
+        HISPEC: When ``True``, apply HiSpec-specific column relabelling and
+            wavelength aggregation before writing.
+    """
     writer: pq.ParquetWriter = None
     schema = None
     metadata = None
@@ -161,15 +208,23 @@ def hlo_to_parquet(
         writer.close()
 
 
-def read_helao_metadata(parquet_file_path):
-    """Read Helao-specific metadata from a Parquet file's schema."""
+def read_helao_metadata(parquet_file_path) -> dict:
+    """Return the ``helao_metadata`` dict embedded in a Parquet schema.
+
+    Args:
+        parquet_file_path: Path to the Parquet file to inspect.
+
+    Returns:
+        The deserialized ``helao_metadata`` dict, or ``{}`` when no such
+        schema-level metadata is present.
+    """
     meta = pq.read_metadata(parquet_file_path)
     metadict = json.loads(meta.metadata.get(b"helao_metadata", b"{}").decode())
     return metadict
 
 
 def __getattr__(name):
-    # Lazy re-export of HelaoData from helao_data to keep import side effects light.
+    """Lazily re-export ``HelaoData`` from :mod:`helao.helpers.helao_data`."""
     if name == "HelaoData":
         from .helao_data import HelaoData
         return HelaoData

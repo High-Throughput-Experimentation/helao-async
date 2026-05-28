@@ -1,5 +1,9 @@
-"""
-Sequence library for ECHE
+"""Sequence library for ECHE (electrochemistry without spectroscopy).
+
+Each public ``ECHE_*`` function builds an experiment list via
+``ExperimentPlanMaker``. Sequences typically chain sample movement,
+startup, OCV/CV/CA/CP electrochemistry (including LED-toggled photo
+variants), and shutdown sub-experiments from the ECHE experiment library.
 """
 
 __all__ = [
@@ -30,7 +34,19 @@ def ECHE_movetosample(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no: int = 1,
-):
+) -> list:
+    """Move the ECHE stage to a particular plate sample.
+
+    Issues one ``ECHE_sub_movetosample`` followed by an ``ECHE_sub_shutdown``.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -52,7 +68,19 @@ def ECHE_move(
     sequence_version: int = 1,
     move_x_mm: float = 1.0,
     move_y_mm: float = 1.0,
-):
+) -> list:
+    """Issue a relative move on the ECHE motor stage.
+
+    Calls ``ECHE_sub_rel_move`` then ``ECHE_sub_shutdown``.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        move_x_mm: Parameter passed through to the sub-experiments.
+        move_y_mm: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -121,7 +149,66 @@ def ECHE_4CA_led_1CV_led(
     toggleCV_illum_period: float = 3.0,
     toggleCV_dark_time_init: float = 0,
     toggleCV_illum_time: float = -1,
-):
+) -> list:
+    """Run four photo-CA potentials followed by one photo-CV.
+
+    For each sample: startup, OCV, four CA-LED steps with OCVs between them, then a CV-LED scan and shutdown.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_vs_nhe: Parameter passed through to the sub-experiments.
+        CA1_potential: Parameter passed through to the sub-experiments.
+        CA1_duration_sec: Parameter passed through to the sub-experiments.
+        CA2_potential: Parameter passed through to the sub-experiments.
+        CA2_duration_sec: Parameter passed through to the sub-experiments.
+        CA3_potential: Parameter passed through to the sub-experiments.
+        CA3_duration_sec: Parameter passed through to the sub-experiments.
+        CA4_potential: Parameter passed through to the sub-experiments.
+        CA4_duration_sec: Parameter passed through to the sub-experiments.
+        CA_samplerate_sec: Parameter passed through to the sub-experiments.
+        CV_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV_cycles: Parameter passed through to the sub-experiments.
+        preCV_duration: Parameter passed through to the sub-experiments.
+        OCV_duration: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+        gamrychannelwait: Parameter passed through to the sub-experiments.
+        gamrychannelsend: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_names: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CA1: Parameter passed through to the sub-experiments.
+        led_name_CA2: Parameter passed through to the sub-experiments.
+        led_name_CA3: Parameter passed through to the sub-experiments.
+        led_name_CA4: Parameter passed through to the sub-experiments.
+        led_name_CV: Parameter passed through to the sub-experiments.
+        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCA_illum_period: Parameter passed through to the sub-experiments.
+        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCA_illum_time: Parameter passed through to the sub-experiments.
+        toggleCV_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCV_illum_period: Parameter passed through to the sub-experiments.
+        toggleCV_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCV_illum_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -376,7 +463,47 @@ def ECHE_CV_CA_CV(
     CV3_samplerate_mV: float = 1,
     CV3_cycles: int = 1,
     gamry_i_range: str = "auto",
-):
+) -> list:
+    """Run a CV / CA / CV photo protocol on each sample.
+
+    Loads sample, runs preCV, CA, then CV with LED toggling and shutdown.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        liquid_volume_ml: Parameter passed through to the sub-experiments.
+        CV1_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV1_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV1_cycles: Parameter passed through to the sub-experiments.
+        preCV_duration: Parameter passed through to the sub-experiments.
+        OCV_duration: Parameter passed through to the sub-experiments.
+        CA2_potential: Parameter passed through to the sub-experiments.
+        CA2_duration_sec: Parameter passed through to the sub-experiments.
+        CA_samplerate_sec: Parameter passed through to the sub-experiments.
+        CV3_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV3_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV3_cycles: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -516,7 +643,35 @@ def ECHE_CV(
     CV1_cycles: int = 1,
     preCV_duration: float = 3,
     gamry_i_range: str = "auto",
-):
+) -> list:
+    """Standalone CV scan for ECHE without illumination.
+
+    Loads the sample, runs OCV, performs a CV scan, and shuts down.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        CV1_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV1_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV1_cycles: Parameter passed through to the sub-experiments.
+        preCV_duration: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -592,7 +747,31 @@ def ECHE_CA(
     CA_samplerate_sec: float = 0.05,
     OCV_duration: float = 1,
     gamry_i_range: str = "auto",
-):
+) -> list:
+    """Standalone CA hold for ECHE without illumination.
+
+    Loads the sample, runs OCV, performs a CA hold, and shuts down.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        CA_potential: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        CA_samplerate_sec: Parameter passed through to the sub-experiments.
+        OCV_duration: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -673,7 +852,43 @@ def ECHE_CA_led(
     toggleCA_illum_period: float = 1.0,
     toggleCA_dark_time_init: float = 0,
     toggleCA_illum_time: float = -1,
-):
+) -> list:
+    """Photo-CA hold for ECHE with LED toggling.
+
+    Loads the sample, runs OCV, performs a CA-LED hold, and shuts down.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        CA_potential: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        CA_samplerate_sec: Parameter passed through to the sub-experiments.
+        OCV_duration: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+        gamrychannelwait: Parameter passed through to the sub-experiments.
+        gamrychannelsend: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_names: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CA: Parameter passed through to the sub-experiments.
+        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCA_illum_period: Parameter passed through to the sub-experiments.
+        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCA_illum_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -772,7 +987,47 @@ def ECHE_CV_led(
     toggleCV_illum_period: float = 3.0,
     toggleCV_dark_time_init: float = 0,
     toggleCV_illum_time: float = -1,
-):
+) -> list:
+    """Photo-CV for ECHE with LED toggling.
+
+    Loads the sample, runs OCV, performs a CV-LED sweep, and shuts down.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        CV_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV_cycles: Parameter passed through to the sub-experiments.
+        preCV_duration: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+        gamrychannelwait: Parameter passed through to the sub-experiments.
+        gamrychannelsend: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_names: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CV: Parameter passed through to the sub-experiments.
+        toggleCV_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCV_illum_period: Parameter passed through to the sub-experiments.
+        toggleCV_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCV_illum_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -862,7 +1117,30 @@ def ECHE_CP(
     CP_duration_sec: float = 4,
     CP_samplerate_sec: float = 0.05,
     gamry_i_range: str = "auto",
-):
+) -> list:
+    """Standalone CP hold for ECHE without illumination.
+
+    Loads the sample, runs OCV, performs a CP hold, and shuts down.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        CP_current: Parameter passed through to the sub-experiments.
+        CP_duration_sec: Parameter passed through to the sub-experiments.
+        CP_samplerate_sec: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -935,7 +1213,42 @@ def ECHE_CP_led(
     toggleCP_illum_period: float = 1.0,
     toggleCP_dark_time_init: float = 0.0,
     toggleCP_illum_time: float = -1,
-):
+) -> list:
+    """Photo-CP hold for ECHE with LED toggling.
+
+    Loads the sample, runs OCV, performs a CP-LED hold, and shuts down.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        CP_current: Parameter passed through to the sub-experiments.
+        CP_duration_sec: Parameter passed through to the sub-experiments.
+        CP_samplerate_sec: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+        gamrychannelwait: Parameter passed through to the sub-experiments.
+        gamrychannelsend: Parameter passed through to the sub-experiments.
+        led_name_CP: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_names: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        toggleCP_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCP_illum_period: Parameter passed through to the sub-experiments.
+        toggleCP_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCP_illum_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1035,7 +1348,56 @@ def ECHE_CVs_CAs(
     CA2_duration_sec: float = 300,
     CA_samplerate_sec: float = 0.05,
     gamry_i_range: str = "auto",
-):
+) -> list:
+    """Run a CV list followed by a CA list per sample.
+
+    Iterates over CV cycle/potential lists then CA potential/duration lists.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        liquid_volume_ml: Parameter passed through to the sub-experiments.
+        CV1_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV1_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV1_cycles: Parameter passed through to the sub-experiments.
+        CV2_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV2_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV2_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV2_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV2_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV2_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV2_cycles: Parameter passed through to the sub-experiments.
+        CV3_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV3_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV3_cycles: Parameter passed through to the sub-experiments.
+        preCV_duration: Parameter passed through to the sub-experiments.
+        OCV_duration: Parameter passed through to the sub-experiments.
+        CA1_potential: Parameter passed through to the sub-experiments.
+        CA1_duration_sec: Parameter passed through to the sub-experiments.
+        CA2_potential: Parameter passed through to the sub-experiments.
+        CA2_duration_sec: Parameter passed through to the sub-experiments.
+        CA_samplerate_sec: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1238,7 +1600,63 @@ def ECHE_cleanCVs_regCVs_CAs(
     CA2_duration_sec: float = 300,
     CA_samplerate_sec: float = 0.05,
     gamry_i_range: str = "auto",
-):
+) -> list:
+    """Run cleaning CVs followed by regular CVs and CAs.
+
+    Loads each sample, runs N cleaning CV cycles, then the main CV list, then the CA list.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        liquid_volume_ml: Parameter passed through to the sub-experiments.
+        CVcln_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CVcln_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CVcln_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CVcln_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CVcln_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CVcln_samplerate_mV: Parameter passed through to the sub-experiments.
+        CVcln_cycles: Parameter passed through to the sub-experiments.
+        CV1_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV1_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV1_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV1_cycles: Parameter passed through to the sub-experiments.
+        CV2_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV2_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV2_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV2_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV2_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV2_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV2_cycles: Parameter passed through to the sub-experiments.
+        CV3_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV3_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV3_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV3_cycles: Parameter passed through to the sub-experiments.
+        preCV_duration: Parameter passed through to the sub-experiments.
+        OCV_duration: Parameter passed through to the sub-experiments.
+        CA1_potential: Parameter passed through to the sub-experiments.
+        CA1_duration_sec: Parameter passed through to the sub-experiments.
+        CA2_potential: Parameter passed through to the sub-experiments.
+        CA2_duration_sec: Parameter passed through to the sub-experiments.
+        CA_samplerate_sec: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 

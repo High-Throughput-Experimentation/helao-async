@@ -1,145 +1,60 @@
+"""Compressing :class:`collections.deque` subclass for memory-tight queues."""
+
 from collections import deque
+from collections.abc import Iterator
+from typing import Any
+
 import pyzstd
 import pickle
 
 
 class zdeque(deque):
-    """
-    A subclass of `collections.deque` that compresses and decompresses items using `pyzstd` and `pickle`.
+    """:class:`collections.deque` that pickles + zstd-compresses every element.
 
-    Methods:
-        __init__(*args, **kwargs):
-            Initialize the zdeque object.
-
-        __getitem__(i):
-            Retrieve the item at index `i` after decompressing and unpickling it.
-
-        __iter__():
-            Iterate over the items, decompressing and unpickling each one.
-
-        popleft():
-            Remove and return the leftmost item after decompressing and unpickling it.
-
-        pop():
-            Remove and return the rightmost item after decompressing and unpickling it.
-
-        insert(i, x):
-            Insert item `x` at index `i` after pickling and compressing it.
-
-        append(x):
-            Append item `x` to the right end after pickling and compressing it.
-
-        appendleft(x):
-            Append item `x` to the left end after pickling and compressing it.
-
-        index(x):
-            Return the index of item `x` after pickling and compressing it.
+    Reads decompress and unpickle on demand; writes pickle and compress before
+    storing. Useful for queues holding large, repetitive payloads.
     """
 
     def __init__(self, *args, **kwargs):
-        """
-        Initialize a new instance of the class.
-
-        Parameters:
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-        """
+        """Forward all arguments to :class:`collections.deque`."""
         super().__init__(*args, **kwargs)
 
-    def __getitem__(self, i):
-        """
-        Retrieve an item from the deque, decompress and deserialize it.
-
-        Args:
-            i (int): The index of the item to retrieve.
-
-        Returns:
-            object: The decompressed and deserialized item at the specified index.
-        """
+    def __getitem__(self, i) -> Any:
+        """Return the decompressed and unpickled element at index ``i``."""
         x = super().__getitem__(i)
         return pickle.loads(pyzstd.decompress(x))
 
-    def __iter__(self):
-        """
-        Iterate over the elements in the deque, decompressing and unpickling each element.
-
-        Yields:
-            Any: The decompressed and unpickled element from the deque.
-        """
+    def __iter__(self) -> Iterator[Any]:
+        """Yield each element after decompressing and unpickling it."""
         for x in super().__iter__():
             yield pickle.loads(pyzstd.decompress(x))
 
-    def popleft(self):
-        """
-        Remove and return an object from the left end of the deque.
-
-        This method overrides the `popleft` method of the superclass to
-        decompress and deserialize the object using `pyzstd` and `pickle`.
-
-        Returns:
-            Any: The decompressed and deserialized object from the left end of the deque.
-        """
+    def popleft(self) -> Any:
+        """Pop and return the leftmost element, decompressing and unpickling it."""
         x = super().popleft()
         return pickle.loads(pyzstd.decompress(x))
 
-    def pop(self):
-        """
-        Remove and return an object from the deque.
-
-        This method overrides the default `pop` method to decompress and
-        deserialize the object using `pyzstd` and `pickle` before returning it.
-
-        Returns:
-            Any: The decompressed and deserialized object from the deque.
-        """
+    def pop(self) -> Any:
+        """Pop and return the rightmost element, decompressing and unpickling it."""
         x = super().pop()
         return pickle.loads(pyzstd.decompress(x))
 
     def insert(self, i, x):
-        """
-        Inserts an element at a given position in the deque.
-
-        Args:
-            i (int): The index at which the element should be inserted.
-            x (Any): The element to be inserted. It will be serialized and compressed before insertion.
-
-        Returns:
-            None
-        """
+        """Insert ``x`` at index ``i`` after pickling and compressing it."""
         super().insert(i, pyzstd.compress(pickle.dumps(x)))
 
     def append(self, x):
-        """
-        Append an item to the deque after compressing and serializing it.
-
-        Args:
-            x: The item to be appended to the deque. It will be serialized using
-               `pickle` and then compressed using `pyzstd` before being appended.
-        """
+        """Append ``x`` to the right end after pickling and compressing it."""
         super().append(pyzstd.compress(pickle.dumps(x)))
 
     def appendleft(self, x):
-        """
-        Add an element to the left end of the deque after compressing and serializing it.
-
-        Args:
-            x: The element to be added to the left end of the deque. The element will be
-               serialized using pickle and then compressed using pyzstd before being added.
-        """
+        """Append ``x`` to the left end after pickling and compressing it."""
         super().appendleft(pyzstd.compress(pickle.dumps(x)))
 
-    def index(self, x):
-        """
-        Returns the index of the first occurrence of the specified element in the deque.
-
-        Args:
-            x: The element to search for in the deque. The element will be serialized
-               using pickle and compressed using pyzstd before searching.
-
-        Returns:
-            int: The index of the first occurrence of the specified element.
+    def index(self, x) -> int:
+        """Return the index of ``x`` after pickling and compressing it.
 
         Raises:
-            ValueError: If the element is not present in the deque.
+            ValueError: If ``x`` is not present.
         """
         return super().index(pyzstd.compress(pickle.dumps(x)))

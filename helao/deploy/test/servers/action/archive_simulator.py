@@ -1,7 +1,9 @@
-"""Archive simulation server
+"""Archive simulation server.
 
-FastAPI server host for the archive simulator driver. Loads historical data.
-TODO: Return addressable space, measured, and unmeasured positions.
+Hosts :class:`ArchiveSim`, a sample-archive simulator backed by a CSV file.
+Exposes private endpoints for inspecting the loaded plate (elements, pH,
+composition space, measured samples) plus action endpoints ``load_space``,
+``query_plate``, and ``acquire`` that the orchestrator drives.
 """
 
 __all__ = ["makeApp"]
@@ -20,7 +22,35 @@ from helao.helpers.premodels import Action
 
 
 class ArchiveSim:
+    """Simulated sample archive backed by an OER eta CSV file.
+
+    Loads the CSV at ``params.data_path`` and pre-computes the available
+    plate spaces (elements present, pH, addressable composition fractions).
+    Tracks one "loaded" plate at a time and a list of compositions acquired
+    against it.
+
+    Attributes:
+        base: Hosting action server.
+        config_dict: ``params`` block from the server config.
+        world_config: Full world configuration.
+        loaded_plate_id: Identifier of the currently loaded plate (or None).
+        loaded_ph: pH of the currently loaded plate.
+        loaded_els: Element labels of the currently loaded plate.
+        loaded_space: Composition fraction vectors available on the loaded
+            plate.
+        measured_space: Compositions acquired so far on the loaded plate,
+            each annotated with pH and ``eta3``/``eta10``.
+        df: Raw measurement dataframe.
+        loaded_df: View of ``df`` restricted to the loaded plate.
+        platespaces: List of per-plate descriptors.
+    """
+
     def __init__(self, action_serv: Base):
+        """Load the archive CSV and precompute plate descriptors.
+
+        Args:
+            action_serv: Action server hosting this driver.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
@@ -64,9 +94,21 @@ class ArchiveSim:
             )
 
     def reset(self):
+        """Clear the list of measured samples."""
         self.measured_space = []
 
-    def load_plate_id(self, plate_id: int, *args, **kwargs):
+    def load_plate_id(self, plate_id: int, *args, **kwargs) -> dict:
+        """Select a plate as the loaded plate and populate its addressable space.
+
+        Args:
+            plate_id: Plate identifier to load.
+            *args: Ignored extra positional arguments.
+            **kwargs: Ignored extra keyword arguments.
+
+        Returns:
+            Dict describing the loaded plate (``plate_id``, ``ph``,
+            ``elements``) or an empty dict if not found.
+        """
         if plate_id in self.list_plates():
             if plate_id == self.loaded_plate_id:
                 LOGGER.info(f"plate {plate_id} is already loaded")
@@ -89,32 +131,52 @@ class ArchiveSim:
             LOGGER.info(f"{plate_id} not found")
             return {}
 
-    def list_spaces(self):
+    def list_spaces(self) -> list:
+        """Return all per-plate descriptors known to the driver."""
         return self.platespaces
 
-    def list_plates(self):
+    def list_plates(self) -> list:
+        """Return all known plate identifiers."""
         return [d["plate_id"] for d in self.platespaces]
 
-    def get_acquired(self):
+    def get_acquired(self) -> list:
+        """Return the list of compositions acquired on the loaded plate."""
         return self.measured_space
 
-    def reset_acquired(self):
+    def reset_acquired(self) -> dict:
+        """Clear acquired samples and return a status detail."""
         self.reset()
         return {"detail": "driver.measured_space was reset to []"}
 
-    def get_loaded_elements(self):
+    def get_loaded_elements(self) -> list:
+        """Return element labels on the currently loaded plate."""
         return self.loaded_els
 
-    def get_loaded_space(self):
+    def get_loaded_space(self) -> list:
+        """Return composition vectors of the loaded plate."""
         return self.loaded_space
 
     def get_loaded_ph(self):
+        """Return the pH of the loaded plate."""
         return self.loaded_ph
 
     def get_loaded_plate_id(self):
+        """Return the identifier of the loaded plate."""
         return self.loaded_plate_id
 
     def acquire(self, element_fracs: list, *args, **kwargs):
+        """Acquire a composition on the loaded plate and record its eta values.
+
+        Args:
+            element_fracs: Composition vector matching the loaded plate's
+                element ordering.
+            *args: Ignored extra positional arguments.
+            **kwargs: Ignored extra keyword arguments.
+
+        Returns:
+            Integer sample number of the matched row, or ``False`` if the
+            composition is not on the loaded plate.
+        """
         if element_fracs in self.loaded_space:
             match = self.loaded_df.iloc[self.loaded_space.index(element_fracs)]
             sample_no = int(match.Sample)
@@ -135,11 +197,25 @@ class ArchiveSim:
             return False
 
     def shutdown(self):
+        """No-op shutdown hook."""
         pass
 
 
 def makeApp(server_key):
+    """Build the archive-simulator FastAPI app.
 
+    Wires :class:`ArchiveSim` into a :class:`BaseAPI` and registers private
+    endpoints for inspecting state (``list_plates``, ``list_all_spaces``,
+    ``get_measured``, ``clear_measured``, ``get_loaded_*``) plus action
+    endpoints ``load_space``, ``query_plate``, and ``acquire`` for
+    orchestrator dispatch.
+
+    Args:
+        server_key: Server name in the launched config.
+
+    Returns:
+        Configured :class:`HelaoFastAPI` app.
+    """
     app = BaseAPI(
         server_key=server_key,
         server_title=server_key,

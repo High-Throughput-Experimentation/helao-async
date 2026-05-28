@@ -1,7 +1,13 @@
+"""HTE data management action server.
+
+Wraps the legacy ``HTEdata`` driver and exposes endpoints for reading and
+writing platemap, screening-print, info-file, RCP and plate-XY-calibration
+information for a given ``plate_id``.
+"""
+
 __all__ = ["makeApp"]
 
 
-# data management server for HTE
 from typing import Optional
 from fastapi import Body
 from helao.core.servers.base_api import BaseAPI
@@ -9,7 +15,20 @@ from helao.helpers.premodels import Action
 from ....drivers.data.HTEdata_legacy import HTEdata
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the HTE data-management FastAPI app.
+
+    Constructs a :class:`BaseAPI` instance backed by the :class:`HTEdata`
+    driver and registers the plate/platemap/info/RCP/calibration endpoints
+    under ``/<server_key>/...``.
+
+    Args:
+        server_key: Key identifying this server in the orchestration group
+            config; used as the URL prefix and server title.
+
+    Returns:
+        The configured :class:`BaseAPI` application.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -25,7 +44,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plateid: Optional[int] = None,
     ):
-        """Gets the elements from the screening print in the info file"""
+        """Return the element list from the screening-print record in the plate info file."""
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
             datadict={
@@ -43,7 +62,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plateid: Optional[int] = None,
     ):
-        """gets platemap"""
+        """Return the platemap for the requested ``plateid``."""
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
             datadict={
@@ -61,7 +80,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plateid: Optional[int] = None,
     ):
-        """gets saved plate alignment matrix"""
+        """Return the stored plate XY alignment matrix for ``plateid``."""
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
             datadict={
@@ -79,7 +98,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plateid: Optional[int] = None,
     ):
-        """saves alignment matrix"""
+        """Persist the plate XY alignment matrix for ``plateid``."""
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
             datadict={
@@ -97,7 +116,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plateid: Optional[int] = None,
     ):
-        """checks that the plate_id (info file) exists"""
+        """Check whether an info file exists for the given ``plateid``."""
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
             datadict={
@@ -113,7 +132,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plateid: Optional[int] = None,
     ):
-        """checks that a print record exist in the info file"""
+        """Check whether a print record is present in the plate info file."""
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
             datadict={
@@ -131,7 +150,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plateid: Optional[int] = None,
     ):
-        """checks that a anneal record exist in the info file"""
+        """Check whether an anneal record is present in the plate info file."""
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
             datadict={
@@ -149,6 +168,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plateid: Optional[int] = None,
     ):
+        """Return the parsed info-file contents for ``plateid``."""
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
             datadict={
@@ -164,6 +184,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plateid: Optional[int] = None,
     ):
+        """Return the RCP (recipe) record associated with ``plateid``."""
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
             datadict={"rcp": app.driver.get_rcp_plateid(**active.action.action_params)}

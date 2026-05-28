@@ -1,3 +1,10 @@
+"""PostgreSQL connection helpers used by the LEANCAT driver.
+
+Provides a :class:`Db` wrapper around ``psycopg2`` with autocommit and
+``tenacity``-driven retries plus a :func:`reconnect` decorator that
+reopens the connection when a query raises.
+"""
+
 from psycopg2 import connect, sql
 from psycopg2 import OperationalError, ProgrammingError, Error
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
@@ -16,6 +23,18 @@ from ..logger import main_log
 
 
 def reconnect(f: Callable):
+    """Decorator that reconnects a :class:`Db` instance before calling ``f``.
+
+    On :class:`psycopg2.Error` the connection is closed and the exception
+    is re-raised so the caller's retry policy can take over.
+
+    Args:
+        f: Method whose first argument is a :class:`Db` instance.
+
+    Returns:
+        Wrapped method enforcing the reconnect-on-error policy.
+    """
+
     def wrapper(db, *args, **kwargs):
         if not db.connected():
             main_log.error("Database not connected")
@@ -32,19 +51,34 @@ def reconnect(f: Callable):
 
 
 class Db:
+    """Thin ``psycopg2`` wrapper with autocommit and retry-friendly helpers.
+
+    Holds the connection parameters dict and lazily opens an autocommit
+    connection. Provides :meth:`query`, :meth:`listen_channels` and
+    :meth:`check_notifications` for LEANCAT's notification-driven flow.
+    """
+
     def __init__(self, params):
+        """Store connection parameters; defer opening the connection.
+
+        Args:
+            params: Mapping passed straight to ``psycopg2.connect``.
+        """
         self._connection_params = params
         self._connection = None
 
     def connected(self) -> bool:
+        """Return ``True`` if a live (unclosed) connection is held."""
         return self._connection and self._connection.closed == 0
 
     def connect(self):
+        """Close any existing connection and open a fresh autocommit one."""
         self.close()
         self._connection = connect(**self._connection_params)
         self._connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
 
     def close(self):
+        """Close the underlying connection if open, swallowing errors."""
         if self.connected():
             # noinspection PyBroadException
             try:
@@ -59,6 +93,20 @@ class Db:
     )
     @reconnect
     def query(self, sql, *args):
+        """Execute ``sql`` with optional positional ``args`` and return rows.
+
+        :class:`OperationalError` is re-raised to trigger ``tenacity`` retry;
+        :class:`ProgrammingError` and other exceptions are returned as
+        ``"Error: ..."`` strings so the retry loop is not disturbed.
+
+        Args:
+            sql: SQL string or ``psycopg2.sql.Composable``.
+            *args: Positional parameters bound to the SQL.
+
+        Returns:
+            ``cur.fetchall()`` results, the original exception object when
+            "No results to fetch" applies, or an ``"Error: ..."`` string.
+        """
         try:
             # Do not use main_log! This would lead to a cycle, because logged messages are written to the log file where the read_lines() function
             # picks them up and feeds them to the db -> this leads to another query and the cycle start over.
@@ -82,6 +130,12 @@ class Db:
     )
     @reconnect
     def check_notifications(self):
+        """Drain pending PostgreSQL ``NOTIFY`` messages.
+
+        Returns:
+            A list of ``{"channel": str, "payload": str}`` dicts, one per
+            queued notification.
+        """
         msgArray = []
         self._connection.poll()
         while self._connection.notifies:
@@ -93,6 +147,11 @@ class Db:
         return msgArray
 
     def listen_channels(self, channels):
+        """Issue a ``LISTEN`` query for each channel name in ``channels``.
+
+        Args:
+            channels: Iterable of channel identifiers to subscribe to.
+        """
         for item in channels:
             self.query(sql.SQL("LISTEN {channel}").format(channel=sql.Identifier(item)))
             main_log.debug(f'Channel listener started: "{item}"')

@@ -1,3 +1,5 @@
+"""ECHEUVIS-specific HELAO loader backed by PostgreSQL + S3."""
+
 import time
 from uuid import UUID
 from typing import Optional
@@ -9,7 +11,12 @@ LOADER: HelaoLoader = None
 
 
 class EcheUvisLoader(HelaoLoader):
-    """ECHEUVIS process dataloader"""
+    """``HelaoLoader`` extended with ECHEUVIS-specific queries.
+
+    Adds retry-aware ``get_sequence`` and ``get_recent`` methods that decorate
+    raw SQL results with ``plate_id`` / ``sample_no`` columns derived from the
+    global label and any sequence-level plate metadata.
+    """
 
     def __init__(
         self,
@@ -18,6 +25,14 @@ class EcheUvisLoader(HelaoLoader):
         cache_json: bool = False,
         cache_sql: bool = False,
     ):
+        """Initialize the loader and a per-instance ``recent_cache`` dict.
+
+        Args:
+            env_file: Path to the ``.env`` file with credentials.
+            cache_s3: Cache raw S3 HLO payloads in memory.
+            cache_json: Cache fetched JSON metadata in memory.
+            cache_sql: Cache SQL query rows in memory.
+        """
         super().__init__(env_file, cache_s3, cache_json, cache_sql)
         # print("!!! using env_file:", env_file)
         # print("!!! postgresql dsn:", self.hcred.api_dsn)
@@ -29,7 +44,21 @@ class EcheUvisLoader(HelaoLoader):
         query: str,
         sequence_uuid: UUID,
         sql_query_retries: int = 5,
-    ):
+    ) -> pd.DataFrame:
+        """Run ``query`` scoped to one ``sequence_uuid`` with retry-on-failure.
+
+        Args:
+            query: Base SQL (the sequence-uuid filter is appended).
+            sequence_uuid: Sequence to scope the query to.
+            sql_query_retries: Max attempts before raising.
+
+        Returns:
+            Result frame annotated with ``plate_id`` / ``sample_no`` and
+            sorted by ``process_timestamp``.
+
+        Raises:
+            Exception: If every retry of the SQL query fails.
+        """
         conditions = []
         conditions.append(f"    AND hp.sequence_uuid = '{str(sequence_uuid)}'")
         tries = 0
@@ -86,7 +115,23 @@ class EcheUvisLoader(HelaoLoader):
         plate_id: Optional[int] = None,
         sample_no: Optional[int] = None,
         sql_query_retries: int = 3,
-    ):
+    ) -> pd.DataFrame:
+        """Run ``query`` filtered by ``min_date`` and optional plate/sample.
+
+        Args:
+            query: Base SQL (the date/plate/sample filter is appended).
+            min_date: ``YYYY-MM-DD`` lower bound on ``process_timestamp``.
+            plate_id: Optional plate-id filter applied client-side.
+            sample_no: Optional sample-no filter applied client-side.
+            sql_query_retries: Max attempts before raising.
+
+        Returns:
+            Filtered frame annotated with ``plate_id`` / ``sample_no`` and
+            sorted by ``process_timestamp``.
+
+        Raises:
+            Exception: If every retry of the SQL query fails.
+        """
         conditions = []
         conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
         # recent_md = sorted(

@@ -16,7 +16,17 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:
-    """finds server name for a given fast driver"""
+    """Look up server entries whose ``fast`` (or ``demo``) module matches ``fast_key``.
+
+    Args:
+        vis: Visualizer host whose ``world_cfg["servers"]`` block is searched.
+        fast_key: Module short name to match against each server's ``fast`` /
+            ``demo`` value (for example ``"gamry_server"``).
+
+    Returns:
+        list: ``(server_name, sorted_param_keys)`` tuples for every matching
+        server entry in the configuration.
+    """
     server_names = []
     for server_name, server_config in vis.world_cfg["servers"].items():
         if server_config.get("fast", server_config.get("demo", "")) == fast_key:
@@ -26,6 +36,25 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
 
 
 def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
+    """Build the action-visualizer Bokeh document.
+
+    Instantiates a :class:`HelaoVis` host, adds a header banner, then walks
+    ``vis_map`` and constructs one per-action visualizer object (e.g.
+    ``C_potvis``, ``C_specvis``, ``C_nidaqmxvis``) for every action server in
+    the config whose ``fast``/``demo`` key matches and which is not excluded
+    via the ``limit_vis`` server parameter. Each visualizer attaches its own
+    layout and WebSocket subscriber to ``doc``.
+
+    Args:
+        doc: Bokeh document supplied by the Bokeh server for this session.
+        confPrefix: Config prefix passed by ``bokeh_launcher.py``.
+        server_key: Visualizer server key from the configuration.
+        helao_repo_root: Absolute path to the HELAO repo root.
+
+    Returns:
+        Bokeh ``Document``: The same ``doc`` passed in, with all visualizer
+        layouts mounted as roots.
+    """
 
     app = HelaoVis(
         server_key=server_key,

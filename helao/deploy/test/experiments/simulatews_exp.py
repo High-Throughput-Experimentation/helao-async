@@ -1,7 +1,8 @@
-"""
-Action library for websocket simulator
+"""Experiment library exercising the websocket simulator action server.
 
-server_key must be a FastAPI action server defined in config
+Builds experiments that alternate orchestrator waits with ``acquire_data``
+calls against the ``SIM`` server to validate end-to-end live-data
+visualization through websockets.
 """
 
 __all__ = ["SIM_websocket_data"]
@@ -27,8 +28,21 @@ def SIM_websocket_data(
     experiment_version: int = 1,
     wait_time: float = 3.0,
     data_duration: float = 5.0,
-):
-    """Produces two data acquisition processes."""
+) -> list:
+    """Build two wait-then-acquire process pairs against the websocket simulator.
+
+    Each ``acquire_data`` action is marked as a process boundary, producing
+    two complete processes per experiment.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Library version tag.
+        wait_time: Orchestrator wait duration before each acquisition.
+        data_duration: Duration of each simulated acquisition.
+
+    Returns:
+        Planned actions: wait, acquire, wait, acquire.
+    """
     apm = ActionPlanMaker()
 
     apm.add(

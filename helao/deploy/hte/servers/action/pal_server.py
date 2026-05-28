@@ -1,3 +1,14 @@
+"""FastAPI action server for the PAL autosampler.
+
+Exposes the full PAL workflow surface as HELAO actions: stop/kill helpers,
+method dispatchers backed by configured CAM entries (``PAL_run_method``,
+ANEC liquid/gas aliquoting and injection, generic GC/HPLC injections,
+tray/custom transfers, archive, deepclean, dilute, autodilute), and the
+sample archive/database endpoints that load and unload trays and custom
+positions, add liquids/gases, query samples, export tray data, and create
+new sample rows.
+"""
+
 __all__ = ["makeApp"]
 
 
@@ -41,7 +52,23 @@ from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI in
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the BaseAPI app for the PAL autosampler.
+
+    Reads the server's ``cams`` and ``positions`` blocks to decide which
+    method endpoints to register. Custom-position endpoints typed against
+    a configured custom-position enum are always available; method
+    endpoints (run-method, ANEC, GC/HPLC injection, transfer, archive,
+    deepclean, dilute, autodilute) are only attached when the
+    corresponding CAM keys exist.
+
+    Args:
+        server_key: Unique key identifying this server in the orchestration
+            group.
+
+    Returns:
+        The configured BaseAPI instance.
+    """
 
     app = BaseAPI(
         server_key,
@@ -68,7 +95,15 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stops measurement in a controlled way."""
+        """Request a controlled stop on the PAL driver.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+
+        Returns:
+            The finished action dictionary including the driver stop result.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="stop")
         await active.enqueue_data_dflt(datadict={"stop": await app.driver.stop()})
         finished_action = await active.finish()
@@ -79,6 +114,15 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
+        """Kill the PAL process via the driver and record the error code.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action()
         error_code = await app.driver.kill_PAL()
         active.action.error_code = error_code
@@ -87,7 +131,15 @@ def makeApp(server_key):
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/convert_v1DB", tags=["action"])
-    async def convert_v1DB(action: Action = Body({}, embed=True)):
+    async def convert_v1DB(action: Action = Body({}, embed=True)) -> dict:
+        """Convert the legacy liquid JSON database to the SQLite schema.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+
+        Returns:
+            An empty dictionary once the migration completes.
+        """
         # await app.driver.convert_oldDB_to_sqllite()
         await app.driver.archive.unified_db.liquidAPI.old_jsondb_to_sqlitedb()
         return {}
@@ -161,7 +213,27 @@ def makeApp(server_key):
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
         ):
-            """universal pal action"""
+            """Run an arbitrary PAL micro-method sequence.
+
+            Each entry in ``micropal`` is a :class:`PalMicroCam` describing a
+            single transfer (method, tool, volume, source/destination
+            position, wash flags); the list is repeated ``totalruns`` times
+            with timing controlled by ``sampleperiod``, ``spacingmethod``,
+            ``spacingfactor``, and ``timeoffset``.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                micropal: Ordered list of PAL micro-camera operations.
+                totalruns: Number of times to repeat the micropal sequence.
+                sampleperiod: Per-step delay schedule passed to the driver.
+                spacingmethod: Spacing method for sampleperiod expansion.
+                spacingfactor: Multiplier applied to the spacing series.
+                timeoffset: Global time offset in seconds before the first run.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             active_dict = await app.driver.method_arbitrary(A)
             return active_dict
@@ -188,6 +260,24 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = False,
         ):
+            """Aliquot from a custom position to both GC and archive sinks.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                toolGC: PAL tool used for the GC injection.
+                toolarchive: PAL tool used for the archive draw.
+                source: Custom source position name.
+                volume_ul_GC: Volume drawn for GC injection in microlitres.
+                volume_ul_archive: Volume drawn for archive in microlitres.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_ANEC_aliquot(A)
@@ -208,6 +298,18 @@ def makeApp(server_key):
             source: dev_customitems = "cell1_we",
             volume_ul_GC: int = 300,
         ):
+            """Aliquot from a custom position straight into the GC.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                toolGC: PAL tool used for the GC injection.
+                source: Custom source position name.
+                volume_ul_GC: Volume injected into the GC in microlitres.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_ANEC_GC(A)
@@ -237,6 +339,27 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = False,
         ):
+            """Inject a vial-tray sample into the GC.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                startGC: If true, trigger the GC start signal after injection.
+                sampletype: Sample phase (liquid or gas) being injected.
+                tool: PAL tool used for the injection.
+                source_tray: Source vial tray number.
+                source_slot: Source slot within the tray.
+                source_vial: Source vial index within the slot.
+                dest: Custom destination port name.
+                volume_ul: Volume to inject in microlitres.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_injection_tray_GC(A)
@@ -264,6 +387,25 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = False,
         ):
+            """Inject from a custom source position into the GC.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                startGC: If true, trigger the GC start signal after injection.
+                sampletype: Sample phase (liquid or gas) being injected.
+                tool: PAL tool used for the injection.
+                source: Custom source position name.
+                dest: Custom destination port name.
+                volume_ul: Volume to inject in microlitres.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_injection_custom_GC(A)
@@ -284,6 +426,23 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = False,
         ):
+            """Inject from a custom source into an HPLC port.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                tool: PAL tool used for the injection.
+                source: Custom source position name.
+                dest: Custom HPLC destination port name.
+                volume_ul: Volume to inject in microlitres.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "HPLC_injection"
             active_dict = await app.driver.method_injection_custom_HPLC(A)
@@ -306,6 +465,25 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = False,
         ):
+            """Inject a vial-tray sample into an HPLC port.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                tool: PAL tool used for the injection.
+                source_tray: Source vial tray number.
+                source_slot: Source slot within the tray.
+                source_vial: Source vial index within the slot.
+                dest: Custom HPLC destination port name.
+                volume_ul: Volume to inject in microlitres.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "HPLC_injection"
             active_dict = await app.driver.method_injection_tray_HPLC(A)
@@ -335,6 +513,31 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = False,
         ):
+            """Transfer ``volume_ul`` between two vial-tray positions.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                sampleperiod: Per-step delay schedule passed to the driver.
+                spacingmethod: Spacing method for sampleperiod expansion.
+                spacingfactor: Multiplier applied to the spacing series.
+                timeoffset: Global time offset in seconds before the run.
+                tool: PAL tool used for the transfer.
+                volume_ul: Volume to transfer in microlitres.
+                source_tray: Source vial tray number.
+                source_slot: Source slot within the tray.
+                source_vial: Source vial index within the slot.
+                dest_tray: Destination vial tray number.
+                dest_slot: Destination slot within the tray.
+                dest_vial: Destination vial index within the slot.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_tray_tray(A)
@@ -362,6 +565,29 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = False,
         ):
+            """Transfer ``volume_ul`` from a vial tray to a custom position.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                sampleperiod: Per-step delay schedule passed to the driver.
+                spacingmethod: Spacing method for sampleperiod expansion.
+                spacingfactor: Multiplier applied to the spacing series.
+                timeoffset: Global time offset in seconds before the run.
+                tool: PAL tool used for the transfer.
+                volume_ul: Volume to transfer in microlitres.
+                source_tray: Source vial tray number.
+                source_slot: Source slot within the tray.
+                source_vial: Source vial index within the slot.
+                dest: Custom destination position name.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_tray_custom(A)
@@ -389,6 +615,29 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = False,
         ):
+            """Transfer ``volume_ul`` from a custom position to a vial tray.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                sampleperiod: Per-step delay schedule passed to the driver.
+                spacingmethod: Spacing method for sampleperiod expansion.
+                spacingfactor: Multiplier applied to the spacing series.
+                timeoffset: Global time offset in seconds before the run.
+                tool: PAL tool used for the transfer.
+                volume_ul: Volume to transfer in microlitres.
+                source: Custom source position name.
+                dest_tray: Destination vial tray number.
+                dest_slot: Destination slot within the tray.
+                dest_vial: Destination vial index within the slot.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_custom_tray(A)
@@ -413,6 +662,27 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = False,
         ):
+            """Transfer ``volume_ul`` between two custom positions.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                sampleperiod: Per-step delay schedule passed to the driver.
+                spacingmethod: Spacing method for sampleperiod expansion.
+                spacingfactor: Multiplier applied to the spacing series.
+                timeoffset: Global time offset in seconds before the run.
+                tool: PAL tool used for the transfer.
+                volume_ul: Volume to transfer in microlitres.
+                source: Custom source position name.
+                dest: Custom destination position name.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_custom_custom(A)
@@ -436,6 +706,26 @@ def makeApp(server_key):
             wash3: bool = False,
             wash4: bool = False,
         ):
+            """Archive ``volume_ul`` from a custom position into storage.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                tool: PAL tool used for the archive draw.
+                source: Custom source position name.
+                volume_ul: Volume to archive in microlitres.
+                sampleperiod: Per-step delay schedule passed to the driver.
+                spacingmethod: Spacing method for sampleperiod expansion.
+                spacingfactor: Multiplier applied to the spacing series.
+                timeoffset: Global time offset in seconds before the run.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "archive"
             active_dict = await app.driver.method_archive(A)
@@ -494,6 +784,22 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = True,
         ):
+            """Run the PAL deep-clean cycle on the chosen tool.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                tool: PAL tool to clean.
+                volume_ul: Wash volume reference (the driver uses a fixed
+                    internal volume for the operation).
+                wash1: Whether to run wash station 1.
+                wash2: Whether to run wash station 2.
+                wash3: Whether to run wash station 3.
+                wash4: Whether to run wash station 4.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "deepclean"
             active_dict = await app.driver.method_deepclean(A)
@@ -520,6 +826,29 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = True,
         ):
+            """Dilute the source liquid into a specific destination vial.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                tool: PAL tool used for the transfer.
+                source: Custom source position name.
+                volume_ul: Volume to transfer in microlitres.
+                dest_tray: Destination vial tray number.
+                dest_slot: Destination slot within the tray.
+                dest_vial: Destination vial index within the slot.
+                sampleperiod: Per-step delay schedule passed to the driver.
+                spacingmethod: Spacing method for sampleperiod expansion.
+                spacingfactor: Multiplier applied to the spacing series.
+                timeoffset: Global time offset in seconds before the run.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "dilute"
             active_dict = await app.driver.method_dilute(A)
@@ -543,6 +872,26 @@ def makeApp(server_key):
             wash3: bool = True,
             wash4: bool = True,
         ):
+            """Dilute the source liquid into a vial chosen by the driver.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                tool: PAL tool used for the transfer.
+                source: Custom source position name.
+                volume_ul: Volume to transfer in microlitres.
+                sampleperiod: Per-step delay schedule passed to the driver.
+                spacingmethod: Spacing method for sampleperiod expansion.
+                spacingfactor: Multiplier applied to the spacing series.
+                timeoffset: Global time offset in seconds before the run.
+                wash1: Whether to run wash station 1 after the operation.
+                wash2: Whether to run wash station 2 after the operation.
+                wash3: Whether to run wash station 3 after the operation.
+                wash4: Whether to run wash station 4 after the operation.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "autodilute"
             active_dict = await app.driver.method_autodilute(A)
@@ -556,6 +905,22 @@ def makeApp(server_key):
         slot: Optional[int] = None,
         vial: Optional[int] = None,
     ):
+        """Look up the sample at a tray/slot/vial location.
+
+        The retrieved sample is appended to ``samples_in`` and a data row
+        with the sample dict and error code is enqueued; the sample dict is
+        also mirrored into ``action_params['_fast_samples_in']``.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            tray: Vial tray number.
+            slot: Slot within the tray.
+            vial: Vial index within the slot.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="query_sample")
         error_code, sample = await app.driver.archive.tray_query_sample(
             tray=active.action.action_params["tray"],
@@ -573,7 +938,18 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/archive_tray_unloadall", tags=["action"])
     async def archive_tray_unloadall(action: Action = Body({}, embed=True)):
-        """Resets app.driver vial table."""
+        """Unload every position from every tray and reset the vial table.
+
+        The previously loaded samples are appended to ``samples_in`` and the
+        outgoing samples (with destruction/keep handling) to ``samples_out``;
+        the resulting tray map is enqueued in the action data.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="unload_sample")
         (
             unloaded,
@@ -604,6 +980,22 @@ def makeApp(server_key):
         slot: Optional[int] = None,
         vial: Optional[int] = None,
     ):
+        """Load a sample into a specific tray/slot/vial position.
+
+        On a successful load the sample is appended to ``samples_in``; the
+        error code and resulting sample dict are enqueued in the action data.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            load_sample_in: The sample (or sample dict) to load.
+            tray: Destination vial tray number.
+            slot: Destination slot within the tray.
+            vial: Destination vial index within the slot.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(
             action_abbr="load_sample",
         )
@@ -626,7 +1018,17 @@ def makeApp(server_key):
         tray: Optional[int] = None,
         slot: Optional[int] = None,
     ):
-        """Resets app.driver vial table."""
+        """Unload one tray (optionally one slot) and update the vial table.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            tray: Vial tray number to unload.
+            slot: Optional slot filter within the tray.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="unload_sample")
         (
             unloaded,
@@ -648,9 +1050,20 @@ def makeApp(server_key):
         action_version: int = 1,
         req_vol: Optional[float] = None,
     ):
-        """Returns an empty vial position for given max volume.
-        For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.
-        It will select the first empty vial which has the smallest volume that still can hold req_vol
+        """Find an empty vial position large enough to hold a given volume.
+
+        Among empty vials, returns the one with the smallest capacity that
+        still fits ``req_vol``.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            req_vol: Required volume in millilitres; ``None`` returns the
+                first empty vial regardless of size.
+
+        Returns:
+            The finished action dictionary including the selected tray/slot
+            /vial location.
         """
         active = await app.base.setup_and_contain_action()
         datadict = await app.driver.archive.tray_new_position(
@@ -675,7 +1088,23 @@ def makeApp(server_key):
         slot: Optional[int] = None,
         vial: Optional[int] = None,
     ):
-        """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
+        """Write a sample reference into the driver's vial table.
+
+        The update succeeds only if the target tray/slot/vial was empty.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            sample: Sample reference to attach to the position.
+            tray: Vial tray number.
+            slot: Slot within the tray.
+            vial: Vial index within the slot.
+
+        Returns:
+            The finished action dictionary; the enqueued data dict contains
+            ``update`` set to ``True`` if the position was empty, else
+            ``False``.
+        """
         active = await app.base.setup_and_contain_action()
         datadict = {
             "update": await app.driver.archive.tray_update_position(
@@ -694,6 +1123,17 @@ def makeApp(server_key):
         tray: Optional[int] = None,
         slot: Optional[int] = None,
     ):
+        """Export the current vial table for a tray/slot as a JSON data row.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            tray: Vial tray number to export.
+            slot: Optional slot filter within the tray.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(
             action_abbr="traytojson",
             file_type="palvialtable_helao__file",
@@ -717,6 +1157,21 @@ def makeApp(server_key):
         rack: Optional[int] = None,
         dilution_factor: Optional[float] = None,
     ):
+        """Export a tray/slot in the ICP-MS sample-list format.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            tray: Vial tray number to export.
+            slot: Optional slot filter within the tray.
+            survey_runs: Number of ICP-MS survey runs per vial.
+            main_runs: Number of ICP-MS main runs per vial.
+            rack: ICP-MS rack number to assign.
+            dilution_factor: Dilution factor recorded in the sample list.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(
             action_abbr="traytoicpms",
         )
@@ -739,6 +1194,17 @@ def makeApp(server_key):
         tray: Optional[int] = None,
         slot: Optional[int] = None,
     ):
+        """Export a tray/slot vial table as CSV.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            tray: Vial tray number to export.
+            slot: Optional slot filter within the tray.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(
             action_abbr="traytocsv",
         )
@@ -759,6 +1225,18 @@ def makeApp(server_key):
         sample_no: int = 1,
         plate_id: int = 1,
     ):
+        """Load a :class:`SolidSample` reference into a custom position.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            custom: Custom position name.
+            sample_no: Sample number on the referenced plate.
+            plate_id: Plate id containing the solid sample.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(
             action_abbr="load_sample",
         )
@@ -788,6 +1266,18 @@ def makeApp(server_key):
             embed=True,
         ),
     ):
+        """Load a sample reference into a custom position.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            custom: Custom position name.
+            load_sample_in: Sample to attach to the position; defaults to a
+                bare local liquid sample reference.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(
             action_abbr="load_sample",
         )
@@ -814,6 +1304,22 @@ def makeApp(server_key):
         keep_solid: bool = False,
         keep_gas: bool = False,
     ):
+        """Unload a single custom position with phase-specific keep/destroy flags.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            custom: Custom position name.
+            destroy_liquid: Destroy the liquid phase on unload.
+            destroy_gas: Destroy the gas phase on unload.
+            destroy_solid: Destroy the solid phase on unload.
+            keep_liquid: Keep the liquid phase after unload.
+            keep_solid: Keep the solid phase after unload.
+            keep_gas: Keep the gas phase after unload.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(
             action_abbr="unload_sample",
         )
@@ -844,6 +1350,25 @@ def makeApp(server_key):
         keep_solid: bool = False,
         keep_gas: bool = False,
     ):
+        """Unload every custom position with phase-specific keep/destroy flags.
+
+        Also stashes the first unloaded solid and the first unloaded liquid
+        (and that liquid's volume) into ``action_params`` for downstream
+        consumers.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            destroy_liquid: Destroy the liquid phase on unload.
+            destroy_gas: Destroy the gas phase on unload.
+            destroy_solid: Destroy the solid phase on unload.
+            keep_liquid: Keep the liquid phase after unload.
+            keep_solid: Keep the solid phase after unload.
+            keep_gas: Keep the gas phase after unload.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(
             action_abbr="unload_sample",
         )
@@ -884,6 +1409,17 @@ def makeApp(server_key):
         action_version: int = 1,
         custom: dev_customitems = None,
     ):
+        """Look up the sample currently loaded at a custom position.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            custom: Custom position name.
+
+        Returns:
+            The finished action dictionary; the sample dict is mirrored into
+            ``action_params['_fast_samples_in']``.
+        """
         active = await app.base.setup_and_contain_action(
             action_abbr="query_sample",
         )
@@ -912,15 +1448,21 @@ def makeApp(server_key):
         combine_liquids: bool = False,
         dilute_liquids: bool = True,
     ):
-        """Adds 'volume_ml' of 'source_liquid_in' to the sample 'custom'.
+        """Add ``volume_ml`` of ``source_liquid_in`` to a custom position.
+
         Args:
-             custom: custom position where liquid will be added
-             source_liquid_in: the liquid from which volume_ml will be added
-                               to custom
-             volume_ml: the volume in ml which will be added
-             combine_liquids: combines liquid in 'custom' and 'source_liquid_in'
-                              in a new liquid
-             dilute_liquids: calculates a dilutes factor (use with combine liquids)
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            custom: Custom position where liquid will be added.
+            source_liquid_in: Liquid sample from which volume is drawn.
+            volume_ml: Volume to add in millilitres.
+            combine_liquids: When true, merge the existing custom liquid and
+                ``source_liquid_in`` into a new combined liquid.
+            dilute_liquids: When true, compute a dilution factor; use
+                together with ``combine_liquids``.
+
+        Returns:
+            The finished action dictionary.
         """
 
         active = await app.base.setup_and_contain_action(
@@ -960,12 +1502,21 @@ def makeApp(server_key):
         combine_gases: bool = False,
         dilute_gases: bool = True,
     ):
-        """Adds 'volume_ml' of 'source_gas_in' to the sample 'custom'.
+        """Add ``volume_ml`` of ``source_gas_in`` to a custom position.
+
         Args:
-             custom: custom position where gas will be added
-             source_liquid_in: the gas from which volume_ml will be added
-                               to custom
-             volume_ml: the volume in ml which will be added
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            custom: Custom position where gas will be added.
+            source_gas_in: Gas sample from which volume is drawn.
+            volume_ml: Volume to add in millilitres.
+            combine_gases: When true, merge the existing custom gas and
+                ``source_gas_in`` into a new combined gas.
+            dilute_gases: When true, compute a dilution factor; use together
+                with ``combine_gases``.
+
+        Returns:
+            The finished action dictionary.
         """
 
         active = await app.base.setup_and_contain_action(
@@ -1003,8 +1554,20 @@ def makeApp(server_key):
             embed=True,
         ),
     ):
-        """Positive sample_no will get it from the beginng, negative
-        from the end of the db."""
+        """Resolve sample references against the unified sample database.
+
+        Positive ``sample_no`` values address rows from the beginning of the
+        table, negative values from the end.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references to resolve; replaces
+                ``action.samples_in`` after the call.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action()
         samples = await app.driver.archive.unified_db.get_samples(
             samples=active.action.samples_in
@@ -1042,13 +1605,23 @@ def makeApp(server_key):
             embed=True,
         ),
     ):
-        """use CAS for chemical if available.
-        Written on bottles of chemicals with all other necessary information.
-        For empty DUID and AUID the UID will automatically created.
-        For manual entry leave DUID, AUID, action_time,
-        and action_params empty and servkey on "data".
-        If its the very first liquid (no source in database exists)
-        leave source and source_ml empty.
+        """Create new sample rows in the unified database.
+
+        Use CAS numbers for chemicals when available. For empty DUID and
+        AUID values the underlying UID is generated automatically. For
+        manual entries leave DUID, AUID, ``action_time`` and ``action_params``
+        empty and set ``servkey`` to ``"data"``. For the first liquid in a
+        chain (no upstream source in the database), leave ``source`` and
+        ``source_ml`` empty.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Reference sample dicts describing the new rows.
+
+        Returns:
+            The finished action dictionary; the first created sample is
+            mirrored into ``action_params['_fast_sample_out']``.
         """
         active = await app.base.setup_and_contain_action()
         samples = await app.driver.archive.create_samples(
@@ -1080,6 +1653,27 @@ def makeApp(server_key):
         platemap_xys: list = [],
         platemap_xys_operator: Optional[ScanOperator] = None,
     ):
+        """Generate a filtered list of sample numbers for a plate.
+
+        Combines a scan direction with optional include/exclude operators on
+        explicit sample numbers and platemap xy coordinates to produce the
+        list. Results are written to the action via the driver helper.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            plate_id: Plate id to scan.
+            sample_code: Sample-code filter (``0``-``2``).
+            skip_n_samples: Number of leading samples to skip.
+            direction: Plate scan direction.
+            sample_nos: Explicit sample numbers to include or exclude.
+            sample_nos_operator: Operator applied with ``sample_nos``.
+            platemap_xys: List of ``(x, y)`` platemap coordinates.
+            platemap_xys_operator: Operator applied with ``platemap_xys``.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action()
         await app.driver.archive.generate_plate_sample_no_list(
             active=active,
@@ -1104,7 +1698,19 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Returns position dict under action_params['_positions']."""
+        """Snapshot the archive's loaded positions into ``action_params``.
+
+        Populates ``_positions`` (full archive dict), ``_tray_pos`` (loaded
+        tray vials keyed by ``(tray, slot, vial)``), and ``_custom_pos``
+        (loaded custom positions keyed by name) on the action.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action()
         positions = app.driver.archive.positions
         tray_positions = {
@@ -1131,8 +1737,18 @@ def makeApp(server_key):
         return finished_action.as_dict()
 
     @app.post(f"/list_new_samples", tags=["action"])
-    async def list_new_samples(num_smps: int = 10, give_only: str = "false"):
-        """List num_smps newest global sample labels from each local DB table."""
+    async def list_new_samples(num_smps: int = 10, give_only: str = "false") -> dict:
+        """List the most recent global sample labels from each local DB table.
+
+        Args:
+            num_smps: Maximum number of labels to return per sample type.
+            give_only: When ``"true"``, restrict to labels marked as
+                give-only.
+
+        Returns:
+            Dict keyed by ``"solid"``, ``"liquid"``, ``"gas"``, and
+            ``"assembly"`` with lists of recent labels.
+        """
         give_bool = True if give_only == "true" else False
         solids = await app.driver.archive.unified_db.solidAPI.list_new_samples(
             limit=num_smps, give_only=give_bool

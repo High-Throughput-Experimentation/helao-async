@@ -1,3 +1,5 @@
+"""Pydantic models describing experiments and their summaries."""
+
 __all__ = ["ShortExperimentModel", "ExperimentModel"]
 
 from datetime import datetime
@@ -26,17 +28,22 @@ from helao.core.helaodict import HelaoDict
 
 
 class ShortExperimentModel(BaseModel, HelaoDict):
-    """
-    Minimal model for representing an experiment in the HELAO system.
+    """Lightweight summary of an experiment.
+
+    Used by sequences and orchestrator state to reference experiments without
+    carrying the full `ExperimentModel` payload.
 
     Attributes:
         experiment_uuid (Optional[UUID]): Unique identifier for the experiment.
         experiment_name (Optional[str]): Name of the experiment.
-        experiment_output_dir (Optional[Path]): Directory where experiment output is stored.
-        orch_key (Optional[str]): Orchestrator key for tracking.
-        orch_host (Optional[str]): Hostname of the orchestrator.
-        orch_port (Optional[int]): Port of the orchestrator.
-        data_request_id (Optional[UUID]): UUID for a data request associated with the experiment.
+        experiment_params (dict): Parameters supplied to the experiment.
+        experiment_output_dir (Optional[Path]): Directory holding experiment output.
+        experiment_comment (Optional[str]): Free-form comment attached to the experiment.
+        orch_key (Optional[str]): Identifier of the owning orchestrator.
+        orch_host (Optional[str]): Hostname of the owning orchestrator.
+        orch_port (Optional[int]): Port of the owning orchestrator.
+        data_request_id (Optional[UUID]): Optional data-request linkage.
+        from_global_exp_params (dict): Params injected from the global experiment context.
     """
 
     experiment_uuid: Optional[UUID] = None
@@ -52,36 +59,44 @@ class ShortExperimentModel(BaseModel, HelaoDict):
 
 
 class ExperimentModel(ShortExperimentModel):
-    """
-    Comprehensive model for representing a full experiment in the HELAO system.
+    """Full record of an experiment.
+
+    Extends `ShortExperimentModel` with status, samples, files, planned and
+    dispatched actions, process bookkeeping, and global parameter snapshots.
 
     Attributes:
-        hlo_version (Optional[str]): HELAO version string.
-        orchestrator (MachineModel): Orchestrator server information.
-        access (Optional[str]): Access type (e.g., 'hte').
-        dummy (bool): If True, experiment is a dummy/test experiment.
-        simulation (bool): If True, experiment is a simulation.
-        run_type (Optional[str]): Type of run (e.g., experiment, calibration).
-        sequence_uuid (Optional[UUID]): UUID of the associated sequence.
-        experiment_uuid (Optional[UUID]): Unique identifier for the experiment.
-        experiment_timestamp (Optional[datetime]): Timestamp when the experiment was created.
-        experiment_status (List[HloStatus]): List of status updates for the experiment.
-        experiment_output_dir (Optional[Path]): Directory where experiment output is stored.
-        experiment_codehash (Optional[str]): Code hash for reproducibility.
-        experiment_label (Optional[str]): Label for the experiment.
-        planned_actions (list): List of planned actions for the experiment.
-        dispatched_actions_abbr (List[ShortActionModel]): List of dispatched action summaries.
-        samples_in (List[Sample]): Input samples for the experiment.
-        samples_out (List[Sample]): Output samples from the experiment.
-        files (List[FileInfo]): Files generated or used by the experiment.
-        process_list (List[UUID]): List of process UUIDs associated with the experiment.
-        process_order_groups (Dict[int, List[int]]): Mapping of process group indices to action orders.
-        data_request_id (Optional[UUID]): UUID for a data request associated with the experiment.
-        orch_key (Optional[str]): Orchestrator key for tracking.
-        orch_host (Optional[str]): Hostname of the orchestrator.
-        orch_port (Optional[int]): Port of the orchestrator.
-        sync_data (bool): If True, synchronize data after experiment.
-        campaign_name (Optional[str]): Name of the campaign.
+        hlo_version (Optional[str]): HELAO version stamped at construction.
+        orchestrator (Optional[MachineModel]): Orchestrator that ran the experiment.
+        access (Optional[str]): Access tier identifier (e.g. ``"hte"``).
+        dummy (bool): True if this is a dummy/test experiment.
+        simulation (bool): True if the experiment ran against simulated drivers.
+        run_type (Optional[str]): Instrument/run-type label.
+        run_use (Optional[RunUse]): How the resulting data is used.
+        sequence_uuid (Optional[UUID]): UUID of the parent sequence.
+        experiment_timestamp (Optional[datetime]): Creation timestamp.
+        experiment_status (List[HloStatus]): Accumulated status flags.
+        experiment_codehash (Optional[str]): Git hash of the experiment source.
+        experiment_codepath (Optional[str]): Source file path of the experiment.
+        experiment_funcname (Optional[str]): Implementing function name.
+        experiment_label (Optional[str]): Free-form label.
+        experiment_finished_timestamp (Optional[datetime]): When the experiment finished.
+        planned_actions (list): Planned action records prior to dispatch.
+        dispatched_actions_abbr (List[ShortActionModel]): Short records of dispatched actions.
+        samples_in (List): Input samples (union of sample types).
+        samples_out (List): Output samples (union of sample types).
+        files (List[FileInfo]): Files produced by the experiment.
+        aux_files (List[str]): Auxiliary file paths.
+        process_list (List[UUID]): Processes generated by this experiment.
+        process_order_groups (Dict[int, List[int]]): Map of process group index to action orders.
+        orch_key (Optional[str]): Orchestrator identifier.
+        orch_host (Optional[str]): Orchestrator hostname.
+        orch_port (Optional[int]): Orchestrator port.
+        sync_data (bool): True to ship experiment data via the syncer.
+        campaign_name (Optional[str]): Campaign label.
+        campaign_uuid (Optional[UUID]): Campaign UUID.
+        run_id (Optional[UUID]): Run identifier.
+        initial_global_params (dict): Snapshot of global params at start.
+        finished_global_params (dict): Snapshot of global params at end.
     """
 
     hlo_version: Optional[str] = Field(default_factory=get_hlo_version)

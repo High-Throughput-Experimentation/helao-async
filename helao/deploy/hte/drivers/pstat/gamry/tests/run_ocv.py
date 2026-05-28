@@ -1,3 +1,10 @@
+"""Standalone OCV test for the Gamry driver.
+
+Connects to a Gamry potentiostat (device id supplied as a CLI argument),
+runs a 30-second open-circuit voltage measurement at a 0.1 s acquisition
+period using ``TECH_OCV``, prints incoming data to stdout, and disconnects.
+"""
+
 import sys
 import time
 from .....drivers.pstat.gamry.driver import GamryDriver
@@ -8,6 +15,11 @@ DATA_RATE = 0.1
 
 
 def run_ocv(pstat):
+    """Configure, start, and drain an OCV measurement on ``pstat``.
+
+    Args:
+        pstat: A connected ``GamryDriver`` instance.
+    """
     resp = pstat.setup(
         technique=TECH_OCV,
         signal_params={"Tval__s": DURATION_SECONDS, "AcqInterval__s": DATA_RATE},
@@ -25,7 +37,13 @@ def run_ocv(pstat):
     print("OCV measurement complete.")
 
 
-def main():
+def main() -> bool:
+    """Entry point: parse the device id from argv, run OCV, and disconnect.
+
+    Returns:
+        True on a successful run, False if the device id argument is missing
+        or cannot be parsed as an integer.
+    """
     if len(sys.argv) < 2:
         print(
             "Device ID was not specified. Provide device ID number as a launch argument."

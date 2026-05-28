@@ -1,6 +1,9 @@
-"""
-Experiment library for Orchestrator testing
-server_key must be a FastAPI action server defined in config
+"""Experiment library for the OER active-learning simulator.
+
+Builds action plans that drive the ``CPSIM`` (chronopotentiometry simulator)
+and ``GPSIM`` (Gaussian-process surrogate) servers together to load a plate,
+measure CPs, decide on the next acquisition, and conditionally requeue
+themselves.
 """
 
 __all__ = [
@@ -31,6 +34,15 @@ def OERSIM_sub_load_plate(
     plate_id: int = 0,
     init_random_points: int = 5,
 ):
+    """Switch CPSIM to ``plate_id`` and seed GPSIM priors for that plate.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Library version tag.
+        plate_id: Plate to load on CPSIM.
+        init_random_points: Number of random initial compositions for GPSIM
+            to acquire when initializing priors.
+    """
     apm = ActionPlanMaker()
     apm.add(CPSIM_server, "change_plate", {"plate_id": plate_id})
     apm.add(CPSIM_server, "get_loaded_plate", {}, to_global_params=["_loaded_plate_id"])
@@ -49,7 +61,19 @@ def OERSIM_sub_measure_CP(
     experiment: Experiment,
     experiment_version: int = 1,
     init_random_points: int = 5,
-):
+) -> list:
+    """Acquire the GPSIM-selected composition with a simulated CP and refit.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Library version tag.
+        init_random_points: Forwarded through the plan for downstream
+            initialization steps.
+
+    Returns:
+        Planned actions: get loaded plate, pick next feature, run simulated
+        CP, then update the GPSIM model.
+    """
     apm = ActionPlanMaker()
     apm.add(CPSIM_server, "get_loaded_plate", {}, to_global_params=["_loaded_plate_id"])
     apm.add(
@@ -79,7 +103,25 @@ def OERSIM_sub_decision(
     repeat_experiment_name: str = "OERSIM_sub_activelearn",
     repeat_experiment_params: dict = {},
     repeat_experiment_kwargs: dict = {},
-):
+) -> list:
+    """Evaluate the active-learning stop condition and optionally requeue.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Library version tag.
+        stop_condition: One of ``"none"``, ``"max_iters"``, ``"max_stdev"``,
+            ``"max_ei"``.
+        thresh_value: Threshold compared against the chosen stop condition.
+        repeat_experiment_name: Name of the experiment to insert when the
+            condition is not yet met.
+        repeat_experiment_params: Parameters for the inserted experiment.
+        repeat_experiment_kwargs: Additional kwargs forwarded to the
+            inserted experiment.
+
+    Returns:
+        Planned actions: get loaded plate (and orchestrator coords) then
+        ask GPSIM to evaluate the stop condition.
+    """
     apm = ActionPlanMaker()
     apm.add(
         CPSIM_server,
@@ -119,7 +161,28 @@ def OERSIM_sub_activelearn(
     stop_condition: str = "max_iters",  # {"none", "max_iters", "max_stdev", "max_ei"}
     thresh_value: Union[float, int] = 10,
     repeat_experiment_kwargs: dict = {},
-):
+) -> list:
+    """One full measure-and-decide iteration of the active-learning loop.
+
+    Concatenates :func:`OERSIM_sub_measure_CP` and :func:`OERSIM_sub_decision`
+    so the decision step requeues this same experiment until the stop
+    condition is met.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Library version tag.
+        init_random_points: Number of random initial compositions if the GP
+            has not yet been initialized for the loaded plate.
+        stop_condition: One of ``"none"``, ``"max_iters"``, ``"max_stdev"``,
+            ``"max_ei"``.
+        thresh_value: Threshold compared against the chosen stop condition.
+        repeat_experiment_kwargs: Additional kwargs forwarded to the
+            requeued experiment.
+
+    Returns:
+        Combined planned actions for measuring the next composition and
+        evaluating the stop condition.
+    """
     apm = ActionPlanMaker()
     apm.add_actions(
         OERSIM_sub_measure_CP(

@@ -1,3 +1,13 @@
+"""Device-model descriptions for Gamry potentiostats.
+
+Bundles the GamryCOM ProgID, supported current-range enum, and per-model
+sense/range-mode flags into a ``GamryPstat`` dataclass, and defines
+pre-configured instances for IFC1010, REF600/REF620, PCI4G300, PCI4G750,
+REF30K, and a generic default. The ``GAMRY_DEVICES`` dict maps device name
+prefixes to these instances, while ``TTL_OUTPUTS`` and ``TTL_OFF`` hold the
+mask/value pairs passed to ``SetDigitalOut`` to assert or clear each TTL line.
+"""
+
 from dataclasses import dataclass
 from enum import StrEnum
 from .range import (
@@ -28,6 +38,16 @@ TTL_OFF = {
 
 @dataclass
 class GamryPstat:
+    """Describes a specific Gamry potentiostat model.
+
+    Attributes:
+        device: GamryCOM ProgID used to create the COM object (e.g.
+            ``"GamryCOM.GamryPC6Pstat"``).
+        ierange: Current-range ``StrEnum`` class appropriate for the model.
+        set_sensemode: Value passed to ``SetSenseSpeedMode`` during setup.
+        set_rangemode: Value passed to ``SetIERangeMode`` when auto-ranging.
+    """
+
     device: str
     ierange: StrEnum
     set_sensemode: bool

@@ -1,4 +1,9 @@
-"""A device class for the KD Scientific Legato 100 series syringe pump."""
+"""KD Scientific Legato 100 series syringe pump driver.
+
+Provides a serial control wrapper (`KDS100`) that talks to one or more daisy-chained
+syringe pumps over a single COM port, plus a `PumpExec` executor that runs an
+infuse/withdraw action and reports status via the action server's live buffer.
+"""
 
 __all__ = []
 
@@ -6,7 +11,7 @@ import serial
 import io
 import time
 import asyncio
-from typing import Optional
+from typing import Any, Optional
 
 # import traceback
 from helao.helpers import helao_logging as logging
@@ -88,7 +93,21 @@ ulmap = {
 
 
 class KDS100:
+    """Driver for KD Scientific Legato 100 syringe pump(s) on an RS-232 chain.
+
+    Opens the serial port specified in ``action_serv.server_cfg['params']`` and
+    spawns two background tasks: one that listens for start/stop polling signals
+    and another that polls each configured pump for status and pushes the
+    parsed state into the action server's live buffer.
+    """
+
     def __init__(self, action_serv: Base):
+        """Open the serial connection and start polling tasks.
+
+        Args:
+            action_serv: Action server providing the configuration dict and
+                live buffer used to publish pump state.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         # self.unified_db = UnifiedSampleDataAPI(self.base)
@@ -116,6 +135,7 @@ class KDS100:
         self.last_state = "unknown"
 
     async def start_polling(self):
+        """Signal the background poller to begin reading pump status."""
         LOGGER.info("got 'start_polling' request, raising signal")
         async with self.base.aiolock:
             await self.poll_signalq.put(True)
@@ -124,6 +144,7 @@ class KDS100:
             await asyncio.sleep(0.1)
 
     async def stop_polling(self):
+        """Signal the background poller to pause."""
         LOGGER.info("got 'stop_polling' request, raising signal")
         async with self.base.aiolock:
             await self.poll_signalq.put(False)
@@ -132,12 +153,22 @@ class KDS100:
             await asyncio.sleep(0.1)
 
     async def poll_signal_loop(self):
+        """Initialize pump(s) into a safe state then route polling start/stop signals."""
         await self.safe_state()
         while True:
             self.polling = await self.poll_signalq.get()
             LOGGER.info("polling signal received")
 
-    async def send(self, pump_name: str, cmd: str):
+    async def send(self, pump_name: str, cmd: str) -> list:
+        """Send a command to the addressed pump and return the parsed response lines.
+
+        Args:
+            pump_name: Key in the config ``pumps`` dict identifying the target pump.
+            cmd: Pump command string; a trailing carriage return is added if missing.
+
+        Returns:
+            List of non-empty response lines stripped of whitespace.
+        """
         if not cmd.endswith("\r"):
             cmd = cmd + "\r"
         addr = self.config_dict["pumps"][pump_name]["address"]
@@ -158,6 +189,11 @@ class KDS100:
         return resp
 
     async def poll_sensor_loop(self, frequency: int = 10):
+        """Continuously query each pump and publish status to the live buffer.
+
+        Args:
+            frequency: Target polling rate in Hz.
+        """
         LOGGER.info("polling background task has started")
         waittime = 1.0 / frequency
         lastupdate = 0
@@ -231,6 +267,11 @@ class KDS100:
                 await asyncio.sleep(0.05)
 
     def update_status_from_response(self, response):
+        """Parse the first response line and patch the live-buffer status for that pump.
+
+        Args:
+            response: List of response lines previously returned by ``send``.
+        """
         status = response[0]
         addr_status = status.split()[0]
         addr = int(addr_status[:2])
@@ -248,8 +289,16 @@ class KDS100:
         status_dict = {"status": state}
         self.base.live_buffer[pump_name][0].update(status_dict)
 
-    async def start_pump(self, pump_name: str, direction: int):
-        "Start motion in direction forward/infuse (1) or reverse/withdraw (-1)"
+    async def start_pump(self, pump_name: str, direction: int) -> Any:
+        """Start pump motion.
+
+        Args:
+            pump_name: Configured pump key.
+            direction: ``1`` to infuse, ``-1`` to withdraw.
+
+        Returns:
+            Response list from the pump, or ``False`` if ``direction`` is invalid.
+        """
         if direction == 1:
             cmd = "irun"
         elif direction == -1:
@@ -260,15 +309,29 @@ class KDS100:
         self.update_status_from_response(resp)
         return resp
 
-    async def set_force(self, pump_name: str, force_val: int):
-        "Set infusion force value in percentage"
+    async def set_force(self, pump_name: str, force_val: int) -> list:
+        """Set the infusion force in percent.
+
+        Args:
+            pump_name: Configured pump key.
+            force_val: Force value in percent.
+        """
         cmd = f"forc {force_val}"
         resp = await self.send(pump_name, cmd)
         self.update_status_from_response(resp)
         return resp
 
-    async def set_rate(self, pump_name: str, rate_val: int, direction: int):
-        "Set infusion|withdraw rate in uL/sec"
+    async def set_rate(self, pump_name: str, rate_val: int, direction: int) -> Any:
+        """Set the infuse or withdraw rate in uL/sec.
+
+        Args:
+            pump_name: Configured pump key.
+            rate_val: Flow rate in microliters per second.
+            direction: ``1`` for infuse, ``-1`` for withdraw.
+
+        Returns:
+            Response list, or ``False`` for invalid ``direction``.
+        """
         if direction == 1:
             cmd = "irate"
         elif direction == -1:
@@ -279,14 +342,24 @@ class KDS100:
         self.update_status_from_response(resp)
         return resp
 
-    async def set_target_volume(self, pump_name: str, vol_val: float):
-        "Set infusion|withdraw volume in uL"
+    async def set_target_volume(self, pump_name: str, vol_val: float) -> list:
+        """Set the target infuse/withdraw volume in microliters.
+
+        Args:
+            pump_name: Configured pump key.
+            vol_val: Target volume in uL.
+        """
         resp = await self.send(pump_name, f"tvolume {vol_val} ul")
         self.update_status_from_response(resp)
         return resp
 
-    async def set_diameter(self, pump_name: str, diameter_mm: float):
-        "Set syringe diameter in mm"
+    async def set_diameter(self, pump_name: str, diameter_mm: float) -> list:
+        """Set syringe diameter in millimeters.
+
+        Args:
+            pump_name: Configured pump key.
+            diameter_mm: Syringe diameter in mm.
+        """
         resp = await self.send(pump_name, f"diameter {diameter_mm:.4f}")
         self.update_status_from_response(resp)
         return resp
@@ -297,7 +370,13 @@ class KDS100:
 
     async def clear_time(
         self, pump_name: Optional[str] = None, direction: Optional[int] = 0
-    ):
+    ) -> list:
+        """Clear the infused/withdrawn time counter on one or all pumps.
+
+        Args:
+            pump_name: Pump key, or ``None`` to clear all configured pumps.
+            direction: ``1`` for infuse-time, ``-1`` for withdraw-time, ``0`` for both.
+        """
         if direction == 1:
             cmd = "citime"
         elif direction == -1:
@@ -316,7 +395,17 @@ class KDS100:
 
     async def clear_volume(
         self, pump_name: Optional[str] = None, direction: Optional[int] = 0
-    ):
+    ) -> list:
+        """Clear the infused/withdrawn volume counter on one or all pumps.
+
+        Also updates ``self.present_volume_ul`` when a non-zero direction is
+        supplied for a single pump by reading the accumulated volume first.
+
+        Args:
+            pump_name: Pump key, or ``None`` to clear all configured pumps.
+            direction: ``1`` for infuse-volume, ``-1`` for withdraw-volume,
+                ``0`` for both.
+        """
         if direction == 1:
             cmd = "civolume"
         elif direction == -1:
@@ -340,7 +429,12 @@ class KDS100:
             self.update_status_from_response(resp)
             return resp
 
-    async def clear_target_volume(self, pump_name: Optional[str] = None):
+    async def clear_target_volume(self, pump_name: Optional[str] = None) -> list:
+        """Clear the target volume on one or all pumps.
+
+        Args:
+            pump_name: Pump key, or ``None`` for all configured pumps.
+        """
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
                 resp = await self.send(cpump_name, "ctvolume")
@@ -351,7 +445,12 @@ class KDS100:
             self.update_status_from_response(resp)
             return resp
 
-    async def stop_pump(self, pump_name: Optional[str] = None):
+    async def stop_pump(self, pump_name: Optional[str] = None) -> list:
+        """Issue a stop command to one or all pumps.
+
+        Args:
+            pump_name: Pump key, or ``None`` for all configured pumps.
+        """
         cmd = "stp"
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
@@ -364,6 +463,12 @@ class KDS100:
             return resp
 
     async def safe_state(self):
+        """Bring every configured pump to a known idle configuration.
+
+        Enables POLL mode, disables NVRAM writes, stops the pump, clears time
+        and target volume counters, and applies the syringe diameter from
+        configuration.
+        """
         for plab, pdict in self.config_dict.get("pumps", {}).items():
             addr = pdict["address"]
             idle_resp = f"{addr:02}:\x11"
@@ -394,6 +499,7 @@ class KDS100:
             self.update_status_from_response(diameter_resp)
 
     async def async_shutdown(self):
+        """Return pumps to safe state and close the serial port on server shutdown."""
         # this gets called when the server is shut down
         # or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
@@ -403,15 +509,24 @@ class KDS100:
 
 
 class PumpExec(Executor):
+    """Executor that drives a single pump through one infuse or withdraw action."""
+
     def __init__(self, direction: int, *args, **kwargs):
+        """Initialize the executor for the first configured pump.
+
+        Args:
+            direction: ``1`` to infuse, ``-1`` to withdraw.
+            *args: Positional args forwarded to :class:`Executor`.
+            **kwargs: Keyword args forwarded to :class:`Executor`.
+        """
         super().__init__(*args, **kwargs)
         self.direction = direction
         # current plan is 1 pump per COM
         self.pump_name = list(self.active.base.server_params["pumps"].keys())[0]
         LOGGER.info("PumpExec initialized.")
 
-    async def _pre_exec(self):
-        "Set rate and volume params, then run."
+    async def _pre_exec(self) -> dict:
+        """Send rate and target-volume setpoints to the pump before starting."""
         LOGGER.info("PumpExec running setup methods.")
         rate_resp = await self.active.driver.set_rate(
             pump_name=self.pump_name,
@@ -426,7 +541,8 @@ class PumpExec(Executor):
         LOGGER.info(f"set_target_volume returned: {vol_resp}")
         return {"error": ErrorCodes.none}
 
-    async def _exec(self):
+    async def _exec(self) -> dict:
+        """Start the pump in the configured direction."""
         start_resp = await self.active.driver.start_pump(
             pump_name=self.pump_name,
             direction=self.direction,
@@ -434,7 +550,8 @@ class PumpExec(Executor):
         LOGGER.info(f"start_pump returned: {start_resp}")
         return {"error": ErrorCodes.none}
 
-    async def _poll(self):
+    async def _poll(self) -> dict:
+        """Map the live-buffer pump status to an HLO status/error tuple."""
         live_buffer, _ = self.active.base.get_lbuf(self.pump_name)
         pump_status = live_buffer["status"]
         # LOGGER.info(f"poll iter status: {pump_status}")
@@ -446,12 +563,14 @@ class PumpExec(Executor):
         else:
             return {"error": ErrorCodes.none, "status": HloStatus.finished}
 
-    async def _manual_stop(self):
+    async def _manual_stop(self) -> dict:
+        """Stop the pump in response to an external stop request."""
         stop_resp = await self.active.driver.stop_pump(self.pump_name)
         LOGGER.info(f"stop_pump returned: {stop_resp}")
         return {"error": ErrorCodes.none}
 
-    async def _post_exec(self):
+    async def _post_exec(self) -> dict:
+        """Clear the volume and target-volume counters after the action ends."""
         LOGGER.info("PumpExec running cleanup methods.")
         clearvol_resp = await self.active.driver.clear_volume(
             pump_name=self.pump_name,

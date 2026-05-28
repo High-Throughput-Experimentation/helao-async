@@ -1,3 +1,13 @@
+"""NI DAQmx driver for HTE cell IV measurements and ancillary IO.
+
+Manages two PXI cards (a 6289 for cell current and a 6284 for cell voltage)
+plus a third task for thermocouple monitors. The driver streams per-cell I/V
+samples via a buffer callback, runs an asyncio control loop that arms/disarms
+the tasks, and exposes simple coroutines for setting digital outputs and
+reading digital inputs (used to drive pumps, gas/liquid valves, heaters, and
+LEDs).
+"""
+
 __all__ = ["cNIMAX"]
 
 import time
@@ -34,8 +44,22 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class cNIMAX:
-    def __init__(self, action_serv: Base):
+    """NI DAQmx wrapper used by the HTE action server.
 
+    Reads device maps (`dev_pump`, `dev_gasvalve`, `dev_liquidvalve`,
+    `dev_heat`, `dev_led`, `dev_monitor`, `dev_cellcurrent`,
+    `dev_cellvoltage`) from the server `params`, opens NI tasks via
+    `nidaqmx`, and runs background monitor and IO loops. `run_cell_IV` starts
+    a buffered IV acquisition that streams per-cell data to the active action
+    via `streamIV_callback`.
+    """
+
+    def __init__(self, action_serv: Base):
+        """Initialize state, build sample DB, register custom scale and monitor loop.
+
+        Args:
+            action_serv: Owning HELAO action server.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
@@ -143,17 +167,24 @@ class cNIMAX:
         myloop.create_task(self.monitorloop())
 
     def set_IO_signalq_nowait(self, val: bool) -> None:
+        """Replace the latest pending IO signal (non-async)."""
         if self.IO_signalq.full():
             _ = self.IO_signalq.get_nowait()
         self.IO_signalq.put_nowait(val)
 
     async def set_IO_signalq(self, val: bool) -> None:
+        """Replace the latest pending IO signal."""
         if self.IO_signalq.full():
             _ = await self.IO_signalq.get()
         await self.IO_signalq.put(val)
 
     def create_IVtask(self):
-        """configures a NImax task for multi cell IV measurements"""
+        """Configure the dual NI-DAQ tasks used for multi-cell IV measurements.
+
+        Sets up the 6289 current task (master) with the negate custom scale
+        and the 6284 voltage task (slave), wires up the buffer callback, and
+        configures the digital-edge start triggers when TTL wait is enabled.
+        """
         # Voltage reading is MASTER
         self.task_6289cellcurrent = nidaqmx.Task()
         for myname, mydev in self.config_dict["dev_cellcurrent"].items():
@@ -324,7 +355,12 @@ class cNIMAX:
     # #         self.task_tempCJC.start()
 
     def create_monitortask(self):
-        """configures and starts a NImax task for nonexperiment temp measurements"""
+        """Configure the background NI-DAQ thermocouple monitoring task.
+
+        Adds one analog-input thermocouple channel per `dev_monitor` entry
+        (K-type by default, T-type when the name contains "Ttc_") and enables
+        the lowpass filter.
+        """
         self.task_monitors = nidaqmx.Task()
         self.task_monitor_keys = list(self.config_dict.get("dev_monitor", {}).keys())
         if self.task_monitor_keys:
@@ -359,6 +395,7 @@ class cNIMAX:
         #        self.task_monitors.start()
 
     async def monitorloop(self):
+        """Background loop that reads the monitor task and posts to the live buffer."""
         self.create_monitortask()
         if self.task_monitor_keys:
             self.task_monitors.start()
@@ -377,7 +414,18 @@ class cNIMAX:
 
     def streamIV_callback(
         self, task_handle, every_n_samples_event_type, number_of_samples, callback_data
-    ):
+    ) -> int:
+        """NI-DAQ buffer callback that drains the I/V tasks and enqueues per-cell data.
+
+        When a measurement is active, reads `number_of_samples` from the
+        current and voltage tasks, augments each cell record with the latest
+        monitor readings, and pushes the result to the active action's data
+        queue. In estop or post-stop conditions the buffer is drained and
+        tasks are closed without enqueuing data.
+
+        Returns:
+            0 (required by the NI-DAQmx callback protocol).
+        """
         if self.IO_do_meas and not self.base.actionservermodel.estop:
             try:
                 self.IO_measuring = True
@@ -460,9 +508,14 @@ class cNIMAX:
         return 0
 
     async def IOloop(self):
-        """only monitors the status and keeps track of time for the
-        multi cell iv task. This one will also handle estop, stop,
-        finishes the active object etc."""
+        """Drive the multi-cell IV task lifecycle from `IO_signalq` requests.
+
+        On a True signal, starts the voltage (slave) then current (master)
+        tasks, waits for the first callback to flip `IO_measuring`, polls
+        until `duration` elapses or a stop/estop is requested, then closes
+        the tasks and finalizes the active action. Handles estop transitions
+        and ignores requests when already busy or already idle.
+        """
         self.IOloop_run = True  # could have another loop before that set of ifs?
         try:
             while self.IOloop_run:
@@ -536,15 +589,20 @@ class cNIMAX:
         celltemp_max,
         reservoir2_min,
         reservoir2_max,
-    ):
-        # samplerate = A.action_params["SampleRate"]
-        # duration = A.action_params["duration"] * 60 * 60  #time in hours
-        # celltemp_min = A.action_params["r1min"]
-        # celltemp_max = A.action_params["r1max"]
-        # reservoir2_min = A.action_params["r2min"]
-        # reservoir2_max = A.action_params["r2max"]
+    ) -> bool:
+        """Bang-bang temperature control for cell and reservoir heaters.
 
-        """attempt maintain temperatures for the mdatatemp task."""
+        For `duration_h` hours, polls the cached monitor temperatures from
+        the live buffer once per second and toggles the `cellheater` and
+        `res_heater` digital outputs to keep cell temperature within
+        `celltemp_min`..`celltemp_max` and reservoir temperature within
+        `reservoir2_min`..`reservoir2_max`. Exits early if `Heatloop_run`
+        is cleared, and turns the heaters off on exit.
+
+        Returns:
+            The final `Heatloop_run` flag, indicating whether the loop
+            completed via timeout (True) or was stopped (False).
+        """
         duration = duration_h * 3600
         heatloopstarttime = time.time()
 
@@ -586,7 +644,18 @@ class cNIMAX:
 
     async def set_digital_out(
         self, do_port=None, do_name: str = "", on: bool = False, *args, **kwargs
-    ):
+    ) -> dict:
+        """Drive a single digital output line via a one-shot NI-DAQ task.
+
+        Args:
+            do_port: NI-DAQ channel string (e.g. "PXI-6284/port0/line0").
+            do_name: Friendly name for the channel.
+            on: True for high, False for low.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("digital_out"),
+            and the applied `value`.
+        """
         LOGGER.info(f"do_port '{do_name}': {do_port} is {on}")
         on = bool(on)
         cmds = []
@@ -617,7 +686,18 @@ class cNIMAX:
 
     async def get_digital_in(
         self, di_port=None, di_name: str = "", on: bool = False, *args, **kwargs
-    ):
+    ) -> dict:
+        """Read a single digital input line via a one-shot NI-DAQ task.
+
+        Args:
+            di_port: NI-DAQ channel string for the digital input.
+            di_name: Friendly name for the channel.
+            on: Unused; placeholder for API symmetry with `set_digital_out`.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("digital_in"),
+            and `value`.
+        """
         LOGGER.info(f"di_port '{di_name}': {di_port}")
         on = None
         err_code = ErrorCodes.none
@@ -640,7 +720,22 @@ class cNIMAX:
             "value": on,
         }
 
-    async def run_cell_IV(self, A: Action):
+    async def run_cell_IV(self, A: Action) -> dict:
+        """Start a buffered multi-cell IV measurement for action `A`.
+
+        Validates the inbound samples against the unified sample DB, creates
+        one file-conn per cell (splitting the active action so each cell has
+        its own output stream), configures the IV NI-DAQ task, and signals
+        the IO loop to begin. Returns an "already in progress" error if a
+        measurement is already running.
+
+        Args:
+            A: HELAO `Action` containing `SampleRate`, `Tval` (duration),
+                and `TTLwait` in `action_params`.
+
+        Returns:
+            The active action as a dict (`as_dict()`).
+        """
         activeDict = {}
 
         samplerate = A.action_params["SampleRate"]
@@ -766,7 +861,8 @@ class cNIMAX:
 
         return activeDict
 
-    async def read_T(self):
+    async def read_T(self) -> dict:
+        """Return the latest cached value for each monitor channel from the live buffer."""
         mdata = {}
         for myname in self.task_monitor_keys:
             mdata[myname], _ = self.base.get_lbuf(myname)
@@ -774,21 +870,33 @@ class cNIMAX:
         return mdata
 
     def stop_monitor(self):
-        """stops instantaneous temp measurement"""
+        """Signal the monitor loop to exit."""
         self.monitorloop_run = False
 
     def stop_heatloop(self):
-        """stops instantaneous temp measurement"""
+        """Signal the heater control loop to exit."""
         self.Heatloop_run = False
 
     async def stop(self):
-        """stops measurement, writes all data and returns from meas loop"""
+        """Request the IV loop to stop the current measurement (if any)."""
         # turn off cell and run before stopping meas loop
         if self.IO_measuring:
             await self.set_IO_signalq(False)
 
-    async def estop(self, switch: bool, *args, **kwargs):
-        """same as estop, but also sets flag"""
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Engage or release the IO emergency stop.
+
+        When `switch` is True, drives every configured LED, pump, gas valve,
+        liquid valve, and heater output low and sets the action-server estop
+        flag. If a measurement is in progress it is also stopped and the
+        active action is marked estopped.
+
+        Args:
+            switch: True to assert estop, False to release.
+
+        Returns:
+            The boolean coerced `switch` value.
+        """
         switch = bool(switch)
         self.base.actionservermodel.estop = switch
 
@@ -816,6 +924,7 @@ class cNIMAX:
         return switch
 
     def shutdown(self):
+        """Signal all background loops to stop and wait for the active action to clear."""
         LOGGER.info("shutting down nidaqmx")
         self.set_IO_signalq_nowait(False)
         retries = 0
@@ -832,14 +941,26 @@ class cNIMAX:
 
 
 class DevMonExec(Executor):
+    """Executor that streams NI-DAQ monitor (thermocouple) channels.
+
+    Reads each `task_monitor_keys` value from the live buffer and finishes
+    when `duration` (seconds; -1 for unlimited) elapses.
+    """
+
     def __init__(self, *args, **kwargs):
+        """Initialize the executor and capture start time/duration."""
         super().__init__(*args, **kwargs)
         LOGGER.info("DevMonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 
-    async def _poll(self):
-        """Read analog inputs from live buffer."""
+    async def _poll(self) -> dict:
+        """Read each monitor channel from the live buffer.
+
+        Returns:
+            Dict with `error`, `status`, and `data` (per-channel values plus
+            `epoch_s`).
+        """
         data_dict = {}
         times = []
         for monitor_name in self.active.driver.task_monitor_keys:

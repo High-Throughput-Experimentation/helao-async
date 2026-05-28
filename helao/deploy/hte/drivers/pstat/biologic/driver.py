@@ -1,15 +1,13 @@
-"""HelaoDriver wrapper around easy-biologic package for Biologic potentiostats
+"""HelaoDriver wrapper around the easy-biologic package for Biologic potentiostats.
 
-https://github.com/bicarlsen/easy-biologic
+Wraps a multi-channel Biologic instrument behind the HelaoDriver contract,
+delegating channel configuration and data retrieval to the easy-biologic
+``BiologicDevice`` and ``BiologicProgram`` classes. The driver tracks per-channel
+program objects, parameter dictionaries, and the active technique so that
+setup, start, get_data, stop, and cleanup can be issued independently for each
+channel of the device.
 
-Notes:
-- import easy_biologic as ebl
-- import easy_biologic.base_programs as blp
-- establish connection using `ebl.BiologicDevice('ip_address')`
-- create technique using blp.OCV, blp.CP, etc. with set channels
-- run technique using retrieve_data=False
-- manually call _retrieve_data_segment to get single channel data
-
+See https://github.com/bicarlsen/easy-biologic for the underlying library.
 """
 
 import time
@@ -34,15 +32,47 @@ from .technique import BiologicTechnique
 
 
 # ctypes struct to dict (won't work with arrays, nested structs)
-def getdict(struct):
+def getdict(struct) -> dict:
+    """Convert a flat ``ctypes.Structure`` instance into a plain dict.
+
+    Only handles top-level scalar fields; arrays and nested structs are not
+    unpacked.
+
+    Args:
+        struct: A ``ctypes.Structure`` instance whose ``_fields_`` describes
+            scalar fields.
+
+    Returns:
+        Mapping of field name to attribute value.
+    """
     return dict((field, getattr(struct, field)) for field, _ in struct._fields_)
 
 
 class BiologicDriver(HelaoDriver):
+    """HelaoDriver implementation for a multi-channel Biologic potentiostat.
+
+    Holds one easy-biologic ``BiologicProgram`` per channel and exposes
+    setup/start/get_data/stop/cleanup methods scoped to a channel index. A
+    single TCP connection to the instrument is established at construction
+    time and reused for the lifetime of the driver.
+
+    Attributes:
+        device_name: Human-readable identifier for the connected instrument.
+        connection_raised: Whether a connection attempt has been made; used to
+            guard against double-open by another process.
+    """
+
     device_name: str
     connection_raised: bool
 
     def __init__(self, config: dict = {}):
+        """Initialize the driver and open the connection to the instrument.
+
+        Args:
+            config: Driver configuration. Recognized keys are ``address``
+                (instrument IP, default ``"192.168.200.240"``) and
+                ``num_channels`` (default ``12``).
+        """
         super().__init__(config=config)
         #
         self.ready = False
@@ -59,7 +89,12 @@ class BiologicDriver(HelaoDriver):
         self.connection_ctx = None
 
     def connect(self) -> DriverResponse:
-        """Open connection to resource."""
+        """Open the TCP connection to the Biologic instrument.
+
+        Returns:
+            ``DriverResponse`` with ``status=ok`` on success, ``status=busy``
+            if another script holds the connection, otherwise ``status=error``.
+        """
         try:
             if self.connection_raised:
                 raise ConnectionError(
@@ -86,7 +121,18 @@ class BiologicDriver(HelaoDriver):
         return response
 
     def get_status(self, channel: Optional[int] = None) -> DriverResponse:
-        """Return current driver status."""
+        """Return the driver status, optionally for a single channel.
+
+        Args:
+            channel: Channel index to query. When ``None``, queries every
+                channel and reports ``busy`` if any channel has a non-zero
+                state.
+
+        Returns:
+            ``DriverResponse`` whose ``data`` maps channel index to the raw
+            Biologic ``State`` value, and whose ``status`` reflects whether
+            any queried channel is busy.
+        """
         try:
             if not self.ready:
                 # raise ConnectionError("Device not connected.")
@@ -127,7 +173,23 @@ class BiologicDriver(HelaoDriver):
         technique: BiologicTechnique,
         action_params: dict = {},  # for mapping action keys to signal keys
     ) -> DriverResponse:
-        """Set measurement conditions on potentiostat."""
+        """Configure a channel for an upcoming measurement.
+
+        Translates action-server parameter keys into easy-biologic parameter
+        names using ``technique.parameter_map``, wraps scalar values for the
+        list-valued parameters (``voltages``, ``currents``, ``durations``),
+        and instantiates ``technique.easy_class`` for the target channel.
+
+        Args:
+            technique: Technique definition specifying the easy-biologic
+                program class and key remaps.
+            action_params: Parameter dictionary supplied by the action server.
+                Must include ``channel`` and the technique-specific keys
+                listed in ``technique.parameter_map``.
+
+        Returns:
+            ``DriverResponse`` reporting setup success or failure.
+        """
         channel = action_params.get("channel", -1)
         try:
             if channel not in self.channels:
@@ -161,7 +223,19 @@ class BiologicDriver(HelaoDriver):
             self.cleanup(channel)
         return response
 
-    def list_techniques(self, channel: int = 0):
+    def list_techniques(self, channel: int = 0) -> list:
+        """Return the list of techniques currently loaded on a channel.
+
+        Args:
+            channel: Channel index to inspect.
+
+        Returns:
+            List of ``(index, technique_payload)`` tuples as reported by the
+            underlying easy-biologic device.
+
+        Raises:
+            ValueError: If the channel does not exist or has not been set up.
+        """
         if channel not in self.channels:
             raise ValueError(f"Channel {channel} does not exist.")
         if self.channels[channel] is None:
@@ -172,6 +246,19 @@ class BiologicDriver(HelaoDriver):
         return techlist
 
     def update_parameters(self, channel: int = 0, new_params: dict = {}):
+        """Merge ``new_params`` into the currently loaded technique on a channel.
+
+        Translates action-server keys via the active technique's
+        ``parameter_map``, wraps list-valued parameters, and pushes the
+        combined parameter set down to the device.
+
+        Args:
+            channel: Channel index to update.
+            new_params: Action-server parameter overrides.
+
+        Raises:
+            ValueError: If the channel does not exist or has not been set up.
+        """
         if channel not in self.channels:
             raise ValueError(f"Channel {channel} does not exist.")
         if self.channels[channel] is None:
@@ -193,7 +280,17 @@ class BiologicDriver(HelaoDriver):
         )
 
     def start_channel(self, channel: int = 0, ttl_params: dict = {}) -> DriverResponse:
-        """Apply signal and begin data acquisition."""
+        """Start the previously configured technique on a channel.
+
+        Args:
+            channel: Channel index to start.
+            ttl_params: TTL configuration forwarded to the easy-biologic
+                program's ``run`` call.
+
+        Returns:
+            ``DriverResponse`` with ``status=busy`` and the wall-clock
+            ``start_time`` in ``data`` on success.
+        """
         try:
             if channel not in self.channels:
                 raise ValueError(f"Channel {channel} does not exist.")
@@ -224,7 +321,20 @@ class BiologicDriver(HelaoDriver):
         return response
 
     async def get_data(self, channel: int = 0) -> DriverResponse:
-        """Retrieve data from device buffer."""
+        """Retrieve buffered data from a running or just-finished channel.
+
+        Pulls one data segment from the channel, drains any remaining
+        segments once the channel reports ``done``, applies the technique's
+        ``field_remap`` to rename data columns, and for impedance techniques
+        derives ``X_ohm`` and ``R_ohm`` from ``modulus`` and ``phase``.
+
+        Args:
+            channel: Channel index to read.
+
+        Returns:
+            ``DriverResponse`` with column-oriented data in ``data`` and a
+            ``measuring``/``done`` marker in ``message``.
+        """
         try:
             if channel not in self.channels:
                 raise ValueError(f"Channel {channel} does not exist.")
@@ -298,7 +408,15 @@ class BiologicDriver(HelaoDriver):
         return response
 
     def stop(self, channel: Optional[int] = None) -> DriverResponse:
-        """General stop method to abort all active methods e.g. motion, I/O, compute."""
+        """Abort the active technique on one or all channels.
+
+        Args:
+            channel: Channel index to stop. When ``None``, every channel with
+                an active program is stopped.
+
+        Returns:
+            ``DriverResponse`` reporting whether the stop call succeeded.
+        """
         try:
             running_channels = [k for k, c in self.channels.items() if c is not None]
             if not self.stopping:
@@ -324,7 +442,17 @@ class BiologicDriver(HelaoDriver):
         return response
 
     def cleanup(self, channel: int) -> DriverResponse:
-        """Release state objects but don't close pstat."""
+        """Clear per-channel program, parameters, and technique state.
+
+        Does not disconnect the instrument.
+
+        Args:
+            channel: Channel index to clean up.
+
+        Returns:
+            ``DriverResponse`` reporting cleanup status. Fails with
+            ``status=error`` if the channel is currently busy.
+        """
         try:
             if channel not in self.channels:
                 raise ValueError(f"Channel {channel} does not exist.")
@@ -349,7 +477,7 @@ class BiologicDriver(HelaoDriver):
         return response
 
     def disconnect(self) -> DriverResponse:
-        """Release connection to resource."""
+        """Close the TCP connection to the instrument and clear ready state."""
         try:
             self.pstat.disconnect()
             LOGGER.info(
@@ -371,7 +499,7 @@ class BiologicDriver(HelaoDriver):
         return response
 
     def reset(self) -> DriverResponse:
-        """Reinitialize driver, force-close old connection if necessary."""
+        """Disconnect then reconnect the driver to recover from a bad state."""
         try:
             self.disconnect()
             response = DriverResponse(
@@ -387,7 +515,10 @@ class BiologicDriver(HelaoDriver):
         return response
 
     def shutdown(self) -> None:
-        """Pass-through shutdown events for BaseAPI."""
+        """Stop any running channels, clean them up, and disconnect.
+
+        Invoked by ``BaseAPI`` when the action server is shutting down.
+        """
         state_dict = self.get_status().data
         running_channels = [ch for ch, state in state_dict.items() if state > 0]
         for ch in running_channels:

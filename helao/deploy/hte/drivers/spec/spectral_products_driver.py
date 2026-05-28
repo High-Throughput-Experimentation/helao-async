@@ -1,3 +1,11 @@
+"""Spectral Products SM303 spectrometer driver.
+
+Wraps the vendor-supplied ``SMdbUSBm.dll`` to operate the SM303 spectrometer
+in software- or externally-triggered acquisition modes. The :class:`SM303`
+class is owned by the spec action server and pushes acquired spectra into
+the active action's data stream.
+"""
+
 __all__ = ["SM303"]
 
 import os
@@ -26,9 +34,27 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class SM303:
-    """_summary_"""
+    """Driver for the Spectral Products SM303 USB spectrometer.
+
+    Loads the vendor ``SMdbUSBm.dll`` (path from the action-server config),
+    sets up the device (TEC, integration time, trigger mode), and provides
+    synchronous single-shot acquisition (:meth:`acquire_spec_adv`) and
+    asynchronous external-trigger acquisition (:meth:`acquire_spec_extrig`)
+    that streams spectra to the active HELAO :class:`Active` object via a
+    background polling task.
+    """
 
     def __init__(self, action_serv: Base):
+        """Initialise the SM303 driver.
+
+        Reads parameters from ``action_serv.server_cfg['params']``, loads the
+        vendor DLL, configures the device, primes an async signal queue, and
+        starts the :meth:`IOloop` background task.
+
+        Args:
+            action_serv: Parent HELAO action server (:class:`Base`) providing
+                config, logger, sample-API and file-output integration.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.lib_path = self.config_dict["lib_path"]
@@ -81,17 +107,24 @@ class SM303:
         self.IOloop_run: bool = False
 
     def set_IO_signalq_nowait(self, val: bool) -> None:
+        """Push ``val`` onto the IO signal queue, evicting any stale entry."""
         if self.IO_signalq.full():
             _ = self.IO_signalq.get_nowait()
         self.IO_signalq.put_nowait(val)
 
     async def set_IO_signalq(self, val: bool) -> None:
+        """Async variant of :meth:`set_IO_signalq_nowait`."""
         if self.IO_signalq.full():
             _ = await self.IO_signalq.get()
         await self.IO_signalq.put(val)
 
     async def IOloop(self):
-        """This is trigger-acquire-read loop which always runs."""
+        """Long-running trigger/acquire/read loop driven by ``IO_signalq``.
+
+        Waits for ``True`` on the signal queue to begin an external-trigger
+        acquisition via :meth:`continuous_read`, then finishes the active
+        action and resets state. Honours the action server's e-stop.
+        """
         self.IOloop_run = True
         try:
             while self.IOloop_run:
@@ -143,6 +176,12 @@ class SM303:
             LOGGER.info("IOloop task was cancelled")
 
     def setup_sm303(self):
+        """Run vendor initialisation sequence and load the wavelength table.
+
+        Tests channels, identifies the model, sets up and inits the channel,
+        enables the TEC, reads the wavelength table from EEPROM, and sets
+        ``self.ready`` to ``True`` on success.
+        """
         try:
             self.spec.spTestAllChannels()
             self.model = ctypes.c_short(self.spec.spGetModel(self.dev_num))
@@ -185,7 +224,15 @@ class SM303:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             LOGGER.error(f"fatal error initializing SM303: {repr(e), tb,}")
 
-    def set_trigger_mode(self, mode: SpecTrigType = SpecTrigType.off):
+    def set_trigger_mode(self, mode: SpecTrigType = SpecTrigType.off) -> bool:
+        """Set the spectrometer trigger source.
+
+        Args:
+            mode: Target :class:`SpecTrigType` (off, internal or external).
+
+        Returns:
+            ``True`` if the DLL reported success, ``False`` otherwise.
+        """
         resp = self.spec.spSetTrgEx(mode, self.dev_num)
         time.sleep(0.1)
         if resp == 1:
@@ -195,7 +242,15 @@ class SM303:
         LOGGER.error(f"Could not set trigger mode to {str(mode)}")
         return False
 
-    def set_extedge_mode(self, mode: TriggerType = TriggerType.risingedge):
+    def set_extedge_mode(self, mode: TriggerType = TriggerType.risingedge) -> bool:
+        """Set the external-trigger edge polarity.
+
+        Args:
+            mode: :class:`TriggerType` indicating rising/falling edge.
+
+        Returns:
+            ``True`` if the DLL reported success, ``False`` otherwise.
+        """
         cedge_mode = ctypes.c_short(mode)
         resp = self.spec.spSetExtEdgeMode(cedge_mode, self.dev_num)
         time.sleep(0.1)
@@ -206,7 +261,15 @@ class SM303:
         LOGGER.error(f"Could not set ext. trigger edge mode to {str(mode)}")
         return False
 
-    def set_integration_time(self, int_time: float = 7.0):
+    def set_integration_time(self, int_time: float = 7.0) -> bool:
+        """Set the integration time in milliseconds (minimum 7.0 ms).
+
+        Args:
+            int_time: Integration time in milliseconds.
+
+        Returns:
+            ``True`` if the DLL reported success, ``False`` otherwise.
+        """
         # minimum int_time for SM303 is 7.0 msec
         self.int_time = float(int_time)
         cint_time = ctypes.c_double(int_time)
@@ -219,7 +282,23 @@ class SM303:
         LOGGER.error(f"Could not set integration time to {int_time:.1f}")
         return False
 
-    def acquire_spec_adv(self, int_time_ms: float, **kwargs):
+    def acquire_spec_adv(self, int_time_ms: float, **kwargs) -> dict:
+        """Acquire a single spectrum using software triggering.
+
+        Configures trigger off mode, advanced integration mode and the
+        requested integration time, then reads a spectrum and returns a flat
+        dict of per-channel intensities plus optional peak intensity within
+        ``peak_lower_wl``/``peak_upper_wl`` bounds.
+
+        Args:
+            int_time_ms: Integration time in milliseconds.
+            **kwargs: Optional ``n_avg``, ``fft``, ``peak_lower_wl`` and
+                ``peak_upper_wl`` parameters.
+
+        Returns:
+            Dict with ``epoch_s``, ``ch_NNNN`` channel values, ``error_code``
+            and ``peak_intensity`` on success; an error dict otherwise.
+        """
         # self.setup_sm303()
         trigset = self.set_trigger_mode(SpecTrigType.off)
         intmset = self.spec.spSetIntMode(
@@ -266,21 +345,20 @@ class SM303:
         LOGGER.info("Trigger or integration time could not be set.")
         return {"error_code": ErrorCodes.not_available}
 
-    async def acquire_spec_extrig(self, A: Action):
-        """Perform async acquisition based on external trigger.
+    async def acquire_spec_extrig(self, A: Action) -> dict:
+        """Start an externally triggered acquisition and return the active dict.
 
-        Notes:
-            SM303 has max 'waiting time' of 7ms, ADC time of 4ms, min USB tx
-            time of 2ms in addition to the min integration time of 7ms.
+        Configures external trigger mode, edge mode and integration time from
+        the action params, validates samples, opens a HELAO ``Active`` with a
+        ``spec_helao__file`` connection (wavelength table in the header),
+        then signals :meth:`IOloop` to begin collecting and waits until the
+        active object has been activated.
 
-            Trigger signal time must be at least 13ms.
-            Galil IO appears to have 1ms toggle resolutionself.
+        Args:
+            A: The :class:`Action` request describing this acquisition.
 
-            TODO: setup external trigger mode and integration time,
-            SPEC server should switch over to usb context and listen for data,
-            Galil IO or PSTAT should send SPEC server a finish signal
-
-        Return active dict.
+        Returns:
+            The active action's ``as_dict()`` payload.
         """
 
         # self.setup_sm303()
@@ -362,7 +440,16 @@ class SM303:
             activeDict = A.as_dict()
         return activeDict
 
-    def read_data(self):
+    def read_data(self) -> int:
+        """Read a single spectrum from the device into ``self.data``.
+
+        Uses ``spReadDataAdvEx`` when averaging or FFT is enabled, else the
+        plain ``spReadDataEx``. Trims the raw 1056-element buffer to the
+        1024 active pixels.
+
+        Returns:
+            The vendor result code (``1`` on success).
+        """
         self._data = (ctypes.c_long * 1056)()
         if self.n_avg != 1 or self.fft != 0:
             result = self.spec.spReadDataAdvEx(
@@ -384,11 +471,20 @@ class SM303:
             self.data = []
         return result
 
-    async def continuous_read(self):
-        """Async polling task.
+    async def continuous_read(self) -> dict:
+        """Background polling coroutine for external-trigger acquisitions.
 
-        'start_margin' is the number of seconds to extend the trigger acquisition window
-        to account for the time delay between SPEC and PSTAT actions
+        Repeatedly calls :meth:`read_data` (via ``run_in_executor`` so that
+        the DLL call's GIL release does not break async ordering), enqueues
+        each spectrum onto the active action's data stream, and stops once
+        ``trigger_duration + start_margin`` has elapsed.
+
+        ``start_margin`` extends the trigger acquisition window to account
+        for the time delay between the spec and pstat actions.
+
+        Returns:
+            ``{"measure": "done_extrig"}`` on normal completion or
+            ``{"measure": "not initialized"}`` if the DLL was never loaded.
         """
         # first_print = True
         await asyncio.sleep(0.01)
@@ -443,6 +539,7 @@ class SM303:
         return {"measure": "done_extrig"}
 
     def close_spec_connection(self):
+        """Disable external trigger and signal the IO loop to stop."""
         if self.IO_measuring:
             self.IO_do_meas = False  # will stop meas loop
             self.IO_measuring = False
@@ -453,14 +550,25 @@ class SM303:
             pass
 
     async def stop(self, delay: int = 0):
-        """stops measurement, writes all data and returns from meas loop"""
+        """Stop the measurement, write all data and exit the meas loop.
+
+        Args:
+            delay: Optional seconds to wait before signalling stop.
+        """
         if self.IO_measuring:
             await asyncio.sleep(delay=delay)
             self.IO_do_meas = False  # will stop meas loop
             await self.set_IO_signalq(False)
 
-    async def estop(self, switch: bool, *args, **kwargs):
-        """same as stop, set or clear estop flag with switch parameter"""
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Set or clear the e-stop flag, stopping the meas loop when set.
+
+        Args:
+            switch: ``True`` to engage e-stop, ``False`` to clear it.
+
+        Returns:
+            The applied boolean state.
+        """
         # should be the same as stop()
         switch = bool(switch)
         self.base.actionservermodel.estop = switch
@@ -474,9 +582,11 @@ class SM303:
         return switch
 
     def unset_external_trigger(self):
+        """Disable the external trigger (sets ``SP_TRIGGER_OFF``)."""
         self.spec.spSetTrgEx(ctypes.c_short(10), self.dev_num)  # 10=SP_TRIGGER_OFF
 
-    def shutdown(self):
+    def shutdown(self) -> dict:
+        """Close the spectrometer channel and return a shutdown marker."""
         LOGGER.info("shutting down SM303")
         # self.unset_external_trigger()
         # self.spec.spSetTEC(ctypes.c_long(0), self.dev_num)

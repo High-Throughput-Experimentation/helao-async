@@ -1,4 +1,9 @@
-"""Kinesis motor server"""
+"""FastAPI action server for Thorlabs Kinesis motorised stages.
+
+Defines :class:`KinesisMotorExec` to drive a single axis from a HELAO action
+and registers move / cancel / velocity endpoints for every axis declared
+under ``server_params['axes']``.
+"""
 
 __all__ = ["makeApp"]
 
@@ -24,7 +29,27 @@ from helao.core.models.hlostatus import HloStatus
 
 
 class KinesisMotorExec(Executor):
+    """Executor that drives a single Kinesis axis for a move action.
+
+    Reads the target axis and movement parameters from the action and
+    delegates motion to :class:`KinesisMotor` via the configured driver.
+
+    Attributes:
+        base: The server's :class:`Base` instance.
+        driver: The :class:`KinesisMotor` driver bound to this server.
+        live_dict: Reference to the poller's shared live-data dict.
+        action_params: Action parameters dict shortcut.
+        axis_name: Resolved axis identifier.
+        axis_params: Per-axis configuration entry from ``server_params``.
+    """
+
     def __init__(self, *args, **kwargs):
+        """Resolve axis configuration and cache driver/buffer shortcuts.
+
+        Args:
+            *args: Forwarded to :class:`Executor`.
+            **kwargs: Forwarded to :class:`Executor`.
+        """
         super().__init__(*args, **kwargs)
         # shortcut attribs
         self.base = self.active.base
@@ -39,8 +64,13 @@ class KinesisMotorExec(Executor):
         self.axis_params = self.base.server_params["axes"][self.axis_name]
         LOGGER.info("KinesisMotorExec initialized.")
 
-    async def _pre_exec(self):
-        "Set velocity and acceleration."
+    async def _pre_exec(self) -> dict:
+        """Configure velocity and acceleration on the axis before motion.
+
+        Returns:
+            Dict containing ``error`` set to :attr:`ErrorCodes.none` on a
+            successful driver setup or :attr:`ErrorCodes.setup` otherwise.
+        """
         LOGGER.info("KinesisMotorExec running setup methods.")
         velocity = self.action_params.get("velocity_mm_s", None)
         acceleration = self.action_params.get("acceleration_mm_s2", None)
@@ -52,8 +82,17 @@ class KinesisMotorExec(Executor):
         LOGGER.info("KinesisMotorExec setup complete.")
         return {"error": error}
 
-    async def _exec(self):
-        "Execute motion."
+    async def _exec(self) -> dict:
+        """Compute the target position and start the move.
+
+        Resolves an absolute target using the relative/absolute move mode,
+        compares against the per-axis ``move_limit_mm`` from configuration,
+        and dispatches the move through the driver when within limits.
+
+        Returns:
+            Dict with ``error`` indicating success, motor-limit refusal, or
+            a critical motor error.
+        """
         LOGGER.info("KinesisMotorExec validating move mode & limit.")
         move_mode = self.action_params.get("move_mode", "relative")
         move_value = self.action_params.get("value_mm", 0.0)
@@ -78,8 +117,13 @@ class KinesisMotorExec(Executor):
             )
             return {"error": ErrorCodes.motor}
 
-    async def _poll(self):
-        """Read position and status from driver live_dict."""
+    async def _poll(self) -> dict:
+        """Sample position and motion status from the poller live buffer.
+
+        Returns:
+            Dict containing the current ``position_mm`` and an :class:`HloStatus`
+            of ``active`` while motion states are present, ``finished`` otherwise.
+        """
         live_dict, epoch_s = self.base.get_lbuf(self.axis_name)
         live_dict["epoch_s"] = epoch_s
         if any([x in MOTION_STATES for x in live_dict["status"]]):
@@ -93,13 +137,26 @@ class KinesisMotorExec(Executor):
             "data": {"position_mm": live_dict["position_mm"]},
         }
 
-    async def _manual_stop(self):
-        "Perform device manual stop, return error state."
+    async def _manual_stop(self) -> dict:
+        """Immediately stop the axis on a user-issued cancel.
+
+        Returns:
+            Dict containing ``error`` set to :attr:`ErrorCodes.none`.
+        """
         self.axis.stop(immediate=True, sync=True)
         return {"error": ErrorCodes.none}
 
 
 async def kinesis_dyn_endpoints(app: BaseAPI):
+    """Register Kinesis motion endpoints after driver initialisation.
+
+    Reads the configured axes from ``server_params['axes']`` and, if any are
+    present, attaches ``kmove``, ``cancel_kmove``, ``set_velocity``, and the
+    private polling control endpoints.
+
+    Args:
+        app: The :class:`BaseAPI` instance being configured.
+    """
     server_key = app.base.server.server_name
     motors = list(app.base.server_params["axes"].keys())
 
@@ -117,7 +174,22 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             poll_rate_s: float = 0.1,
             exec_id: Optional[str] = None,
         ):
-            """Set flow rate and record."""
+            """Start a :class:`KinesisMotorExec` to move the selected axis.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                axis: Axis identifier from the driver's enumerated devices.
+                move_mode: Relative or absolute interpretation of ``value_mm``.
+                value_mm: Move magnitude or absolute target in millimetres.
+                velocity_mm_s: Optional override for axis velocity.
+                acceleration_mm_s2: Optional override for axis acceleration.
+                poll_rate_s: Executor polling period in seconds.
+                exec_id: Optional executor id (used by the cancel endpoint).
+
+            Returns:
+                The active action dictionary from ``start_executor``.
+            """
             active = await app.base.setup_and_contain_action()
             active.action.action_abbr = "kmove"
             executor = KinesisMotorExec(
@@ -135,7 +207,21 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             axis: app.driver.dev_kinesis = motors[0],
             exec_id: Optional[str] = None,
         ):
-            """Stop flowrate & acquisition for given device_name."""
+            """Cancel a running ``kmove`` executor by id or by axis.
+
+            If ``exec_id`` is provided the matching executor is stopped;
+            otherwise every ``kmove`` executor matching the optional axis
+            filter is stopped.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                axis: Optional axis filter when ``exec_id`` is not given.
+                exec_id: Optional executor identifier to stop directly.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action()
             if active.action.action_params["exec_id"] is not None:
                 app.base.stop_executor(active.action.action_params["exec_id"])
@@ -156,6 +242,18 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             velocity_mm_s: Optional[float] = None,
             acceleration_mm_s2: Optional[float] = None,
         ):
+            """Apply velocity and acceleration parameters to the chosen axis.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                axis: Axis identifier from the driver's enumerated devices.
+                velocity_mm_s: Maximum velocity in mm/s.
+                acceleration_mm_s2: Acceleration in mm/s^2.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="set_velocity")
             app.driver.motors[
                 active.action.action_params["axis"]
@@ -167,17 +265,29 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
         @app.post("/start_polling", tags=["private"])
-        async def start_polling():
+        async def start_polling() -> str:
+            """Start the Kinesis poller background loop."""
             await app.poller.start_polling()
             return "start_polling: ok"
 
         @app.post("/stop_polling", tags=["private"])
-        async def stop_polling():
+        async def stop_polling() -> str:
+            """Stop the Kinesis poller background loop."""
             await app.poller.stop_polling()
             return "stop_polling: ok"
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the BaseAPI app for Kinesis motorised stages.
+
+    Args:
+        server_key: Unique key identifying this server in the orchestration
+            group.
+
+    Returns:
+        The configured BaseAPI instance. Axis-specific endpoints are added
+        lazily via :func:`kinesis_dyn_endpoints`.
+    """
 
     # current plan is 1 mfc per COM
 

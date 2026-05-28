@@ -1,6 +1,8 @@
-"""Abstract base classes for HLO file and metadata processors.
+"""Abstract base classes for HLO file and metadata post-processors.
 
-Consolidates the former hlo_postprocessor and meta_processor modules.
+Defines :class:`HloPostProcessor` for transforming an action's on-disk
+output files after completion and :class:`MetaProcessor` for in-place
+mutation of metadata objects such as ``Action``/``Experiment``/``Sequence``.
 """
 
 __all__ = ["HloPostProcessor", "MetaProcessor"]
@@ -16,8 +18,28 @@ from .premodels import Action
 
 
 class HloPostProcessor(ABC):
+    """Abstract base for post-processing an action's HLO output files.
+
+    Subclasses implement :meth:`process` to transform, summarize, or augment
+    the files written by an action and return an updated file list.
+
+    Attributes:
+        action: The completed action whose outputs are being processed.
+        output_dir: Filesystem directory containing the action's outputs.
+        exp_yml_path: Path to the parent experiment YAML, if found.
+        seq_yml_path: Path to the parent sequence YAML, if found.
+        files: The action's current file list (input to processing).
+    """
 
     def __init__(self, action: Action, save_root: str):
+        """Resolve experiment/sequence YAML paths relative to the action output.
+
+        Args:
+            action: The completed action to post-process.
+            save_root: Root directory under which action outputs live; the
+                ``RUNS_ACTIVE`` segment is rewritten to ``RUNS_DIAG`` when
+                ``action.manual_action`` is set.
+        """
         self.action = action
         if action.manual_action:
             save_root = str(save_root).replace("RUNS_ACTIVE", "RUNS_DIAG")
@@ -32,12 +54,35 @@ class HloPostProcessor(ABC):
 
     @abstractmethod
     def process(self) -> List[FileInfo]:
-        """Return updated list of all action files, after post-processing."""
+        """Run post-processing and return the updated file list.
+
+        Returns:
+            The new ``FileInfo`` list reflecting any files added, removed,
+            or rewritten by the processor.
+        """
 
 
 class MetaProcessor(ABC):
+    """Abstract base for in-place mutation of action/experiment/sequence metadata.
+
+    Subclasses implement :meth:`process` to modify ``self.meta`` directly.
+
+    Attributes:
+        core: The owning runtime object (e.g. orchestrator or base server).
+        meta: The metadata model to be mutated.
+        meta_type: Lowercased class name of ``meta`` (e.g. ``"action"``).
+        global_params: Orchestrator global parameters dict when ``core`` is an
+            orchestrator, otherwise an empty dict.
+    """
 
     def __init__(self, meta, core):
+        """Capture the metadata target and surrounding runtime context.
+
+        Args:
+            meta: The metadata object that :meth:`process` will mutate.
+            core: The runtime object owning the metadata; orchestrator
+                instances contribute ``global_params``.
+        """
         self.core = core
         self.meta = meta
         self.meta_type = meta.__class__.__name__.lower()
@@ -47,4 +92,4 @@ class MetaProcessor(ABC):
 
     @abstractmethod
     def process(self) -> None:
-        """Update object in-place."""
+        """Mutate ``self.meta`` in place."""

@@ -1,4 +1,9 @@
-"""Andor Camera driver for Helao"""
+"""HelaoDriver wrapping the Andor Zyla camera and Andor ATSpectrograph.
+
+Combines the ``pyAndorSDK3`` camera SDK with the ``pyAndorSpectrograph``
+spectrograph control library so the action server can capture spectra,
+manage cooling and select grating/filter/slit settings.
+"""
 
 from pyAndorSDK3 import AndorSDK3, CameraException
 import numpy as np
@@ -21,6 +26,24 @@ from helao.core.drivers.helao_driver import (
 
 
 class AndorDriver(HelaoDriver):
+    """HelaoDriver for an Andor Zyla camera coupled to an ATSpectrograph.
+
+    Opens a single camera context for the lifetime of the driver, sets up
+    imaging defaults, configures the spectrograph (grating, central
+    wavelength, slit, ND filter) and caches frame metadata (pixel width,
+    wavelength array, AOI size, stride and timestamp clock frequency).
+
+    Attributes:
+        cam: The underlying ``AndorSDK3`` camera handle.
+        pixel_width: Detector pixel width in micrometres.
+        wl_arr: Calibrated wavelength array for the configured AOI.
+        horiz_pixels: AOI width in pixels.
+        vert_pixels: AOI height in pixels.
+        stride: Buffer row stride in bytes.
+        clock_hz: Timestamp clock frequency, used to convert ticks to seconds.
+        frame: Last frame index produced by an acquisition loop.
+    """
+
     cam: AndorSDK3
     pixel_width: float
     wl_arr: np.ndarray
@@ -31,6 +54,14 @@ class AndorDriver(HelaoDriver):
     frame: int
 
     def __init__(self, config: dict = {}):
+        """Construct the driver and immediately open the camera.
+
+        Reads ``dev_id`` from ``config`` (default ``0``), instantiates the
+        SDK, calls :meth:`connect`, and marks the driver ready on success.
+
+        Args:
+            config: Driver configuration dict from the action server.
+        """
         super().__init__(config=config)
         # get params from config or use defaults
         self.cam = None
@@ -51,7 +82,11 @@ class AndorDriver(HelaoDriver):
         self.ready = True
 
     def connect(self) -> DriverResponse:
-        """Open connection to resource."""
+        """Open the camera, configure imaging and prime spectrograph metadata.
+
+        Returns:
+            A success :class:`DriverResponse` on connect, ``failed`` on error.
+        """
         try:
             self.cam = self.sdk3.GetCamera(self.device_id)
             LOGGER.debug(f"connected to {self.device_id}")
@@ -72,9 +107,15 @@ class AndorDriver(HelaoDriver):
         return response
 
     def cool(self):
-        """This function cools the camera to 20 degrees C below ambient temperature. The camera will not warm untill told unless self.cam.close() is called.
-        The function will wait until the camera is at the target temperature before returning.
-            args: cam: AndorSDK3 object
+        """Enable sensor cooling and block until the temperature stabilises.
+
+        Polls the sensor every 5 s until ``TemperatureStatus`` reports
+        ``Stabilised``. The camera will not warm up again until either
+        :meth:`warm_and_close` is invoked or ``self.cam.close()`` is called.
+
+        Raises:
+            RuntimeError: If the camera reports a ``Fault`` temperature
+                status while cooling.
         """
         self.cam.SensorCooling = True
         while self.cam.TemperatureStatus != "Stabilised":
@@ -85,7 +126,15 @@ class AndorDriver(HelaoDriver):
                 err_str = "Camera faulted when cooling to target temperature"
                 raise RuntimeError(err_str)
 
-    def set_cooldown(self, cool: bool = True):
+    def set_cooldown(self, cool: bool = True) -> DriverResponse:
+        """Enable or disable sensor cooling without blocking.
+
+        Args:
+            cool: ``True`` to enable cooling, ``False`` to disable.
+
+        Returns:
+            A :class:`DriverResponse` indicating success/failure.
+        """
         try:
             self.cam.SensorCooling = cool
             response = DriverResponse(
@@ -98,7 +147,13 @@ class AndorDriver(HelaoDriver):
             )
         return response
 
-    def check_temperature(self):
+    def check_temperature(self) -> DriverResponse:
+        """Return current sensor temperature and cooler status.
+
+        Returns:
+            A :class:`DriverResponse` whose ``data`` is
+            ``{"temp": float, "status": str}``.
+        """
         try:
             data = {
                 "temp": self.cam.SensorTemperature,
@@ -114,10 +169,18 @@ class AndorDriver(HelaoDriver):
             )
         return response
 
-    def setup_image(self, exposure_time=0.0098):
-        """This function sets up the camera to take a single image with the desired framerate and exposure time. It returns the pixel width of the camera
-        Which is used to convert pixels to wavelengths in the spectrograph fucntions. Start with framerate is 100 Hz and exposure time is 9.8 ms.
-        args: cam: camera object, framerate: desired framerate , exposure_time: desired exposure time defaults are max values for the camera
+    def setup_image(self, exposure_time=0.0098) -> float:
+        """Configure the camera for single-image (vertical-bin=1) acquisition.
+
+        Sets 16-bit Mono32 encoding, rolling shutter, 280 MHz pixel readout,
+        fixed cycle mode and the requested exposure time, then returns the
+        sensor pixel width used downstream by the spectrograph calibration.
+
+        Args:
+            exposure_time: Exposure time in seconds (default ``0.0098``).
+
+        Returns:
+            Detector pixel width in micrometres.
         """
         self.cam.AOIVBin = 1  # readout on a single row
         self.cam.SimplePreAmpGainControl = "16-bit (low noise & high well capacity)"
@@ -139,14 +202,18 @@ class AndorDriver(HelaoDriver):
         # LOGGER.info(sdkcamhandle.PixelWidth)
         return self.cam.PixelWidth
 
-    def image_and_check_dynamic_range(self, exposure_time=0.0098):
-        """This function collects a single image and checks that the maximum value is in the optimum dynamic range for the measurment.
-        It returns the image, the maximum pixel value and a boolean that is true if the maximum value is in the optimum dynamic range
-        defined by the range 65536-55536.
-        An optimality value is calculated as 1- the absolute difference between the maximum value and an approximate optimum max value of 63000, normalised by 63000.
-        An optimality close to 1 indicates that the maximum value is close to the optimum value.
-        An optimality that is negative indicates that the source is too bright.  To search for the optimum value, the range bool and the optimality value can be used together.
-        args: cam: AndorSDK3 object
+    def image_and_check_dynamic_range(self, exposure_time=0.0098) -> tuple:
+        """Acquire one image and evaluate its dynamic-range optimality.
+
+        The optimality value is ``1 + |63000 - max| / 63000``; values close
+        to 1 are near-optimal, negative values indicate over-exposure. The
+        range bool is ``True`` when the maximum lies in ``[55536, 65536)``.
+
+        Args:
+            exposure_time: Exposure time in seconds.
+
+        Returns:
+            ``(acquisition, max_pixel, range_bool, optimality)``.
         """
         _ = self.setup_image(exposure_time)
         LOGGER.info(self.cam.SerialNumber)
@@ -169,10 +236,14 @@ class AndorDriver(HelaoDriver):
 
         return test, max, range_bool, optimality
 
-    def get_meta_data(self):
-        """This function gets the metadata from the camera and prints it to the console.
-        It returns the width, height and stride of the image, this is used later to convert pixels to wavelengths in the spectrograph functions.
-        The clock frequency is also returned, which is used to convert the timestamp ticks to seconds.
+    def get_meta_data(self) -> tuple:
+        """Enable metadata, take one image and log/return key frame fields.
+
+        Turns on metadata (including IRIG if available), performs an
+        acquisition and logs frame info, timestamp and cooler info.
+
+        Returns:
+            ``(width, height, stride, timestamp_clock_frequency_hz)``.
         """
         self.cam.MetadataEnable = True  # Turn on Metadata
         self.setup_image()
@@ -227,10 +298,23 @@ class AndorDriver(HelaoDriver):
         NumHorizPixels=2560,
         ND_filter_num=1,
         slit_width_um=200,
-    ):
-        """
-        This functionsets up the spectrograph with standard parameters as default.
+    ) -> np.ndarray:
+        """Initialise the ATSpectrograph and return the wavelength array.
 
+        Sets the detector offset, grating, central wavelength, slit width
+        and ND filter, then reads the calibrated wavelength array for the
+        requested number of horizontal pixels.
+
+        Args:
+            PixelWidth: Detector pixel width (from :meth:`setup_image`).
+            centralWL: Central wavelength in nm.
+            NumHorizPixels: Number of horizontal pixels in the AOI.
+            ND_filter_num: ND filter position in ``1..6``.
+            slit_width_um: Slit width in micrometres (``10..200``).
+
+        Returns:
+            Calibrated wavelength array of length ``NumHorizPixels``, or
+            ``None`` when the filter/slit arguments are out of range.
         """
         ## the return from GetWavelengthLimits looks weird to me :Wavelength Min: 0.0 Wavelength Max: 11127.045898
         # everything else looks fine and will get calibrated in the next block
@@ -333,7 +417,18 @@ class AndorDriver(HelaoDriver):
             shm = spc.Close()
             return WL_array
 
-    def adjust_ND(self):
+    def adjust_ND(self) -> DriverResponse:
+        """Sweep the ND filter wheel and pick the most optimal position.
+
+        Iterates filters 1..6, evaluates each via
+        :meth:`image_and_check_dynamic_range`, discards positions whose max
+        pixel exceeds 54000, and applies the best filter. Returns the per-
+        filter ``max_array``/``optimality_array`` and the chosen position.
+
+        Returns:
+            A :class:`DriverResponse` whose ``data`` contains ``max_array``,
+            ``optimality_array`` and ``ND_filter_num``.
+        """
 
         adjust_success = False
         try:
@@ -460,8 +555,18 @@ class AndorDriver(HelaoDriver):
         return response
 
     def warm_and_close(self, warmup: bool):
-        """
-        This function warms the camera back up and closes the connection to the camera. Warmup will only occur if the WarmupBool is set to True.
+        """Optionally warm the sensor then close the camera handle.
+
+        When ``warmup`` is ``True``, disables sensor cooling and polls every
+        5 s until the sensor reaches at least 20 C with a ``Stabilised``
+        status, then calls ``cam.close()``. When ``False``, leaves the
+        camera as-is.
+
+        Args:
+            warmup: Whether to warm the sensor before closing.
+
+        Raises:
+            RuntimeError: If the camera reports a temperature ``Fault``.
         """
         if warmup:
             self.cam.SensorCooling = False
@@ -479,9 +584,20 @@ class AndorDriver(HelaoDriver):
         else:
             LOGGER.info("Warmup is set to False, so the camera will not warm up. ")
 
-    def generate_spectral_array(self, WL_arr, acqs, clockHz):
-        """This function takes an aquisition object, the wavelength array and the camera clock speed and returns a dataframe of spectra
-        args: WL_arr: wavelength array, acqs: aquisition object, clockHz: camera clock speed
+    def generate_spectral_array(self, WL_arr, acqs, clockHz) -> pd.DataFrame:
+        """Stack acquisitions into a wavelength-vs-time spectra DataFrame.
+
+        Builds a ``pandas.DataFrame`` whose rows are wavelengths from
+        ``WL_arr`` and whose columns are clock-derived tick times in seconds
+        relative to the first frame.
+
+        Args:
+            WL_arr: Wavelength array (DataFrame index).
+            acqs: Container holding the acquisition objects.
+            clockHz: Camera timestamp clock frequency in Hz.
+
+        Returns:
+            DataFrame of spectra indexed by wavelength, columns by tick time.
         """
 
         acqs = list(acqs[0])
@@ -510,7 +626,14 @@ class AndorDriver(HelaoDriver):
         return Spectra
 
     def get_status(self, retries: int = 5) -> DriverResponse:
-        """Return current driver status."""
+        """Return the current driver status.
+
+        Args:
+            retries: Unused retry hint kept for interface symmetry.
+
+        Returns:
+            A :class:`DriverResponse` with status :class:`DriverStatus`.
+        """
         try:
             response = DriverResponse(
                 response=DriverResponseType.success,
@@ -527,7 +650,21 @@ class AndorDriver(HelaoDriver):
     def setup(
         self, exp_time: float = 0.0098, framerate: float = 98, buffer_count: int = 10
     ) -> DriverResponse:
-        """This function sets the camera up for a continous aquisition at the fastest rate using the complete AOI which is 10 ms exposure time"""
+        """Configure continuous full-AOI acquisition and queue frame buffers.
+
+        Sets vertical binning over the full AOI, Mono32 encoding, rolling
+        shutter with overlap mode, 280 MHz readout, continuous cycle mode,
+        and the requested exposure/framerate, then queues ``buffer_count``
+        buffers for the SDK to fill.
+
+        Args:
+            exp_time: Exposure time in seconds.
+            framerate: Target framerate in Hz.
+            buffer_count: Number of buffers to pre-queue.
+
+        Returns:
+            Success :class:`DriverResponse` once the camera is armed.
+        """
         try:
             # external start will start the camera upon 5V TTL signal. The camera will then aquire as fast as possible
             self.cam.AOIVBin = 2160  # full verrtical binning over the  AOI
@@ -575,7 +712,15 @@ class AndorDriver(HelaoDriver):
         return response
 
     def set_trigger(self, external: bool = True) -> DriverResponse:
-        """Apply signal and begin data acquisition."""
+        """Select trigger source and start the acquisition.
+
+        Args:
+            external: ``True`` for ``External Start``, ``False`` for
+                ``Software`` triggering.
+
+        Returns:
+            :class:`DriverResponse` with ``busy`` status when armed.
+        """
         try:
             # call function to activate External Trigger mode
             if external:
@@ -604,7 +749,23 @@ class AndorDriver(HelaoDriver):
         external: bool = True,
         first_tick: Optional[float] = None,
     ) -> DriverResponse:
-        """Retrieve data from device buffer."""
+        """Pull up to ``frames`` spectra from queued buffers.
+
+        Drains the camera buffer queue, optionally issuing software
+        triggers, requeues each buffer, and stops early once the tick-time
+        delta from ``first_tick`` reaches ``total_duration``.
+
+        Args:
+            frames: Maximum number of frames to read.
+            total_duration: Stop once this many seconds (relative to
+                ``first_tick``) have elapsed.
+            external: ``False`` to issue a software trigger each frame.
+            first_tick: Reference tick time for the duration check.
+
+        Returns:
+            :class:`DriverResponse` whose ``data`` is
+            ``{"tick_time": [...], "ch_NNNN": [...]}``.
+        """
         try:
             status = DriverStatus.busy
             data_dict = {"tick_time": []}
@@ -645,7 +806,7 @@ class AndorDriver(HelaoDriver):
         return response
 
     def stop(self) -> DriverResponse:
-        """General stop method to abort all active methods e.g. motion, I/O, compute."""
+        """Abort the ongoing acquisition via ``AcquisitionStop``."""
         try:
             # call function to stop ongoing acquisition
             self.cam.AcquisitionStop()
@@ -659,8 +820,8 @@ class AndorDriver(HelaoDriver):
             )
         return response
 
-    def cleanup(self):
-        """Release state objects."""
+    def cleanup(self) -> DriverResponse:
+        """Stop acquisition and flush queued buffers."""
         try:
             self.cam.AcquisitionStop()
             self.cam.flush()
@@ -678,7 +839,7 @@ class AndorDriver(HelaoDriver):
         return response
 
     def disconnect(self) -> DriverResponse:
-        """Release connection to resource."""
+        """Close the camera handle if open and release the SDK resource."""
         try:
             if self.cam is not None:
                 self.cam.close()
@@ -694,7 +855,7 @@ class AndorDriver(HelaoDriver):
         return response
 
     def reset(self) -> DriverResponse:
-        """Reinitialize driver, force-close old connection if necessary."""
+        """Clean up, disconnect and reconnect the camera."""
         try:
             if self.cam is not None:
                 self.cleanup()
@@ -711,5 +872,5 @@ class AndorDriver(HelaoDriver):
         return response
 
     def shutdown(self) -> None:
-        """Pass-through shutdown events for BaseAPI."""
+        """BaseAPI shutdown hook; disconnects the camera."""
         self.disconnect()

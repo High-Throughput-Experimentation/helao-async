@@ -1,23 +1,4 @@
-"""
-This module contains the implementation of the HelaoVis and Vis classes for the Helao visualization server.
-
-Classes:
-    HelaoVis(HelaoBokehAPI): A server class that extends the HelaoBokehAPI to provide visualization capabilities.
-    Vis: A class to represent the visualization server.
-
-HelaoVis:
-
-
-Vis:
-        server (MachineModel): An instance of MachineModel representing the server.
-        server_cfg (dict): Configuration dictionary for the server.
-        world_cfg (dict): Global configuration dictionary.
-        doc (Document): Bokeh document instance.
-        helaodirs (HelaoDirs): Directories used by the Helao system.
-
-        __init__(bokehapp: HelaoBokehAPI):
-        print_message(*args, **kwargs):
-"""
+"""Bokeh visualization server base classes for HELAO."""
 
 __all__ = ["Vis", "HelaoVis"]
 
@@ -33,15 +14,11 @@ LOGGER = logging.LOGGER
 
 # TODO: HelaoVis will return doc to replace makeBokehApp func
 class HelaoVis(HelaoBokehAPI):
-    """
-    HelaoVis is a server class that extends the HelaoBokehAPI to provide visualization capabilities.
+    """Bokeh application wrapper that pairs a ``HelaoBokehAPI`` with a ``Vis`` helper.
 
     Attributes:
-        vis (Vis): An instance of the Vis class for handling visualization tasks.
-
-    Methods:
-        __init__(config, server_key, doc):
-            Initialize the Vis server with the given configuration, server key, and documentation object.
+        vis: ``Vis`` instance that exposes config, directories and a logger
+            for the underlying Bokeh document.
     """
 
     def __init__(
@@ -49,52 +26,39 @@ class HelaoVis(HelaoBokehAPI):
         server_key,
         doc,
     ):
-        """
-        Initialize the Vis server.
+        """Initialize the Bokeh visualization server.
 
         Args:
-            config (dict): Configuration dictionary for the server.
-            server_key (str): Unique key identifying the server.
-            doc (object): Documentation object for the server.
+            server_key: Unique key identifying the server in the world config.
+            doc: Bokeh ``Document`` for this server instance.
         """
         super().__init__(server_key, doc)
         self.vis = Vis(self)
 
 
 class Vis:
-    """
-    A class to represent the visualization server.
+    """Per-server visualization helper.
 
-    Attributes
-    ----------
-    server : MachineModel
-        An instance of MachineModel representing the server.
-    server_cfg : dict
-        Configuration dictionary for the server.
-    world_cfg : dict
-        Global configuration dictionary.
-    doc : Document
-        Bokeh document instance.
-    helaodirs : HelaoDirs
-        Directories used by the Helao system.
+    Wraps server identity, the loaded world config, the Bokeh document, and
+    the HELAO directory layout so visualizer code can share a single entry
+    point for printing and resolving paths.
 
-    Methods
-    -------
-    __init__(bokehapp: HelaoBokehAPI)
-        Initializes the Vis instance with the given Bokeh application.
-    print_message(*args, **kwargs)
-        Prints a message using the server configuration and log directory.
+    Attributes:
+        server: ``MachineModel`` describing the server name and host.
+        server_cfg: Configuration dictionary for this server entry.
+        world_cfg: Full HELAO world configuration.
+        doc: The Bokeh document associated with this visualizer.
+        helaodirs: Resolved HELAO directory layout.
     """
 
     def __init__(self, bokehapp: HelaoBokehAPI):
-        """
-        Initializes the visualization server.
+        """Wire the visualization helper to a running Bokeh app.
 
         Args:
-            bokehapp (HelaoBokehAPI): An instance of the HelaoBokehAPI class.
+            bokehapp: The ``HelaoBokehAPI`` instance hosting this visualizer.
 
         Raises:
-            ValueError: If the root directory is not defined in the configuration.
+            ValueError: If the world config does not define a root directory.
         """
         self.server = MachineModel(
             server_name=bokehapp.helao_srv, machine_name=gethostname().lower()
@@ -112,15 +76,11 @@ class Vis:
             )
 
     def print_message(self, *args, **kwargs):
-        """
-        Prints a message with the server configuration and server name.
+        """Forward a log message through the shared HELAO logger.
 
-        Parameters:
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-
-        Returns:
-        None
+        Args:
+            *args: Positional message arguments passed through to ``print_message``.
+            **kwargs: Keyword arguments forwarded to the logger.
         """
         print_message(
             LOGGER,

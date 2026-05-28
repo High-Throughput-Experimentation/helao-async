@@ -30,9 +30,49 @@ VALID_ACTION_NAME = ("cellIV",)
 
 
 class C_nidaqmxvis:
-    """NImax visualizer module class"""
+    """Bokeh visualizer for a NI-DAQmx ``cellIV`` action server.
+
+    Subscribes to the server's ``ws_data`` WebSocket and renders nine
+    selectable cell voltages and currents (``E``/``I`` per cell) across the
+    active and previous actions, each on a dedicated figure.
+
+    Attributes:
+        vis: Host :class:`Vis` instance providing the Bokeh document.
+        config_dict: ``params`` block from the visualizer's server config.
+        max_points: Rolling window length for the data sources.
+        update_rate: Minimum seconds between WebSocket polls.
+        last_update_time: Epoch timestamp of the most recent poll.
+        nidaqmx_key: Server key of the NI-DAQmx action server.
+        wss: :class:`WsSubscriber` connected to ``ws_data``.
+        data_url: Fully formed ``ws://`` URL for the data WebSocket.
+        IOloop_data_run: Liveness flag for the data ingestion task.
+        activeCell: Per-cell visibility flags (length 9).
+        data_dict_keys: ``t_s`` plus 9 ``Icell{n}_A`` and 9 ``Ecell{n}_V`` keys.
+        datasource: Live :class:`ColumnDataSource`.
+        prev_datasource: Snapshotted :class:`ColumnDataSource` for the prior action.
+        cur_action_uuid: Action UUID currently being plotted.
+        prev_action_uuid: Action UUID of the prior run.
+        layout: Composed Bokeh layout mounted on the document.
+        input_max_points: Widget setting ``max_points``.
+        paragraph1: Static ``cells:`` label rendered above the cell selector.
+        yaxis_selector_group: Checkbox buttons selecting active cells.
+        yselect: Cached active list of ``yaxis_selector_group``.
+        plot_VOLT: Active voltage figure.
+        plot_CURRENT: Active current figure.
+        plot_VOLT_prev: Previous voltage figure.
+        plot_CURRENT_prev: Previous current figure.
+        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Wire up data sources, widgets, plot layout, and start the WS ingest task.
+
+        Args:
+            vis_serv: Host :class:`Vis` server providing the Bokeh document.
+            serv_key: Configuration key of the NI-DAQmx action server. If the
+                server is not in the config, ``__init__`` returns early
+                without registering any roots.
+        """
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.max_points = 500
@@ -145,12 +185,28 @@ class C_nidaqmxvis:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def cleanup_session(self, session_context):
+        """Cancel the data ingest task when the Bokeh session is torn down.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.nidaqmx_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def callback_input_max_points(self, attr, old, new, sender):
-        """callback for input_max_points"""
+        """Validate the ``max datapoints`` input and update the rolling window.
+
+        Parses ``new`` as an int, falls back to ``old`` (or ``500``) on bad
+        input, then clamps to ``[2, 10000]`` before storing it as
+        ``self.max_points`` and refreshing the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_int(val):
             try:
@@ -179,9 +235,21 @@ class C_nidaqmxvis:
         )
 
     def update_input_value(self, sender, value):
+        """Write ``value`` back onto a Bokeh input widget on the document thread.
+
+        Args:
+            sender: Bokeh input widget whose ``value`` is being updated.
+            value: New string value to assign.
+        """
         sender.value = value
 
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+    async def IOloop_data(self):
+        """Continuously pull WebSocket data packages and schedule plot updates.
+
+        Runs for the lifetime of the Bokeh session. Each iteration honors
+        ``self.update_rate`` and forwards messages to :meth:`add_points` on
+        the document thread.
+        """
         LOGGER.info(f" ... NImax visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
@@ -191,6 +259,15 @@ class C_nidaqmxvis:
             await asyncio.sleep(0.01)
 
     def add_points(self, datapackage_list: list):
+        """Stream a batch of action-server data packages into the active source.
+
+        Triggers :meth:`reset_plot` on every package so changes in the action
+        UUID promote the live data to ``prev_datasource``. Only packages with
+        accepted ``status`` and ``action_name`` contribute new samples.
+
+        Args:
+            datapackage_list: List of data packages from the subscriber.
+        """
         for data_package in datapackage_list:
             data_dict = {k: [] for k in self.data_dict_keys}
             # only resets if axis selector or action_uuid changes
@@ -209,6 +286,12 @@ class C_nidaqmxvis:
             self.datasource.stream(data_dict, rollover=self.max_points)
 
     def _add_plots(self):
+        """Rebuild the four cell voltage/current figures.
+
+        Clears existing renderers and legends, retitles each figure with the
+        appropriate action UUID, then draws one voltage and one current line
+        per selected cell using the ``Category10`` palette.
+        """
         # remove all old lines and clear legend
         if self.plot_VOLT.renderers:
             self.plot_VOLT.legend.items = []
@@ -269,6 +352,18 @@ class C_nidaqmxvis:
             )
 
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
+        """Snapshot the live data to ``prev_datasource`` when the action changes.
+
+        On UUID change (or ``forceupdate``) the live data is deep-copied to
+        the previous source, ``cur_action_uuid`` is updated, the live data
+        is cleared, and the figures are rebuilt. Selector changes also
+        trigger a rebuild.
+
+        Args:
+            new_action_uuid: Action UUID of the incoming data package.
+            forceupdate: If ``True``, force a rebuild even when the UUID
+                hasn't changed.
+        """
         if self.cur_action_uuid != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
                 LOGGER.info(" ... reseting NImax graph")

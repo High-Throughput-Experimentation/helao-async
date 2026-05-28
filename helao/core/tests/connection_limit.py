@@ -1,3 +1,13 @@
+"""Stress test for an orchestrator's private dispatcher endpoint.
+
+Fires ``NUM_JOBS`` concurrent ``get_status`` calls at an orchestrator on
+``HOST:PORT`` using :func:`async_private_dispatcher`, logs any errors
+returned by each call, and exits.
+
+Command-line usage:
+    python connection_limit.py <num_jobs> [timeout_seconds]
+"""
+
 import sys
 import asyncio
 from helao.helpers.dispatcher import async_private_dispatcher
@@ -14,6 +24,11 @@ else:
 
 
 async def main():
+    """Dispatch ``NUM_JOBS`` concurrent ``get_status`` calls and exit.
+
+    Gathers responses, logs the error component of each ``(response, error)``
+    tuple, and terminates the interpreter with exit code ``0``.
+    """
     server_key = "ORCH"
     private_action = "get_status"
     params_dict = {}

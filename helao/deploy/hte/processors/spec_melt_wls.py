@@ -1,3 +1,12 @@
+"""Post-processor that melts reflectance/transmission HLO data to parquet.
+
+For each ``spec_r_helao__file`` / ``spec_t_helao__file`` HLO output,
+reads the data, renames per-channel columns to their wavelengths,
+melts the dataframe into ``(t_s, wl_nm, intensity)`` long form, sorts
+by time and wavelength, writes a parquet file (optionally suffixed
+with the action's ``comment``) and removes the original ``.hlo`` file.
+"""
+
 import os
 from typing import List
 from copy import copy
@@ -14,8 +23,15 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class PostProcess(HloPostProcessor):
+    """Melt spectral HLO data into wavelength long form and write parquet."""
 
     def process(self) -> List[FileInfo]:
+        """Convert each spectral HLO file to a melted parquet file.
+
+        Returns:
+            List[FileInfo]: Updated file list with each converted
+            spec file replaced by its new ``*_parquet__file`` entry.
+        """
         processed_file_list = []
         for act_file in self.files:
             try:

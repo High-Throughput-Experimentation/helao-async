@@ -1,16 +1,20 @@
 # shell: uvicorn motion_server:app --reload
-"""A FastAPI service definition for a motion/IO server, e.g. Galil.
+"""Galil motion action server.
 
-The motion/IO service defines RESTful methods for sending commmands and retrieving data
-from a motion controller driver class such as 'galil_driver' using
-FastAPI. The methods provided by this service are not device-specific. Appropriate code
-must be written in the driver class to ensure that the service methods are generic, i.e.
-calls to 'motion.*' are not device-specific. Currently inherits configuration from
-driver code, and hard-coded to use 'galil' class (see "__main__").
+Wraps the :class:`Galil` motion driver and exposes generic motion endpoints
+(``move``, ``easymove``, ``easymove_to_solid``, ``query_position[s]``,
+``query_moving``, ``axis_on``/``axis_off``, ``z_move``, ``disconnect``,
+``stop``, ``reset``), plate-alignment endpoints (``setmotionref``,
+``reset_plate_alignment``, ``load_plate_alignment``, ``run_aligner``,
+``stop_aligner``), coordinate transforms (``toMotorXY``, ``toPlateXY``,
+``MxytoMPlate``) and platemap-lookup helpers (``solid_get_platemap``,
+``solid_get_samples_xy``, ``solid_get_builtin_specref``,
+``solid_get_nearest_specref``). Endpoints are registered conditionally on the
+configured ``axis_id`` set.
 
 Motor calibration procedure for new instrument alignment:
 Place alignment plate onto stage.
-In c:\inst_hlo\database\plate_calib, delete the instrument_calib.json
+In c:\\inst_hlo\\database\\plate_calib, delete the instrument_calib.json
 ---
 Open the MOTOR bokeh
 ----
@@ -29,7 +33,6 @@ Back in helao, redo the alignment for 6353 plate or any 4x6 plate or round.
 For rounds, type any map 57 plate number and align to the sample numbers on the round alignment plate.
 
 Exit helao and restart.
-
 """
 
 __all__ = ["makeApp"]
@@ -52,6 +55,15 @@ from helao.core.error import ErrorCodes
 
 
 async def galil_dyn_endpoints(app: BaseAPI):
+    """Register Galil motion endpoints once the driver is enabled.
+
+    Builds a per-axis enum from the configured ``axis_id`` mapping and
+    conditionally registers the motion and platemap routes when any axis is
+    present.
+
+    Args:
+        app: The :class:`BaseAPI` instance being constructed by ``makeApp``.
+    """
     server_key = app.base.server.server_name
 
     if app.driver.galil_enabled is True:
@@ -63,11 +75,11 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/setmotionref", tags=["action"])
             async def setmotionref(action: Action = Body({}, embed=True)):
-                """Set the reference position for xyz by
-                (1) homing xyz,
-                (2) set abs zero,
-                (3) moving by center counts back,
-                (4) set abs zero"""
+                """Establish the xyz reference position.
+
+                Homes xyz, sets absolute zero, moves back by the configured
+                centre counts and resets absolute zero again.
+                """
                 active = await app.base.setup_and_contain_action(
                     action_abbr="setmotionref"
                 )
@@ -79,6 +91,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/reset_plate_alignment", tags=["action"])
         async def reset_plate_alignment(action: Action = Body({}, embed=True)):
+            """Reset the plate transform matrix back to identity."""
             active = await app.base.setup_and_contain_action()
             app.driver.reset_plate_transfermatrix()
             finished_action = await active.finish()
@@ -90,6 +103,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action_version: int = 1,
             matrix: List = [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
         ):
+            """Install ``matrix`` as the plate-to-motor transform matrix."""
             active = await app.base.setup_and_contain_action()
             newmatrix = app.driver.update_plate_transfermatrix(
                 newtransfermatrix=np.matrix(active.action.action_params["matrix"])
@@ -104,7 +118,10 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action_version: int = 1,
             plateid_or_pmpath: int | str = 6353,  # None
         ):
-            """starts the plate aligning process, matrix is return when fully done"""
+            """Start the interactive plate-alignment routine.
+
+            The driver returns once the alignment matrix has been computed.
+            """
             A = app.base.setup_action()
             active_dict = await app.driver.run_aligner(A)
             return active_dict
@@ -114,7 +131,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
         ):
-            """starts the plate aligning process, matrix is return when fully done"""
+            """Abort an in-progress plate-alignment routine."""
             active = await app.base.setup_and_contain_action()
             active.action.error_code = await app.driver.stop_aligner()
             finished_action = await active.finish()
@@ -127,7 +144,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action_version: int = 1,
             platexy: Optional[str] = None,
         ):
-            """Converts plate to motor xy"""
+            """Transform plate (sample) XY coordinates into motor XY coordinates."""
             active = await app.base.setup_and_contain_action(action_abbr="tomotorxy")
             await active.enqueue_data_dflt(
                 datadict={
@@ -146,7 +163,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action_version: int = 1,
             motorxy: Optional[str] = None,
         ):
-            """Converts motor to plate xy"""
+            """Transform motor XY coordinates into plate (sample) XY coordinates."""
             active = await app.base.setup_and_contain_action(action_abbr="toplatexy")
             await active.enqueue_data_dflt(
                 datadict={
@@ -164,7 +181,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action_version: int = 1,
             Mxy: Optional[str] = None,
         ):
-            """removes Minstr from Msystem to obtain Mplate for alignment"""
+            """Strip the instrument matrix from a system matrix to obtain ``Mplate``."""
             active = await app.base.setup_and_contain_action(action_abbr="mxytomplate")
             await active.enqueue_data_dflt(
                 datadict={
@@ -188,9 +205,13 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 mode: MoveModes = MoveModes.relative,
                 transformation: TransformationModes = TransformationModes.motorxy,  # default, nothing to do
             ):
-                """Move a specified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
-                Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
-                No z, Rx, Ry, Rz when platexy selected."""
+                """Move the listed axes by per-axis distances.
+
+                Uses ``mode`` (relative/absolute) and the chosen ``transformation``
+                coordinate frame. ``Rx``/``Ry``/``Rz`` rotational axes may only
+                be combined with ``x``/``y``/``z`` in the ``motorxy`` frame;
+                only x/y are valid when ``platexy`` is selected.
+                """
                 active = await app.base.setup_and_contain_action(action_abbr="move")
                 datadict = await app.driver.motor_move(active)
                 active.action.error_code = app.base.get_main_error(
@@ -212,9 +233,10 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 mode: MoveModes = MoveModes.relative,
                 transformation: TransformationModes = TransformationModes.motorxy,  # default, nothing to do
             ):
-                """Move a specified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
-                Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
-                No z, Rx, Ry, Rz when platexy selected."""
+                """Single-axis variant of ``move`` taking a single ``axis``/``d_mm`` pair.
+
+                Same coordinate/rotation restrictions as ``move`` apply.
+                """
                 active = await app.base.setup_and_contain_action(action_abbr="move")
                 datadict = await app.driver.motor_move(active)
                 active.action.error_code = app.base.get_main_error(
@@ -232,6 +254,13 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 sample_no: Optional[int] = None,
                 speed: Optional[int] = None,
             ):
+                """Move xy to the platemap position of ``sample_no`` on ``plate_id``.
+
+                Looks up the sample's plate XY via :meth:`solid_get_samples_xy`
+                then performs an absolute move in the platexy frame. Sets
+                ``error_code`` to ``not_available`` if the sample has no
+                platemap coordinates.
+                """
                 active = await app.base.setup_and_contain_action()
                 datadict0 = await app.driver.solid_get_samples_xy(
                     **active.action.action_params
@@ -261,6 +290,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
         ):
+            """Disconnect from the Galil motion controller."""
             active = await app.base.setup_and_contain_action(action_abbr="disconnect")
             await active.enqueue_data_dflt(datadict=await app.driver.motor_disconnect())
             finished_action = await active.finish()
@@ -273,6 +303,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 action: Action = Body({}, embed=True),
                 action_version: int = 1,
             ):
+                """Return the current position of every configured axis."""
                 active = await app.base.setup_and_contain_action(
                     action_abbr="query_position"
                 )
@@ -293,6 +324,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 # axis: Union[List[str], str] = None
                 axis: dev_axisitems = None,
             ):
+                """Return the current position of a single named axis."""
                 active = await app.base.setup_and_contain_action(
                     action_abbr="query_position"
                 )
@@ -312,6 +344,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 action_version: int = 1,
                 axis: Union[List[str], str] = None,
             ):
+                """Return whether the given axis or list of axes is currently moving."""
                 active = await app.base.setup_and_contain_action(
                     action_abbr="query_moving"
                 )
@@ -334,6 +367,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 # axis: Union[List[str], str] = None
                 axis: dev_axisitems = None,
             ):
+                """De-energise (turn off) the named motor axis."""
                 # http://127.0.0.1:8001/motor/set/off?axis=x
                 active = await app.base.setup_and_contain_action(action_abbr="axis_off")
                 datadict = await app.driver.motor_off(**active.action.action_params)
@@ -352,6 +386,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 action_version: int = 1,
                 axis: dev_axisitems = None,
             ):
+                """Energise (turn on) the named motor axis."""
                 active = await app.base.setup_and_contain_action(action_abbr="axis_on")
                 datadict = await app.driver.motor_on(**active.action.action_params)
                 active.action.error_code = app.base.get_main_error(
@@ -367,6 +402,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action_version: int = 1,
             plate_id: Optional[int] = None,
         ):
+            """Return the platemap rows for ``plate_id`` via the driver."""
             active = await app.base.setup_and_contain_action()
             datadict = await app.driver.solid_get_platemap(
                 **active.action.action_params
@@ -382,6 +418,12 @@ async def galil_dyn_endpoints(app: BaseAPI):
             plate_id: Optional[int] = None,
             sample_no: Optional[int] = None,
         ):
+            """Return the plate XY position(s) for ``sample_no`` on ``plate_id``.
+
+            Stores the first returned ``platexy`` pair back on the action
+            params as ``_platexy`` and sets ``error_code`` to ``not_available``
+            when the lookup yields no coordinates.
+            """
             active = await app.base.setup_and_contain_action()
             datadict = await app.driver.solid_get_samples_xy(
                 **active.action.action_params
@@ -401,6 +443,11 @@ async def galil_dyn_endpoints(app: BaseAPI):
             specref_code: int = 1,
             ref_position_name: str = "builtin_ref_motorxy",
         ):
+            """Return a pre-configured spectrometer reference position from world config.
+
+            Looks up ``ref_position_name`` in :attr:`Base.world_cfg` and stores
+            it on the action params as ``_refxy``.
+            """
             active = await app.base.setup_and_contain_action()
             refxy = app.base.world_cfg[active.action.action_params["ref_position_name"]]
             active.action.action_params.update({"_refxy": refxy})
@@ -416,6 +463,12 @@ async def galil_dyn_endpoints(app: BaseAPI):
             sample_no: Optional[int] = None,
             specref_code: int = 1,
         ):
+            """Return the platemap reference sample nearest to ``sample_no``.
+
+            Pulls the platemap for ``plate_id``, filters for rows whose
+            ``code`` equals ``specref_code``, and picks the one closest to the
+            target sample. Stores ``_refno`` and ``_refxy`` on the action params.
+            """
             active = await app.base.setup_and_contain_action()
             datadict = await app.driver.solid_get_platemap(
                 active.action.action_params["plate_id"]
@@ -455,6 +508,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
         ):
+            """De-energise every configured motor axis."""
             active = await app.base.setup_and_contain_action(action_abbr="stop")
             datadict = await app.driver.motor_off(axis=app.driver.get_all_axis())
             active.action.error_code = app.base.get_main_error(
@@ -469,9 +523,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
         ):
-            """FOR EMERGENCY USE ONLY!
-            resets galil device.
-            """
+            """Reset the Galil controller. Emergency use only."""
             active = await app.base.setup_and_contain_action(action_abbr="reset")
             await active.enqueue_data_dflt(datadict={"reset": await app.driver.reset()})
             finished_action = await active.finish()
@@ -489,7 +541,12 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 action_version: int = 1,
                 z_position: Zpos = "NA",
             ):
-                """Move the z-axis motor to cell positions predefined in the config."""
+                """Move the z-axis to a named cell height from the server config.
+
+                ``z_position`` is one of the keys of the ``z_height_mm`` mapping
+                in this server's config; ``NA`` is a no-op that returns
+                ``not_available``.
+                """
                 active = await app.base.setup_and_contain_action(action_abbr="z_move")
                 z_arg = active.action.action_params["z_position"]
                 if isinstance(z_arg, Zpos):
@@ -517,7 +574,18 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 return finished_action.as_dict()
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the Galil motion FastAPI app.
+
+    Constructs a :class:`BaseAPI` backed by the :class:`Galil` motion driver
+    and defers endpoint registration to :func:`galil_dyn_endpoints`.
+
+    Args:
+        server_key: Key identifying this server in the orchestration group.
+
+    Returns:
+        The configured :class:`BaseAPI` application.
+    """
 
     app = BaseAPI(
         server_key=server_key,

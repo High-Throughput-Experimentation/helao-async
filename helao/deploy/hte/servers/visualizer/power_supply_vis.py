@@ -1,4 +1,8 @@
-"""Live visualizer for power supply server"""
+"""Bokeh live visualizer for a power-supply action server.
+
+Exposes :class:`C_powersupplyvis`, a per-server visualizer that subscribes to
+``ws_data`` and plots voltage/current traces alongside a latest-values table.
+"""
 
 import time
 import asyncio
@@ -20,9 +24,42 @@ from helao.helpers.ws_utils import WsSubscriber as Wss
 
 
 class C_powersupplyvis:
-    """Power supply visualizer module class"""
+    """Bokeh visualizer for a power-supply action server.
+
+    Subscribes to the server's ``ws_data`` WebSocket and renders voltage and
+    current traces against time, alongside a latest-values table.
+
+    Attributes:
+        vis: Host :class:`Vis` instance providing the Bokeh document.
+        config_dict: ``params`` block from the visualizer's server config.
+        update_rate: Minimum seconds between WebSocket polls.
+        max_points: Rolling window length for the data source.
+        last_update_time: Epoch timestamp of the most recent poll.
+        live_key: Server key of the power-supply action server.
+        wss: :class:`WsSubscriber` connected to ``ws_data``.
+        data_url: Fully formed ``ws://`` URL for the data WebSocket.
+        IOloop_data_run: Liveness flag for the data ingestion task.
+        IOloop_stat_run: Liveness flag for the status ingestion task.
+        data_dict_keys: Column names streamed into the plot source.
+        datasource: :class:`ColumnDataSource` backing the time-series plot.
+        datasource_table: :class:`ColumnDataSource` backing the latest-values table.
+        layout: Composed Bokeh layout mounted on the document.
+        input_max_points: Widget setting ``max_points``.
+        input_update_rate: Widget setting ``update_rate``.
+        plot: Bokeh ``figure`` for voltage/current vs time.
+        table: Bokeh ``DataTable`` showing the most recent values.
+        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Wire up data sources, widgets, plot layout, and start the WS ingest task.
+
+        Args:
+            vis_serv: Host :class:`Vis` server providing the Bokeh document.
+            serv_key: Configuration key of the power-supply action server.
+                If the server is not in the config, ``__init__`` returns
+                early without registering any roots.
+        """
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.update_rate = self.config_dict.get("update_rate", 0.5)
@@ -124,12 +161,28 @@ class C_powersupplyvis:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def cleanup_session(self, session_context):
+        """Cancel the data ingest task when the Bokeh session is torn down.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.live_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def callback_input_max_points(self, attr, old, new, sender):
-        """callback for input_max_points"""
+        """Validate the ``max datapoints`` input and update the rolling window.
+
+        Parses ``new`` as an int, falls back to ``old`` (or ``500``) on bad
+        input, then clamps to ``[2, 10000]`` before storing it as
+        ``self.max_points`` and refreshing the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_int(val):
             try:
@@ -158,10 +211,26 @@ class C_powersupplyvis:
         )
 
     def update_input_value(self, sender, value):
+        """Write ``value`` back onto a Bokeh input widget on the document thread.
+
+        Args:
+            sender: Bokeh input widget whose ``value`` is being updated.
+            value: New string value to assign.
+        """
         sender.value = value
 
     def callback_input_update_rate(self, attr, old, new, sender):
-        """callback for input_update_rate"""
+        """Validate the ``update sec`` input and adjust the polling cadence.
+
+        Parses ``new`` as a float (defaulting to ``0.5`` on bad input), stores
+        it as ``self.update_rate``, and writes the value back to the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_float(val):
             try:
@@ -178,6 +247,15 @@ class C_powersupplyvis:
         )
 
     def add_points(self, datapackage_list: list):
+        """Stream live power-supply samples into the data source and table.
+
+        Unpacks ``(value, epoch)`` tuples from each package, expands
+        ``sim_dict`` payloads, appends the latest sample to the data table,
+        and rebuilds the plot renderers.
+
+        Args:
+            datapackage_list: List of dicts from the live WebSocket.
+        """
         latest_epoch = 0
         data_dict = {k: [] for k in self.data_dict_keys}
         for datapackage in datapackage_list:
@@ -201,7 +279,12 @@ class C_powersupplyvis:
         self.datasource_table.stream(table_data_dict, rollover=len(keys))
         self._add_plots()
 
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+    async def IOloop_data(self):
+        """Continuously pull WebSocket data packages and schedule plot updates.
+
+        Runs for the lifetime of the Bokeh session, honoring
+        ``self.update_rate`` as a minimum gap between polls.
+        """
         LOGGER.info(f" ... Power supply visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
@@ -211,6 +294,7 @@ class C_powersupplyvis:
             await asyncio.sleep(0.01)
 
     def _add_plots(self):
+        """Rebuild the voltage/current traces on a shared time axis."""
         # clear legend
         if self.plot.renderers:
             self.plot.legend.items = []
@@ -235,4 +319,10 @@ class C_powersupplyvis:
         )
 
     def reset_plot(self, forceupdate: bool = False):
+        """Rebuild the figure renderers.
+
+        Args:
+            forceupdate: Accepted for parity with other visualizers; the plot
+                is always rebuilt.
+        """
         self._add_plots()

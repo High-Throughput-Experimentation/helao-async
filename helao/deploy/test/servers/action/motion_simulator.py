@@ -1,7 +1,8 @@
-"""Motion simulation server
+"""Motion simulation server.
 
-FastAPI server host for the motion simulator driver. Currently just sleeps.
-TODO: Calculate sleep time using displacement and speed.
+Hosts :class:`MotionSim`, a stage simulator that reads a platemap CSV and
+returns ``(x, y)`` for queried samples. The ``move`` action currently
+sleeps a fixed duration instead of computing a motion time.
 """
 
 __all__ = ["makeApp"]
@@ -20,7 +21,26 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class MotionSim:
+    """Simulated motion stage backed by a platemap CSV.
+
+    Loads a platemap of sample positions from ``params.platemap_path`` and
+    serves ``(x, y)`` lookups by sample number. ``move`` is a stub.
+
+    Attributes:
+        base: Hosting action server.
+        config_dict: ``params`` block from the server config.
+        world_config: Full world configuration.
+        present_x: Cached x position (unused).
+        present_y: Cached y position (unused).
+        pmdf: Platemap dataframe with sample positions and codes.
+    """
+
     def __init__(self, action_serv: Base):
+        """Load the platemap CSV.
+
+        Args:
+            action_serv: Action server hosting this driver.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
@@ -46,7 +66,19 @@ class MotionSim:
             self.config_dict["platemap_path"], skiprows=2, header=None, names=pm_cols
         )
 
-    def solid_get_samples_xy(self, plate_id: int, sample_no: int, *args, **kwargs):
+    def solid_get_samples_xy(self, plate_id: int, sample_no: int, *args, **kwargs) -> dict:
+        """Look up the (x, y) coordinates of a sample on a plate.
+
+        Args:
+            plate_id: Plate identifier (used in log messages only).
+            sample_no: Sample number to look up.
+            *args: Ignored extra positional arguments.
+            **kwargs: Ignored extra keyword arguments.
+
+        Returns:
+            Dict with key ``"platexy"`` mapping to ``[x, y]`` or
+            ``[None, None]`` if the sample is not found.
+        """
         rowmatch = self.pmdf.query(f"Sample=={sample_no}")
         if len(rowmatch) == 0:
             LOGGER.info(
@@ -65,14 +97,32 @@ class MotionSim:
         return {"platexy": retxy}
 
     def move(self, d_mm: List[float], axis: List[str], speed: Optional[int] = None):
+        """No-op move stub.
+
+        Args:
+            d_mm: Per-axis displacements in millimeters.
+            axis: Axis labels matching ``d_mm``.
+            speed: Optional motion speed.
+        """
         pass
 
     def shutdown(self):
+        """No-op shutdown hook."""
         pass
 
 
 def makeApp(server_key):
+    """Build the motion-simulator FastAPI app.
 
+    Wires :class:`MotionSim` into a :class:`BaseAPI` and exposes
+    ``solid_get_samples_xy`` (platemap lookup) and ``move`` (sleep stub).
+
+    Args:
+        server_key: Server name in the launched config.
+
+    Returns:
+        Configured :class:`HelaoFastAPI` app.
+    """
     app = BaseAPI(
         server_key=server_key,
         server_title=server_key,
@@ -88,6 +138,7 @@ def makeApp(server_key):
         plate_id: Optional[int] = None,
         sample_no: Optional[int] = None,
     ):
+        """Look up the platemap coordinates for a sample and stamp them on the action."""
         active = await app.base.setup_and_contain_action()
         platexy = app.driver.solid_get_samples_xy(**active.action.action_params)
         active.action.action_params.update({"_platexy": platexy})
@@ -102,9 +153,7 @@ def makeApp(server_key):
         axis: List[str] = ["x", "y"],
         speed: Optional[int] = None,
     ):
-        """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
-        Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
-        No z, Rx, Ry, Rz when platexy selected."""
+        """Simulate axis motion by sleeping for a fixed 3 seconds."""
         active = await app.base.setup_and_contain_action(action_abbr="move")
         await asyncio.sleep(3)
         finished_action = await active.finish()

@@ -1,3 +1,12 @@
+"""Post-processor that calibrates HISPEC Andor spectra against a CV trace.
+
+Reads ``andor_helao__file`` HLO outputs alongside the parent
+experiment's CV action data, runs the
+:func:`fully_read_and_calibrate_parquet` pipeline to map spectra to
+voltage/current, and writes the result as a wavelength-melted,
+cycle/direction-partitioned parquet dataset.
+"""
+
 import os
 from typing import List
 from copy import copy
@@ -21,8 +30,15 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class PostProcess(HloPostProcessor):
+    """Convert Andor HISPEC HLO outputs into calibrated, melted parquet datasets."""
 
     def process(self) -> List[FileInfo]:
+        """Calibrate, melt and partition each Andor HISPEC file in the action output.
+
+        Returns:
+            List[FileInfo]: Original files plus a new
+            ``andor_spec_parquet__file`` entry per generated partition.
+        """
         processed_file_list = []
         for act_file in self.files:
             try:

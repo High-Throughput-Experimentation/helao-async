@@ -1,3 +1,11 @@
+"""SQLite-backed sample database APIs for HELAO sample tracking.
+
+Provides per-sample-type APIs (liquid, gas, solid, assembly) sharing a common
+:class:`SampleModelAPI` base, a :class:`UnifiedSampleDataAPI` dispatcher that
+routes by ``sample_type``, a legacy CSV/JSON :class:`OldLiquidSampleAPI`
+adapter, and helpers for unpacking assemblies and updating volumes.
+"""
+
 __all__ = [
     "LiquidSampleAPI",
     "GasSampleAPI",
@@ -36,8 +44,34 @@ from .file_utils import file_in_use
 
 
 class SampleModelAPI:
-    def __init__(self, sampleclass, Serv_class, extra_columns: str):
+    """SQLite-backed CRUD API for a single Helao sample type.
 
+    Builds a per-host sqlite database file under the server's ``db_root`` with
+    a fixed common schema plus a per-subclass ``extra_columns`` string. JSON
+    columns are serialized on write and deserialized on read.
+
+    Attributes:
+        extra_columns: Subclass-specific column definitions appended to the
+            shared schema.
+        columns: Full schema column DDL string used to create the table.
+        column_names: List of column names in declaration order.
+        column_types: Mapping of column name to lowercased SQL type.
+        column_notNULL: Mapping of column name to NOT NULL flag.
+        column_count: Total number of columns.
+        ready: True once :meth:`init_db` has completed.
+    """
+
+    def __init__(self, sampleclass, Serv_class, extra_columns: str):
+        """Build the schema and resolve the sqlite db file path.
+
+        Args:
+            sampleclass: An instance of the sample pydantic model whose
+                ``sample_type`` selects the database/table name.
+            Serv_class: The owning ``Base`` server instance (used for paths,
+                machine/server names, NTP-corrected timestamps).
+            extra_columns: SQL fragment appended to the shared column list to
+                add subclass-specific columns.
+        """
         self.extra_columns = extra_columns
         self.columns = f"""hlo_version TEXT,
               global_label TEXT NOT NULL,
@@ -116,8 +150,17 @@ class SampleModelAPI:
             self._cur = None
 
     def _df_to_sample(self, df):
-        """converts db dataframe back to a sample basemodel
-        and performs a simply data integrity check"""
+        """Convert the last row of a query DataFrame to a sample model.
+
+        Args:
+            df: Result of a sqlite query; the last row is materialized.
+
+        Returns:
+            A sample model instance, or :class:`NoneSample` for empty input.
+
+        Raises:
+            ValueError: If ``idx`` does not match ``sample_no`` (integrity check).
+        """
 
         if df.size == 0:
             return NoneSample()
@@ -134,8 +177,18 @@ class SampleModelAPI:
         return object_to_sample(sampledict)
 
     def _df_to_samples(self, df):
-        """converts db dataframe back to a sample basemodel
-        and performs a simply data integrity check"""
+        """Convert every row of a query DataFrame to a sample model list.
+
+        Args:
+            df: Result of a sqlite query.
+
+        Returns:
+            A list of sample model instances; a single :class:`NoneSample`
+            for empty input.
+
+        Raises:
+            ValueError: If any row's ``idx`` does not match its ``sample_no``.
+        """
 
         if df.size == 0:
             return [NoneSample()]
@@ -156,6 +209,7 @@ class SampleModelAPI:
         return sample_list
 
     def _create_init_db(self):
+        """Create the sample table with an autoincrementing ``idx`` PK."""
         self._cur.execute(
             f"""CREATE TABLE {self._sample_type}(
               idx INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -171,6 +225,15 @@ class SampleModelAPI:
         self,
         sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
     ) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
+        """Assign ``sample_no``, fill server metadata, and insert a new row.
+
+        Args:
+            sample: The sample to persist. Mutated to add missing fields
+                (``sample_no``, machine/server names, timestamps, label).
+
+        Returns:
+            The persisted sample as read back from the database.
+        """
         await asyncio.sleep(0.01)
         lock = asyncio.Lock()
         async with lock:
@@ -224,6 +287,7 @@ class SampleModelAPI:
             return retsample
 
     async def _key_checks(self, sample):
+        """Hook for subclasses to normalize required fields before write."""
         return sample
 
     async def new_samples(
@@ -232,6 +296,17 @@ class SampleModelAPI:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Insert new samples of this API's sample type into the database.
+
+        Samples whose runtime type does not match this API's sample class are
+        logged and skipped rather than raising.
+
+        Args:
+            samples: Candidate samples to persist.
+
+        Returns:
+            The successfully appended samples as read back from the database.
+        """
         while not self.ready:
             LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
@@ -258,6 +333,7 @@ class SampleModelAPI:
         return ret_samples
 
     async def init_db(self):
+        """Create the sample table if absent and mark the API ready."""
         lock = asyncio.Lock()
         async with lock:
             await self._open_db()
@@ -278,6 +354,7 @@ class SampleModelAPI:
         await self.count_samples()  # has also a separate lock
 
     async def count_samples(self) -> int:
+        """Return the current row count in the sample table."""
         while not self.ready:
             LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
@@ -297,9 +374,17 @@ class SampleModelAPI:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
-        """this will only use the sample_no for local sample, or global_label for external samples
-        and fills in the rest from the db and returns the list again.
-        We expect to not have mixed sample types here.
+        """Look up samples by ``sample_no`` and return populated models.
+
+        Negative ``sample_no`` values index from the most recent record; positive
+        values are absolute. Zero is unsupported. The caller is expected to pass
+        a homogeneous list of this API's sample type.
+
+        Args:
+            samples: Sparse sample stubs carrying at least ``sample_no``.
+
+        Returns:
+            Fully populated sample models for entries that exist in the db.
         """
         while not self.ready:
             LOGGER.info("db not ready")
@@ -357,9 +442,16 @@ class SampleModelAPI:
     async def list_new_samples(
         self, limit: int = 10, give_only: bool = False
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
-        """this will only use the sample_no for local sample, or global_label for external samples
-        and fills in the rest from the db and returns the list again.
-        We expect to not have mixed sample types here.
+        """Return the most recently created samples as dicts.
+
+        Args:
+            limit: Maximum number of rows to return, ordered by descending
+                ``sample_creation_timecode``.
+            give_only: If True, restrict to samples whose ``inheritance`` is
+                ``"give_only"``.
+
+        Returns:
+            List of sample dicts (only entries with a non-None sample type).
         """
         while not self.ready:
             LOGGER.info("db not ready")
@@ -396,6 +488,12 @@ class SampleModelAPI:
         return ret_samples
 
     def _update(self, sample_dfdict):
+        """Issue UPDATE statements for each known column in ``sample_dfdict``.
+
+        Args:
+            sample_dfdict: Dict containing ``idx`` plus the columns to write.
+                Unknown keys are logged and skipped.
+        """
         idx = sample_dfdict["idx"]
         for key, val in sample_dfdict.items():
             if key in self.column_types and key != "idx":
@@ -429,6 +527,15 @@ class SampleModelAPI:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ):
+        """Update existing rows for the given samples after safety checks.
+
+        Each sample must have a positive ``sample_no``, a ``global_label``, and
+        must match the previously stored ``global_label`` and ``sample_type``;
+        rows failing any check are logged and skipped.
+
+        Args:
+            samples: Samples carrying the updated field values to persist.
+        """
         while not self.ready:
             LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
@@ -511,6 +618,7 @@ class SampleModelAPI:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[list]:
+        """Return platemaps for the given samples; unsupported for non-solid types."""
         LOGGER.error(f"not supported for {self._sample_type}")
         return []
 
@@ -520,11 +628,14 @@ class SampleModelAPI:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[Tuple[float, float]]:
+        """Return ``(x, y)`` coordinates per sample; unsupported for non-solid types."""
         LOGGER.error(f"not supported for {self._sample_type}")
         return []
 
 
 class LiquidSampleAPI(SampleModelAPI):
+    """Sample API for liquid samples with volume, pH, and dilution columns."""
+
     def __init__(self, Serv_class):
         super().__init__(
             sampleclass=LiquidSample(),
@@ -533,6 +644,7 @@ class LiquidSampleAPI(SampleModelAPI):
         )
 
     async def _key_checks(self, sample):
+        """Default ``volume_ml`` to 0.0 and ``dilution_factor`` to 1.0 when missing."""
         if sample.volume_ml is None:
             sample.volume_ml = 0.0
         if sample.dilution_factor is None:
@@ -540,6 +652,7 @@ class LiquidSampleAPI(SampleModelAPI):
         return sample
 
     async def old_jsondb_to_sqlitedb(self):
+        """Migrate every row from the legacy JSON/CSV liquid db into this sqlite db."""
         old_liquid_sample_db = OldLiquidSampleAPI(self._base)
         counts = await old_liquid_sample_db.count_samples()
         LOGGER.info(f"old db sample count: {counts}")
@@ -557,6 +670,8 @@ class LiquidSampleAPI(SampleModelAPI):
 
 
 class GasSampleAPI(SampleModelAPI):
+    """Sample API for gas samples with volume and dilution columns."""
+
     def __init__(self, Serv_class):
         super().__init__(
             sampleclass=GasSample(),
@@ -565,6 +680,7 @@ class GasSampleAPI(SampleModelAPI):
         )
 
     async def _key_checks(self, sample):
+        """Default ``volume_ml`` to 0.0 and ``dilution_factor`` to 1.0 when missing."""
         if sample.volume_ml is None:
             sample.volume_ml = 0.0
         if sample.dilution_factor is None:
@@ -573,6 +689,8 @@ class GasSampleAPI(SampleModelAPI):
 
 
 class AssemblySampleAPI(SampleModelAPI):
+    """Sample API for assembly samples that contain a JSON-serialized parts list."""
+
     def __init__(self, Serv_class):
         super().__init__(
             sampleclass=AssemblySample(),
@@ -583,6 +701,12 @@ class AssemblySampleAPI(SampleModelAPI):
 
 
 class SolidSampleAPI(SampleModelAPI):
+    """Sample API for solid samples backed by the legacy plate database.
+
+    Read-only with respect to insertion: ``new_samples`` is a no-op.
+    Lookups resolve plate/position via :class:`HTEPlateAPI`.
+    """
+
     def __init__(self, Serv_class):
         super().__init__(
             sampleclass=SolidSample(),
@@ -597,6 +721,7 @@ class SolidSampleAPI(SampleModelAPI):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[list]:
+        """Return the legacy platemap entry list for each sample's plate."""
         pmlist = []
         for sample in samples:
             pmmap = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
@@ -611,6 +736,7 @@ class SolidSampleAPI(SampleModelAPI):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[Tuple[float, float]]:
+        """Return ``[x, y]`` coordinates per sample from the legacy platemap."""
         xylist = []
         for sample in samples:
             pmdata = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
@@ -631,6 +757,7 @@ class SolidSampleAPI(SampleModelAPI):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Unsupported for solid samples; returns an empty list."""
         LOGGER.error("new_sample is not supported yet for solid sample")
         await asyncio.sleep(0.01)
         ret_samples = []
@@ -643,6 +770,7 @@ class SolidSampleAPI(SampleModelAPI):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Resolve solid samples via the legacy platemap (validates legacy entries by xy)."""
         await asyncio.sleep(0.01)
         ret_samples = []
 
@@ -686,6 +814,7 @@ class SolidSampleAPI(SampleModelAPI):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """No-op update for solid samples: revalidates and returns the samples."""
         # self._base.print_message("Update is not supported yet "
         #                          "for solid sample", error=True)
         await asyncio.sleep(0.01)
@@ -694,6 +823,11 @@ class SolidSampleAPI(SampleModelAPI):
 
 
 class OldLiquidSampleAPI:
+    """Legacy CSV+per-sample-JSON liquid sample database (predecessor format).
+
+    Used solely to read existing records for migration into :class:`LiquidSampleAPI`.
+    """
+
     def __init__(self, Serv_class):
         self._base = Serv_class
 
@@ -714,7 +848,15 @@ class OldLiquidSampleAPI:
             f"liquid sample no database is: {os.path.join(self._dbfilepath, self._dbfile)}"
         )
 
-    async def _open_db(self, mode):
+    async def _open_db(self, mode) -> bool:
+        """Open the legacy CSV index file in the requested mode.
+
+        Args:
+            mode: ``aiofiles.open`` mode string.
+
+        Returns:
+            True if the file was opened, False if the db directory is missing.
+        """
         if os.path.exists(self._dbfilepath):
             self.fdb = await aiofiles.open(
                 os.path.join(self._dbfilepath, self._dbfile), mode
@@ -724,10 +866,11 @@ class OldLiquidSampleAPI:
             return False
 
     async def _close_db(self):
+        """Close the legacy CSV index file handle."""
         await self.fdb.close()
 
-    async def count_samples(self):
-        # TODO: faster way?
+    async def count_samples(self) -> int:
+        """Return the number of liquid sample rows in the legacy CSV index."""
         _ = await self._open_db("a+")
         counter = 0
         await self.fdb.seek(0)
@@ -736,9 +879,18 @@ class OldLiquidSampleAPI:
         await self._close_db()
         return counter - self.headerlines
 
-    async def new_samples(self, new_sample: LiquidSample):
+    async def new_samples(self, new_sample: LiquidSample) -> LiquidSample:
+        """Append a new liquid sample row to the legacy CSV and per-sample JSON file.
+
+        Args:
+            new_sample: Sample to persist; ``sample_no`` is assigned from the
+                current row count.
+
+        Returns:
+            The same sample with ``sample_no`` populated.
+        """
         async def write_sample_no_jsonfile(filename, datadict):
-            """write a separate json file for each new sample_no"""
+            """Write a per-sample JSON sidecar next to the CSV index."""
             self.fjson = await aiofiles.open(
                 os.path.join(self._dbfilepath, filename), "a+"
             )
@@ -767,8 +919,19 @@ class OldLiquidSampleAPI:
         return new_sample
 
     async def get_samples(self, sample: LiquidSample):
-        """accepts a liquid sample model with minimum information to find it in the db
-        and returns its full information
+        """Read and normalize one legacy liquid sample record.
+
+        Accepts a sample stub with at least ``sample_no`` and
+        ``machine_name`` matching the local host; reads the corresponding
+        legacy JSON sidecar and migrates old field names (``id``,
+        ``sample_id``, ``AUID``, ``DUID``, ``volume_mL``, ``source``).
+
+        Args:
+            sample: Sample stub used to locate the record.
+
+        Returns:
+            Populated :class:`LiquidSample` or ``None`` if the record is
+            missing or the host check fails.
         """
 
         async def load_json_file(filename, linenr=1):
@@ -871,6 +1034,20 @@ class OldLiquidSampleAPI:
 
 
 class UnifiedSampleDataAPI:
+    """Sample API dispatcher that routes operations by :class:`SampleType`.
+
+    Owns one :class:`SampleModelAPI` instance per sample type and forwards
+    requests to the appropriate backend. Assemblies are walked recursively so
+    contained ``parts`` are resolved or updated alongside the parent.
+
+    Attributes:
+        solidAPI: Solid sample backend.
+        liquidAPI: Liquid sample backend.
+        gasAPI: Gas sample backend.
+        assemblyAPI: Assembly sample backend.
+        ready: True after :meth:`init_db` completes for all backends.
+    """
+
     def __init__(self, Serv_class):
         self._base = Serv_class
         self._dbfilepath = self._base.helaodirs.db_root
@@ -882,6 +1059,7 @@ class UnifiedSampleDataAPI:
         self.ready = False
 
     async def init_db(self) -> None:
+        """Initialize all per-type backends and mark the dispatcher ready."""
         await self.solidAPI.init_db()
         await self.liquidAPI.init_db()
         await self.gasAPI.init_db()
@@ -895,6 +1073,14 @@ class UnifiedSampleDataAPI:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Dispatch ``new_samples`` to the appropriate per-type backend.
+
+        Args:
+            samples: Mixed-type sample inputs; each is routed by ``sample_type``.
+
+        Returns:
+            Concatenated list of persisted samples from every backend touched.
+        """
         retval = []
 
         for sample_ in samples:
@@ -924,9 +1110,14 @@ class UnifiedSampleDataAPI:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
-        """this will only use the sample_no for local sample, or global_label for external samples
-        and fills in the rest from the db and returns the list again.
-        We expect to not have mixed sample types here.
+        """Dispatch ``get_samples`` per sample type; recurse into assembly parts.
+
+        Args:
+            samples: Stubs identifying the records to resolve.
+
+        Returns:
+            Concatenated list of populated samples; assemblies have their
+            ``parts`` resolved recursively.
         """
         retval = []
 
@@ -966,11 +1157,8 @@ class UnifiedSampleDataAPI:
 
     async def list_new_samples(
         self, limit: int = 10
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
-        """this will only use the sample_no for local sample, or global_label for external samples
-        and fills in the rest from the db and returns the list again.
-        We expect to not have mixed sample types here.
-        """
+    ) -> dict:
+        """Return a per-type dict of the most recent samples (up to ``limit`` each)."""
         retdict = {
             "liquid": await self.liquidAPI.list_new_samples(limit),
             "solid": await self.solidAPI.list_new_samples(limit),
@@ -985,6 +1173,7 @@ class UnifiedSampleDataAPI:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> None:
+        """Dispatch ``update_samples`` per sample type; recurse into assembly parts."""
         for sample_ in samples:
             sample = object_to_sample(sample_)
             LOGGER.info(
@@ -1012,7 +1201,8 @@ class UnifiedSampleDataAPI:
         samples: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> None:
+    ) -> list:
+        """Dispatch ``get_samples_xy`` per sample type and concatenate results."""
         retval = []
         for sample_ in samples:
             sample = object_to_sample(sample_)
@@ -1048,7 +1238,8 @@ class UnifiedSampleDataAPI:
         samples: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> None:
+    ) -> list:
+        """Dispatch ``get_platemap`` per sample type and concatenate results."""
         retval = []
         for sample_ in samples:
             sample = object_to_sample(sample_)
@@ -1089,13 +1280,16 @@ def unpack_samples_helper(
     List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
 ]:
-    """
-    Unpacks a list of samples into separate lists based on their sample type.
+    """Split a sample list by primitive type, flattening any assemblies.
 
-    Recursively unpacks assembly samples into liquid, solid, and gas sublists.
+    Assembly samples are walked recursively so all leaf parts end up in the
+    matching primitive bucket.
+
+    Args:
+        samples: Sample list that may include assemblies.
 
     Returns:
-        Tuple of (liquid_list, solid_list, gas_list).
+        ``(liquid_list, solid_list, gas_list)``.
     """
     liquid_list = []
     solid_list = []
@@ -1132,13 +1326,17 @@ def unpack_samples_helper(
 
 
 def update_vol(BS, delta_vol_ml: float, dilute: bool):
-    """
-    Updates the volume of a sample and optionally adjusts its dilution factor.
+    """Apply a volume delta to a sample, optionally rescaling its dilution factor.
 
-    Parameters:
-    BS (SampleModel): The sample object which contains volume and dilution factor attributes.
-    delta_vol_ml (float): The change in volume to be applied to the sample, in milliliters.
-    dilute (bool): A flag indicating whether to adjust the dilution factor based on the new volume.
+    If the new total volume is non-positive, the sample is zeroed and marked
+    destroyed. When ``dilute`` is set, the dilution factor is rescaled so the
+    concentration before mixing is preserved (negative sentinel when the old
+    volume was non-positive).
+
+    Args:
+        BS: Sample model with ``volume_ml`` (and optionally ``dilution_factor``).
+        delta_vol_ml: Signed change in volume, in milliliters.
+        dilute: When True, recompute ``dilution_factor`` from the new volume.
     """
     if hasattr(BS, "volume_ml"):
         old_vol = BS.volume_ml
