@@ -1,8 +1,9 @@
 """ZeroMQ + msgspec RPC fast-path for HELAO inter-server calls.
 
-See zmq_rpc.py for the full implementation.  This package is intentionally
-small: it exposes ``RPCDispatcher`` (server side) and ``RPCClient`` (client
-side), plus the msgspec Struct envelopes used on the wire.
+Re-exports the public surface from :mod:`zmq_rpc`: ``RPCDispatcher`` (server
+side), ``RPCClient`` / ``RPCSyncClient`` (client side), the on-wire
+``RPCRequest`` / ``RPCResponse`` Structs, the ``RPCError`` exception, and the
+``derive_rpc_port`` helper that pairs an HTTP port with its RPC port.
 """
 
 from helao.core.rpc.zmq_rpc import (

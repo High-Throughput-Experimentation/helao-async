@@ -1,3 +1,11 @@
+"""Gaussian-process surrogate simulator for OER active-learning demos.
+
+Provides :class:`GPSim`, a driver that loads a pickled subset of CP measurements,
+maintains per-plate ``gpflow`` models, and exposes acquisition/initialization/fit
+routines used by the GP simulator action server, plus :class:`GPSimExec`, the
+:class:`Executor` that fits the model from inside a running action.
+"""
+
 import os
 import asyncio
 import time
@@ -19,7 +27,17 @@ from scipy.stats import norm
 from sklearn.metrics import mean_absolute_error
 
 
-def calc_eta(cp_dict):
+def calc_eta(cp_dict) -> float:
+    """Compute the OER overpotential from the last four seconds of a CP trace.
+
+    Args:
+        cp_dict: Dict with parallel ``"t_s"`` and ``"erhe_v"`` lists from a CP
+            measurement.
+
+    Returns:
+        Mean potential (in V vs RHE) over the final 4 s of the trace minus the
+        thermodynamic OER potential (1.23 V).
+    """
     thresh_ts = max(cp_dict["t_s"]) - 4
     thresh_idx = min([i for i, v in enumerate(cp_dict["t_s"]) if v > thresh_ts])
     erhes = cp_dict["erhe_v"][thresh_idx:]
@@ -27,7 +45,40 @@ def calc_eta(cp_dict):
 
 
 class GPSim:
+    """Per-plate Gaussian-process surrogate over an OER composition library.
+
+    Loads pickled CP data for every plate in ``oer13_cps.pzstd``, derives an eta
+    target per composition, and maintains a ``gpflow`` regression model per
+    plate alongside the bookkeeping (acquired/available indices, EI history,
+    progress) that the GP action server endpoints rely on.
+
+    Attributes:
+        base: Hosting action server, used for live-buffer updates.
+        config_dict: ``params`` block from the server config.
+        rng: Seeded ``numpy`` generator for random initialization.
+        all_data: Pickled per-plate composition-and-trace dataset.
+        els: Element labels common to every plate.
+        features: Mapping of ``plate_id`` to its composition feature array.
+        targets: Mapping of ``plate_id`` to its eta target column.
+        acquired: Per-plate indices acquired through this plate's own CP runs.
+        acq_fromglobal: Per-plate indices acquired through other plates that
+            share the same composition.
+        available: Per-plate indices still eligible for acquisition.
+        g_acq: Set of compositions acquired across all plates.
+        g_avl: Set of all known compositions.
+        invfeats: Mapping of composition tuple to ``(plate_id, idx)`` entries.
+        models: Per-plate ``gpflow.models.GPR`` instances.
+        progress: Latest acquisition record per plate.
+        initialized: Per-plate flag set after prior initialization.
+        global_step: Counter of acquisitions across all plates.
+    """
+
     def __init__(self, action_serv: Base):
+        """Initialize the simulator and kick off prior initialization.
+
+        Args:
+            action_serv: Action server hosting this driver.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.rng = np.random.default_rng(seed=self.config_dict["random_seed"])
@@ -108,13 +159,25 @@ class GPSim:
         self.myinit()
 
     def myinit(self):
+        """Schedule background initialization of priors for every plate."""
         asyncio.create_task(self.init_all_plates(5))
 
     async def init_all_plates(self, num_points: int):
+        """Initialize random priors for every plate in the dataset.
+
+        Args:
+            num_points: Number of random compositions to acquire per plate.
+        """
         for plate_id in self.features:
             await self.init_priors_random(plate_id, num_points)
 
     async def init_priors_random(self, plate_id: int, num_points: int):
+        """Clear a plate and seed it with random initial acquisitions.
+
+        Args:
+            plate_id: Plate to (re)initialize.
+            num_points: Number of random compositions to acquire before fitting.
+        """
         arr = self.features[plate_id]
         ridxs = self.rng.choice(
             range(arr.shape[0]),
@@ -130,12 +193,17 @@ class GPSim:
         self.initialized[plate_id] = True
 
     def calc_ei(self, plate_id, xi=0.001, noise=True):
-        """
-        Computes the EI at points X based on existing samples X_sample
-        and Y_sample using a Gaussian process surrogate model.
+        """Compute Expected Improvement over unacquired compositions on a plate.
+
+        Args:
+            plate_id: Plate whose surrogate model and indices to score.
+            xi: Exploration weighting added to the incumbent.
+            noise: If True, use the predicted mean of acquired points as the
+                incumbent; otherwise use the observed maximum.
 
         Returns:
-            Expected improvements at points X.
+            Tuple ``(ei, mu, variance)`` of arrays over the unacquired
+            compositions of ``plate_id``.
         """
         acqinds = np.array(
             self.acquired[plate_id] + self.acq_fromglobal[plate_id]
@@ -169,8 +237,25 @@ class GPSim:
 
     async def acquire_point(
         self, plate_id: int, init_point: list = [], orch_str: str = ""
-    ):
-        """Adds eta result to acquired list and returns next composition."""
+    ) -> dict:
+        """Pick (or record) the next composition to measure on a plate.
+
+        When ``init_point`` is empty the maximum-EI unacquired composition is
+        chosen and recorded as the next measurement; otherwise the supplied
+        composition is logged as already acquired (used during prior
+        initialization).
+
+        Args:
+            plate_id: Plate to advance.
+            init_point: Optional explicit composition vector to mark acquired.
+            orch_str: Label of the requesting orchestrator for live-buffer
+                status messages.
+
+        Returns:
+            Progress dict (``expected_improvement``, ``feature``,
+            ``total_plate_mae``, ``plate_step``, ``global_step``) for the
+            EI-driven branch, or an empty dict for the init branch.
+        """
         if not init_point:
             plate_step = len(self.acquired[plate_id])
             latest_ei = self.ei_step[plate_id][plate_step]
@@ -234,8 +319,22 @@ class GPSim:
         )
         return data
 
-    async def fit_model(self, plate_id, orch_str: str = ""):
-        """Assemble acquired etas per plate and predict loaded space."""
+    async def fit_model(self, plate_id, orch_str: str = "") -> dict:
+        """Refit the per-plate GP and update prediction/EI bookkeeping.
+
+        Pushes a per-step live-buffer update (acquired fraction, last
+        composition, ground-truth and predicted histograms) before refitting,
+        then stores total/available MAE and the next EI vector.
+
+        Args:
+            plate_id: Plate whose model to refit.
+            orch_str: Label of the requesting orchestrator for live-buffer
+                status messages.
+
+        Returns:
+            Empty dict; results are written to ``self.total_step`` /
+            ``self.avail_step`` / ``self.ei_step``.
+        """
         plate_step = len(self.acquired[plate_id])
 
         if plate_step > 0:
@@ -342,6 +441,7 @@ class GPSim:
         return data
 
     def clear_global(self):
+        """Reset all per-plate state, models, and global acquisition history."""
         self.acquired = {k: [] for k in self.all_data}
         self.acq_fromglobal = {k: [] for k in self.all_data}
         self.opt_logs = {k: {} for k in self.all_data}
@@ -357,6 +457,11 @@ class GPSim:
         self.models = {k: None for k in self.all_data}
 
     def clear_plate(self, plate_id):
+        """Reset state for one plate, retaining globally acquired compositions.
+
+        Args:
+            plate_id: Plate to reset.
+        """
         self.acquired[plate_id] = []
         self.acq_fromglobal[plate_id] = [
             idx
@@ -377,7 +482,22 @@ class GPSim:
         ]
         self.models[plate_id] = None
 
-    async def check_condition(self, activeobj: Active):
+    async def check_condition(self, activeobj: Active) -> dict:
+        """Evaluate the active-learning stop condition and requeue if needed.
+
+        Inspects the latest plate progress against the configured
+        ``stop_condition`` (``none``, ``max_iters``, ``max_stdev``,
+        ``max_ei``). While the condition is unmet, this dispatches an
+        ``insert_experiment`` RPC back to the requesting orchestrator to
+        queue the next iteration.
+
+        Args:
+            activeobj: Active action whose ``action_params`` carry the
+                stop criteria and orchestrator coordinates.
+
+        Returns:
+            Latest progress dict augmented with ``max_prediction_stdev``.
+        """
         params = activeobj.action.action_params
         plate_id = params["plate_id"]
         stop_condition = params["stop_condition"]
@@ -445,7 +565,15 @@ class GPSim:
 
 
 class GPSimExec(Executor):
+    """Executor that refits the GP surrogate inside a running action.
+
+    Reads ``plate_id`` and ``orch_str`` from the active action's parameters,
+    invokes :meth:`GPSim.fit_model`, then surfaces the resulting progress
+    dict in ``_post_exec``.
+    """
+
     def __init__(self, *args, **kwargs):
+        """Initialize the executor from the active action's parameters."""
         super().__init__(*args, **kwargs)
         LOGGER.info("GPSimExec initialized.")
         self.start_time = time.time()  # instantiation time
@@ -453,14 +581,25 @@ class GPSimExec(Executor):
         self.plate_id = self.active.action.action_params["plate_id"]
         self.orch_str = self.active.action.action_params["orch_str"]
 
-    async def _exec(self):
+    async def _exec(self) -> dict:
+        """Refit the surrogate model for the configured plate.
+
+        Returns:
+            ``{"error": ErrorCodes.none, "status": HloStatus.active}``.
+        """
         await self.active.driver.fit_model(self.plate_id, self.orch_str)
         return {
             "error": ErrorCodes.none,
             "status": HloStatus.active,
         }
 
-    async def _post_exec(self):
+    async def _post_exec(self) -> dict:
+        """Return the latest plate progress as the action's final data.
+
+        Returns:
+            Dict with the plate's progress payload, ``error`` and
+            ``HloStatus.finished``.
+        """
         data = self.active.driver.progress[self.plate_id]
         return {
             "data": data,

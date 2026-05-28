@@ -21,6 +21,13 @@ REF_TABLE = {"leakless": 0.21, "inhouse": 0.21, "rhe": 0.0}
 
 
 class Reference:
+    """Lightweight container describing a reference electrode.
+
+    Attributes:
+        name: Reference electrode identifier matching a key in :data:`REF_TABLE`.
+        Vnhe: Offset from the normal hydrogen electrode in volts.
+    """
+
     name: str
     Vnhe: float
 

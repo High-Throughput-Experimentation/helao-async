@@ -1,37 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Asynchronous orchestrator example.
+"""HTE deployment orchestrator entrypoint.
 
-This server implements a general-purpose orchestrator capable of executing a mixed queue
-of synchronous and asynchronous actions. It provides POST request endpoints for managing
-a OrchHandler class object, the core functionality of an async orchestrator.
-
-    Startup:
-    The orchestrator server must be started AFTER all instrument and action servers
-    within a configuration file. Creating server actions via the launch.py launch
-    script enforces the required launch order.
-
-    After instantiating the global OrchHandler, the object will subscribe to all action
-    server status websockets using the .monitor_states() coroutine. Websocket messages
-    coming from action servers will update the OrchHandler's asyncio 'data' queue, which
-    in turn acts as a trigger for checks to the global blocking status while running the
-    orchestrator's action dispatch loop. This design avoids continuous polling on the
-    global blocking status.
-
-    Queue:
-    The orchestrator uses deque objects to maintain separate sample and action queues.
-    The sample queue may be populated using POST requests to '/append_experiment' or
-    '/prepend_experiment' endpoints. The action queue is determined by the 'experiment'
-    method of a given sample [experiment]. Experiments are defined in an action library
-    specified by the configuration. An experiment takes a sample argument and returns a
-    list of actions. The action queue is repopulated once all actions on a given sample
-    have finished (this prevents simultaneous execution of actions across samples).
-
-    Dispatch:
-    Sample and action queues are actioned by the 'run_dispatch_loop' coroutine, which
-    is created by posting a request to the '/start' server endpoint. The corresponding
-    '/stop' endpoint is used to end experimenting but at the moment does not interrupt any
-    actions in progress.
-
+Exposes ``makeApp`` so the FastAPI launcher can instantiate the generic
+:class:`helao.core.servers.orch_api.OrchAPI` for an HTE orchestration group.
+The orchestrator subscribes to action servers, queues experiments and
+sequences, and dispatches actions over HTTP.
 """
 
 __all__ = ["makeApp"]
@@ -39,7 +12,21 @@ __all__ = ["makeApp"]
 from helao.core.servers.orch_api import OrchAPI
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> OrchAPI:
+    """Construct the FastAPI orchestrator app for ``server_key``.
+
+    Called by ``fast_launcher.py`` after the configuration has been resolved.
+    The returned :class:`OrchAPI` registers orchestrator endpoints (queue
+    management, dispatch start/stop, status websockets) and is launched under
+    uvicorn for the lifetime of the orchestration group.
+
+    Args:
+        server_key: Identifier of this orchestrator entry in the config
+            ``servers`` block. Used as both the server key and display name.
+
+    Returns:
+        OrchAPI: Configured orchestrator application instance.
+    """
 
     app = OrchAPI(
         server_key,

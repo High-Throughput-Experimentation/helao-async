@@ -1,3 +1,11 @@
+"""Enumerations and model classes describing PAL robot methods (``CAM`` files).
+
+Defines the position kinds, GC sample categories, the per-method ``_cam`` model
+holding the source/destination policy and TTL flags, the enumeration of all
+supported PAL ``CAM`` files, sample-spacing methods, and the tool labels
+recognized by the PAL software.
+"""
+
 from enum import Enum
 from pydantic import BaseModel
 from typing import Optional
@@ -5,6 +13,20 @@ from helao.core.models.sample import SampleType
 
 
 class _cam(BaseModel):
+    """Describes a single PAL ``CAM`` method.
+
+    Attributes:
+        name: Method name as referenced by the orchestrator.
+        file_name: Vendor ``.cam`` file name; filled in at runtime from config.
+        file_path: Directory containing the ``.cam`` file.
+        sample_out_type: Output sample type produced by the method.
+        ttl_start: Whether the method emits the start TTL trigger.
+        ttl_continue: Whether the method emits the continue TTL trigger.
+        ttl_done: Whether the method emits the done TTL trigger.
+        source: Source position kind (see :class:`_positiontype`).
+        dest: Destination position kind (see :class:`_positiontype`).
+    """
+
     name: Optional[str] = None
     file_name: Optional[str] = None
     file_path: Optional[str] = None
@@ -20,6 +42,8 @@ class _cam(BaseModel):
 
 
 class _positiontype(str, Enum):
+    """Categories of source/destination positions understood by the PAL driver."""
+
     tray = "tray"
     custom = "custom"
     next_empty_vial = "next_empty_vial"
@@ -27,6 +51,8 @@ class _positiontype(str, Enum):
 
 
 class GCsampletype(str, Enum):
+    """Sample phase categories accepted for GC injection methods."""
+
     liquid = "liquid"
     gas = "gas"
     none = "none"
@@ -35,6 +61,12 @@ class GCsampletype(str, Enum):
 
 
 class CAMS(Enum):
+    """Catalog of supported PAL ``CAM`` methods keyed by method name.
+
+    Each member's value is a :class:`_cam` template; ``file_name`` and
+    ``file_path`` are populated by the driver from server configuration.
+    """
+
 
     transfer_tray_tray = _cam(
         name="transfer_tray_tray",
@@ -207,6 +239,14 @@ class CAMS(Enum):
 
 
 class Spacingmethod(str, Enum):
+    """Scheduling spacing options for repeated PAL runs.
+
+    Attributes:
+        linear: Equal intervals between runs.
+        geometric: Intervals scaled by a geometric factor.
+        custom: Caller-supplied list of absolute timestamps.
+    """
+
     linear = "linear"  # 1, 2, 3, 4, 5, ...
     geometric = "gemoetric"  # 1, 2, 4, 8, 16
     custom = "custom"  # list of absolute times for each run
@@ -217,6 +257,8 @@ class Spacingmethod(str, Enum):
 
 
 class PALtools(str, Enum):
+    """PAL syringe tool identifiers as recognized by the PAL software."""
+
     LS1 = "LS 1"
     LS2 = "LS 2"
     LS3 = "LS 3"

@@ -32,6 +32,14 @@ TEST_defaults = {
 
 
 def main():
+    """Test driver that exercises the gCLD operator loop against a dummy sequence.
+
+    Walks the same dispatch-and-wait flow as the production gCLD operator but
+    uses :func:`TEST_consecutive_noblocking` for both the measurement and the
+    follow-up "analysis" pass. If no pending data requests exist, creates a
+    fabricated one and sleeps before re-checking. After a successful run the
+    data request is reset to ``pending`` so the loop can repeat indefinitely.
+    """
     helao_repo_root = os.path.dirname(os.path.realpath(__file__))
     while "launch.py" not in os.listdir(helao_repo_root):
         helao_repo_root = os.path.dirname(helao_repo_root)

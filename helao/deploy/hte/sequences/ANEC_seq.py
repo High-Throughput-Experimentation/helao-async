@@ -1,4 +1,10 @@
-"""Sequence library for ANEC"""
+"""Sequence library for ANEC (Aqueous Nitrate Electrolysis Cell).
+
+Each public ``ANEC_*`` function builds an experiment list via
+``ExperimentPlanMaker``. Sequences chain cell load, electrolyte fill,
+electrochemistry (OCV/CA/CV), product sampling, GC/HPLC archiving, and
+cleanup sub-experiments defined in the ANEC experiment library.
+"""
 
 __all__ = [
     "ANEC_sample_ready",
@@ -53,23 +59,33 @@ def ANEC_sample_ready(
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
     liquidDrain_time: float = 80.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Sample-ready sequence: startup, clean cell, then loop fill/CA/drain.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) Drain cell and purge with CO2 for 60 seconds
+    Runs :sub:`ANEC_sub_startup` to position the cell, ``ANEC_sub_normal_state``
+    plus two ``ANEC_sub_cleanup`` passes, unloads the cell, loads the solid
+    sample, then repeats fill/CA/drain ``num_repeats`` times.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Sequence version tag.
+        num_repeats: Number of fill/CA/drain repeats.
+        plate_id: Plate id of the solid sample.
+        solid_sample_no: Sample number on the plate.
+        z_move_mm: Z-stage engage height (mm).
+        reservoir_liquid_sample_no: Reservoir liquid sample number.
+        volume_ul_cell_liquid: Cell fill volume (uL).
+        WE_potential__V: CA potential in the chosen frame.
+        WE_versus: Frame label (``"ref"``/``"rhe"``).
+        ref_type: Reference electrode type label.
+        pH: Solution pH.
+        CA_duration_sec: CA hold duration (s).
+        SampleRate: Sample interval (s).
+        IErange: Gamry current range string.
+        ref_offset__V: Reference electrode offset (V).
+        liquidDrain_time: Drain duration (s).
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -153,24 +169,41 @@ def ANEC_series_CA(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
-):
-    """running CA at different potentials and aliquot sampling at the cell1_we position.
+) -> list:
+    """CA series at each potential in ``WE_potential__V`` with GC+archive aliquots.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Unloads the cell, loads the solid sample, then for each
+    ``(potential, duration)`` pair runs ``ANEC_sub_flush_fill_cell``,
+    ``ANEC_sub_CA``, ``ANEC_sub_aliquot`` (GC + liquid archive with the
+    configured wash flags) and ``ANEC_sub_drain_cell``. Concludes with
+    ``ANEC_sub_alloff``.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Sequence version tag.
+        plate_id: Plate id of the solid sample.
+        solid_sample_no: Sample number on the plate.
+        reservoir_liquid_sample_no: Reservoir liquid sample number.
+        volume_ul_cell_liquid: Cell fill volume (uL).
+        WE_potential__V: Per-cycle potentials in the chosen frame.
+        WE_versus: Frame label (``"ref"``/``"rhe"``).
+        ref_type: Reference electrode type label.
+        pH: Solution pH.
+        CA_duration_sec: Per-cycle CA durations (s).
+        SampleRate: Sample interval (s).
+        IErange: Gamry current range string.
+        ref_offset__V: Reference electrode offset (V).
+        toolGC: PAL tool string for the GC injection.
+        toolarchive: PAL tool string for the archive injection.
+        volume_ul_GC: GC injection volume (uL).
+        volume_ul_archive: Archive aliquot volume (uL).
+        liquidDrain_time: Drain duration (s).
+        wash1: Enable wash position 1.
+        wash2: Enable wash position 2.
+        wash3: Enable wash position 3.
+        wash4: Enable wash position 4.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -260,24 +293,37 @@ def ANEC_series_CAliquidOnly(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
-):
-    """running CA at different potentials and aliquot sampling at the cell1_we position.
+) -> list:
+    """CA series with liquid-only archive aliquots (no GC).
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Same flow as :func:`ANEC_series_CA` but each cycle uses
+    ``ANEC_sub_liquidarchive`` instead of the GC+archive aliquot, so no
+    headspace injection is taken.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Sequence version tag.
+        plate_id: Plate id of the solid sample.
+        solid_sample_no: Sample number on the plate.
+        reservoir_liquid_sample_no: Reservoir liquid sample number.
+        volume_ul_cell_liquid: Cell fill volume (uL).
+        WE_potential__V: Per-cycle potentials in the chosen frame.
+        WE_versus: Frame label (``"ref"``/``"rhe"``).
+        ref_type: Reference electrode type label.
+        pH: Solution pH.
+        CA_duration_sec: Per-cycle CA durations (s).
+        SampleRate: Sample interval (s).
+        IErange: Gamry current range string.
+        ref_offset__V: Reference electrode offset (V).
+        toolarchive: PAL tool string for the archive injection.
+        volume_ul_archive: Archive aliquot volume (uL).
+        liquidDrain_time: Drain duration (s).
+        wash1: Enable wash position 1.
+        wash2: Enable wash position 2.
+        wash3: Enable wash position 3.
+        wash4: Enable wash position 4.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -359,24 +405,27 @@ def ANEC_OCV(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
-):
-    """running CA at different potentials and aliquot sampling at the cell1_we position.
-
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+) -> list:
+    """Load, fill, run a single OCV, take a liquid archive aliquot, then drain.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Sequence version tag.
+        plate_id: Plate id of the solid sample.
+        solid_sample_no: Sample number on the plate.
+        reservoir_liquid_sample_no: Reservoir liquid sample number.
+        volume_ul_cell_liquid: Cell fill volume (uL).
+        Tval__s: OCV duration (s).
+        IErange: Gamry current range string.
+        toolarchive: PAL tool string for the archive injection.
+        volume_ul_archive: Archive aliquot volume (uL).
+        liquidDrain_time: Drain duration (s).
+        wash1: Enable wash position 1.
+        wash2: Enable wash position 2.
+        wash3: Enable wash position 3.
+        wash4: Enable wash position 4.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -461,24 +510,49 @@ def ANEC_photo_CA(
     wash4: bool = False,
     liquid_flush_time: float = 60.0,
     liquidDrain_time: float = 80.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Photo-CA series: load sample, fill, run photo-CA at each potential with aliquots, then drain.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Iterates over ``WE_potential__V`` running ``ANEC_sub_photo_CA`` at each potential with the matching duration and LED toggle settings, taking a GC+archive aliquot between cycles.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        gamrychannelwait: Parameter passed through to the sub-experiments.
+        gamrychannelsend: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CA: Parameter passed through to the sub-experiments.
+        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCA_illum_period: Parameter passed through to the sub-experiments.
+        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCA_illum_time: Parameter passed through to the sub-experiments.
+        toolGC: Parameter passed through to the sub-experiments.
+        toolarchive: Parameter passed through to the sub-experiments.
+        volume_ul_GC: Parameter passed through to the sub-experiments.
+        volume_ul_archive: Parameter passed through to the sub-experiments.
+        wash1: Parameter passed through to the sub-experiments.
+        wash2: Parameter passed through to the sub-experiments.
+        wash3: Parameter passed through to the sub-experiments.
+        wash4: Parameter passed through to the sub-experiments.
+        liquid_flush_time: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -586,24 +660,43 @@ def ANEC_photo_CAgasonly(
     volume_ul_GC: int = 300,
     liquid_flush_time: float = 60.0,
     liquidDrain_time: float = 80.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Photo-CA series taking only the GC (headspace) aliquot per cycle.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Same flow as :func:`ANEC_photo_CA` but the aliquot step uses ``ANEC_sub_GCLiquid_archive`` for a GC-only sample.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        gamrychannelwait: Parameter passed through to the sub-experiments.
+        gamrychannelsend: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CA: Parameter passed through to the sub-experiments.
+        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCA_illum_period: Parameter passed through to the sub-experiments.
+        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCA_illum_time: Parameter passed through to the sub-experiments.
+        toolGC: Parameter passed through to the sub-experiments.
+        volume_ul_GC: Parameter passed through to the sub-experiments.
+        liquid_flush_time: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -708,23 +801,46 @@ def ANEC_photo_CV(
     toggleCA_illum_time: float = -1,
     liquid_flush_time: float = 60.0,
     liquidDrain_time: float = 80.0,
-):
-    """Repeat CV at the cell1_we position.
+) -> list:
+    """Photo-CV at the cell1_we position with optional LED toggle.
 
-    Flush and fill cell, run CV, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CV
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Loads the sample, fills the cell, then runs ``ANEC_sub_photo_CV`` with the configured vertices and LED parameters before draining.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential_init__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
+        WE_potential_final__V: Parameter passed through to the sub-experiments.
+        ScanRate_V_s: Parameter passed through to the sub-experiments.
+        Cycles: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        gamrychannelwait: Parameter passed through to the sub-experiments.
+        gamrychannelsend: Parameter passed through to the sub-experiments.
+        ref_offset: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CA: Parameter passed through to the sub-experiments.
+        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCA_illum_period: Parameter passed through to the sub-experiments.
+        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCA_illum_time: Parameter passed through to the sub-experiments.
+        liquid_flush_time: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -785,8 +901,16 @@ def ANEC_photo_CV(
     return epm.planned_experiments
 
 
-def ANEC_cleanup_disengage(sequence_version: int = 1):
-    """fulsh and sicharge the cell"""
+def ANEC_cleanup_disengage(sequence_version: int = 1) -> list:
+    """Run two cleanup passes, switch everything off, and disengage the cell.
+
+    Args:
+        sequence_version: Sequence version tag.
+
+    Returns:
+        List of planned experiments performing two cleanups followed by
+        ``ANEC_sub_alloff`` and ``ANEC_sub_disengage``.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -816,23 +940,31 @@ def ANEC_CA_pretreat(
     ref_offset__V: float = 0.0,
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 50.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Pre-treat the cell at a single CA potential then drain.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) Drain cell and purge with CO2 for 60 seconds
+    Loads the solid sample, flushes/fills the cell, runs one ``ANEC_sub_CA`` at ``WE_potential__V`` for ``CA_duration_sec`` seconds, and drains.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        liquid_flush_time: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -900,24 +1032,35 @@ def ANEC_CA_DOE_demo(
     wash3: bool = True,
     wash4: bool = False,
     liquidDrain_time: float = 60.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """DOE-style CA at a single point with optional headspace and archive aliquots.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Single-shot variant used in the DOE demo: load sample, fill cell, run one CA, take optional aliquots, then drain.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        toolGC: Parameter passed through to the sub-experiments.
+        toolarchive: Parameter passed through to the sub-experiments.
+        volume_ul_GC: Parameter passed through to the sub-experiments.
+        volume_ul_archive: Parameter passed through to the sub-experiments.
+        wash1: Parameter passed through to the sub-experiments.
+        wash2: Parameter passed through to the sub-experiments.
+        wash3: Parameter passed through to the sub-experiments.
+        wash4: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -979,24 +1122,29 @@ def ANEC_CA_DOE_demo_headspace(
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
     liquidDrain_time: float = 60.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """DOE-style CA producing only a GC headspace aliquot.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Variant of the DOE demo that uses ``ANEC_sub_GCLiquid_archive`` for a single headspace sample after the CA.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        toolGC: Parameter passed through to the sub-experiments.
+        volume_ul_GC: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -1062,24 +1210,39 @@ def ANEC_repeat_CA(
     wash4: bool = False,
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 60.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Repeat a single-potential CA followed by aliquot+drain.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Loads the sample once, then repeats fill -> CA -> aliquot -> drain ``num_repeats`` times.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        toolGC: Parameter passed through to the sub-experiments.
+        toolarchive: Parameter passed through to the sub-experiments.
+        volume_ul_GC: Parameter passed through to the sub-experiments.
+        volume_ul_archive: Parameter passed through to the sub-experiments.
+        wash1: Parameter passed through to the sub-experiments.
+        wash2: Parameter passed through to the sub-experiments.
+        wash3: Parameter passed through to the sub-experiments.
+        wash4: Parameter passed through to the sub-experiments.
+        liquid_flush_time: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -1160,24 +1323,34 @@ def ANEC_repeat_TentHeatCAgasonly(
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 60.0,
     target_temperature_degc: float = 25.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Repeated tent-heated CA with GC headspace aliquots.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    For ``num_repeats`` iterations: heat the tent, fill, run CA, take a GC-only aliquot, drain.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        toolGC: Parameter passed through to the sub-experiments.
+        volume_ul_GC: Parameter passed through to the sub-experiments.
+        liquid_flush_time: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
+        target_temperature_degc: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -1248,24 +1421,25 @@ def ANEC_heatOCV(
     liquid_flush_time: float = 60.0,
     liquidDrain_time: float = 60.0,
     target_temperature_degc: float = 25.0,
-):
-    """running CA at different potentials and aliquot sampling at the cell1_we position.
+) -> list:
+    """Repeated heated OCV measurement with archive aliquots.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    For ``num_repeats`` iterations: heat the tent, fill, run OCV, take an archive aliquot, drain.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        Tval__s: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        liquid_flush_time: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
+        target_temperature_degc: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -1336,24 +1510,40 @@ def ANEC_repeat_TentHeatCA(
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 80.0,
     target_temperature_degc: float = 25.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Repeated tent-heated CA with combined GC+archive aliquots.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    For ``num_repeats`` iterations: heat the tent, fill, run CA, take GC+archive aliquots, drain.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        toolGC: Parameter passed through to the sub-experiments.
+        toolarchive: Parameter passed through to the sub-experiments.
+        volume_ul_GC: Parameter passed through to the sub-experiments.
+        volume_ul_archive: Parameter passed through to the sub-experiments.
+        wash1: Parameter passed through to the sub-experiments.
+        wash2: Parameter passed through to the sub-experiments.
+        wash3: Parameter passed through to the sub-experiments.
+        wash4: Parameter passed through to the sub-experiments.
+        liquid_flush_time: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
+        target_temperature_degc: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -1445,24 +1635,40 @@ def ANEC_repeat_HeatCA(
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 80.0,
     target_temperature_degc: float = 25.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Repeated heated CA without the tent step.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    For ``num_repeats`` iterations: heat the cell, fill, run CA, take aliquots, drain.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        toolGC: Parameter passed through to the sub-experiments.
+        toolarchive: Parameter passed through to the sub-experiments.
+        volume_ul_GC: Parameter passed through to the sub-experiments.
+        volume_ul_archive: Parameter passed through to the sub-experiments.
+        wash1: Parameter passed through to the sub-experiments.
+        wash2: Parameter passed through to the sub-experiments.
+        wash3: Parameter passed through to the sub-experiments.
+        wash4: Parameter passed through to the sub-experiments.
+        liquid_flush_time: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
+        target_temperature_degc: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -1543,24 +1749,33 @@ def ANEC_gasonly_CA(
     volume_ul_GC: int = 300,
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 60.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Single CA producing only a gas-phase (GC) aliquot.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Loads the sample, fills the cell, runs one CA and one GC-only aliquot, then drains.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        toolGC: Parameter passed through to the sub-experiments.
+        volume_ul_GC: Parameter passed through to the sub-experiments.
+        liquid_flush_time: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -1635,23 +1850,34 @@ def ANEC_repeat_CV(
     IErange: str = "auto",
     ref_offset: float = 0.0,
     liquidDrain_time: float = 80.0,
-):
-    """Repeat CV at the cell1_we position.
+) -> list:
+    """Repeated CV scans with optional aliquots between repeats.
 
-    Flush and fill cell, run CV, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CV
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Loads the sample once and repeats fill -> CV -> drain ``num_repeats`` times.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential_init__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
+        WE_potential_final__V: Parameter passed through to the sub-experiments.
+        ScanRate_V_s: Parameter passed through to the sub-experiments.
+        Cycles: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -1724,24 +1950,37 @@ def ANEC_ferricyanide_simpleprotocol(
     Cycles: int = 1,
     SampleRate_CV: float = 0.1,
     target_temperature_degc: float = 25.0,
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Simple ferricyanide diagnostic protocol.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Runs a fixed fill/CA/aliquot/drain protocol used to validate the ANEC potentiostat with a ferricyanide standard.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate_CA: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        WE_potential_init__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
+        WE_potential_final__V: Parameter passed through to the sub-experiments.
+        ScanRate_V_s: Parameter passed through to the sub-experiments.
+        Cycles: Parameter passed through to the sub-experiments.
+        SampleRate_CV: Parameter passed through to the sub-experiments.
+        target_temperature_degc: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -1817,24 +2056,38 @@ def ANEC_ferricyanide_protocol(
     liquidDrain_time: float = 80.0,
     target_temperature_degc: List[float] = [25.0],
     CV_only: str = "yes",
-):
-    """Repeat CA and aliquot sampling at the cell1_we position.
+) -> list:
+    """Full ferricyanide validation protocol with multi-step CA/CV.
 
-    Flush and fill cell, run CA, and drain.
-
-    (1) Fill cell with liquid for 90 seconds
-    (2) Equilibrate for 15 seconds
-    (3) run CA
-    (4) mix product
-    (5) Drain cell and purge with CO2 for 60 seconds
+    Extended ferricyanide diagnostic: fills the cell, runs CA and CV with archive aliquots, then drains and cleans.
 
     Args:
-        exp (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate_CA: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        WE_potential_init__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
+        WE_potential_final__V: Parameter passed through to the sub-experiments.
+        ScanRate_V_s: Parameter passed through to the sub-experiments.
+        Cycles: Parameter passed through to the sub-experiments.
+        SampleRate_CV: Parameter passed through to the sub-experiments.
+        liquidDrain_time: Parameter passed through to the sub-experiments.
+        target_temperature_degc: Parameter passed through to the sub-experiments.
+        CV_only: Parameter passed through to the sub-experiments.
 
-
-
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -1910,7 +2163,29 @@ def ANEC_create_and_load_liquid_sample(
     tray: int = 2,
     slot: int = 1,
     vial: List[int] = [1, 2, 3, 4, 5],
-):
+) -> list:
+    """Create and load identical liquid samples into a tray's vials.
+
+    For each entry in ``vial`` adds one ``create_and_load_liquid_sample``
+    experiment, all sharing the supplied chemistry metadata.
+
+    Args:
+        volume_ml: Per-vial sample volume (mL).
+        source: Source labels recorded on the sample.
+        partial_molarity: Per-constituent partial molarity strings.
+        chemical: Per-constituent chemical identifier strings.
+        ph: Solution pH.
+        supplier: Per-constituent supplier strings.
+        lot_number: Per-constituent lot-number strings.
+        electrolyte_name: Electrolyte label.
+        prep_date: Preparation date.
+        tray: PAL tray index (the call site hard-codes tray=2).
+        slot: PAL slot index.
+        vial: Iterable of PAL vial indices to fill.
+
+    Returns:
+        List of planned create-and-load experiments.
+    """
     epm = ExperimentPlanMaker()
     for num, vial_no in enumerate(vial):
         epm.add(
@@ -1988,9 +2263,24 @@ def GC_Archiveliquid_analysis(
     dest: str = "Injector 1",
     volume_ul: int = 2,
     GC_analysis_time: float = 520.0,
-):
-    """
-    Analyze archived liquid product by GC
+) -> list:
+    """Inject archived liquid samples into the GC over a range of vials.
+
+    Iterates ``source_vial`` from ``source_vial_from`` through ``source_vial_to``
+    inclusive and queues one ``ANEC_sub_GCLiquid_analysis`` experiment per vial.
+
+    Args:
+        experiment_version: Experiment version tag (unused beyond bookkeeping).
+        source_tray: PAL source tray index.
+        source_slot: PAL source slot index.
+        source_vial_from: First vial number (inclusive).
+        source_vial_to: Last vial number (inclusive).
+        dest: GC injection destination string.
+        volume_ul: Injection volume per vial (uL).
+        GC_analysis_time: GC analysis duration (s).
+
+    Returns:
+        List of planned ``ANEC_sub_GCLiquid_analysis`` experiments.
     """
 
     epm = ExperimentPlanMaker()
@@ -2019,9 +2309,24 @@ def HPLC_Archiveliquid_analysis(
     source_vial_to: int = 1,
     dest: str = "LCInjector1",
     volume_ul: int = 25,
-):
-    """
-    Analyze archived liquid product by GC
+) -> list:
+    """Inject archived liquid samples into the HPLC over a range of vials.
+
+    Iterates ``source_vial`` from ``source_vial_from`` through ``source_vial_to``
+    inclusive and queues one ``ANEC_sub_HPLCLiquid_analysis`` experiment per
+    vial with all wash positions enabled except wash4.
+
+    Args:
+        experiment_version: Experiment version tag (unused beyond bookkeeping).
+        source_tray: PAL source tray index.
+        source_slot: PAL source slot index.
+        source_vial_from: First vial number (inclusive).
+        source_vial_to: Last vial number (inclusive).
+        dest: HPLC injection destination string.
+        volume_ul: Injection volume per vial (uL).
+
+    Returns:
+        List of planned ``ANEC_sub_HPLCLiquid_analysis`` experiments.
     """
 
     epm = ExperimentPlanMaker()

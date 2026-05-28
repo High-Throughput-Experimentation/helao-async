@@ -1,12 +1,18 @@
-"""Logging module, import at top of every script
+"""Canonical logger factory shared by every HELAO server.
 
-Usage:
+Adds a custom ``ALERT`` level above ``CRITICAL`` and provides ``make_logger``,
+which configures a single per-server ``logging.Logger`` with a coloured
+console handler, a daily ``TimedRotatingFileHandler`` that gzips rotated
+files, and optional NTP-offset-aware timestamps. When credentials are
+provided, ``ALERT``-level records are also fanned out to an SMTP handler
+and/or a JSON HTTP POST webhook via queue listeners.
+
+Usage::
 
     from helao.helpers import helao_logging as logging
     if logging.LOGGER is None:
         logger = logging.make_logger(__file__)
     logger = logging.LOGGER
-
 """
 
 import tempfile
@@ -34,6 +40,7 @@ logging.addLevelName(ALERT_LEVEL, "ALERT")
 
 
 def alert(self, message, *args, **kws):
+    """Log ``message`` at the custom ``ALERT`` level if enabled."""
     if self.isEnabledFor(ALERT_LEVEL):
         # Yes, logger takes its '*args' as 'args'.
         self._log(ALERT_LEVEL, message, args, **kws)
@@ -47,13 +54,19 @@ HOST = gethostname()
 
 
 class GZipRotator:
+    """Rotation callable that renames the rotated log file and gzips it."""
+
     def __call__(self, source, dest):
+        """Move ``source`` to ``dest`` then spawn ``gzip`` to compress it."""
         os.rename(source, dest)
         subprocess.Popen(["gzip", dest])
 
 
 class TitledSMTPHandler(SMTPHandler):
-    def getSubject(self, record):
+    """SMTP handler that derives a structured subject line from the record."""
+
+    def getSubject(self, record) -> str:
+        """Return ``"<LEVEL> - <title> on <HOST>"`` for ``record``."""
         if "~" in record.message:
             title = record.message.split("~")[0].strip()
         else:
@@ -62,7 +75,16 @@ class TitledSMTPHandler(SMTPHandler):
 
 
 class HTTPPostHandler(logging.Handler):
+    """Logging handler that POSTs each record as JSON to a webhook URL."""
+
     def __init__(self, url, headers=None, **kwargs):
+        """Store the webhook URL, headers and extra payload fields.
+
+        Args:
+            url: Destination URL for the HTTP POST.
+            headers: Request headers (defaults to ``application/json``).
+            **kwargs: Extra key/value pairs merged into every payload.
+        """
         super().__init__()
         self.url = url
         self.headers = (
@@ -71,9 +93,7 @@ class HTTPPostHandler(logging.Handler):
         self.payload = kwargs
 
     def emit(self, record):
-        """
-        Emit a record.
-        """
+        """Format ``record`` and POST it to the webhook with the stored payload."""
         try:
             # Format the log record into a desired structure (e.g., a JSON dictionary)
             log_entry = self.format(record)
@@ -88,7 +108,22 @@ class HTTPPostHandler(logging.Handler):
 
 
 class NtpOffsetFormatter(logging.Formatter):
+    """Formatter that shifts timestamps by a fixed NTP-derived offset.
+
+    Attributes:
+        offset: Timedelta added to each record's creation time.
+        tz: Timezone used for formatting (UTC or local).
+    """
+
     def __init__(self, *args, offset_seconds=0, use_utc: bool = False, **kwargs):
+        """Build the formatter.
+
+        Args:
+            *args: Positional arguments forwarded to ``logging.Formatter``.
+            offset_seconds: Seconds to add to each log record timestamp.
+            use_utc: If ``True``, format times in UTC instead of local time.
+            **kwargs: Keyword arguments forwarded to ``logging.Formatter``.
+        """
         super().__init__(*args, **kwargs)
         self.offset = timedelta(seconds=offset_seconds)
         if use_utc:
@@ -99,7 +134,8 @@ class NtpOffsetFormatter(logging.Formatter):
             local_tz = local_now.tzinfo
             self.tz = local_tz
 
-    def formatTime(self, record, datefmt=None):
+    def formatTime(self, record, datefmt=None) -> str:
+        """Return the record's creation time shifted by the configured offset."""
         # Convert the record's timestamp (seconds since epoch) to a UTC datetime
         ct = datetime.fromtimestamp(record.created, tz=self.tz)
         # Apply the desired offset
@@ -114,7 +150,17 @@ class NtpOffsetFormatter(logging.Formatter):
 
 
 class ColoredNtpOffsetFormatter(ColoredFormatter):
+    """Colour-aware variant of ``NtpOffsetFormatter`` for stream handlers."""
+
     def __init__(self, *args, offset_seconds=0, use_utc: bool = False, **kwargs):
+        """Build the formatter.
+
+        Args:
+            *args: Positional arguments forwarded to ``ColoredFormatter``.
+            offset_seconds: Seconds to add to each log record timestamp.
+            use_utc: If ``True``, format times in UTC instead of local time.
+            **kwargs: Keyword arguments forwarded to ``ColoredFormatter``.
+        """
         super().__init__(*args, **kwargs)
         self.offset = timedelta(seconds=offset_seconds)
         if use_utc:
@@ -125,7 +171,8 @@ class ColoredNtpOffsetFormatter(ColoredFormatter):
             local_tz = local_now.tzinfo
             self.tz = local_tz
 
-    def formatTime(self, record, datefmt=None):
+    def formatTime(self, record, datefmt=None) -> str:
+        """Return the record's creation time shifted by the configured offset."""
         # Convert the record's timestamp (seconds since epoch) to a UTC datetime
         ct = datetime.fromtimestamp(record.created, tz=self.tz)
         # Apply the desired offset
@@ -145,17 +192,30 @@ def make_logger(
     log_level: int = 20,  # 10 (DEBUG), 20 (INFO), 30 (WARNING), 40 (ERROR), 50 (CRITICAL)
     email_config: dict = {},
     show_debug_console: bool = False,
-):
-    """
-    Creates and configures a logger instance with both console and file handlers.
+) -> logging.Logger:
+    """Build and configure the canonical per-server HELAO logger.
+
+    Attaches a daily-rotating gzip file handler and a coloured console
+    handler. When ``email_config`` provides full SMTP credentials or a
+    webhook plus payload, an ``ALERT``-level queue-backed handler is added
+    that forwards records to email and/or HTTP respectively. Timestamps are
+    offset using the cached NTP offset from ``ntpLastSync.txt`` in
+    ``log_dir`` when present.
 
     Args:
-        logger_name (Optional[str]): The name of the logger. If None, the root logger is used.
-        log_dir (Optional[str]): The directory where the log file will be stored. If None, the system's temporary directory is used.
-        log_level (int): The logging level. Default is 20 (INFO). Other levels are 10 (DEBUG), 30 (WARNING), 40 (ERROR), 50 (CRITICAL).
+        logger_name: Logger name; if it ends with ``.py`` the basename
+            without extension is used.
+        log_dir: Directory for log files; defaults to a fresh temp dir.
+        log_level: Threshold for the file and (non-debug) console handlers.
+        email_config: Configuration dict that may contain SMTP credentials
+            (``mailhost``, ``mailport``, ``fromaddr``, ``username``,
+            ``password``, ``recipients``, ``subject``) and/or a ``webhook``
+            URL with associated ``payload``.
+        show_debug_console: If ``True``, the console handler is set to
+            ``DEBUG`` level.
 
     Returns:
-        logging.Logger: Configured logger instance.
+        The configured ``logging.Logger`` instance.
     """
     if logger_name is not None and logger_name.endswith(".py"):
         logger_name = os.path.basename(logger_name).replace(".py", "")
@@ -275,12 +335,19 @@ def make_logger(
 
 
 def print_message(logger, server_name, *args, **kwargs):
-    """
-    Logs a message using the specified logger.
+    """Forward a message to ``logger`` at a level chosen by recognised kwargs.
 
-    The log level is selected by the presence of recognized kwargs:
-    ``error`` → ``logger.error``; ``warning``/``warn`` → ``logger.warning``;
-    ``info`` or no recognized key → ``logger.info``.
+    The level is picked from ``kwargs``: ``error`` selects ``logger.error``,
+    ``warning`` or ``warn`` selects ``logger.warning``, ``info`` or no
+    recognised key selects ``logger.info``. Positional ``args`` are
+    stringified and joined with spaces.
+
+    Args:
+        logger: Target logger.
+        server_name: Originating server name (currently unused, retained for
+            call-site compatibility).
+        *args: Message fragments concatenated with spaces.
+        **kwargs: Level-selecting flags as described above.
     """
     if "error" in kwargs:
         logger_method = logger.error

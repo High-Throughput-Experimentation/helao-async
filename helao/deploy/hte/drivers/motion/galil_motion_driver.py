@@ -1,16 +1,17 @@
-"""A device class for the Galil motion controller, used by a FastAPI server instance.
+"""Galil motion-controller driver used by a HELAO FastAPI action server.
 
-The 'galil' device class exposes motion and I/O functions from the underlying 'gclib'
-library. Class methods are specific to Galil devices. Device configuration is read from
-config/config.py.
+Wraps the motion portion of the `gclib` library: opens a TCP connection to
+the Galil controller at `galil_ip_str`, applies per-axis init commands
+(`MT`, `CE`, `TW`, `SD`, `SH`), and exposes coroutines to move motors in
+motor/plate/instrument frames, query position and motion status, home,
+e-stop, and reset. The driver also owns a `TransformXY` helper that performs
+the coordinate transforms between the motor, plate, and instrument frames,
+and optionally hosts a Bokeh `Aligner` UI when `enable_aligner` is set.
 
-This driver requires gclib to be installed. After installation, activate the helao
-environment and run:
+Requires gclib (Windows). After installing the Galil toolkit, install the
+Python module from the helao environment:
 
-`python "c:\Program Files (x86)\Galil\gclib\source\wrappers\python\setup.py" install`
-
-to install the python module.
-
+`python "c:\\Program Files (x86)\\Galil\\gclib\\source\\wrappers\\python\\setup.py" install`
 """
 
 __all__ = ["Galil", "MoveModes", "TransformationModes"]
@@ -50,13 +51,30 @@ import gclib
 
 
 class cmd_exception(ValueError):
+    """Raised when an invalid motion mode reaches the Galil command builder."""
+
     def __init__(self, arg):
+        """Store the offending argument(s) on the exception."""
         self.args = arg
 
 
 class Galil:
-    def __init__(self, action_serv: Base):
+    """Galil motion controller driver attached to a HELAO action server.
 
+    Maintains the plate transformation matrix on disk (`<host>_last_plate_calib.json`),
+    the instrument transformation matrix (`<host>_instrument_calib.json`), and a
+    `TransformXY` helper. Public methods expose motion (`motor_move`,
+    `stop_axis`, `motor_off`, `motor_on`), state queries (`query_axis_position`,
+    `query_axis_moving`), homing/setup (`setaxisref`), and aligner-UI control.
+    """
+
+    def __init__(self, action_serv: Base):
+        """Connect to the controller, load calibration matrices, and start the aligner.
+
+        Args:
+            action_serv: Owning HELAO action server, used for config access
+                and on-disk paths.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.unified_db = UnifiedSampleDataAPI(self.base)
@@ -184,7 +202,12 @@ class Galil:
         if self.aligner_enabled and self.galil_enabled:
             self.start_aligner()
 
-    def convert_Mplate_to_Minstr(self, Mplate):
+    def convert_Mplate_to_Minstr(self, Mplate) -> list:
+        """Embed a 3x3 plate matrix into a 4x4 instrument matrix.
+
+        Copies the xy linear block and the xy offset column; leaves the
+        z/rotation rows as identity.
+        """
         Minstr = [
             [1, 0, 0, 0],
             [0, 1, 0, 0],
@@ -200,6 +223,7 @@ class Galil:
         return Minstr
 
     def start_aligner(self):
+        """Launch the embedded Bokeh aligner server on `bokeh_port`."""
         servHost = self.base.server_cfg["host"]
         servPort = self.base.server_params.get(
             "bokeh_port", self.base.server_cfg["port"] + 1000
@@ -217,6 +241,7 @@ class Galil:
         # self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
 
     def makeBokehApp(self, doc, motor):
+        """Bokeh document factory that attaches an `Aligner` to `doc`."""
         app = HelaoVis(
             server_key=self.base.server.server_name,
             doc=doc,
@@ -226,7 +251,17 @@ class Galil:
         return doc
 
     async def setaxisref(self):
-        # home all axis first
+        """Home every linear axis, refine the home position, then zero absolute coords.
+
+        Skips the rotational `Rx`/`Ry`/`Rz` axes. Performs a fast homing move,
+        then a 2mm relative back-off, then a slow homing approach, then moves
+        to the configured `axis_zero` offsets and zeros the encoder positions
+        via `DP`.
+
+        Returns:
+            The result of the final relative move, or "error" if the
+            controller is disabled.
+        """
         if not self.galil_enabled:
             return "error"
 
@@ -298,13 +333,24 @@ class Galil:
             return "error"
 
     async def stop_aligner(self) -> ErrorCodes:
+        """Ask the Bokeh aligner to terminate its current alignment session."""
         if self.aligner_enabled and self.aligner:
             self.aligner.stop_align()
             return ErrorCodes.none
         else:
             return ErrorCodes.not_available
 
-    async def run_aligner(self, A: Action):
+    async def run_aligner(self, A: Action) -> dict:
+        """Start an aligner session for the supplied action, returning its active dict.
+
+        Args:
+            A: HELAO action containing `plateid_or_pmpath` in its
+                `action_params`.
+
+        Returns:
+            The active action's dict, with `in_progress` set if the driver is
+            blocked or `not_available` if the aligner is not enabled.
+        """
         if not self.blocked and self.galil_enabled:
             if not self.aligner_enabled or not self.aligner:
                 A.error_code = ErrorCodes.not_available
@@ -340,7 +386,16 @@ class Galil:
             activeDict = A.as_dict()
         return activeDict
 
-    async def motor_move(self, active):
+    async def motor_move(self, active) -> dict:
+        """Public motor-move entry point that extracts params from `active.action`.
+
+        Guards against concurrent moves with `self.blocked`. Forwards `d_mm`,
+        `axis`, `speed`, `mode`, and `transformation` to `_motor_move`.
+
+        Returns:
+            The result dict from `_motor_move`, or an `in_progress` stub when
+            the driver is already busy or disabled.
+        """
         d_mm = active.action.action_params.get("d_mm", [])
         axis = active.action.action_params.get("axis", [])
         speed = active.action.action_params.get("speed", None)
@@ -370,7 +425,22 @@ class Galil:
                 "counts": None,
             }
 
-    async def _motor_move(self, d_mm, axis, speed, mode, transformation):
+    async def _motor_move(self, d_mm, axis, speed, mode, transformation) -> dict:
+        """Internal mover: transforms coordinates, issues `BG` per axis, and waits.
+
+        Converts `d_mm` from the requested `transformation` frame (motor/plate/
+        instrument) into motor-axis distances, computes counts using
+        `count_to_mm`, clamps speed to `motor_max_speed_count_sec`, builds the
+        Galil command sequence (with `ST/MO/SH/SP/PR|PA|HM/BG`), then polls
+        `query_axis_moving` until every axis stops or the per-axis timeout
+        expires.
+
+        Returns:
+            Dict with per-axis lists: `moved_axis`, `speed`, `accepted_rel_dist`,
+            `supplied_rel_dist`, `err_dist`, `err_code`, `counts`. On estop or
+            controller error, all values may be None and `err_code` reflects
+            the failure.
+        """
         if self.motor_busy or not self.galil_enabled:
             return {
                 "moved_axis": None,
@@ -740,7 +810,12 @@ class Galil:
             "counts": ret_counts,
         }
 
-    async def motor_disconnect(self):
+    async def motor_disconnect(self) -> dict:
+        """Close the gclib TCP connection and report the resulting state.
+
+        Returns:
+            Dict with a single `connection` field describing the outcome.
+        """
         try:
             self.g.GClose()  # don't forget to close connections!
         except gclib.GclibError as e:
@@ -748,10 +823,20 @@ class Galil:
             return {"connection": {"Unexpected GclibError:", e}}
         return {"connection": "motor_offline"}
 
-    async def query_axis_position(self, axis, *args, **kwargs):
-        # this only queries the position of a single axis
-        # server example:
-        # http://127.0.0.1:8000/motor/query/position?axis=x
+    async def query_axis_position(self, axis, *args, **kwargs) -> dict:
+        """Query absolute axis positions and return them in motor mm.
+
+        Reads `TP` to discover how many physical axes exist, then `PA ?,?,?...`
+        for the absolute positions; the raw counts are scaled by
+        `count_to_mm` and mapped back through the inverse of `axis_id`. The
+        aligner UI is also notified.
+
+        Args:
+            axis: Single axis name or list of axis names to return.
+
+        Returns:
+            Dict with parallel `ax` and `position` lists in the requested order.
+        """
         if not self.galil_enabled:
             LOGGER.error("Galil is disabled")
             return {"ax": [], "position": []}
@@ -807,8 +892,16 @@ class Galil:
         await self.update_aligner(msg={"ax": msg_ret_ax, "position": msg_ret_position})
         return {"ax": ret_ax, "position": ret_position}
 
-    async def query_axis_moving(self, axis, *args, **kwargs):
-        # this functions queries the status of the axis
+    async def query_axis_moving(self, axis, *args, **kwargs) -> dict:
+        """Query the `SC` stop-code register and classify each axis as moving or stopped.
+
+        Args:
+            axis: Single axis name or list of axis names.
+
+        Returns:
+            Dict with `motor_status` (per-axis "moving"/"stopped"/"invalid")
+            and `err_code` (per-axis error code).
+        """
         if not self.galil_enabled:
             LOGGER.error("Galil is disabled")
             return {"motor_status": [], "err_code": ErrorCodes.not_available}
@@ -856,18 +949,22 @@ class Galil:
         return msg
 
     async def reset(self):
-        # The RS command resets the state of the actionor to its power-on condition.
-        # The previously saved state of the controller,
-        # along with parameter values, and saved experiments are restored.
+        """Send the Galil `RS` reset command, restoring saved state and parameters."""
         if self.galil_enabled:
             return self.galilcmd("RS")
         else:
             return ""
 
-    async def estop(self, switch: bool, *args, **kwargs):
-        # this will estop the axis
-        # set estop: switch=true
-        # release estop: switch=false
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Engage or release the motion emergency stop.
+
+        Args:
+            switch: True stops every axis and disables its motor, False
+                only clears the action-server estop flag.
+
+        Returns:
+            The `switch` value passed in.
+        """
         LOGGER.info("Axis Estop")
         if switch == True:
             await self.stop_axis(self.get_all_axis())
@@ -879,11 +976,15 @@ class Galil:
             self.base.actionservermodel.estop = False
         return switch
 
-    async def stop_axis(self, axis):
-        # this will stop the current motion of the axis
-        # but not turn off the motor
-        # for stopping and turnuing off use moto_off
+    async def stop_axis(self, axis) -> dict:
+        """Halt motion on the listed axes without disabling their motors.
 
+        Args:
+            axis: Single axis name or list of axis names.
+
+        Returns:
+            Combined `query_axis_moving` and `query_axis_position` dict.
+        """
         if self.galil_enabled:
             # convert single axis move to list
             if not isinstance(axis, list):
@@ -897,15 +998,15 @@ class Galil:
         ret.update(await self.query_axis_position(axis=axis))
         return ret
 
-    async def motor_off(self, axis, *args, **kwargs):
+    async def motor_off(self, axis, *args, **kwargs) -> dict:
+        """Stop and disable (de-energize) the listed motors for manual alignment.
 
-        # sometimes it is useful to turn the motors off for manual alignment
-        # this function does exactly that
-        # It then returns the status
-        # and the current position of all motors
+        Args:
+            axis: Single axis name or list of axis names.
 
-        # an example would be:
-        # http://127.0.0.1:8000/motor/stop
+        Returns:
+            Combined `query_axis_moving` and `query_axis_position` dict.
+        """
         if self.galil_enabled:
             # convert single axis move to list
             if not isinstance(axis, list):
@@ -928,6 +1029,7 @@ class Galil:
         return ret
 
     def motor_off_shutdown(self, axis, *args, **kwargs):
+        """Synchronous variant of `motor_off` used from `shutdown`."""
         if self.galil_enabled:
             if not isinstance(axis, list):
                 axis = [axis]
@@ -944,14 +1046,15 @@ class Galil:
                 for cmd in cmd_seq:
                     _ = self.galilcmd(cmd)
 
-    async def motor_on(self, axis, *args, **kwargs):
-        # sometimes it is useful to turn the motors back on for manual alignment
-        # this function does exactly that
-        # It then returns the status
-        # and the current position of all motors
-        # server example
-        # http://127.0.0.1:8000/motor/on?axis=x
+    async def motor_on(self, axis, *args, **kwargs) -> dict:
+        """Re-enable (`SH`) the listed motors after a manual alignment.
 
+        Args:
+            axis: Single axis name or list of axis names.
+
+        Returns:
+            Combined `query_axis_moving` and `query_axis_position` dict.
+        """
         if self.galil_enabled:
             # convert single axis move to list
             if not isinstance(axis, list):
@@ -979,14 +1082,16 @@ class Galil:
         ret.update(await self.query_axis_position(axis=axis))
         return ret
 
-    def get_all_axis(self):
+    def get_all_axis(self) -> list:
+        """Return every configured axis name."""
         return [ax for ax in self.axis_id]
 
-    def shutdown(self):
-        # this gets called when the server is shut down
-        # or reloaded to ensure a clean
-        # disconnect ... just restart or terminate the server
-        # self.stop_axis(self.get_all_axis())
+    def shutdown(self) -> set:
+        """Close the gclib connection and cancel the aligner IO task on server shutdown.
+
+        Returns:
+            A single-element set containing "shutdown".
+        """
         LOGGER.info("shutting down galil motion")
         self.galil_enabled = False
         try:
@@ -1001,10 +1106,16 @@ class Galil:
         return {"shutdown"}
 
     async def update_aligner(self, msg):
+        """Forward `msg` to the aligner's motor-position queue, if running."""
         if self.aligner_enabled and self.aligner:
             await self.aligner.motorpos_q.put(msg)
 
     def save_transfermatrix(self, file):
+        """Write `self.plate_transfermatrix` to `file` as JSON.
+
+        Creates the parent directory if needed; silently returns when `file`
+        is None.
+        """
         if file is not None:
             filedir, filename = os.path.split(file)
             LOGGER.info(f"saving calib '{filename}' to '{filedir}'")
@@ -1015,6 +1126,12 @@ class Galil:
                 f.write(json.dumps(self.plate_transfermatrix.tolist()))
 
     def load_transfermatrix(self, file):
+        """Read a JSON-encoded transformation matrix from `file`.
+
+        Returns:
+            A `np.matrix` of the same shape as `self.dflt_matrix`, or None
+            if the file is missing, malformed, or has the wrong shape.
+        """
         if os.path.exists(file):
             with open(file, "r") as f:
                 try:
@@ -1038,6 +1155,11 @@ class Galil:
             return None
 
     def update_plate_transfermatrix(self, newtransfermatrix):
+        """Replace the plate matrix, propagate to `TransformXY`, and persist to disk.
+
+        Falls back to the default identity matrix if the new matrix has the
+        wrong shape. Returns the matrix that was actually stored.
+        """
         if newtransfermatrix.shape != self.dflt_matrix.shape:
             LOGGER.error(
                 f"matrix \n'{newtransfermatrix}' has wrong shape, using dflt.",
@@ -1053,11 +1175,13 @@ class Galil:
         return self.plate_transfermatrix
 
     def reset_plate_transfermatrix(self):
+        """Restore the plate transformation matrix to the identity default."""
         self.update_plate_transfermatrix(newtransfermatrix=self.dflt_matrix)
 
     async def solid_get_platemap(
         self, plate_id: Optional[int] = None, **kwargs
     ) -> dict:
+        """Look up the platemap for a solid sample by plate ID via the unified DB."""
         return {
             "platemap": await self.unified_db.get_platemap(
                 [SolidSample(plate_id=plate_id)]
@@ -1070,6 +1194,7 @@ class Galil:
         sample_no: Optional[int] = None,
         **kwargs,
     ) -> dict:
+        """Resolve the plate-frame xy coordinates of a solid sample via the unified DB."""
         return {
             "platexy": await self.unified_db.get_samples_xy(
                 [SolidSample(plate_id=plate_id, sample_no=sample_no)]
@@ -1078,9 +1203,26 @@ class Galil:
 
 
 class TransformXY:
-    # Updating plate calibration will automatically update the system transformation
-    # matrix. When angles are changed updated them also here and run update_Msystem
+    """Coordinate transformer between motor, plate, and instrument frames.
+
+    Stores the per-instrument matrix `Minstrxyz`, the plate calibration
+    `Mplate`, and the composed system matrix `M` (and its inverse). Update
+    the rotation angles `alpha`/`beta`/`gamma` and call `update_Msystem` when
+    the kinematic chain changes; calling `update_Mplatexy` after a plate
+    recalibration both updates the plate block and refreshes the cached
+    system matrix.
+    """
+
     def __init__(self, action_serv: Base, Minstr, seq=None):
+        """Initialize the matrices and precompute the system matrix.
+
+        Args:
+            action_serv: Owning HELAO action server (used for logging).
+            Minstr: 4x4 motor-to-instrument calibration matrix.
+            seq: Optional ordered sequence of axes/rotations (e.g. ['x','y','z',
+                'Rz']) describing the kinematic chain; None uses the default
+                xy-only transform.
+        """
         self.base = action_serv
         # instrument specific matrix
         # motor to instrument
@@ -1105,8 +1247,15 @@ class TransformXY:
         self.update_Msystem()
 
     def transform_platexy_to_motorxy(self, platexy, *args, **kwargs):
-        """simply calculates motorxy based on platexy
-        plate warping (z) will be a different call"""
+        """Map a plate-frame xy point to motor-frame xy via the system matrix `M`.
+
+        Args:
+            platexy: 2- or 3-element sequence (or comma-separated string) in
+                the plate frame; missing trailing entries are padded.
+
+        Returns:
+            Numpy array `[motor_x, motor_y]`.
+        """
         if isinstance(platexy, str):
             platexy = [float(x.strip()) for x in platexy.split(",")]
         platexy = np.asarray(platexy)
@@ -1124,7 +1273,7 @@ class TransformXY:
         return motorxy
 
     def transform_motorxy_to_platexy(self, motorxy, *args, **kwargs):
-        """simply calculates platexy from current motorxy"""
+        """Map a motor-frame xy point to plate-frame xy via the inverse `Minv`."""
         if isinstance(motorxy, str):
             motorxy = [float(x.strip()) for x in motorxy.split(",")]
         motorxy = np.asarray(motorxy)
@@ -1141,7 +1290,7 @@ class TransformXY:
         return platexy
 
     def transform_motorxyz_to_instrxyz(self, motorxyz, *args, **kwargs):
-        """simply calculatesinstrxyz from current motorxyz"""
+        """Map a motor-frame xyz point to the instrument frame via `Minstrinv`."""
         motorxyz = np.asarray(motorxyz)
         if len(motorxyz) == 3:
             # append 1 at end
@@ -1152,7 +1301,7 @@ class TransformXY:
         return np.array(instrxyz)[0]
 
     def transform_instrxyz_to_motorxyz(self, instrxyz, *args, **kwargs):
-        """simply calculates motorxyz from current instrxyz"""
+        """Map an instrument-frame xyz point back to the motor frame via `Minstr`."""
         instrxyz = np.asarray(instrxyz)
         if len(instrxyz) == 3:
             instrxyz = np.append(instrxyz, 1)
@@ -1163,7 +1312,7 @@ class TransformXY:
         return np.array(motorxyz)[0]
 
     def Rx(self):
-        """returns rotation matrix around x-axis"""
+        """Return the 4x4 rotation matrix about the x-axis for `self.alpha` (degrees)."""
         alphatmp = np.mod(self.alpha, 360)  # this actually takes care of neg. values
         # precalculate some common angles for better accuracy and speed
         if alphatmp == 0:  # or alphatmp == -0.0:
@@ -1195,7 +1344,7 @@ class TransformXY:
             )
 
     def Ry(self):
-        """returns rotation matrix around y-axis"""
+        """Return the 4x4 rotation matrix about the y-axis for `self.beta` (degrees)."""
         betatmp = np.mod(self.beta, 360)  # this actually takes care of neg. values
         # precalculate some common angles for better accuracy and speed
         if betatmp == 0:  # or betatmp == -0.0:
@@ -1227,7 +1376,7 @@ class TransformXY:
             )
 
     def Rz(self):
-        """returns rotation matrix around z-axis"""
+        """Return the 4x4 rotation matrix about the z-axis for `self.gamma` (degrees)."""
         gammatmp = np.mod(self.gamma, 360)  # this actually takes care of neg. values
         # precalculate some common angles for better accuracy and speed
         if gammatmp == 0:  # or gammatmp == -0.0:
@@ -1259,35 +1408,41 @@ class TransformXY:
             )
 
     def Mx(self):
-        """returns Mx part of Minstr"""
+        """Return the 4x4 matrix containing only the x-row of `Minstrxyz`."""
         Mx = np.asmatrix(np.identity(4))
         Mx[0, 0:4] = self.Minstrxyz[0, 0:4]
         # LOGGER.info(" ... Mx")
         return Mx
 
     def My(self):
-        """returns My part of Minstr"""
+        """Return the 4x4 matrix containing only the y-row of `Minstrxyz`."""
         My = np.asmatrix(np.identity(4))
         My[1, 0:4] = self.Minstrxyz[1, 0:4]
         # LOGGER.info(" ... My")
         return My
 
     def Mz(self):
-        """returns Mz part of Minstr"""
+        """Return the 4x4 matrix containing only the z-row of `Minstrxyz`."""
         Mz = np.asmatrix(np.identity(4))
         Mz[2, 0:4] = self.Minstrxyz[2, 0:4]
         # LOGGER.info(" ... Mz")
         return Mz
 
     def Mplatewarp(self, platexy):
-        """returns plate warp correction matrix (Z-correction.
-        Only valid for a single platexy coordinate"""
+        """Return the z-correction matrix for a single plate xy point.
+
+        Currently a stub that returns the identity matrix.
+        """
         return np.asmatrix(np.identity(4))  # TODO, just returns identity matrix for now
 
     def update_Msystem(self):
-        """updates the transformation matrix for new plate calibration or
-        when angles are changed.
-        Follows stacking experiment from bottom to top (plate)"""
+        """Recompute `Minstr`, `M`, and their inverses from the current `seq` and angles.
+
+        If `seq` is None the transform reduces to `Minstrxyz . Mplate`.
+        Otherwise the matrix is built by walking `seq` and accumulating the
+        corresponding rotation or selector matrices. Singular inverses fall
+        back to a sentinel matrix with `-1` in the bottom-right entry.
+        """
 
         LOGGER.info("updating M")
 
@@ -1356,8 +1511,16 @@ class TransformXY:
                     [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, -1]]
                 )
 
-    def update_Mplatexy(self, Mxy, *args, **kwargs):
-        """updates the xy part of the plate calibration"""
+    def update_Mplatexy(self, Mxy, *args, **kwargs) -> bool:
+        """Copy a 3x3 plate-xy matrix into `Mplate` and refresh the system matrix.
+
+        Args:
+            Mxy: 3x3 plate calibration matrix (linear block in [0:2, 0:2],
+                offsets in column 2).
+
+        Returns:
+            True once the update completes.
+        """
         Mxy = np.matrix(Mxy)
         # assign the xy part
         self.Mplate[0:2, 0:2] = Mxy[0:2, 0:2]
@@ -1372,7 +1535,7 @@ class TransformXY:
         return True
 
     def get_Mplatexy(self):
-        """returns the xy part of the platecalibration"""
+        """Return the 3x3 plate xy calibration matrix derived from `self.Mplate`."""
         self.Mplatexy = np.asmatrix(np.identity(3))
         self.Mplatexy[0:2, 0:2] = self.Mplate[0:2, 0:2]
         self.Mplatexy[0, 2] = self.Mplate[0, 3]
@@ -1380,7 +1543,12 @@ class TransformXY:
         return self.Mplatexy
 
     def get_Mplate_Msystem(self, Mxy, *args, **kwargs):
-        """removes Minstr from Msystem to obtain Mplate for alignment"""
+        """Given a global system matrix `Mxy`, factor out `Minstr` to recover Mplate.
+
+        Used during alignment to convert a fitted global transform into a
+        plate-only calibration. Falls back to a sentinel matrix when
+        `Minstr` is singular.
+        """
         Mxy = np.asarray(Mxy)
         Mglobal = np.asmatrix(np.identity(4))
         Mglobal[0:2, 0:2] = Mxy[0:2, 0:2]

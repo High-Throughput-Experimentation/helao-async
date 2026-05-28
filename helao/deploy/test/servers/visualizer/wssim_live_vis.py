@@ -1,3 +1,10 @@
+"""Bokeh visualizer module for the websocket simulator action server.
+
+Subscribes to the simulator's ``ws_live`` websocket, plots the rolling
+``series_<i>`` values against time, and mirrors the latest snapshot as a
+two-column table.
+"""
+
 import time
 import asyncio
 from datetime import datetime
@@ -20,9 +27,31 @@ from helao.helpers.ws_utils import WsSubscriber as Wss
 
 
 class C_simlivevis:
-    """potentiostat visualizer module class"""
+    """Live Bokeh visualizer for the websocket simulator action server.
+
+    Builds widgets for ``max_points`` and ``update_rate``, a line plot of
+    the synthetic series against time, and a key/value table for the
+    latest sample. A background coroutine reads from the action server's
+    ``ws_live`` websocket and streams the new points to both.
+
+    Attributes:
+        vis: Hosting visualizer server.
+        update_rate: Polling period (seconds) between websocket reads.
+        max_points: Rolling buffer size for the streamed plot.
+        live_key: Name of the action server being visualized.
+        wss: ``WsSubscriber`` consumer for ``ws_live`` messages.
+        datasource: ``ColumnDataSource`` backing the line plot.
+        datasource_table: ``ColumnDataSource`` backing the key/value table.
+        layout: Top-level Bokeh layout.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Build the layout and start the polling coroutine.
+
+        Args:
+            vis_serv: Hosting visualizer server.
+            serv_key: Name of the action server to visualize.
+        """
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.update_rate = self.config_dict.get("update_rate", 0.5)
@@ -114,12 +143,24 @@ class C_simlivevis:
         self._add_plots()
 
     def cleanup_session(self, session_context):
+        """Cancel the IO loop when the Bokeh session ends.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.live_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def callback_input_max_points(self, attr, old, new, sender):
-        """callback for input_max_points"""
+        """Validate and apply a new ``max_points`` input, then echo it back.
+
+        Args:
+            attr: Bokeh attribute name (unused).
+            old: Previous string value.
+            new: New string value.
+            sender: The source widget.
+        """
 
         def to_int(val):
             try:
@@ -148,10 +189,23 @@ class C_simlivevis:
         )
 
     def update_input_value(self, sender, value):
+        """Push ``value`` back into the source widget.
+
+        Args:
+            sender: Bokeh widget to update.
+            value: New value to assign.
+        """
         sender.value = value
 
     def callback_input_update_rate(self, attr, old, new, sender):
-        """callback for input_update_rate"""
+        """Validate and apply a new update-rate input, then echo it back.
+
+        Args:
+            attr: Bokeh attribute name (unused).
+            old: Previous string value.
+            new: New string value.
+            sender: The source widget.
+        """
 
         def to_float(val):
             try:
@@ -168,6 +222,15 @@ class C_simlivevis:
         )
 
     def add_points(self, datapackage_list: list):
+        """Stream a batch of websocket messages into the plot and table.
+
+        Flattens ``sim_dict`` entries into per-series lists, derives a
+        ``datetime`` column from the latest epoch, and streams the result
+        into both the line plot and the latest-value table.
+
+        Args:
+            datapackage_list: List of message dicts from the websocket.
+        """
         latest_epoch = 0
         data_dict = {k: [] for k in self.data_dict_keys}
         for datapackage in datapackage_list:
@@ -190,6 +253,7 @@ class C_simlivevis:
             self.datasource_table.stream(table_data_dict, rollover=len(keys))
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
+        """Poll the live websocket and schedule UI updates on the document."""
         LOGGER.info(" ... Live visualizer receiving messages.")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
@@ -199,6 +263,7 @@ class C_simlivevis:
             await asyncio.sleep(0.01)
 
     def _add_plots(self):
+        """Redraw the line plot, one renderer per non-time series."""
         # clear legend
         if self.plot.renderers:
             self.plot.legend.items = []

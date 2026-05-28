@@ -1,9 +1,10 @@
-"""GP simulation server
+"""Gaussian-process simulation server.
 
-FastAPI server host for the GP modeling simulator.
-
-Loads a subset of 3 mA/cm2 CP measurement data from https://doi.org/10.1039/C8MH01641K
-
+Hosts :class:`GPSim`, which maintains per-plate GP surrogates over a subset
+of CP data from https://doi.org/10.1039/C8MH01641K . Exposes actions to
+(re)initialize a plate's priors, pick the next EI composition, refit the
+surrogate (driven by :class:`GPSimExec`), report progress, and evaluate the
+active-learning stop condition.
 """
 
 __all__ = ["makeApp"]
@@ -21,7 +22,20 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 def makeApp(server_key):
+    """Build the GP-simulator FastAPI app.
 
+    Wires :class:`GPSim` into a :class:`BaseAPI` and exposes actions
+    ``initialize_global``, ``initialize_plate``, ``get_progress``,
+    ``acquire_point``, ``update_model`` (uses :class:`GPSimExec`), and
+    ``check_condition``, plus private endpoints for clearing per-plate or
+    global state.
+
+    Args:
+        server_key: Server name in the launched config.
+
+    Returns:
+        Configured :class:`HelaoFastAPI` app.
+    """
     app = BaseAPI(
         server_key=server_key,
         server_title=server_key,
@@ -37,6 +51,7 @@ def makeApp(server_key):
         num_random_points: int = 5,
         random_seed: int = 9999,
     ):
+        """Reset all per-plate state and global acquisition history."""
         active = await app.base.setup_and_contain_action()
         app.driver.clear_global()
         finished_action = await active.finish()
@@ -50,6 +65,7 @@ def makeApp(server_key):
         num_random_points: int = 5,
         reinitialize: bool = False,
     ):
+        """Seed random priors for a plate and fit its surrogate."""
         active = await app.base.setup_and_contain_action()
         pid = active.action.action_params["plate_id"]
         reinit = active.action.action_params["reinitialize"]
@@ -71,6 +87,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plate_id: int = 0,
     ):
+        """Return the latest progress record for a plate, refitting if empty."""
         active = await app.base.setup_and_contain_action()
         progress = app.driver.progress[active.action.action_params["plate_id"]]
         if not progress:
@@ -87,6 +104,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plate_id: int = 0,
     ):
+        """Pick the next EI composition for a plate and stamp it on the action."""
         active = await app.base.setup_and_contain_action()
         data = {}
         orch_string = f"{active.action.orch_key} {active.action.orch_host}:{active.action.orch_port}"
@@ -107,7 +125,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plate_id: int = 0,
     ):
-        """Record simulated data."""
+        """Refit the surrogate model for a plate via :class:`GPSimExec`."""
         active = await app.base.setup_and_contain_action()
         active.action.action_params["orch_str"] = (
             f"{active.action.orch_key} {active.action.orch_host}:{active.action.orch_port}"
@@ -134,6 +152,7 @@ def makeApp(server_key):
         orch_host: str = "",
         orch_port: int = 0,
     ):
+        """Evaluate the active-learning stop condition and requeue if unmet."""
         active = await app.base.setup_and_contain_action()
         return_dict = await app.driver.check_condition(active)
         await active.enqueue_data_dflt(datadict=return_dict)

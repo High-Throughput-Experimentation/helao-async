@@ -1,3 +1,11 @@
+"""OPC UA station and variable wrappers used by the LEANCAT driver.
+
+:class:`Station` opens a single ``opcua`` client connection for a named
+LEANCAT station, while :class:`Variable` wraps an individual node and
+provides typed read/write plus favourite-flag toggling against the
+LEANCAT ``opcVariables`` table.
+"""
+
 from typing import Any
 from opcua import ua, Client, Node
 from psycopg2 import sql
@@ -10,12 +18,33 @@ from ..logger import script_log
 
 
 class Variable:
+    """Wrapper around an ``opcua.Node`` belonging to a named station.
+
+    Holds the registered node, owning station name and node id so that
+    favourite-flag updates can be applied against the LEANCAT database.
+    """
+
     def __init__(self, node: Node, station_name: str, node_id: str) -> None:
+        """Store the OPC node and the station/node identifiers.
+
+        Args:
+            node: The registered ``opcua.Node``.
+            station_name: Owning LEANCAT station name.
+            node_id: Identifier of the node within the OPC namespace.
+        """
         self._node = node
         self._station_name = station_name
         self._node_id = node_id
 
     def set_value(self, value) -> None:
+        """Write ``value`` to the underlying node using its variant type.
+
+        Args:
+            value: Python value to write.
+
+        Raises:
+            Exception: If the OPC write fails for any reason.
+        """
         try:
             variant_type = self._node.get_data_type_as_variant_type()
             self._node.set_attribute(
@@ -29,6 +58,11 @@ class Variable:
             raise Exception(error_msg)
 
     def get_value(self) -> Any:
+        """Read and return the current value of the node.
+
+        Raises:
+            Exception: If the OPC read fails.
+        """
         try:
             return self._node.get_value()
         except Exception as e:
@@ -36,6 +70,11 @@ class Variable:
             raise Exception(error_msg)
 
     def get_data_type(self) -> str:
+        """Return the node's variant data type name without the prefix.
+
+        Raises:
+            Exception: If the data-type query fails.
+        """
         try:
             variant_type = str(self._node.get_data_type_as_variant_type())
             # str converts the variant type enum including the prefix 'VariantType.' that is removed with [12:]
@@ -45,6 +84,11 @@ class Variable:
             raise Exception(error_msg)
 
     def add_to_favorites(self) -> int:
+        """Flag this variable as an export favourite in the LEANCAT DB.
+
+        Returns:
+            The id of the updated ``opcVariables`` row.
+        """
         str_sql1 = sql.SQL(
             """SELECT "id" FROM "stations" WHERE "name" = {station_name}"""
         ).format(
@@ -63,6 +107,11 @@ class Variable:
         return res[0][0]
 
     def remove_from_favorites(self) -> int:
+        """Clear the export-favourite flag for this variable.
+
+        Returns:
+            The id of the updated ``opcVariables`` row.
+        """
         str_sql1 = sql.SQL(
             """SELECT "id" FROM "stations" WHERE "name" = {station_name}"""
         ).format(
@@ -82,7 +131,23 @@ class Variable:
 
 
 class Station:
+    """Connection wrapper for a single LEANCAT OPC UA station.
+
+    Looks up the requested station's OPC connection options inside
+    ``app_config['stations']`` and opens an ``opcua.Client`` against
+    ``opc.tcp://<host>:<port>``.
+    """
+
     def __init__(self, station_name: str, app_config: dict) -> None:
+        """Load OPC connection options for ``station_name`` from ``app_config``.
+
+        Args:
+            station_name: Name of the LEANCAT station to configure.
+            app_config: Parsed LEANCAT ``app.config.json`` dict.
+
+        Raises:
+            Exception: If no matching station is found in ``app_config``.
+        """
         self._station_name = station_name
         self._connection_options = None
         self._client = None
@@ -103,6 +168,14 @@ class Station:
             )
 
     def connect(self) -> Client:
+        """Open the underlying ``opcua.Client`` connection.
+
+        Returns:
+            The connected :class:`opcua.Client` instance.
+
+        Raises:
+            Exception: If the OPC connection fails.
+        """
         try:
             host = self._connection_options["host"]
             port = self._connection_options["port"]
@@ -118,6 +191,11 @@ class Station:
             )
 
     def disconnect(self):
+        """Disconnect the OPC client.
+
+        Raises:
+            Exception: If the OPC disconnect fails.
+        """
         try:
             self._client.disconnect()
             script_log.debug(f'Station "{self._station_name}" disconnected')
@@ -127,6 +205,21 @@ class Station:
             )
 
     def get_variable(self, node_id) -> Variable:
+        """Resolve ``node_id`` on the server, register it and wrap it.
+
+        The OPC node is registered with the client for faster subsequent
+        reads/writes, and a :class:`Variable` is returned for convenient
+        access.
+
+        Args:
+            node_id: OPC node identifier string.
+
+        Returns:
+            A :class:`Variable` bound to the registered node.
+
+        Raises:
+            Exception: If the node lookup or registration fails.
+        """
         try:
             node = self._client.get_node(node_id)
 
@@ -148,6 +241,7 @@ class Station:
             raise Exception(e)
 
     def remove_all_from_favorites(self) -> None:
+        """Clear the export-favourite flag on every variable for this station."""
         str_sql1 = sql.SQL(
             """SELECT "id" FROM "stations" WHERE "name" = {station_name}"""
         ).format(

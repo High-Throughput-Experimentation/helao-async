@@ -1,3 +1,14 @@
+"""Current-range enums and lookup helpers for Gamry potentiostat models.
+
+Defines a ``StrEnum`` per supported model (IFC1010, REF600/REF620,
+PCI4G300, PCI4G750, REF30K, plus a generic default) whose members carry the
+human-readable current label (e.g. ``"30nA"``). The ``get_range`` helper
+resolves a user-supplied range specifier (by enum name, label, raw float in
+amps, or value+unit string) to a member of the appropriate enum, falling back
+to ``auto``. The ``RANGES`` dict maps mode names to the integer indices
+passed to ``SetIERange``.
+"""
+
 from typing import Union
 from enum import StrEnum
 
@@ -27,6 +38,12 @@ RANGES = {
 
 # for IFC1010
 class Gamry_IErange_IFC1010(StrEnum):
+    """Current ranges for IFC1010 interface potentiostats.
+
+    The labels below correspond to 300 mA / 30 mA variants; multiply by 2.5
+    for 750 mA models and by 2.0 for 600 mA models.
+    """
+
     # NOTE: The ranges listed below are for 300 mA or 30 mA models. For 750 mA models, multiply the ranges by 2.5. For 600 mA models, multiply the ranges by 2.0.
     auto = "auto"
     # mode0 = "N/A"
@@ -48,6 +65,8 @@ class Gamry_IErange_IFC1010(StrEnum):
 
 
 class Gamry_IErange_REF600(StrEnum):
+    """Current ranges for Reference 600 / 620 potentiostats."""
+
     auto = "auto"
     # mode0 = "N/A"
     mode1 = "60pA"
@@ -69,6 +88,8 @@ class Gamry_IErange_REF600(StrEnum):
 
 # G750 is 7.5nA to 750mA
 class Gamry_IErange_PCI4G300(StrEnum):
+    """Current ranges for PCI4/G300 potentiostats (3 nA to 300 mA)."""
+
     auto = "auto"
     # mode0 = "N/A"
     # mode1 = "N/A"
@@ -89,6 +110,8 @@ class Gamry_IErange_PCI4G300(StrEnum):
 
 
 class Gamry_IErange_PCI4G750(StrEnum):
+    """Current ranges for PCI4/G750 potentiostats (7.5 nA to 750 mA)."""
+
     auto = "auto"
     # mode0 = "N/A"
     # mode1 = "N/A"
@@ -109,6 +132,8 @@ class Gamry_IErange_PCI4G750(StrEnum):
 
 
 class Gamry_IErange_dflt(StrEnum):
+    """Generic placeholder current ranges (mode0..mode15) for unknown models."""
+
     auto = "auto"
     mode0 = "mode0"
     mode1 = "mode1"
@@ -128,6 +153,8 @@ class Gamry_IErange_dflt(StrEnum):
     mode15 = "mode15"
 
 class Gamry_IErange_REF30K(StrEnum):
+    """Current ranges for Reference 30K booster potentiostats (300 pA to 30 A)."""
+
     auto = "auto"
     # mode0 = "mode0"
     # mode1 = "mode1"
@@ -147,6 +174,16 @@ class Gamry_IErange_REF30K(StrEnum):
     # mode15 = "mode15"
 
 def split_val_unit(val_string: str) -> tuple[float, str]:
+    """Split a value+unit string into a numeric magnitude and unit suffix.
+
+    Args:
+        val_string: String such as ``"30nA"`` or ``"7.5 mA"``.
+
+    Returns:
+        ``(number, unit)`` tuple where ``number`` is the parsed float (or
+        ``None`` on parse failure) and ``unit`` is the trailing alphabetic
+        suffix.
+    """
     def to_float(val):
         try:
             return float(val)
@@ -159,6 +196,17 @@ def split_val_unit(val_string: str) -> tuple[float, str]:
 
 
 def to_amps(number: float, unit: str) -> Union[float, None]:
+    """Convert a numeric value plus current unit suffix to amperes.
+
+    Args:
+        number: Numeric magnitude.
+        unit: Unit suffix; recognized values are ``aA``, ``fA``, ``pA``,
+            ``nA``, ``uA``, ``mA``, ``A``, ``kA`` (case-insensitive).
+
+    Returns:
+        The value expressed in amperes, or ``None`` if ``unit`` is not
+        recognized.
+    """
     unit = unit.lower()
     unit_map = {
         "aa": 1e-18,
@@ -176,8 +224,21 @@ def to_amps(number: float, unit: str) -> Union[float, None]:
     return number * exp
 
 
-def get_range(requested_range: Union[str, None], range_enum: StrEnum):
+def get_range(requested_range: Union[str, None], range_enum: StrEnum) -> StrEnum:
+    """Resolve a requested current range to a member of ``range_enum``.
 
+    Accepts the enum member name, the enum value (current label),
+    a numeric value in amperes, or a value+unit string. Falls back to
+    ``range_enum.auto`` when the request is ``None`` or cannot be parsed.
+
+    Args:
+        requested_range: User-supplied range specifier.
+        range_enum: Model-specific current-range ``StrEnum`` class.
+
+    Returns:
+        The selected ``range_enum`` member. When matched by amperage, returns
+        the smallest range whose magnitude is >= the request.
+    """
     if requested_range is None:
         LOGGER.warn("could not detect IErange, using 'auto'")
         return range_enum.auto

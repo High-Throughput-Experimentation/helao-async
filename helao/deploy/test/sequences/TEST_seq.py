@@ -1,6 +1,4 @@
-"""
-Sequence library for Orchestrator testing
-"""
+"""Sequence library for exercising orchestrator scheduling features."""
 
 __all__ = ["TEST_consecutive_noblocking"]
 
@@ -19,7 +17,25 @@ def TEST_consecutive_noblocking(
     plate_sample_no_list: List[int] = [1, 2, 3],
     *args,
     **kwargs,
-):
+) -> list:
+    """Plan repeated ``TEST_sub_noblocking`` experiments across sample numbers.
+
+    Generates one experiment per ``(sample_no, cycle)`` pair. After the first
+    cycle for each sample, subsequent experiments pull ``dummy_param`` from
+    the prior cycle's ``test_wait`` global to exercise param hand-off.
+
+    Args:
+        sequence_version: Library version tag.
+        wait_time: Base wait used inside each sub-experiment.
+        cycles: Number of cycles per sample.
+        dummy_list: Unused placeholder list, kept for parameter-typing tests.
+        plate_sample_no_list: Sample numbers to iterate over.
+        *args: Ignored positional arguments.
+        **kwargs: Ignored keyword arguments.
+
+    Returns:
+        Planned experiments for the orchestrator to enqueue.
+    """
     epm = ExperimentPlanMaker()
 
     for smp in plate_sample_no_list:

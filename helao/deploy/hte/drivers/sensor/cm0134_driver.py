@@ -1,3 +1,10 @@
+"""CM-0134 oxygen sensor driver (RS-485 / Modbus).
+
+Provides :class:`CM0134`, a Modbus driver that polls O2 ppm values into the
+action server's live buffer, and :class:`O2MonExec`, an executor that records
+those values for a configured duration.
+"""
+
 __all__ = ["CM0134", "O2MonExec"]
 
 import time
@@ -15,16 +22,27 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class CM0134:
-    """Device driver class for the CM0134 oxygen sensor using RS-485 communication.
+    """Modbus-RTU driver for the CM-0134 oxygen sensor.
+
+    Opens a Modbus serial connection on construction and starts a background
+    polling task that pushes O2 ppm readings into the action server's live
+    buffer under the ``o2_ppm`` key.
 
     Server config parameters:
-    "device": str -- port (e.g. "COM7") or device path (e.g. "/dev/ttyUSB0")
-    "address": int -- modbus device address
-    "baudrate": int -- serial communication baud rate (default 9600)
-
+        ``device``: COM port or device path (e.g. ``"COM7"`` or
+            ``"/dev/ttyUSB0"``).
+        ``address``: Modbus device address.
+        ``baudrate``: Serial baud rate (default 9600).
+        ``start_margin``: Margin appended to recording windows.
+        ``allow_no_sample``: Whether actions can run without samples.
     """
 
     def __init__(self, action_serv: Base):
+        """Open the Modbus connection and spawn the polling task.
+
+        Args:
+            action_serv: Action server providing configuration and live buffer.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.inst = minimalmodbus.Instrument(
@@ -43,7 +61,11 @@ class CM0134:
         self.polling_task = self.event_loop.create_task(self.poll_sensor_loop())
 
     async def poll_sensor_loop(self, frequency: int = 2):
-        """Continuous polling loop which populates live buffer with O2 ppm values."""
+        """Continuously read O2 ppm from the sensor and publish to the live buffer.
+
+        Args:
+            frequency: Target polling rate in Hz.
+        """
         waittime = 1.0 / frequency
         LOGGER.info("Starting polling loop")
         while True:
@@ -61,7 +83,7 @@ class CM0134:
             await asyncio.sleep(waittime)
 
     def shutdown(self):
-        """Stops polling task and closes serial device connection."""
+        """Cancel the polling task and close the underlying serial port."""
         try:
             self.polling_task.cancel()
         except asyncio.CancelledError:
@@ -70,16 +92,27 @@ class CM0134:
 
 
 class O2MonExec(Executor):
-    """O2 recording action written as an executor."""
+    """Executor that records the live-buffer O2 ppm value for the action duration."""
 
     def __init__(self, *args, **kwargs):
+        """Capture start time and the optional ``duration`` action parameter.
+
+        Args:
+            *args: Positional args forwarded to :class:`Executor`.
+            **kwargs: Keyword args forwarded to :class:`Executor`.
+        """
         super().__init__(*args, **kwargs)
         LOGGER.info("O2MonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 
-    async def _poll(self):
-        """Read O2 ppm from live buffer."""
+    async def _poll(self) -> dict:
+        """Read O2 ppm from the live buffer and report active/finished status.
+
+        Returns:
+            Dict with ``error``, ``status`` (``finished`` once ``duration``
+            has elapsed, ``active`` otherwise), and ``data`` keys.
+        """
         live_dict = {}
         o2_ppm, epoch_s = self.active.base.get_lbuf("o2_ppm")
         live_dict["o2_ppm"] = o2_ppm

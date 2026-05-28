@@ -1,9 +1,12 @@
-"""Gamry potentiostat driver using HelaoDriver abstract base class
+"""Gamry potentiostat driver built on the HelaoDriver abstract base class.
 
-This Gamry driver has zero dependencies on action server base object, and all
-exposed methods are intended to be blocking. Async should be handled in the server.
-All public methods must return a DriverResponse.
-
+Wraps the GamryCOM Windows COM API behind the HelaoDriver contract. All
+public driver methods are blocking and return a ``DriverResponse``; any async
+behavior is expected to be implemented in the calling action server. The
+driver chooses an appropriate ``GamryPstat`` model from ``GAMRY_DEVICES``
+based on the device name returned by ``GamryDeviceList``, configures
+sense/range/filter settings during setup, drives data acquisition via a
+``GamryDtaqSink``, and exposes EIS measurements through a ``ReadZ`` helper.
 """
 
 import sys
@@ -42,11 +45,32 @@ DUMMY_SINK = DummySink()
 
 
 class GamryDriver(HelaoDriver):
+    """HelaoDriver implementation for a Gamry potentiostat via GamryCOM.
+
+    Manages a single COM connection to one device in the GamryCOM device list,
+    holds the currently configured technique/signal/dtaq state, and exposes
+    blocking ``setup``/``measure``/``get_data``/``stop``/``cleanup`` methods
+    plus EIS helpers (``setup_eis``/``close_eis``).
+
+    Attributes:
+        dtaqsink: Event sink that buffers data points from the active dtaq.
+        device_name: Name reported by GamryCOM for the connected device.
+        model: ``GamryPstat`` descriptor selected based on ``device_name``.
+    """
+
     dtaqsink: GamryDtaqSink
     device_name: str
     model: GamryPstat
 
     def __init__(self, config: dict = {}):
+        """Initialize the driver and open the GamryCOM connection.
+
+        Args:
+            config: Driver configuration. Recognized keys are ``dev_id``
+                (index into ``GamryDeviceList.EnumSections``),
+                ``filterfreq_hz`` (analog input filter, default 1000 Hz), and
+                ``grounded`` (passed to ``SetGround``, default True).
+        """
         super().__init__(config=config)
         #
         self.device_name = "unknown"
@@ -69,6 +93,14 @@ class GamryDriver(HelaoDriver):
         LOGGER.debug(f"connected to {self.device_name} on device_id {self.device_id}")
 
     def connect(self) -> DriverResponse:
+        """Load the GamryCOM type library, open the device, and turn the cell off.
+
+        Selects the ``GamryPstat`` model based on the device-name prefix and
+        leaves the potentiostat in a safe ``CellOff`` state.
+
+        Returns:
+            ``DriverResponse`` reporting connection success or failure.
+        """
         try:
             self.connection_raised = True
             LOGGER.info(f"using device_id {self.device_id} from config")
@@ -96,7 +128,16 @@ class GamryDriver(HelaoDriver):
         return response
 
     def get_status(self, retries: int = 5) -> DriverResponse:
-        """Return current driver status."""
+        """Return the parsed instrument state reported by ``pstat.State()``.
+
+        Args:
+            retries: Currently unused retry hint.
+
+        Returns:
+            ``DriverResponse`` whose ``data`` is the key/value dictionary
+            parsed from the GamryCOM state string, or ``status=uninitialized``
+            if the pstat object has not been created.
+        """
         if self.pstat is not None:
             try:
                 self.state = self.pstat.State()
@@ -125,7 +166,34 @@ class GamryDriver(HelaoDriver):
         action_params: dict = {},  # for mapping action keys to signal keys
         ierange: Enum = "auto",
     ) -> DriverResponse:
-        """Set measurement conditions on potentiostat."""
+        """Configure the potentiostat for a single measurement.
+
+        Applies analog input ranges and filters, selects the I/E range, sets
+        the control mode, constructs the technique-specific dtaq and signal
+        COM objects, applies dtaq stop/threshold limits, and resolves any
+        ``signal.map_keys`` against the supplied ``action_params``.
+
+        Args:
+            technique: Technique descriptor specifying the dtaq, signal, and
+                range-handling flags.
+            signal_params: Parameters consumed by the GamrySignal object
+                (e.g. ``Vinit__V``, ``Vfinal__V``).
+            dtaq_params: Optional dtaq limit/threshold parameters. Keys must
+                appear in ``technique.dtaq.int_param_keys`` or
+                ``bool_param_keys``.
+            action_params: Action-server parameters used to fill in any
+                signal map keys that name a string source.
+            ierange: Requested current range identifier. Resolved against the
+                model-specific range enum by ``get_range``.
+
+        Returns:
+            ``DriverResponse`` reporting setup status.
+
+        Raises:
+            TypeError: If another technique is still active (non-``DummySink``).
+            KeyError: If the resolved signal parameters are missing keys
+                required by the technique.
+        """
         try:
             # check for ongoing measurement via dtaqsink
             if not isinstance(self.dtaqsink, DummySink):
@@ -279,7 +347,16 @@ class GamryDriver(HelaoDriver):
         return response
 
     def measure(self, ttl_params: dict = {}) -> DriverResponse:
-        """Apply signal and begin data acquisition."""
+        """Energize the cell and start dtaq data acquisition.
+
+        Args:
+            ttl_params: Optional ``{"TTLsend": <index>}`` selecting a digital
+                output line to assert before the measurement begins.
+
+        Returns:
+            ``DriverResponse`` with ``status=busy`` and the wall-clock
+            ``start_time`` in ``data`` on success.
+        """
         try:
             # emit TTL output
             ttl_send = ttl_params.get("TTLsend", -1)
@@ -315,7 +392,17 @@ class GamryDriver(HelaoDriver):
         return response
 
     def get_data(self, pump_rate: float) -> DriverResponse:
-        """Retrieve data from device buffer."""
+        """Pump COM events and return any newly acquired data points.
+
+        Args:
+            pump_rate: Argument forwarded to ``comtypes.client.PumpEvents``,
+                expressed in seconds.
+
+        Returns:
+            ``DriverResponse`` whose ``data`` maps each output key of the
+            active dtaq to a list of new samples since the previous call, and
+            whose ``status`` is ``busy`` while points are still arriving.
+        """
         try:
             client.PumpEvents(pump_rate)
             total_points = len(self.dtaqsink.acquired_points)
@@ -353,7 +440,7 @@ class GamryDriver(HelaoDriver):
         return response
 
     async def stop(self) -> DriverResponse:
-        """General stop method to abort all active methods e.g. motion, I/O, compute."""
+        """Abort the currently running dtaq and mark the sink as done."""
         try:
             if not self.stopping:
                 if self.dtaqsink.dtaq is not None:
@@ -372,8 +459,18 @@ class GamryDriver(HelaoDriver):
             )
         return response
 
-    def cleanup(self, ttl_params: dict = {}):
-        """Release state objects but don't close pstat."""
+    def cleanup(self, ttl_params: dict = {}) -> DriverResponse:
+        """Turn the cell off, clear TTL output, and drop technique state.
+
+        Does not close the COM connection.
+
+        Args:
+            ttl_params: Optional ``{"TTLsend": <index>}`` selecting a digital
+                output line to de-assert.
+
+        Returns:
+            ``DriverResponse`` reporting cleanup status.
+        """
         try:
             if self.pstat is not None:
                 # disable TTL output
@@ -402,7 +499,7 @@ class GamryDriver(HelaoDriver):
         return response
 
     def disconnect(self) -> DriverResponse:
-        """Release connection to resource."""
+        """Turn the cell off and close the GamryCOM pstat handle."""
         try:
             if self.pstat is not None:
                 self.pstat.SetCell(self.GamryCOM.CellOff)
@@ -422,7 +519,12 @@ class GamryDriver(HelaoDriver):
         return response
 
     def reset(self) -> DriverResponse:
-        """Reinitialize driver, force-close old connection if necessary."""
+        """Force-kill the GamryCOM process and reconnect.
+
+        Used to recover from a hung COM server: closes the existing pstat,
+        terminates any running GamryCOM processes via ``kill_gamrycom``,
+        then re-runs ``connect``.
+        """
         try:
             self.pstat.SetCell(self.GamryCOM.CellOff)
             self.pstat.Close()
@@ -446,6 +548,16 @@ class GamryDriver(HelaoDriver):
         return response
 
     def kill_gamrycom(self) -> DriverResponse:
+        """Terminate any running GamryCOM Windows processes via psutil.
+
+        Iterates ``psutil.process_iter`` looking for processes whose name
+        starts with ``"gamrycom"`` and issues up to three ``terminate`` calls
+        with short sleeps between them.
+
+        Returns:
+            ``DriverResponse`` with ``status=ok`` if all GamryCOM processes
+            were terminated (or none were running).
+        """
         try:
             process_ids = {
                 p.pid: p
@@ -484,7 +596,10 @@ class GamryDriver(HelaoDriver):
         return response
 
     def shutdown(self) -> None:
-        """Pass-through shutdown events for BaseAPI."""
+        """Clean up technique state, disconnect, and kill GamryCOM.
+
+        Invoked by ``BaseAPI`` when the action server is shutting down.
+        """
         self.cleanup()
         self.disconnect()
         try:
@@ -502,7 +617,24 @@ class GamryDriver(HelaoDriver):
         z_expected: float,
         set_ierange_ac: bool = False,
     ) -> DriverResponse:
-        """Set up EIS measurement on potentiostat."""
+        """Build a ``ReadZ`` helper for a single-frequency EIS measurement.
+
+        Args:
+            control_mode: Potentiostatic or galvanostatic control mode.
+            fast: If True selects ``ReadZSpeedFast``; otherwise
+                ``ReadZSpeedNorm``.
+            frequency: Excitation frequency in Hz.
+            ac_amplitude: AC amplitude (V for potentiostatic, A for
+                galvanostatic).
+            dc_amplitude: DC bias (V for potentiostatic, A for galvanostatic).
+            z_expected: Expected impedance magnitude, used for range
+                selection.
+            set_ierange_ac: If True use ``TestIERangeAC`` instead of
+                ``TestIERange`` when picking the current range.
+
+        Returns:
+            ``DriverResponse`` reporting EIS setup status.
+        """
         try:
             # check for ongoing measurement via dtaqsink
             if not isinstance(self.dtaqsink, DummySink):
@@ -536,8 +668,8 @@ class GamryDriver(HelaoDriver):
             )
         return response
 
-    def close_eis(self):
-        """Close EIS measurement on potentiostat."""
+    def close_eis(self) -> DriverResponse:
+        """Stop the EIS dtaq, turn the cell off, and clear EIS state."""
         try:
             if self.dtaq is not None:
                 self.dtaq.Run(False)
@@ -565,18 +697,34 @@ class GamryDriver(HelaoDriver):
             self.counter = 0
         return response
 
-    def get_gamry_state(self):
+    def get_gamry_state(self) -> dict:
+        """Return the raw ``pstat.State()`` string parsed into a key/value dict."""
         state = self.pstat.State()
         state = dict([x.split("\t") for x in state.split("\r\n") if x])
         return state
 
 
 class GamryPoller(DriverPoller):
-    """ Note: this poller conflicts with running techniques. 
+    """Background poller that samples voltage/current/aux directly from the pstat.
+
+    Note: this poller calls the same COM methods used by running techniques,
+    so it conflicts with any active measurement and should only be used when
+    the driver is idle.
+
+    Attributes:
+        driver: The ``GamryDriver`` instance whose pstat handle is polled.
     """
+
     driver: GamryDriver
 
-    def get_data(self):
+    def get_data(self) -> DriverResponse:
+        """Sample ``Ewe_V``, ``I_A``, and ``Aux_V`` and append driver status.
+
+        Returns:
+            ``DriverResponse`` whose ``data`` contains the three measured
+            quantities plus the parsed pstat state, or ``status=uninitialized``
+            if the pstat handle is not open.
+        """
         try:
             if self.driver.pstat.TestIsOpen():
                 poll_data = {

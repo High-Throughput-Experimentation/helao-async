@@ -1,3 +1,5 @@
+"""Heuristic bubble detection from open-circuit potential traces."""
+
 from scipy.signal import find_peaks
 import statistics
 import pandas as pd
@@ -15,8 +17,26 @@ def bubble_detection(
     signal_change_threshold: float,
     amplitude_threshold: float,
 ) -> bool:
-    """
-    data must be pd.Dataframe with t, and E column
+    """Detect bubble formation in a potential-time trace using four heuristics.
+
+    Runs four independent tests on the input trace and returns ``True`` if any
+    of them fires. The tests are: relative standard deviation of ``Ewe_V``
+    exceeding ``RSD_threshold``; the most recent ``Ewe_V`` sample falling below
+    ``simple_threshold``; the largest 0.5-second-spaced sample-to-sample delta
+    exceeding ``signal_change_threshold``; and the mean peak-to-trough
+    amplitude exceeding ``amplitude_threshold``.
+
+    Args:
+        data: Trace containing ``t_s`` (time in seconds) and ``Ewe_V``
+            (working-electrode potential) columns.
+        RSD_threshold: Relative standard deviation cutoff in percent.
+        simple_threshold: Lower bound on the final ``Ewe_V`` sample.
+        signal_change_threshold: Maximum allowed change between successive
+            0.5-second-spaced samples.
+        amplitude_threshold: Maximum allowed mean peak-to-trough amplitude.
+
+    Returns:
+        ``True`` if any heuristic indicates a bubble, otherwise ``False``.
     """
     # relative standard deviation test
     SD = statistics.stdev(list(data["Ewe_V"]))

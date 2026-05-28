@@ -1,3 +1,9 @@
+"""Helpers for LEANCAT's per-run file/stream loggers.
+
+The active deployment wires up ``main_log`` and ``script_log`` elsewhere;
+this module exposes :func:`setup_logger` used to create those handles.
+"""
+
 import os
 import sys
 import logging
@@ -22,6 +28,17 @@ log_level_acquired = True
 
 
 def setup_logger(log_name, log_folder, level) -> logging.Logger:
+    """Create a logger with a timestamped file handler and a stream handler.
+
+    Args:
+        log_name: Logger name. The output file is
+            ``<log_folder>/<log_name>_<timestamp>.log``.
+        log_folder: Directory that will hold the log file.
+        level: Logging level applied to the logger.
+
+    Returns:
+        The configured :class:`logging.Logger` instance.
+    """
     date = datetime.now()
     date_formatted = date.strftime("%Y_%m_%dT%H_%M_%S_%f%z")
     log_path = os.path.join(log_folder, f"{log_name}_{date_formatted}.log")

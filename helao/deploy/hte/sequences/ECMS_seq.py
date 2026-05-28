@@ -1,4 +1,10 @@
-"""Sequence library for AutoGDE"""
+"""Sequence library for AutoGDE / ECMS (electrochemistry + mass spectrometry).
+
+Each public ``ECMS_*`` function builds an experiment list via
+``ExperimentPlanMaker``. Sequences typically chain cell setup, headspace
+purges, CO2 baselines, mass-spec calibration, and electrochemical actions
+(CV/CA/pulseCA) for both single-pass and recirculating configurations.
+"""
 
 __all__ = [
     "ECMS_initiation",
@@ -41,7 +47,29 @@ def ECMS_initiation(
     MS_baseline_duration_1: float = 120,
     MS_baseline_duration_2: float = 90,
     liquid_drain_time: float = 60.0,
-):
+) -> list:
+    """ECMS cell setup: load sample, vacuum, fill, CO2 baseline, drain.
+
+    Performs the standard pre-run housekeeping followed by two CO2 baseline acquisitions at fast and slow flow rates.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        vacuum_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -106,7 +134,31 @@ def ECMS_initiation_recirculation(
     MS_baseline_duration_2: float = 90,
     tube_clear_time: float = 20,
     liquid_drain_time: float = 60.0,
-):
+) -> list:
+    """ECMS cell setup variant with electrolyte recirculation reservoir fill.
+
+    Same shape as :func:`ECMS_initiation` but fills a recirculation reservoir before the cell and drains via the recirculation loop.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        liquid_fill_time: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        vacuum_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        tube_clear_time: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -179,7 +231,32 @@ def ECMS_initiation_recirculation_mixedreactant(
     MS_baseline_duration_2: float = 180,
     tube_clear_time: float = 20,
     liquid_drain_time: float = 60.0,
-):
+) -> list:
+    """ECMS recirculation setup with mixed reactant calibration baseline.
+
+    Like :func:`ECMS_initiation_recirculation` but replaces the second CO2 baseline with a ``ECMS_sub_cali`` mixed-reactant calibration.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        liquid_fill_time: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        vacuum_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
+        Califlowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        tube_clear_time: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -266,7 +343,43 @@ def ECMS_repeat_CV(
     liquid_drain_time: float = 60.0,
     # electrolyte_recirculation: str = "on",
     # liquid_cleancell_time: float = 120,
-):
+) -> list:
+    """Repeat CV sweeps at two scan rates with CO2 baselines per cycle.
+
+    For ``num_repeats`` iterations: fill, run two CO2 baselines, then run CV at ``ScanRate_V_s_1`` and CV at ``ScanRate_V_s_2``, return to normal state and drain.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        WE_potential_init__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
+        WE_potential_final__V: Parameter passed through to the sub-experiments.
+        ScanRate_V_s_1: Parameter passed through to the sub-experiments.
+        ScanRate_V_s_2: Parameter passed through to the sub-experiments.
+        Cycles: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset: Parameter passed through to the sub-experiments.
+        MS_equilibrium_time: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -401,7 +514,47 @@ def ECMS_repeat_CV_recirculation(
     tube_clear_delaytime: float = 40.0,
     liquid_drain_time: float = 80.0,
     # liquid_cleancell_time: float = 120,
-):
+) -> list:
+    """Recirculating-cell variant of :func:`ECMS_repeat_CV` with cleaning cycles.
+
+    Adds ``cleaning_times`` clean cycles between CVs and uses the recirculation drain.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        WE_potential_init__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
+        WE_potential_final__V: Parameter passed through to the sub-experiments.
+        ScanRate_V_s_1: Parameter passed through to the sub-experiments.
+        ScanRate_V_s_2: Parameter passed through to the sub-experiments.
+        Cycles: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset: Parameter passed through to the sub-experiments.
+        MS_equilibrium_time: Parameter passed through to the sub-experiments.
+        cleaning_times: Parameter passed through to the sub-experiments.
+        liquid_fill_time: Parameter passed through to the sub-experiments.
+        tube_clear_time: Parameter passed through to the sub-experiments.
+        tube_clear_delaytime: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -679,7 +832,48 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
     tube_clear_delaytime: float = 40.0,
     liquid_drain_time: float = 80.0,
     # liquid_cleancell_time: float = 120,
-):
+) -> list:
+    """Recirculating CV protocol using a mixed-reactant calibration baseline.
+
+    Adapts :func:`ECMS_repeat_CV_recirculation` to take a calibration baseline at each iteration.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
+        Califlowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        num_repeats: Parameter passed through to the sub-experiments.
+        WE_potential_init__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
+        WE_potential_final__V: Parameter passed through to the sub-experiments.
+        ScanRate_V_s_1: Parameter passed through to the sub-experiments.
+        ScanRate_V_s_2: Parameter passed through to the sub-experiments.
+        Cycles: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset: Parameter passed through to the sub-experiments.
+        MS_equilibrium_time: Parameter passed through to the sub-experiments.
+        cleaning_times: Parameter passed through to the sub-experiments.
+        liquid_fill_time: Parameter passed through to the sub-experiments.
+        tube_clear_time: Parameter passed through to the sub-experiments.
+        tube_clear_delaytime: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -829,7 +1023,46 @@ def ECMS_CV_recirculation_mixedreactant(
     tube_clear_delaytime: float = 40.0,
     liquid_drain_time: float = 170.0,
     # liquid_cleancell_time: float = 120,
-):
+) -> list:
+    """Single CV pass with mixed-reactant calibration baseline (recirculating cell).
+
+    One-shot variant of the recirculating mixed-reactant CV protocol.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
+        Califlowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        WE_potential_init__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
+        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
+        WE_potential_final__V: Parameter passed through to the sub-experiments.
+        ScanRate_V_s_1: Parameter passed through to the sub-experiments.
+        Cycles: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset: Parameter passed through to the sub-experiments.
+        MS_equilibrium_time: Parameter passed through to the sub-experiments.
+        cleaning_times: Parameter passed through to the sub-experiments.
+        liquid_fill_time: Parameter passed through to the sub-experiments.
+        tube_clear_time: Parameter passed through to the sub-experiments.
+        tube_clear_delaytime: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -953,7 +1186,37 @@ def ECMS_series_CA(
     liquid_drain_time: float = 60.0,
     # electrolyte_recirculation: str = "on",
     # liquid_cleancell_time: float = 120,
-):
+) -> list:
+    """Run a CA series sweeping through ``WE_potential__V`` values.
+
+    For each potential: fill, run CO2 baselines, run CA, then drain.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        MS_equilibrium_time: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1153,7 +1416,41 @@ def ECMS_series_CA_recirculation(
     tube_clear_time: float = 20,
     tube_clear_delaytime: float = 40.0,
     # liquid_cleancell_time: float = 120,
-):
+) -> list:
+    """Recirculating-cell variant of :func:`ECMS_series_CA`.
+
+    Adds the recirculation reservoir fill and drain and inserts cleaning cycles.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        MS_equilibrium_time: Parameter passed through to the sub-experiments.
+        cleaning_times: Parameter passed through to the sub-experiments.
+        liquid_fill_time: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+        tube_clear_time: Parameter passed through to the sub-experiments.
+        tube_clear_delaytime: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1280,7 +1577,42 @@ def ECMS_series_CA_recirculation_mixedreactant(
     tube_clear_time: float = 20,
     tube_clear_delaytime: float = 40.0,
     # liquid_cleancell_time: float = 120,
-):
+) -> list:
+    """Recirculating CA series with mixed-reactant calibration baselines.
+
+    Same loop as :func:`ECMS_series_CA_recirculation` but with ``ECMS_sub_cali`` baselines.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
+        Califlowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        MS_equilibrium_time: Parameter passed through to the sub-experiments.
+        cleaning_times: Parameter passed through to the sub-experiments.
+        liquid_fill_time: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+        tube_clear_time: Parameter passed through to the sub-experiments.
+        tube_clear_delaytime: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1407,7 +1739,41 @@ def ECMS_series_CA_recirculation_mixedthreereactant(
     tube_clear_time: float = 10,
     tube_clear_delaytime: float = 40.0,
     # liquid_cleancell_time: float = 120,
-):
+) -> list:
+    """Recirculating CA series with a three-reactant calibration baseline.
+
+    Three-gas variant of the mixed-reactant CA protocol.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
+        Califlowrate_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        MS_equilibrium_time: Parameter passed through to the sub-experiments.
+        cleaning_times: Parameter passed through to the sub-experiments.
+        liquid_fill_time: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+        tube_clear_time: Parameter passed through to the sub-experiments.
+        tube_clear_delaytime: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1536,7 +1902,42 @@ def ECMS_series_pulseCA(
     AcqInterval__s: float = 0.01,  # acquisition rate
     run_OCV: bool = False,
     Tocv__s: float = 60.0,
-):
+) -> list:
+    """Pulsed CA series alternating between potentials in a recirculating cell.
+
+    Runs sequence of pulsed CA segments separated by recovery holds.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
+        WE_pulsepotential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        MS_equilibrium_time: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+        Vinit__V: Parameter passed through to the sub-experiments.
+        Tinit__s: Parameter passed through to the sub-experiments.
+        Tstep__s: Parameter passed through to the sub-experiments.
+        Cycles: Parameter passed through to the sub-experiments.
+        AcqInterval__s: Parameter passed through to the sub-experiments.
+        Tocv__s: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1614,7 +2015,31 @@ def ECMS_MS_calibration_recirculation(
     MSsignal_quilibrium_time: float = 300,
     liquid_drain_time: float = 60.0,
     tube_clear_time: float = 20,
-):
+) -> list:
+    """Calibrate the mass spec in the recirculating ECMS configuration.
+
+    Cycles through calibration mixtures and records the resulting MS signal levels.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        liquid_fill_time: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
+        Califlowrate_sccm: Parameter passed through to the sub-experiments.
+        MSsignal_quilibrium_time_initial: Parameter passed through to the sub-experiments.
+        MSsignal_quilibrium_time: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+        tube_clear_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1780,7 +2205,29 @@ def ECMS_MS_calibration(
     MSsignal_quilibrium_time_initial: float = 480,
     MSsignal_quilibrium_time: float = 300,
     liquid_drain_time: float = 60.0,
-):
+) -> list:
+    """Calibrate the mass spec in the non-recirculating configuration.
+
+    Single-pass variant of the MS calibration sequence.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
+        Califlowrate_sccm: Parameter passed through to the sub-experiments.
+        MSsignal_quilibrium_time_initial: Parameter passed through to the sub-experiments.
+        MSsignal_quilibrium_time: Parameter passed through to the sub-experiments.
+        liquid_drain_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1844,7 +2291,27 @@ def ECMS_MS_pulsecalibration(
     MSsignal_quilibrium_time: float = 10,
     calibration_cycles: int = 15,
     # liquid_drain_time: float = 60.0,
-):
+) -> list:
+    """Pulsed MS calibration alternating gas mixtures.
+
+    Calibrates the MS by toggling between calibration gases.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
+        liquid_backward_time: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        Califlowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        MSsignal_quilibrium_time: Parameter passed through to the sub-experiments.
+        calibration_cycles: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1926,7 +2393,37 @@ def ECMS_series_CA_change_gasflow(
     PreExp_Califlowrate2_sccm: List[float] = [10.0, 0.0],
     # MSsignal_quilibrium_time_initial: float = 480,
     PreExp_MSsignal_quilibrium_time: float = 100,
-):
+) -> list:
+    """Run a CA series while stepping through CO2 flow rates.
+
+    Allows the operator to study the flow-rate dependence of the products with one sequence.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
+        flowrate_sccm: Parameter passed through to the sub-experiments.
+        flow_ramp_sccm: Parameter passed through to the sub-experiments.
+        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
+        WE_potential__V: Parameter passed through to the sub-experiments.
+        WE_versus: Parameter passed through to the sub-experiments.
+        ref_type: Parameter passed through to the sub-experiments.
+        pH: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        SampleRate: Parameter passed through to the sub-experiments.
+        IErange: Parameter passed through to the sub-experiments.
+        ref_offset__V: Parameter passed through to the sub-experiments.
+        postCA_MS_equilibrium_time: Parameter passed through to the sub-experiments.
+        CA_flow_change_duration_sec: Parameter passed through to the sub-experiments.
+        CA_CO2_flow_rate_sccm: Parameter passed through to the sub-experiments.
+        PreExp_CO2flowrate_sccm: Parameter passed through to the sub-experiments.
+        PreExp_Califlowrate2_sccm: Parameter passed through to the sub-experiments.
+        PreExp_MSsignal_quilibrium_time: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 

@@ -1,3 +1,12 @@
+"""Filesystem-backed accessor for legacy HTE plate and platemap records.
+
+``HTELegacyAPI`` reads the plate ``.info`` files and platemap ``mp.txt``
+files stored under fixed network paths (``J:\\hte_jcap_app_proto``), parses
+their indentation-based key/value structure into nested dicts, and exposes
+helpers for retrieving the platemap, the element list, and the
+multi-element ink concentration matrix for a given ``plateid``.
+"""
+
 __all__ = ["HTELegacyAPI"]
 
 import os
@@ -13,8 +22,14 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class HTELegacyAPI:
-    def __init__(self):
+    """File-based accessor for the legacy HTE plate/platemap directory tree.
 
+    Caches per-``plateid`` lookups (info file, platemap path, parsed
+    platemap, element list and info path) so repeated queries are cheap.
+    """
+
+    def __init__(self):
+        """Initialise the cache dicts and the platemap/plate search paths."""
         self.PLATEMAPFOLDERS = [
             r"J:\hte_jcap_app_proto\map",
         ]
@@ -30,16 +45,27 @@ class HTELegacyAPI:
         self.els_cache = {}
 
     @property
-    def has_access(self):
+    def has_access(self) -> bool:
+        """Return ``True`` when at least one platemap and one plate folder exist."""
         return any([os.path.exists(mp) for mp in self.PLATEMAPFOLDERS]) and any(
             [os.path.exists(pp) for pp in self.PLATEFOLDERS]
         )
 
     def get_rcp_plateid(self, plateid: int):
+        """Log a lookup request and return ``None`` (RCP lookup is unimplemented)."""
         LOGGER.info(f" ... get rcp for plateid: {plateid}")
         return None
 
     def get_info_plateid(self, plateid: int):
+        """Return the platemap dict-list for a plate, or ``None`` if missing.
+
+        Args:
+            plateid: Numeric plate identifier.
+
+        Returns:
+            The platemap as returned by ``get_platemap_plateid``, or
+            ``None`` if no info file exists for ``plateid``.
+        """
         infod = self.importinfo(plateid)
         # 1. checks that the plate_id (info file) exists
         if infod is not None:
@@ -60,7 +86,8 @@ class HTELegacyAPI:
         else:
             return None
 
-    def check_plateid(self, plateid: int):
+    def check_plateid(self, plateid: int) -> bool:
+        """Return ``True`` if an info file exists for ``plateid``."""
         infod = self.importinfo(plateid)
         # 1. checks that the plate_id (info file) exists
         if infod is not None:
@@ -69,6 +96,7 @@ class HTELegacyAPI:
             return False
 
     def check_printrecord_plateid(self, plateid: int):
+        """Return ``True`` if a print record is present in the plate info."""
         infod = self.importinfo(plateid)
         if infod is not None:
             if "prints" not in infod:
@@ -77,6 +105,7 @@ class HTELegacyAPI:
                 return True
 
     def check_annealrecord_plateid(self, plateid: int):
+        """Return ``True`` if an anneal record is present in the plate info."""
         infod = self.importinfo(plateid)
         if infod is not None:
             if "anneals" not in infod:
@@ -84,7 +113,16 @@ class HTELegacyAPI:
             else:
                 return True
 
-    def get_platemap_plateid(self, plateid: int):
+    def get_platemap_plateid(self, plateid: int) -> list:
+        """Return the parsed platemap for a plate id (cached).
+
+        Args:
+            plateid: Numeric plate identifier.
+
+        Returns:
+            List of per-sample dicts from the platemap file, or ``[]`` when
+            no platemap path can be resolved.
+        """
         if plateid in self.map_cache.keys():
             return self.map_cache[plateid]
         else:
@@ -103,6 +141,28 @@ class HTELegacyAPI:
         exclude_elements_list=[""],
         return_defaults_if_none=False,
     ):  # print_key_or_keyword can be e.g. "print__3" or screening_print_id
+        """Return the element list for a plate, walking the lineage if needed.
+
+        Walks ``infofiled["lineage"]`` upward until a parent info file with
+        the requested print record is found. Optionally returns the
+        multi-element ink concentration matrix as well.
+
+        Args:
+            plateid: Either a plate id or a pre-loaded info dict.
+            multielementink_concentrationinfo_bool: If ``True``, also return
+                the per-channel concentration info via
+                ``get_multielementink_concentrationinfo``.
+            print_key_or_keyword: Either ``"screening_print_id"`` or an
+                explicit print key such as ``"print__3"``.
+            exclude_elements_list: Element symbols to filter out.
+            return_defaults_if_none: Forwarded to
+                ``get_multielementink_concentrationinfo``.
+
+        Returns:
+            The list of element symbols, or a ``(els, conc_info)`` tuple
+            when ``multielementink_concentrationinfo_bool`` is set, or
+            ``None`` if the required records cannot be located.
+        """
         if isinstance(plateid, dict):
             infofiled = plateid
         else:
@@ -154,10 +214,22 @@ class HTELegacyAPI:
     ##########################################################################
     # Helper functions
     ##########################################################################
-    def getnumspaces(self, a):
+    def getnumspaces(self, a) -> int:
+        """Return the number of leading space characters in ``a``."""
         return len(a) - len(a.lstrip(" "))
 
     def rcp_to_dict(self, rcppath):  # read standard rcp/exp/ana/info structure to dict
+        """Parse an indentation-structured RCP/EXP/ANA/INFO file into a nested dict.
+
+        Supports either a plain text file or a ``*.copied.zip`` archive (in
+        which case the matching ``.rcp``/``.exp``/``.ana`` member is read).
+
+        Args:
+            rcppath: Path to the file or zip archive.
+
+        Returns:
+            Nested dictionary representation of the file.
+        """
         dlist = []
 
         def _tab_level(astr):
@@ -231,6 +303,24 @@ class HTELegacyAPI:
         return_pmidstr=False,
         pmidstr=None,
     ):
+        """Resolve the on-disk platemap file path for ``plateid``.
+
+        Reads the plate's info file to find the screening map id, then
+        searches the platemap folder for a matching ``*-mp.txt`` file.
+
+        Args:
+            plateid: Numeric plate identifier.
+            erroruifcn: Optional callable invoked on lookup failure to obtain
+                a fallback path interactively.
+            infokey: Key string to search for in the info file when no
+                ``pmidstr`` is supplied.
+            return_pmidstr: When ``True``, return ``(path, pmidstr)``.
+            pmidstr: Pre-known platemap id string; bypasses the info lookup.
+
+        Returns:
+            The resolved platemap path, or ``(path, pmidstr)`` when
+            ``return_pmidstr`` is true.
+        """
         if plateid in self.pmpath_pid_cache.keys():
             p, pmidstr = self.pmpath_pid_cache[plateid]
         else:
@@ -278,6 +368,14 @@ class HTELegacyAPI:
         return (p, pmidstr) if return_pmidstr else p
 
     def importinfo(self, plateid: int):
+        """Load and cache the parsed ``.info`` file for ``plateid``.
+
+        Args:
+            plateid: Numeric plate identifier.
+
+        Returns:
+            The parsed info dictionary, or ``None`` if no info file exists.
+        """
         if plateid in self.info_cache.keys():
             return self.info_cache[plateid]
         else:
@@ -296,8 +394,18 @@ class HTELegacyAPI:
             self.info_cache[plateid] = infofiled
             return infofiled
 
-    def tryprependpath(self, preppendfolderlist, p, testfile=True, testdir=True):
-        # if (testfile and os.path.isfile(p)) or (testdir and os.path.isdir(p)):
+    def tryprependpath(self, preppendfolderlist, p, testfile=True, testdir=True) -> str:
+        """Return ``p`` joined under the first folder in which it resolves.
+
+        Args:
+            preppendfolderlist: Folders to try prepending to ``p``.
+            p: Relative path to resolve.
+            testfile: When ``True``, accept a path that resolves to a file.
+            testdir: When ``True``, accept a path that resolves to a directory.
+
+        Returns:
+            The first matching joined path, or ``""`` if none match.
+        """
         if os.path.isfile(p):
             return p
         p = p.strip(chr(47)).strip(chr(92))
@@ -308,6 +416,16 @@ class HTELegacyAPI:
         return ""
 
     def getinfopath_plateid(self, plateid: int, erroruifcn=None):
+        """Resolve the on-disk ``.info`` file path for ``plateid`` (cached).
+
+        Args:
+            plateid: Numeric plate identifier.
+            erroruifcn: Optional callable used to obtain a fallback path
+                when no info file is found automatically.
+
+        Returns:
+            The resolved info file path, or ``None`` if none exists.
+        """
         if plateid in self.infopath_cache.keys():
             return self.infopath_cache[plateid]
         else:
@@ -323,14 +441,30 @@ class HTELegacyAPI:
             self.infopath_cache[plateid] = p
             return p
 
-    def filedict_lines(self, lines):
+    def filedict_lines(self, lines) -> dict:
+        """Parse indentation-structured lines into a nested dict.
+
+        Args:
+            lines: Iterable of raw text lines (blank lines are dropped).
+
+        Returns:
+            Nested dict representation of the indented key/value structure.
+        """
         lines = [l for l in lines if len(l.strip()) > 0]
         exptuplist = []
         while len(lines) > 0:
             exptuplist += [self.createnestparamtup(lines)]
         return dict([self.createdict_tup(tup) for tup in exptuplist])
 
-    def createnestparamtup(self, lines):
+    def createnestparamtup(self, lines) -> tuple:
+        """Pop a line and all of its deeper-indented children from ``lines``.
+
+        Args:
+            lines: List of raw text lines; consumed in place.
+
+        Returns:
+            A ``(line_without_leading_space, child_tuples)`` tuple.
+        """
         ln = str(lines.pop(0).rstrip())
         numspaces = self.getnumspaces(ln)
         subl = []
@@ -340,7 +474,16 @@ class HTELegacyAPI:
 
         return (ln.lstrip(" "), subl)
 
-    def createdict_tup(self, nam_listtup):
+    def createdict_tup(self, nam_listtup) -> tuple:
+        """Convert a nested ``(line, children)`` tuple to a ``(key, value)`` pair.
+
+        Args:
+            nam_listtup: Tuple produced by ``createnestparamtup``.
+
+        Returns:
+            A ``(key, value)`` tuple where ``value`` is either the scalar
+            partitioned from the line, or a nested dict built recursively.
+        """
         k_vtup = self.partitionlineitem(nam_listtup[0])
         if len(nam_listtup[1]) == 0:
             return k_vtup
@@ -350,7 +493,23 @@ class HTELegacyAPI:
     def get_multielementink_concentrationinfo(
         self, printd, els, return_defaults_if_none=False
     ):  # None if nothing to report, (True, str) if error, (False, (cels_set_ordered, conc_el_chan)) with the set of elements and how to caclualte their concentration from the platemap
+        """Compute how to derive per-element concentrations from a platemap row.
 
+        Inspects ``concentration_elements`` and ``concentration_values`` on
+        the print dict to build a ``(cels_set_ordered, conc_el_chan)`` pair
+        where ``conc_el_chan`` is a matrix mapping ink channel intensities
+        to element concentrations.
+
+        Args:
+            printd: Print record dict.
+            els: List of element symbols associated with the print.
+            return_defaults_if_none: When ``True``, fall back to identity-
+                style defaults if concentration info is missing.
+
+        Returns:
+            ``None`` if there is nothing to report; ``(True, message)`` on
+            error; ``(False, (cels_set_ordered, conc_el_chan))`` on success.
+        """
         searchstr1 = "concentration_elements"
         searchstr2 = "concentration_values"
         if not (searchstr1 in printd and searchstr2 in printd):
@@ -427,11 +586,17 @@ class HTELegacyAPI:
             return False, (els, numpy.identity(len(els), dtype="float64") * conclist[0])
         return None
 
-    def partitionlineitem(self, ln):
+    def partitionlineitem(self, ln) -> tuple:
+        """Split ``"key: value"`` at the first colon, stripping whitespace."""
         a, b, c = ln.strip().partition(":")
         return (a.strip(), c.strip())
 
     def myeval(self, c):
+        """Coerce a platemap cell value into a Python scalar.
+
+        Handles ``None``/``nan`` sentinels and strips leading zeros before
+        evaluating with the built-in ``eval``.
+        """
         if c == "None":
             c = None
         elif c == "nan" or c == "NaN":
@@ -450,8 +615,22 @@ class HTELegacyAPI:
         returnfiducials: Optional[bool] = False,
         erroruifcn=None,
         lines: Optional[list] = None,
-    ):
+    ) -> tuple:
+        """Parse a single ``-mp.txt`` platemap file into a list of sample dicts.
 
+        Args:
+            p: Path to the platemap file (ignored when ``lines`` is given).
+            returnfiducials: When ``True``, parse and return the fiducial
+                coordinates from the file header.
+            erroruifcn: Optional callable used to obtain a fallback path
+                when ``p`` cannot be opened.
+            lines: Optional pre-read list of lines (skips disk read).
+
+        Returns:
+            A ``(dlist, fid)`` tuple. ``dlist`` is the list of per-sample
+            dicts (with a synthesised ``sample_no`` key when missing) and
+            ``fid`` is the parsed fiducial list (empty when not requested).
+        """
         dlist = []
         fid = []
         if lines is None:

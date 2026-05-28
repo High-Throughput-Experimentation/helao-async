@@ -1,3 +1,5 @@
+"""Helper for resolving HELAO output files across RUNS_* state directories."""
+
 import os
 from pathlib import Path
 from typing import Union
@@ -7,54 +9,36 @@ from .hlo_data import read_hlo
 
 
 class FileMapper:
-    """
-    FileMapper is a class that helps in mapping and locating files within a specified directory structure.
-    It provides methods to locate, read, and process files based on their paths and states.
+    """Locate and read files within a run tree across its lifecycle states.
+
+    HELAO writes output beneath ``<root>/RUNS_<state>/...`` where ``<state>``
+    cycles through ``ACTIVE``, ``FINISHED``, ``SYNCED``, ``DIAG``, and
+    ``NOSYNC`` as a run progresses, plus a parallel ``PROCESSES`` tree.
+    A :class:`FileMapper` is constructed from any path inside one of those
+    trees and exposes ``read_*`` methods that resolve a path relative to
+    the ``RUNS_*`` root and try each state directory in turn.
 
     Attributes:
-        inputfile (Path or None): The absolute path of the input file if it exists, otherwise None.
-        inputdir (Path): The absolute path of the input directory.
-        inputparts (list): A list of parts of the input directory path.
-        runpos (int): The position of the "RUNS_*" or "PROCESSES" directory in the path.
-        prestr (str): The path string up to the "RUNS_*" or "PROCESSES" directory.
-        states (list): A list of states used to identify different run directories.
-        relstrs (list): A list of relative paths of files within the "RUNS_*" or "PROCESSES" directories.
-
-    Methods:
-        __init__(save_path: Union[str, Path]):
-            Initializes the FileMapper with the given save path.
-
-        locate(p: str) -> Union[str, None]:
-            Locates the file path based on the given relative path and returns the absolute path if found.
-
-        read_hlo(p: str, retries: int = 3) -> Union[tuple, None]:
-            Reads an HLO file from the given relative path with a specified number of retries.
-
-        read_yml(p: str) -> dict:
-            Reads a YAML file from the given relative path and returns its contents as a dictionary.
-
-        read_lines(p: str) -> list:
-            Reads a text file from the given relative path and returns its contents as a list of lines.
-
-        read_bytes(p: str) -> bytes:
-            Reads a binary file from the given relative path and returns its contents as bytes.
+        inputfile: Absolute path of the input file, or ``None`` if a
+            directory was supplied.
+        inputdir: Absolute directory containing ``inputfile`` (or the
+            input directory itself).
+        inputparts: ``inputdir.parts`` as a mutable list, used to splice
+            in different ``RUNS_<state>`` names.
+        runpos: Index in ``inputparts`` of the ``RUNS_<state>`` or
+            ``PROCESSES`` segment.
+        prestr: Joined parent path up to (but not including) ``runpos``.
+        states: Run-state names tried by :meth:`locate`.
+        relstrs: Relative paths (under the ``RUNS_*``/``PROCESSES`` root)
+            of all files discovered at or below the input location.
     """
 
     def __init__(self, save_path: Union[str, Path]):
-        """
-        Initializes the FileMapper object with the given save path.
+        """Index every file at or below ``save_path`` across all run states.
 
         Args:
-            save_path (Union[str, Path]): The path where files are saved. It can be a string or a Path object.
-
-        Attributes:
-            inputfile (Path or None): The absolute path of the input file if save_path is a file, otherwise None.
-            inputdir (Path): The absolute path of the directory containing the input file or the save_path directory.
-            inputparts (list): A list of parts of the input directory path.
-            runpos (int): The position of the "RUNS_*" or "PROCESSES" directory in the input directory path.
-            prestr (str): The path string up to the "RUNS_*" or "PROCESSES" directory.
-            states (list): A list of states used to identify different run states.
-            relstrs (list): A list of relative paths of all files at the save_path level and deeper, relative to "RUNS_*" or "PROCESSES".
+            save_path: Any path inside a ``RUNS_<state>`` or ``PROCESSES``
+                tree; may point to a file or a directory.
         """
         if isinstance(save_path, str):
             save_path = Path(save_path)
@@ -90,20 +74,19 @@ class FileMapper:
                 self.relstrs.append(os.path.join(*p.parts[self.runpos + 1 :]))
 
     def locate(self, p: str):
-        """
-        Locate the file path based on the given string `p`.
+        """Resolve a run-tree-relative path against each known run state.
 
-        This method checks if the string `p` contains the substring "PROCESSES".
-        If it does, the method returns `p` as is. Otherwise, it iterates through
-        the `states` attribute, constructs a potential file path by joining
-        `prestr`, "RUNS_" followed by the current state, and `p`. If the constructed
-        path exists, it returns this path. If no valid path is found, it returns None.
+        If ``p`` already contains ``"PROCESSES"`` it is returned unchanged.
+        Otherwise the method tries ``<prestr>/RUNS_<state>/<p>`` for each
+        state in :attr:`states` and returns the first existing path.
 
         Args:
-            p (str): The file path or partial file path to locate.
+            p: Path relative to the ``RUNS_<state>`` root.
 
         Returns:
-            str or None: The located file path if found, otherwise None.
+            A :class:`Path` (or ``p`` unchanged for ``PROCESSES`` inputs)
+            pointing at an existing file, or ``None`` if no state contains
+            it.
         """
         if "PROCESSES" in p:
             return p
@@ -114,19 +97,22 @@ class FileMapper:
         return None
 
     def read_hlo(self, p: str, retries: int = 3):
-        """
-        Reads an HLO file from the specified path with retry logic.
+        """Read an HLO file via :func:`read_hlo`, retrying on partial writes.
+
+        :class:`ValueError` raised by :func:`read_hlo` (typically because
+        the underlying file is still being flushed) is caught and the
+        read is retried up to ``retries`` times.
 
         Args:
-            p (str): The path to the HLO file.
-            retries (int, optional): The number of times to retry reading the file in case of a ValueError. Defaults to 3.
+            p: Path relative to the ``RUNS_<state>`` root.
+            retries: Maximum number of retries on :class:`ValueError`.
 
         Returns:
-            tuple: The contents of the HLO file if read successfully.
+            The ``(meta, data)`` tuple from :func:`read_hlo`, or ``None``
+            if all retries exhaust without raising.
 
         Raises:
-            FileNotFoundError: If the file cannot be located.
-            ValueError: If the file cannot be read after the specified number of retries.
+            FileNotFoundError: ``p`` could not be located in any run state.
         """
         lp = self.locate(p)
         if lp is None:
@@ -143,18 +129,17 @@ class FileMapper:
                     retry_counter += 1
             return None
 
-    def read_yml(self, p: str):
-        """
-        Reads a YAML file from the specified path and returns its contents as a dictionary.
+    def read_yml(self, p: str) -> dict:
+        """Resolve and parse a YAML file from the run tree.
 
         Args:
-            p (str): The path to the YAML file.
+            p: Path relative to the ``RUNS_<state>`` root.
 
         Returns:
-            dict: The contents of the YAML file as a dictionary.
+            Parsed YAML contents as a plain dict.
 
         Raises:
-            FileNotFoundError: If the file cannot be located.
+            FileNotFoundError: ``p`` could not be located in any run state.
         """
         lp = self.locate(p)
         if lp is None:
@@ -163,18 +148,17 @@ class FileMapper:
             # print(lp)
             return dict(yml_load(Path(lp)))
 
-    def read_lines(self, p: str):
-        """
-        Reads the contents of a file and returns them as a list of lines.
+    def read_lines(self, p: str) -> list:
+        """Resolve and read a text file from the run tree, split on newlines.
 
         Args:
-            p (str): The path to the file.
+            p: Path relative to the ``RUNS_<state>`` root.
 
         Returns:
-            list: A list of strings, each representing a line in the file.
+            One string per line in the file.
 
         Raises:
-            FileNotFoundError: If the file cannot be located.
+            FileNotFoundError: ``p`` could not be located in any run state.
         """
         lp = self.locate(p)
         if lp is None:
@@ -183,18 +167,17 @@ class FileMapper:
             lines = lp.read_text().split("\n")
             return lines
 
-    def read_bytes(self, p: str):
-        """
-        Reads the content of a file as bytes.
+    def read_bytes(self, p: str) -> bytes:
+        """Resolve and read a binary file from the run tree.
 
         Args:
-            p (str): The path to the file.
+            p: Path relative to the ``RUNS_<state>`` root.
 
         Returns:
-            bytes: The content of the file.
+            File contents as raw bytes.
 
         Raises:
-            FileNotFoundError: If the file cannot be located.
+            FileNotFoundError: ``p`` could not be located in any run state.
         """
         lp = self.locate(p)
         if lp is None:

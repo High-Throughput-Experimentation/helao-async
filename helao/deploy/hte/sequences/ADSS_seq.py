@@ -1,5 +1,10 @@
-"""
-Sequence library for ADSS
+"""Sequence library for ADSS (Automated Droplet Screening Station).
+
+Each public ``ADSS_*`` function builds and returns an experiment list via
+``ExperimentPlanMaker``. Sequences typically chain cell load, electrolyte
+fill, recirculation, electrochemical actions (OCV/CA/CV/CP), aliquot
+sampling, drain, and cell-cleaning sub-experiments defined in the matching
+ADSS experiment library.
 """
 
 __all__ = [
@@ -63,10 +68,59 @@ def ADSS_CA_cell_1potential(
     water_refill_volume_ul: float = 6000,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "LS4_newsyringe040923",
-):
-    """tbd
+) -> list:
+    """Single-potential CA run with OCV bookends and optional LED illumination.
 
-    last functionality test: tbd"""
+    Loads a single sample, fills and recirculates the cell, runs an OCV
+    measurement, a CA at ``CA_potential_vs``, another OCV, then drains,
+    optionally flushes/cleans the cell and refills syringes. When
+    ``led_illumination`` is true the OCV/CA steps use the ``*_photo`` variants.
+
+    Args:
+        sequence_version: Sequence version tag.
+        plate_id: Plate id of the solid sample.
+        plate_sample_no: Sample number on the plate.
+        same_sample: If True, skip the move-to-sample step.
+        stay_sample: If True, perform a flush+drain after the experiment.
+        liquid_sample_no: Reservoir liquid sample number.
+        liquid_sample_volume_ul: Cell fill volume (uL).
+        CA_potential_vs: CA potential in the selected frame.
+        potential_versus: Frame label (``"oer"``/``"rhe"``/``"ref"``).
+        ph: Solution pH.
+        ref_type: Reference electrode type label.
+        ref_offset__V: Reference electrode offset (V).
+        CA_duration_sec: CA hold duration (s).
+        aliquot_tf: Master switch for in-situ aliquots.
+        aliquot_times_sec: CA-relative aliquot timestamps (s).
+        aliquot_volume_ul: Aliquot volume (uL).
+        insert_electrolyte_bool: Inject extra electrolyte mid-CA.
+        insert_electrolyte_ul: Inserted electrolyte volume (uL).
+        insert_electrolyte_time_sec: Insertion time relative to CA start (s).
+        keep_electrolyte: Retain electrolyte at end of sequence.
+        use_electrolyte: Reuse previously loaded electrolyte.
+        OCV_duration: OCV duration (s).
+        OCValiquot_times_sec: OCV-relative aliquot timestamps (s).
+        samplerate_sec: Sample interval (s).
+        led_illumination: Use photo-CA/OCV variants when True.
+        led_dutycycle: LED toggle duty cycle (0-1).
+        led_wavelength: LED wavelength string.
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        Cell_draintime_s: Drain duration (s).
+        ReturnLineWait_s: Forward return-line wait (s).
+        ReturnLineReverseWait_s: Reverse return-line wait (s).
+        ResidualWait_s: Residual wait (s) passthrough.
+        flush_volume_ul: Flush volume (uL) when ``stay_sample`` is True.
+        clean: Move to clean cell and run cleaning.
+        clean_volume_ul: Cleaning volume (uL).
+        refill: Refill syringes at end of sequence.
+        refill_volume_ul: Working solution refill volume (uL).
+        water_refill_volume_ul: Water syringe refill volume (uL).
+        PAL_Injector: PAL injector key.
+        PAL_Injector_id: PAL injector identifier.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -381,10 +435,63 @@ def ADSS_PA_CVs_CAs_cell(
     water_refill_volume_ul: float = 6000,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "LS4_newsyringe040923",
-):
-    """tbd
+) -> list:
+    """Run a series of CV sweeps followed by a series of CAs on one sample.
 
-    last functionality test: tbd"""
+    Loads a sample, fills the cell, recirculates, then iterates through the
+    parallel ``CV_cycles``/``Vinit_vsRHE``/``Vapex1_vsRHE``/``Vapex2_vsRHE``/
+    ``Vfinal_vsRHE``/``scanrate_voltsec`` lists running one CV per index and
+    taking an aliquot whenever ``aliquot_postCV[i] == 1``. The same loop is
+    repeated for CAs at every entry of ``CA_potentials_vs`` with aliquots
+    governed by ``aliquot_postCA``. The cell can optionally be drained,
+    flushed, cleaned, and refilled at the end.
+
+    Args:
+        sequence_version: Sequence version tag.
+        plate_id: Plate id of the solid sample.
+        plate_sample_no: Sample number on the plate.
+        same_sample: Skip the move-to-sample step.
+        stay_sample: Flush+drain instead of full unload.
+        liquid_sample_no: Reservoir liquid sample number.
+        liquid_sample_volume_ul: Cell fill volume (uL).
+        recirculate_wait_time_m: Recirculation duration (minutes).
+        CV_cycles: Number of CV cycles per scan list entry.
+        Vinit_vsRHE: Initial potentials vs RHE per CV (V).
+        Vapex1_vsRHE: First-apex potentials vs RHE per CV (V).
+        Vapex2_vsRHE: Second-apex potentials vs RHE per CV (V).
+        Vfinal_vsRHE: Final potentials vs RHE per CV (V).
+        scanrate_voltsec: Scan rates per CV (V/s).
+        CV_samplerate_sec: CV sample interval (s).
+        number_of_postCAs: Reserved hint (unused at runtime).
+        CA_potentials_vs: CA potentials in the chosen frame.
+        potential_versus: Frame label for CAs (``"rhe"``/``"ref"``).
+        CA_duration_sec: Per-CA durations (s).
+        CA_samplerate_sec: CA sample interval (s).
+        gamry_i_range: Gamry current range string.
+        ph: Solution pH.
+        ref_type: Reference electrode type label.
+        ref_offset__V: Reference electrode offset (V).
+        aliquot_postCV: Per-CV aliquot flags (1/0).
+        aliquot_postCA: Per-CA aliquot flags (1/0).
+        aliquot_volume_ul: Aliquot volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        Drain: Drain the cell at the end.
+        Cell_draintime_s: Drain duration (s).
+        ReturnLineWait_s: Forward return-line wait (s).
+        ReturnLineReverseWait_s: Reverse return-line wait (s).
+        ResidualWait_s: Passthrough residual wait (s).
+        flush_volume_ul: Flush volume (uL) for stay-sample flush.
+        clean: Run a clean cell step.
+        clean_volume_ul: Cleaning volume (uL).
+        refill: Refill syringes at the end.
+        refill_volume_ul: Refill volume for the working solution (uL).
+        water_refill_volume_ul: Refill volume for water (uL).
+        PAL_Injector: PAL injector key.
+        PAL_Injector_id: PAL injector identifier.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -675,10 +782,68 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     Clean_drain_s: float = 60,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "LS4_peek",
-):
-    """tbd
+) -> list:
+    """Iterate over a list of plate samples running CV-CA-CV with aliquots.
 
-    last functionality test: tbd"""
+    For each entry in ``plate_sample_no`` the sequence loads the sample,
+    refills electrolyte (unless reusing the current one), recirculates
+    forward/reverse, takes an optional initial aliquot, runs the first CV
+    list (one per index), then the CA list, then the second CV list
+    (``CV2_*`` parameters), aliquoting after each step driven by the
+    ``aliquot_post*`` flags. When ``Move_to_clean_and_clean`` is True the
+    cell is cleaned between samples.
+
+    Args:
+        sequence_version: Sequence version tag.
+        plate_id: Plate id holding the samples.
+        plate_sample_no: List of plate sample numbers to iterate.
+        same_sample: Skip the move-to-sample step.
+        keep_electrolyte: Retain electrolyte at the end of each iteration.
+        use_electrolyte: Reuse previously loaded electrolyte.
+        Move_to_clean_and_clean: Move to the clean cell and run cleaning.
+        liquid_sample_no: Reservoir liquid sample number.
+        liquid_sample_volume_ul: Cell fill volume (uL).
+        recirculate_wait_time_m: Forward recirculation duration (minutes).
+        recirculate_reverse_wait_time_s: Reverse recirculation duration (s).
+        CV_cycles: First CV-loop cycle counts.
+        Vinit_vsRHE: First CV-loop initial potentials vs RHE (V).
+        Vapex1_vsRHE: First CV-loop apex 1 potentials vs RHE (V).
+        Vapex2_vsRHE: First CV-loop apex 2 potentials vs RHE (V).
+        Vfinal_vsRHE: First CV-loop final potentials vs RHE (V).
+        scanrate_voltsec: First CV-loop scan rates (V/s).
+        CV_samplerate_sec: First CV sample interval (s).
+        number_of_postCAs: Reserved hint (unused at runtime).
+        CA_potentials_vs: CA potentials in the chosen frame.
+        potential_versus: Frame label for CAs.
+        CA_duration_sec: Per-CA durations (s).
+        CA_samplerate_sec: CA sample interval (s).
+        CV2_cycles: Second CV-loop cycle counts.
+        CV2_Vinit_vsRHE: Second CV-loop initial potentials vs RHE (V).
+        CV2_Vapex1_vsRHE: Second CV-loop apex 1 potentials vs RHE (V).
+        CV2_Vapex2_vsRHE: Second CV-loop apex 2 potentials vs RHE (V).
+        CV2_Vfinal_vsRHE: Second CV-loop final potentials vs RHE (V).
+        CV2_scanrate_voltsec: Second CV-loop scan rates (V/s).
+        CV2_samplerate_sec: Second CV sample interval (s).
+        gamry_i_range: Gamry current range string.
+        ph: Solution pH.
+        ref_type: Reference electrode type label.
+        ref_offset__V: Reference electrode offset (V).
+        aliquot_init: Take an aliquot before electrochemistry starts.
+        aliquot_postCV: Aliquot flag list applied to the CV loops.
+        aliquot_postCA: Aliquot flag list applied to the CA loop.
+        aliquot_volume_ul: Aliquot volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        Cell_draintime_s: Drain duration (s).
+        ReturnLineReverseWait_s: Reverse return-line wait (s).
+        Clean_volume_ul: Cleaning volume (uL).
+        Clean_recirculate_s: Cleaning recirculation duration (s).
+        Clean_drain_s: Cleaning drain duration (s).
+        PAL_Injector: PAL injector key.
+        PAL_Injector_id: PAL injector identifier.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -971,10 +1136,53 @@ def ADSS_CA_cell_multipotential(
     water_refill_volume_ul: float = 6000,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "LS4_newsyringe040923",
-):
-    """tbd
+) -> list:
+    """Run an OCV/CA/OCV cycle at each potential in ``CA_potentials_vs``.
 
-    last functionality test: tbd"""
+    Loads the sample (or uses the same one), fills the cell, then for each
+    potential adds OCV before, CA at the potential, and OCV after. The
+    ``led_illumination`` flag selects the ``*_photo`` variants. After the
+    measurement the cell is drained and optionally flushed/cleaned/refilled.
+
+    Args:
+        sequence_version: Sequence version tag.
+        plate_id: Plate id of the solid sample.
+        plate_sample_no: Sample number on the plate.
+        same_sample: Skip the move-to-sample step.
+        stay_sample: Flush+drain after the experiment.
+        liquid_sample_no: Reservoir liquid sample number.
+        liquid_sample_volume_ul: Cell fill volume (uL).
+        CA_potentials_vs: CA potentials to sweep through (V).
+        potential_versus: Frame label for CAs (``"oer"``/``"rhe"``).
+        ph: Solution pH.
+        ref_type: Reference electrode type label.
+        ref_offset__V: Reference electrode offset (V).
+        CA_duration_sec: CA hold duration (s) for each potential.
+        aliquot_times_sec: CA-relative aliquot timestamps (s).
+        aliquot_volume_ul: Aliquot volume (uL).
+        OCV_duration: OCV duration (s) before and after each CA.
+        OCValiquot_times_sec: OCV-relative aliquot timestamps (s).
+        samplerate_sec: Sample interval (s).
+        led_illumination: Use photo-CA/OCV variants when True.
+        led_dutycycle: LED toggle duty cycle (0-1).
+        led_wavelength: LED wavelength string.
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        Cell_draintime_s: Drain duration (s).
+        ReturnLineWait_s: Forward return-line wait (s).
+        ReturnLineReverseWait_s: Reverse return-line wait (s).
+        ResidualWait_s: Passthrough residual wait (s).
+        flush_volume_ul: Flush volume (uL) when ``stay_sample`` is True.
+        clean: Move-to-clean-cell and clean.
+        clean_volume_ul: Cleaning volume (uL).
+        refill: Refill syringes at end.
+        refill_volume_ul: Refill volume for working solution (uL).
+        water_refill_volume_ul: Refill volume for water (uL).
+        PAL_Injector: PAL injector key.
+        PAL_Injector_id: PAL injector identifier.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1279,10 +1487,58 @@ def ADSS_PA_CVs_testing(
     # water_refill_volume_ul: float = 6000,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "LS4_newsyringe040923",
-):
-    """tbd
+) -> list:
+    """Testing variant of the PA CV protocol with manual gas-switching pauses.
 
-    last functionality test: tbd"""
+    Loads ``plate_sample_no`` (then optionally swaps to ``second_sample_no``),
+    fills/recirculates, runs the first CV list pausing for an oxygen swap
+    after the second CV, prompts the operator to inject phosphoric acid,
+    runs the second CV list (``CV2_*``), then either keeps electrolyte or
+    drains/cleans the cell. If draining a second sample is loaded and the
+    first CV list is repeated with another interrupt to swap back to N2.
+
+    Args:
+        sequence_version: Sequence version tag.
+        plate_id: Plate id holding the samples.
+        plate_sample_no: Primary sample number.
+        second_sample_no: Sample number used after the cleaning step.
+        same_sample: Skip the initial move-to-sample step.
+        keep_electrolyte: Retain electrolyte during the first phase.
+        keep_electrolyte_post: Retain electrolyte during the second phase.
+        use_electrolyte: Reuse previously loaded electrolyte.
+        liquid_sample_no: Reservoir liquid sample number.
+        liquid_sample_volume_ul: Cell fill volume (uL).
+        recirculate_wait_time_m: Recirculation duration (minutes).
+        CV_cycles: First CV-loop cycle counts.
+        Vinit_vsRHE: First CV-loop initial potentials vs RHE (V).
+        Vapex1_vsRHE: First CV-loop apex 1 potentials vs RHE (V).
+        Vapex2_vsRHE: First CV-loop apex 2 potentials vs RHE (V).
+        Vfinal_vsRHE: First CV-loop final potentials vs RHE (V).
+        scanrate_voltsec: First CV-loop scan rates (V/s).
+        CV_samplerate_sec: First CV sample interval (s).
+        potential_versus: Frame label for any CA actions (unused in this loop).
+        CV2_cycles: Second CV-loop cycle counts.
+        CV2_Vinit_vsRHE: Second CV-loop initial potentials vs RHE (V).
+        CV2_Vapex1_vsRHE: Second CV-loop apex 1 potentials vs RHE (V).
+        CV2_Vapex2_vsRHE: Second CV-loop apex 2 potentials vs RHE (V).
+        CV2_Vfinal_vsRHE: Second CV-loop final potentials vs RHE (V).
+        CV2_scanrate_voltsec: Second CV-loop scan rates (V/s).
+        CV2_samplerate_sec: Second CV sample interval (s).
+        gamry_i_range: Gamry current range string.
+        ph: Solution pH.
+        ref_type: Reference electrode type label.
+        ref_offset__V: Reference electrode offset (V).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        Cell_draintime_s: Drain duration (s).
+        ReturnLineReverseWait_s: Reverse return-line wait (s).
+        Clean_volume_ul: Cleaning volume (uL).
+        CleanDrainWait_s: Clean drain duration (s).
+        PAL_Injector: PAL injector key.
+        PAL_Injector_id: PAL injector identifier.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -1654,10 +1910,72 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     # water_refill_volume_ul: float = 6000,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "LS4_peek",
-):
-    """tbd
+) -> list:
+    """PA CV/CA protocol with automatic N2<->O2 gas switching valves.
 
-    last functionality test: tbd"""
+    Optionally pauses for phosphoric-acid source setup, loads the sample,
+    purges with N2 and runs cleaning CV cycles, switches to O2 and runs the
+    main CV list, runs the CA list, transfers phosphoric acid into the cell,
+    recirculates, runs the ``CV2_*`` list, and finally drains/cleans the
+    cell. Aliquots are taken at each ``aliquot_post*`` flag and a wash
+    counter rotates the rinse profile across aliquots.
+
+    Args:
+        sequence_version: Sequence version tag.
+        plate_id: Plate id holding the sample.
+        plate_sample_no: Sample number on the plate.
+        same_sample: Skip the move-to-sample step.
+        use_electrolyte: Reuse previously loaded electrolyte.
+        keep_electrolyte: Retain electrolyte at end of run.
+        liquid_sample_no: Reservoir liquid sample number.
+        liquid_sample_volume_ul: Cell fill volume (uL).
+        phosphoric_sample_no: Sample number for the phosphoric vial.
+        phosphoric_location: ``[tray, slot, vial]`` location of the source.
+        phosphoric_quantity_ul: Phosphoric acid injection volume (uL).
+        recirculate_wait_time_m: Initial recirculation duration (minutes).
+        postN2_recirculate_wait_time_m: Post-N2 recirculation duration (minutes).
+        CleaningCV_cycles: N2 cleaning CV cycle count.
+        CleaningCV_Vinit_vsRHE: Cleaning CV initial potential vs RHE (V).
+        CleaningCV_Vapex2_vsRHE: Cleaning CV apex-2 potential vs RHE (V).
+        CleaningCV_scanrate_voltsec: Cleaning CV scan rate (V/s).
+        CV_cycles: Main CV-loop cycle counts.
+        Vinit_vsRHE: Main CV initial potentials vs RHE (V).
+        Vapex1_vsRHE: Main CV apex-1 potentials vs RHE (V).
+        Vapex2_vsRHE: Main CV apex-2 potentials vs RHE (V).
+        Vfinal_vsRHE: Main CV final potentials vs RHE (V).
+        scanrate_voltsec: Main CV scan rates (V/s).
+        CV_samplerate_sec: Main CV sample interval (s).
+        CA_potentials_vs: CA potentials in the chosen frame.
+        potential_versus: Frame label for CAs.
+        CA_duration_sec: Per-CA durations (s).
+        CA_samplerate_sec: CA sample interval (s).
+        CV2_cycles: Second CV-loop cycle counts.
+        CV2_Vinit_vsRHE: Second CV initial potentials vs RHE (V).
+        CV2_Vapex1_vsRHE: Second CV apex-1 potentials vs RHE (V).
+        CV2_Vapex2_vsRHE: Second CV apex-2 potentials vs RHE (V).
+        CV2_Vfinal_vsRHE: Second CV final potentials vs RHE (V).
+        CV2_scanrate_voltsec: Second CV scan rates (V/s).
+        CV2_samplerate_sec: Second CV sample interval (s).
+        gamry_i_range: Gamry current range string.
+        ph: Solution pH.
+        ref_type: Reference electrode type label.
+        ref_offset__V: Reference electrode offset (V).
+        aliquot_init: Take an initial aliquot before electrochemistry.
+        aliquot_postCV: Aliquot flags for the main CV loop.
+        aliquot_postCA: Aliquot flags for the CA loop.
+        aliquot_volume_ul: Aliquot volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        Cell_draintime_s: Drain duration (s).
+        ReturnLineReverseWait_s: Reverse return-line wait (s).
+        clean_cell: Run a clean cell step at the end.
+        Clean_volume_ul: Cleaning volume (uL).
+        CleanDrainWait_s: Clean drain duration (s).
+        PAL_Injector: PAL injector key.
+        PAL_Injector_id: PAL injector identifier.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
 
     epm = ExperimentPlanMaker()
 
@@ -2102,18 +2420,105 @@ def ADSS_PA_CV_TRI(
     # refill: bool = False,
     # refill_volume_ul: float = 6000,
     # water_refill_volume_ul: float = 6000,
-):
-    """
-    This sequence is the most recent one for the TRI Pt dissolution project using ADSS.
-    Included features:
-    - scheduled aliquotes and injection of phosphoric acid
-    - track gas saturation with OCV during N2-O2 and O2-N2 switches
-    - automatic refill of syringes
-    - you can define number of cleaning cycles (to make sure we are cleaning off Co and Ni residues)
-    - include reference Pt measurements before and after sequence
-    - generating sample-LPL-UPL combinations
-    - bubble removal using OCV. bubble removal = reversal of pumps for some seconds
+) -> list:
+    """TRI Pt-dissolution protocol cycling over (LPL, UPL, sample) triples.
 
+    Features built into the experiment list:
+
+    * Optional reference-Pt measurement at the beginning and end of the
+      sequence using ``ADSS_sub_move_to_ref_measurement``.
+    * Per-sample workflow: move/load, optional pre-fill electrolyte rinse,
+      electrolyte fill, N2 saturation OCV (with optional bubble-removal
+      OCV), cleaning CVs, background CVs in N2, gas swap to O2 with OCV,
+      testing CVs in O2, phosphoric acid injection, recirculation, more
+      testing CVs in O2, gas swap back to N2, final OCV, unload and drain.
+    * Optional cleaning cycles between samples with automatic syringe
+      refills, scaling the refill volume when cleaning volume exceeds 10 mL.
+    * Aliquots scheduled by ``aliquot_after_cleaningCV``,
+      ``aliquote_after_CV_init``, ``aliquote_CV_O2``, and ``aliquote_CV_final``.
+
+    Args:
+        sequence_version: Sequence version tag.
+        plate_id: Plate id holding the working-electrode samples.
+        plate_id_ref_Pt: Plate id used for the reference Pt sample.
+        plate_sample_no_list: Sample numbers paired with LPL/UPL entries.
+        LPL_list: Lower potential limits (vs RHE) per sample.
+        UPL_list: Upper potential limits (vs RHE) per sample.
+        same_sample: Skip the move-to-sample step.
+        use_bubble_removal: Enable bubble-removal OCV checks.
+        use_current_electrolyte: Reuse previously loaded electrolyte.
+        pump_reversal_during_filling: Add a reverse pump leg during fills.
+        keep_electrolyte_at_end: Retain electrolyte at the end of the run.
+        move_to_clean_and_clean: Run a clean cell step between samples.
+        measure_ref_Pt_at_beginning: Run the initial reference Pt block.
+        name_ref_Pt_at_beginning: Reference position for the initial block.
+        measure_ref_Pt_at_end: Run the final reference Pt block.
+        name_ref_Pt_at_end: Reference position for the final block.
+        bubble_removal_OCV_t_s: OCV duration during bubble checks (s).
+        bubble_removal_pump_reverse_t_s: Reverse pump time during removal (s).
+        bubble_removal_pump_forward_t_s: Forward pump time during removal (s).
+        bubble_removal_RSD_threshold: RSD threshold for bubble detection.
+        bubble_removal_simple_threshold: Simple threshold for bubble detection.
+        bubble_removal_signal_change_threshold: Signal-change threshold.
+        bubble_removal_amplitude_threshold: Amplitude threshold.
+        purge_wait_initialN2_min: Initial N2 purge time (minutes).
+        purge_wait_N2_to_O2_min: N2->O2 purge time (minutes).
+        purge_wait_O2_to_N2_min: O2->N2 purge time (minutes).
+        rinse_with_electrolyte_bf_prefill: Pre-fill rinse with electrolyte.
+        rinse_with_electrolyte_bf_prefill_volume_uL: Rinse volume (uL).
+        rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec: Rinse
+            recirculation duration (s).
+        rinse_with_electrolyte_bf_prefill_drain_time_sec: Rinse drain (s).
+        ph: Solution pH.
+        liquid_sample_no: Reservoir liquid sample number.
+        liquid_sample_volume_ul: Cell fill volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        fill_recirculate_wait_time_sec: Forward fill recirculation time (s).
+        fill_recirculate_reverse_wait_time_sec: Reverse fill recirculation (s).
+        Inject_PA: Master switch for phosphoric-acid injection.
+        phosphoric_sample_no: PAL sample number for phosphoric acid.
+        phosphoric_location: ``[tray, slot, vial]`` of the source vial.
+        phosphoric_quantity_ul: Injection volume (uL).
+        inject_recirculate_wait_time_sec: Recirculation time post-injection (s).
+        ref_CV_cycles: Reference CV cycle counts.
+        ref_Vinit_vsRHE: Reference CV initial potentials vs RHE (V).
+        ref_Vapex1_vsRHE: Reference CV apex-1 potentials vs RHE (V).
+        ref_Vapex2_vsRHE: Reference CV apex-2 potentials vs RHE (V).
+        ref_Vfinal_vsRHE: Reference CV final potentials vs RHE (V).
+        ref_CV_scanrate_voltsec: Reference CV scan rates (V/s).
+        ref_CV_samplerate_sec: Reference CV sample interval (s).
+        cleaning_CV_cycles: Cleaning CV cycle counts.
+        cleaning_Vinit_vsRHE: Cleaning CV initial potentials vs RHE (V).
+        cleaning_Vapex1_vsRHE: Cleaning CV apex-1 potentials vs RHE (V).
+        cleaning_Vapex2_vsRHE: Cleaning CV apex-2 potentials vs RHE (V).
+        cleaning_Vfinal_vsRHE: Cleaning CV final potentials vs RHE (V).
+        cleaning_scanrate_voltsec: Cleaning CV scan rates (V/s).
+        cleaning_CV_samplerate_sec: Cleaning CV sample interval (s).
+        testing_CV_scanrate_voltsec: Testing CV scan rate (V/s).
+        testing_CV_samplerate_sec: Testing CV sample interval (s).
+        CV_N2_cycles: Background N2 CV cycle counts.
+        CV_O2_cycles: O2 testing CV cycle counts.
+        OCP_samplerate_sec: OCV sample interval (s) during purges.
+        gamry_i_range: Gamry current range string.
+        ref_type: Reference electrode type label.
+        ref_offset__V: Reference electrode offset (V).
+        aliquot_init: Take an initial aliquot.
+        aliquot_after_cleaningCV: Per-cleaning-CV aliquot flags.
+        aliquote_after_CV_init: Per-background-CV aliquot flags.
+        aliquote_CV_O2: Per-O2-CV aliquot flags.
+        aliquote_CV_final: Final CV aliquot flags.
+        aliquot_volume_ul: Aliquot volume (uL).
+        PAL_Injector: PAL injector key.
+        PAL_Injector_id: PAL injector identifier.
+        cell_draintime_sec: Drain duration (s).
+        ReturnLineReverseWait_sec: Reverse return-line wait (s).
+        number_of_cleans: Number of clean cycles per cleaning pass.
+        clean_volume_ul: Cleaning volume (uL).
+        clean_recirculate_sec: Cleaning recirculation duration (s).
+        clean_drain_sec: Cleaning drain duration (s).
+
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -3388,18 +3793,106 @@ def ADSS_PA_CV_TRI_new(
     # refill: bool = False,
     # refill_volume_ul: float = 6000,
     # water_refill_volume_ul: float = 6000,
-):
-    """
-    This sequence is the most recent one for the TRI Pt dissolution project using ADSS.
-    Included features:
-    - scheduled aliquotes and injection of phosphoric acid
-    - track gas saturation with OCV during N2-O2 and O2-N2 switches
-    - automatic refill of syringes
-    - you can define number of cleaning cycles (to make sure we are cleaning off Co and Ni residues)
-    - include reference Pt measurements before and after sequence
-    - generating sample-LPL-UPL combinations
-    - bubble removal using OCV. bubble removal = reversal of pumps for some seconds
+) -> list:
+    """Updated TRI Pt-dissolution protocol with a separate phosphoric injector.
 
+    Same overall structure as :func:`ADSS_PA_CV_TRI` (reference Pt blocks,
+    per-sample fill/clean/CV/CA loops with N2<->O2 saturation, scheduled
+    aliquots, and optional cleaning between samples) with:
+
+    * Aliquots and phosphoric injection moved into the experiment library so
+      the orchestrator records them as their own actions.
+    * A dedicated phosphoric PAL injector configured via ``phos_PAL_Injector``
+      and ``phos_PAL_Injector_id``, plus a deep-clean cleaning volume
+      ``PAL_cleanvol_ul``.
+    * Optional flags ``aliquot_init``, ``Inject_PA``, ``use_bubble_removal``,
+      ``rinse_with_electrolyte_bf_prefill`` to toggle sub-blocks.
+
+    Args:
+        sequence_version: Sequence version tag.
+        plate_id: Plate id holding working-electrode samples.
+        plate_id_ref_Pt: Plate id used for reference Pt samples.
+        plate_sample_no_list: Sample numbers paired with LPL/UPL entries.
+        LPL_list: Lower potential limits (vs RHE) per sample.
+        UPL_list: Upper potential limits (vs RHE) per sample.
+        same_sample: Skip move-to-sample.
+        aliquot_init: Take an initial aliquot.
+        Inject_PA: Master switch for phosphoric injection.
+        use_bubble_removal: Enable bubble-removal OCV checks.
+        rinse_with_electrolyte_bf_prefill: Pre-fill electrolyte rinse.
+        use_current_electrolyte: Reuse previously loaded electrolyte.
+        pump_reversal_during_filling: Add reverse pump leg during fills.
+        keep_electrolyte_at_end: Retain electrolyte at end of run.
+        move_to_clean_and_clean: Run a clean cell step between samples.
+        measure_ref_Pt_at_beginning: Run the initial reference block.
+        name_ref_Pt_at_beginning: Reference position name (initial).
+        measure_ref_Pt_at_end: Run the final reference block.
+        name_ref_Pt_at_end: Reference position name (final).
+        bubble_removal_OCV_t_s: OCV duration during bubble checks (s).
+        bubble_removal_pump_reverse_t_s: Reverse pump time (s).
+        bubble_removal_pump_forward_t_s: Forward pump time (s).
+        bubble_removal_RSD_threshold: RSD threshold.
+        bubble_removal_simple_threshold: Simple threshold.
+        bubble_removal_signal_change_threshold: Signal-change threshold.
+        bubble_removal_amplitude_threshold: Amplitude threshold.
+        purge_wait_initialN2_min: Initial N2 purge time (minutes).
+        purge_wait_N2_to_O2_min: N2->O2 purge time (minutes).
+        purge_wait_O2_to_N2_min: O2->N2 purge time (minutes).
+        rinse_with_electrolyte_bf_prefill_volume_uL: Rinse volume (uL).
+        rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec: Rinse
+            recirculation duration (s).
+        rinse_with_electrolyte_bf_prefill_drain_time_sec: Rinse drain (s).
+        ph: Solution pH.
+        liquid_sample_no: Reservoir liquid sample number.
+        liquid_sample_volume_ul: Cell fill volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        fill_recirculate_wait_time_sec: Forward fill recirculation (s).
+        fill_recirculate_reverse_wait_time_sec: Reverse fill recirculation (s).
+        phosphoric_sample_no: PAL sample number for phosphoric acid.
+        phosphoric_location: ``[tray, slot, vial]`` for phosphoric source.
+        phosphoric_quantity_ul: Phosphoric injection volume (uL).
+        inject_recirculate_wait_time_sec: Recirculation time post-injection (s).
+        phos_PAL_Injector: PAL injector key for phosphoric.
+        phos_PAL_Injector_id: PAL injector identifier for phosphoric.
+        PAL_cleanvol_ul: PAL deep-clean volume (uL).
+        ref_CV_cycles: Reference CV cycle counts.
+        ref_Vinit_vsRHE: Reference CV initial potentials vs RHE (V).
+        ref_Vapex1_vsRHE: Reference CV apex-1 potentials vs RHE (V).
+        ref_Vapex2_vsRHE: Reference CV apex-2 potentials vs RHE (V).
+        ref_Vfinal_vsRHE: Reference CV final potentials vs RHE (V).
+        ref_CV_scanrate_voltsec: Reference CV scan rates (V/s).
+        ref_CV_samplerate_sec: Reference CV sample interval (s).
+        cleaning_CV_cycles: Cleaning CV cycle counts.
+        cleaning_Vinit_vsRHE: Cleaning CV initial potentials vs RHE (V).
+        cleaning_Vapex1_vsRHE: Cleaning CV apex-1 potentials vs RHE (V).
+        cleaning_Vapex2_vsRHE: Cleaning CV apex-2 potentials vs RHE (V).
+        cleaning_Vfinal_vsRHE: Cleaning CV final potentials vs RHE (V).
+        cleaning_scanrate_voltsec: Cleaning CV scan rates (V/s).
+        cleaning_CV_samplerate_sec: Cleaning CV sample interval (s).
+        testing_CV_scanrate_voltsec: Testing CV scan rate (V/s).
+        testing_CV_samplerate_sec: Testing CV sample interval (s).
+        CV_N2_cycles: Background N2 CV cycle counts.
+        CV_O2_cycles: O2 testing CV cycle counts.
+        OCP_samplerate_sec: OCV sample interval (s) during purges.
+        gamry_i_range: Gamry current range string.
+        ref_type: Reference electrode type label.
+        ref_offset__V: Reference electrode offset (V).
+        aliquot_after_cleaningCV: Per-cleaning-CV aliquot flags.
+        aliquote_after_CV_init: Per-background-CV aliquot flags.
+        aliquote_CV_O2: Per-O2-CV aliquot flags.
+        aliquote_CV_final: Final CV aliquot flags.
+        aliquot_volume_ul: Aliquot volume (uL).
+        PAL_Injector: PAL injector key.
+        PAL_Injector_id: PAL injector identifier.
+        cell_draintime_sec: Drain duration (s).
+        ReturnLineReverseWait_sec: Reverse return-line wait (s).
+        number_of_cleans: Number of clean cycles per cleaning pass.
+        clean_volume_ul: Cleaning volume (uL).
+        clean_recirculate_sec: Cleaning recirculation duration (s).
+        clean_drain_sec: Cleaning drain duration (s).
+
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()
@@ -4778,10 +5271,70 @@ def ADSS_PA_CV_single(
     clean_volume_ul: float = 12000,
     clean_recirculate_sec: float = 60,
     clean_drain_sec: float = 120,
-):
-    """
-    Simplified sequence that measures a single CV for a single sample and takes an aliquot afterwards.
-    Based on ADSS_PA_CV_TRI_new but without reference measurements.
+) -> list:
+    """Single-sample, single-CV measurement with an aliquot afterwards.
+
+    Optionally pre-rinses the cell with electrolyte, loads the requested
+    sample, fills the cell and saturates with N2 (running an OCV check and
+    optional bubble removal), swaps to O2 with another OCV, runs a single CV
+    using ``Vinit_vsRHE``/``Vapex1_vsRHE``/``Vapex2_vsRHE``/``Vfinal_vsRHE``
+    and the chosen scan rate, takes an aliquot, then drains and optionally
+    cleans the cell. Derived from :func:`ADSS_PA_CV_TRI_new` without the
+    reference Pt blocks.
+
+    Args:
+        sequence_version: Sequence version tag.
+        plate_id: Plate id of the solid sample.
+        plate_sample_no: Sample number on the plate.
+        same_sample: Skip move-to-sample.
+        use_bubble_removal: Enable bubble-removal OCV check.
+        rinse_with_electrolyte_bf_prefill: Pre-fill electrolyte rinse.
+        use_current_electrolyte: Reuse previously loaded electrolyte.
+        pump_reversal_during_filling: Add reverse pump leg during fill.
+        keep_electrolyte_at_end: Retain electrolyte at end of run.
+        move_to_clean_and_clean: Run a clean cell step at the end.
+        bubble_removal_OCV_t_s: OCV duration during bubble check (s).
+        bubble_removal_pump_reverse_t_s: Reverse pump time (s).
+        bubble_removal_pump_forward_t_s: Forward pump time (s).
+        bubble_removal_RSD_threshold: RSD threshold.
+        bubble_removal_simple_threshold: Simple threshold.
+        bubble_removal_signal_change_threshold: Signal-change threshold.
+        bubble_removal_amplitude_threshold: Amplitude threshold.
+        purge_wait_initialN2_min: Initial N2 purge time (minutes).
+        purge_wait_N2_to_O2_min: N2->O2 purge time (minutes).
+        rinse_with_electrolyte_bf_prefill_volume_uL: Rinse volume (uL).
+        rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec: Rinse
+            recirculation duration (s).
+        rinse_with_electrolyte_bf_prefill_drain_time_sec: Rinse drain (s).
+        ph: Solution pH.
+        liquid_sample_no: Reservoir liquid sample number.
+        liquid_sample_volume_ul: Cell fill volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        fill_recirculate_wait_time_sec: Forward fill recirculation (s).
+        fill_recirculate_reverse_wait_time_sec: Reverse fill recirculation (s).
+        CV_cycles: Number of CV cycles.
+        Vinit_vsRHE: CV initial potential vs RHE (V).
+        Vapex1_vsRHE: CV apex-1 potential vs RHE (V).
+        Vapex2_vsRHE: CV apex-2 potential vs RHE (V).
+        Vfinal_vsRHE: CV final potential vs RHE (V).
+        CV_scanrate_voltsec: CV scan rate (V/s).
+        CV_samplerate_sec: CV sample interval (s).
+        OCP_samplerate_sec: OCV sample interval (s) during purges.
+        gamry_i_range: Gamry current range string.
+        ref_type: Reference electrode type label.
+        ref_offset__V: Reference electrode offset (V).
+        aliquot_volume_ul: Aliquot volume (uL).
+        PAL_Injector: PAL injector key.
+        PAL_Injector_id: PAL injector identifier.
+        cell_draintime_sec: Drain duration (s).
+        ReturnLineReverseWait_sec: Reverse return-line wait (s).
+        number_of_cleans: Number of clean cycles.
+        clean_volume_ul: Cleaning volume (uL).
+        clean_recirculate_sec: Cleaning recirculation duration (s).
+        clean_drain_sec: Cleaning drain duration (s).
+
+    Returns:
+        List of planned experiments to dispatch.
     """
 
     epm = ExperimentPlanMaker()

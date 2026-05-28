@@ -1,3 +1,5 @@
+"""Models describing per-endpoint, per-server, and orchestrator-wide live status."""
+
 __all__ = [
     "ActionServerModel",
     "GlobalStatusModel",
@@ -23,6 +25,16 @@ main_finished_status = [HloStatus.errored]
 
 
 class EndpointModel(BaseModel, HelaoDict):
+    """Live status of one endpoint on an action server.
+
+    Attributes:
+        endpoint_name (str): Endpoint (action) name.
+        active_dict (Dict[UUID, Action]): Active actions keyed by UUID.
+        nonactive_dict (Dict[HloStatus, Dict[UUID, Action]]): Finished actions
+            bucketed by status (``finished`` plus any `main_finished_status`).
+        max_uuids (Optional[int]): Optional cap on retained UUIDs; `None` means unbounded.
+    """
+
     endpoint_name: str
     # status is a dict (keyed by action uuid)
     # which hold a dict of active actions
@@ -36,16 +48,19 @@ class EndpointModel(BaseModel, HelaoDict):
     max_uuids: Optional[int] = None
     # todo: - add local queue and priority lists here?
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Return a compact ``active:[...], finished:[...]`` summary string."""
         finished_uuids = [
             uuid.hex for uuid in self.nonactive_dict.get(HloStatus.finished, {}).keys()
         ]
         return f"active:{[uuid.hex for uuid in self.active_dict.keys()]}, finished:{finished_uuids}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return the angle-bracketed `str()` rendering."""
         return f"<{self.__str__()}>"
 
     def sort_status(self):
+        """Move finished actions out of `active_dict` into the appropriate `nonactive_dict` buckets."""
         del_keys = []
         if HloStatus.finished not in self.nonactive_dict:
             self.nonactive_dict[HloStatus.finished] = {}
@@ -74,12 +89,21 @@ class EndpointModel(BaseModel, HelaoDict):
             del self.active_dict[key]
 
     def clear_finished(self):
-        """clears all status dicts except active_dict"""
+        """Reset `nonactive_dict` to an empty `finished` bucket, leaving `active_dict` untouched."""
         self.nonactive_dict = {}
         self.nonactive_dict[HloStatus.finished] = {}
 
 
 class ActionServerModel(BaseModel, HelaoDict):
+    """Live status snapshot of a single action server and its endpoints.
+
+    Attributes:
+        action_server (MachineModel): Identity of the server.
+        endpoints (Dict[str, EndpointModel]): Per-endpoint status keyed by endpoint name.
+        estop (bool): True if the server has signalled an emergency stop.
+        last_action_uuid (Optional[UUID]): UUID of the most recently dispatched action.
+    """
+
     action_server: MachineModel
     # endpoints keyed by the name of the endpoint (action_name)
     endpoints: Dict[str, EndpointModel] = Field(default={})
@@ -87,7 +111,16 @@ class ActionServerModel(BaseModel, HelaoDict):
     estop: bool = False
     last_action_uuid: Optional[UUID] = None
 
-    def get_fastapi_json(self, action_name: Optional[str] = None):
+    def get_fastapi_json(self, action_name: Optional[str] = None) -> dict:
+        """Return a serializable dict for the whole server or a single endpoint.
+
+        Args:
+            action_name: If given, restrict the payload to that endpoint;
+                otherwise include all endpoints.
+
+        Returns:
+            Dict representation suitable for FastAPI JSON responses.
+        """
         json_dict = {}
         if action_name is None:
             # send all
@@ -105,11 +138,27 @@ class ActionServerModel(BaseModel, HelaoDict):
         return json_dict
 
     def init_endpoints(self):
+        """Reset finished buckets on every endpoint (called when (re)initializing the server)."""
         for _, endpoint in self.endpoints.items():
             endpoint.clear_finished()
 
 
 class GlobalStatusModel(BaseModel, HelaoDict):
+    """Per-orchestrator aggregate of all known action-server statuses.
+
+    Attributes:
+        orchestrator (MachineModel): Identity of the owning orchestrator.
+        server_dict (Dict[Tuple, ActionServerModel]): Action server status keyed by
+            `MachineModel.as_key()`.
+        active_dict (Dict[UUID, Action]): All active actions for this orch.
+        nonactive_dict (Dict[HloStatus, Dict[UUID, Action]]): Finished actions
+            bucketed by status.
+        loop_intent (LoopIntent): Requested loop transition.
+        loop_state (LoopStatus): Current dispatch-loop state.
+        orch_state (OrchStatus): Orchestrator top-level state.
+        counter_dispatched_actions (Dict[UUID, int]): Dispatch counters keyed by experiment UUID.
+    """
+
     orchestrator: MachineModel
     # a dict of actionserversmodels keyed by the server name
     # use MachineModel.as_key() for the dict key
@@ -132,7 +181,8 @@ class GlobalStatusModel(BaseModel, HelaoDict):
     # counter for dispatched actions, keyed by experiment uuid
     counter_dispatched_actions: Dict[UUID, int] = Field(default={})
 
-    def as_json(self):
+    def as_json(self) -> dict:
+        """Return a JSON-friendly dict with `server_dict` keys flattened to ``server@machine`` strings."""
         json_dict = {
             k: vars(self)[k]
             for k in (
@@ -151,7 +201,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         return json_dict
 
     def actions_idle(self) -> bool:
-        """checks if all action servers for this orch are idle"""
+        """Return True if no action is active for this orchestrator."""
         if self.active_dict:
             return False
         else:
@@ -161,7 +211,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         self,
         action_server: MachineModel,
     ) -> bool:
-        """checks if action server is idle for this orch"""
+        """Return True if `action_server` has no active actions belonging to this orchestrator."""
         free = True
         if action_server.as_key() in self.server_dict:
             actionservermodel = self.server_dict[action_server.as_key()]
@@ -176,8 +226,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         return free
 
     def endpoint_free(self, action_server: MachineModel, endpoint_name: str) -> bool:
-        """checks if an action server endpoint is available
-        for this orch"""
+        """Return True if `endpoint_name` on `action_server` has no active actions for this orchestrator."""
         free = True
         # check if the actio server is registered for this orch
         # if action_server.server_name in self.server_dict:
@@ -196,9 +245,13 @@ class GlobalStatusModel(BaseModel, HelaoDict):
 
         return free
 
-    def _sort_status(self):
-        """sorts actions from server_dict
-        into orch specific separate dicts"""
+    def _sort_status(self) -> list:
+        """Move actions from `server_dict` endpoints into this orch's active/nonactive dicts.
+
+        Returns:
+            A list of ``(uuid, status_name)`` tuples for actions that newly
+            transitioned out of `active_dict`.
+        """
         recent_nonactive = []
 
         # loop through all servers
@@ -223,7 +276,15 @@ class GlobalStatusModel(BaseModel, HelaoDict):
                             self.nonactive_dict[hlostatus].update({uuid: statusmodel})
         return recent_nonactive
 
-    def update_global_with_acts(self, actionservermodel: ActionServerModel):
+    def update_global_with_acts(self, actionservermodel: ActionServerModel) -> list:
+        """Merge an incoming `ActionServerModel` into `server_dict` and re-sort statuses.
+
+        Args:
+            actionservermodel: Latest status snapshot from one action server.
+
+        Returns:
+            Same as `_sort_status`: tuples of newly-finished ``(uuid, status_name)``.
+        """
         if actionservermodel.action_server.as_key() not in self.server_dict:
             # add it for the first time
             self.server_dict.update(
@@ -238,7 +299,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         return recent_nonactive
 
     def find_hlostatus_in_finished(self, hlostatus: HloStatus) -> Dict[UUID, Action]:
-        """returns a dict of uuids for actions which contain hlostatus"""
+        """Return finished actions whose status set contains `hlostatus`."""
         uuid_dict = {}
 
         if hlostatus in self.nonactive_dict:
@@ -254,6 +315,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         return uuid_dict
 
     def clear_in_finished(self, hlostatus: HloStatus):
+        """Clear the bucket of finished actions associated with `hlostatus`."""
         if hlostatus in self.nonactive_dict:
             self.nonactive_dict[hlostatus] = {}
         elif HloStatus.finished in self.nonactive_dict:
@@ -262,10 +324,11 @@ class GlobalStatusModel(BaseModel, HelaoDict):
                 del self.nonactive_dict[HloStatus.finished][key]
 
     def new_experiment(self, exp_uuid: UUID):
+        """Initialize the dispatched-action counter for a new experiment."""
         self.counter_dispatched_actions[exp_uuid] = 0
 
     def finish_experiment(self, exp_uuid: UUID) -> List[Action]:
-        """returns all finished actions"""
+        """Return all finished actions for `exp_uuid` and clear the nonactive buckets and counter."""
         # we don't filter by orch as this should have happened already when they
         # were added to the finished_exps
         finished_acts = []

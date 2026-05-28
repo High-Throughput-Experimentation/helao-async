@@ -25,9 +25,51 @@ FWIN = 20
 
 
 class C_mfc:
-    """mass flow controller visualizer module class"""
+    """Bokeh visualizer for a multi-device mass flow controller server.
+
+    Subscribes to the action server's ``ws_live`` WebSocket and renders per
+    device traces for the currently selected control variable (mass flow or
+    pressure) together with a setpoint reference and a rolling mean. A
+    side-by-side data table summarises the latest sample. The y-axis label
+    and active variable switch automatically when the device's
+    ``control_point`` reports a different control mode.
+
+    Attributes:
+        vis: Host :class:`Vis` instance providing the Bokeh document.
+        actsrv_cfg: ``params`` block from the MFC action server's config.
+        config_dict: ``params`` block from the visualizer's server config.
+        update_rate: Minimum seconds between WebSocket polls.
+        max_points: Rolling window length for the data source.
+        last_update_time: Epoch timestamp of the most recent poll.
+        live_key: Server key of the MFC action server.
+        wss: :class:`WsSubscriber` connected to ``ws_live``.
+        data_url: Fully formed ``ws://`` URL for the live WebSocket.
+        IOloop_data_run: Liveness flag for the data ingestion task.
+        IOloop_stat_run: Liveness flag for the status ingestion task.
+        data_suffices: Per-device measurement field suffixes.
+        data_dict_keys: Combined ``datetime`` + per-device columns.
+        devices: Sorted list of device names from the action server.
+        datasource: :class:`ColumnDataSource` backing the plot.
+        datasource_table: :class:`ColumnDataSource` backing the table.
+        layout: Composed Bokeh layout mounted on the document.
+        input_max_points: Widget setting ``max_points``.
+        input_update_rate: Widget setting ``update_rate``.
+        plot: Bokeh ``figure`` for the live trace.
+        table: Bokeh ``DataTable`` showing the latest values.
+        control_mode: Last observed device ``control_point`` value.
+        yvar: Currently plotted variable (``"mass_flow"`` or ``"pressure"``).
+        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Wire up data sources, widgets, plot layout, and start the WS ingest task.
+
+        Args:
+            vis_serv: Host :class:`Vis` server providing the Bokeh document.
+            serv_key: Configuration key of the MFC action server to subscribe
+                to. If the server is not in the config, ``__init__`` returns
+                early without registering any roots.
+        """
         self.vis = vis_serv
         self.actsrv_cfg = self.vis.world_cfg["servers"][serv_key]["params"]
         self.config_dict = self.vis.server_cfg.get("params", {})
@@ -145,12 +187,28 @@ class C_mfc:
         self._add_plots()
 
     def cleanup_session(self, session_context):
+        """Cancel the data ingest task when the Bokeh session is torn down.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.live_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def callback_input_max_points(self, attr, old, new, sender):
-        """callback for input_max_points"""
+        """Validate the ``max datapoints`` input and update the rolling window.
+
+        Parses ``new`` as an int, falls back to ``old`` (or ``500``) on bad
+        input, then clamps to ``[2, 10000]`` before storing it as
+        ``self.max_points`` and refreshing the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_int(val):
             try:
@@ -179,10 +237,26 @@ class C_mfc:
         )
 
     def update_input_value(self, sender, value):
+        """Write ``value`` back onto a Bokeh input widget on the document thread.
+
+        Args:
+            sender: Bokeh input widget whose ``value`` is being updated.
+            value: New string value to assign.
+        """
         sender.value = value
 
     def callback_input_update_rate(self, attr, old, new, sender):
-        """callback for input_update_rate"""
+        """Validate the ``update sec`` input and adjust the polling cadence.
+
+        Parses ``new`` as a float (defaulting to ``0.5`` on bad input), stores
+        it as ``self.update_rate``, and writes the value back to the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_float(val):
             try:
@@ -199,6 +273,16 @@ class C_mfc:
         )
 
     def add_points(self, datapackage_list: list):
+        """Stream live MFC samples into the data source and switch axes on mode change.
+
+        Expands nested per-device dicts into flat ``device__suffix`` columns,
+        computes rolling means for ``pressure`` and ``mass_flow`` columns,
+        detects ``control_point`` changes (switching between mass-flow and
+        pressure plotting), and refreshes the data table.
+
+        Args:
+            datapackage_list: List of dicts from the live WebSocket.
+        """
         latest_epoch = 0
         data_dict = {k: [] for k in self.data_dict_keys}
         for datapackage in datapackage_list:
@@ -256,7 +340,13 @@ class C_mfc:
             self.control_mode = control_mode
             self._add_plots()
 
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+    async def IOloop_data(self):
+        """Continuously read the live WebSocket and schedule plot updates.
+
+        Sleeps briefly each iteration, respects ``self.update_rate`` as a
+        minimum gap between polls, and dispatches non-empty message batches
+        to :meth:`add_points` on the document thread.
+        """
         LOGGER.info(
             f" ... Mass flow controller visualizer subscribing to: {self.data_url}"
         )
@@ -271,6 +361,12 @@ class C_mfc:
             await asyncio.sleep(0.01)
 
     def _add_plots(self):
+        """Rebuild the flow/pressure figure with one trace group per device.
+
+        For each device draws an actual line, a dotted setpoint line, and a
+        blue rolling-mean line, using the currently selected ``yvar``
+        (mass flow or pressure).
+        """
         # clear legend
         if self.plot.renderers:
             self.plot.legend.items = []
@@ -308,6 +404,12 @@ class C_mfc:
         self.plot.legend.background_fill_alpha = 0.2
 
     def reset_plot(self, forceupdate: bool = False):
+        """Rebuild the figure renderers.
+
+        Args:
+            forceupdate: Accepted for parity with other visualizers; the plot
+                is always rebuilt.
+        """
         # self.xselect = self.xaxis_selector_group.active
         # self.yselect = self.yaxis_selector_group.active
         self._add_plots()

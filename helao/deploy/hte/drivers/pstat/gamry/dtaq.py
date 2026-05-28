@@ -1,15 +1,45 @@
+"""Dataclass and instances describing Gamry dtaq (data acquisition) objects.
+
+A ``GamryDtaq`` captures the GamryCOM ProgID of a dtaq class, the names of
+the data columns it emits, and the names of int- and bool-style parameter
+setters it accepts so that ``GamryDriver.setup`` can construct, parameterize,
+and read from the dtaq without per-technique branching.
+"""
+
 from dataclasses import dataclass, field
 from typing import Optional, List
 from enum import StrEnum
 
 
 class DtaqType(StrEnum):
+    """Subtype passed to ``GamryDtaqChrono.Init`` to select potentiostatic vs
+    galvanostatic chronoamperometry.
+
+    Attributes:
+        ChronoPot: Chronopotentiometry (controlled current).
+        ChronoAmp: Chronoamperometry (controlled potential).
+    """
+
     ChronoPot = "ChronoPot"
     ChronoAmp = "ChronoAmp"
 
 
 @dataclass
 class GamryDtaq:
+    """Description of a GamryCOM dtaq class and its parameters.
+
+    Attributes:
+        name: GamryCOM ProgID (e.g. ``"GamryCOM.GamryDtaqCpiv"``).
+        dtaq_type: Optional ``DtaqType`` subtype passed to ``Init`` for
+            dtaqs that require one (e.g. ``GamryDtaqChrono``).
+        output_keys: Column names of the data tuples emitted by ``Cook``,
+            in order.
+        int_param_keys: Names of dtaq setter methods that take a single
+            integer / float argument (delay limits etc.).
+        bool_param_keys: Names of dtaq setter methods that take an
+            ``(enable, value)`` pair.
+    """
+
     name: str
     dtaq_type: Optional[DtaqType] = None
     output_keys: List[str] = field(default_factory=list)

@@ -1,5 +1,10 @@
 # shell: uvicorn motion_server:app --reload
-"""A FastAPI service definition for a diaphragm pump server."""
+"""Diaphragm pump (SIMDOS) action server.
+
+Wraps the :class:`SIMDOS` driver and exposes endpoints for continuous-rate
+pumping via the :class:`RunExec` executor, plus private endpoints to control
+the driver's polling loop and direct pump start/stop.
+"""
 
 __all__ = ["makeApp"]
 
@@ -12,7 +17,19 @@ from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the diaphragm-pump FastAPI app.
+
+    Constructs a :class:`BaseAPI` backed by :class:`SIMDOS` and registers the
+    ``run_continuous`` / ``cancel_run_continuous`` action endpoints plus the
+    private polling and pump on/off endpoints.
+
+    Args:
+        server_key: Key identifying this server in the orchestration group.
+
+    Returns:
+        The configured :class:`BaseAPI` application.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -24,18 +41,22 @@ def makeApp(server_key):
 
     @app.post("/start_polling", tags=["private"])
     async def start_polling():
+        """Start the SIMDOS driver's internal status polling loop."""
         await app.driver.start_polling()
 
     @app.post("/stop_polling", tags=["private"])
     async def stop_polling():
+        """Stop the SIMDOS driver's internal status polling loop."""
         await app.driver.stop_polling()
 
     @app.post("/start_pump", tags=["private"])
     async def start_pump():
+        """Start the pump directly via the driver (no action record)."""
         await app.driver.start()
 
     @app.post("/stop_pump", tags=["private"])
     async def stop_pump():
+        """Stop the pump directly via the driver (no action record)."""
         await app.driver.stop()
 
     @app.post(f"/{server_key}/run_continuous", tags=["action"])
@@ -45,6 +66,10 @@ def makeApp(server_key):
         rate_uL_min: int = 0,
         duration_sec: float = -1,
     ):
+        """Pump continuously at ``rate_uL_min`` via a :class:`RunExec` executor.
+
+        ``duration_sec`` of ``-1`` runs until ``cancel_run_continuous``.
+        """
         active = await app.base.setup_and_contain_action()
         executor = RunExec(active=active, oneoff=False, poll_rate=0.2)
         active_action_dict = active.start_executor(executor)
@@ -56,7 +81,11 @@ def makeApp(server_key):
         action_version: int = 1,
         exec_id: Optional[str] = None,
     ):
-        """Stop flowrate & acquisition for given device_name."""
+        """Stop the targeted ``run_continuous`` executor, or all of them.
+
+        If ``exec_id`` is provided only that executor is stopped; otherwise all
+        executors whose id begins with ``run_continuous`` are stopped.
+        """
         active = await app.base.setup_and_contain_action()
         if active.action.action_params["exec_id"] is not None:
             app.base.stop_executor(active.action.action_params["exec_id"])

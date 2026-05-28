@@ -1,4 +1,8 @@
-"""Sequence library for Closed Loop Accelerated Durability (CLAD)"""
+"""Sequence library for Closed Loop Accelerated Durability (CLAD).
+
+Exposes the :func:`CLAD_seq` program that drives the ADSS deployment through
+reference setup, cell cleaning, and a multi-potential CA loop for each sample.
+"""
 
 from helao.helpers.premodels import ExperimentPlanMaker
 
@@ -38,7 +42,63 @@ def CLAD_seq(
     enable_aliquots: bool = True,
     pal_injector: str = "LS 4",
     pal_injector_id: str = "LS4_peek",
-):
+) -> list:
+    """Closed-loop accelerated-durability sequence over a list of plate samples.
+
+    For each sample number in ``plate_sample_no_list`` the sequence:
+
+    1. Drains, unloads, and primes the cell.
+    2. Performs a reference setup followed by an OCV bubble check
+       (with optional post-OCV aliquot).
+    3. Cleans the cell ``number_of_cleans`` times using nitric and water,
+       refilling the respective syringes after each cycle.
+    4. Flushes with electrolyte, drains, then refills the work syringe.
+    5. Loads the next sample assembly, recirculates with alternating
+       direction, and runs an OCV bubble check.
+    6. Runs CA at each potential in ``ca_potential_list``, taking an aliquot
+       after every CA when ``enable_aliquots`` is true.
+    7. Drains/unloads, runs another reference measurement, and parks the
+       ADSS in standby.
+
+    The sequence ends with a filled cell at the reference sample position.
+
+    Args:
+        sequence_version: Sequence version tag.
+        solid_plate_id: Plate id holding the working-electrode samples.
+        plate_sample_no_list: Plate sample numbers to iterate through.
+        ca_potential_list: CA potentials (V) to apply per sample.
+        ca_sample_rate_s: CA sample interval in seconds.
+        ca_duration_s: CA hold duration in seconds.
+        electrolyte_sample_no: Liquid sample number used as the electrolyte.
+        electrolyte_ph: pH of the electrolyte.
+        reference_offset_V: Reference electrode offset (V).
+        reference_position: Builtin reference position name.
+        drain_duration_s: Cell drain wait time (s).
+        fill_volume_ul: Cell fill volume per phase (uL).
+        fill_rate_ul_s: Syringe fill rate (uL/s).
+        fill_recirc_fwd_duration_s: Forward recirculation duration (s) after fill.
+        fill_recirc_rev_duration_s: Reverse recirculation duration (s) after fill.
+        rinse_recirc_duration_s: Rinse recirculation duration (s).
+        rinse_volume_ul: Rinse volume (uL).
+        clean_recirc_duration_s: Cleaning recirculation duration (s).
+        clean_volume_ul: Cleaning volume (uL).
+        clean_drain_duration_s: Drain time after cleaning (s).
+        ocv_duration_s: OCV duration (s) used in reference/bubble checks.
+        ocv_sample_rate_s: OCV sample interval (s).
+        ocv_bubble_check: Whether to enable bubble check during OCV.
+        number_of_cleans: How many clean cycles to run per sample.
+        gamry_i_range: Gamry current range string.
+        gas_sample_no: Gas sample number loaded for the experiment.
+        gas_volume_ml: Gas volume associated with the load.
+        bubbler_gas: Bubbler gas label.
+        aliquot_volume_ul: Aliquot volume (uL) when enabled.
+        enable_aliquots: Master switch for post-CA aliquoting.
+        pal_injector: PAL injector key.
+        pal_injector_id: PAL injector identifier.
+
+    Returns:
+        List of planned experiments to be dispatched by the orchestrator.
+    """
 
     epm = ExperimentPlanMaker()
 

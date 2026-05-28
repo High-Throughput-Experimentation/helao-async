@@ -1,3 +1,5 @@
+"""Pydantic models describing sequences (the top-level orchestrator run unit)."""
+
 __all__ = ["ShortSequenceModel", "SequenceModel"]
 
 from datetime import datetime
@@ -19,15 +21,20 @@ from helao.core.helaodict import HelaoDict
 
 
 class ShortSequenceModel(BaseModel, HelaoDict):
-    """
-    Template model for defining a sequence in the HELAO system.
+    """Lightweight definition of a sequence as authored by the operator.
 
     Attributes:
         sequence_name (Optional[str]): Name of the sequence.
-        sequence_params (dict): Parameters for the sequence.
-        sequence_label (Optional[str]): Label for the sequence.
-        planned_experiments (List[ShortExperimentModel]): List of planned experiments in the sequence.
-        from_global_seq_params (dict): Parameters received from global sequence context.
+        sequence_params (dict): Parameters supplied to the sequence.
+        sequence_label (Optional[str]): Label for the sequence; default ``"noLabel"``.
+        sequence_comment (Optional[str]): Free-form comment.
+        planned_experiments (List[ShortExperimentModel]): Experiments planned by the sequence.
+        run_type (Optional[str]): Run-type/instrument label.
+        campaign_name (Optional[str]): Campaign label.
+        campaign_uuid (Optional[UUID]): Campaign UUID.
+        run_id (Optional[UUID]): Run identifier.
+        run_sequence_parameter_variable (Optional[List[str]]): Variables the run wires through.
+        from_global_seq_params (dict): Params injected from the global sequence context.
     """
 
     sequence_name: Optional[str] = None
@@ -46,26 +53,33 @@ class ShortSequenceModel(BaseModel, HelaoDict):
 
 
 class SequenceModel(ShortSequenceModel):
-    """
-    Comprehensive model for representing a full sequence in the HELAO system.
+    """Full record of a sequence executed by the orchestrator.
+
+    Extends `ShortSequenceModel` with identity, status, code provenance,
+    dispatched experiment history, and global parameter snapshots.
 
     Attributes:
-        hlo_version (Optional[str]): HELAO version string.
-        access (Optional[str]): Access type (e.g., 'hte').
-        dummy (bool): If True, sequence is a dummy/test sequence.
-        simulation (bool): If True, sequence is a simulation.
+        hlo_version (Optional[str]): HELAO version stamped at construction.
+        access (Optional[str]): Access tier identifier (e.g. ``"hte"``).
+        dummy (bool): True if this is a dummy/test sequence.
+        simulation (bool): True if the sequence ran against simulated drivers.
         sequence_uuid (Optional[UUID]): Unique identifier for the sequence.
-        sequence_timestamp (Optional[datetime]): Timestamp when the sequence was created.
-        sequence_status (List[HloStatus]): List of status updates for the sequence.
-        sequence_output_dir (Optional[Path]): Directory where sequence output is stored.
-        sequence_codehash (Optional[str]): Code hash for reproducibility.
-        sequence_comment (Optional[str]): Comment or description for the sequence.
-        data_request_id (Optional[UUID]): UUID for a data request associated with the sequence.
-        orchestrator (MachineModel): Orchestrator server information.
-        dispatched_experiments_abbr (List[ShortExperimentModel]): List of dispatched experiment summaries.
-        sync_data (bool): If True, synchronize data after sequence.
-        campaign_name (Optional[str]): Name of the campaign.
-        manual_action (bool): If True, sequence contains manual actions.
+        sequence_timestamp (Optional[datetime]): Creation timestamp.
+        sequence_status (List[HloStatus]): Accumulated status flags.
+        sequence_output_dir (Optional[Path]): Output directory.
+        sequence_codehash (Optional[str]): Git hash of the sequence source.
+        sequence_codepath (Optional[str]): Source file path.
+        sequence_funcname (Optional[str]): Implementing function name.
+        sequence_finished_timestamp (Optional[datetime]): When the sequence finished.
+        files (List[FileInfo]): Files produced.
+        aux_files (List[str]): Auxiliary file paths.
+        data_request_id (Optional[UUID]): Optional data-request linkage.
+        orchestrator (MachineModel): Owning orchestrator.
+        dispatched_experiments_abbr (List[ShortExperimentModel]): Short records of dispatched experiments.
+        sync_data (bool): True to ship sequence data via the syncer.
+        manual_action (bool): True if the sequence contains manual actions.
+        initial_global_params (dict): Snapshot of global params at start.
+        finished_global_params (dict): Snapshot of global params at end.
     """
 
     hlo_version: Optional[str] = Field(default_factory=get_hlo_version)

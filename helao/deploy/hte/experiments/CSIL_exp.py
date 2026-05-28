@@ -1,7 +1,11 @@
-"""
-Action library for CCSI
+"""Experiment library for the CSIL station (CCSI-derived).
 
-server_key must be a FastAPI action server defined in config
+Mirrors the CCSI experiment library and exports the same ``CCSI_sub_*``
+functions. Each function takes an ``Experiment`` and returns the list of
+actions to enqueue. Action targets are referenced by ``server_key`` strings
+(e.g. ``PSTAT``, ``MOTOR``, ``NI``, ``PAL``, ``IO``, ``CALC``, ``CO2SENSOR``,
+``MFC``, ``N2MFC``, ``DOSEPUMP``, ``WORKSYRINGE``, ``CLEANSYRINGE``,
+``WATERSYRINGE``, ``ORCH``).
 """
 
 __all__ = [
@@ -77,8 +81,16 @@ WATERSYRINGE_server = MachineModel(
 toggle_triggertype = TriggerType.fallingedge
 
 
-def CCSI_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
-    """Unload Sample at 'cell1_we' position."""
+def CCSI_sub_unload_cell(experiment: Experiment, experiment_version: int = 1) -> list:
+    """Unload every sample currently tracked at the ``cell1_we`` PAL custom position.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add(PAL_server, "archive_custom_unloadall", {})
@@ -90,7 +102,18 @@ def CCSI_sub_load_solid(
     experiment_version: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
-):
+) -> list:
+    """Load a legacy solid plate sample into ``cell1_we`` and finish a process record.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(
@@ -124,10 +147,19 @@ def CCSI_sub_load_liquid(
     volume_ul_cell_liquid: int = 1000,
     water_True_False: bool = False,
     combine_True_False: bool = False,
-):
-    """Add liquid volume to cell position.
+) -> list:
+    """Archive a liquid sample addition into ``cell1_we`` and finish a process record.
 
-    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        reservoir_liquid_sample_no: Liquid sample number in the reservoir.
+        volume_ul_cell_liquid: Volume added (uL).
+        water_True_False: Forwarded as ``dilute_liquids`` to PAL.
+        combine_True_False: Forwarded as ``combine_liquids`` to PAL.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -160,8 +192,18 @@ def CCSI_sub_load_gas(
     experiment_version: int = 2,
     reservoir_gas_sample_no: int = 1,
     volume_ul_cell_gas: int = 1000,
-):
-    """Add gas volume to cell position."""
+) -> list:
+    """Load a gas sample into ``cell1_we`` and finish a process record.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        reservoir_gas_sample_no: Gas sample number in the reservoir.
+        volume_ul_cell_gas: Volume added (uL).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add(
@@ -187,11 +229,15 @@ def CCSI_sub_load_gas(
 def CCSI_sub_alloff(
     experiment: Experiment,
     experiment_version: int = 1,
-):
-    """
+) -> list:
+    """Turn the recirculating pump off and close every CCSI gas/liquid valve.
 
     Args:
-        experiment (Experiment): Experiment object provided by Orch
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -225,7 +271,25 @@ def CCSI_sub_headspace_purge_and_measure(
     co2_ppm_thresh: float = 90000,
     purge_if: Union[str, float] = "below",
     max_repeats: int = 5,
-):
+) -> list:
+    """Run a headspace purge and then take an MFC flow + CO2 sensor measurement.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        HSpurge_duration: Headspace purge time (s).
+        DeltaDilute1_duration: Initial dilution-recirc time (s); ``0`` skips.
+        initialization: Toggle initialization-specific valve sequencing.
+        recirculation_rate_uL_min: Recirculation rate (informational).
+        co2measure_duration: Acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        co2_ppm_thresh: CO2 threshold for the calling sequence.
+        purge_if: ``"above"``/``"below"`` or a numeric threshold.
+        max_repeats: Maximum follow-up repeats for the calling sequence.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     if DeltaDilute1_duration == 0:
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -315,7 +379,19 @@ def CCSI_sub_headspace_measure(
     recirculation_rate_uL_min: int = 10000,
     co2measure_duration: float = 10,
     co2measure_acqrate: float = 0.5,
-):
+) -> list:
+    """Query the cell sample, then acquire MFC flow and CO2 ppm in parallel with recirculation.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        recirculation_rate_uL_min: Recirculation rate (informational).
+        co2measure_duration: Acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(
@@ -367,7 +443,22 @@ def CCSI_sub_drain(
     recirculation: bool = False,
     recirculation_duration: float = 20,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Drain the cell with a long valve sequence, optionally recirculating in stages.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        HSpurge_duration: Headspace purge duration (s).
+        DeltaDilute1_duration: Optional dilution-recirc time (s); ``0`` skips.
+        initialization: Toggle initialization-specific valve sequencing.
+        recirculation: Run mid-purge recirculation stages when True.
+        recirculation_duration: Total recirculation time split across stages (s).
+        recirculation_rate_uL_min: Recirculation rate (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     if DeltaDilute1_duration == 0:
@@ -502,7 +593,23 @@ def CCSI_sub_n2drain(
     drain_recirculation: bool = True,
     recirculation_duration: float = 120,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Drain the cell using a metered N2 purge via the N2 MFC, with optional recirculation.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        n2flowrate_sccm: N2 flow rate (sccm).
+        HSpurge_duration: N2 purge duration (s).
+        DeltaDilute1_duration: Optional dilution-recirc time (s); ``0`` skips.
+        initialization: Toggle initialization-specific valve sequencing.
+        drain_recirculation: Run a recirculation stage during the drain.
+        recirculation_duration: Recirculation time (s).
+        recirculation_rate_uL_min: Recirculation rate (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     if DeltaDilute1_duration == 0:
@@ -590,7 +697,16 @@ def CCSI_sub_n2drain(
 def CCSI_sub_initialization_end_state(
     experiment: Experiment,
     experiment_version: int = 1,
-):
+) -> list:
+    """Place the system into its post-initialization state: pump off and valve 1A closed.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     # only Pump off, 1A closed //
 
     apm = ActionPlanMaker()
@@ -617,7 +733,16 @@ def CCSI_sub_initialization_end_state(
 def CCSI_sub_peripumpoff(
     experiment: Experiment,
     experiment_version: int = 1,
-):
+) -> list:
+    """Stop the recirculation dose pump (CSIL variant).
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(DOSEPUMP_server, "cancel_run_continuous", {})
     # apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1}, asc.no_wait)
@@ -642,7 +767,22 @@ def CCSI_sub_initialization_firstpart(
     Sensorpurge1_duration: float = 15,
     recirculation_rate_uL_min: int = 10000,
     #    DeltaDilute1_duration: float = 15,
-):
+) -> list:
+    """Run the first-time CSIL initialization purge sequence (headspace → probe → sensor).
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        HSpurge1_duration: Main headspace purge duration (s).
+        Manpurge1_duration: Manifold/solvent purge duration (s).
+        Alphapurge1_duration: Line/alpha purge duration (s).
+        Probepurge1_duration: Probe purge duration (s).
+        Sensorpurge1_duration: pCO2 sensor purge duration (s).
+        recirculation_rate_uL_min: Recirculation rate (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     #
     # ALL OFF
     apm = ActionPlanMaker()
@@ -764,7 +904,40 @@ def CCSI_sub_cellfill(
     co2_filltime_s: float = 30,
     #    co2measure_duration: float = 20,
     #    co2measure_acqrate: float = 0.5,
-):
+) -> list:
+    """Fill the CSIL cell with optional secondary, solution, and clean injections (with N2/CO2 push).
+
+    Sequences multivalve+syringe injections in stages: optional pre-solution
+    secondary (water-like) injection, the main work-syringe injection, and
+    a clean-syringe (or secondary) injection. Each stage is followed by an
+    N2 or CO2 push depending on ``n2_push``.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Solution_description: Free-text solution label.
+        Solution_reservoir_sample_no: Liquid sample number for the solution.
+        Solution_volume_ul: Solution volume to inject (uL); ``0`` skips.
+        Clean_reservoir_sample_no: Liquid sample number for the clean stage.
+        Clean_volume_ul: Clean volume to inject (uL); ``0`` skips.
+        secondliquid_injection: Enable a secondary injection stage.
+        secondliquid_injection_before_IL: Place the secondary before the solution.
+        secondliquid_injection_reservoir_sample_no: Liquid sample number.
+        secondliquid_injection_volume_ul: Secondary injection volume (uL).
+        secondliquid_injection_syringe_rate_ulsec: Secondary syringe rate.
+        Syringe_rate_ulsec: Primary syringe rate (uL/s).
+        SyringePushWait_s: Wait after the main syringe push (s).
+        LiquidFillWait_s: Wait after the solution-fill push (s).
+        CleanFillWait_s: Wait after the clean-fill push (s).
+        WaterFillWait_s: Wait after the secondary-injection push (s).
+        previous_liquid: Forwarded to PAL combine/dilute flags.
+        n2_push: Push with N2 (True) or CO2 (False).
+        co2_fill_after_n2push: After N2 push, also briefly push CO2.
+        co2_filltime_s: CO2 push time (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
@@ -1243,7 +1416,19 @@ def CCSI_sub_co2monitoring(
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Acquire CO2 in the recirculated headspace using the DOSEPUMP recirculator.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        co2measure_duration: Acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -1289,7 +1474,22 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
     flowramp_sccm: float = 9,
     init_max_flow_s: float = 30,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Step up MFC flow then ramp while measuring CO2 and recirculating via DOSEPUMP.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        co2measure_duration: Total CO2 acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        flowrate_sccm: Steady MFC flow rate (sccm).
+        flowramp_sccm: MFC ramp rate (sccm/s).
+        init_max_flow_s: Initial high-flow ramp duration (s).
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -1362,7 +1562,23 @@ def CCSI_sub_co2topup_mfcmassdose(
     target_pressure: float = 14.30,
     total_gas_scc: float = 7.0,
     refill_freq_sec: float = 2.0,
-):
+) -> list:
+    """Hold the cell at a target pressure by topping up CO2 via the MFC.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        co2measure_acqrate: Acquisition rate (s).
+        flowrate_sccm: MFC flow rate (sccm).
+        flowramp_sccm: MFC ramp rate (sccm/s).
+        duration_s: Pressure-maintenance duration (s).
+        target_pressure: Pressure setpoint (psia).
+        total_gas_scc: Allowance for total dispensed gas (scc).
+        refill_freq_sec: Refill check interval (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -1409,7 +1625,21 @@ def CCSI_sub_co2constantpressure(
     atm_pressure: float = 14.27,
     pressureramp: float = 2,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Hold a target pressure via the MFC while recording CO2 and recirculating via DOSEPUMP.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        co2measure_duration: Acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        atm_pressure: Pressure setpoint (psia).
+        pressureramp: Pressure ramp rate (psi/s).
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     # v2 v1ab open, sol inject clean inject
 
     apm = ActionPlanMaker()
@@ -1473,7 +1703,22 @@ def CCSI_sub_co2mass_temp(
     flowramp_sccm: float = 9,
     init_max_flow_s: float = 30,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Step up flow then ramp while measuring CO2 and recirculating via DOSEPUMP.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        co2measure_duration: Total acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        flowrate_sccm: Steady MFC flow rate (sccm).
+        flowramp_sccm: MFC ramp rate (sccm/s).
+        init_max_flow_s: Initial high-flow ramp duration (s).
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     # v2 v1ab open, sol inject clean inject
 
     apm = ActionPlanMaker()
@@ -1559,7 +1804,24 @@ def CCSI_sub_co2massdose(
     total_gas_scc: float = 7.0,
     refill_freq_sec: float = 2.0,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Dose CO2 to a pressure setpoint while measuring CO2 and recirculating via DOSEPUMP.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        co2measure_duration: CO2 acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        flowrate_sccm: MFC flow rate (sccm).
+        flowramp_sccm: MFC ramp rate (sccm/s).
+        target_pressure: Pressure setpoint (psia).
+        total_gas_scc: Allowance for total dispensed gas (scc).
+        refill_freq_sec: Refill check interval (s).
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     #    apm.add(IO_server, "acquire_analog_in", {"duration":co2measure_duration + 1,"acquisition_rate": co2measure_acqrate, }, nonblocking=True)
@@ -1646,7 +1908,25 @@ def CCSI_sub_co2maintainconcentration(
     headspace_scc: float = 7.5,
     refill_freq_sec: float = 60.0,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Maintain a target CO2 concentration in the recirculated headspace via DOSEPUMP.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        pureco2_sample_no: Gas sample number of the pure CO2 source.
+        co2measure_duration: Total acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        flowrate_sccm: MFC flow rate (sccm).
+        flowramp_sccm: MFC ramp rate (sccm/s).
+        target_co2_ppm: Target CO2 concentration (ppm).
+        headspace_scc: Headspace volume (scc).
+        refill_freq_sec: Refill check interval (s).
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(
         PAL_server,
@@ -1769,7 +2049,21 @@ def CCSI_sub_flowflush(
     flowrate_sccm: float = 0.3,
     flowramp_sccm: float = 0,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Run a long flow-and-flush diagnostic with valve-toggle cycles and CO2 logging.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        co2measure_duration: Acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        flowrate_sccm: MFC flow rate (sccm).
+        flowramp_sccm: MFC ramp rate (sccm/s).
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(
@@ -1840,7 +2134,30 @@ def CCSI_sub_clean_inject(
     DeltaDilute1_duration: float = 0,
     drainrecirc: bool = True,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Inject clean water, recirculate, measure CO2, then drain — repeating via calc if needed.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Clean_volume_ul: Clean water volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        LiquidCleanWait_s: Wait after liquid fill before measurement (s).
+        co2measure_duration: CO2 acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        use_co2_check: Repeat via CALC threshold check when True.
+        need_fill: Refill the water syringe before the clean injection.
+        co2_ppm_thresh: CO2 ppm threshold for the repeat check.
+        purge_if: ``"above"``/``"below"`` or a numeric threshold.
+        max_repeats: Maximum follow-up repeats (informational).
+        LiquidCleanPurge_duration: Drain purge duration forwarded to drain (s).
+        DeltaDilute1_duration: Dilution recirc duration forwarded to drain (s).
+        drainrecirc: Forwarded ``recirculation`` flag to drain.
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     # drain
     # only 1B 6A-waste opened 1A closed pump off//differ from delta purge
 
@@ -1994,7 +2311,18 @@ def CCSI_sub_refill_clean(
     experiment_version: int = 3,  # v3 1ml backlash volume v2 no backlash volume
     Clean_volume_ul: int = 5000,
     Syringe_rate_ulsec: int = 100,
-):
+) -> list:
+    """Refill the water syringe with backlash correction.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Clean_volume_ul: Target net withdraw volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -2115,7 +2443,20 @@ def CCSI_debug_co2purge(
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
     purge_if: Union[str, float] = -0.05,
-):
+) -> list:
+    """Debug helper that acquires CO2 and conditionally re-queues itself via CALC.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        co2measure_duration: Acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        co2_ppm_thresh: CO2 threshold for the repeat check.
+        purge_if: ``"above"``/``"below"`` or a numeric threshold.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(
         CO2S_server,
@@ -2154,7 +2495,20 @@ def CCSI_leaktest_co2(
     co2measure_acqrate: float = 1,
     recirculate: bool = True,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Run a long CO2 acquisition (optionally with DOSEPUMP recirculation) as a leak test.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        co2measure_duration: Acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        recirculate: Run the DOSEPUMP recirculation during the test.
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(
@@ -2186,7 +2540,20 @@ def CCSI_sub_monitorcell(
     co2measure_acqrate: float = 1,
     recirculation: bool = False,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Concurrently acquire MFC flow and CO2 ppm to monitor the cell (DOSEPUMP recirc).
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        co2measure_duration: Acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        recirculation: Run the DOSEPUMP recirculation in parallel when True.
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add(
         MFC_server,
@@ -2245,7 +2612,35 @@ def CCSI_sub_n2flush(
     co2_ppm_thresh: float = 1000,
     purge_if: Union[str, float] = "above",
     max_repeats: int = 5,
-):
+) -> list:
+    """Multi-stage N2 flush of headspace, lines, probe, and pCO2 sensor.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        flush_cycles: Number of full purge cycles; ``0`` disables fixed cycles.
+        n2flowrate_sccm: N2 flow rate (sccm).
+        HSpurge1_duration: First headspace-purge duration (s).
+        HSpurge_duration: Final headspace-purge duration (s).
+        DeltaDilute1_duration: Dilution recirc duration (s); ``0`` skips.
+        Manpurge1_duration: Manifold purge duration (s).
+        Alphapurge1_duration: Alpha (line) purge duration (s).
+        Probepurge1_duration: Probe purge duration (s).
+        Sensorpurge1_duration: pCO2 sensor purge duration (s).
+        recirculation: Run a mid-final-purge recirculation when True.
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+        initialization: Toggle initialization-specific valve sequencing.
+        co2measure_delay: Delay before CO2 measurement (s).
+        co2measure_duration: Acquisition duration (s).
+        co2measure_acqrate: Acquisition rate (s).
+        use_co2_check: Run a CALC threshold repeat after the cycles.
+        co2_ppm_thresh: CO2 threshold for the repeat check.
+        purge_if: ``"above"``/``"below"`` or a numeric threshold.
+        max_repeats: Maximum follow-up repeats (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     #
     apm = ActionPlanMaker()
 
@@ -2518,7 +2913,41 @@ def CCSI_sub_n2clean(
     co2_ppm_thresh: float = 1400,
     purge_if: Union[str, float] = "above",
     max_repeats: int = 2,
-):
+) -> list:
+    """Full N2 cleaning sequence: clean-fill the cell, N2 drain, refill syringe, N2 flush.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Clean_reservoir_sample_no: Liquid sample number for the clean reservoir.
+        Clean_volume_ul: Clean injection volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        LiquidFillWait_s: Wait after liquid fill (s).
+        n2_push: Push the injected liquid with N2 when True.
+        n2flowrate_sccm: N2 flow rate (sccm).
+        drain_HSpurge_duration: N2-drain purge duration (s).
+        drain_recirculation_duration: Recirculation time during drain (s).
+        flush_HSpurge1_duration: First N2-flush purge duration (s).
+        flush_HSpurge_duration: Final N2-flush purge duration (s).
+        DeltaDilute1_duration: Dilution recirc duration (s).
+        Manpurge1_duration: Manifold purge duration (s).
+        Alphapurge1_duration: Alpha (line) purge duration (s).
+        Probepurge1_duration: Probe purge duration (s).
+        Sensorpurge1_duration: pCO2 sensor purge duration (s).
+        recirculation: Forwarded ``recirculation`` flag to drain.
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+        initialization: Toggle initialization-specific valve sequencing.
+        co2measure_delay: Delay before CO2 measurement in N2 flush (s).
+        co2measure_duration: Acquisition duration in N2 flush (s).
+        co2measure_acqrate: Acquisition rate (s).
+        use_co2_check: Run a CALC threshold repeat after the cycles.
+        co2_ppm_thresh: CO2 threshold for the repeat check.
+        purge_if: ``"above"``/``"below"`` or a numeric threshold.
+        max_repeats: Maximum follow-up repeats (informational).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     #
     apm = ActionPlanMaker()
 
@@ -2605,7 +3034,30 @@ def CCSI_sub_n2rinse(
     drain_recirculation_duration: float = 150,
     recirculation: bool = False,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Run ``rinse_cycles`` of clean-fill + optional agitation + N2 drain + syringe refill.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        rinse_cycles: Number of clean-water rinse cycles.
+        Clean_reservoir_sample_no: Liquid sample number for the clean reservoir.
+        Clean_volume_ul: Clean injection volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        LiquidFillWait_s: Wait after liquid fill (s).
+        rinse_agitation: Run an in-cell recirculation between fill and drain.
+        rinse_agitation_wait: Delay before agitation (s).
+        rinse_agitation_duration: Agitation recirculation duration (s).
+        n2_push: Push the injected liquid with N2 when True.
+        n2flowrate_sccm: N2 flow rate (sccm).
+        drain_HSpurge_duration: N2-drain purge duration (s).
+        drain_recirculation_duration: Recirculation time during drain (s).
+        recirculation: Forwarded ``recirculation`` flag to drain.
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     #
     apm = ActionPlanMaker()
 
@@ -2662,7 +3114,21 @@ def CCSI_sub_n2headspace(
     recirculation: bool = True,
     recirculation_duration: float = 60,
     recirculation_rate_uL_min: int = 10000,
-):
+) -> list:
+    """Open the gas path, run an N2 purge through the headspace, then optionally recirculate.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        n2flowrate_sccm: N2 flow rate (sccm).
+        HSpurge_duration: Total N2 purge duration (s).
+        recirculation: Run a recirculation stage mid-purge when True.
+        recirculation_duration: Recirculation time (s).
+        recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
 

@@ -1,4 +1,11 @@
-"""Experiment library for Closed Loop Accelerated Durability (CLAD)"""
+"""Experiment library for the Closed-Loop Accelerated Durability (CLAD) station.
+
+Defines sub-experiments that build action lists for an orchestrator. Each
+function takes an ``Experiment`` and returns the list of actions to enqueue.
+Action targets are referenced by ``server_key`` strings (e.g. ``MOTOR``,
+``NI``, ``PAL``, ``WORKSYRINGE``, ``WATERSYRINGE``, ``CLEANSYRINGE``,
+``ORCH``).
+"""
 
 __all__ = [
     "CLAD_sub_recirculate_alternating",
@@ -52,8 +59,19 @@ def CLAD_sub_recirculate_alternating(
     forward_duration_s: float = 30.0,
     reverse_duration_s: float = 15.0,
     final_duration_s: float = 5.0,
-):
-    """Recirculates with pump alternating forward and reverse directions for specified durations."""
+) -> list:
+    """Recirculate by alternating peristaltic-pump direction forward, reverse, then forward again.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        forward_duration_s: Initial forward-recirc time (s).
+        reverse_duration_s: Reverse-recirc time (s).
+        final_duration_s: Final forward-recirc time (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     # RECIRCULATE FORWARD
@@ -89,9 +107,29 @@ def CLAD_sub_load_sample(
     gas_sample_no: Optional[int] = None,
     gas_volume_ml: Optional[float] = None,
     bubbler_gas: Optional[str] = None,
-):
+) -> list:
+    """Register optional solid/liquid/gas samples into a PAL custom position.
+
+    Any sample type whose ``*_sample_no`` (and volume, where applicable) is
+    not None is loaded; ``clear_position`` first unloads existing samples.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        load_position: PAL custom position name.
+        clear_position: Unload existing samples first.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+        liquid_sample_no: Liquid sample number on this host.
+        liquid_volume_ul: Liquid volume to add (uL).
+        gas_sample_no: Gas sample number.
+        gas_volume_ml: Gas volume to add (mL).
+        bubbler_gas: Informational gas label (unused by the actions).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
-    """Registers solid, liquid, and gas into load_position."""
 
     if clear_position:
         apm.add(
@@ -163,8 +201,23 @@ def CLAD_sub_fill_cell(
     fill_volume_ul: float = 3000,
     fill_rate_ul_s: float = 300,
     load_sample: bool = False,
-):
-    """Fills cell with liquid from syringe, optionally loading sample from _fast_samples_in."""
+) -> list:
+    """Infuse the work syringe into the cell, optionally tagging the current cell sample.
+
+    When ``load_sample`` is True the current sample at ``cell1_we`` is
+    queried into ``_fast_samples_in`` first, and the syringe infuse forwards
+    that into the cell-fill technique.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        fill_volume_ul: Fill volume (uL).
+        fill_rate_ul_s: Syringe rate (uL/s).
+        load_sample: Query the cell sample before infusing.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     if load_sample:
@@ -214,17 +267,19 @@ def CLAD_sub_setup_cell(
     rinse_volume_ul: float = 3000.0,
     fill_rate_ul_s: float = 300.0,
     drain_wait_duration_s: float = 30.0,
-):
-    """Move cell to rinse position, fill and recirculate with working electrolyte, then drain and refill syringe.
+) -> list:
+    """Move to the rinse position, fill+forward-recirc, drain, then refill the work syringe.
 
     Args:
-        rinse_recirc_duration_s (float, optional): Defaults to 30.0.
-        rinse_volume_ul (float, optional): Defaults to 3000.0.
-        fill_rate_ul_s (float, optional): Defaults to 300.0.
-        drain_wait_duration_s (float, optional): Defaults to 30.0.
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        rinse_recirc_duration_s: Forward recirculation duration (s).
+        rinse_volume_ul: Cell rinse volume (uL).
+        fill_rate_ul_s: Syringe rate (uL/s).
+        drain_wait_duration_s: Drain wait passed to ``ADSS_sub_drain_cell`` (s).
 
     Returns:
-        list: Planned actions for the experiment.
+        List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()
 
@@ -307,26 +362,28 @@ def CLAD_sub_reference_setup(
     ocv_duration_s: float = 30.0,
     ocv_sample_rate_s: float = 0.1,
     gamry_i_range: str = "auto",
-):
-    """Move cell to reference position, load reference sample, fill and recirculate with flowing O2, and refill syringe.
+) -> list:
+    """Move to a reference position, load a reference solid+liquid, fill, flow O2, recirculate, refill.
 
     Args:
-        reference_position_name (str, optional): Defaults to "builtin_ref_motorxy_2".
-        reference_sample_label (str, optional): Defaults to "reference-fto__solid__11_1".
-        load_position (str, optional): Defaults to "cell1_we".
-        liquid_sample_no (int, optional): Defaults to 1053.
-        fill_volume_ul (float, optional): Defaults to 7000.0.
-        fill_rate_ul_s (float, optional): Defaults to 300.0.
-        fill_recirc_fwd_duration_s (float, optional): Defaults to 30.0.
-        fill_recirc_rev_duration_s (float, optional): Defaults to 15.0.
-        electrolyte_ph (float, optional): Defaults to 1.0.
-        reference_offset_V (float, optional): Defaults to 0.0.
-        ocv_duration_s (float, optional): Defaults to 30.0.
-        ocv_sample_rate_s (float, optional): Defaults to 0.1.
-        gamry_i_range (str, optional): Defaults to "auto".
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        reference_position_name: Built-in specref position name.
+        reference_sample_label: Informational solid label.
+        load_position: PAL custom position for the reference assembly.
+        liquid_sample_no: Liquid sample number.
+        fill_volume_ul: Fill volume (uL).
+        fill_rate_ul_s: Syringe rate (uL/s).
+        fill_recirc_fwd_duration_s: Forward recirculation duration (s).
+        fill_recirc_rev_duration_s: Reverse recirculation duration (s).
+        electrolyte_ph: Electrolyte pH (informational here).
+        reference_offset_V: Reference offset (V) (informational here).
+        ocv_duration_s: OCV duration (s) (informational here).
+        ocv_sample_rate_s: OCV sample rate (s) (informational here).
+        gamry_i_range: Gamry current-range setting (informational here).
 
     Returns:
-        list: Planned actions for the experiment.
+        List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()
 
@@ -435,21 +492,23 @@ def CLAD_sub_OCV_bubble_check(
     bubble_check: bool = True,
     aliquot_post_ocv: bool = True,
     run_use: RunUse = RunUse.data,
-):
-    """Runs bubble-check OCV if bubble_check is True, then runs OCV with aliquot after measurement if aliquot_post_ocv is True.
+) -> list:
+    """Optionally run a short OCV with bubble detection then run the main OCV (with aliquot).
 
     Args:
-        ocv_duration_s (float, optional): Defaults to 30.0.
-        ocv_sample_rate_s (float, optional): Defaults to 0.1.
-        electrolyte_ph (float, optional): Defaults to 1.0.
-        reference_offset_V (float, optional): Defaults to 0.0.
-        gamry_i_range (str, optional): Defaults to "auto".
-        bubble_check (bool, optional): Defaults to True.
-        aliquot_post_ocv (bool, optional): Defaults to True.
-        run_use (RunUse, optional): Defaults to RunUse.data.
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        ocv_duration_s: Main OCV duration (s).
+        ocv_sample_rate_s: OCV sample rate (s).
+        electrolyte_ph: Solution pH.
+        reference_offset_V: Reference offset (V).
+        gamry_i_range: Gamry current-range setting.
+        bubble_check: Prepend a short bubble-check OCV when True.
+        aliquot_post_ocv: Take a post-OCV PAL aliquot when True.
+        run_use: ``RunUse`` tag forwarded to the main OCV.
 
     Returns:
-        list: Planned actions for the experiment.
+        List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()
 
@@ -513,22 +572,24 @@ def CLAD_sub_load_assembly(
     gas_sample_no: int = 2,
     gas_volume_ml: float = 1.0,
     bubbler_gas: str = "O2",
-):
-    """Registers solid, liquid, and gas into load_position, then moves to solid, seals, and fills liquid.
+) -> list:
+    """Move to the plate sample, seal, register solid+liquid+gas, then infuse the cell.
 
     Args:
-        load_position (str, optional): Defaults to "cell1_we".
-        solid_plate_id (int, optional): Defaults to 4534.
-        solid_sample_no (int, optional): Defaults to 1.
-        liquid_sample_no (int, optional): Defaults to 1053.
-        fill_volume_ul (float, optional): Defaults to 7000.0.
-        fill_rate_ul_s (float, optional): Defaults to 300.0.
-        gas_sample_no (int, optional): Defaults to 2.
-        gas_volume_ml (float, optional): Defaults to 1.0.
-        bubbler_gas (str, optional): Defaults to "O2".
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        load_position: PAL custom position name.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+        liquid_sample_no: Liquid sample number.
+        fill_volume_ul: Cell fill volume (uL).
+        fill_rate_ul_s: Syringe rate (uL/s).
+        gas_sample_no: Gas sample number.
+        gas_volume_ml: Gas volume to add (mL).
+        bubbler_gas: Informational bubbled-gas label.
 
     Returns:
-        list: Planned actions for the experiment.
+        List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()
 
@@ -624,8 +685,24 @@ def CLAD_sub_clean_cell(
     ReturnLineReverseWait_s: float = 15,
     lift: bool = False,
     #    ResidualWait_s: float = 15,
-):
-    """Cleans cell with nitric acid and water, then refills syringes."""
+) -> list:
+    """Sequentially flush the cell with nitric acid then water, draining between each.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        nitric_volume_ul: Nitric flush volume (uL).
+        water_volume_ul: Water rinse volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+        PurgeWait_s: Reserved gas purge wait (s); not currently used.
+        ReturnLineWait_s: Pump-forward time to clear the return line (s).
+        DrainWait_s: Drain duration passed to ``ADSS_sub_drain_cell`` (s).
+        ReturnLineReverseWait_s: Reverse pump time during drain (s).
+        lift: Lift Z to load after cleaning when True.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add("NI", "gasvalve", {"gasvalve": "inlet", "on": 0})
@@ -688,8 +765,19 @@ def CLAD_sub_refill_syringe(
     syringe: str = "clean",
     fill_volume_ul: float = 0,
     Syringe_rate_ulsec: float = 300,
-):
-    """Refills syringe with specified volume and rate."""
+) -> list:
+    """Refill one of the named syringes (clean, water, work) via its refill liquid valve.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        syringe: ``"clean"``, ``"water"``, or ``"work"``.
+        fill_volume_ul: Withdraw volume (uL).
+        Syringe_rate_ulsec: Syringe rate (uL/s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     syringes = {"clean": "CLEANSYRINGE", "water": "WATERSYRINGE", "work": "WORKSYRINGE"}
@@ -713,8 +801,16 @@ def CLAD_sub_refill_syringe(
 def CLAD_sub_standby(
     experiment: Experiment,
     experiment_version: int = 1,
-):
-    """Turns off pumps and inlet gasvalve for safe standby."""
+) -> list:
+    """Drive the station to a safe standby: peristaltic pump off, inlet gas valve closed.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
     apm.add("NI", "pump", {"pump": "peripump", "on": 0})
     apm.add("NI", "gasvalve", {"gasvalve": "inlet", "on": 0})

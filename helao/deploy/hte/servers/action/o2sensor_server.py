@@ -1,5 +1,9 @@
 # shell: uvicorn motion_server:app --reload
-"""Serial sensor server"""
+"""FastAPI action server for the CM-0134 dissolved-oxygen sensor.
+
+Exposes endpoints to start and stop continuous O2 ppm acquisition backed by
+the :class:`CM0134` driver and :class:`O2MonExec` executor.
+"""
 
 __all__ = ["makeApp"]
 
@@ -17,7 +21,19 @@ from helao.core.models.sample import (
 from ...drivers.sensor.cm0134_driver import CM0134, O2MonExec
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the BaseAPI app for the CM-0134 O2 sensor.
+
+    Constructs a FastAPI app bound to the CM0134 driver and registers
+    endpoints to acquire and cancel O2 ppm measurements.
+
+    Args:
+        server_key: Unique key identifying this server in the orchestration
+            group; used as the URL prefix and configuration lookup key.
+
+    Returns:
+        The configured BaseAPI instance ready for the launcher.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -37,7 +53,19 @@ def makeApp(server_key):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
     ):
-        """Record O2 ppm level."""
+        """Start an O2MonExec to poll the O2 sensor at acquisition_rate.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            duration: Total acquisition duration in seconds; negative value
+                runs until cancelled.
+            acquisition_rate: Polling period in seconds passed to the executor.
+            fast_samples_in: Sample references associated with this action.
+
+        Returns:
+            The active action dictionary returned by ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "O2"
         executor = O2MonExec(
@@ -53,7 +81,18 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stop running O2 acquisition."""
+        """Stop any running ``acquire_o2`` executor.
+
+        Iterates the server's executor registry and calls
+        ``stop_action_task`` on each ``acquire_o2`` instance.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():
             if exec_id.split()[0] == "acquire_o2":

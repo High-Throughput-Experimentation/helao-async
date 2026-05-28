@@ -1,6 +1,18 @@
-"""schema.py
-Standard classes for experiment queue objects.
+"""Queue-side schemas for sequences, experiments and actions.
 
+Extends the bare ``helao.core.models`` pydantic types with the runtime
+behaviour the orchestrator needs while building and dispatching work:
+
+* ``Sequence``: an ``ExperimentModel`` bag with a ``dispatched_experiments``
+  tally and helpers that initialise timestamp/uuid/output-dir fields.
+* ``Experiment`` (subclasses ``Sequence``): same idea one level down, with a
+  ``dispatched_actions`` tally and logic that rolls completed actions back
+  into ``samples_in``/``samples_out``/``files``.
+* ``Action`` (subclasses ``Experiment``): a single action that can be
+  auto-promoted to a manual sequence/experiment when launched standalone.
+* ``ActionPlanMaker`` / ``ExperimentPlanMaker``: helpers used inside
+  experiment- and sequence-library functions to register planned actions
+  and experiments on the current frame.
 """
 
 __all__ = ["Sequence", "Experiment", "Action", "ActionPlanMaker", "ExperimentPlanMaker"]
@@ -33,20 +45,36 @@ HOST = gethostname()
 
 
 class Sequence(SequenceModel):
-    "Experiment grouping class."
+    """Runtime sequence object held by the orchestrator.
+
+    Augments ``SequenceModel`` with a live tally of completed experiments
+    plus helpers that assign timestamps, UUIDs and output directories on
+    demand.
+
+    Attributes:
+        dispatched_experiments: Experiments that have already completed
+            within this sequence, retained for status reporting.
+    """
 
     # not in SequenceModel:
     dispatched_experiments: List[ExperimentModel] = (
         []
     )  # running tally of completed experiments
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return ``<sequence_name:NAME>`` for log lines."""
         return f"<sequence_name:{self.sequence_name}>"
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Return ``sequence_name:NAME``."""
         return f"sequence_name:{self.sequence_name}"
 
-    def get_seq(self):
+    def get_seq(self) -> SequenceModel:
+        """Return a plain ``SequenceModel`` snapshot of this sequence.
+
+        The returned model carries ``dispatched_experiments_abbr`` populated
+        from ``ShortExperimentModel`` views of the completed experiments.
+        """
         seq = SequenceModel(**self.model_dump())
         seq.dispatched_experiments_abbr = [
             ShortExperimentModel(**exp.model_dump())
@@ -58,6 +86,13 @@ class Sequence(SequenceModel):
         return seq
 
     def init_seq(self, time_offset: float = 0, force: Optional[bool] = False):
+        """Populate timestamp, UUID, status and output dir if not already set.
+
+        Args:
+            time_offset: Seconds to add to the wall clock when generating
+                ``sequence_timestamp``.
+            force: When truthy, overwrite any pre-existing values.
+        """
         if force is None:
             force = False
         if force or self.sequence_timestamp is None:
@@ -69,7 +104,12 @@ class Sequence(SequenceModel):
         if force or self.sequence_output_dir is None:
             self.sequence_output_dir = self.get_sequence_dir()
 
-    def get_sequence_dir(self):
+    def get_sequence_dir(self) -> str:
+        """Build the relative output directory for this sequence.
+
+        Layout is ``YY.WW/MMDD/HHMMSS__name__label[-plate-serial[-sampleno]]``
+        and is always returned with forward slashes.
+        """
         HMS = self.sequence_timestamp.strftime("%H%M%S")
         year_week = self.sequence_timestamp.strftime("%y.%U")
         sequence_day = self.sequence_timestamp.strftime("%m%d")
@@ -93,18 +133,36 @@ class Sequence(SequenceModel):
 
 
 class Experiment(Sequence, ExperimentModel):
-    "Sample-action grouping class."
+    """Runtime experiment object held by the orchestrator.
+
+    Combines ``Sequence`` and ``ExperimentModel`` so the same instance can
+    track its parent sequence's metadata and its own action queue.
+
+    Attributes:
+        dispatched_actions: Actions that have already completed within this
+            experiment, used to rebuild ``samples_in``/``samples_out`` and
+            ``files`` aggregates.
+    """
 
     # not in ExperimentModel, dispatched_actions is a list of completed ActionModels:
     dispatched_actions: List[ActionModel] = []
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return ``<experiment_name:NAME>`` for log lines."""
         return f"<experiment_name:{self.experiment_name}>"
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Return ``experiment_name:NAME``."""
         return f"experiment_name:{self.experiment_name}"
 
     def init_exp(self, time_offset: float = 0, force: Optional[bool] = False):
+        """Populate experiment timestamp, UUID, status and output dir if unset.
+
+        Args:
+            time_offset: Seconds to add to the wall clock when generating
+                ``experiment_timestamp``.
+            force: When truthy, overwrite any pre-existing values.
+        """
         if force is None:
             force = False
         if force or self.experiment_timestamp is None:
@@ -116,8 +174,8 @@ class Experiment(Sequence, ExperimentModel):
         if force or self.experiment_output_dir is None:
             self.experiment_output_dir = self.get_experiment_dir()
 
-    def get_experiment_dir(self):
-        """accepts action or experiment object"""
+    def get_experiment_dir(self) -> str:
+        """Return ``sequence_dir/YYMMDD.HHMMSS__experiment_name``."""
         experiment_time = self.experiment_timestamp.strftime("%y%m%d.%H%M%S")
         sequence_dir = self.sequence_output_dir
         return os.path.join(
@@ -125,13 +183,25 @@ class Experiment(Sequence, ExperimentModel):
             f"{experiment_time}__{self.experiment_name}",
         ).replace(r"\\", "/")
 
-    def get_exp(self):
+    def get_exp(self) -> ExperimentModel:
+        """Return a plain ``ExperimentModel`` snapshot with aggregated actions.
+
+        Builds an ``ExperimentModel`` from ``self.model_dump()`` and folds in
+        the contents of ``dispatched_actions`` via
+        ``_experiment_update_from_actlist``.
+        """
         exp = ExperimentModel(**self.model_dump())
         # now add all actions
         self._experiment_update_from_actlist(exp=exp)
         return exp
 
     def _experiment_update_from_actlist(self, exp: ExperimentModel):
+        """Rebuild ``exp``'s samples and files from ``dispatched_actions``.
+
+        Resets ``exp.samples_in``, ``exp.samples_out`` and ``exp.files``,
+        then walks every dispatched action and re-folds its samples and
+        files into ``exp`` while preserving per-sample ``action_uuid`` lists.
+        """
         # reset sample list of exp
         exp.samples_in = []
         exp.samples_out = []
@@ -177,6 +247,11 @@ class Experiment(Sequence, ExperimentModel):
         self._check_sample_duplicates(exp=exp)
 
     def _check_sample(self, new_sample, sample_list):
+        """Return the index of ``new_sample`` inside ``sample_list`` if present.
+
+        Equality ignores ``action_uuid`` so the same sample reported by
+        multiple actions can be matched and merged.
+        """
         for idx, sample in enumerate(sample_list):
             tmp_sample = deepcopy(sample)
             tmp_sample.action_uuid = []
@@ -186,6 +261,7 @@ class Experiment(Sequence, ExperimentModel):
         return None
 
     def _check_sample_duplicates(self, exp: ExperimentModel):
+        """Index samples in ``exp`` by global label (currently informational)."""
         out_labels = defaultdict(list)
         in_labels = defaultdict(list)
         for i, sample in enumerate(exp.samples_out):
@@ -216,7 +292,14 @@ class Experiment(Sequence, ExperimentModel):
 # see what experiment the action belongs to. This turns the
 # action model into an instance of an Action
 class Action(Experiment, ActionModel):
-    "Sample-action identifier class."
+    """Runtime action object combining sequence, experiment and action data.
+
+    Attributes:
+        file_conn_keys: File-connection UUIDs the data logger uses to route
+            this action's output streams to disk.
+        data_stream_status: Last-seen ``HloStatus`` reported through the
+            action's data stream; ``None`` means "no explicit status yet".
+    """
 
     # internal
     file_conn_keys: List[UUID] = Field(default=[])
@@ -226,16 +309,31 @@ class Action(Experiment, ActionModel):
     # in the data stream
     data_stream_status: Optional[HloStatus] = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return ``<action_name:NAME>`` for log lines."""
         return f"<action_name:{self.action_name}>"
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Return ``action_name:NAME``."""
         return f"action_name:{self.action_name}"
 
-    def get_act(self):
+    def get_act(self) -> ActionModel:
+        """Return a plain ``ActionModel`` snapshot of this action."""
         return ActionModel(**self.model_dump())
 
     def init_act(self, time_offset: float = 0, force: Optional[bool] = False):
+        """Initialise action identity, promoting it to a manual run if needed.
+
+        When the action has no parent sequence/experiment timestamps it is
+        flagged ``manual_action`` with ``access="manual"`` and synthetic
+        sequence/experiment names are generated. Action-level timestamp,
+        UUID, status and output directory are then filled in.
+
+        Args:
+            time_offset: Seconds added to the wall clock when generating
+                timestamps.
+            force: When truthy, overwrite pre-existing action-level values.
+        """
         if self.sequence_timestamp is None or self.experiment_timestamp is None:
             self.manual_action = True
             self.access = "manual"
@@ -260,7 +358,12 @@ class Action(Experiment, ActionModel):
         if force or self.action_output_dir is None:
             self.action_output_dir = self.get_action_dir()
 
-    def get_action_dir(self):
+    def get_action_dir(self) -> str:
+        """Return the relative output directory for this action.
+
+        Layout is
+        ``experiment_dir/{orch_submit_order}__{action_split}__{server_name}__{action_name}``.
+        """
         experiment_dir = self.experiment_output_dir
         return "/".join(
             [
@@ -273,7 +376,23 @@ class Action(Experiment, ActionModel):
 
 
 class ActionPlanMaker:
+    """Helper used inside experiment-library functions to plan actions.
+
+    Construct an ``ActionPlanMaker`` at the top of an experiment function;
+    it inspects the caller's frame, locates the ``Experiment`` argument and
+    exposes every other argument plus every ``experiment_params`` entry on
+    ``self.pars`` (string ``"true"``/``"false"`` values are coerced to
+    booleans). Calls to ``add`` append fully-built ``Action`` objects to
+    ``planned_actions``.
+
+    Attributes:
+        expname: Name of the enclosing experiment function.
+        planned_actions: Actions queued up via ``add``/``add_actions``.
+        pars: Object whose attributes mirror the merged parameter set.
+    """
+
     def __init__(self):
+        """Capture the enclosing frame and build ``self.pars`` from it."""
         frame = inspect.currentframe().f_back
         _args, _varargs, _keywords, _locals = inspect.getargvalues(frame)
         self.expname = frame.f_code.co_name
@@ -345,9 +464,16 @@ class ActionPlanMaker:
         )
 
     class _C:
+        """Bag object that holds merged experiment/local parameters as attributes."""
+
         pass
 
     def add_actions(self, planned_action_list: list):
+        """Append already-constructed ``Action`` objects to the plan.
+
+        Args:
+            planned_action_list: Iterable of ``Action`` instances.
+        """
         for action in planned_action_list:
             self.planned_actions.append(action)
 
@@ -361,7 +487,21 @@ class ActionPlanMaker:
         from_global_act_params: dict = {},
         **kwargs,
     ):
-        """Shorthand add_action()."""
+        """Build a new ``Action`` from the current experiment and queue it.
+
+        Args:
+            action_server: Target action server, given as a ``MachineModel``,
+                a server-key string, or a pre-built ``as_dict()`` payload.
+            action_name: Action endpoint name on the server.
+            action_params: Parameter dictionary forwarded to the action.
+            start_condition: Scheduling condition for the action.
+            to_global_params: Names of action outputs to copy into the
+                orchestrator's global parameter store.
+            from_global_act_params: Mapping of global parameter names to
+                inject into ``action_params`` at dispatch time.
+            **kwargs: Additional fields merged into the action dict (notably
+                ``run_use``, which defaults to the experiment's value).
+        """
         action_dict = self._experiment.as_dict()
         if isinstance(action_server, MachineModel):
             action_server = action_server.as_dict()
@@ -385,21 +525,38 @@ class ActionPlanMaker:
         self.planned_actions.append(Action(**action_dict))
 
     @property
-    def experiment(self):
+    def experiment(self) -> Experiment:
+        """Return the captured experiment with ``planned_actions`` attached."""
         exp = self._experiment
         exp.planned_actions = self.planned_actions
         return exp
 
 
 class ExperimentPlanMaker:
+    """Collector that lets a sequence-library function queue experiments.
+
+    Attributes:
+        planned_experiments: ``ShortExperimentModel`` entries queued via ``add``.
+    """
+
     def __init__(
         self,
     ):
+        """Initialise an empty experiment plan."""
         self.planned_experiments = []
 
     def add(
         self, experiment_name, experiment_params, from_global_exp_params={}, **kwargs
     ):
+        """Append a ``ShortExperimentModel`` to the plan.
+
+        Args:
+            experiment_name: Name of the experiment library function.
+            experiment_params: Parameter dictionary for the experiment.
+            from_global_exp_params: Mapping of global parameter names to
+                inject into ``experiment_params`` at runtime.
+            **kwargs: Additional fields forwarded to ``ShortExperimentModel``.
+        """
         self.planned_experiments.append(
             ShortExperimentModel(
                 experiment_name=experiment_name,

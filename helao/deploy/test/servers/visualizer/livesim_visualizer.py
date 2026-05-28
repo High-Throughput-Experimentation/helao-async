@@ -1,3 +1,10 @@
+"""Bokeh application that mounts websocket-live visualizers.
+
+Discovers ``ws_simulator`` and ``gpsim_server`` action servers in the
+loaded config and attaches the corresponding live visualizer modules to
+the Bokeh document.
+"""
+
 __all__ = ["makeBokehApp"]
 
 from importlib import import_module
@@ -16,7 +23,15 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:
-    """finds server name for a given fast driver"""
+    """Return action-server names whose ``fast``/``demo`` key matches ``fast_key``.
+
+    Args:
+        vis: Visualizer context exposing the loaded ``world_cfg``.
+        fast_key: Action-server module name to match.
+
+    Returns:
+        List of ``(server_name, sorted_params)`` tuples.
+    """
     server_names = []
     for server_name, server_config in vis.world_cfg["servers"].items():
         if server_config.get("fast", server_config.get("demo", "")) == fast_key:
@@ -26,7 +41,21 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
 
 
 def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
+    """Build the live-simulator Bokeh app.
 
+    Adds a header to the document and instantiates a websocket-live
+    visualizer for every ``ws_simulator`` and ``gpsim_server`` action
+    server discovered in the loaded config.
+
+    Args:
+        doc: Bokeh document to attach to.
+        confPrefix: Config prefix used to launch the group.
+        server_key: This visualizer's server name in the config.
+        helao_repo_root: Repository root path.
+
+    Returns:
+        The same Bokeh document with the layout attached.
+    """
     app = HelaoVis(
         server_key=server_key,
         doc=doc,

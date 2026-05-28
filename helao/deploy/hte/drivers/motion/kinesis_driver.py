@@ -1,24 +1,14 @@
-"""Thorlabs Kinesis motor driver class
+"""Thorlabs Kinesis motor driver.
 
-Notes:
-# list devices
-devices = Thorlabs.list_kinesis_devices()
+Wraps `pylablib.devices.Thorlabs.KinesisMotor` per configured axis and
+exposes the HELAO `HelaoDriver` interface (`connect`, `get_status`, `stop`,
+`reset`, `disconnect`) plus `setup` and `move`. Per-axis position/velocity/
+acceleration scales are read from `config["axes"]`.
 
-# connect to MLJ150/M
-stage = Thorlabs.KinesisMotor("49370234", scale=(pos_scale, vel_scle, acc_scale))
-
-# get current status (position, status list, motion parameters)
-stage.get_full_status()
-
-# move_by
-# move_to
-# home
-
-# MLJ150/M -- read ranges from kinesis application, switch between device and phys units
-# position 0 - 61440000 :: 0 - 50 mm :: physical-to-internal = 1228800.0
-# velocity 0 - 329853488 :: 0 - 5 mm/s :: physical-to-internal = 65970697.6
-# accel 0 - 135182 :: 0 - 10 mm/s2 :: physical-to-internal = 13518.2
-
+Reference scales for the MLJ150/M stage:
+- position 0..61440000 counts -> 0..50 mm  (1228800.0 counts/mm)
+- velocity 0..329853488        -> 0..5 mm/s (65970697.6)
+- acceleration 0..135182       -> 0..10 mm/s^2 (13518.2)
 """
 
 from helao.helpers import helao_logging as logging
@@ -41,6 +31,13 @@ from helao.core.drivers.helao_driver import (
 
 
 class MoveModes(str, Enum):
+    """Move mode for the Kinesis driver.
+
+    Attributes:
+        relative: Move by an offset from the current position.
+        absolute: Move to an absolute coordinate.
+    """
+
     relative = "relative"
     absolute = "absolute"
 
@@ -56,12 +53,26 @@ MOTION_STATES = [
 
 
 class KinesisMotor(HelaoDriver):
+    """`HelaoDriver` managing one Thorlabs Kinesis motor per configured axis.
+
+    Each entry under `config["axes"]` must provide `serial_no`, `pos_scale`,
+    `vel_scale`, and `acc_scale`. The driver also builds a `dev_kinesis`
+    enum mapping axis name to itself for use in the action server's typed
+    endpoints.
+    """
+
     def __init__(self, config: dict = {}):
+        """Initialize the driver state and immediately attempt to connect.
+
+        Args:
+            config: Driver configuration containing an `axes` dict.
+        """
         super().__init__(config=config)
         self.motors = {}
         self.connect()
 
     def connect(self) -> DriverResponse:
+        """Open a `KinesisMotor` instance for every configured axis."""
         try:
             for axis_name, dev_dict in self.config.get("axes", {}).items():
                 scale_tup = (
@@ -91,6 +102,7 @@ class KinesisMotor(HelaoDriver):
         return response
 
     def get_status(self) -> DriverResponse:
+        """Return per-axis position (mm), velocity, acceleration, and status flags."""
         try:
             state = {}
             for axis, motor in self.motors.items():
@@ -121,6 +133,13 @@ class KinesisMotor(HelaoDriver):
         velocity: Optional[float] = None,
         acceleration: Optional[float] = None,
     ) -> DriverResponse:
+        """Configure max velocity and/or acceleration on a single axis.
+
+        Args:
+            axis: Axis name (key in `self.motors`).
+            velocity: New maximum velocity (physical units), or None to keep.
+            acceleration: New acceleration (physical units), or None to keep.
+        """
         try:
             if velocity is not None or acceleration is not None:
                 self.motors[axis].setup_velocity(
@@ -142,6 +161,14 @@ class KinesisMotor(HelaoDriver):
         return response
 
     def move(self, axis: str, move_mode: MoveModes, value: float) -> DriverResponse:
+        """Start a relative or absolute move on the named axis.
+
+        Args:
+            axis: Axis name (key in `self.motors`).
+            move_mode: `MoveModes.relative` calls `move_by`,
+                `MoveModes.absolute` calls `move_to`.
+            value: Target distance or absolute position in physical units.
+        """
         try:
             if move_mode == MoveModes.relative:
                 move_func = self.motors[axis].move_by
@@ -162,6 +189,7 @@ class KinesisMotor(HelaoDriver):
         return response
 
     def stop(self, axis: Optional[str] = None) -> DriverResponse:
+        """Immediately stop one named axis or, when `axis` is None, every axis."""
         try:
             stop_axes = [axis] if axis is not None else self.motors.keys()
             for stop_axis in stop_axes:
@@ -179,6 +207,7 @@ class KinesisMotor(HelaoDriver):
         return response
 
     def reset(self) -> DriverResponse:
+        """Disconnect every motor and reconnect; report failure if reconnect errors."""
         try:
             self.disconnect()
             reconnect_resp = self.connect()
@@ -197,6 +226,7 @@ class KinesisMotor(HelaoDriver):
         return response
 
     def disconnect(self) -> DriverResponse:
+        """Close every Kinesis motor handle owned by this driver."""
         try:
             for axis_name, kmotor in self.motors.items():
                 LOGGER.info(f"closing connection to {axis_name}")
@@ -215,6 +245,9 @@ class KinesisMotor(HelaoDriver):
 
 
 class KinesisPoller(DriverPoller):
-    def get_data(self):
+    """`DriverPoller` that publishes `KinesisMotor.get_status()` on every tick."""
+
+    def get_data(self) -> DriverResponse:
+        """Return the latest `get_status` `DriverResponse` from the underlying driver."""
         poll_data = self.driver.get_status()
         return poll_data

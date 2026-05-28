@@ -1,3 +1,5 @@
+"""Mixin providing HELAO-aware dict and serialization helpers for pydantic models."""
+
 __all__ = ["HelaoDict"]
 
 from datetime import datetime, date
@@ -14,6 +16,7 @@ import math
 
 # https://stackoverflow.com/a/71389334
 def nan2None(obj):
+    """Recursively replace NaN float values in a nested dict/list structure with `None`."""
     if isinstance(obj, dict):
         return {k: nan2None(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -24,10 +27,16 @@ def nan2None(obj):
 
 
 class HelaoDict:
-    """implements dict and serialization methods for helao - this cleans up things that are
-    not serializable such as np arrays etc"""
+    """Serialization helpers for HELAO models.
 
-    def _serialize_dict(self, dict_in: dict):
+    Provides `as_dict` and `clean_dict` methods that walk a pydantic model's
+    attributes and coerce non-JSON-friendly values (numpy scalars, `UUID`,
+    `datetime`, `Path`, enums, NaN floats, nested models) into plain Python
+    types suitable for YAML/JSON output.
+    """
+
+    def _serialize_dict(self, dict_in: dict) -> dict:
+        """Serialize each entry of a dict via `_serialize_item`, skipping functions and dunder strings."""
         clean = {}
         for k, v in dict_in.items():
             if not isinstance(v, types.FunctionType) and not (
@@ -38,6 +47,14 @@ class HelaoDict:
         return clean
 
     def _serialize_item(self, val: Any):
+        """Coerce a single value into a JSON/YAML-friendly representation.
+
+        Handles enums, numpy scalars, paths, datetimes, UUIDs, lists/tuples/sets,
+        dicts, nested `HelaoDict`/`BaseModel` instances, and rounds floats.
+
+        Raises:
+            ValueError: If `val` is of an unsupported type.
+        """
         if isinstance(val, Enum):
             # need to be first to catch also str enums
             if isinstance(val, str):
@@ -86,16 +103,19 @@ class HelaoDict:
             tmp_str = f"Helao as_dict cannot serialize {val} of type {type(val)}"
             raise ValueError(tmp_str)
 
-    def as_dict(self):
+    def as_dict(self) -> dict:
+        """Return a fully-serialized dict of the instance's attributes with NaNs replaced by `None`."""
         d = deepcopy(vars(self))
         attr_only = self._serialize_dict(dict_in=d)
         clean_nans = {k: nan2None(v) for k, v in attr_only.items()}
         return clean_nans
 
-    def clean_dict(self, strip_private: bool = False):
+    def clean_dict(self, strip_private: bool = False) -> dict:
+        """Return `as_dict()` pruned of empty values, optionally dropping ``_``-prefixed keys."""
         return self._cleanupdict(self.as_dict(), strip_private)
 
-    def _cleanupdict(self, d: dict, strip_private: bool = False):
+    def _cleanupdict(self, d: dict, strip_private: bool = False) -> dict:
+        """Recursively drop `None`, empty strings/lists, and empty nested dicts from `d`."""
         clean = {}
         for k, v in d.items():
             if str(k).startswith("_") and strip_private:
@@ -123,7 +143,8 @@ class HelaoDict:
                     clean[k] = v
         return clean
 
-    def _cleanuplist(self, input_list):
+    def _cleanuplist(self, input_list) -> list:
+        """Recursively clean a list by passing dicts through `_cleanupdict` and stringifying UUIDs."""
         clean_list = []
         for list_item in input_list:
             if isinstance(list_item, dict):

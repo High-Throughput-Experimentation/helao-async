@@ -1,11 +1,10 @@
-"""Archive class handles local sample DB and legacy DB lookup
+"""Archive driver for the HTE PAL/sample-handling action server.
 
-TODO:
-1. consolidate tray_export_json, tray_export_csv, tray_export_icpms, and make
-tray_unloadall call the export function
-2. write tray_import function to consume exported json or csv and ingest into local
-sqlite database, import needs to check for existing global_sample_labels
-
+Wires the :class:`UnifiedSampleDataAPI` (local SQLite + Modelyst lookup)
+to the in-memory representation of physical tray slots and custom
+positions defined in :mod:`helao.helpers.sample_positions`. Provides
+load/unload/export, sample-creation, assembly-handling and platemap
+helpers used by all HTE liquid- and solid-handling actions.
 """
 
 __all__ = [
@@ -58,6 +57,8 @@ from helao.helpers.sample_api import update_vol
 
 
 class ScanDirection(str, Enum):
+    """Allowed traversal orders for platemap sample-list generation."""
+
     raster_rows = "raster_rows"
     raster_columns = "raster_columns"
     left_to_right = "left_to_right"
@@ -65,6 +66,8 @@ class ScanDirection(str, Enum):
 
 
 class ScanOperator(str, Enum):
+    """Comparison operators usable in platemap sample filters."""
+
     so_gt = "gt"
     so_gte = "gte"
     so_lt = "lt"
@@ -73,7 +76,25 @@ class ScanOperator(str, Enum):
 
 
 class Archive:
+    """In-memory sample/tray archive backed by a unified sample DB.
+
+    Holds the current :class:`Positions` (tray slots and custom
+    positions) for an action server, persists them to
+    ``<host>_<server>_archive.json``, and proxies sample CRUD operations
+    through :class:`UnifiedSampleDataAPI`. Most HTE PAL/orchestrator
+    actions interact with samples via this class.
+    """
+
     def __init__(self, action_serv: Base):
+        """Initialise the archive, load persisted positions, sync samples.
+
+        Compares the persisted positions against the startup config and
+        falls back to the config when they diverge, then refreshes every
+        loaded sample from the unified database.
+
+        Args:
+            action_serv: Hosting action server.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
@@ -176,7 +197,13 @@ class Archive:
             self.write_config()
             asyncio.gather(self.update_samples_from_db())
 
-    def action_startup_config(self):
+    def action_startup_config(self) -> Positions:
+        """Build a :class:`Positions` object from the server config.
+
+        Parses ``positions:`` entries (``tray<n>.slot<m>`` and ``custom``)
+        into :class:`VT54`/:class:`VT15`/:class:`VT70` slot objects and
+        :class:`Custom` positions.
+        """
         positions = Positions()
         # custom_positions = {}
         # trays_dict = {}
@@ -240,7 +267,11 @@ class Archive:
         LOGGER.info(f"customs: {positions.customs_dict}")
         return positions  # trays_dict, custom_positions
 
-    def load_config(self):
+    def load_config(self) -> Positions:
+        """Load the persisted archive JSON into a fresh :class:`Positions`.
+
+        Returns an empty :class:`Positions` if the file is unreadable.
+        """
         if self.archivejson is not None:
             with open(self.archivejson, "r") as f:
                 try:
@@ -260,6 +291,7 @@ class Archive:
         # self.positions.customs_dict = {}
 
     def write_config(self):
+        """Serialise the current :attr:`positions` to the archive JSON."""
         if self.archivejson is not None:
             with open(self.archivejson, "w") as f:
                 json.dump(self.positions.as_dict(), f)
@@ -269,6 +301,13 @@ class Archive:
         #         pickle.dump(data, f)
 
     async def update_samples_from_db(self):
+        """Refresh every sample in :attr:`positions` from the unified DB.
+
+        Waits for the unified DB to finish initialising, then walks every
+        custom position and every tray slot, replacing each sample with
+        its freshest copy from the database, and persists the result to
+        the archive JSON.
+        """
         LOGGER.info("Updating all samples in position table.")
         # need to wait for the db to finish initializing
         while not self.unified_db.ready:
@@ -306,9 +345,12 @@ class Archive:
     async def update_samples_from_db_helper(
         self,
         sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
-    ):
-        """pulls the newest sample data from the db,
-        only of global_label is not none, else sample is a ref sample"""
+    ) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
+        """Return the freshest DB copy of ``sample`` if it has a global label.
+
+        Reference samples (no ``global_label``) are returned unchanged
+        and logged, since they should never have been persisted.
+        """
         if sample.sample_type is not None:
             if sample.global_label is not None:
                 _sample = await self.unified_db.get_samples([sample])
@@ -336,6 +378,21 @@ class Archive:
         ErrorCodes,
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
     ]:
+        """Load ``load_sample_in`` into ``(tray, slot, vial)``.
+
+        Verifies the sample exists in the database, that the position is
+        defined and currently empty, then loads the slot and returns the
+        DB-refreshed sample.
+
+        Args:
+            tray: Tray index.
+            slot: Slot index within the tray.
+            vial: 1-based vial index within the slot.
+            load_sample_in: Sample model (or dict) to load.
+
+        Returns:
+            ``(error, sample)`` describing the outcome.
+        """
         vial -= 1
         sample = NoneSample()
         error = ErrorCodes.not_available
@@ -382,6 +439,12 @@ class Archive:
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
         dict,
     ]:
+        """Unload every vial in ``(tray, slot)`` and write samples back to the DB.
+
+        Returns ``(unloaded, samples_in, samples_out, tray_dict)`` where
+        ``samples_in``/``samples_out`` are unpacked-assembly buckets
+        produced by :meth:`_unload_unpack_samples_helper`.
+        """
         samples = []
         unloaded = False
         tray_dict = {}
@@ -421,6 +484,11 @@ class Archive:
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
         dict,
     ]:
+        """Unload every slot of every configured tray.
+
+        Returns the same ``(unloaded, samples_in, samples_out,
+        tray_dict)`` shape as :meth:`tray_unload`.
+        """
         tray_dict = {}
         samples = []
         for tray_key, tray_item in self.positions.trays_dict.items():
@@ -466,6 +534,7 @@ class Archive:
     async def tray_export_json(
         self, tray: Optional[int] = None, slot: Optional[int] = None, *args, **kwargs
     ):
+        """Return the ``as_dict()`` representation of one tray slot."""
         self.write_config()
 
         if tray in self.positions.trays_dict:
@@ -477,6 +546,12 @@ class Archive:
     async def tray_export_csv(
         self, tray: Optional[int] = None, slot: Optional[int] = None, myactive=None
     ):
+        """Write a ``VialTable__...csv`` file for one tray slot.
+
+        The CSV has columns ``vial_no, global_sample_label, vol_ml``,
+        emitted through ``myactive.write_file`` with file type
+        ``pal_vialtable_file``.
+        """
         self.write_config()  # save backup
 
         if tray in self.positions.trays_dict:
@@ -527,6 +602,14 @@ class Archive:
         rack: Optional[int] = None,
         dilution_factor: Optional[float] = None,
     ):
+        """Write an ICPMS-format ``VialTable__...csv`` for one tray slot.
+
+        Only vials whose stored sample is not :class:`NoneSample` are
+        included; columns are ``liquid_sample_no; Survey Runs; Main
+        Runs; Rack; Vial; Dilution Factor`` (semicolon-separated). The
+        per-vial dilution factor falls back to ``dilution_factor`` when
+        provided, otherwise to the sample's own value.
+        """
         self.write_config()  # save backup
 
         trayobj = self.positions.trays_dict.get(tray, {})
@@ -603,6 +686,12 @@ class Archive:
         ErrorCodes,
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
     ]:
+        """Return the sample currently stored in ``(tray, slot, vial)``.
+
+        Returns ``(error, sample)``; ``error`` is :attr:`ErrorCodes.none`
+        on success and :attr:`ErrorCodes.not_available` if the position
+        is undefined.
+        """
         vial -= 1
         sample = NoneSample()
         error = ErrorCodes.not_available
@@ -623,10 +712,19 @@ class Archive:
         sample = await self._update_samples(sample)
         return error, sample
 
-    async def tray_new_position(self, req_vol: float = 2.0, *args, **kwargs):
-        """Returns an empty vial position for given max volume.
-        For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.
-        It will select the first empty vial which has the smallest volume that still can hold req_vol
+    async def tray_new_position(self, req_vol: float = 2.0, *args, **kwargs) -> dict:
+        """Reserve the smallest empty vial that can hold ``req_vol`` mL.
+
+        Walks trays in sorted order and returns the first empty position
+        whose ``max_vol_ml`` is the smallest still meeting ``req_vol``;
+        marks that vial as blocked.
+
+        Args:
+            req_vol: Required volume in mL.
+
+        Returns:
+            ``{"tray": ..., "slot": ..., "vial": ...}`` with ``None`` for
+            any value when no vial is available.
         """
 
         await asyncio.sleep(0.01)
@@ -672,9 +770,12 @@ class Archive:
         after_tray: Optional[int] = None,
         after_slot: Optional[int] = None,
         after_vial: Optional[int] = None,
-    ):
-        """Finds the next full vial after the current vial position
-        defined in micropal."""
+    ) -> dict:
+        """Find the next loaded vial after the given ``(tray, slot, vial)``.
+
+        Returns ``{"tray": ..., "slot": ..., "vial": ...}`` with ``None``
+        values when no further loaded vial exists.
+        """
         if after_tray is None:
             after_tray = -1
         if after_slot is None:
@@ -728,7 +829,12 @@ class Archive:
         dilute: bool = False,
         *args,
         **kwargs,
-    ):
+    ) -> bool:
+        """Overwrite the sample at ``(tray, slot, vial)`` with ``sample``.
+
+        Returns ``True`` on success, ``False`` when the position is not
+        defined or ``sample`` is ``None``.
+        """
         if sample is None:
             return False
 
@@ -748,28 +854,32 @@ class Archive:
         return False
 
     def custom_is_destroyed(self, custom: Optional[str] = None) -> bool:
-        """checks if the custom position is a waste, injector
-        and similar position which fully comsumes and destroyes a
-        sample if selected as a destination"""
+        """Return ``True`` when ``custom`` is a waste/injector-style position.
+
+        Such positions fully consume any sample written to them.
+        """
 
         if custom in self.positions.customs_dict:
             return self.positions.customs_dict[custom].is_destroyed()
         else:
             return False
 
-    def custom_assembly_allowed(self, custom: Optional[str] = None):
+    def custom_assembly_allowed(self, custom: Optional[str] = None) -> bool:
+        """Return whether ``custom`` may hold an :class:`AssemblySample`."""
         if custom in self.positions.customs_dict:
             return self.positions.customs_dict[custom].assembly_allowed()
         else:
             return False
 
-    def custom_dest_allowed(self, custom: Optional[str] = None):
+    def custom_dest_allowed(self, custom: Optional[str] = None) -> bool:
+        """Return whether ``custom`` is a valid destination position."""
         if custom in self.positions.customs_dict:
             return self.positions.customs_dict[custom].dest_allowed()
         else:
             return False
 
-    def custom_dilution_allowed(self, custom: Optional[str] = None):
+    def custom_dilution_allowed(self, custom: Optional[str] = None) -> bool:
+        """Return whether the position supports volume-based dilution."""
         if custom in self.positions.customs_dict:
             return self.positions.customs_dict[custom].dilution_allowed()
         else:
@@ -781,6 +891,7 @@ class Archive:
         ErrorCodes,
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
     ]:
+        """Return the DB-refreshed sample stored at ``custom``."""
         sample = NoneSample()
         error = ErrorCodes.none
 
@@ -801,6 +912,11 @@ class Archive:
     ) -> Tuple[
         bool, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ]:
+        """Replace the sample at ``custom`` with ``sample`` (if allowed).
+
+        Rejects assemblies in positions that do not allow assemblies and
+        any sample that is already destroyed.
+        """
         if sample is None:
             return False, NoneSample()
         sample = object_to_sample(sample)
@@ -834,6 +950,11 @@ class Archive:
     ) -> Tuple[
         bool, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ]:
+        """Replace the sample at ``custom`` or clear the position if destroyed.
+
+        Like :meth:`custom_replace_sample` but unloads the position when
+        the incoming sample is already in ``destroyed`` status.
+        """
         if sample is None:
             return False, NoneSample()
 
@@ -863,7 +984,8 @@ class Archive:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ],
         newstatus: List[str],
-    ):
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Replace each sample's status list with ``newstatus`` in place."""
         if not isinstance(newstatus, list):
             newstatus = [newstatus]
         for sample in samples:
@@ -877,6 +999,7 @@ class Archive:
         ],
         newstatus,
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Append ``newstatus`` to each sample's existing status list."""
         for sample in samples:
             sample.status.append(newstatus)
         return samples
@@ -898,6 +1021,11 @@ class Archive:
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
         dict,
     ]:
+        """Iterate every custom position and call :meth:`custom_unload`.
+
+        Returns the aggregated ``(True, samples_in, samples_out,
+        customs_dict)``.
+        """
         samples_in = []
         samples_out = []
 
@@ -948,6 +1076,12 @@ class Archive:
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
         dict,
     ]:
+        """Unload a single custom position.
+
+        Optionally destroys liquid/gas/solid samples or keeps a subset
+        in place (re-loading them, possibly as a new assembly). Returns
+        ``(unloaded, samples_in, samples_out, customs_dict)``.
+        """
         samples = []
         unloaded = False
         customs_dict = {}
@@ -1041,6 +1175,12 @@ class Archive:
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
+        """Refresh, unpack and optionally destroy a list of unloaded samples.
+
+        Returns the ``(samples_in, samples_out)`` lists with the
+        ``unloaded`` status appended and any selected destructions
+        applied via :meth:`selective_destroy_samples`.
+        """
         # update samlpes with most recent info from db
         for sample in samples:
             sample = await self.update_samples_from_db_helper(sample=sample)
@@ -1087,7 +1227,15 @@ class Archive:
         ] = None,
         *args,
         **kwargs,
-    ):
+    ) -> tuple:
+        """Load ``load_sample_in`` into the named ``custom`` position.
+
+        Verifies the sample exists in the DB and the position is
+        configured before delegating to the position's ``load`` method.
+
+        Returns:
+            ``(loaded, sample, customs_dict)``.
+        """
         sample = NoneSample()
         loaded = False
         customs_dict = {}
@@ -1123,6 +1271,12 @@ class Archive:
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
+        """Recursively unpack assemblies into ``samples_in``/``samples_out``.
+
+        Marks assemblies as destroyed (samples_in) and their parts as
+        recovered (samples_out); pass-through samples become preserved
+        samples_in.
+        """
         ret_samples_in = []
         ret_samples_out = []
         for sample in samples:
@@ -1164,6 +1318,7 @@ class Archive:
         self,
         sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
     ) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
+        """Return the freshest DB copy of ``sample`` or a :class:`NoneSample`."""
         tmp_samples = await self.unified_db.get_samples(samples=[sample])
         if tmp_samples:
             return tmp_samples[0]
@@ -1171,6 +1326,7 @@ class Archive:
             return NoneSample()
 
     async def _add_listA_to_listB(self, listA, listB) -> list:
+        """Append deep copies of each item in ``listA`` to ``listB``."""
         for item in listA:
             listB.append(deepcopy(item))
         return listB
@@ -1191,8 +1347,22 @@ class Archive:
         bool,
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
-        """volume_ml and sample_position need to be updated after the
-        function call by the function calling this."""
+        """Build new reference samples (liquid/gas/assembly) from ``samples_in``.
+
+        Aggregates ``chemical``, ``partial_molarity``, ``supplier`` and
+        ``lot_number`` across the input list and stamps the action UUIDs
+        onto the new reference. ``combine_liquids``/``combine_gases``
+        request merging of multiple inputs of the same type into a
+        single reference instead of an assembly.
+
+        Note:
+            ``volume_ml`` and ``sample_position`` must still be updated
+            by the caller before persisting.
+
+        Returns:
+            ``(error_code, samples)`` containing the new reference
+            samples (or an empty list on error).
+        """
 
         error = ErrorCodes.none
         samples: List[
@@ -1309,7 +1479,18 @@ class Archive:
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
-        """adds new liquid from a 'reservoir' to a custom position"""
+        """Transfer ``volume_ml`` of ``source_liquid_in`` into ``custom``.
+
+        Creates a new liquid reference for the transferred portion, then
+        either places it directly (empty position), merges it with an
+        existing liquid (when allowed and ``combine_liquids`` is set),
+        merges with an existing assembly's liquid part, or creates a
+        new assembly. Updates source-reservoir volume and writes
+        everything back through :attr:`unified_db`.
+
+        Returns:
+            ``(error_code, samples_in_initial, samples_out)``.
+        """
 
         error = ErrorCodes.none
         samples_in = []
@@ -1694,7 +1875,14 @@ class Archive:
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
-        """adds new gas from a 'reservoir' to a custom position"""
+        """Transfer ``volume_ml`` of ``source_gas_in`` into ``custom``.
+
+        Mirrors :meth:`custom_add_liquid` but for :class:`GasSample`
+        reservoirs.
+
+        Returns:
+            ``(error_code, samples_in_initial, samples_out)``.
+        """
 
         error = ErrorCodes.none
         samples_in = []
@@ -2060,9 +2248,8 @@ class Archive:
         sample: Optional[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = None,
-    ) -> bool:
-        """will mark a sample as destroyed in the sample db
-        and update its parameters accordingly"""
+    ) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
+        """Refresh ``sample`` from the DB, mark it destroyed, write back."""
         # first update it from the db (get the most recent info)
         sample = await self.update_samples_from_db_helper(sample=sample)
         # now destroy the sample
@@ -2079,6 +2266,12 @@ class Archive:
         destroy_gas: bool = False,
         destroy_solid: bool = False,
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Destroy samples of the requested types from ``samples``.
+
+        Assemblies must be unpacked first and are skipped; the returned
+        list always contains every input sample (refreshed from the DB),
+        possibly with ``destroyed`` status applied.
+        """
         ret_samples = []
         for sample in samples:
             # first update it from the db (get the most recent info)
@@ -2124,7 +2317,13 @@ class Archive:
         ],
         action: Optional[Action] = None,
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
-        """creates new samples in the db from provided refernces samples"""
+        """Persist reference samples as real samples in the unified DB.
+
+        Stamps each reference with the current action's UUIDs and
+        ``created`` status, then for assemblies refreshes each part,
+        marks them ``incorporated``, and updates their DB rows before
+        inserting the new samples.
+        """
         samples_out = []
 
         if action is None:
@@ -2169,15 +2368,22 @@ class Archive:
         sample_nos_operator: Optional[ScanOperator] = None,
         platemap_xys: List[Tuple[int, int]] = [],
         platemap_xys_operator: Optional[ScanOperator] = None,
-    ):
-        """generate the sample list based on filters:
-        - which direction to move
-        (raster rows, raster columns, left-to-right, top-to-bottom)
-        - platemap composition (A>0 and/or B=0)
-        - platemap sample codes (code=0, code!=1)
-        - skip every N samples
-        - sample number equals, gt, gte, lt, lte, not
-        - platemap x,y equals, gt, gte, lt, lte, not
+    ) -> bool:
+        """Write a filtered sample-number list for ``plate_id`` to a file.
+
+        Pulls the platemap for ``plate_id``, picks every
+        ``skip_n_samples``-th row whose ``code`` matches ``sample_code``,
+        and writes the resulting ``sample_no`` list to
+        ``plate_sample_no_list_file`` via ``active.write_file``.
+
+        Other filter arguments (``direction``, ``sample_nos``,
+        ``sample_nos_operator``, ``platemap_xys``,
+        ``platemap_xys_operator``) are accepted by the signature for
+        future use.
+
+        Returns:
+            ``False`` when required arguments are missing or the
+            platemap cannot be loaded, otherwise ``True``.
         """
         if (
             active is None

@@ -1,7 +1,9 @@
-"""Motion simulation server
+"""Websocket simulation server.
 
-FastAPI server host for the websocket simulator driver.
-
+Hosts :class:`WsSim`, which polls a synthetic 6-series random data
+generator into the action server's live buffer, and exposes the
+``acquire_data``/``cancel_acquire_data`` actions driven by
+:class:`WsExec` to forward the live buffer to clients.
 """
 
 __all__ = ["makeApp"]
@@ -31,7 +33,27 @@ from helao.helpers.premodels import Action
 
 
 class WsSim:
+    """Synthetic 6-series data generator feeding the action server live buffer.
+
+    Spawns a background polling task that emits a dict of ``series_<i>``
+    values scaled by ``self.scale_map`` and a random ``[0, 1)`` factor at
+    10 Hz.
+
+    Attributes:
+        base: Hosting action server.
+        config_dict: ``params`` block from the server config.
+        world_config: Full world configuration.
+        scale_map: Per-series multiplier (1, 2, 5, 10, 50, 100).
+        event_loop: Reference to the running asyncio loop.
+        polling_task: Background task running :meth:`poll_data_loop`.
+    """
+
     def __init__(self, action_serv: Base):
+        """Initialize the simulator and start the polling loop.
+
+        Args:
+            action_serv: Action server hosting this driver.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
@@ -43,6 +65,11 @@ class WsSim:
         self.polling_task = self.event_loop.create_task(self.poll_data_loop())
 
     async def poll_data_loop(self, frequency_hz: float = 10):
+        """Continuously push synthetic series data into the live buffer.
+
+        Args:
+            frequency_hz: Polling rate in Hz.
+        """
         waittime = 1.0 / frequency_hz
         LOGGER.info("Starting polling loop")
         while True:
@@ -51,18 +78,34 @@ class WsSim:
             await asyncio.sleep(waittime)
 
     def shutdown(self):
+        """No-op shutdown hook."""
         pass
 
 
 class WsExec(Executor):
+    """Executor that streams the websocket simulator's live buffer.
+
+    Reads the latest ``sim_dict`` snapshot from the action server's live
+    buffer on each poll and forwards it as the action's data. Terminates
+    when ``duration`` seconds have elapsed, or runs indefinitely when
+    ``duration`` is negative.
+    """
+
     def __init__(self, *args, **kwargs):
+        """Initialize the executor from the active action's parameters."""
         super().__init__(*args, **kwargs)
         LOGGER.info("WsExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 
-    async def _poll(self):
-        """Read data from live buffer."""
+    async def _poll(self) -> dict:
+        """Forward the latest live-buffer snapshot to the action.
+
+        Returns:
+            Dict with the snapshot data, ``ErrorCodes.none`` and an
+            ``HloStatus`` that switches to ``finished`` once ``duration``
+            seconds have elapsed (when ``duration`` is non-negative).
+        """
         live_dict = {}
         sim_dict, epoch_s = self.active.base.get_lbuf("sim_dict")
         live_dict["epoch_s"] = epoch_s
@@ -82,7 +125,18 @@ class WsExec(Executor):
 
 
 def makeApp(server_key):
+    """Build the websocket-simulator FastAPI app.
 
+    Wires :class:`WsSim` into a :class:`BaseAPI` and exposes the
+    ``acquire_data`` action (driven by :class:`WsExec`) and
+    ``cancel_acquire_data``.
+
+    Args:
+        server_key: Server name in the launched config.
+
+    Returns:
+        Configured :class:`HelaoFastAPI` app.
+    """
     app = BaseAPI(
         server_key=server_key,
         server_title=server_key,
@@ -101,7 +155,7 @@ def makeApp(server_key):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
     ):
-        """Record simulated data."""
+        """Start a :class:`WsExec` that streams the simulator's live buffer."""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "WsSim"
         executor = WsExec(
@@ -117,7 +171,7 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stop running acquire_data."""
+        """Stop any running ``acquire_data`` executor."""
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():
             if exec_id.split()[0] == "acquire_data":

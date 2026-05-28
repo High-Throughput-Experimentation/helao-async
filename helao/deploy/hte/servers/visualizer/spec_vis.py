@@ -40,9 +40,55 @@ VALID_ACTION_NAME = (
 
 
 class C_specvis:
-    """spectrometer visualizer module class"""
+    """Bokeh visualizer for a spectrometer action server.
+
+    Subscribes to the server's ``ws_data`` WebSocket and renders the active
+    action's spectra plus a snapshot of the previous action's spectra side
+    by side. Wavelength and energy axes are fetched once from the action
+    server via :func:`private_dispatcher`; the displayed traces fade across
+    a configurable colormap as new spectra are appended.
+
+    Attributes:
+        vis: Host :class:`Vis` instance providing the Bokeh document.
+        config_dict: ``params`` block from the visualizer's server config.
+        max_spectra: Maximum number of spectra retained per action.
+        downsample: Stride applied to ``wl``, ``ev``, and ``trans`` data.
+        update_rate: Minimum seconds between WebSocket polls.
+        last_update_time: Epoch timestamp of the most recent poll.
+        spec_key: Server key of the spectrometer action server.
+        specserv_config: Mapping with ``host``/``port`` for the action server.
+        specserv_host: Action server hostname.
+        specserv_port: Action server port.
+        wss: :class:`WsSubscriber` connected to ``ws_data``.
+        cmap: Matplotlib colormap used to colour individual spectra.
+        latest_coloridx: Reserved counter for the newest spectrum's colour.
+        data_url: Fully formed ``ws://`` URL for the data WebSocket.
+        wl: Wavelength axis fetched from the action server.
+        ev: Energy axis derived from ``wl``.
+        IOloop_data_run: Liveness flag for the data ingestion task.
+        IOloop_stat_run: Liveness flag for the status ingestion task.
+        data_dict_keys: Column names streamed per spectrum.
+        datasource: Live :class:`ColumnDataSource` for the current action.
+        prev_datasource: Snapshotted source for the previous action.
+        cur_action_uuid: Action UUID currently being plotted.
+        prev_action_uuid: Action UUID of the previous run.
+        layout: Composed Bokeh layout mounted on the document.
+        input_max_spectra: Widget setting ``max_spectra``.
+        input_downsample: Widget setting ``downsample``.
+        plot: Active spectra ``figure``.
+        plot_prev: Previous spectra ``figure``.
+        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Wire up data sources, widgets, plot layout, and start the WS ingest task.
+
+        Args:
+            vis_serv: Host :class:`Vis` server providing the Bokeh document.
+            serv_key: Configuration key of the spectrometer action server.
+                If the server is not in the config, ``__init__`` returns
+                early without registering any roots.
+        """
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.max_spectra = 5
@@ -155,12 +201,29 @@ class C_specvis:
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
     def cleanup_session(self, session_context):
+        """Cancel the data ingest task when the Bokeh session is torn down.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.spec_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def callback_input_max_spectra(self, attr, old, new, sender):
-        """callback for input_max_spectra"""
+        """Validate the ``max num spectra`` input and resize the colormap.
+
+        Parses ``new`` as an int, falls back to ``old`` (or ``500``) on bad
+        input, then clamps to ``[2, 10000]`` before storing it as
+        ``self.max_spectra``, regenerating the ``Reds_r`` colormap, and
+        refreshing the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_int(val):
             try:
@@ -190,7 +253,17 @@ class C_specvis:
         )
 
     def callback_input_downsample(self, attr, old, new, sender):
-        """callback for input_downsample"""
+        """Validate the ``downsampling factor`` input.
+
+        Parses ``new`` as an int (defaulting to ``old`` or ``2``), stores it
+        as ``self.downsample``, and writes the value back to the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_int(val):
             try:
@@ -212,9 +285,20 @@ class C_specvis:
         )
 
     def update_input_value(self, sender, value):
+        """Write ``value`` back onto a Bokeh input widget on the document thread.
+
+        Args:
+            sender: Bokeh input widget whose ``value`` is being updated.
+            value: New string value to assign.
+        """
         sender.value = value
 
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+    async def IOloop_data(self):
+        """Continuously pull WebSocket data packages and schedule plot updates.
+
+        Runs for the lifetime of the Bokeh session and honors
+        ``self.update_rate`` as a minimum gap between polls.
+        """
         LOGGER.info(f" ... spectrometer visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
@@ -224,6 +308,16 @@ class C_specvis:
             await asyncio.sleep(0.01)
 
     def add_points(self, datapackage_list: list):
+        """Append new spectra to the live source and roll older colours.
+
+        Promotes prior data to the previous-action source when the action
+        UUID changes, then for each accepted package builds a downsampled
+        ``wl``/``ev``/``trans`` row, "patches" existing colour entries to
+        fade older spectra, and streams the new row into ``self.datasource``.
+
+        Args:
+            datapackage_list: List of data packages from the WebSocket.
+        """
         for data_package in datapackage_list:
             # only resets if axis selector or action_uuid changes
             self.reset_plot(str(data_package.action_uuid))
@@ -260,6 +354,7 @@ class C_specvis:
                     self.datasource.stream(data_dict, rollover=self.max_spectra)
 
     def _add_plots(self):
+        """Rebuild the active and previous spectra figures with current sources."""
         # # clear legend
         # if self.plot.renderers:
         #     self.plot.legend.items = []
@@ -291,7 +386,17 @@ class C_specvis:
         )
 
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
-        """Clear current plot and move data to previous plot"""
+        """Snapshot the live spectra to the previous-action figure on UUID change.
+
+        When the action UUID changes (or ``forceupdate`` is set), the live
+        data is deep-copied to ``prev_datasource``, ``cur_action_uuid`` is
+        updated, the live data is cleared, and both figures are rebuilt.
+
+        Args:
+            new_action_uuid: Action UUID of the incoming data package.
+            forceupdate: If ``True``, force a rebuild even when the UUID
+                hasn't changed.
+        """
         if self.cur_action_uuid != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
                 LOGGER.info(" ... reseting spectrometer graph")
