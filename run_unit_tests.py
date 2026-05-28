@@ -1,6 +1,66 @@
+"""Aggregate unit-test runner for ``helao.core.tests``.
+
+These are not pytest tests; each ``unit_test_*`` module under
+``helao/core/tests/`` exposes a callable that prints per-assertion
+results and returns ``True`` only when every assertion in that module
+passed.
+
+``launch.py`` invokes this script before launching an orchestration
+group and aborts on a non-zero exit. To keep that gate honest, this
+runner now collects the results of every test module, prints a summary
+table, and exits with ``1`` if any module returned ``False``.
+"""
+
 __all__ = []
 
+import sys
 
 from helao.core.tests.unit_test_sample_models import sample_model_unit_test
+from helao.core.tests.unit_test_action_experiment_sequence import (
+    action_experiment_sequence_unit_test,
+)
+from helao.core.tests.unit_test_config_loader import config_loader_unit_test
+from helao.core.tests.unit_test_logging import logging_unit_test
+from helao.core.tests.unit_test_artifact_generation import (
+    artifact_generation_unit_test,
+)
+from helao.core.tests.unit_test_dispatcher import dispatcher_unit_test
+from helao.core.tests.unit_test_base_api import base_api_unit_test
+from helao.core.tests.unit_test_orch_status import orch_status_unit_test
 
-print("passed model test:", sample_model_unit_test())
+
+TESTS = [
+    ("sample_models", sample_model_unit_test),
+    ("action_experiment_sequence", action_experiment_sequence_unit_test),
+    ("config_loader", config_loader_unit_test),
+    ("logging", logging_unit_test),
+    ("artifact_generation", artifact_generation_unit_test),
+    ("dispatcher", dispatcher_unit_test),
+    ("base_api", base_api_unit_test),
+    ("orch_status", orch_status_unit_test),
+]
+
+
+def main() -> int:
+    """Run every registered unit test, print a summary, return overall status."""
+    results = []
+    for name, fn in TESTS:
+        print(f"\n===== running {name} =====")
+        try:
+            ok = bool(fn())
+        except Exception as exc:  # noqa: BLE001
+            print(f"{name} crashed: {exc!r}")
+            ok = False
+        results.append((name, ok))
+        print(f"{name}: {'PASS' if ok else 'FAIL'}")
+
+    print("\n===== summary =====")
+    for name, ok in results:
+        print(f"  {name}: {'PASS' if ok else 'FAIL'}")
+    overall_ok = all(ok for _, ok in results)
+    print(f"overall: {'PASS' if overall_ok else 'FAIL'}")
+    return 0 if overall_ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

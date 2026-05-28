@@ -1,6 +1,7 @@
 dummy: true
 simulation: true
 show_debug: true
+run_unit_tests: true
 experiment_libraries:
   - simulatews_exp
   - helao/deploy/test/experiments/TEST_exp.py
