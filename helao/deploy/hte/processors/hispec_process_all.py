@@ -9,9 +9,9 @@ import pyarrow.parquet as pq
 import pandas as pd
 
 from helao.core.models.file import FileInfo
-from helao.helpers.hlo_postprocessor import HloPostProcessor
+from helao.helpers.processors import HloPostProcessor
 from helao.helpers.helao_data import HelaoData
-from helao.helpers.parquet import hlo_to_parquet
+from helao.helpers.hlo_data import hlo_to_parquet
 from helao.deploy.hte.processors.libs.hispec_calibrate_downsample_parquet import (
     fully_read_and_calibrate_parquet,
 )

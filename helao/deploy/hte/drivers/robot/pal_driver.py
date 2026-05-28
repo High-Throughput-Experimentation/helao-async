@@ -34,7 +34,7 @@ from helao.core.models.sample import (
 )
 from helao.core.models.file import FileConnParams
 from helao.helpers.active_params import ActiveParams
-from helao.helpers.update_sample_vol import update_vol
+from helao.helpers.sample_api import update_vol
 from helao.core.models.data import DataModel
 from ...drivers.data.archive_driver import Archive
 from ...drivers.robot.enum import (

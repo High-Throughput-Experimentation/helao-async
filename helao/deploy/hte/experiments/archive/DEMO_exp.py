@@ -15,7 +15,7 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.core.models.machine import MachineModel
-from helao.helpers.ref_electrode import REF_TABLE
+from helao.helpers.constants import REF_TABLE
 
 # list valid experiment functions
 EXPERIMENTS = __all__

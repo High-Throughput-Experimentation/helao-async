@@ -31,7 +31,7 @@ from helao.core.models.sample import SolidSample, LiquidSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.electrolyte import Electrolyte
-from helao.helpers.ref_electrode import REF_TABLE
+from helao.helpers.constants import REF_TABLE
 
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.deploy.hte.drivers.io.enum import TriggerType

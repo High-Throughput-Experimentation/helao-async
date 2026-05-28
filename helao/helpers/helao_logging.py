@@ -27,7 +27,7 @@ from pathlib import Path
 
 from colorlog import ColoredFormatter
 from datetime import datetime, timezone, timedelta
-from helao.helpers.get_ntp_time import read_saved_offset
+from helao.helpers.time_utils import read_saved_offset
 
 ALERT_LEVEL = 60
 logging.addLevelName(ALERT_LEVEL, "ALERT")
@@ -272,3 +272,23 @@ def make_logger(
     logger_instance.info(f"writing log events to {log_path}")
     logger_instance.propagate = False
     return logger_instance
+
+
+def print_message(logger, server_name, *args, **kwargs):
+    """
+    Logs a message using the specified logger.
+
+    The log level is selected by the presence of recognized kwargs:
+    ``error`` → ``logger.error``; ``warning``/``warn`` → ``logger.warning``;
+    ``info`` or no recognized key → ``logger.info``.
+    """
+    if "error" in kwargs:
+        logger_method = logger.error
+    elif "warning" in kwargs or "warn" in kwargs:
+        logger_method = logger.warning
+    elif "info" in kwargs:
+        logger_method = logger.info
+    else:
+        logger_method = logger.info
+
+    logger_method(" ".join([str(x) for x in args]))

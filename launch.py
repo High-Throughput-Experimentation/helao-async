@@ -42,7 +42,7 @@ import colorama
 from helao.core.version import get_hlo_version
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.config_loader import read_config
-from helao.helpers.get_ntp_time import get_ntp_time
+from helao.helpers.time_utils import get_ntp_time
 
 from helao.core.tests.unit_test_sample_models import sample_model_unit_test
 
