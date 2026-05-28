@@ -49,7 +49,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         world_config (dict): World configuration dictionary.
         local_ana_root (str): Local directory path for storing analysis results.
         max_tasks (int): Maximum number of concurrent tasks.
-        task_queue (asyncio.PriorityQueue): Priority queue for managing tasks.
+        task_queue (asyncio.Queue): FIFO queue for managing tasks.
         task_set (set): Set of task identifiers.
         syncer_loop (asyncio.Task): The main loop task for processing the queue.
         s3 (pgs3.Client): S3 client for uploading data.
@@ -67,13 +67,13 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         sync_exit_callback(self, task: asyncio.Task):
             Callback function to handle task completion and cleanup.
 
-        async enqueue_calc(self, calc_tup: Tuple[UUID, pd.DataFrame, dict, str], rank: int = 0):
-            Adds a calculation tuple to the task queue with the specified priority rank.
+        async enqueue_calc(self, calc_tup: Tuple[UUID, pd.DataFrame, dict, str]):
+            Adds a calculation tuple to the task queue.
 
         async syncer(self):
             Main loop coroutine that processes the task queue and manages task execution.
 
-        async sync_ana(self, calc_tup: Tuple[UUID, pd.DataFrame, dict, str], retries: int = 3, rank: int = 5):
+        async sync_ana(self, calc_tup: Tuple[UUID, pd.DataFrame, dict, str], retries: int = 3):
             Performs the analysis and handles the synchronization of results to S3 and API.
 
         async to_api(self, req_model: dict, retries: int = 3):
@@ -108,7 +108,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             world_config (dict): World configuration from the action server.
             local_ana_root (str): Path to the local analysis root directory.
             max_tasks (int): Maximum number of tasks allowed.
-            task_queue (asyncio.PriorityQueue): Priority queue for managing tasks.
+            task_queue (asyncio.Queue): FIFO queue for managing tasks.
             task_set (set): Set of tasks.
             running_tasks (dict): Dictionary of currently running tasks.
             syncer_loop (asyncio.Task): Asynchronous task for the syncer loop.
@@ -123,7 +123,7 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self.get_loader()
         # self.api_host = self.config_dict["api_host"]
 
-        self.task_queue = asyncio.PriorityQueue()
+        self.task_queue = asyncio.Queue()
         self.task_set = set()
         self.running_tasks = {}
 
@@ -184,10 +184,9 @@ class HelaoAnalysisSyncer(HelaoSyncer):
     async def enqueue_calc(
         self,
         calc_tup: Tuple[UUID, pd.DataFrame, dict, BaseAnalysis, Optional[UUID]],
-        rank: int = 0,
     ):
         """
-        Adds a calculation task to the queue with a specified priority.
+        Adds a calculation task to the queue.
 
         Args:
             calc_tup (Tuple[UUID, pd.DataFrame, dict, str]): A tuple containing:
@@ -195,14 +194,13 @@ class HelaoAnalysisSyncer(HelaoSyncer):
                 - query_df (pd.DataFrame): DataFrame containing the query data.
                 - ana_params (dict): Dictionary of analysis parameters.
                 - str: Additional string parameter.
-            rank (int, optional): Priority rank for the task in the queue. Defaults to 5.
 
         Returns:
             None
         """
         self.task_set.add(calc_tup[0])
-        await self.task_queue.put((rank, calc_tup))
-        LOGGER.info(f"Added {str(calc_tup[0])} to syncer queue with priority {rank}.")
+        await self.task_queue.put(calc_tup)
+        LOGGER.info(f"Added {str(calc_tup[0])} to syncer queue.")
 
     async def syncer(self):
         """
@@ -228,10 +226,10 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         LOGGER.info("Starting syncer queue processor task.")
         while True:
             if len(self.running_tasks) < self.max_tasks:
-                rank, calc_tup = await self.task_queue.get()
+                calc_tup = await self.task_queue.get()
                 LOGGER.info(f"creating ana task for {calc_tup[0]}.")
                 self.running_tasks[str(calc_tup[0])] = asyncio.create_task(
-                    self.sync_ana(calc_tup, rank=rank), name=str(calc_tup[0])
+                    self.sync_ana(calc_tup), name=str(calc_tup[0])
                 )
                 self.running_tasks[str(calc_tup[0])].add_done_callback(
                     self.sync_exit_callback
@@ -243,7 +241,6 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         self,
         calc_tup: Tuple[UUID, pd.DataFrame, dict, BaseAnalysis, UUID],
         retries: int = 3,
-        rank: int = 5,
     ):
         """
         Asynchronously performs analysis synchronization.
@@ -256,7 +253,6 @@ class HelaoAnalysisSyncer(HelaoSyncer):
             calc_tup (Tuple[UUID, pd.DataFrame, dict, str]): A tuple containing the process UUID, the DataFrame
                 to be analyzed, the analysis parameters, and the analysis function name.
             retries (int, optional): The number of retries for the synchronization. Defaults to 3.
-            rank (int, optional): The rank of the analysis. Defaults to 5.
 
         Returns:
             bool: True if the synchronization was successful, False otherwise.
