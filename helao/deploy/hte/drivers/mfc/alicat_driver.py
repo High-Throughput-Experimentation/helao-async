@@ -29,7 +29,7 @@ from helao.helpers.executor import Executor
 from helao.core.models.hlostatus import HloStatus
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helao.helpers.ws_subscriber import WsSyncClient as WSC
+from helao.helpers.ws_utils import WsSyncClient as WSC
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

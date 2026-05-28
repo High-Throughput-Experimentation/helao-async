@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from .premodels import Sequence
-from .gen_uuid import gen_uuid
+from .time_utils import gen_uuid
 
 
 def constructor(

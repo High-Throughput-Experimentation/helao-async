@@ -1,21 +1,46 @@
-from typing import Union
-from pathlib import Path
+"""Small file I/O utilities.
+
+Consolidates the former file_in_use, zip_dir, and zstd_io modules.
+"""
+
+__all__ = [
+    "file_in_use",
+    "rm_tree",
+    "rm_tree_async",
+    "zip_dir",
+    "unzpickle",
+    "zpickle",
+]
+
+import os
 import zipfile
+from pathlib import Path
+from typing import Union
+
+import _pickle as cPickle
 import anyio
+import pyzstd
 
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
+def file_in_use(file_path):
+    path = Path(file_path)
+
+    if not path.exists():
+        return False
+
+    try:
+        path.rename(path)
+        return False
+    except PermissionError:
+        return True
+
+
 async def rm_tree_async(pth: Union[anyio.Path, str]):
-    """
-    Recursively removes a directory and all its contents asynchronously.
-
-    Args:
-        pth (str or Path): The path to the directory to be removed.
-
-    """
+    """Recursively remove a directory and its contents asynchronously."""
     if isinstance(pth, str):
         pth = anyio.Path(pth)
     elif isinstance(pth, Path):
@@ -30,17 +55,7 @@ async def rm_tree_async(pth: Union[anyio.Path, str]):
 
 
 def rm_tree(pth):
-    """
-    Recursively removes a directory and all its contents.
-
-    Args:
-        pth (str or Path): The path to the directory to be removed.
-
-    Raises:
-        FileNotFoundError: If the directory does not exist.
-        PermissionError: If the user does not have permission to delete a file or directory.
-        OSError: If an error occurs while deleting a file or directory.
-    """
+    """Recursively remove a directory and its contents."""
     pth = Path(pth)
     for child in pth.glob("*"):
         if child.is_file():
@@ -51,25 +66,10 @@ def rm_tree(pth):
 
 
 def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]):
+    """Compress the contents of a directory into a zip file, then remove the source dir.
+
+    Files with the ``.lock`` suffix are excluded.
     """
-    Compresses the contents of a directory into a zip file.
-
-    Args:
-        dir (Union[Path, str]): The directory to compress. Can be a Path object or a string.
-        filename (Union[Path, str]): The name of the output zip file. Can be a Path object or a string.
-
-    Returns:
-        None
-
-    Raises:
-        Exception: If an error occurs during the zipping process, an exception is caught and its traceback is printed.
-
-    Notes:
-        - Files with the ".lock" suffix are excluded from the zip file.
-        - If the zipping process is successful, the original directory is removed using the `rm_tree` function.
-    """
-
-    # Convert to Path object
     target_dir = Path(target_dir)
     success = False
 
@@ -87,3 +87,18 @@ def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]):
 
     if success:
         rm_tree(target_dir)
+
+
+def unzpickle(fpath):
+    """Decompress a zstd-compressed file and deserialize the contained pickle."""
+    data = pyzstd.ZstdFile(fpath, "rb")
+    data = cPickle.load(data)
+    return data
+
+
+def zpickle(fpath, data):
+    """Serialize ``data`` to ``fpath`` using zstandard compression."""
+    with pyzstd.ZstdFile(fpath, "wb") as f:
+        cPickle.dump(data, f)
+    print(f"wrote to {os.path.abspath(f)}")
+    return True

@@ -341,3 +341,224 @@ class OpenAPIClient:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit the runtime context related to this object."""
         self.close()
+
+
+class AsyncOpenAPIClient:
+    """
+    An asynchronous client for interacting with an API described by an OpenAPI (JSON) specification.
+    Dynamically creates async methods for GET and POST operations based on the 'operationId'.
+    """
+
+    def __init__(self, openapi_json_url: str, api_key: str = ""):
+        """
+        Initializes the AsyncOpenAPIClient.
+
+        Args:
+            openapi_json_url: The URL to the openapi.json file.
+        """
+        self.openapi_json_url = openapi_json_url
+        self.api_key = api_key
+        self._client = None
+
+        self.derived_base_url = urljoin(self.openapi_json_url, ".")
+        if not self.derived_base_url.endswith("/"):
+            self.derived_base_url += "/"
+
+        try:
+            self.headers = {"X-Api-Key": self.api_key} if self.api_key else None
+            with httpx.Client(headers=self.headers, timeout=30.0) as client:
+                response = client.get(self.openapi_json_url)
+            response.raise_for_status()
+            self.spec = response.json()
+        except httpx.RequestError as e:
+            self.close()
+            raise RuntimeError(
+                f"Failed to fetch OpenAPI spec from {self.openapi_json_url}: {e}"
+            )
+        except json.JSONDecodeError as e:
+            self.close()
+            raise RuntimeError(
+                f"Failed to parse OpenAPI spec JSON from {self.openapi_json_url}: {e}"
+            )
+        except Exception as e:
+            self.close()
+            raise e
+
+        self._create_methods()
+
+    def _get_api_server_base_url(self) -> str:
+        final_server_url = self.derived_base_url
+
+        if "servers" in self.spec and self.spec["servers"]:
+            server_url_from_spec = self.spec["servers"][0]["url"]
+            final_server_url = urljoin(self.derived_base_url, server_url_from_spec)
+        elif "servers" not in self.spec:
+            final_server_url = urljoin(self.derived_base_url, "/")
+
+        if not final_server_url.endswith("/"):
+            final_server_url += "/"
+        return final_server_url
+
+    def _create_methods(self):
+        if "paths" not in self.spec:
+            return
+
+        api_call_base_url = self._get_api_server_base_url()
+
+        for path_template, path_item_spec in self.spec["paths"].items():
+            for http_method_type in ["get", "post"]:
+                if http_method_type in path_item_spec:
+                    operation_spec = path_item_spec[http_method_type]
+                    operation_id = operation_spec.get("operationId")
+
+                    if not operation_id:
+                        continue
+
+                    parameters_spec_list = operation_spec.get("parameters", [])
+                    current_req_body_spec = (
+                        operation_spec.get("requestBody", {})
+                        if http_method_type == "post"
+                        else None
+                    )
+
+                    def _api_method_factory(
+                        op_id,
+                        current_http_method,
+                        current_path_template,
+                        current_params_spec,
+                        req_body_spec,
+                        base_url_for_calls,
+                        op_details,
+                    ):
+
+                        async def dynamic_method(self_instance, **kwargs):
+                            """Dynamically generated API method."""
+                            resolved_path_template = current_path_template
+                            query_params = {}
+                            request_body_data = {}
+
+                            for param_spec in current_params_spec:
+                                param_name = param_spec["name"]
+                                param_in = param_spec["in"]
+                                is_required = param_spec.get("required", False)
+
+                                if is_required and param_name not in kwargs:
+                                    raise ValueError(
+                                        f"Missing required parameter '{param_name}' for operation '{op_id}'."
+                                    )
+
+                                param_value = kwargs.get(param_name)
+
+                                if param_value is not None:
+                                    if param_in == "path":
+                                        resolved_path_template = (
+                                            resolved_path_template.replace(
+                                                f"{{{param_name}}}",
+                                                quote(str(param_value), safe=""),
+                                            )
+                                        )
+                                    elif param_in == "query":
+                                        query_params[param_name] = param_value
+
+                            if current_http_method == "post" and req_body_spec:
+                                if (
+                                    req_body_spec.get("required", False)
+                                    and "request_body" not in kwargs
+                                ):
+                                    raise ValueError(
+                                        f"Missing required 'request_body' for POST operation '{op_id}'."
+                                    )
+                                request_body_data = kwargs.get("request_body", {})
+
+                            relative_path_for_join = resolved_path_template.lstrip("/")
+                            full_url = urljoin(
+                                base_url_for_calls, relative_path_for_join
+                            )
+
+                            quoted_query_params = {}
+                            for _key, value in query_params.items():
+                                if isinstance(_key, str):
+                                    key = quote(_key, safe="")
+                                else:
+                                    key = _key
+                                if isinstance(value, str):
+                                    quoted_query_params[key] = quote(value, safe="")
+                                else:
+                                    quoted_query_params[key] = value
+
+                            try:
+                                if current_http_method == "get":
+                                    async with httpx.AsyncClient(
+                                        headers=self_instance.headers, timeout=30
+                                    ) as client:
+                                        response = await client.get(
+                                            full_url, params=quoted_query_params
+                                        )
+                                elif current_http_method == "post":
+                                    async with httpx.AsyncClient(
+                                        headers=self_instance.headers, timeout=30
+                                    ) as client:
+                                        response = await client.post(
+                                            full_url,
+                                            params=quoted_query_params,
+                                            json=request_body_data,
+                                        )
+                                else:
+                                    raise NotImplementedError(
+                                        f"HTTP method {current_http_method} not supported by client."
+                                    )
+
+                                response.raise_for_status()
+                                content_type = response.headers.get("content-type", "")
+                                if "application/json" in content_type:
+                                    try:
+                                        return response.json()
+                                    except json.JSONDecodeError:
+                                        return response.text
+                                return response.text
+                            except httpx.HTTPStatusError as e:
+                                error_message = f"API call to '{op_id}' ({e.request.method} {e.request.url}) failed: {e.response.status_code}"
+                                try:
+                                    error_details = e.response.json()
+                                    error_message += f" - Details: {error_details}"
+                                except json.JSONDecodeError:
+                                    error_message += (
+                                        f" - Response: {e.response.text[:200]}"
+                                    )
+                                raise RuntimeError(error_message) from e
+                            except httpx.RequestError as e:
+                                raise RuntimeError(
+                                    f"Request failed for operation '{op_id}' to {e.request.url}: {e}"
+                                )
+
+                        dynamic_method.__name__ = op_id
+                        return dynamic_method
+
+                    method_function = _api_method_factory(
+                        op_id=operation_id,
+                        current_http_method=http_method_type,
+                        current_path_template=path_template,
+                        current_params_spec=parameters_spec_list,
+                        req_body_spec=current_req_body_spec,
+                        base_url_for_calls=api_call_base_url,
+                        op_details=operation_spec,
+                    )
+
+                    method_name = (
+                        operation_spec.get("summary", operation_id.lower())
+                        .lower()
+                        .replace(" ", "_")
+                    )
+                    setattr(
+                        self, method_name, method_function.__get__(self, self.__class__)
+                    )
+
+    def close(self):
+        if hasattr(self, "_client") and self._client and not self._client.is_closed:
+            self._client.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()

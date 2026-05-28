@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Union
 
 from .yml_tools import yml_load
-from .read_hlo import read_hlo
+from .hlo_data import read_hlo
 
 
 class FileMapper:

@@ -4,6 +4,8 @@ __all__ = [
     "AssemblySampleAPI",
     "UnifiedSampleDataAPI",
     "OldLiquidSampleAPI",
+    "unpack_samples_helper",
+    "update_vol",
 ]
 
 import asyncio
@@ -30,7 +32,7 @@ from helao.core.models.sample import (
     object_to_sample,
     SampleType,
 )
-from .file_in_use import file_in_use
+from .file_utils import file_in_use
 
 
 class SampleModelAPI:
@@ -1076,3 +1078,85 @@ class UnifiedSampleDataAPI:
                     f"validation error, type '{type(sample)}' is not a valid sample model"
                 )
         return retval
+
+
+def unpack_samples_helper(
+    samples: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = [],
+) -> Tuple[
+    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+]:
+    """
+    Unpacks a list of samples into separate lists based on their sample type.
+
+    Recursively unpacks assembly samples into liquid, solid, and gas sublists.
+
+    Returns:
+        Tuple of (liquid_list, solid_list, gas_list).
+    """
+    liquid_list = []
+    solid_list = []
+    gas_list = []
+
+    for sample in samples:
+        if sample.sample_type == SampleType.assembly:
+            for part in sample.parts:
+                if part.sample_type == SampleType.assembly:
+                    tmp_liquid_list, tmp_solid_list, tmp_gas_list = (
+                        unpack_samples_helper(samples=[part])
+                    )
+                    for s in tmp_liquid_list:
+                        liquid_list.append(s)
+                    for s in tmp_gas_list:
+                        gas_list.append(s)
+                    for s in tmp_solid_list:
+                        solid_list.append(s)
+                elif part.sample_type == SampleType.solid:
+                    solid_list.append(part)
+                elif part.sample_type == SampleType.liquid:
+                    liquid_list.append(part)
+                elif part.sample_type == SampleType.gas:
+                    gas_list.append(part)
+
+        elif sample.sample_type == SampleType.solid:
+            solid_list.append(sample)
+        elif sample.sample_type == SampleType.liquid:
+            liquid_list.append(sample)
+        elif sample.sample_type == SampleType.gas:
+            gas_list.append(sample)
+
+    return liquid_list, solid_list, gas_list
+
+
+def update_vol(BS, delta_vol_ml: float, dilute: bool):
+    """
+    Updates the volume of a sample and optionally adjusts its dilution factor.
+
+    Parameters:
+    BS (SampleModel): The sample object which contains volume and dilution factor attributes.
+    delta_vol_ml (float): The change in volume to be applied to the sample, in milliliters.
+    dilute (bool): A flag indicating whether to adjust the dilution factor based on the new volume.
+    """
+    if hasattr(BS, "volume_ml"):
+        old_vol = BS.volume_ml
+        tot_vol = old_vol + delta_vol_ml
+        if tot_vol <= 0:
+            LOGGER.error(
+                "new volume is <= 0, setting it to zero and setting status to destroyed"
+            )
+            BS.zero_volume()
+            tot_vol = 0
+        BS.volume_ml = tot_vol
+        if dilute:
+            if hasattr(BS, "dilution_factor"):
+                old_df = BS.dilution_factor
+                if old_vol <= 0:
+                    LOGGER.error("previous volume is <= 0, setting new df to 0.")
+                    new_df = -1
+                else:
+                    new_df = tot_vol / (old_vol / old_df)
+                BS.dilution_factor = new_df
+                LOGGER.info(f"updated sample dilution-factor: {BS.dilution_factor}")

@@ -1,5 +1,29 @@
+"""Small constants and reference tables used across helao.
+
+Consolidates the former ref_electrode, reference, and spec_map modules.
+"""
+
+__all__ = [
+    "REF_TABLE",
+    "Reference",
+    "SPEC_MAP",
+    "SPECSRV_MAP",
+    "SPEC_T_server",
+    "SPEC_R_server",
+]
+
 from socket import gethostname
+
 from helao.core.models.machine import MachineModel as MM
+
+
+REF_TABLE = {"leakless": 0.21, "inhouse": 0.21, "rhe": 0.0}
+
+
+class Reference:
+    name: str
+    Vnhe: float
+
 
 SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname().lower()).as_dict()
 SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname().lower()).as_dict()

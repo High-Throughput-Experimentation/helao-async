@@ -9,7 +9,7 @@ from helao.core.models.analysis import (
 )
 from helao.core.models.s3locator import S3Locator
 from helao.core.models.run_use import RunUse
-from helao.helpers.set_time import set_time
+from helao.helpers.time_utils import set_time
 from pydasher.serialization import hasher
 
 

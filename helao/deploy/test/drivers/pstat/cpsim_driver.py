@@ -8,7 +8,7 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.helpers.zstd_io import unzpickle
+from helao.helpers.file_utils import unzpickle
 from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from ...drivers.data.gpsim_driver import calc_eta

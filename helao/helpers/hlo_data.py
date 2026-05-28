@@ -1,44 +1,75 @@
-import json
-from ruamel.yaml import YAML
-from collections import defaultdict
+"""HLO file reading and parquet conversion.
 
+Consolidates the former read_hlo and parquet modules.
+``HelaoData`` is re-exported from ``helao.helpers.helao_data`` for callers that
+imported it from ``read_hlo``.
+"""
+
+__all__ = [
+    "read_hlo",
+    "read_hlo_header",
+    "read_hlo_data_chunks",
+    "hlo_to_parquet",
+    "read_helao_metadata",
+    "HelaoData",
+]
+
+import json
+from collections import defaultdict
+from pathlib import Path
+from typing import Tuple
+
+import orjson
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+from ruamel.yaml import YAML
 
-"""
-This module provides helper functions to read HLO files, process their data, and convert them to Parquet format.
+from .yml_tools import yml_load
 
-Functions:
-    read_hlo_header(file_path):
 
-    read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
-        Reads the data chunks from a HLO file starting from a given index.
-        The data is at this point downsampled to every 1 nm, the wavelengths
-        are set to be the columns and the time is set to be the index.
+_yaml = YAML()
 
-    hlo_to_parquet(input_hlo_path, output_parquet_path, chunk_size=100):
-        Converts a HLO file to a Parquet file.
 
-    read_helao_metadata(parquet_file_path):
-        Reads the custom metadata from a Parquet file.
-"""
+def read_hlo(
+    path: str, keep_keys: list = [], omit_keys: list = []
+) -> Tuple[dict, dict]:
+    """Read a .hlo file and return its (meta, data) dictionaries."""
+    if keep_keys and omit_keys:
+        print(
+            "Both keep_keys and omit_keys are provided. keep_keys will take precedence."
+        )
 
-yaml = YAML()
+    path_to_hlo = Path(path)
+    header_lines = []
+    header_end = False
+    data = defaultdict(list)
+
+    with open(str(path_to_hlo), "rb") as f:
+        for line in f:
+            if header_end:
+                line_dict = orjson.loads(line)
+                for k in line_dict:
+                    if k in keep_keys or k not in omit_keys:
+                        v = line_dict[k]
+                        if isinstance(v, list):
+                            data[k] += v
+                        else:
+                            data[k].append(v)
+            elif line.decode("utf8").startswith("%%"):
+                header_end = True
+            elif not header_end:
+                header_lines.append(line)
+    if header_lines:
+        meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
+    else:
+        meta = {}
+
+    return meta, data
 
 
 def read_hlo_header(file_path):
-    """
-    Reads the header of a HLO file and returns the parsed YAML content and the index where the data starts.
-
-    Args:
-        file_path (str): The path to the HLO file.
-
-    Returns:
-        tuple: A tuple containing:
-            - dict: Parsed YAML content from the header.
-            - int: The index where the data starts in the file.
-    """
+    """Read the YAML header of an HLO file. Returns (header_dict, data_start_index)."""
     yml_lines = []
     data_start_index = -1
     with open(file_path) as f:
@@ -48,24 +79,12 @@ def read_hlo_header(file_path):
                 break
             else:
                 yml_lines.append(line)
-        yd = dict(yaml.load("\n".join(yml_lines)))
+        yd = dict(_yaml.load("\n".join(yml_lines)))
     return yd, data_start_index
 
 
 def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
-    """
-    Reads data from a file in chunks and yields the data as dictionaries.
-
-    Args:
-        file_path (str): The path to the file to read.
-        data_start_index (int): The line index to start reading data from.
-        chunk_size (int, optional): The number of lines to read in each chunk. Defaults to 100.
-
-    Yields:
-        tuple: A tuple containing:
-            - dict: A dictionary where keys are the JSON keys from the file and values are lists of the corresponding values.
-            - int: The maximum length of the lists in the dictionary.
-    """
+    """Yield (chunk_dict, max_chunk_len) tuples from an HLO file in chunks."""
     with open(file_path) as f:
         chunkd = defaultdict(list)
         for i, line in enumerate(f):
@@ -88,17 +107,7 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
 def hlo_to_parquet(
     input_hlo_path, output_parquet_path, chunk_size=100, HISPEC: bool = False
 ):
-    """
-    Converts HLO (custom format) data to Parquet format.
-
-    Parameters:
-    input_hlo_path (str): Path to the input HLO file.
-    output_parquet_path (str): Path to the output Parquet file.
-    chunk_size (int, optional): Number of rows to process at a time. Default is 100.
-
-    Returns:
-    None
-    """
+    """Convert an HLO file to Parquet format."""
     writer: pq.ParquetWriter = None
     schema = None
     metadata = None
@@ -109,7 +118,6 @@ def hlo_to_parquet(
         df_headers_no_time = header["optional"]["wl"]
         df_headers_all = [000] + df_headers_no_time
         df_headers_all = list(map(float, df_headers_all))
-    # print(len(df_headers_all))
 
     for chunk, chunklen in read_hlo_data_chunks(
         input_hlo_path, data_start, chunk_size=chunk_size
@@ -120,26 +128,11 @@ def hlo_to_parquet(
             start_ticktime = df0.iloc[0, 0]
 
         if HISPEC:
-
-            # convert from ticktime to time
             df0.iloc[:, 0] = df0.iloc[:, 0].apply(lambda x: x - start_ticktime)
-
-            # rename the first collumn to Time (s)
-            # df0.rename(columns={df0.columns[0]: 'Time (s)'}, inplace=True)
-
-            # rename the collumns using df_headers
-            # print(current_idx, current_idx+chunklen)
             df0.columns = df_headers_all
-
-            # create a new dataframe with collumns 1:-1 of df0
             df = df0.iloc[:, 1:-1]
-
-            # downsample the data to every 1 nm
             df = df.T.groupby(df.columns // 1).mean().T
-
-            # insert the time collumn from df into df0 as collumn 0
             df.insert(0, "t_s", df0.iloc[:, 0])
-
             df.columns = df.columns.astype(str)
 
             table = pa.Table.from_pandas(df)
@@ -149,8 +142,6 @@ def hlo_to_parquet(
         else:
             table = pa.Table.from_pandas(df0)
             current_idx += chunklen
-
-        # print(df.head())
 
         if schema is None:
             schema = table.schema
@@ -171,23 +162,15 @@ def hlo_to_parquet(
 
 
 def read_helao_metadata(parquet_file_path):
-    """
-    Reads Helao metadata from a Parquet file.
-
-    Args:
-        parquet_file_path (str): The file path to the Parquet file.
-
-    Returns:
-        dict: A dictionary containing the Helao metadata.
-    """
+    """Read Helao-specific metadata from a Parquet file's schema."""
     meta = pq.read_metadata(parquet_file_path)
     metadict = json.loads(meta.metadata.get(b"helao_metadata", b"{}").decode())
     return metadict
 
 
-if __name__ == "__main__":
-    input_hlo_path = r"/Users/benj/Documents/SpEC_Class_2/test_data/newdata/ANDORSPEC-1.1.0.0__0 (1).hlo"
-    output_parquet_path = (
-        r"/Users/benj/Documents/SpEC_Class_2/test_data/newdata/test.parquet"
-    )
-    hlo_to_parquet(input_hlo_path, output_parquet_path, HISPEC=True)
+def __getattr__(name):
+    # Lazy re-export of HelaoData from helao_data to keep import side effects light.
+    if name == "HelaoData":
+        from .helao_data import HelaoData
+        return HelaoData
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
