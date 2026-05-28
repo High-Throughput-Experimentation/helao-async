@@ -960,6 +960,9 @@ class SyncDriver:
         self.task_queue = asyncio.PriorityQueue()
         self.task_set = set()
         self.running_tasks = {}
+        # per-experiment locks; actions sharing an experiment must serialize so
+        # the parent experiment's progress dict / process metas are not raced.
+        self.exp_locks: Dict[str, asyncio.Lock] = {}
         self.aiolock = asyncio.Lock()
         # push happens via async task queue
         # processes are checked after each action push
@@ -1072,50 +1075,54 @@ class SyncDriver:
         except KeyError:
             pass
 
-    async def syncer(self):
+    def _get_exp_lock_for_action(self, yml_path: Path) -> Optional[asyncio.Lock]:
+        """Return a per-experiment lock for an action yml, or None for other types.
+
+        Action yml files live at ``<runs_root>/<seq_dir>/<exp_dir>/<act_dir>/<name>-act.yml``;
+        the experiment directory (``yml_path.parent.parent``) is used as the lock key so
+        that two actions belonging to the same experiment cannot sync concurrently.
+        Experiments, sequences, processes, and analyses return None and are free to
+        run in parallel.
         """
-        Asynchronous method to continuously process tasks from a queue and manage their execution.
+        if not yml_path.stem.endswith("-act"):
+            return None
+        exp_key = str(yml_path.parent.parent)
+        lock = self.exp_locks.get(exp_key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self.exp_locks[exp_key] = lock
+        return lock
 
-        This method runs an infinite loop that checks if the number of currently running tasks
-        is less than the maximum allowed tasks. If so, it retrieves the next task from the queue
-        and starts its execution if it is not already running.
+    async def syncer(self):
+        """Worker coroutine: pull one yml from the queue at a time and await its sync.
 
-        The method performs the following steps:
-        1. Checks if the number of running tasks is less than the maximum allowed tasks.
-        2. Retrieves the next task from the task queue.
-        3. If the task is not already running, creates and starts an asynchronous task for it.
-        4. Adds a callback to handle the task's completion.
-        5. Waits for a short period before repeating the process.
-
-        The tasks are expected to be YAML files, and the method ensures that each task is only
-        processed once at a time.
-
-        Attributes:
-            running_tasks (dict): A dictionary to keep track of currently running tasks.
-            max_tasks (int): The maximum number of tasks that can run concurrently.
-            task_queue (asyncio.Queue): A queue from which tasks are retrieved.
-
-        Returns:
-            None
+        ``self.max_tasks`` instances of this coroutine run as parallel workers, so up
+        to ``max_tasks`` syncs are in flight concurrently. Actions of the same
+        experiment serialize on a per-experiment ``asyncio.Lock`` to protect the
+        shared experiment progress dict; experiments, sequences, processes, and
+        analyses run without that lock.
         """
         while True:
-            if len(self.running_tasks) < self.max_tasks:
-                LOGGER.debug("Getting next yml_target from queue.")
-                rank, yml_path = await self.task_queue.get()
-                LOGGER.debug(f"Acquired {yml_path.name} with priority {rank}.")
-                if yml_path.name not in self.running_tasks:
-                    LOGGER.debug(f"Creating sync task for {yml_path.name}.")
-                    async with self.aiolock:
-                        self.running_tasks[yml_path.name] = asyncio.create_task(
-                            self.sync_yml(yml_path=yml_path, rank=rank),
-                            name=yml_path.name,
-                        )
-                        self.running_tasks[yml_path.name].add_done_callback(
-                            self.sync_exit_callback
-                        )
+            rank, yml_path = await self.task_queue.get()
+            LOGGER.debug(f"Acquired {yml_path.name} with priority {rank}.")
+            self.task_set.discard(yml_path.name)
+            if yml_path.name in self.running_tasks:
+                LOGGER.debug(f"{yml_path.name} sync is already in progress, skipping.")
+                continue
+            self.running_tasks[yml_path.name] = asyncio.current_task()
+            try:
+                exp_lock = self._get_exp_lock_for_action(yml_path)
+                if exp_lock is not None:
+                    async with exp_lock:
+                        await self.sync_yml(yml_path=yml_path, rank=rank)
                 else:
-                    LOGGER.debug(f"{yml_path.name} sync is already in progress.")
-            await asyncio.sleep(0.1)
+                    await self.sync_yml(yml_path=yml_path, rank=rank)
+            except Exception:
+                LOGGER.error(
+                    f"Error in syncer worker for {yml_path}", exc_info=True
+                )
+            finally:
+                self.running_tasks.pop(yml_path.name, None)
 
     def get_progress(self, yml_path: Path):
         """
