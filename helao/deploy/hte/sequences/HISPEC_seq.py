@@ -64,7 +64,64 @@ def HISPEC_CV(
     # Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps. # temporarily uncommented to test a fixed V2
     # Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
     # scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
-):
+) -> list:
+    """Build a HISPEC cyclic voltammetry / SpEC sequence over plate samples.
+
+    For each sample in ``plate_sample_no_list`` the sequence unloads/disengages
+    the cell, moves to the sample, optionally engages the cell with the
+    z-motor, optionally stops electrolyte flow during the spectro-electrochemical
+    (SpEC) measurement, then runs the sub-experiment stack: OCV, PEIS,
+    CP, CA, and a SpEC scan. Global experiment parameters are threaded
+    between sub-experiments to seed initial/apex potentials for the
+    PEIS/CA/SpEC steps. The cell is finally left sealed and full of
+    solution if the z-motor is in use, then a shutdown experiment runs.
+
+    Args:
+        sequence_version: Version tag for the sequence definition.
+        plate_id: Material library plate identifier.
+        plate_sample_no_list: Sample numbers on the plate to visit.
+        cycles: Number of CV cycles in the SpEC scan.
+        Ival__A: Current setpoint for the CP step, in amps.
+        scanrate_voltsec: SpEC scan rate in V/s.
+        cell_fill_wait: Seconds to wait after engaging the cell with flow.
+        Tval__s: Duration in seconds for the OCV and CA steps.
+        CP_Tval__s: Duration in seconds for the CP step.
+        reservoir_electrolyte: Electrolyte enum identifying the reservoir.
+        reservoir_liquid_sample_no: Liquid sample number to load into the cell.
+        solution_bubble_gas: Gas used to bubble the reservoir solution.
+        solution_ph: Solution pH passed to potential references.
+        Flow_during_SpEC: If False, flow is stopped before the SpEC stack.
+        samplerate_sec: SpEC data acquisition interval in seconds.
+        gamrychannelwait: Gamry channel wait flag.
+        gamrychannelsend: Gamry channel send flag.
+        IRange: Gamry current range string.
+        ERange: Gamry voltage range string.
+        Bandwidth: Gamry bandwidth selection string.
+        ref_vs_nhe: Reference electrode offset vs NHE in volts.
+        toggle1_source: Toggle1 source name driving the spectrometer trigger.
+        toggle1_init_delay: Initial delay for the toggle1 trigger, seconds.
+        toggle1_duty: Duty cycle for the toggle1 trigger.
+        Vamp__V: PEIS perturbation amplitude in volts.
+        Finit__Hz: PEIS initial frequency in Hz.
+        Ffinal__Hz: PEIS final frequency in Hz.
+        FrequencyNumber: Number of PEIS frequencies in the sweep.
+        Duration__s: PEIS total duration in seconds.
+        AcqInterval__s: PEIS data acquisition interval, seconds.
+        AcqInterval_CA_CP__s: CA/CP data acquisition interval, seconds.
+        SweepMode: PEIS sweep mode (e.g. ``"log"``).
+        Repeats: PEIS repeats per frequency.
+        DelayFraction: PEIS settling delay fraction.
+        comment: Free-form sequence comment.
+        measurement_area: Geometric cell area in cm^2.
+        liquid_volume_ml: Volume of liquid loaded into the cell.
+        use_z_motor: Use the z-motor to engage/disengage the cell.
+        cell_engaged_z: Cell engaged z-height in mm.
+        cell_disengaged_z: Cell disengaged z-height in mm.
+        cell_vent_wait: Wait time after venting the cell, in seconds.
+
+    Returns:
+        list: Ordered list of planned ``Experiment`` objects.
+    """
     epm = ExperimentPlanMaker()
     epm.add("HISPEC_sub_unloadall_customs", {})
     epm.add(
@@ -265,7 +322,50 @@ def HISPEC_EIS_only(
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
     cell_fill_wait: float = 60,
-):
+) -> list:
+    """Build a HISPEC sequence that runs only a PEIS impedance scan per sample.
+
+    A startup experiment is added once, then for each sample the cell is
+    disengaged (or paused with an interrupt if the z-motor is disabled),
+    the sample is loaded, the cell is re-engaged, an OCV is captured to
+    seed the PEIS initial voltage, and a PEIS scan is run. The cell is
+    finally sealed with electrolyte for storage when the z-motor is used.
+
+    Args:
+        sequence_version: Version tag for the sequence definition.
+        plate_id: Material library plate identifier.
+        plate_sample_no_list: Sample numbers on the plate to visit.
+        reservoir_electrolyte: Electrolyte enum for the reservoir.
+        reservoir_liquid_sample_no: Liquid sample number to load.
+        solution_bubble_gas: Gas used to bubble the reservoir solution.
+        solution_ph: Solution pH passed to potential references.
+        Vamp__V: PEIS perturbation amplitude in volts.
+        Finit__Hz: PEIS initial frequency in Hz.
+        Ffinal__Hz: PEIS final frequency in Hz.
+        FrequencyNumber: Number of PEIS frequencies in the sweep.
+        Duration__s: PEIS total duration in seconds.
+        AcqInterval__s: PEIS data acquisition interval, seconds.
+        SweepMode: PEIS sweep mode (e.g. ``"log"``).
+        Repeats: PEIS repeats per frequency.
+        DelayFraction: PEIS settling delay fraction.
+        gamrychannelwait: Gamry channel wait flag.
+        gamrychannelsend: Gamry channel send flag.
+        IRange: Gamry current range string.
+        ERange: Gamry voltage range string.
+        Bandwidth: Gamry bandwidth selection string.
+        ref_vs_nhe: Reference electrode offset vs NHE in volts.
+        comment: Free-form sequence comment.
+        measurement_area: Geometric cell area in cm^2.
+        liquid_volume_ml: Volume of liquid loaded into the cell.
+        use_z_motor: Use the z-motor to engage/disengage the cell.
+        cell_engaged_z: Cell engaged z-height in mm.
+        cell_disengaged_z: Cell disengaged z-height in mm.
+        cell_vent_wait: Wait time after venting the cell, in seconds.
+        cell_fill_wait: Wait time after filling the cell, in seconds.
+
+    Returns:
+        list: Ordered list of planned ``Experiment`` objects.
+    """
     epm = ExperimentPlanMaker()
 
     epm.add(
@@ -1255,7 +1355,18 @@ def ECHEUVIS_postseq(
     analysis_seq_uuid: str = "",
     plate_id: int = 0,
     recent: bool = False,
-):
+) -> list:
+    """Build a post-sequence that runs the ECHEUVIS stability analysis.
+
+    Args:
+        sequence_version: Version tag for the sequence definition.
+        analysis_seq_uuid: UUID of the source sequence to analyze.
+        plate_id: Plate identifier scoping the analysis.
+        recent: Restrict to the most recent matching run when True.
+
+    Returns:
+        list: Ordered list of planned ``Experiment`` objects.
+    """
     epm = ExperimentPlanMaker()
     epm.add(
         "ECHEUVIS_analysis_stability",

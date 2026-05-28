@@ -1,7 +1,8 @@
-"""Potentiostat simulation server
+"""Potentiostat simulation server.
 
-FastAPI server host for the potentiostat simulator driver. Currently just sleeps.
-TODO: Load and stream old measurements.
+Hosts :class:`PstatSim`, a minimal potentiostat stand-in that loads an OER
+archive CSV to expose plate metadata. The ``run_CP`` action currently
+sleeps for ``Tval__s`` seconds without streaming data.
 """
 
 __all__ = ["makeApp"]
@@ -18,7 +19,28 @@ from helao.helpers.premodels import Action
 
 
 class PstatSim:
+    """Simulated potentiostat backed by an OER eta archive CSV.
+
+    Loads the CSV at ``params.data_path`` and precomputes per-plate
+    descriptors (pH, element labels, composition fractions). Used only as a
+    metadata source by the simulated CP action.
+
+    Attributes:
+        base: Hosting action server.
+        config_dict: ``params`` block from the server config.
+        world_config: Full world configuration.
+        measure_status: Reserved placeholder.
+        df: Raw measurement dataframe.
+        loaded_df: View of ``df`` restricted to the loaded plate.
+        platespaces: List of per-plate descriptors.
+    """
+
     def __init__(self, action_serv: Base):
+        """Load the archive CSV and precompute plate descriptors.
+
+        Args:
+            action_serv: Action server hosting this driver.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
@@ -58,11 +80,22 @@ class PstatSim:
             )
 
     def shutdown(self):
+        """No-op shutdown hook."""
         pass
 
 
 def makeApp(server_key):
+    """Build the potentiostat-simulator FastAPI app.
 
+    Wires :class:`PstatSim` into a :class:`BaseAPI` and registers the
+    ``run_CP`` action, which sleeps for ``Tval__s`` seconds.
+
+    Args:
+        server_key: Server name in the launched config.
+
+    Returns:
+        Configured :class:`HelaoFastAPI` app.
+    """
     app = BaseAPI(
         server_key=server_key,
         server_title=server_key,
@@ -81,9 +114,7 @@ def makeApp(server_key):
             float
         ] = 1.0,  # Time between data acquisition samples in seconds.
     ):
-        """Chronopotentiometry (Potential response on controlled current)
-        use 4bit bitmask for triggers
-        IErange depends on gamry model used (test actual limit before using)"""
+        """Simulate a chronopotentiometry run by sleeping ``Tval__s`` seconds."""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CP"
         await asyncio.sleep(active.action.action_params["Tval__s"])

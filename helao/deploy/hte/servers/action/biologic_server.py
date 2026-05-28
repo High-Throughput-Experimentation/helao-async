@@ -1,9 +1,10 @@
 # shell: uvicorn motion_server:app --reload
-"""A FastAPI service definition for a potentiostat device server, e.g. Biologic.
+"""Biologic potentiostat action server.
 
-biologic_server uses the Executor model with helao.drivers.pstat.biologic.driver which decouples
-the hardware driver class from the action server base class.
-
+Wraps :class:`BiologicDriver` and exposes electrochemistry technique endpoints
+(``run_CA``, ``run_CP``, ``run_CV``, ``run_OCV``, ``run_PEIS``, ``run_GEIS``,
+``run_CAOCV``) plus status/stop routes. Uses the :class:`Executor` model so
+the hardware driver stays decoupled from the action-server base class.
 """
 
 
@@ -61,10 +62,30 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class BiologicExec(Executor):
+    """Executor that runs a single Biologic technique on one channel.
+
+    Loads the technique into the driver in ``_pre_exec``, starts the channel
+    (optionally honouring Gamry-style TTL parameters) in ``_exec``, streams
+    data via ``_poll`` while monitoring optional Ewe/I alert thresholds, and
+    cleans up the channel in ``_post_exec`` while running bubble detection on
+    OCV traces. ``_manual_stop`` aborts the measurement.
+    """
+
     technique: BiologicTechnique
     driver: BiologicDriver
 
     def __init__(self, *args, **kwargs):
+        """Initialise the Biologic executor for a specific technique.
+
+        Reads the action parameters (filtering out ``TTL*`` / ``alert*``
+        helper keys into separate dicts), binds the driver and target channel,
+        and stores the ``technique`` keyword argument.
+
+        Args:
+            *args: Positional arguments forwarded to :class:`Executor`.
+            **kwargs: Keyword arguments forwarded to :class:`Executor`; must
+                include ``technique`` (a :class:`BiologicTechnique`).
+        """
         super().__init__(*args, **kwargs)
         try:
             self.poll_rate = 0.01  # pump events every 10 millisecond
@@ -117,7 +138,7 @@ class BiologicExec(Executor):
             LOGGER.error("BiologicExec was not initialized.", exc_info=True)
 
     async def _pre_exec(self) -> dict:
-        """Setup potentiostat device for given technique."""
+        """Load the configured technique and action parameters into the driver."""
         try:
             resp = self.driver.setup(
                 technique=self.technique,
@@ -131,7 +152,7 @@ class BiologicExec(Executor):
         return {"error": error}
 
     async def _exec(self) -> dict:
-        """Begin measurement or wait for TTL trigger if specified."""
+        """Start the configured channel (optionally waiting for a TTL trigger)."""
         LOGGER.debug("starting measurement")
         try:
             resp = self.driver.start_channel(self.channel, self.ttl_params)
@@ -148,7 +169,13 @@ class BiologicExec(Executor):
             return {"error": ErrorCodes.critical_error}
 
     async def _poll(self) -> dict:
-        """Return data and status from dtaq event sink."""
+        """Pull the next data chunk from the channel and evaluate alerts.
+
+        Extends the rolling ``data_buffer`` deques with the latest samples,
+        emits :meth:`LOGGER.alert` when configured Ewe/I thresholds are
+        crossed for ``alert_duration__s``, and translates the driver response
+        into HLO ``active`` / ``finished`` / ``errored`` status.
+        """
         try:
             resp = await self.driver.get_data(self.channel)
             # populate executor buffer for output calculation
@@ -240,7 +267,13 @@ class BiologicExec(Executor):
             LOGGER.error("BiologicExec poll error", exc_info=True)
             return {"error": ErrorCodes.critical_error, "status": HloStatus.errored}
 
-    async def _post_exec(self):
+    async def _post_exec(self) -> dict:
+        """Clean up the channel and post-process the buffered data.
+
+        Stores the trailing mean of ``t_s``/``Ewe_V``/``I_A`` on the action
+        params and, for OCV runs, evaluates :func:`bubble_detection` and sets
+        ``has_bubble`` on the action params.
+        """
         LOGGER.info("BiologicExec running post_exec.")
         resp = self.driver.cleanup(self.channel)
 
@@ -271,13 +304,22 @@ class BiologicExec(Executor):
         return {"error": error, "data": {}}
 
     async def _manual_stop(self) -> dict:
-        """Interrupt measurement and disconnect cell."""
+        """Interrupt the running technique and disconnect the cell."""
         resp = self.driver.stop()
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.stop
         return {"error": error}
 
 
 async def biologic_dyn_endpoints(app: BaseAPI):
+    """Register the Biologic technique endpoints once the driver is ready.
+
+    Disables concurrent actions on this server, waits for
+    ``app.driver.ready``, then attaches the ``run_CA``, ``run_CP``, ``run_CV``,
+    ``run_OCV``, ``run_PEIS``, ``run_GEIS`` and ``run_CAOCV`` POST routes.
+
+    Args:
+        app: The :class:`BaseAPI` instance being constructed by ``makeApp``.
+    """
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
 
@@ -307,10 +349,13 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         alert_sleep__s: float = -1,
         alertThreshI_A: float = 0,
     ):
-        """Chronoamperometry (current response on amplied potential)
-        use 4bit bitmask for triggers
-        IErange depends on biologic model used
-        (test actual limit before using)"""
+        """Run chronoamperometry (current response to a stepped potential).
+
+        Maps the I/E/Bandwidth range enums to their driver values and dispatches
+        a :class:`BiologicExec` configured with :data:`TECH_CA`. Use a 4-bit
+        bitmask for trigger arguments; valid I/E ranges depend on the
+        Biologic model.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CA"
         active.action.action_params["AcqInterval__A"] = 10.0
@@ -349,9 +394,12 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         alert_sleep__s: float = -1,
         alertThreshEwe_V: float = 0,
     ):
-        """Chronopotentiometry (Potential response on controlled current)
-        use 4bit bitmask for triggers
-        IErange depends on biologic model used (test actual limit before using)"""
+        """Run chronopotentiometry (potential response to a controlled current).
+
+        Maps I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
+        configured with :data:`TECH_CP`. Use a 4-bit bitmask for trigger
+        arguments; valid I/E ranges depend on the Biologic model.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CP"
         active.action.action_params["AcqInterval__V"] = 10.0
@@ -394,10 +442,13 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         alert_sleep__s: float = -1,
         alertThreshI_A: float = 0,
     ):
-        """Cyclic Voltammetry (most widely used technique
-        for acquireing information about electrochemical reactions)
-        use 4bit bitmask for triggers
-        IErange depends on biologic model used (test actual limit before using)"""
+        """Run cyclic voltammetry between two apex potentials.
+
+        Subtracts one from ``Cycles`` (the driver expects additional cycles),
+        derives ``AcqInterval__V`` from the time interval and scan rate, maps
+        I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
+        configured with :data:`TECH_CV`.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_params["Cycles"] -= 1  # i.e. additional cycles
         active.action.action_params["AcqInterval__V"] = (
@@ -436,9 +487,12 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         signal_change_threshold: float = 0.01,
         amplitude_threshold: float = 0.05,
     ):
-        """mesasures open circuit potential
-        use 4bit bitmask for triggers
-        IErange depends on biologic model used (test actual limit before using)"""
+        """Measure open-circuit potential for ``Tval__s`` seconds.
+
+        Dispatches a :class:`BiologicExec` configured with :data:`TECH_OCV`;
+        the ``*_threshold`` parameters are forwarded to bubble detection during
+        ``_post_exec``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "OCV"
         active.action.action_params["AcqInterval__V"] = 10.0
@@ -472,7 +526,11 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         TTLsend: int = -1,
         TTLduration: float = 1.0,
     ):
-        """run Potentiostatic EIS"""
+        """Run potentiostatic electrochemical impedance spectroscopy (PEIS).
+
+        Maps the I/E/Bandwidth range enums and dispatches a
+        :class:`BiologicExec` configured with :data:`TECH_PEIS`.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "PEIS"
         active.action.action_params["IRange"] = EC_IRange_map[
@@ -514,7 +572,11 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         TTLsend: int = -1,
         TTLduration: float = 1.0,
     ):
-        """run Galvanostataic EIS"""
+        """Run galvanostatic electrochemical impedance spectroscopy (GEIS).
+
+        Maps the I/E/Bandwidth range enums and dispatches a
+        :class:`BiologicExec` configured with :data:`TECH_GEIS`.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "GEIS"
         active.action.action_params["IRange"] = EC_IRange_map[
@@ -554,10 +616,12 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         alert_sleep__s: float = -1,
         alertThreshI_A: float = 0,
     ):
-        """Chronoamperometry (current response on amplied potential)
-        use 4bit bitmask for triggers
-        IErange depends on biologic model used
-        (test actual limit before using)"""
+        """Run a CA step followed by an OCV recovery, interleaved per pair.
+
+        Iterates the ``CA_Vval__V_list`` / ``CA_Tval__s_list`` lists; maps the
+        CA I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
+        configured with :data:`TECH_CAOCV`.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CAOCV"
         active.action.action_params["CA_AcqInterval__A"] = 10.0
@@ -575,7 +639,19 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the Biologic potentiostat FastAPI app.
+
+    Constructs a :class:`BaseAPI` backed by :class:`BiologicDriver`, defers
+    technique endpoint registration to :func:`biologic_dyn_endpoints`, and adds
+    the ``get_meas_status``, ``stop`` and private ``stop_private`` routes.
+
+    Args:
+        server_key: Key identifying this server in the orchestration group.
+
+    Returns:
+        The configured :class:`BaseAPI` application.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -588,8 +664,11 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/get_meas_status", tags=["action"])
     async def get_meas_status(action: Action = Body({}, embed=True)):
-        """Will return 'idle' or 'measuring'.
-        Should be used in conjuction with eta to async.sleep loop poll"""
+        """Report the dtaq sink status (e.g. ``idle``/``measuring``).
+
+        Intended for use alongside an estimated ETA in an
+        ``asyncio.sleep``-based polling loop.
+        """
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict={"status": app.driver.dtaqsink.status})
         finished_action = await active.finish()
@@ -601,7 +680,7 @@ def makeApp(server_key):
         action_version: int = 1,
         channel: Optional[int] = None,
     ):
-        """Stops measurement in a controlled way."""
+        """Stop the measurement on ``channel`` via :meth:`BiologicDriver.stop`."""
         active = await app.base.setup_and_contain_action(action_abbr="stop")
         app.driver.stop(active.action.action_params["channel"])
         finished_action = await active.finish()
@@ -609,7 +688,7 @@ def makeApp(server_key):
 
     @app.post("/stop_private", tags=["private"])
     def stop_private(channel: Optional[int] = None):
-        """Stops measurement."""
+        """Internal counterpart to ``stop`` (no action record)."""
         app.driver.stop(channel)
 
     return app

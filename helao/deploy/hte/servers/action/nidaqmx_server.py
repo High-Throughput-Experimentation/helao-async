@@ -1,3 +1,13 @@
+"""FastAPI action server for an NI DAQmx instrument.
+
+Wraps :class:`cNIMAX` and the :class:`DevMonExec` executor and dynamically
+exposes digital-output endpoints for each populated device group declared
+in ``server_params`` (mastercell, activecell, pump, gasvalve, liquidvalve,
+multivalve, led, fswbcd, heater) plus digital-input endpoints for foot
+switches, multi-cell IV measurement, monitor acquisition, and a
+temperature-controlled heat loop.
+"""
+
 __all__ = ["makeApp"]
 
 # NIdaqmx server
@@ -32,7 +42,19 @@ from helao.helpers.premodels import Action
 from helao.core.error import ErrorCodes
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the BaseAPI app for the NI DAQmx server.
+
+    Reads device group dictionaries from ``server_params`` and only registers
+    endpoint families whose corresponding mapping is non-empty.
+
+    Args:
+        server_key: Unique key identifying this server in the orchestration
+            group.
+
+    Returns:
+        The configured BaseAPI instance.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -95,6 +117,17 @@ def makeApp(server_key):
             cell: dev_mastercellitems = None,
             on: bool = True,
         ):
+            """Toggle the digital line wired to the chosen master cell.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                cell: Master cell identifier from ``dev_mastercell``.
+                on: Output level to apply.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="mcell")
             # some additional params in order to call the same driver functions
             # for all DO actions
@@ -119,6 +152,17 @@ def makeApp(server_key):
             cell: dev_activecellitems = None,
             on: bool = True,
         ):
+            """Toggle the digital line wired to the chosen active cell.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                cell: Active cell identifier from ``dev_activecell``.
+                on: Output level to apply.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="acell")
             # some additional params in order to call the same driver functions
             # for all DO actions
@@ -143,6 +187,17 @@ def makeApp(server_key):
             pump: dev_pumpitems = None,
             on: bool = True,
         ):
+            """Toggle the digital line wired to the chosen pump.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                pump: Pump identifier from ``dev_pump``.
+                on: Output level to apply.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="pump")
             # some additional params in order to call the same driver functions
             # for all DO actions
@@ -167,6 +222,17 @@ def makeApp(server_key):
             gasvalve: dev_gasvalveitems = None,
             on: bool = True,
         ):
+            """Toggle the digital line wired to the chosen gas valve.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                gasvalve: Gas valve identifier from ``dev_gasvalve``.
+                on: Output level to apply.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="gfv")
             # some additional params in order to call the same driver functions
             # for all DO actions
@@ -193,6 +259,17 @@ def makeApp(server_key):
             liquidvalve: dev_liquidvalveitems = None,
             on: bool = True,
         ):
+            """Toggle the digital line wired to the chosen liquid valve.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                liquidvalve: Liquid valve identifier from ``dev_liquidvalve``.
+                on: Output level to apply.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="lfv")
             # some additional params in order to call the same driver functions
             # for all DO actions
@@ -219,6 +296,17 @@ def makeApp(server_key):
             multivalve: dev_multivalveitems = None,
             on: bool = True,
         ):
+            """Toggle the digital line wired to the chosen multi-port valve.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                multivalve: Valve identifier from ``dev_multivalve``.
+                on: Output level to apply.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="lfv")
             # some additional params in order to call the same driver functions
             # for all DO actions
@@ -245,6 +333,17 @@ def makeApp(server_key):
             led: dev_leditems = None,
             on: bool = True,
         ):
+            """Toggle the digital line wired to the chosen LED.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                led: LED identifier from ``dev_led``.
+                on: Output level to apply.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="led")
             # some additional params in order to call the same driver functions
             # for all DO actions
@@ -269,6 +368,17 @@ def makeApp(server_key):
             fswbcd: dev_fswbcditems = None,
             on: bool = True,
         ):
+            """Toggle the digital line wired to a foot-switch BCD output.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                fswbcd: Output identifier from ``dev_fswbcd``.
+                on: Output level to apply.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="fswbcd")
             # some additional params in order to call the same driver functions
             # for all DO actions
@@ -294,6 +404,16 @@ def makeApp(server_key):
             action_version: int = 1,
             fsw: dev_fswitems = None,
         ):
+            """Read the digital input wired to the chosen foot switch.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                fsw: Foot switch identifier from ``dev_fsw``.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="fsw")
             # some additional params in order to call the same driver functions
             # for all DI actions
@@ -322,11 +442,22 @@ def makeApp(server_key):
             SampleRate: int = Query(1.0, ge=1),
             TTLwait: int = -1,  # -1 disables, else select TTL channel
         ):
-            """Runs multi cell IV measurement.
+            """Run a synchronised multi-cell current/voltage measurement.
+
+            Delegates to ``driver.run_cell_IV`` which streams I and V samples
+            for every configured cell channel.
+
             Args:
-                 SampleRate: samples per second
-                 Tval: time of measurement in seconds
-                 TTLwait: trigger channel, -1 disables, else select TTL channel"""
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                fast_samples_in: Sample references associated with this action.
+                Tval: Total measurement duration in seconds.
+                SampleRate: Samples per second per channel; must be >= 1.
+                TTLwait: Trigger channel to wait on; ``-1`` disables waiting.
+
+            Returns:
+                The active action dictionary returned by the driver.
+            """
             A = app.base.setup_action()
             A.action_abbr = "multiCV"
             active_dict = await app.driver.run_cell_IV(A)
@@ -344,7 +475,20 @@ def makeApp(server_key):
                 Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
             ] = Body([], embed=True),
         ):
-            """Record NIMax monitor device channels."""
+            """Start a :class:`DevMonExec` to stream NI monitor channels.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                duration: Acquisition duration in seconds; negative runs until
+                    cancelled.
+                acquisition_rate: Polling period in seconds passed to the
+                    executor.
+                fast_samples_in: Sample references associated with this action.
+
+            Returns:
+                The active action dictionary from ``start_executor``.
+            """
             active = await app.base.setup_and_contain_action()
             active.action.action_abbr = "ni_monitor"
             executor = DevMonExec(
@@ -360,7 +504,15 @@ def makeApp(server_key):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
         ):
-            """Stop NIMax monitor acquisition."""
+            """Stop any running ``acquire_monitors`` executor.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action()
             for exec_id, executor in app.base.executors.items():
                 if exec_id.split()[0] == "acquire_monitors":
@@ -370,7 +522,11 @@ def makeApp(server_key):
 
         @app.post("/readtemp", tags=["private"])
         async def readtemp():
-            """Runs temp measurement.  T and S thermocouples"""
+            """Read configured T-type and S-type thermocouple channels.
+
+            Returns:
+                The thermocouple dictionary produced by ``driver.read_T``.
+            """
             tempread = {}
             tempread = await app.driver.read_T()
             print(tempread)
@@ -385,6 +541,17 @@ def makeApp(server_key):
             heater: dev_heatitems = None,
             on: bool = True,
         ):
+            """Toggle the digital line wired to the chosen heater.
+
+            Args:
+                action: Action wrapper supplied by the orchestrator.
+                action_version: Schema version for this endpoint.
+                heater: Heater identifier from ``dev_heat``.
+                on: Output level to apply.
+
+            Returns:
+                The finished action dictionary.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="heat")
             # some additional params in order to call the same driver functions
             # for all DO actions
@@ -406,6 +573,7 @@ def makeApp(server_key):
 
         @app.post("/monloop", tags=["private"])
         async def monloop():
+            """Run the driver's blocking monitor loop until ``stop_monitor``."""
             # A =  app.base.setup_action()
             A = await app.driver.monitorloop()
 
@@ -419,6 +587,19 @@ def makeApp(server_key):
             reservoir2_min_C: float = 84.5,
             reservoir2_max_C: float = 85.5,
         ):
+            """Drive heater channels to keep cell and reservoir in temperature.
+
+            Delegates to ``driver.Heatloop`` which toggles configured heater
+            outputs based on thermocouple readings until ``duration_hrs``
+            elapses or :func:`heatloopstop` is invoked.
+
+            Args:
+                duration_hrs: Run duration in hours.
+                celltemp_min_C: Lower bound for the cell thermocouple.
+                celltemp_max_C: Upper bound for the cell thermocouple.
+                reservoir2_min_C: Lower bound for the reservoir thermocouple.
+                reservoir2_max_C: Upper bound for the reservoir thermocouple.
+            """
             # A =  app.base.setup_action()
             A = await app.driver.Heatloop(
                 duration_h=duration_hrs,
@@ -470,10 +651,12 @@ def makeApp(server_key):
 
         @app.post("/stopmonloop", tags=["private"])
         async def monloopstop():
+            """Signal the driver's monitor loop to exit."""
             app.driver.stop_monitor()
 
         @app.post("/stopheatloop", tags=["private"])
         async def heatloopstop():
+            """Signal the driver's heat loop to exit."""
             app.driver.stop_heatloop()
 
     @app.post(f"/{server_key}/stop", tags=["action"])
@@ -481,7 +664,15 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stops measurement in a controlled way."""
+        """Stop driver activity in a controlled way and record the result.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="stop")
         await active.enqueue_data_dflt(datadict={"stop": await app.driver.stop()})
         finished_act = await active.finish()

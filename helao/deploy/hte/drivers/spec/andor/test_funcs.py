@@ -1,3 +1,13 @@
+"""Standalone exploratory script for the Andor camera/spectrograph stack.
+
+Runs an end-to-end smoke test of the Andor SDK3 camera and ATSpectrograph
+helpers: cool, set up the spectrograph, acquire a single image, optimise
+the ND filter, run a timed acquisition burst and an SEC acquisition, then
+warm down.
+
+Importing this file executes the test sequence at module scope.
+"""
+
 from pyAndorSDK3 import AndorSDK3
 from collections import deque
 import numpy as np
@@ -14,9 +24,15 @@ cam = sdk3.GetCamera(0)
 
 
 def cool(cam):
-    """This function cools the camera to 20 degrees C below ambient temperature. The camera will not warm untill told unless cam.close() is called.
-    The function will wait until the camera is at the target temperature before returning.
-        args: cam: AndorSDK3 object
+    """Enable sensor cooling and block until the temperature stabilises.
+
+    Polls every 5 s and raises if the camera reports a temperature fault.
+
+    Args:
+        cam: ``AndorSDK3`` camera object.
+
+    Raises:
+        RuntimeError: When ``cam.TemperatureStatus`` becomes ``Fault``.
     """
     cam.SensorCooling = True
     while cam.TemperatureStatus != "Stabilised":
@@ -28,10 +44,15 @@ def cool(cam):
             raise RuntimeError(err_str)
 
 
-def setup_image(cam, exposure_time=0.0098):
-    """This function sets up the camera to take a single image with the desired framerate and exposure time. It returns the pixel width of the camera
-    Which is used to convert pixels to wavelengths in the spectrograph fucntions. Start with framerate is 100 Hz and exposure time is 9.8 ms.
-    args: cam: camera object, framerate: desired framerate , exposure_time: desired exposure time defaults are max values for the camera
+def setup_image(cam, exposure_time=0.0098) -> float:
+    """Configure the camera for a single, vertical-bin=1 image acquisition.
+
+    Args:
+        cam: ``AndorSDK3`` camera object.
+        exposure_time: Exposure time in seconds.
+
+    Returns:
+        Detector pixel width used for spectrograph calibration.
     """
     cam.AOIVBin = 1  # readout on a single row
     cam.SimplePreAmpGainControl = "16-bit (low noise & high well capacity)"
@@ -52,14 +73,19 @@ def setup_image(cam, exposure_time=0.0098):
     return cam.PixelWidth
 
 
-def image_and_check_dynamic_range(cam, WL=[], exposure_time=0.0098):
-    """This function collects a single image and checks that the maximum value is in the optimum dynamic range for the measurment.
-    It returns the image, the maximum pixel value and a boolean that is true if the maximum value is in the optimum dynamic range
-    defined by the range 65536-55536.
-    An optimality value is calculated as 1- the absolute difference between the maximum value and an approximate optimum max value of 63000, normalised by 63000.
-    An optimality close to 1 indicates that the maximum value is close to the optimum value.
-    An optimality that is negative indicates that the source is too bright.  To search for the optimum value, the range bool and the optimality value can be used together.
-    args: cam: AndorSDK3 object
+def image_and_check_dynamic_range(cam, WL=[], exposure_time=0.0098) -> tuple:
+    """Acquire one image, plot it and evaluate dynamic-range optimality.
+
+    The optimality value is ``1 + |63000 - max| / 63000``. The range bool is
+    ``True`` when the maximum pixel lies in ``[55536, 65536)``.
+
+    Args:
+        cam: ``AndorSDK3`` camera object.
+        WL: Optional wavelength array used to label the plot x-axis.
+        exposure_time: Exposure time in seconds.
+
+    Returns:
+        ``(acquisition, max_pixel, range_bool, optimality)``.
     """
     _ = setup_image(cam, exposure_time)
     print(cam.SerialNumber)
@@ -78,10 +104,14 @@ def image_and_check_dynamic_range(cam, WL=[], exposure_time=0.0098):
     return test, max, range_bool, optimality
 
 
-def GetMetaData(cam):
-    """This function gets the metadata from the camera and prints it to the console.
-    It returns the width, height and stride of the image, this is used later to convert pixels to wavelengths in the spectrograph functions.
-    The clock frequency is also returned, which is used to convert the timestamp ticks to seconds.
+def GetMetaData(cam) -> tuple:
+    """Enable metadata, acquire one image and print/return key frame fields.
+
+    Args:
+        cam: ``AndorSDK3`` camera object.
+
+    Returns:
+        ``(width, height, stride, timestamp_clock_frequency_hz)``.
     """
     cam.MetadataEnable = True  # Turn on Metadata
     setup_image(cam)
@@ -130,10 +160,18 @@ def GetMetaData(cam):
 
 def SetupSpectroscope(
     PixelWidth, centralWL=672.26, NumHorizPixels=2560, ND_filer_num=1, slit_width_um=10
-):
-    """
-    This functionsets up the spectrograph with standard parameters as default.
+) -> np.ndarray:
+    """Initialise the spectrograph with standard parameters and return WLs.
 
+    Args:
+        PixelWidth: Detector pixel width.
+        centralWL: Central wavelength in nm.
+        NumHorizPixels: Number of horizontal pixels in the AOI.
+        ND_filer_num: ND filter position in ``1..6``.
+        slit_width_um: Slit width in micrometres (``10..100``).
+
+    Returns:
+        Calibrated wavelength array, or ``None`` if arguments are out of range.
     """
     ## the return from GetWavelengthLimits looks weird to me :Wavelength Min: 0.0 Wavelength Max: 11127.045898
     # everything else looks fine and will get calibrated in the next block
@@ -228,7 +266,19 @@ def SetupSpectroscope(
         return WL_array
 
 
-def adjust_ND(cam, WL_arr):
+def adjust_ND(cam, WL_arr) -> tuple:
+    """Sweep ND filter positions 1..6 and pick the most optimal one.
+
+    Discards positions whose maximum pixel exceeds 54000, then applies the
+    filter with the best optimality value.
+
+    Args:
+        cam: ``AndorSDK3`` camera object.
+        WL_arr: Wavelength array used for plotting in the sweep.
+
+    Returns:
+        ``(max_array, optimality_array, ND_filter_num)``.
+    """
 
     # Load libraries
     spc = ATSpectrograph()
@@ -329,8 +379,15 @@ def adjust_ND(cam, WL_arr):
 
 
 def setup_SEC_aquisition(cam, exp_time=0.0098, framerate=98):
-    """This function sets the camera up for a continous aquisition at the fastest rate using the complete AOI which is 10 ms exposure time
-    args: cam: AndorSDK3 object
+    """Configure full-AOI continuous acquisition triggered by external 5 V TTL.
+
+    Uses rolling shutter with overlap mode, 280 MHz readout and continuous
+    cycle mode.
+
+    Args:
+        cam: ``AndorSDK3`` camera object.
+        exp_time: Exposure time in seconds.
+        framerate: Target framerate in Hz.
     """
     cam.TriggerMode = "External Start"  # external start will start the camera upon 5V TTL signal. The camera will then aquire as fast as possible
     cam.AOIVBin = 2160  # full verrtical binning over the  AOI
@@ -357,13 +414,21 @@ def setup_SEC_aquisition(cam, exp_time=0.0098, framerate=98):
 
 def test_aquisition(
     cam, frame_count, timeout, buffer_count=10
-):  # curently working with external trigger and a fixed nymber of aquisitions
-    """This function runs a fixed number of aquisitions so the timing of the aquisition can be tested.
-    It returns a breakdown of times taken for each step of the aquisition.
-    args: cam: AndorSDK3 object,
-    frame_count: number of frames to aquire,
-    timeout: time to wait in for a buffer to be filled in ms for the timeout to be activated,
-     buffer_count: number of buffers to create, 10 is default
+) -> tuple:  # curently working with external trigger and a fixed nymber of aquisitions
+    """Run a fixed-count acquisition while recording per-step timings.
+
+    Returns a ``DataFrame`` of triggering/buffer-wait/queue times so that
+    acquisition overhead can be profiled.
+
+    Args:
+        cam: ``AndorSDK3`` camera object.
+        frame_count: Number of frames to acquire.
+        timeout: Buffer-fill timeout in milliseconds.
+        buffer_count: Number of buffers to pre-queue.
+
+    Returns:
+        ``(acqs, times_df, measurement_time)`` or ``(None, None, None)`` if
+        the camera is in fixed cycle mode.
     """
 
     if (
@@ -453,13 +518,18 @@ def test_aquisition(
     return acqs, times, measurment_time
 
 
-def SEC_aquisition(cam, frame_count, timeout, buffer_count=10):
-    """This function runs a fixed number of aquisitions upon recipt of external trigger.
-    It returns a breakdown of times taken for each step of the aquisition.
-    args: cam: AndorSDK3 object,
-    frame_count: number of frames to aquire,
-    timeout: time to wait in for a buffer to be filled in ms for the timeout to be activated,
-     buffer_count: number of buffers to create, 10 is default
+def SEC_aquisition(cam, frame_count, timeout, buffer_count=10) -> tuple:
+    """Run a fixed-count acquisition started by the external trigger.
+
+    Args:
+        cam: ``AndorSDK3`` camera object.
+        frame_count: Number of frames to acquire.
+        timeout: Buffer-fill timeout in milliseconds.
+        buffer_count: Number of buffers to pre-queue.
+
+    Returns:
+        ``(acqs,)`` deque of acquisitions, or ``(None, None, None)`` if the
+        camera is in fixed cycle mode.
     """
 
     if (
@@ -534,8 +604,19 @@ def SEC_aquisition(cam, frame_count, timeout, buffer_count=10):
 
 
 def WarmAndClose(cam, WarmupBool):
-    """
-    This function warms the camera back up and closes the connection to the camera. Warmup will only occur if the WarmupBool is set to True.
+    """Optionally warm the camera back up, then close the SDK handle.
+
+    When ``WarmupBool`` is ``True``, disables cooling and polls until the
+    sensor reaches at least 20 C with a stable status before calling
+    ``cam.close()``.
+
+    Args:
+        cam: ``AndorSDK3`` camera object.
+        WarmupBool: Whether to perform the warm-up before closing.
+
+    Raises:
+        RuntimeError: If the camera reports a temperature fault during
+            warm-up.
     """
     if WarmupBool == True:
         cam.SensorCooling = False
@@ -552,12 +633,12 @@ def WarmAndClose(cam, WarmupBool):
 
 
 def process_timings(timez, measurment_time):
-    """This function takes the times dataframe of the test_aquisition function and plots up the time taken for each step of the aquisition
-    args:
-    timez: dataframe of the test_aquisition function
-    measurment_time: total time taken for the aquisition
+    """Plot per-step and aggregated timings produced by :func:`test_aquisition`.
 
-
+    Args:
+        timez: DataFrame returned by :func:`test_aquisition` with triggering,
+            buffer-wait and queue times.
+        measurment_time: Total measurement time in seconds.
     """
     # Create a figure and a 2-frame subplot
     fig, axs = plt.subplots(2)
@@ -605,9 +686,16 @@ def process_timings(timez, measurment_time):
     plt.tight_layout()
 
 
-def generate_spectral_array(WL_arr, acqs, clockHz):
-    """This function takes an aquisition object, the wavelength array and the camera clock speed and returns a dataframe of spectra
-    args: WL_arr: wavelength array, acqs: aquisition object, clockHz: camera clock speed
+def generate_spectral_array(WL_arr, acqs, clockHz) -> pd.DataFrame:
+    """Stack acquisitions into a wavelength-vs-time spectra DataFrame.
+
+    Args:
+        WL_arr: Wavelength array (DataFrame index).
+        acqs: Container of acquisition objects.
+        clockHz: Camera timestamp clock frequency in Hz.
+
+    Returns:
+        DataFrame of spectra indexed by wavelength, columns by tick time.
     """
 
     acqs = list(acqs[0])

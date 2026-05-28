@@ -1,3 +1,5 @@
+"""Helpers for resolving HELAO version strings and source-file git hashes."""
+
 from fsspec.implementations.http import ex
 import os
 import inspect
@@ -8,8 +10,8 @@ from socket import gethostname
 __all__ = ["hlo_version", "get_hlo_version"]
 
 
-def get_branch_commithash():
-    """Return current git branch and commit hash."""
+def get_branch_commithash() -> tuple:
+    """Return ``(branch, short_commit_hash)`` of the working tree, or ``("", "")`` on failure."""
     try:
         command = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
         branch = (
@@ -28,7 +30,8 @@ def get_branch_commithash():
         return "", ""
 
 
-def get_filehash(filename: str):
+def get_filehash(filename: str) -> str:
+    """Return the short git hash of the last commit that touched `filename`, or ``""`` on failure."""
     try:
         filename = os.path.abspath(filename)
         parent_dir = os.path.dirname(filename)
@@ -46,16 +49,20 @@ def get_filehash(filename: str):
     except Exception:
         return ""
 
-def get_hlo_version():
-    """Return hard-coded HELAO release version."""
+def get_hlo_version() -> str:
+    """Return the HELAO version string.
+
+    Uses the current short git commit hash when available, falling back to
+    ``{hostname}_{YYMMDD}``.
+    """
     try:
         return get_branch_commithash()[1]
     except Exception:
         return f"{gethostname()}_{datetime.now().strftime('%y%m%d')}"
 
 
-def get_caller_filehash():
-    """Return short git hash and filename of calling frame."""
+def get_caller_filehash() -> tuple:
+    """Return ``(short_hash, filename)`` for the immediate caller's source file."""
     try:
         caller_frame = inspect.stack()[1]
         caller_filename_full = caller_frame.filename
@@ -65,8 +72,8 @@ def get_caller_filehash():
         return "", ""
 
 
-def get_object_filehash(obj):
-    """Return short git hash and source file of object."""
+def get_object_filehash(obj) -> tuple:
+    """Return ``(short_hash, filename)`` for the source file that defines `obj`."""
     try:
         filename = inspect.getabsfile(obj)
         short_hash = get_filehash(filename)

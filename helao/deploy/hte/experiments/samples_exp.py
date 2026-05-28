@@ -1,3 +1,5 @@
+"""Sample bookkeeping experiments: create/load PAL samples and orch waits."""
+
 __all__ = [
     "create_liquid_sample",
     "create_gas_sample",
@@ -48,9 +50,26 @@ def create_liquid_sample(
     electrolyte_name: str = "name",
     prep_date: str = "2000-01-01",
     comment: str = "comment",
-):
-    """creates a custom liquid sample
-    input fields contain json strings"""
+) -> list:
+    """Register a new custom liquid sample in the PAL sample database.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        volume_ml: Sample volume in millilitres.
+        source: List of source labels for the constituents.
+        partial_molarity: Per-constituent partial molarity strings.
+        chemical: Per-constituent chemical identifier strings.
+        ph: Solution pH.
+        supplier: Per-constituent supplier strings.
+        lot_number: Per-constituent lot-number strings.
+        electrolyte_name: Electrolyte name recorded with the sample.
+        prep_date: Preparation date (ISO date string).
+        comment: Free-form comment.
+
+    Returns:
+        List with a single PAL ``db_new_samples`` action creating the entry.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
@@ -91,9 +110,24 @@ def create_gas_sample(
     lot_number: List[str] = ["lot1", "lot2"],
     prep_date: str = "2000-01-01",
     comment: str = "comment",
-):
-    """creates a custom gas sample
-    input fields contain json strings"""
+) -> list:
+    """Register a new custom gas sample in the PAL sample database.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        volume_ml: Sample volume in millilitres.
+        source: Source labels for the gas constituents.
+        partial_molarity: Per-constituent partial molarity strings.
+        chemical: Per-constituent chemical identifier strings.
+        supplier: Per-constituent supplier strings.
+        lot_number: Per-constituent lot-number strings.
+        prep_date: Preparation date (ISO date string).
+        comment: Free-form comment.
+
+    Returns:
+        List with a single PAL ``db_new_samples`` action creating the entry.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
@@ -135,15 +169,27 @@ def create_assembly_sample(
     # supplier: List[str] = ["supplier1","supplier2"],
     # lot_number: List[str] = ["lot1","lot2"],
     comment: str = "comment",
-):
-    """creates a custom assembly sample
-    from local samples
-    input fields contain json strings
+) -> list:
+    """Build a PAL assembly sample from existing liquid/gas/solid sample numbers.
+
+    Looks up each constituent in the local PAL database, combines them into
+    one ``AssemblySample`` payload, and registers the assembly via PAL
+    ``db_new_samples``. Returns early with an empty list when the
+    ``solid_plate_ids`` and ``solid_sample_nos`` lengths disagree.
+
     Args:
-        liquid_sample_nos: liquid sample numbers from local liquid sample db
-        gas_sample_nos: liquid sample numbers from local gas sample db
-        solid_plate_ids: plate ids
-        solid_sample_nos: sample_no on plate (one plate_id for each sample_no)
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        liquid_sample_nos: Liquid sample numbers from the local liquid db.
+        gas_sample_nos: Gas sample numbers from the local gas db.
+        solid_plate_ids: Plate ids paired with ``solid_sample_nos``.
+        solid_sample_nos: Sample numbers on the matching plates.
+        volume_ml: Assembly volume in millilitres.
+        comment: Free-form comment.
+
+    Returns:
+        List with a single PAL ``db_new_samples`` action, or an empty plan when
+        the solid id/sample-no lists are mismatched.
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # check first
@@ -205,8 +251,17 @@ def sort_plate_sample_no_list(
     experiment: Experiment,
     experiment_version: int = 1,
     plate_sample_no_list: list = [2],
-):
-    """tbd"""
+) -> list:
+    """Placeholder that returns an empty plan; reserved for plate-sample sorting.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        plate_sample_no_list: Plate sample numbers (currently unused).
+
+    Returns:
+        Empty list of planned actions.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -226,7 +281,23 @@ def generate_sample_no_list(
     platemap_xys: List[Tuple[int, int]] = [(None, None)],
     platemap_xys_operator: str = "",
 ):
-    """tbd"""
+    """Queue a PAL ``generate_plate_sample_no_list`` action for a plate.
+
+    Note:
+        This function currently does not return ``apm.planned_actions``.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        plate_id: Plate id to enumerate.
+        sample_code: Sample code filter passed to PAL.
+        skip_n_samples: Number of samples to skip in the resulting list.
+        direction: Optional traversal direction hint (unused; PAL-side).
+        sample_nos: Optional explicit sample-number filter (unused; PAL-side).
+        sample_nos_operator: Combinator for ``sample_nos`` (unused).
+        platemap_xys: Optional XY filter pairs (unused; PAL-side).
+        platemap_xys_operator: Combinator for ``platemap_xys`` (unused).
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -254,7 +325,21 @@ def load_liquid_sample(
     tray: int = 0,
     slot: int = 0,
     vial: int = 0,
-):
+) -> list:
+    """Load an existing liquid sample into a PAL tray/slot/vial position.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        liquid_sample_no: Sample number to load.
+        machine_name: Machine the sample is registered against.
+        tray: PAL tray index.
+        slot: PAL slot index within the tray.
+        vial: PAL vial index within the slot.
+
+    Returns:
+        List with a single PAL ``archive_tray_load`` action.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     liquid = LiquidSample(sample_no=liquid_sample_no, machine_name=machine_name)
@@ -284,9 +369,33 @@ def create_and_load_liquid_sample(
     tray: int = 0,
     slot: int = 0,
     vial: int = 0,
-):
-    """creates a custom liquid sample
-    input fields contain json strings"""
+) -> list:
+    """Create a new liquid sample and immediately load it into a PAL vial.
+
+    Registers the sample via PAL ``db_new_samples``, captures the returned
+    sample number, then runs PAL ``archive_tray_load`` to deposit it in the
+    chosen tray/slot/vial.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        volume_ml: Sample volume in millilitres.
+        source: List of source labels.
+        partial_molarity: Per-constituent partial molarity strings.
+        chemical: Per-constituent chemical identifier strings.
+        ph: Solution pH.
+        supplier: Per-constituent supplier strings.
+        lot_number: Per-constituent lot-number strings.
+        electrolyte_name: Electrolyte label recorded on the sample.
+        prep_date: Preparation date (ISO date string).
+        comment: Free-form comment.
+        tray: PAL tray index for loading.
+        slot: PAL slot index within the tray.
+        vial: PAL vial index within the slot.
+
+    Returns:
+        List of PAL ``db_new_samples`` and ``archive_tray_load`` actions.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
@@ -328,7 +437,17 @@ def orch_sub_wait(
     experiment: Experiment,
     experiment_version: int = 2,
     wait_time_s: float = 10,
-):
+) -> list:
+    """Ask the orchestrator to pause for ``wait_time_s`` seconds.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        wait_time_s: Wait duration in seconds.
+
+    Returns:
+        List with a single ORCH ``wait`` action.
+    """
     apm = ActionPlanMaker()
 
     apm.add(ORCH_server, "wait", {"waittime": wait_time_s})

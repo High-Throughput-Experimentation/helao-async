@@ -14,26 +14,31 @@ from pydasher.serialization import hasher
 
 
 class BaseAnalysis:
-    """
-    BaseAnalysis class for handling analysis data and exporting results.
+    """Common base for analysis classes that target a single HELAO process.
+
+    Concrete subclasses fill in the declared attributes (name, params, the
+    process being analyzed, the input/output containers) and rely on this
+    base for deterministic UUID generation and S3 export packaging.
+
     Attributes:
-        analysis_name (str): Name of the analysis.
-        analysis_timestamp (datetime): Timestamp of the analysis.
-        analysis_uuid (UUID): Unique identifier for the analysis.
-        analysis_params (dict): Parameters for the analysis.
-        process_uuid (UUID): Unique identifier for the process.
-        process_timestamp (datetime): Timestamp of the process.
-        process_name (str): Name of the process.
-        run_type (str): Type of the run.
-        technique_name (str): Name of the technique used.
-        inputs (AnalysisInput): Input data for the analysis.
-        outputs (BaseModel): Output data from the analysis.
-        analysis_codehash (str): Hash of the analysis code.
-    Methods:
-        gen_uuid(global_sample_label: Optional[str] = None) -> UUID:
-            Generates a unique identifier for the analysis based on input data models and parameters.
-        export_analysis(bucket: str, region: str, dummy: bool = True, global_sample_label: Optional[str] = None) -> Tuple[dict, dict]:
-            Exports the analysis results to a specified S3 bucket and returns the analysis model and outputs.
+        analysis_name: Human-readable analysis identifier.
+        analysis_timestamp: When the analysis ran.
+        analysis_uuid: Stable UUID derived from inputs/params/codehash.
+        analysis_params: Parameter dict the analysis was invoked with.
+        process_uuid: UUID of the source process.
+        process_timestamp: Timestamp of the source process.
+        process_name: Name of the source process.
+        run_type: Run classification (e.g. data, calibration).
+        run_use: Run-use enum value used for input matching.
+        technique_name: Technique name from the source process.
+        analysis_codehash: Hash of the analysis source.
+        analysis_codepath: Filesystem path to the analysis module.
+        analysis_classname: Class name of the concrete analysis.
+        analysis_action_uuid: Optional originating action UUID.
+        campaign_name: Optional campaign label.
+        campaign_uuid: Optional campaign UUID.
+        inputs: Input data container.
+        outputs: Output data container.
     """
 
     analysis_name: str
@@ -55,23 +60,20 @@ class BaseAnalysis:
     inputs: AnalysisInput
     outputs: AnalysisOutput
 
-    def gen_uuid(self, global_sample_label: Optional[str] = None):
-        """
-        Generates a UUID for the analysis based on various attributes.
+    def gen_uuid(self, global_sample_label: Optional[str] = None) -> UUID:
+        """Derive a stable analysis UUID from analysis identity and inputs.
 
-        Parameters:
-        global_sample_label (Optional[str]): A label for the global sample. If not provided,
-                             it will be derived from the input data models.
+        The UUID is the deterministic hash of ``analysis_name``,
+        ``analysis_params``, ``process_uuid``, the resolved
+        ``global_sample_label``, ``analysis_codehash``, and ``run_use``.
+
+        Args:
+            global_sample_label: Sample label to include in the hash. When
+                None, the first input data model with ``run_use == data`` is
+                used.
 
         Returns:
-        UUID: A unique identifier generated from the hash representation of the analysis attributes.
-
-        The UUID is generated using a hash representation that includes:
-        - analysis_name: The name of the analysis.
-        - analysis_params: The parameters of the analysis.
-        - process_uuid: The UUID of the process.
-        - global_sample_label: The global sample label.
-        - analysis_codehash: The hash of the analysis code.
+            The hashed UUID.
         """
         input_data_models = self.inputs.get_datamodels(global_sample_label)
         if global_sample_label is None:
@@ -94,28 +96,22 @@ class BaseAnalysis:
         region: str,
         dummy: bool = True,
         global_sample_label: Optional[str] = None,
-    ):
-        """
-        Export the analysis results to a structured format.
+    ) -> tuple:
+        """Package the analysis into an ``AnalysisModel`` + raw outputs dict.
+
+        Output values are split into a ``scalar`` and an ``array`` group, each
+        wrapped in an ``AnalysisOutputModel`` pointing at the S3 key
+        ``analysis/<uuid>_output_<group>.json`` in ``bucket``/``region``.
 
         Args:
-            bucket (str): The S3 bucket where the analysis output will be stored.
-            region (str): The AWS region where the S3 bucket is located.
-            dummy (bool, optional): A flag indicating whether this is a dummy run. Defaults to True.
-            global_sample_label (Optional[str], optional): A label for the global sample. Defaults to None.
+            bucket: S3 bucket where outputs will be stored.
+            region: AWS region for the bucket.
+            dummy: Mark the produced model as a dummy run.
+            global_sample_label: Sample label override; resolved from inputs
+                when None.
 
         Returns:
-            Tuple[Dict, Dict]: A tuple containing the cleaned analysis model dictionary and the outputs model dump.
-
-        Raises:
-            ValueError: If the analysis does not contain any outputs.
-
-        Notes:
-            - The function retrieves input data models based on the global sample label.
-            - It categorizes the outputs into scalar and array outputs.
-            - It constructs output data models for each category and appends them to the output data models list.
-            - If no output data models are found, a message is printed indicating the absence of outputs.
-            - An AnalysisModel instance is created with the relevant details and returned as a cleaned dictionary along with the outputs model dump.
+            A ``(analysis_model_dict, outputs_dump)`` tuple.
         """
         input_data_models = self.inputs.get_datamodels(global_sample_label)
         if global_sample_label is None:

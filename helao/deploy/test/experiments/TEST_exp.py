@@ -1,6 +1,8 @@
-"""
-Experiment library for Orchestrator testing
-server_key must be a FastAPI action server defined in config
+"""Experiment library for exercising orchestrator scheduling features.
+
+Defines short experiments that combine ``wait``/``add_global_param``/
+``conditional_stop`` actions on the orchestrator itself to verify
+non-blocking dispatch and conditional sequence termination.
 """
 
 __all__ = ["TEST_sub_noblocking", "TEST_sub_conditional_stop"]
@@ -30,6 +32,19 @@ def TEST_sub_noblocking(
     wait_time: float = 3.0,
     dummy_param: float = 0.0,
 ):
+    """Build an experiment with a non-blocking wait followed by a blocking wait.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Library version tag.
+        wait_time: Base wait duration; the non-blocking wait uses 10x this.
+        dummy_param: Unused placeholder parameter exposed for sequence
+            wiring tests.
+
+    Returns:
+        The configured ``Experiment`` with an added
+        ``test_additional_param`` parameter.
+    """
     apm = ActionPlanMaker()
     apm.add(
         ORCH_server,
@@ -48,6 +63,18 @@ def TEST_sub_conditional_stop(
     experiment: Experiment,
     experiment_version: int = 1,
 ):
+    """Build an experiment that sets a global param and conditionally stops.
+
+    Sets ``global_test`` then calls ``conditional_stop`` to halt the
+    sequence before the trailing wait actions execute.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Library version tag.
+
+    Returns:
+        The configured ``Experiment``.
+    """
     apm = ActionPlanMaker()
     apm.add(
         ORCH_server,

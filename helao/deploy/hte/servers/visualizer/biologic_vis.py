@@ -42,9 +42,54 @@ VALID_ACTION_NAME = [k for k in AXIS_MAP.keys()]
 
 
 class C_biovis:
-    """potentiostat visualizer module class"""
+    """Bokeh visualizer for a multi-channel Biologic potentiostat server.
+
+    Subscribes to the action server's ``ws_data`` WebSocket and streams
+    per-channel time-series plots (active and previous run side-by-side) with
+    radio-button x/y selectors, a max-points input, and per-channel stop
+    buttons.
+
+    Attributes:
+        vis: Host :class:`Vis` instance providing the Bokeh document.
+        config_dict: ``params`` block from the visualizer's server config.
+        num_channels: Number of Biologic channels to render plots for.
+        max_points: Rolling window length per data source.
+        update_rate: Minimum seconds between WebSocket polls.
+        last_update_time: Epoch timestamp of the most recent poll.
+        potentiostat_key: Server key of the action server being visualized.
+        potserv_config: Mapping with ``host``/``port`` for the action server.
+        potserv_host: Action server hostname.
+        potserv_port: Action server port.
+        wss: :class:`WsSubscriber` connected to ``ws_data``.
+        data_url: Fully formed ``ws://`` URL for the data WebSocket.
+        IOloop_data_run: Liveness flag for the data ingestion task.
+        IOloop_stat_run: Liveness flag for the status ingestion task.
+        data_dict_keys: Keys streamed per channel data source.
+        channel_datasources: Live :class:`ColumnDataSource` per channel.
+        channel_datasources_prev: Snapshot of the prior run per channel.
+        channel_action_uuid: Current action UUID per channel.
+        channel_action_uuid_prev: Previous action UUID per channel.
+        layout: Composed Bokeh layout mounted on the document.
+        input_max_points: Widget setting ``max_points``.
+        xaxis_selector_group: Radio buttons selecting the x-axis variable.
+        yaxis_selector_group: Radio buttons selecting the y-axis variable.
+        channel_plots: Per-channel live ``figure`` objects.
+        channel_plots_prev: Per-channel prior-run ``figure`` objects.
+        stop_buttons: Per-channel danger buttons that abort the channel.
+        xselect: Cached active index of ``xaxis_selector_group``.
+        yselect: Cached active index of ``yaxis_selector_group``.
+        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Wire up data sources, widgets, plot layout, and start the WS ingest task.
+
+        Args:
+            vis_serv: Host :class:`Vis` server providing the Bokeh document.
+            serv_key: Configuration key of the Biologic action server to
+                subscribe to. If the server is not in the config, ``__init__``
+                returns early without registering any roots.
+        """
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.num_channels = self.config_dict.get("num_channels", 1)
@@ -193,16 +238,40 @@ class C_biovis:
             self.reset_plot(ch, forceupdate=True)
 
     def cleanup_session(self, session_context):
+        """Cancel the data ingest task when the Bokeh session is torn down.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.potentiostat_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def callback_selector_change(self, attr, old, new):
+        """Re-render every channel plot after the user picks new axes.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Previous selector index.
+            new: New selector index.
+        """
         for ch in self.channel_action_uuid:
             self.reset_plot(ch)
 
     def callback_input_max_points(self, attr, old, new, sender):
-        """callback for input_max_points"""
+        """Validate the ``max datapoints`` input and update the rolling window.
+
+        Parses ``new`` as an int, falls back to ``old`` (or ``500``) on bad
+        input, then clamps the result to ``[2, 10000]`` before storing it as
+        ``self.max_points`` and writing the normalized value back to the
+        input widget.
+
+        Args:
+            attr: Bokeh property name that changed (``"value"``).
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh with the clamped value.
+        """
 
         def to_int(val):
             try:
@@ -231,9 +300,21 @@ class C_biovis:
         )
 
     def update_input_value(self, sender, value):
+        """Write ``value`` back onto a Bokeh input widget on the document thread.
+
+        Args:
+            sender: Bokeh input widget whose ``value`` is being updated.
+            value: New string value to assign.
+        """
         sender.value = value
 
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+    async def IOloop_data(self):
+        """Continuously pull WebSocket data packages and schedule plot updates.
+
+        Runs for the lifetime of the Bokeh session. Each iteration honors
+        ``self.update_rate``, reads messages from the subscriber, and
+        schedules :meth:`add_points` on the document thread.
+        """
         LOGGER.info(f" ... potentiostat visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
@@ -243,6 +324,17 @@ class C_biovis:
             await asyncio.sleep(0.01)
 
     def add_points(self, datapackage_list: list):
+        """Stream a batch of incoming data packages into the per-channel sources.
+
+        Filters out packages whose ``status`` or ``action_name`` is not
+        recognized, calls :meth:`reset_plot` when the channel's action UUID
+        changes, normalizes ``NaN`` values, and pads short columns before
+        streaming into the active channel's :class:`ColumnDataSource`.
+
+        Args:
+            datapackage_list: List of action-server data packages received
+                from the WebSocket subscriber.
+        """
         for data_package in datapackage_list:
             if (
                 data_package.datamodel.status in VALID_DATA_STATUS 
@@ -282,6 +374,16 @@ class C_biovis:
                         )
 
     def _add_plots(self, channel):
+        """Rebuild the active and previous-run figures for a single channel.
+
+        Clears existing renderers and legends, updates the figure titles with
+        the channel's current and previous action UUIDs, then plots the
+        currently selected x/y variables against the channel's live and
+        snapshot data sources.
+
+        Args:
+            channel: Zero-based Biologic channel index to redraw.
+        """
         # clear legend
         if self.channel_plots[channel].renderers:
             self.channel_plots[channel].legend.items = []
@@ -320,6 +422,23 @@ class C_biovis:
         )
 
     def reset_plot(self, channel, new_data_package=None, forceupdate: bool = False):
+        """Promote live data to "previous" and start a new plot when the action changes.
+
+        If ``new_data_package`` belongs to a different action UUID than the
+        one currently bound to ``channel`` (or ``forceupdate`` is set),
+        snapshots the live data source to the previous source, resets the
+        live data, picks axis defaults from :data:`AXIS_MAP` based on the
+        new action name, and rebuilds the plot. Also rebuilds the plot if
+        the user changed the axis selector between updates.
+
+        Args:
+            channel: Channel index to reset.
+            new_data_package: Latest data package whose ``action_uuid`` /
+                ``action_name`` drive the reset. May be ``None`` to only
+                respond to axis-selector changes.
+            forceupdate: If ``True``, force a rebuild even when the UUID
+                hasn't changed.
+        """
         new_action_uuid = ""
         action_name = ""
         if new_data_package is not None:
@@ -357,6 +476,16 @@ class C_biovis:
             self._add_plots(channel)
 
     def callback_stop_measure(self, event, channel):
+        """Dispatch a private ``stop`` call to the action server for one channel.
+
+        Fired when the user clicks the channel's stop button. Schedules an
+        asynchronous private dispatch so the cancel call doesn't block the
+        Bokeh document.
+
+        Args:
+            event: Bokeh ``ButtonClick`` event (unused).
+            channel: Biologic channel index to stop.
+        """
         LOGGER.info("stopping gamry measurement")
         self.vis.doc.add_next_tick_callback(
             partial(

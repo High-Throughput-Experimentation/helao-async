@@ -1,3 +1,11 @@
+"""Browse and read sequence/experiment/action output trees produced by HELAO.
+
+``HelaoData`` wraps either a directory tree under ``RUNS_*`` or a zipped
+sequence and exposes its YAML metadata plus children (sub-sequences,
+experiments, actions) and helpers for reading associated ``.hlo``,
+``.parquet`` and ``.json`` data files.
+"""
+
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -19,67 +27,38 @@ from .file_mapper import FileMapper
 
 
 class HelaoData:
-    """
-    A class to represent and manage Helao data, which can be stored in either a directory or a zip file.
+    """Navigate a sequence/experiment/action output tree or zipped sequence.
+
+    A ``HelaoData`` is rooted at a ``-seq.yml``, ``-exp.yml`` or ``-act.yml``
+    file (or a zip archive containing one) and recursively wraps its children
+    as further ``HelaoData`` instances. It also lazily exposes the YAML
+    metadata and a list of associated data files so callers can read .hlo,
+    .parquet and .json payloads on demand.
 
     Attributes:
-        ord (list): Order of data types.
-        abbrd (dict): Abbreviations for data types.
-        target (str): Path to the target file or directory.
-        zflist (list): List of files in the zip archive.
-        ymlpath (str): Path to the YAML file.
-        ymldir (str): Directory containing the YAML file.
-        type (str): Type of the data (sequence, experiment, or action).
-        yml (dict): Parsed YAML content.
-        seq (list): List of sequence data.
-        exp (list): List of experiment data.
-        act (list): List of action data.
-        data_files (list): List of data files.
-        name (str): Name of the data.
-        params (dict): Parameters of the data.
-        uuid (str): UUID of the data.
-        timestamp (str): Timestamp of the data.
-        samples_in (list): List of input samples.
-        children (list): List of child data objects.
-
-    Methods:
-        ls: Prints a list of child data objects.
-        read_hlo(hlotarget): Reads HLO data from the target.
-        read_file(hlotarget): Reads a file from the zip archive.
-        data: Returns the data from the first data file.
-        __repr__(): Returns a string representation of the object.
+        ord: Short codes for the three levels (``seq``, ``exp``, ``act``).
+        abbrd: Mapping from short codes to full names.
+        target: Path to the directory, yml file, or zip archive.
+        zflist: List of paths inside the zip archive (zip-mode only).
+        ymlpath: Path of the YAML file describing this node.
+        ymldir: Directory containing ``ymlpath``.
+        type: One of ``seq``, ``exp`` or ``act`` for this node.
+        seq: Child sequence nodes.
+        exp: Child experiment nodes.
+        act: Child action nodes.
+        children: Flat concatenation of ``seq + exp + act``.
     """
 
     def __init__(self, target: str, **kwargs):
-        """
-        Initialize a HelaoData object.
+        """Build a ``HelaoData`` rooted at ``target``.
 
-        Parameters:
-        target (str): The target file or directory. This can be a path to a zip file,
-                      a directory, or a YAML file.
-        **kwargs: Additional keyword arguments.
-            - zflist (list): List of files in the zip archive.
-            - ztarget (str): Target YAML file within the zip archive.
-
-        Attributes:
-        ord (list): List of strings representing the order of data types.
-        abbrd (dict): Dictionary mapping abbreviations to full names.
-        target (str): The target file or directory.
-        zflist (list): List of files in the zip archive.
-        ymlpath (str): Path to the YAML file.
-        ymldir (str): Directory containing the YAML file.
-        type (str): Type of the YAML file (sequence, experiment, or action).
-        yml (dict): Parsed YAML content.
-        seq (list): List of HelaoData objects for sequences.
-        exp (list): List of HelaoData objects for experiments.
-        act (list): List of HelaoData objects for actions.
-        data_files (list): List of data files.
-        name (str): Name of the sequence, experiment, or action.
-        params (dict): Parameters of the sequence, experiment, or action.
-        uuid (str): UUID of the sequence, experiment, or action.
-        timestamp (str): Timestamp of the sequence, experiment, or action.
-        samples_in (list): List of input samples.
-        children (list): List of child HelaoData objects (sequences, experiments, actions).
+        Args:
+            target: Either a path to a zip archive, a run directory, or a
+                ``*-seq.yml`` / ``*-exp.yml`` / ``*-act.yml`` file. When a
+                ``HelaoData`` instance is passed, its attributes are copied
+                onto this instance.
+            **zflist: Pre-computed list of zip member names (zip-mode only).
+            **ztarget: Path inside the zip archive of the YAML to wrap.
         """
         self._yml_cache = {}
         self.ord = ["seq", "exp", "act"]
@@ -199,6 +178,7 @@ class HelaoData:
 
     @property
     def yml(self) -> dict:
+        """Return the parsed YAML metadata for this node (cached)."""
         if self._yml_cache:
             return self._yml_cache
         if self.target.endswith(".zip"):  # this will always be a zipped sequence
@@ -211,26 +191,32 @@ class HelaoData:
 
     @property
     def name(self) -> str:
+        """Return the sequence/experiment/action name from the YAML."""
         return self.yml.get(f"{self.abbrd[self.type]}_name", "NA")
 
     @property
     def params(self) -> dict:
+        """Return the parameter dictionary from the YAML, or ``{}``."""
         return self.yml.get(f"{self.abbrd[self.type]}_params", {})
 
     @property
     def uuid(self) -> str:
+        """Return the UUID for this node from the YAML."""
         return self.yml[f"{self.abbrd[self.type]}_uuid"]
 
     @property
     def timestamp(self) -> str:
+        """Return the timestamp for this node from the YAML."""
         return self.yml[f"{self.abbrd[self.type]}_timestamp"]
 
     @property
     def samples_in(self) -> list:
+        """Return the ``samples_in`` list from the YAML, or ``[]``."""
         return self.yml.get("samples_in", [])
 
     @property
-    def data_files(self):
+    def data_files(self) -> list:
+        """Return paths of associated data files (excluding ``RUNS_NOSYNC``)."""
         if self.target.endswith(".zip"):
             return self._data_files
         return [
@@ -240,7 +226,8 @@ class HelaoData:
         ]
 
     @property
-    def nosync_files(self):
+    def nosync_files(self) -> list:
+        """Return paths of data files that live under ``RUNS_NOSYNC``."""
         if self.target.endswith(".zip"):
             return self._nosync_files
         return [
@@ -249,16 +236,7 @@ class HelaoData:
 
     @property
     def ls(self):
-        """
-        Prints a formatted string representation of the current object and its children.
-
-        The method prints the string representation of the current object followed by
-        the string representations of its children, each prefixed with their index in
-        the list of children.
-
-        Returns:
-            None
-        """
+        """Print this node and its children with their indices."""
         return print(
             "\n".join(
                 [self.__repr__()]
@@ -269,22 +247,21 @@ class HelaoData:
     def read_hlo(
         self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
     ) -> Tuple[dict, dict]:
-        """
-        Reads and processes a .hlo file from a zip archive or directly.
+        """Read a ``.hlo`` file and return its YAML header and data dict.
 
-        If the target file ends with ".zip", it reads the specified hlotarget file
-        from within the zip archive, decodes the lines, and processes the metadata
-        and data sections. The metadata is parsed as YAML, and the data is parsed
-        as JSON and stored in a defaultdict.
+        When this ``HelaoData`` wraps a zip archive (and ``hlotarget`` is not a
+        ``RUNS_NOSYNC`` path), reads the member from inside the archive;
+        otherwise delegates to ``read_hlo`` for an on-disk path.
 
         Args:
-            hlotarget (str): The target .hlo file to read.
+            hlotarget: Path of the ``.hlo`` file (relative inside the zip when
+                the archive is the target).
+            keep_keys: When non-empty, only these data keys are kept.
+            omit_keys: Data keys to discard (applied when ``keep_keys`` is empty).
 
         Returns:
-            tuple: A tuple containing:
-            - meta (dict): The metadata parsed from the .hlo file.
-            - data (defaultdict): The data parsed from the .hlo file, organized
-              into a defaultdict of lists.
+            A ``(meta, data)`` tuple where ``meta`` is the parsed YAML header
+            and ``data`` is a dict of column lists.
         """
         if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
             header_lines = []
@@ -317,6 +294,18 @@ class HelaoData:
     def read_parquet(
         self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
     ) -> Tuple[dict, pd.DataFrame]:
+        """Read a Parquet file and return ``({}, column_dict)``.
+
+        Args:
+            hlotarget: Path of the Parquet file (relative inside the zip when
+                the archive is the target).
+            keep_keys: Unused; accepted for API symmetry with ``read_hlo``.
+            omit_keys: Unused; accepted for API symmetry with ``read_hlo``.
+
+        Returns:
+            A tuple of an empty metadata dict and a dict-of-lists view of the
+            Parquet contents.
+        """
         if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
             with TemporaryDirectory() as tmpdir:
                 with zipfile.ZipFile(self.target, "r") as zf:
@@ -330,6 +319,17 @@ class HelaoData:
     def read_json(
         self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
     ) -> Tuple[dict, dict]:
+        """Read a JSON data file and return ``({}, parsed_dict)``.
+
+        Args:
+            hlotarget: Path of the JSON file (relative inside the zip when
+                the archive is the target).
+            keep_keys: Unused; accepted for API symmetry with ``read_hlo``.
+            omit_keys: Unused; accepted for API symmetry with ``read_hlo``.
+
+        Returns:
+            A tuple of an empty metadata dict and the parsed JSON object.
+        """
         if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
             json_dict = orjson.loads(self.read_file(hlotarget))
         else:
@@ -338,20 +338,28 @@ class HelaoData:
 
         return {}, json_dict
 
-    def read_file(self, hlotarget):
-        """
-        Reads the contents of a file within a zip archive.
+    def read_file(self, hlotarget) -> bytes:
+        """Read a single zip member as raw bytes.
 
         Args:
-            hlotarget (str): The path to the target file within the zip archive.
+            hlotarget: Path of the member inside the zip archive.
 
         Returns:
-            bytes: The contents of the file as bytes.
+            The member's contents as bytes.
         """
         bytes = zipfile.Path(self.target, hlotarget).read_bytes()
         return bytes
 
-    def read_data_file(self, target_data_file: str):
+    def read_data_file(self, target_data_file: str) -> Tuple[dict, dict]:
+        """Dispatch to the reader matching the file extension.
+
+        Args:
+            target_data_file: Path of the data file to read.
+
+        Returns:
+            A ``(meta, data)`` tuple, or ``({}, {})`` if the extension is not
+            supported.
+        """
         if target_data_file.endswith(".hlo"):
             return self.read_hlo(target_data_file)
         elif target_data_file.endswith(".json"):
@@ -363,6 +371,16 @@ class HelaoData:
             return {}, {}
 
     def read_data_index(self, idx: int = 0):
+        """Read the ``idx``-th data file, falling back to nosync files.
+
+        Args:
+            idx: Index into ``data_files`` (or ``nosync_files`` when the
+                former is empty).
+
+        Returns:
+            A ``(meta, data)`` tuple, or ``({}, {})`` if no data file is
+            available.
+        """
         try:
             if self.data_files:
                 target_data_file = self.data_files[idx]
@@ -376,7 +394,9 @@ class HelaoData:
 
     @property
     def data(self):
+        """Return the ``(meta, data)`` tuple from the first data file."""
         return self.read_data_index(0)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return a one-line summary of the node type, name and timestamp."""
         return f"{self.abbrd[self.type]}: {self.name} @ {self.timestamp} CONTAINING {len(self.children)} children"

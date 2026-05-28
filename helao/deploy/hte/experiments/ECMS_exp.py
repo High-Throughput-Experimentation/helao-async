@@ -1,7 +1,10 @@
-"""
-Action library for AutoGDE
+"""Experiment library for the AutoGDE / ECMS station.
 
-server_key must be a FastAPI action server defined in config
+Defines sub-experiments that build action lists for an orchestrator. Each
+function takes an ``Experiment`` and returns the list of actions to enqueue.
+Action targets are referenced by ``server_key`` strings (e.g. ``PSTAT``,
+``NI``, ``PAL``, ``IO``, ``CALC``, ``MFC``, ``CALIBRATIONMFC``,
+``CALIBRATIONMFCSECOND``, ``ORCH``).
 """
 
 # editted 111224
@@ -80,8 +83,16 @@ CALIBRATIONMFCSECOND_server = MachineModel(
 toggle_triggertype = TriggerType.fallingedge
 
 
-def ECMS_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
-    """Unload Sample at 'cell1_we' position."""
+def ECMS_sub_unload_cell(experiment: Experiment, experiment_version: int = 1) -> list:
+    """Unload every sample at the ``cell1_we`` PAL custom position.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add(PAL_server, "archive_custom_unloadall", {})
@@ -93,7 +104,18 @@ def ECMS_sub_load_solid(
     experiment_version: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
-):
+) -> list:
+    """Load a legacy solid plate sample into ``cell1_we``.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     apm.add(
@@ -121,10 +143,19 @@ def ECMS_sub_load_liquid(
     volume_ul_cell_liquid: int = 1000,
     water_True_False: bool = False,
     combine_True_False: bool = False,
-):
-    """Add liquid volume to cell position.
+) -> list:
+    """Archive a liquid sample addition into ``cell1_we``.
 
-    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        reservoir_liquid_sample_no: Liquid sample number in the reservoir.
+        volume_ul_cell_liquid: Volume added (uL).
+        water_True_False: Forwarded as ``dilute_liquids`` to PAL.
+        combine_True_False: Forwarded as ``combine_liquids`` to PAL.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -151,8 +182,18 @@ def ECMS_sub_load_gas(
     experiment_version: int = 2,
     reservoir_gas_sample_no: int = 1,
     volume_ul_cell_gas: int = 1000,
-):
-    """Add gas volume to cell position."""
+) -> list:
+    """Load a gas sample into ``cell1_we``.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        reservoir_gas_sample_no: Gas sample number in the reservoir.
+        volume_ul_cell_gas: Volume added (uL).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add(
@@ -172,14 +213,19 @@ def ECMS_sub_load_gas(
 def ECMS_sub_normal_state(
     experiment: Experiment,
     experiment_version: int = 1,
-):
-    """Set ECMS to 'normal' state.
+) -> list:
+    """Drive the ECMS station to its idle/normal state.
 
-    All experiments begin and end in the following 'normal' state:
-    - separate (old) MFC for CO2 is ON to bypass GDE cell but go to MS.
+    Closes all CO2 / calibration-gas MFC valves, closes every NI gas valve
+    except ``6B`` (which is opened to route flow past the GDE cell to the
+    MS).
 
     Args:
-        experiment (Experiment): Experiment object provided by Orch
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -249,11 +295,15 @@ def ECMS_sub_normal_state(
 def ECMS_sub_alloff(
     experiment: Experiment,
     experiment_version: int = 1,
-):
-    """
+) -> list:
+    """Turn off both peristaltic pumps, close MFC valves, and close every NI valve.
 
     Args:
-        experiment (Experiment): Experiment object provided by Orch
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -328,7 +378,17 @@ def ECMS_sub_electrolyte_fill_recirculationreservoir(
     experiment: Experiment,
     experiment_version: int = 1,
     liquid_fill_time: float = 30,
-):
+) -> list:
+    """Run the reservoir peristaltic pump forward to fill the recirculation reservoir.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        liquid_fill_time: Pump-on duration (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     # Fill cell with liquid
@@ -347,10 +407,18 @@ def ECMS_sub_electrolyte_fill_cell(
     liquid_backward_time: float = 10,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1,
-):
-    """Add electrolyte volume to cell position.
+) -> list:
+    """Reverse-pump electrolyte from reservoir into the cell and archive the addition.
 
-    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        liquid_backward_time: Reverse pump-on duration (s).
+        reservoir_liquid_sample_no: Liquid sample number in the reservoir.
+        volume_ul_cell_liquid: Volume archived to the cell (mL forwarded to PAL).
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -428,10 +496,18 @@ def ECMS_sub_electrolyte_fill_cell_recirculation(
     liquid_backward_time: float = 80,
     reservoir_liquid_sample_no: int = 2,
     volume_ul_cell_liquid: float = 1.0,
-):
-    """Add electrolyte volume to cell position.
+) -> list:
+    """Reverse-pump electrolyte into the cell via the recirculation path and archive the addition.
 
-    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        liquid_backward_time: Reverse pump-on duration (s).
+        reservoir_liquid_sample_no: Liquid sample number in the reservoir.
+        volume_ul_cell_liquid: Volume archived to the cell.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -507,8 +583,17 @@ def ECMS_sub_prevacuum_cell(
     experiment: Experiment,
     experiment_version: int = 2,
     vacuum_time: float = 10,
-):
-    """prevacuum the cell gas phase side to make the electrolyte contact with GDE"""
+) -> list:
+    """Open the vacuum path to evacuate the gas side and pull electrolyte against the GDE.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        vacuum_time: Vacuum duration (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
 
@@ -533,8 +618,20 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     MS_baseline_duration: float = 300,
     # flow_duration: float = -1,
     # co2measure_acqrate: float = 0.5
-):
-    """prevacuum the cell gas phase side to make the electrolyte contact with GDE"""
+) -> list:
+    """Open the CO2 gas path, set the MFC flow, equilibrate, then route to MS for a baseline.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CO2equilibrium_duration: Wait after starting CO2 flow (s).
+        flowrate_sccm: CO2 flow rate (sccm).
+        flow_ramp_sccm: MFC ramp rate (sccm/s).
+        MS_baseline_duration: Baseline wait once routed to MS (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
 
@@ -589,8 +686,20 @@ def ECMS_sub_headspace_purge_and_Arbaseline(
     MS_baseline_duration: float = 100,
     # flow_duration: float = -1,
     # co2measure_acqrate: float = 0.5
-):
-    """prevacuum the cell gas phase side to make the electrolyte contact with GDE"""
+) -> list:
+    """Open the Ar/inert gas path, set the calibration MFC flow, then route to MS for a baseline.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Arequilibrium_duration: Wait after starting flow (s).
+        flowrate_sccm: Inert-gas flow rate (sccm).
+        flow_ramp_sccm: MFC ramp rate (sccm/s).
+        MS_baseline_duration: Baseline wait once routed to MS (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
 
@@ -626,10 +735,15 @@ def ECMS_sub_headspace_purge_and_Arbaseline(
 def ECMS_sub_electrolyte_recirculation_on(
     experiment: Experiment,
     experiment_version: int = 1,
-):
-    """Add electrolyte volume to cell position.
+) -> list:
+    """Open the recirculation valves and start the recirculation pump in reverse direction.
 
-    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -645,10 +759,15 @@ def ECMS_sub_electrolyte_recirculation_on(
 def ECMS_sub_electrolyte_recirculation_off(
     experiment: Experiment,
     experiment_version: int = 1,
-):
-    """Add electrolyte volume to cell position.
+) -> list:
+    """Stop the recirculation pump and close the recirculation valves.
 
-    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -671,7 +790,28 @@ def ECMS_sub_CA(
     ref_type: str = "leakless",
     pH: float = 6.8,
     MS_equilibrium_time: float = 90.0,
-):
+) -> list:
+    """Run a CA experiment then wait for the MS signal to equilibrate.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: ``"ref"`` or ``"rhe"``.
+        CA_duration_sec: CA duration (s).
+        SampleRate: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+        ref_offset__V: Reference offset (V).
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH (used in RHE conversion).
+        MS_equilibrium_time: Post-CA wait for the MS signal to settle (s).
+
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
         potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
@@ -729,7 +869,33 @@ def ECMS_sub_pulseCA(
     ref_type: str = "leakless",
     pH: float = 6.8,
     MS_equilibrium_time: float = 90.0,
-):
+) -> list:
+    """Run a pulsed (rectangular) CA via ``run_RCA``; optionally precede it with an OCV.
+
+    When ``run_OCV`` is True an OCV is run first and its final Ewe is fed
+    into ``run_RCA`` as the starting potential.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Vinit__V: Initial step potential (V) (ignored when ``run_OCV`` is True).
+        Tinit__s: Initial step duration (s).
+        Vstep__V: Step potential delta (V).
+        Tstep__s: Step duration (s).
+        Cycles: Number of pulse cycles.
+        AcqInterval__s: Acquisition interval (s).
+        run_OCV: Run an OCV first to set the starting potential.
+        Tocv__s: OCV duration (s).
+        IErange: Gamry current-range setting.
+        WE_versus: Reference frame label (informational; not used in math).
+        ref_offset__V: Reference offset (V).
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH.
+        MS_equilibrium_time: Post-CA wait for the MS signal to settle (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # =============================================================================
     #     if WE_versus == "ref":
@@ -837,7 +1003,29 @@ def ECMS_sub_CV(
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
     MS_equilibrium_time: float = 90.0,
-):
+) -> list:
+    """Run a CV experiment then wait for the MS signal to equilibrate.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_versus: ``"ref"`` or ``"rhe"``.
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH (used in RHE conversion).
+        WE_potential_init__V: Initial potential (V).
+        WE_potential_apex1__V: Apex 1 potential (V).
+        WE_potential_apex2__V: Apex 2 potential (V).
+        WE_potential_final__V: Final potential (V).
+        ScanRate_V_s: Scan rate (V/s).
+        Cycles: CV cycle count.
+        SampleRate: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+        ref_offset__V: Reference offset (V).
+        MS_equilibrium_time: Post-CV wait for the MS signal to settle (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
         potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
@@ -911,10 +1099,17 @@ def ECMS_sub_drain_recirculation(
     experiment_version: int = 1,
     tube_clear_time: float = 20,
     liquid_drain_time: float = 80,
-):
-    """Add electrolyte volume to cell position.
+) -> list:
+    """Clear the recirculation tubes then drain the cell via the recirculation pump.
 
-    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        tube_clear_time: Tube-clearing pump duration (s).
+        liquid_drain_time: Liquid drain pump duration (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -972,10 +1167,23 @@ def ECMS_sub_clean_cell_recirculation(
     tube_clear_delaytime: float = 40.0,
     tube_clear_time: float = 20,
     liquid_drain_time: float = 80,
-):
-    """Add electrolyte volume to cell position.
+) -> list:
+    """Repeat fill-reservoir + recirc-fill + drain cycles to clean the cell.
 
-    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        cleaning_times: Number of fill/drain cycles.
+        liquid_fill_time: Reservoir-fill pump duration (s).
+        volume_ul_cell_liquid: Per-fill cell volume (uL forwarded).
+        liquid_backward_time: Reverse-pump duration during fill (s).
+        reservoir_liquid_sample_no: Liquid sample number in the reservoir.
+        tube_clear_delaytime: Unused tube-clearing delay (s); reserved.
+        tube_clear_time: Tube-clearing pump duration during drain (s).
+        liquid_drain_time: Drain pump duration (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -1024,7 +1232,17 @@ def ECMS_sub_drain(
     experiment: Experiment,
     experiment_version: int = 1,
     liquid_drain_time: float = 30,
-):
+) -> list:
+    """Drain the cell using the reservoir pump (peripump 1) in reverse direction.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        liquid_drain_time: Drain pump duration (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()
 
     # Fill cell with liquid
@@ -1048,10 +1266,19 @@ def ECMS_sub_final_clean_cell(
     liquid_backward_time_2: float = 300,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1,
-):
-    """Add electrolyte volume to cell position.
+) -> list:
+    """Run a two-stage final clean: reservoir-to-cell then cell-to-cell, then archive.
 
-    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        liquid_backward_time_1: First-stage reverse-pump duration (s).
+        liquid_backward_time_2: Second-stage reverse-pump duration (s).
+        reservoir_liquid_sample_no: Liquid sample number in the reservoir.
+        volume_ul_cell_liquid: Volume archived to the cell.
+
+    Returns:
+        List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()
@@ -1094,8 +1321,20 @@ def ECMS_sub_cali(
     Califlowrate_sccm: float = 0.0,
     flow_ramp_sccm: float = 0,
     MSsignal_quilibrium_time: float = 300,
-):
-    """prevacuum the cell gas phase side to make the electrolyte contact with GDE"""
+) -> list:
+    """Set CO2 and calibration-gas MFC flow rates and wait for the MS to equilibrate.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: Calibration-gas flow rate (sccm).
+        flow_ramp_sccm: MFC ramp rate (sccm/s).
+        MSsignal_quilibrium_time: Equilibration wait (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
 
@@ -1147,8 +1386,21 @@ def ECMS_sub_threegascali(
     Califlowrate_two_sccm: float = 0.0,  # Ar
     flow_ramp_sccm: float = 0,
     MSsignal_quilibrium_time: float = 300,
-):
-    """prevacuum the cell gas phase side to make the electrolyte contact with GDE"""
+) -> list:
+    """Set CO2, calibration-gas, and second calibration-gas MFC flow rates simultaneously.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: First calibration-gas flow rate (sccm).
+        Califlowrate_two_sccm: Second calibration-gas flow rate (sccm).
+        flow_ramp_sccm: MFC ramp rate (sccm/s).
+        MSsignal_quilibrium_time: Equilibration wait (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
 
@@ -1218,8 +1470,20 @@ def ECMS_sub_inertgascali(
     Califlowrate_two_sccm: float = 0.0,  # Ar
     flow_ramp_sccm: float = 0,
     MSsignal_quilibrium_time: float = 300,
-):
-    """prevacuum the cell gas phase side to make the electrolyte contact with GDE"""
+) -> list:
+    """Set CO2 and second calibration-gas (inert) MFC flow rates and wait for the MS.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_two_sccm: Second calibration-gas (inert) flow rate (sccm).
+        flow_ramp_sccm: MFC ramp rate (sccm/s).
+        MSsignal_quilibrium_time: Equilibration wait (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
 
@@ -1273,8 +1537,19 @@ def ECMS_sub_pulsecali(
     Califlowrate_sccm: float = 0.0,
     flow_ramp_sccm: float = 0,
     MSsignal_quilibrium_time: float = 300,
-):
-    """prevacuum the cell gas phase side to make the electrolyte contact with GDE"""
+) -> list:
+    """Set the calibration-gas MFC flow rate and wait for the MS to equilibrate.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        Califlowrate_sccm: Calibration-gas flow rate (sccm).
+        flow_ramp_sccm: MFC ramp rate (sccm/s).
+        MSsignal_quilibrium_time: Equilibration wait (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
 
     apm = ActionPlanMaker()
     apm.add(
@@ -1408,7 +1683,23 @@ def ECMS_sub_preCA_CO2flow(
     flow_change_duration_sec: List[float] = [10.0, 60.0],
     CO2_flow_rate_sccm: List[float] = [0.0, 10.0],
     # inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
-):
+) -> list:
+    """Iterate through a CO2/inert-gas flow profile via the MFCs (no electrochemistry).
+
+    For each step, the inert-gas flow rate is computed as
+    ``total_MFC_flow_rate_sccm - CO2_flow_rate``.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        MS_equilibrium_time: Final MS equilibration wait (s).
+        total_MFC_flow_rate_sccm: Combined CO2 + inert MFC budget (sccm).
+        flow_change_duration_sec: Step durations (s).
+        CO2_flow_rate_sccm: CO2 flow rates per step (sccm).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     for cycle, (CO2_flow_duration_sec, CO2_flow_rate) in enumerate(
@@ -1482,7 +1773,35 @@ def ECMS_sub_CA_CO2flow(
     flow_change_duration_sec: List[float] = [60.0, 60.0, 60.0],
     CO2_flow_rate_sccm: List[float] = [0.0, 10.0, 0.0],
     # inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
-):
+) -> list:
+    """Run a CA experiment in parallel with a stepped CO2/inert-gas flow profile.
+
+    The flow steps run concurrently (``no_wait``) alongside the CA. For each
+    step the inert-gas flow rate is computed as
+    ``total_MFC_flow_rate_sccm - CO2_flow_rate``.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        experiment_version: Version tag of the sub-experiment.
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: ``"ref"`` or ``"rhe"``.
+        CA_duration_sec: CA duration (s).
+        SampleRate: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+        ref_offset__V: Reference offset (V).
+        ref_type: Reference electrode key into ``REF_TABLE``.
+        pH: Solution pH (used in RHE conversion).
+        MS_equilibrium_time: Final MS equilibration wait (s).
+        total_MFC_flow_rate_sccm: Combined CO2 + inert MFC budget (sccm).
+        flow_change_duration_sec: Step durations (s).
+        CO2_flow_rate_sccm: CO2 flow rates per step (sccm).
+
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if WE_versus == "ref":
         potential_vsRef = WE_potential__V - 1.0 * ref_offset__V

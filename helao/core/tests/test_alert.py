@@ -1,3 +1,10 @@
+"""Manual smoke test for the logger's email alert path.
+
+Loads an email-config YAML whose path is supplied as ``sys.argv[1]``,
+builds a logger configured with that config, and emits a single
+``alert``-level message so the alert delivery channel can be verified.
+"""
+
 import sys
 
 from helao.helpers import helao_logging as logging

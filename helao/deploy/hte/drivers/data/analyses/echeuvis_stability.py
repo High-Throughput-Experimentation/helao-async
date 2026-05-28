@@ -1,3 +1,13 @@
+"""In-situ ECHE-UV-Vis optical stability analysis.
+
+Pulls SDC-UVIS process/action records from the Modelyst postgres DB
+(query :data:`SDCUVIS_QUERY`), aligns baseline-OCV, in-situ-CA, and
+post-CA OCV spectra for a single ``(plate_id, sample_no)``, performs
+background-style normalisation, binning, Savitzky-Golay smoothing and
+reference clipping, and emits per-sample stability figures of merit via
+:class:`EcheUvisAnalysis`.
+"""
+
 import sys
 from copy import copy
 from typing import List
@@ -80,7 +90,11 @@ WHERE
 
 
 def parse_spechlo(hlod: dict):
-    """Read spectrometer hlo into wavelength, epoch, spectra tuple."""
+    """Decode a spectrometer hlo dict into ``(wavelength, epoch, spectra)``.
+
+    Returns ``False`` and logs the failure when parsing raises an
+    exception.
+    """
     try:
         wl = np.array(hlod["meta"]["optional"]["wl"])
         epochs = np.array(hlod["data"]["epoch_s"])
@@ -100,8 +114,16 @@ def parse_spechlo(hlod: dict):
     return wl, epochs, specarr
 
 
-def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit):
-    """Normalization func from JCAPDataProcess uvis_basics.py, updated for array ops."""
+def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit) -> tuple:
+    """Clip and rescale rows of ``v`` to ``[min_limit, max_limit]``.
+
+    Rows whose minimum sits in ``[min_mthd_allowed, min_limit)`` are
+    shifted up; rows whose maximum sits in ``[max_limit,
+    max_mthd_allowed]`` are scaled down to one.
+
+    Returns:
+        ``(min_rescaled_mask, max_rescaled_mask, adjusted_array)``.
+    """
     w = copy(v)
     min_rescaled = np.bitwise_and(
         (w.min(axis=-1) >= min_mthd_allowed),
@@ -122,6 +144,21 @@ def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit):
 
 
 class EcheUvisInputs(AnalysisInput):
+    """Resolved baseline/in-situ/pre-situ processes and actions for one sample.
+
+    Attributes:
+        baseline: Pre-CA OCV process used as the optical baseline.
+        baseline_spec_act: Spectrometer action paired with the baseline.
+        baseline_ocv_act: ``run_OCV`` action of the baseline.
+        insitu: In-situ CA process under analysis.
+        insitu_spec_act: Spectrometer action during the CA hold.
+        insitu_ca_act: ``run_CA`` action for the in-situ process.
+        presitu: Post-CA OCV process used as the recovery reference.
+        presitu_spec_act: Spectrometer action during the post-CA OCV.
+        presitu_ocv_act: ``run_OCV`` action for the post-CA OCV.
+        process_params: ``process_params`` dict from the in-situ row.
+    """
+
     # ref_darks: List[HelaoProcess]
     # ref_dark_spec_acts: List[HelaoAction]
     # ref_lights: List[HelaoProcess]
@@ -145,6 +182,15 @@ class EcheUvisInputs(AnalysisInput):
         sample_no: int,
         query_df: pd.DataFrame,
     ):
+        """Resolve the baseline / in-situ / pre-situ acts from ``query_df``.
+
+        Args:
+            insitu_process_uuid: Process UUID of the in-situ CA run.
+            plate_id: Plate id of the sample under analysis.
+            sample_no: Sample number on that plate.
+            query_df: Query-result DataFrame produced by
+                :data:`SDCUVIS_QUERY`.
+        """
         self.plate_id = plate_id
         self.sample_no = sample_no
         self.insitu = HelaoProcess(insitu_process_uuid, query_df)
@@ -248,31 +294,45 @@ class EcheUvisInputs(AnalysisInput):
 
     @property
     def baseline_spec(self):
+        """Loaded ``.hlo`` payload for the baseline spectrometer action."""
         return self.baseline_spec_act.hlo
 
     @property
     def baseline_ocv(self):
+        """Loaded ``.hlo`` payload for the baseline OCV action."""
         return self.baseline_ocv_act.hlo
 
     @property
     def insitu_spec(self):
+        """Loaded ``.hlo`` payload for the in-situ spectrometer action."""
         return self.insitu_spec_act.hlo
 
     @property
     def insitu_ca(self):
+        """Loaded ``.hlo`` payload for the in-situ CA action."""
         return self.insitu_ca_act.hlo
 
     @property
     def presitu_spec(self):
+        """Loaded ``.hlo`` payload for the post-CA spectrometer action."""
         return self.presitu_spec_act.hlo
 
     @property
     def presitu_ocv(self):
+        """Loaded ``.hlo`` payload for the post-CA OCV action."""
         return self.presitu_ocv_act.hlo
 
     def get_datamodels(
         self, global_sample_label: str, *args, **kwargs
     ) -> List[AnalysisDataModel]:
+        """Build :class:`AnalysisDataModel` entries for each spec action.
+
+        Args:
+            global_sample_label: Override for the resulting
+                ``global_sample_label`` field; falls back to a legacy
+                ``solid__<plate>_<sample>`` label for data/baseline
+                inputs.
+        """
         action_keys = [k for k in vars(self).keys() if "spec_act" in k]
         inputs = []
         for ak in action_keys:
@@ -309,6 +369,48 @@ class EcheUvisInputs(AnalysisInput):
 
 
 class EcheUvisOutputs(BaseModel):
+    """Per-sample output payload for :class:`EcheUvisAnalysis`.
+
+    Attributes:
+        wavelength: Full spectrometer wavelength axis.
+        lower_wl_idx: Index of the lower wavelength cutoff.
+        upper_wl_idx: Index of the upper wavelength cutoff.
+        mean_ref_dark: Mean dark-reference vector (currently empty).
+        mean_ref_light: Mean light-reference vector (currently empty).
+        agg_method: Aggregation method (``"mean"`` or ``"median"``).
+        agg_baseline: Aggregated baseline OCV spectrum.
+        agg_insitu: Aggregated in-situ CA spectrum.
+        agg_presitu: Aggregated post-CA OCV spectrum.
+        bin_wavelength: Binned wavelength axis.
+        bin_baseline: Binned baseline spectrum.
+        bin_insitu: Binned in-situ spectrum.
+        bin_presitu: Binned post-CA spectrum.
+        smth_baseline: Smoothed binned baseline.
+        smth_insitu: Smoothed binned in-situ.
+        smth_presitu: Smoothed binned post-CA.
+        rscl_baseline: Rescaled baseline.
+        rscl_insitu: Rescaled in-situ.
+        rscl_presitu: Rescaled post-CA.
+        baseline_min_rescaled: Whether the baseline min was rescaled.
+        baseline_max_rescaled: Whether the baseline max was rescaled.
+        insitu_min_rescaled: Whether the in-situ min was rescaled.
+        insitu_max_rescaled: Whether the in-situ max was rescaled.
+        presitu_min_rescaled: Whether the post-CA min was rescaled.
+        presitu_max_rescaled: Whether the post-CA max was rescaled.
+        mean_abs_omT_ratio: Mean over wavelengths of
+            ``|log10((1-T_insitu)/(1-T_baseline))|``.
+        mean_abs_omT_diff: Mean absolute ``(1-T)`` difference.
+        noagg_wavelength: Wavelength axis for un-aggregated in-situ.
+        noagg_epoch: Epoch axis for un-aggregated in-situ.
+        noagg_presitu_wavelength: Wavelength axis for un-aggregated
+            post-CA.
+        noagg_presitu_epoch: Epoch axis for un-aggregated post-CA.
+        noagg_omt_baseline: ``1-T`` reference-adjusted baseline.
+        noagg_omt_insitu: Per-frame ``1-T`` for in-situ.
+        noagg_omt_presitu: Per-frame ``1-T`` for post-CA.
+        noagg_omt_ratio: Per-frame ratio in-situ/baseline.
+    """
+
     wavelength: list
     lower_wl_idx: int
     upper_wl_idx: int
@@ -347,7 +449,28 @@ class EcheUvisOutputs(BaseModel):
 
 
 class EcheUvisAnalysis(BaseAnalysis):
-    """ECHEUVIS Optical Stability Analysis for GCLD demonstration."""
+    """In-situ ECHE-UVIS optical-stability analysis for one CA process.
+
+    Attributes:
+        analysis_name: Fixed analysis name string.
+        analysis_timestamp: Time the analysis instance was built.
+        analysis_uuid: Generated analysis UUID.
+        analysis_params: Effective parameters (defaults merged with
+            caller overrides).
+        plate_id: Plate id under analysis.
+        sample_no: Sample number on that plate.
+        ca_potential_vrhe: CA potential vs. RHE used in the in-situ
+            process.
+        process_uuid: UUID of the in-situ CA process.
+        process_timestamp: Timestamp of that process.
+        process_name: Technique name from the row.
+        run_type: Run type (e.g. ``echeuvis``).
+        technique_name: Technique-name string.
+        inputs: Resolved :class:`EcheUvisInputs`.
+        outputs: Populated :class:`EcheUvisOutputs` after
+            :meth:`calc_output`.
+        analysis_codehash: Hash of the analysis source file.
+    """
 
     analysis_name: str
     analysis_timestamp: datetime
@@ -371,6 +494,15 @@ class EcheUvisAnalysis(BaseAnalysis):
         query_df: pd.DataFrame,
         analysis_params: dict,
     ):
+        """Build inputs, derive plate/sample identifiers, generate UUID.
+
+        Args:
+            process_uuid: UUID of the in-situ CA process.
+            query_df: Query result frame produced by
+                :data:`SDCUVIS_QUERY`.
+            analysis_params: Overrides merged into
+                :data:`ANALYSIS_DEFAULTS`.
+        """
         self.analysis_name = "ECHEUVIS_InsituOpticalStability"
         self.analysis_timestamp = datetime.now()
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
@@ -398,8 +530,18 @@ class EcheUvisAnalysis(BaseAnalysis):
         self.analysis_classname = self.__class__.__name__
         self.analysis_uuid = self.gen_uuid()
 
-    def calc_output(self):
-        """Calculate stability FOMs and intermediate vectors."""
+    def calc_output(self) -> bool:
+        """Calculate stability FOMs and intermediate vectors.
+
+        Parses the three spectrometer hlos, aggregates the last
+        ``agg_last_secs`` seconds of each (skipping ``skip_first_n``
+        frames), bins, smooths and rescales the spectra, and finally
+        populates :attr:`outputs`.
+
+        Returns:
+            ``True`` on success, ``False`` when any spectrometer parse
+            fails.
+        """
         # rdtups = [parse_spechlo(x) for x in self.inputs.ref_dark_spec]
         # rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
         btup = parse_spechlo(self.inputs.baseline_spec)

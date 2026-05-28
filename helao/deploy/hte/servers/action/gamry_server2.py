@@ -1,9 +1,11 @@
 # shell: uvicorn motion_server:app --reload
-"""A FastAPI service definition for a potentiostat device server, e.g. Gamry.
+"""FastAPI action server for Gamry potentiostats.
 
-gamry_server2 uses the Executor model with helao.drivers.pstat.gamry.driver which decouples
-the hardware driver class from the action server base class.
-
+Uses an Executor-based architecture: :class:`GamryExec` runs dtaq-driven
+techniques (LSV, CA, CP, CV, OCV, RCA), and :class:`GamryEisExec` runs
+potentiostatic/galvanostatic EIS sweeps via :class:`ReadZ`. The hardware
+driver class is :class:`GamryDriver`; the server dynamically attaches one
+endpoint per supported technique once the driver is initialised.
 """
 
 
@@ -55,10 +57,36 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class GamryExec(Executor):
+    """Executor that runs a single Gamry dtaq-based technique.
+
+    Splits action parameters into signal, dtaq, TTL trigger, and alert
+    groups; configures the driver in ``_pre_exec``; starts the measurement
+    in ``_exec``; polls the dtaq event sink in ``_poll`` while checking
+    optional Ewe/I alert thresholds; computes mean Ewe/I/t outputs in
+    ``_post_exec`` (and a bubble-detection flag for OCV runs); and forwards
+    user stops to the driver in ``_manual_stop``.
+
+    Attributes:
+        technique: The :class:`GamryTechnique` definition to execute.
+        driver: The bound :class:`GamryDriver` instance.
+        data_buffer: Rolling deques of the last 1000 points per channel
+            used for output statistics and alert windowing.
+        signal_params: Subset of action params relevant to the signal.
+        dtaq_params: Subset of action params relevant to the dtaq.
+        ttl_params: TTLwait/TTLsend trigger bits.
+        alert_params: Thresholds and timing for runtime alerts.
+    """
+
     technique: GamryTechnique
     driver: GamryDriver
 
     def __init__(self, *args, **kwargs):
+        """Cache the technique, driver, and parameter groupings.
+
+        Args:
+            *args: Forwarded to :class:`Executor`.
+            **kwargs: Must include ``technique`` (:class:`GamryTechnique`).
+        """
         super().__init__(*args, **kwargs)
         try:
             self.poll_rate = 0.01  # pump events every 10 millisecond
@@ -109,7 +137,16 @@ class GamryExec(Executor):
             LOGGER.error("GamryExec was not initialized.", exc_info=True)
 
     async def _pre_exec(self) -> dict:
-        """Setup potentiostat device for given technique."""
+        """Wait for the cell to be free and configure the technique.
+
+        Polls ``get_gamry_state`` until the cell is idle (up to 30 s) and
+        then calls ``driver.setup`` with the technique, signal, dtaq, and
+        IE-range parameters.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.setup` on timeout or driver failure.
+        """
         max_wait = 30
         init_time = time.time()
         while self.driver.get_gamry_state()["Cell"] != "0":
@@ -129,7 +166,12 @@ class GamryExec(Executor):
         return {"error": error}
 
     async def _exec(self) -> dict:
-        """Begin measurement or wait for TTL trigger if specified."""
+        """Wait for a TTL trigger (if configured) and start the measurement.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on a successful
+            ``measure`` call or :attr:`ErrorCodes.critical_error` otherwise.
+        """
         if self.ttl_params["TTLwait"] > -1:
             bits = self.driver.pstat.DigitalIn()
             LOGGER.info(f"Gamry DIbits: {bits}, waiting for trigger.")
@@ -145,7 +187,18 @@ class GamryExec(Executor):
         return {"error": error}
 
     async def _poll(self) -> dict:
-        """Return data and status from dtaq event sink."""
+        """Drain the dtaq event sink and apply runtime alert checks.
+
+        Appends each polled data slice to ``self.data_buffer`` and, when
+        ``alert_params`` defines a threshold, walks the rolling time buffer
+        backwards to find a window of at least ``alert_duration__s`` of
+        consecutive points above/below the configured Ewe/I threshold.
+        Triggered alerts are emitted via ``LOGGER.alert``.
+
+        Returns:
+            Dict with ``error``, an :class:`HloStatus` (``finished`` once the
+            dtaq reports ``done``), and the latest ``data`` slice.
+        """
         try:
             resp = self.driver.get_data(self.poll_rate)
             # populate executor buffer for output calculation
@@ -227,7 +280,18 @@ class GamryExec(Executor):
             print(data_dq)
             return {"error": ErrorCodes.critical_error, "status": HloStatus.errored}
 
-    async def _post_exec(self):
+    async def _post_exec(self) -> dict:
+        """Compute summary statistics and run OCV bubble detection.
+
+        Calls ``driver.cleanup``, stores the mean of the final five samples
+        of ``t_s``, ``Ewe_V``, and ``I_A`` back into ``action_params`` under
+        ``<key>__mean_final``, and, for ``run_OCV`` actions, calls
+        :func:`bubble_detection` and stores the boolean result under
+        ``has_bubble``.
+
+        Returns:
+            Dict with ``error`` (success or critical) and an empty ``data``.
+        """
         resp = self.driver.cleanup(self.ttl_params)
 
         # parse calculate outputs from data buffer:
@@ -257,17 +321,48 @@ class GamryExec(Executor):
         return {"error": error, "data": {}}
 
     async def _manual_stop(self) -> dict:
-        """Interrupt measurement and disconnect cell."""
+        """Stop the active technique and disconnect the cell on demand.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.stop` if the driver stop call fails.
+        """
         resp = await self.driver.stop()
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.stop
         return {"error": error}
 
 
 class GamryEisExec(Executor):
+    """Executor that runs a PEIS or GEIS frequency sweep.
+
+    Builds a logarithmically spaced frequency list from
+    ``Finit__Hz``/``Ffinal__Hz``/``FrequenciesPerDecade``, performs an
+    optional pre-measurement OCV to update the DC offset, and steps the
+    :class:`ReadZ` instance through each frequency. Retries on the same
+    frequency are bounded by ``MaxRetries``.
+
+    Attributes:
+        driver: The bound :class:`GamryDriver` instance.
+        readz: The :class:`ReadZ` instance attached to the driver.
+        control_mode: Pstat or Gstat mode chosen by the action abbreviation.
+        offset: Initial DC offset (optionally OCV-corrected).
+        freq_list: Computed list of measurement frequencies (Hz).
+        z_expected: Expected impedance used to pick IE range.
+        freq_idx: Current index into ``freq_list``.
+        retry_count: Retries accumulated at the current frequency.
+        max_repeats: Per-frequency retry limit (``MaxRetries`` param).
+    """
+
     driver: GamryDriver
     readz: ReadZ
 
     def __init__(self, *args, **kwargs):
+        """Build the frequency list and cache offsets and control mode.
+
+        Args:
+            *args: Forwarded to :class:`Executor`.
+            **kwargs: Forwarded to :class:`Executor`.
+        """
         super().__init__(*args, **kwargs)
         try:
             self.action_params = self.active.action.action_params
@@ -312,7 +407,18 @@ class GamryEisExec(Executor):
             LOGGER.error("GamryEisExec was not initialized.", exc_info=True)
 
     async def _pre_exec(self) -> dict:
-        """Setup potentiostat device for given technique."""
+        """Wait for the cell to be free, optionally measure OCV, set up EIS.
+
+        Polls until the cell is idle (up to 30 s). If ``versus_OCV`` is set,
+        runs :func:`measure_ocv` for ``OCV_duration__s`` seconds, writes the
+        OCV trace as a HELAO file, and adds the mean of the final five
+        samples to ``self.offset``. Then calls ``driver.setup_eis`` and
+        ``readz.init_pstat`` to arm the sweep.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.setup` on failure.
+        """
         max_wait = 30
         init_time = time.time()
         while self.driver.get_gamry_state()["Cell"] != "0":
@@ -375,7 +481,12 @@ class GamryEisExec(Executor):
         return {"error": error}
 
     async def _exec(self) -> dict:
-        """Begin measurement or wait for TTL trigger if specified."""
+        """Wait for a TTL trigger if configured and start the first frequency.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.critical_error` on exception.
+        """
         try:
             if self.ttl_params["TTLwait"] > -1:
                 bits = self.driver.pstat.DigitalIn()
@@ -393,7 +504,20 @@ class GamryEisExec(Executor):
         return {"error": error}
 
     async def _poll(self) -> dict:
-        """Return data and status from dtaq event sink."""
+        """Advance the EIS sweep based on the dtaq event message.
+
+        Reads the latest :class:`ReadZ` response and acts on its ``message``:
+        ``retry`` increments the retry count, ``done`` advances ``freq_idx``,
+        and any other non-measuring message resets the dtaq sink and starts
+        the next frequency (optionally rescaling the IE range from the
+        previous Zmod when ``IErange_fromAC`` is true on GEIS). The sweep
+        terminates when the retry limit is exceeded or all frequencies are
+        consumed.
+
+        Returns:
+            Dict containing ``error``, an :class:`HloStatus`, and ``data``
+            with an injected ``t_s`` relative to ``start_time``.
+        """
         try:
             resp = self.readz.get_data(self.poll_rate)
             error = (
@@ -439,7 +563,15 @@ class GamryEisExec(Executor):
             LOGGER.error("GamryExec poll error", exc_info=True)
             return {"error": ErrorCodes.critical_error, "status": HloStatus.errored}
 
-    async def _post_exec(self):
+    async def _post_exec(self) -> dict:
+        """Tear down the EIS state on the driver.
+
+        Calls ``driver.cleanup`` and ``driver.close_eis`` and clears both
+        the executor's and the driver's ``readz`` reference.
+
+        Returns:
+            Dict with ``error`` (success or critical) and an empty ``data``.
+        """
         resp = self.driver.cleanup(self.ttl_params)
         self.driver.close_eis()
         self.driver.readz = None
@@ -451,13 +583,28 @@ class GamryEisExec(Executor):
         return {"error": error, "data": {}}
 
     async def _manual_stop(self) -> dict:
-        """Interrupt measurement and disconnect cell."""
+        """Stop the active EIS sweep on demand.
+
+        Returns:
+            Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
+            :attr:`ErrorCodes.stop` if the stop call fails.
+        """
         resp = await self.readz.stop()
         error = ErrorCodes.none if resp.response == "success" else ErrorCodes.stop
         return {"error": error}
 
 
 async def gamry_dyn_endpoints(app: BaseAPI):
+    """Register all Gamry technique endpoints once the driver is ready.
+
+    Blocks until ``app.driver.ready`` is true, disables concurrent actions,
+    captures the driver model's IE-range enum to use as the ``IErange``
+    parameter type, and attaches one endpoint per technique
+    (LSV, CA, CP, CV, OCV, RCA, PEIS, GEIS).
+
+    Args:
+        app: The :class:`BaseAPI` instance being configured.
+    """
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
 
@@ -499,9 +646,45 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alertThreshI_A: float = 0,
         comment: str = "",
     ):
-        """Linear Sweep Voltammetry (unlike CV no backward scan is done)
-        use 4bit bitmask for triggers
-        IErange depends on gamry model used (test actual limit before using)"""
+        """Start a Linear Sweep Voltammetry run via :class:`GamryExec`.
+
+        A forward-only voltage sweep is performed (no return scan).
+        ``TTLwait``/``TTLsend`` use the lower 4 bits as a trigger bitmask;
+        ``IErange`` accepts values supported by the connected potentiostat
+        model.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            Vinit__V: Initial potential in volts.
+            Vfinal__V: Final potential in volts.
+            ScanRate__V_s: Scan rate in V/s.
+            AcqInterval__s: Sample interval in seconds.
+            TTLwait: TTL channel to wait on (``-1`` disables).
+            TTLsend: TTL channel to assert on start (``-1`` disables).
+            IErange: Current range setting; ``"auto"`` for autoranging.
+            SetStopIMin: Lower current threshold for early stop.
+            SetStopIMax: Upper current threshold for early stop.
+            SetStopDIMin: Lower dI/dt threshold for early stop.
+            SetStopDIMax: Upper dI/dt threshold for early stop.
+            SetStopADIMin: Lower |dI/dt| threshold for early stop.
+            SetStopADIMax: Upper |dI/dt| threshold for early stop.
+            SetStopAtDelayIMin: Consecutive-point delay for ``SetStopIMin``.
+            SetStopAtDelayIMax: Consecutive-point delay for ``SetStopIMax``.
+            SetStopAtDelayDIMin: Consecutive-point delay for ``SetStopDIMin``.
+            SetStopAtDelayDIMax: Consecutive-point delay for ``SetStopDIMax``.
+            SetStopAtDelayADIMin: Consecutive-point delay for ``SetStopADIMin``.
+            SetStopAtDelayADIMax: Consecutive-point delay for ``SetStopADIMax``.
+            alert_duration__s: Minimum duration for runtime alerts (seconds).
+            alert_above: Whether to alert on above- or below-threshold.
+            alert_sleep__s: Suppression window between alerts.
+            alertThreshI_A: Current alert threshold in amperes.
+            comment: Free-form comment recorded with the action.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "LSV"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_LSV)
@@ -539,10 +722,35 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alertThreshI_A: float = 0,
         comment: str = "",
     ):
-        """Chronoamperometry (current response on amplied potential)
-        use 4bit bitmask for triggers
-        IErange depends on gamry model used
-        (test actual limit before using)"""
+        """Start a Chronoamperometry run via :class:`GamryExec`.
+
+        Holds ``Vval__V`` for ``Tval__s`` while sampling current at
+        ``AcqInterval__s``. ``TTLwait``/``TTLsend`` use the lower 4 bits as
+        a trigger bitmask.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            Vval__V: Hold potential in volts.
+            Tval__s: Hold duration in seconds.
+            AcqInterval__s: Sample interval in seconds.
+            TTLwait: TTL channel to wait on (``-1`` disables).
+            TTLsend: TTL channel to assert on start (``-1`` disables).
+            IErange: Current range setting; ``"auto"`` for autoranging.
+            SetStopXMin: Lower current threshold for early stop.
+            SetStopXMax: Upper current threshold for early stop.
+            SetStopAtDelayXMin: Consecutive-point delay for ``SetStopXMin``.
+            SetStopAtDelayXMax: Consecutive-point delay for ``SetStopXMax``.
+            alert_duration__s: Minimum duration for runtime alerts (seconds).
+            alert_above: Whether to alert on above- or below-threshold.
+            alert_sleep__s: Suppression window between alerts.
+            alertThreshI_A: Current alert threshold in amperes.
+            comment: Free-form comment recorded with the action.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CA"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_CA)
@@ -580,9 +788,35 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alertThreshEwe_V: float = 0,
         comment: str = "",
     ):
-        """Chronopotentiometry (Potential response on controlled current)
-        use 4bit bitmask for triggers
-        IErange depends on gamry model used (test actual limit before using)"""
+        """Start a Chronopotentiometry run via :class:`GamryExec`.
+
+        Holds ``Ival__A`` for ``Tval__s`` while sampling potential at
+        ``AcqInterval__s``. ``TTLwait``/``TTLsend`` use the lower 4 bits as
+        a trigger bitmask.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            Ival__A: Hold current in amperes.
+            Tval__s: Hold duration in seconds.
+            AcqInterval__s: Sample interval in seconds.
+            TTLwait: TTL channel to wait on (``-1`` disables).
+            TTLsend: TTL channel to assert on start (``-1`` disables).
+            IErange: Current range setting; ``"auto"`` for autoranging.
+            SetStopXMin: Lower potential threshold for early stop.
+            SetStopXMax: Upper potential threshold for early stop.
+            SetStopAtDelayXMin: Consecutive-point delay for ``SetStopXMin``.
+            SetStopAtDelayXMax: Consecutive-point delay for ``SetStopXMax``.
+            alert_duration__s: Minimum duration for runtime alerts (seconds).
+            alert_above: Whether to alert on above- or below-threshold.
+            alert_sleep__s: Suppression window between alerts.
+            alertThreshEwe_V: Potential alert threshold in volts.
+            comment: Free-form comment recorded with the action.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CP"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_CP)
@@ -624,10 +858,40 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alertThreshI_A: float = 0,
         comment: str = "",
     ):
-        """Cyclic Voltammetry (most widely used technique
-        for acquireing information about electrochemical reactions)
-        use 4bit bitmask for triggers
-        IErange depends on gamry model used (test actual limit before using)"""
+        """Start a Cyclic Voltammetry run via :class:`GamryExec`.
+
+        Sweeps from ``Vinit__V`` to ``Vapex1__V`` to ``Vapex2__V`` to
+        ``Vfinal__V`` at ``ScanRate__V_s`` for ``Cycles`` cycles, sampling
+        every ``AcqInterval__s``. ``TTLwait``/``TTLsend`` use the lower
+        4 bits as a trigger bitmask.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            Vinit__V: Initial potential in volts.
+            Vapex1__V: First apex potential in volts.
+            Vapex2__V: Second apex potential in volts.
+            Vfinal__V: Final potential in volts.
+            ScanRate__V_s: Scan rate in V/s.
+            AcqInterval__s: Sample interval in seconds.
+            Cycles: Number of CV cycles to run.
+            TTLwait: TTL channel to wait on (``-1`` disables).
+            TTLsend: TTL channel to assert on start (``-1`` disables).
+            IErange: Current range setting; ``"auto"`` for autoranging.
+            SetStopIMin: Lower current threshold for early stop.
+            SetStopIMax: Upper current threshold for early stop.
+            SetStopAtDelayIMin: Consecutive-point delay for ``SetStopIMin``.
+            SetStopAtDelayIMax: Consecutive-point delay for ``SetStopIMax``.
+            alert_duration__s: Minimum duration for runtime alerts (seconds).
+            alert_above: Whether to alert on above- or below-threshold.
+            alert_sleep__s: Suppression window between alerts.
+            alertThreshI_A: Current alert threshold in amperes.
+            comment: Free-form comment recorded with the action.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CV"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_CV)
@@ -658,9 +922,36 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alertThreshEwe_V: float = 0,
         comment: str = "",
     ):
-        """mesasures open circuit potential
-        use 4bit bitmask for triggers
-        IErange depends on gamry model used (test actual limit before using)"""
+        """Measure open-circuit potential via :class:`GamryExec`.
+
+        The post-exec hook runs :func:`bubble_detection` over the recorded
+        Ewe trace using the four ``*_threshold`` parameters and stores the
+        boolean result under ``action_params['has_bubble']``.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            Tval__s: Total measurement duration in seconds.
+            AcqInterval__s: Sample interval in seconds.
+            RSD_threshold: RSD threshold forwarded to :func:`bubble_detection`.
+            simple_threshold: Simple-difference threshold for bubble detection.
+            signal_change_threshold: Signal-change threshold for bubble detection.
+            amplitude_threshold: Amplitude threshold for bubble detection.
+            TTLwait: TTL channel to wait on (``-1`` disables).
+            TTLsend: TTL channel to assert on start (``-1`` disables).
+            IErange: Current range setting; ``"auto"`` for autoranging.
+            SetStopADVMin: Lower |dV/dt| early-stop threshold.
+            SetStopADVMax: Upper |dV/dt| early-stop threshold.
+            alert_duration__s: Minimum duration for runtime alerts (seconds).
+            alert_above: Whether to alert on above- or below-threshold.
+            alert_sleep__s: Suppression window between alerts.
+            alertThreshEwe_V: Potential alert threshold in volts.
+            comment: Free-form comment recorded with the action.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "OCV"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_OCV)
@@ -689,7 +980,34 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         alertThreshI_A: float = 0,
         comment: str = "",
     ):
-        """Measure pulsed voltammetry"""
+        """Run a pulsed-voltammetry cycle via :class:`GamryExec`.
+
+        Builds a per-cycle ``SignalArray__V`` that holds ``Vinit__V`` for
+        ``Tinit__s`` then steps to ``Vstep__V`` for ``Tstep__s``, sampled
+        at ``AcqInterval__s``, repeated for ``Cycles`` cycles.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            Vinit__V: Resting potential within a cycle.
+            Tinit__s: Resting phase duration in seconds.
+            Vstep__V: Stepped potential within a cycle.
+            Tstep__s: Stepped phase duration in seconds.
+            Cycles: Number of pulse cycles to run.
+            AcqInterval__s: Sample interval in seconds.
+            TTLwait: TTL channel to wait on (``-1`` disables).
+            TTLsend: TTL channel to assert on start (``-1`` disables).
+            IErange: Current range setting; ``"auto"`` for autoranging.
+            alert_duration__s: Minimum duration for runtime alerts (seconds).
+            alert_above: Whether to alert on above- or below-threshold.
+            alert_sleep__s: Suppression window between alerts.
+            alertThreshI_A: Current alert threshold in amperes.
+            comment: Free-form comment recorded with the action.
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
 
         # custom signal array can't be done with mapping, generate array here
@@ -733,7 +1051,30 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = -1,
         TTLsend: int = -1,
     ):
-        """run Potentiostatic EIS"""
+        """Start a Potentiostatic EIS sweep via :class:`GamryEisExec`.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            versus_OCV: If true, add a pre-measured mean OCV to ``Voffset__V``.
+            OCV_duration__s: OCV measurement duration when ``versus_OCV`` is true.
+            OCV_acquisition_period__s: OCV sampling period in seconds.
+            Voffset__V: DC potential offset in volts.
+            Vamp__V: AC voltage amplitude in volts.
+            Finit__Hz: Starting frequency in Hz.
+            Ffinal__Hz: Ending frequency in Hz.
+            FrequenciesPerDecade: Spectral resolution in points per decade.
+            Zinit_expected_Ohm: Expected impedance for IE-range selection.
+            ReadFast: If true, request the driver's fast EIS mode.
+            MaxRetries: Per-frequency retry limit before advancing.
+            IErange_fromAC: If true, derive IE range from AC response.
+            TTLwait: TTL channel to wait on (``-1`` disables).
+            TTLsend: TTL channel to assert on start (``-1`` disables).
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "PEIS"
         executor = GamryEisExec(active=active, oneoff=False)
@@ -759,7 +1100,27 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         TTLwait: int = -1,
         TTLsend: int = -1,
     ):
-        """run Galvanostataic EIS"""
+        """Start a Galvanostatic EIS sweep via :class:`GamryEisExec`.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+            fast_samples_in: Sample references associated with this action.
+            Ioffset__A: DC current offset in amperes.
+            Iamp__A: AC current amplitude in amperes.
+            Finit__Hz: Starting frequency in Hz.
+            Ffinal__Hz: Ending frequency in Hz.
+            FrequenciesPerDecade: Spectral resolution in points per decade.
+            Zinit_expected_Ohm: Expected impedance for IE-range selection.
+            ReadFast: If true, request the driver's fast EIS mode.
+            MaxRetries: Per-frequency retry limit before advancing.
+            IErange_fromAC: If true, derive IE range from AC response.
+            TTLwait: TTL channel to wait on (``-1`` disables).
+            TTLsend: TTL channel to assert on start (``-1`` disables).
+
+        Returns:
+            The active action dictionary from ``start_executor``.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "GEIS"
         executor = GamryEisExec(active=active, oneoff=False)
@@ -767,7 +1128,18 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
 
-def makeApp(server_key):
+def makeApp(server_key) -> BaseAPI:
+    """Build the BaseAPI app for the Gamry potentiostat.
+
+    Args:
+        server_key: Unique key identifying this server in the orchestration
+            group.
+
+    Returns:
+        The configured BaseAPI instance with technique endpoints attached
+        via :func:`gamry_dyn_endpoints` plus action-level ``get_meas_status``
+        and ``stop`` endpoints and private state/measurement helpers.
+    """
 
     app = BaseAPI(
         server_key=server_key,
@@ -781,8 +1153,17 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/get_meas_status", tags=["action"])
     async def get_meas_status(action: Action = Body({}, embed=True)):
-        """Will return 'idle' or 'measuring'.
-        Should be used in conjuction with eta to async.sleep loop poll"""
+        """Report the dtaq sink's current state.
+
+        Use together with the eta-driven sleep loop to poll for completion.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+
+        Returns:
+            The finished action dictionary containing ``status`` (typically
+            ``'idle'`` or ``'measuring'``).
+        """
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict={"status": app.driver.dtaqsink.status})
         finished_action = await active.finish()
@@ -793,7 +1174,15 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stops measurement in a controlled way."""
+        """Stop every active executor on the server in a controlled way.
+
+        Args:
+            action: Action wrapper supplied by the orchestrator.
+            action_version: Schema version for this endpoint.
+
+        Returns:
+            The finished action dictionary.
+        """
         active = await app.base.setup_and_contain_action(action_abbr="stop")
         for exec_key in app.base.executors.keys():
             app.base.stop_executor(exec_key)
@@ -801,8 +1190,8 @@ def makeApp(server_key):
         return finished_action.as_dict()
 
     @app.post("/stop_private", tags=["private"])
-    async def stop_private():
-        """Stops measurement."""
+    async def stop_private() -> list:
+        """Stop every active executor and return the list of stopped keys."""
         stopped_keys = []
         for exec_key in app.base.executors.keys():
             app.base.stop_executor(exec_key)
@@ -811,31 +1200,31 @@ def makeApp(server_key):
 
     @app.post("/gamry_state", tags=["private"])
     def gamry_state():
-        """Return pstat.State()."""
+        """Return the dictionary form of ``pstat.State()``."""
         state = app.driver.get_gamry_state()
         return state
 
     @app.post("/gamry_is_open", tags=["private"])
     def gamry_is_open():
-        """Return pstat.TestIsOpen()"""
+        """Return the result of ``pstat.TestIsOpen()``."""
         state = app.driver.pstat.TestIsOpen()
         return state
 
     @app.post("/measure_v", tags=["private"])
     def measure_v():
-        """Return pstat.MeasureV()"""
+        """Return a single voltage reading via ``pstat.MeasureV()``."""
         state = app.driver.pstat.MeasureV()
         return state
 
     @app.post("/measure_i", tags=["private"])
     def measure_i():
-        """Return pstat.MeasureI()"""
+        """Return a single current reading via ``pstat.MeasureI()``."""
         state = app.driver.pstat.MeasureI()
         return state
 
     @app.post("/measure_a", tags=["private"])
     def measure_a():
-        """Return pstat.MeasureA()"""
+        """Return a single auxiliary reading via ``pstat.MeasureA()``."""
         state = app.driver.pstat.MeasureA()
         return state
 

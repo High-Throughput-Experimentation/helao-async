@@ -1,6 +1,8 @@
-"""
-Experiment library for HISPEC
-server_key must be a FastAPI action server defined in config
+"""Experiment library for the HISPEC deployment.
+
+Provides sub-experiment builders that assemble action lists for the orchestrator
+to drive the HISPEC potentiostat, motor, IO, PAL and Andor camera servers. Each
+function returns a list of planned actions built by an `ActionPlanMaker`.
 """
 
 # everything is a 'machine model schema '
@@ -76,15 +78,30 @@ CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict
 toggle_triggertype = TriggerType.risingedge
 
 
-def HISPEC_sub_cooldown(experiment: Experiment):
-    """Cool the detector"""
+def HISPEC_sub_cooldown(experiment: Experiment) -> list:
+    """Run the Andor detector cooling action.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+
+    Returns:
+        List of planned actions invoking the Andor server `cooling` endpoint.
+    """
     apm = ActionPlanMaker()
     apm.add(ANDOR_server, "cooling", {})
     return apm.planned_actions
 
 
-def HISPEC_sub_stop_flow(experiment: Experiment):
-    """Stop the flow"""
+def HISPEC_sub_stop_flow(experiment: Experiment) -> list:
+    """Switch off the working- and counter-electrode flow/pump digital outputs.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+
+    Returns:
+        List of `set_digital_out` actions on the IO server clearing
+        ``we_flow``, ``we_pump`` and ``ce_pump``.
+    """
     apm = ActionPlanMaker()
     for item, flow_flag in (
         ("we_flow", False),
@@ -100,8 +117,16 @@ def HISPEC_sub_stop_flow(experiment: Experiment):
     return apm.planned_actions
 
 
-def HISPEC_sub_unloadall_customs(experiment: Experiment):
-    """last functionality test: -"""
+def HISPEC_sub_unloadall_customs(experiment: Experiment) -> list:
+    """Unload every sample from every custom position via the PAL server.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+
+    Returns:
+        List containing a single PAL ``archive_custom_unloadall`` action
+        with ``destroy_liquid=True``.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -124,7 +149,20 @@ def HISPEC_sub_add_liquid(
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "O2",
     liquid_volume_ml: float = 1.0,
-):
+) -> list:
+    """Inject a liquid aliquot from a reservoir sample into a custom position.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        solid_custom_position: Target custom position holding the solid sample.
+        reservoir_liquid_sample_no: Liquid sample number in the local PAL db.
+        solution_bubble_gas: Reservoir headspace gas label.
+        liquid_volume_ml: Volume of liquid to add in millilitres.
+
+    Returns:
+        List with a single PAL ``archive_custom_add_liquid`` action.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
@@ -155,8 +193,19 @@ def HISPEC_sub_load_solid(
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
-):
-    """last functionality test: -"""
+) -> list:
+    """Load a solid sample (plate_id/sample_no) into a custom PAL position.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        solid_custom_position: Target custom position name.
+        solid_plate_id: Plate id of the solid sample.
+        solid_sample_no: Sample number on the plate.
+
+    Returns:
+        List with a single PAL ``archive_custom_load`` action.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -189,7 +238,26 @@ def HISPEC_sub_engage(
     # calibrate_intensity: bool = False,
     max_integration_time: int = 150,
     # illumination_source: str = "doric_wled",
-):
+) -> list:
+    """Engage the cell: raise the K-motor stage, prime electrolyte flow, then idle.
+
+    Drives the KMOTOR stage to ``z_height``, closes vent valves, energises the
+    selected WE/CE flow and pump digital outputs to pull electrolyte into the
+    chambers, waits ``fill_wait`` seconds, then turns off the high-speed pumps
+    while keeping the WE flow on when requested.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        flow_we: If True, enable working-electrode flow during the fill step.
+        flow_ce: If True, enable counter-electrode pump during the fill step.
+        z_height: Absolute Z position in millimetres for the K-motor.
+        fill_wait: Seconds to dwell while electrolyte is pulled in.
+        max_integration_time: Detector integration ceiling (currently unused).
+
+    Returns:
+        List of motion/IO/wait actions performing the engage sequence.
+    """
 
     # raise z (engage)
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -239,7 +307,17 @@ def HISPEC_sub_interrupt(
     experiment: Experiment,
     experiment_version: int = 1,
     reason: str = "wait",
-):
+) -> list:
+    """Pause the orchestrator with a human-readable reason.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        reason: Message displayed by the operator UI when the interrupt fires.
+
+    Returns:
+        List with a single ORCH ``interrupt`` action.
+    """
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "interrupt", {"reason": reason})
     return apm.planned_actions
@@ -252,7 +330,24 @@ def HISPEC_sub_disengage(
     clear_ce: bool = False,
     z_height: float = 0,
     vent_wait: float = 10.0,
-):
+) -> list:
+    """Disengage the cell: optionally vent/clear chambers and lower the stage.
+
+    Opens vent valves and runs pumps to clear the WE/CE chambers as requested,
+    waits ``vent_wait`` seconds, lowers the K-motor stage to ``z_height``, then
+    closes every WE/CE vent and pump.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        clear_we: If True, energise WE vent/pump during the clear step.
+        clear_ce: If True, energise CE vent/pump during the clear step.
+        z_height: Absolute Z position in millimetres for the K-motor.
+        vent_wait: Seconds to dwell while venting/draining.
+
+    Returns:
+        List of IO, wait, and motion actions performing the disengage.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     for clear_flag, items in (
         (clear_ce, ("ce_vent", "ce_pump")),
@@ -291,9 +386,26 @@ def HISPEC_sub_startup(
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "N2",
     liquid_volume_ml: float = 1.0,
-):
-    """Sub experiment
-    last functionality test: -"""
+) -> list:
+    """Start-up sequence: unload existing samples, load solid+liquid, move to XY.
+
+    Chains :func:`HISPEC_sub_unloadall_customs`, :func:`HISPEC_sub_load_solid`,
+    and :func:`HISPEC_sub_add_liquid`, then queries the plate XY for the chosen
+    sample and moves the motor stage to that position.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        solid_custom_position: Custom position used for the working electrode.
+        solid_plate_id: Plate id of the solid sample.
+        solid_sample_no: Sample number on the plate.
+        reservoir_liquid_sample_no: Liquid sample number for cell filling.
+        solution_bubble_gas: Reservoir headspace gas label.
+        liquid_volume_ml: Volume of liquid to add in millilitres.
+
+    Returns:
+        List of planned PAL, MOTOR and motion actions composing the start-up.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -352,8 +464,15 @@ def HISPEC_sub_startup(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def HISPEC_sub_shutdown(experiment: Experiment):
-    """Unload custom position and disable IR emitter."""
+def HISPEC_sub_shutdown(experiment: Experiment) -> list:
+    """Shutdown sequence: unload every custom position and destroy liquid.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+
+    Returns:
+        List containing a single PAL ``archive_custom_unloadall`` action.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
     return apm.planned_actions  # returns complete action list to orch
@@ -361,7 +480,18 @@ def HISPEC_sub_shutdown(experiment: Experiment):
 def HISPEC_sub_check_CP_Ewe_bounds(experiment: Experiment,
     experiment_version: int = 1,
     Ewe_V__mean_final: float = 0.3,
-):
+) -> list:
+    """Bound the final CP Ewe value through the CALC server.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        Ewe_V__mean_final: Candidate final mean Ewe to bound.
+
+    Returns:
+        List with a single CALC ``check_CP_Ewe_bounds`` action that exports the
+        limited value to the orch global parameter ``limited_Ewe_V__mean_final``.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(CALC_server, "check_CP_Ewe_bounds", {"Ewe_V__mean_final": Ewe_V__mean_final},
     to_global_params={"limited_Ewe_V__mean_final": "Ewe_V__mean_final"}
@@ -376,7 +506,20 @@ def HISPEC_calculate_lower_vertex_potential(
     min_offset_ocv: float = 3,
     new_ocv: float = 3,
     offset_value: float = -0.2,
-):
+) -> list:
+    """Track the minimum OCV and compute a lower vertex potential.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        min_offset_ocv: Running minimum OCV (with offset already applied).
+        new_ocv: Latest OCV measurement to compare against ``min_offset_ocv``.
+        offset_value: Offset applied to the OCV before bookkeeping.
+
+    Returns:
+        List with a single CALC ``keep_min_ocv`` action that exports the
+        running minimum to the orch global ``new_min_OCV``.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
@@ -415,7 +558,25 @@ def HISPEC_sub_CA(
     channel: int = 0,
     TTLwait: int = -1,
     TTLsend: int = -1,
-):
+) -> list:
+    """Run a single chronoamperometry step on the PSTAT server.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        Vval__V: Applied potential (V).
+        Tval__s: Step duration in seconds.
+        AcqInterval__s: Sample interval in seconds.
+        IRange: Current range string accepted by the driver.
+        ERange: Potential range string accepted by the driver.
+        Bandwidth: Bandwidth setting accepted by the driver.
+        channel: Potentiostat channel index.
+        TTLwait: TTL-in trigger channel (-1 disables).
+        TTLsend: TTL-out trigger channel (-1 disables).
+
+    Returns:
+        List with a single PSTAT ``run_CA`` action tagged with technique ``CA``.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
         PSTAT_server,
@@ -449,7 +610,19 @@ def HISPEC_sub_OCV(
     experiment_version: int = 1,
     Tval__s: float = 1,
     SampleRate: float = 0.05,
-):
+) -> list:
+    """Query the loaded sample then run an OCV step and update the min-OCV tracker.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        Tval__s: OCV measurement duration in seconds.
+        SampleRate: Sample interval in seconds.
+
+    Returns:
+        List of PAL/PSTAT/CALC actions: sample query, PSTAT ``run_OCV`` (tagged
+        technique ``OCV``), and a CALC ``keep_min_ocv`` step.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
         PAL_server,
@@ -528,8 +701,39 @@ def HISPEC_sub_SpEC(
     # toggle2_period: float = 2.0,
     # toggle2_time: float = -1,
     comment: str = "",
-):
-    """last functionality test: -"""
+) -> list:
+    """Run a spectro-electrochemistry sweep: trigger Andor acquisition and CV.
+
+    Computes the CV duration from the apex/scan-rate parameters, queries the
+    loaded sample, arms the Andor camera for external-triggered acquisition,
+    waits briefly, then issues a PSTAT ``run_CV`` whose vertices are shifted
+    against the supplied reference and pH.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        Vapex1_vsRHE: First CV vertex vs RHE in volts.
+        Vapex2_vsRHE: Second CV vertex vs RHE in volts.
+        scanrate_voltsec: Scan rate in V/s.
+        samplerate_sec: Sample interval in seconds.
+        cycles: Number of CV cycles.
+        gamrychannelwait: PSTAT TTL-in channel (-1 disables).
+        gamrychannelsend: PSTAT TTL-out channel (-1 disables).
+        IRange: Current range string.
+        ERange: Potential range string.
+        Bandwidth: Bandwidth setting.
+        solution_ph: pH for RHE conversion.
+        ref_vs_nhe: Reference offset vs NHE.
+        toggle1_source: IO output name used for the spectro trigger.
+        toggle1_init_delay: Initial delay before the toggle (s).
+        toggle1_duty: Duty cycle (0-1).
+        toggle1_period: Toggle period in seconds.
+        toggle1_time: Toggle duration; ``-1`` means use the CV duration.
+        comment: Free-form comment recorded with the action params.
+
+    Returns:
+        List of PAL, Andor, ORCH, and PSTAT actions composing the SpEC run.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -671,10 +875,30 @@ def HISPEC_sub_CP(
     # alert_above: bool = True,
     # alert_sleep__s: float = -1,
     # alertThreshEwe_V: float = 0,
-):
+) -> list:
+    """Query the cell sample then run a chronopotentiometry step with bounds check.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        Ival__A: Applied current in amps.
+        Tval__s: Step duration in seconds.
+        AcqInterval__s: Sample interval in seconds.
+        IRange: Current range string.
+        ERange: Potential range string.
+        Bandwidth: Bandwidth setting.
+        channel: Potentiostat channel index.
+        TTLwait: TTL-in trigger channel (-1 disables).
+        TTLsend: TTL-out trigger channel (-1 disables).
+        TTLduration: TTL pulse duration (s).
+
+    Returns:
+        List of PAL, PSTAT and CALC actions performing the CP step and then a
+        bounds check on the resulting final mean Ewe.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    
+
     apm.add(
         PAL_server,
         "archive_custom_query_sample",
@@ -748,7 +972,33 @@ def HISPEC_sub_PEIS(
     TTLwait: int = -1,
     TTLsend: int = -1,
     TTLduration: float = 1.0,
-):
+) -> list:
+    """Run a potentio-EIS sweep on the PSTAT server.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        Vinit__V: DC bias for the EIS sweep (V).
+        Vamp__V: AC amplitude (V).
+        Finit__Hz: Initial frequency (Hz).
+        Ffinal__Hz: Final frequency (Hz).
+        FrequencyNumber: Number of frequency points.
+        Duration__s: Total duration (s); 0 lets the driver decide.
+        AcqInterval__s: Sample interval (s).
+        SweepMode: ``"log"`` or ``"lin"`` frequency sweep.
+        Repeats: Number of sweep repeats.
+        DelayFraction: Pre-sweep delay fraction.
+        IRange: Current range string.
+        ERange: Potential range string.
+        Bandwidth: Bandwidth setting.
+        channel: Potentiostat channel index.
+        TTLwait: TTL-in trigger channel (-1 disables).
+        TTLsend: TTL-out trigger channel (-1 disables).
+        TTLduration: TTL pulse duration (s).
+
+    Returns:
+        List with a single PSTAT ``run_PEIS`` action tagged ``PEIS``.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(

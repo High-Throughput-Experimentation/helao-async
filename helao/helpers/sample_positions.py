@@ -1,3 +1,11 @@
+"""Pydantic models describing custom sample holders and vial trays.
+
+Defines :class:`Custom` (named cell/reservoir/injector/waste positions),
+:class:`_VT_template` and the concrete vial-tray models :class:`VT15`,
+:class:`VT54`, :class:`VT70`, and the :class:`Positions` container that maps
+``tray_num -> slot_num -> tray`` plus a name-keyed ``customs_dict``.
+"""
+
 __all__ = [
     "Custom",
     "CustomTypes",
@@ -37,6 +45,8 @@ VTUnion = ForwardRef("VTUnion")
 
 
 class CustomTypes(str, Enum):
+    """Enumerated roles for :class:`Custom` sample positions."""
+
     cell = "cell"
     reservoir = "reservoir"
     injector = "injector"
@@ -44,6 +54,16 @@ class CustomTypes(str, Enum):
 
 
 class Custom(BaseModel, HelaoDict):
+    """Named single-sample holder of a particular :class:`CustomTypes` role.
+
+    Attributes:
+        sample: The currently loaded sample (or :class:`NoneSample` when empty).
+        custom_name: Position label unique within the configuration.
+        custom_type: Role determining assembly/dilution/destination behavior.
+        blocked: True when the position is administratively blocked.
+        max_vol_ml: Optional maximum holdup volume.
+    """
+
     sample: Optional[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = NoneSample()
@@ -59,6 +79,7 @@ class Custom(BaseModel, HelaoDict):
         return f"custom_name:{self.custom_name}, custom_type:{self.custom_type}"
 
     def assembly_allowed(self) -> bool:
+        """Return True if this position may participate in an assembly (cells only)."""
         if self.custom_type == CustomTypes.cell:
             return True
         elif self.custom_type == CustomTypes.reservoir:
@@ -68,6 +89,7 @@ class Custom(BaseModel, HelaoDict):
             return False
 
     def dilution_allowed(self) -> bool:
+        """Return True if dilution updates are valid for this position (cells only)."""
         if self.custom_type == CustomTypes.cell:
             return True
         elif self.custom_type == CustomTypes.reservoir:
@@ -77,6 +99,7 @@ class Custom(BaseModel, HelaoDict):
             return False
 
     def is_destroyed(self) -> bool:
+        """Return True for terminal positions (injector, waste)."""
         if self.custom_type == CustomTypes.injector:
             return True
         elif self.custom_type == CustomTypes.waste:
@@ -85,6 +108,7 @@ class Custom(BaseModel, HelaoDict):
             return False
 
     def dest_allowed(self) -> bool:
+        """Return True if this position is a valid transfer destination."""
         if self.custom_type == CustomTypes.cell:
             return True
         elif self.custom_type == CustomTypes.injector:
@@ -98,6 +122,7 @@ class Custom(BaseModel, HelaoDict):
     def unload(
         self,
     ) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
+        """Remove and return the loaded sample, clearing block/volume state."""
         ret_sample = deepcopy(self.sample)
         self.blocked = False
         self.max_vol_ml = None
@@ -112,6 +137,15 @@ class Custom(BaseModel, HelaoDict):
     ) -> Tuple[
         bool, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ]:
+        """Load a sample into this position if it is currently empty.
+
+        Args:
+            sample_in: Sample to load.
+
+        Returns:
+            ``(True, copy_of_loaded_sample)`` on success, or
+            ``(False, NoneSample())`` if a sample is already loaded.
+        """
         if self.sample != NoneSample():
             LOGGER.error("sample already loaded. Unload first to load new one.")
             return False, NoneSample()
@@ -123,6 +157,17 @@ class Custom(BaseModel, HelaoDict):
 
 
 class _VT_template(BaseModel, HelaoDict):
+    """Base model for a fixed-size vial tray of identical vial volumes.
+
+    Attributes:
+        max_vol_ml: Per-vial maximum volume.
+        VTtype: Tray type tag (e.g. ``"VT15"``, ``"VT54"``, ``"VT70"``).
+        positions: Number of vial slots in this tray.
+        vials: Per-slot occupancy flags.
+        blocked: Per-slot administrative block flags.
+        samples: Per-slot sample contents (defaults to :class:`NoneSample`).
+    """
+
     max_vol_ml: float
     VTtype: str
     positions: int  # = positions
@@ -135,6 +180,11 @@ class _VT_template(BaseModel, HelaoDict):
 
     @root_validator(skip_on_failure=True)
     def check_init_VT(cls, values):
+        """Ensure ``vials``, ``blocked``, and ``samples`` are aligned to ``positions``.
+
+        Reinitializes any list whose length disagrees with ``positions`` and
+        coerces every sample entry through :func:`object_to_sample`.
+        """
         positions = values.get("positions")
         vials = values.get("vials")
         blocked = values.get("blocked")
@@ -161,23 +211,32 @@ class _VT_template(BaseModel, HelaoDict):
         return f"{self.VTtype} with vials:{self.positions} and max_vol_ml:{self.max_vol_ml}"
 
     def reset_tray(self):
+        """Clear all vial, block, and sample state to the empty defaults."""
         self.vials: List[bool] = [False for i in range(self.positions)]
         self.blocked: List[bool] = [False for i in range(self.positions)]
         self.samples: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [NoneSample() for i in range(self.positions)]
 
-    def first_empty(self):
+    def first_empty(self) -> Optional[int]:
+        """Return the index of the first empty, non-blocked vial slot, or None."""
         res = next(
             (i for i, j in enumerate(self.vials) if not j and not self.blocked[i]), None
         )
         return res
 
-    def first_full(self):
+    def first_full(self) -> Optional[int]:
+        """Return the index of the first occupied vial slot, or None."""
         res = next((i for i, j in enumerate(self.vials) if j), None)
         return res
 
     def update_vials(self, vial_dict):
+        """Set the occupancy flags from an iterable of boolean-like values.
+
+        Args:
+            vial_dict: Iterable of truthy values; entries that cannot be cast
+                to ``bool`` are set to False.
+        """
         for i, vial in enumerate(vial_dict):
             try:
                 self.vials[i] = bool(vial)
@@ -185,6 +244,7 @@ class _VT_template(BaseModel, HelaoDict):
                 self.vials[i] = False
 
     def update_samples(self, samples):
+        """Replace per-slot samples from an iterable; fall back to :class:`NoneSample` on error."""
         for i, sample in enumerate(samples):
             try:
                 self.samples[i] = deepcopy(sample)
@@ -194,6 +254,7 @@ class _VT_template(BaseModel, HelaoDict):
     def unload(
         self,
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Return copies of all non-empty samples and reset the tray."""
         ret_sample = []
         for sample in self.samples:
             if sample != NoneSample():
@@ -207,6 +268,15 @@ class _VT_template(BaseModel, HelaoDict):
         sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
         vial: Optional[int] = None,
     ) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
+        """Load ``sample`` into the 1-indexed ``vial`` slot, if empty.
+
+        Args:
+            sample: Sample to load; :class:`NoneSample` is a no-op.
+            vial: 1-based vial index.
+
+        Returns:
+            A copy of the loaded sample on success, otherwise :class:`NoneSample`.
+        """
         vial -= 1
         ret_sample = NoneSample()
         if sample == NoneSample():
@@ -222,24 +292,37 @@ class _VT_template(BaseModel, HelaoDict):
 
 
 class VT15(_VT_template):
+    """15-position vial tray with 10 ml vials."""
+
     VTtype: Literal["VT15"] = "VT15"
     positions: Literal[15] = 15
     max_vol_ml: Literal[10] = 10.0
 
 
 class VT54(_VT_template):
+    """54-position vial tray with 2 ml vials."""
+
     VTtype: Literal["VT54"] = "VT54"
     positions: Literal[54] = 54
     max_vol_ml: Literal[2] = 2.0
 
 
 class VT70(_VT_template):
+    """70-position vial tray with 1 ml vials."""
+
     VTtype: Literal["VT70"] = "VT70"
     positions: Literal[70] = 70
     max_vol_ml: Literal[1] = 1.0
 
 
 class Positions(BaseModel, HelaoDict):
+    """Container mapping tray/slot to tray models and named custom positions.
+
+    Attributes:
+        trays_dict: Nested mapping ``tray_num -> slot_num -> VT instance``.
+        customs_dict: Mapping of ``custom_name -> Custom`` position.
+    """
+
     # a dict keyed by tray_num, then slot_num and then the VT as value
     trays_dict: Dict[int, Dict[int, Union[VTUnion, None]]] = Field(default={})
     customs_dict: Dict[str, Custom] = Field(default={})

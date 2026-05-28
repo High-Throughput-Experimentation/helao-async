@@ -1,1 +1,1 @@
-# helao.core.models __init__
+"""Pydantic data models and enums shared across HELAO servers and drivers."""

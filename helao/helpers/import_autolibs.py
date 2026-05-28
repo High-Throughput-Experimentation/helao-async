@@ -1,3 +1,13 @@
+"""Dynamic loader for experiment and sequence library modules.
+
+``import_autolibs`` walks the ``experiment_libraries`` or
+``sequence_libraries`` entries of a world config, locates each named
+``*.py`` under the deployment's library directory (with fallbacks to the
+``hte`` deployment and a glob across all deployments), executes it, and
+collects the public callables advertised by the module's ``EXPERIMENTS`` or
+``SEQUENCES`` list alongside their file hashes and source paths.
+"""
+
 __all__ = ["import_autolibs"]
 
 import os
@@ -18,8 +28,31 @@ def import_autolibs(
     lib_dir: Optional[str] = None,
     user_lib_dir: Optional[str] = None,
     lib_type: str = "sequence",
-):
-    """Import automation library functions into environment."""
+) -> tuple:
+    """Import experiment or sequence library functions named by a config.
+
+    Each library module is expected to expose an ``EXPERIMENTS`` or
+    ``SEQUENCES`` list (named after ``lib_type.upper()``) of function names
+    to publish. After loading the configured ``<lib_type>_libraries`` from
+    ``lib_dir``, all ``.py`` files in ``user_lib_dir`` (if any) are also
+    imported.
+
+    Args:
+        world_config_dict: World config; ``<lib_type>_libraries`` lists the
+            modules to load, and ``<lib_type>_path`` may override ``lib_dir``.
+        lib_dir: Directory containing the library modules. Defaults to the
+            deployment's ``<lib_type>s`` folder, derived from
+            ``CONFIG['loaded_config_path']``.
+        user_lib_dir: Optional additional directory whose ``.py`` files are
+            all imported.
+        lib_type: ``"sequence"`` or ``"experiment"``.
+
+    Returns:
+        A 3-tuple ``(lib, codehash_lib, codepath_lib)``: a dict mapping
+        function name to the imported callable, a dict mapping function
+        name to source-file hash, and a dict mapping function name to
+        forward-slash source path.
+    """
 
     lib = {}
     codehash_lib = {}

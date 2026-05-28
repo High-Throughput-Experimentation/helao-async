@@ -1,10 +1,32 @@
+"""String enums mirroring easy-biologic IRange / ERange / Bandwidth values.
+
+Provides serializable ``StrEnum`` aliases plus lookup dictionaries that map
+each alias to the corresponding ``easy_biologic.lib.ec_lib`` enum member, so
+the rest of the driver can accept plain strings from configs and actions.
+"""
+
 from enum import StrEnum
 from easy_biologic.lib.ec_lib import IRange, ERange, Bandwidth
 
 
 class EC_IRange(StrEnum):
-    """
-    Current ranges.
+    """String alias for Biologic current ranges (full-scale current).
+
+    Attributes:
+        p100: 100 pA range.
+        n1: 1 nA range.
+        n10: 10 nA range.
+        n100: 100 nA range.
+        u1: 1 uA range.
+        u10: 10 uA range.
+        u100: 100 uA range.
+        m1: 1 mA range.
+        m10: 10 mA range.
+        m100: 100 mA range.
+        a1: 1 A range.
+        KEEP: Keep the previously configured current range.
+        BOOSTER: External booster range.
+        AUTO: Auto-range.
     """
 
     p100 = "p100"
@@ -25,8 +47,13 @@ class EC_IRange(StrEnum):
 
 
 class EC_ERange(StrEnum):
-    """
-    Voltage ranges
+    """String alias for Biologic voltage ranges (full-scale voltage).
+
+    Attributes:
+        v2_5: +/-2.5 V range.
+        v5: +/-5 V range.
+        v10: +/-10 V range.
+        AUTO: Auto-range.
     """
 
     v2_5 = "v2_5"
@@ -36,8 +63,21 @@ class EC_ERange(StrEnum):
 
 
 class EC_Bandwidth(StrEnum):
-    """
-    Bandwidths
+    """String alias for Biologic control-loop bandwidth settings.
+
+    BW1 corresponds to the slowest stable bandwidth and BW7 to the fastest on
+    standard hardware. BW8 and BW9 are only available on the SP-300 series.
+
+    Attributes:
+        BW1: Slow bandwidth.
+        BW2: Bandwidth setting 2.
+        BW3: Bandwidth setting 3.
+        BW4: Bandwidth setting 4.
+        BW5: Medium bandwidth.
+        BW6: Bandwidth setting 6.
+        BW7: Fast bandwidth.
+        BW8: SP-300-only bandwidth setting.
+        BW9: SP-300-only bandwidth setting.
     """
 
     BW1 = "BW1"  # "Slow"

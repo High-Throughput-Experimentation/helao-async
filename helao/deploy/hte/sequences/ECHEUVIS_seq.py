@@ -1,3 +1,11 @@
+"""Sequence library for ECHEUVIS (electrochemistry with UV-Vis spectroscopy).
+
+Each public ``ECHEUVIS_*`` function builds an experiment list via
+``ExperimentPlanMaker``. Sequences chain sample loading, reference
+measurements, LED-triggered electrochemistry (CV/CA/CP/multiCA), and a
+post-sequence analysis hook.
+"""
+
 __all__ = [
     "ECHEUVIS_CV_led",
     "ECHEUVIS_CA_led",
@@ -66,7 +74,63 @@ def ECHEUVIS_CV_led(
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
     cell_fill_wait: float = 30.0,
-):
+) -> list:
+    """Photo-CV protocol with LED toggling and UV-Vis acquisition.
+
+    Loads the sample, performs reference measurements, then runs CV with synchronized LED illumination and spectrometer triggering.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_vs_nhe: Parameter passed through to the sub-experiments.
+        CV_Vinit_vsRHE: Parameter passed through to the sub-experiments.
+        CV_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
+        CV_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
+        CV_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
+        CV_scanrate_voltsec: Parameter passed through to the sub-experiments.
+        CV_samplerate_mV: Parameter passed through to the sub-experiments.
+        CV_cycles: Parameter passed through to the sub-experiments.
+        preCV_duration: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_names: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CV: Parameter passed through to the sub-experiments.
+        toggleCV_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCV_illum_period: Parameter passed through to the sub-experiments.
+        toggleCV_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCV_illum_time: Parameter passed through to the sub-experiments.
+        toggleSpec_duty: Parameter passed through to the sub-experiments.
+        toggleSpec_period: Parameter passed through to the sub-experiments.
+        toggleSpec_init_delay: Parameter passed through to the sub-experiments.
+        toggleSpec_time: Parameter passed through to the sub-experiments.
+        spec_ref_duration: Parameter passed through to the sub-experiments.
+        spec_int_time_ms: Parameter passed through to the sub-experiments.
+        spec_n_avg: Parameter passed through to the sub-experiments.
+        spec_technique: Parameter passed through to the sub-experiments.
+        calc_ev_parts: Parameter passed through to the sub-experiments.
+        calc_bin_width: Parameter passed through to the sub-experiments.
+        calc_window_length: Parameter passed through to the sub-experiments.
+        calc_poly_order: Parameter passed through to the sub-experiments.
+        calc_lower_wl: Parameter passed through to the sub-experiments.
+        calc_upper_wl: Parameter passed through to the sub-experiments.
+        use_z_motor: Parameter passed through to the sub-experiments.
+        cell_engaged_z: Parameter passed through to the sub-experiments.
+        cell_disengaged_z: Parameter passed through to the sub-experiments.
+        cell_vent_wait: Parameter passed through to the sub-experiments.
+        cell_fill_wait: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
     epm = ExperimentPlanMaker()
 
     epm.add("ECHE_sub_unloadall_customs", {})
@@ -413,7 +477,59 @@ def ECHEUVIS_CA_led(
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
     cell_fill_wait: float = 30.0,
-):
+) -> list:
+    """Photo-CA protocol with LED toggling and UV-Vis acquisition.
+
+    Loads the sample, performs reference measurements, then runs CA with synchronized LED illumination and spectrometer triggering.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_vs_nhe: Parameter passed through to the sub-experiments.
+        CA_potential_vsRHE: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        CA_samplerate_sec: Parameter passed through to the sub-experiments.
+        OCV_duration: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_names: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CA: Parameter passed through to the sub-experiments.
+        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCA_illum_period: Parameter passed through to the sub-experiments.
+        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCA_illum_time: Parameter passed through to the sub-experiments.
+        toggleSpec_duty: Parameter passed through to the sub-experiments.
+        toggleSpec_period: Parameter passed through to the sub-experiments.
+        toggleSpec_init_delay: Parameter passed through to the sub-experiments.
+        toggleSpec_time: Parameter passed through to the sub-experiments.
+        spec_ref_duration: Parameter passed through to the sub-experiments.
+        spec_int_time_ms: Parameter passed through to the sub-experiments.
+        spec_n_avg: Parameter passed through to the sub-experiments.
+        spec_technique: Parameter passed through to the sub-experiments.
+        calc_ev_parts: Parameter passed through to the sub-experiments.
+        calc_bin_width: Parameter passed through to the sub-experiments.
+        calc_window_length: Parameter passed through to the sub-experiments.
+        calc_poly_order: Parameter passed through to the sub-experiments.
+        calc_lower_wl: Parameter passed through to the sub-experiments.
+        calc_upper_wl: Parameter passed through to the sub-experiments.
+        use_z_motor: Parameter passed through to the sub-experiments.
+        cell_engaged_z: Parameter passed through to the sub-experiments.
+        cell_disengaged_z: Parameter passed through to the sub-experiments.
+        cell_vent_wait: Parameter passed through to the sub-experiments.
+        cell_fill_wait: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
     epm = ExperimentPlanMaker()
 
     epm.add("ECHE_sub_unloadall_customs", {})
@@ -753,7 +869,58 @@ def ECHEUVIS_CP_led(
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
     cell_fill_wait: float = 30.0,
-):
+) -> list:
+    """Photo-CP protocol with LED toggling and UV-Vis acquisition.
+
+    Loads the sample, performs reference measurements, then runs CP with synchronized LED illumination and spectrometer triggering.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_vs_nhe: Parameter passed through to the sub-experiments.
+        CP_current: Parameter passed through to the sub-experiments.
+        CP_duration_sec: Parameter passed through to the sub-experiments.
+        CP_samplerate_sec: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_names: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CP: Parameter passed through to the sub-experiments.
+        toggleCP_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCP_illum_period: Parameter passed through to the sub-experiments.
+        toggleCP_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCP_illum_time: Parameter passed through to the sub-experiments.
+        toggleSpec_duty: Parameter passed through to the sub-experiments.
+        toggleSpec_period: Parameter passed through to the sub-experiments.
+        toggleSpec_init_delay: Parameter passed through to the sub-experiments.
+        toggleSpec_time: Parameter passed through to the sub-experiments.
+        spec_ref_duration: Parameter passed through to the sub-experiments.
+        spec_int_time_ms: Parameter passed through to the sub-experiments.
+        spec_n_avg: Parameter passed through to the sub-experiments.
+        spec_technique: Parameter passed through to the sub-experiments.
+        calc_ev_parts: Parameter passed through to the sub-experiments.
+        calc_bin_width: Parameter passed through to the sub-experiments.
+        calc_window_length: Parameter passed through to the sub-experiments.
+        calc_poly_order: Parameter passed through to the sub-experiments.
+        calc_lower_wl: Parameter passed through to the sub-experiments.
+        calc_upper_wl: Parameter passed through to the sub-experiments.
+        use_z_motor: Parameter passed through to the sub-experiments.
+        cell_engaged_z: Parameter passed through to the sub-experiments.
+        cell_disengaged_z: Parameter passed through to the sub-experiments.
+        cell_vent_wait: Parameter passed through to the sub-experiments.
+        cell_fill_wait: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
     epm = ExperimentPlanMaker()
 
     epm.add("ECHE_sub_unloadall_customs", {})
@@ -1071,7 +1238,44 @@ def ECHEUVIS_diagnostic_CV(
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
     cell_fill_wait: float = 30.0,
-):
+) -> list:
+    """Diagnostic CV used to validate the ECHEUVIS pstat and optics.
+
+    Loads a reference sample and runs a standard CV scan with the configured spectrometer reference.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        solid_sample_no: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_vs_nhe: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_names: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CA: Parameter passed through to the sub-experiments.
+        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCA_illum_period: Parameter passed through to the sub-experiments.
+        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCA_illum_time: Parameter passed through to the sub-experiments.
+        toggleSpec_duty: Parameter passed through to the sub-experiments.
+        toggleSpec_period: Parameter passed through to the sub-experiments.
+        toggleSpec_init_delay: Parameter passed through to the sub-experiments.
+        toggleSpec_time: Parameter passed through to the sub-experiments.
+        spec_n_avg: Parameter passed through to the sub-experiments.
+        cell_engaged_z: Parameter passed through to the sub-experiments.
+        cell_disengaged_z: Parameter passed through to the sub-experiments.
+        cell_vent_wait: Parameter passed through to the sub-experiments.
+        cell_fill_wait: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
     epm = ExperimentPlanMaker()
     epm.add("ECHEUVIS_sub_startup", {})
     epm.add(
@@ -1229,7 +1433,54 @@ def ECHEUVIS_multiCA_led(
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
     cell_fill_wait: float = 30.0,
-):
+) -> list:
+    """Photo-CA series at multiple potentials with UV-Vis.
+
+    Iterates through the supplied CA potential list running photo-CA and UV-Vis acquisition at each value.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        plate_sample_no_list: Parameter passed through to the sub-experiments.
+        reservoir_electrolyte: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
+        solution_bubble_gas: Parameter passed through to the sub-experiments.
+        solution_ph: Parameter passed through to the sub-experiments.
+        measurement_area: Parameter passed through to the sub-experiments.
+        ref_vs_nhe: Parameter passed through to the sub-experiments.
+        CA_potential_vsRHE: Parameter passed through to the sub-experiments.
+        CA_duration_sec: Parameter passed through to the sub-experiments.
+        CA_samplerate_sec: Parameter passed through to the sub-experiments.
+        OCV_duration_sec: Parameter passed through to the sub-experiments.
+        gamry_i_range: Parameter passed through to the sub-experiments.
+        led_type: Parameter passed through to the sub-experiments.
+        led_date: Parameter passed through to the sub-experiments.
+        led_names: Parameter passed through to the sub-experiments.
+        led_wavelengths_nm: Parameter passed through to the sub-experiments.
+        led_intensities_mw: Parameter passed through to the sub-experiments.
+        led_name_CA: Parameter passed through to the sub-experiments.
+        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
+        toggleCA_illum_period: Parameter passed through to the sub-experiments.
+        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
+        toggleCA_illum_time: Parameter passed through to the sub-experiments.
+        toggleSpec_duty: Parameter passed through to the sub-experiments.
+        toggleSpec_period: Parameter passed through to the sub-experiments.
+        toggleSpec_init_delay: Parameter passed through to the sub-experiments.
+        toggleSpec_time: Parameter passed through to the sub-experiments.
+        spec_ref_duration: Parameter passed through to the sub-experiments.
+        spec_int_time_ms: Parameter passed through to the sub-experiments.
+        spec_n_avg: Parameter passed through to the sub-experiments.
+        spec_technique: Parameter passed through to the sub-experiments.
+        random_start_potential: Parameter passed through to the sub-experiments.
+        use_z_motor: Parameter passed through to the sub-experiments.
+        cell_engaged_z: Parameter passed through to the sub-experiments.
+        cell_disengaged_z: Parameter passed through to the sub-experiments.
+        cell_vent_wait: Parameter passed through to the sub-experiments.
+        cell_fill_wait: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
     epm = ExperimentPlanMaker()
 
     epm.add("ECHEUVIS_sub_startup", {})
@@ -1573,7 +1824,20 @@ def ECHEUVIS_postseq(
     analysis_seq_uuid: str = "",
     plate_id: int = 0,
     recent: bool = False,
-):
+) -> list:
+    """Post-sequence analysis hook for ECHEUVIS runs.
+
+    Forwards the sequence UUID and parameters to the ECHEUVIS analyzer.
+
+    Args:
+        sequence_version: Parameter passed through to the sub-experiments.
+        analysis_seq_uuid: Parameter passed through to the sub-experiments.
+        plate_id: Parameter passed through to the sub-experiments.
+        recent: Parameter passed through to the sub-experiments.
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
     epm = ExperimentPlanMaker()
     epm.add(
         "ECHEUVIS_analysis_stability",

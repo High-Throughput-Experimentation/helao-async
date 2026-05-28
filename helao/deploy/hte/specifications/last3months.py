@@ -1,3 +1,10 @@
+"""Specification parser that lists sequence zip files from the last 15 weeks.
+
+Implements a :class:`BaseParser` that the orchestrator uses to surface
+recently-finished sequence runs (under year/week-numbered folders) for
+re-running with overridden parameters.
+"""
+
 import os
 import glob
 import inspect
@@ -13,14 +20,28 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class SpecParser(BaseParser):
+    """Lister/parser for sequence zips collected over the last 15 weeks."""
+
     def __init__(self):
+        """Declare the parameter-name to type map exposed to the operator UI."""
         self.PARAM_TYPES = {
             "plate_id": int,
             "plate_sample_no": int,
             "plate_sample_no_list": list,
         }
 
-    def lister(self, folderpath: str):
+    def lister(self, folderpath: str) -> list:
+        """Return up to 50 recent non-manual sequence zips from ``folderpath``.
+
+        Globs ``folderpath/<YY.WW>/**/*.zip`` for each of the last 15
+        weeks and excludes ``__manual_orch_seq__`` paths.
+
+        Args:
+            folderpath: Root directory holding ``YY.WW`` subfolders.
+
+        Returns:
+            List of up to 50 zip paths sorted newest-first.
+        """
         specfiles = []
         for i in range(15):
             yearweek = (datetime.now() + timedelta(weeks=-i)).strftime("%y.%W")
@@ -36,7 +57,18 @@ class SpecParser(BaseParser):
         latest_50 = specfiles[:50]
         return latest_50
 
-    def list_params(self, specfile: str, orch):
+    def list_params(self, specfile: str, orch) -> dict:
+        """Return the argument-name to annotation map for the spec's sequence.
+
+        Args:
+            specfile: Path to the sequence zip file.
+            orch: Orchestrator whose ``sequence_lib`` is used to look
+                up the sequence function.
+
+        Returns:
+            Mapping of argument name to annotation (or
+            ``"unspecified"``), or ``{}`` if the sequence is missing.
+        """
         zdat = HelaoData(specfile)
         zyml = zdat.yml
         seqname = zyml["sequence_name"]
@@ -52,6 +84,18 @@ class SpecParser(BaseParser):
         return {k: v for k, v in zip(tmpargs, tmptypes)}
 
     def parser(self, specfile: str, orch, params: dict = {}, **kwargs):
+        """Build a new sequence from a spec zip, optionally overriding params.
+
+        Args:
+            specfile: Path to the sequence zip file.
+            orch: Orchestrator providing sequence lib/codehash/codepath.
+            params: Optional overrides merged on top of the saved
+                sequence params.
+            **kwargs: Ignored extra arguments.
+
+        Returns:
+            A freshly constructed sequence ready for enqueueing.
+        """
         zdat = HelaoData(specfile)
         zyml = zdat.yml
         loaded_params = zyml["sequence_params"]

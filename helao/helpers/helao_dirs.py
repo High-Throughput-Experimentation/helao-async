@@ -1,3 +1,12 @@
+"""Resolve and prepare the on-disk directory layout used by a HELAO server.
+
+Given a loaded config, ``helao_dirs`` ensures the standard ``RUNS_ACTIVE``,
+``LOGS``, ``STATES``, ``DATABASE``, ``USER_CONFIG``, ``ANALYSES`` and
+``PROCESSES`` subdirectories exist under the configured ``root``, archives
+any leftover ``*.txt`` log files from a previous run, and returns a
+populated ``HelaoDirs`` model.
+"""
+
 __all__ = ["helao_dirs"]
 
 import os
@@ -10,18 +19,21 @@ from helao.core.models.helaodirs import HelaoDirs
 
 
 def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
-    """
-    Initializes and verifies the directory structure for the Helao application based on the provided configuration.
+    """Create the standard HELAO directory tree and return its paths.
+
+    If ``world_cfg`` defines a ``root``, the canonical subdirectories under
+    that root are created if missing and any prior ``*.txt`` logs under
+    ``LOGS/<server_name>`` are zipped and removed. If ``root`` is absent,
+    a ``HelaoDirs`` with all-``None`` paths is returned.
 
     Args:
-        world_cfg (dict): Configuration dictionary containing the root directory and other settings.
-        server_name (str, optional): Name of the server. If provided, old log files will be compressed.
+        world_cfg: Loaded world configuration dictionary.
+        server_name: Server name used to locate this server's log directory
+            for archival. Logs are only rotated when this is provided.
 
     Returns:
-        HelaoDirs: An instance of the HelaoDirs class containing paths to various directories.
-
-    Raises:
-        Exception: If there is an error compressing old log files.
+        A ``HelaoDirs`` model populated with the resolved paths (or all
+        ``None`` when ``root`` is absent from the config).
     """
 
     def check_dir(path):

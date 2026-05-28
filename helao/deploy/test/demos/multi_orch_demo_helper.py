@@ -1,3 +1,11 @@
+"""Helper script for launching active-learning demo sequences on multiple orchestrators.
+
+Resolves the demo config matching the ``demo0``/``demo1``/``demo2`` prefix supplied on
+the command line, builds an ``OERSIM_activelearn`` sequence with the requested stop
+criteria, enqueues it through the orchestrator's ``append_sequence`` endpoint, and
+then starts the orchestrator.
+"""
+
 import os
 import sys
 

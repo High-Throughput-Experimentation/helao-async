@@ -1,3 +1,11 @@
+"""Meerstetter MeCom TEC driver and HELAO executors.
+
+Wraps the ``mecom`` library to talk to a Meerstetter TEC over serial,
+periodically poll parameters such as object temperature and stability, and
+expose monitor/wait executors usable by the temperature-control action
+server.
+"""
+
 __all__ = ["MeerstetterTEC", "TECMonExec", "TECWaitExec"]
 
 import time
@@ -38,9 +46,24 @@ COMMAND_TABLE = {
 
 
 class MeerstetterTEC(object):
-    """Controlling TEC devices via serial."""
+    """Driver for a Meerstetter TEC device controlled over serial.
+
+    Opens a ``MeCom`` serial session, identifies the device address, runs a
+    periodic ``poll_sensor_loop`` task that pushes selected parameters into
+    the action server's live buffer, and exposes helpers to enable/disable
+    the control loop and set the target object temperature.
+    """
 
     def __init__(self, action_serv: Base):
+        """Initialise the driver from the action server's config.
+
+        Reads ``channel``, ``port``, ``retries``, ``queries``, ``start_margin``
+        and ``allow_no_sample`` from ``server_cfg['params']``, retries the
+        serial handshake on timeouts and starts the polling background task.
+
+        Args:
+            action_serv: Parent HELAO action server (:class:`Base`).
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.channel = self.config_dict["channel"]
@@ -68,9 +91,11 @@ class MeerstetterTEC(object):
         self.polling_task = self.event_loop.create_task(self.poll_sensor_loop())
 
     def _tearDown(self):
+        """Stop the underlying ``MeCom`` serial session."""
         self.session().stop()
 
     def _connect(self):
+        """Open a ``MeCom`` session on ``self.port`` and identify the address."""
         # open session
         self._session = MeCom(serialport=self.port, timeout=1)
         # get device address
@@ -78,11 +103,18 @@ class MeerstetterTEC(object):
         logging.info("connected to {}".format(self.address))
 
     def session(self):
+        """Return the active session, lazily reconnecting if needed."""
         if self._session is None:
             self._connect()
         return self._session
 
-    def get_data(self):
+    def get_data(self) -> dict:
+        """Query each parameter in ``self.queries`` and return their values.
+
+        Returns:
+            ``{description: (value, unit)}`` for each successfully queried
+            parameter.
+        """
         data = {}
         for description in self.queries:
             cid, unit = COMMAND_TABLE[description]
@@ -99,11 +131,16 @@ class MeerstetterTEC(object):
         return data
 
     def set_temp(self, value):
-        """
-        Set object temperature of channel to desired value.
-        :param value: float
-        :param channel: int
-        :return:
+        """Set the object temperature setpoint for this channel.
+
+        Args:
+            value: Target temperature in degrees Celsius. Must be ``float``.
+
+        Returns:
+            The result of the underlying ``set_parameter`` call.
+
+        Raises:
+            AssertionError: If ``value`` is not a ``float``.
         """
         # assertion to explicitly enter floats
         assert type(value) is float
@@ -118,11 +155,13 @@ class MeerstetterTEC(object):
         )
 
     def _set_enable(self, enable=True):
-        """
-        Enable or disable control loop
-        :param enable: bool
-        :param channel: int
-        :return:
+        """Enable or disable the TEC control loop for this channel.
+
+        Args:
+            enable: ``True`` to turn the loop on, ``False`` to turn it off.
+
+        Returns:
+            The result of the underlying ``set_parameter`` call.
         """
         value, description = (1, "on") if enable else (0, "off")
         logging.info("set loop for channel {} to {}".format(self.channel, description))
@@ -134,12 +173,19 @@ class MeerstetterTEC(object):
         )
 
     def enable(self):
+        """Enable the TEC control loop."""
         return self._set_enable(True)
 
     def disable(self):
+        """Disable the TEC control loop."""
         return self._set_enable(False)
 
     async def poll_sensor_loop(self, frequency: int = 1):
+        """Forever-running task that pushes ``tec_vals`` to the live buffer.
+
+        Args:
+            frequency: Poll rate in Hz; sleep interval is ``1 / frequency``.
+        """
         waittime = 1.0 / frequency
         LOGGER.info("Starting polling loop")
         while True:
@@ -150,6 +196,7 @@ class MeerstetterTEC(object):
             await asyncio.sleep(waittime)
 
     def shutdown(self):
+        """Cancel the polling task and disable the TEC control loop."""
         try:
             self.polling_task.cancel()
         except asyncio.CancelledError:
@@ -158,14 +205,26 @@ class MeerstetterTEC(object):
 
 
 class TECMonExec(Executor):
+    """HELAO :class:`Executor` that monitors TEC values for a fixed duration.
+
+    Polls the live buffer for ``tec_vals`` and yields ``HloStatus.active``
+    until ``duration`` seconds have elapsed (or indefinitely when
+    ``duration < 0``).
+    """
+
     def __init__(self, *args, **kwargs):
+        """Capture the start time and configured monitor duration."""
         super().__init__(*args, **kwargs)
         LOGGER.info("TECMonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 
     async def _poll(self):
-        """Read TEC values from live buffer."""
+        """Read TEC values from the live buffer and signal duration completion.
+
+        Returns:
+            Standard executor dict with ``error``, ``status`` and ``data``.
+        """
         live_dict = {}
         tec_vals, epoch_s = self.active.base.get_lbuf("tec_vals")
         live_dict["epoch_s"] = epoch_s
@@ -194,7 +253,14 @@ STABLE_ID_MAP = {
 
 
 class TECWaitExec(Executor):
+    """HELAO :class:`Executor` that waits until the TEC reports stable.
+
+    Polls ``tec_vals['temperature_is_stable']`` and finishes once it equals
+    ``2`` (the "temperature is stable" code).
+    """
+
     def __init__(self, *args, **kwargs):
+        """Capture timing state and configure the initial pre-exec sleep."""
         super().__init__(*args, **kwargs)
         LOGGER.info("TECWaitExec initialized.")
         self.start_time = time.time()
@@ -203,13 +269,17 @@ class TECWaitExec(Executor):
         self.initial_sleep = 2
 
     async def _pre_exec(self):
-        "Setup methods, return error state."
+        """Sleep for ``self.initial_sleep`` to let the live buffer settle."""
         LOGGER.info(f"TECWait Executor sleeping for {self.initial_sleep} seconds.")
         await asyncio.sleep(self.initial_sleep)
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
-        """Read TEC values from live buffer."""
+        """Read TEC values and finish once stability code reaches ``2``.
+
+        Returns:
+            Standard executor dict with ``error``, ``status`` and ``data``.
+        """
         live_dict = {}
         tec_vals, epoch_s = self.active.base.get_lbuf("tec_vals")
         live_dict["epoch_s"] = epoch_s

@@ -1,14 +1,18 @@
-"""A device class for the AliCat mass flow controller.
+"""Alicat mass flow controller driver and HELAO executors.
 
-This device class uses the python implementation from https://github.com/numat/alicat
-and additional methods from https://documents.alicat.com/Alicat-Serial-Primer.pdf. The
-default gas list included in the module code differs from our MFC at G16 (i-C4H10),
-G25 (He-25), and G26 (He-75). Update the gas list registers in case any of the 3 gases
-are used.
+Builds on a forked copy of the numat `alicat` serial driver (`FlowMeter`,
+`FlowController` at the bottom of this module) and wraps it in `AliCatMFC`,
+which owns one `FlowController` per configured device and runs an asyncio
+polling task that publishes status to the action-server live buffer. Three
+`Executor` subclasses (`MfcExec`, `PfcExec`, `MfcConstPresExec`,
+`MfcConstConcExec`) drive constant-flow, constant-pressure, and
+concentration-feedback sequences.
 
-NOTE: Factory default control setpoint is analog and must be changed for driver operation.
-Setpoint setup (Menu-Control-Setpoint_setup-Setpoint_source) has to be set to serial.
-
+NOTE: the factory default control setpoint on Alicat MFCs is analog and must
+be changed to serial (Menu-Control-Setpoint_setup-Setpoint_source) for this
+driver to operate. The default gas list shipped with `alicat` differs from
+HELAO's units at G16 (i-C4H10), G25 (He-25), and G26 (He-75); update the gas
+registers if those gases are used.
 """
 
 __all__ = ["AliCatMFC", "MfcExec", "PfcExec", "MfcConstPresExec"]
@@ -35,7 +39,21 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class AliCatMFC:
+    """HELAO wrapper around one or more Alicat `FlowController` instances.
+
+    Reads a `devices` dict from `server_cfg["params"]`, instantiates a
+    `FlowController` per entry, queries each device's gas/info registers, and
+    runs `poll_sensor_loop` to publish per-device status to the live buffer.
+    Exposes async helpers for setting flow/pressure, swapping gases,
+    locking/unlocking the front panel, holding valves, and taring.
+    """
+
     def __init__(self, action_serv: Base):
+        """Connect to every configured Alicat and start the polling tasks.
+
+        Args:
+            action_serv: Owning HELAO action server.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
 
@@ -62,6 +80,16 @@ class AliCatMFC:
         self.last_state = "unknown"
 
     def make_fc_instance(self, device_name: str, device_config: dict):
+        """Open a `FlowController` and cache its gas list and identity info.
+
+        Sends `lsss` to force serial setpoint control, then queries `??g*` and
+        `??m*` to populate `self.fcinfo[device_name]` with `gases` and `info`
+        dicts.
+
+        Args:
+            device_name: Key used to look up this controller in `self.fcs`.
+            device_config: Per-device config containing `port` and `unit_id`.
+        """
         self.fcs[device_name] = FlowController(
             port=device_config["port"], address=device_config["unit_id"]
         )
@@ -85,7 +113,17 @@ class AliCatMFC:
         mfg_dict = {" ".join(line.split()[:-1]): line.split()[-1] for line in mfg_list}
         self.fcinfo[device_name] = {"gases": gas_dict, "info": mfg_dict}
 
-    def _send(self, device_name: str, command: str):
+    def _send(self, device_name: str, command: str) -> list:
+        """Send a raw serial command to a controller and collect the multi-line reply.
+
+        Args:
+            device_name: Key in `self.fcs`.
+            command: Command body; a trailing carriage return is added if
+                missing. The unit_id prefix is prepended automatically.
+
+        Returns:
+            List of response lines (without the trailing blank line).
+        """
         unit_id = self.config_dict["devices"][device_name]["unit_id"]
         if not command.endswith("\r"):
             command += "\r"
@@ -100,6 +138,7 @@ class AliCatMFC:
         return lines
 
     async def start_polling(self):
+        """Signal the polling loop to resume and block until it has restarted."""
         LOGGER.info("got 'start_polling' request, raising signal")
         # async with self.base.aiolock:
         await self.poll_signalq.put(True)
@@ -108,6 +147,7 @@ class AliCatMFC:
             await asyncio.sleep(0.1)
 
     async def stop_polling(self):
+        """Signal the polling loop to pause and block until it has stopped."""
         LOGGER.info("got 'stop_polling' request, raising signal")
         # async with self.base.aiolock:
         await self.poll_signalq.put(False)
@@ -116,11 +156,17 @@ class AliCatMFC:
             await asyncio.sleep(0.1)
 
     async def poll_signal_loop(self):
+        """Consume signals from `poll_signalq` and update `self.polling`."""
         while True:
             self.polling = await self.poll_signalq.get()
             LOGGER.info("polling signal received")
 
     async def poll_sensor_loop(self, waittime: float = 0.1):
+        """Background loop polling each MFC and pushing status to the live buffer.
+
+        On a `get_status` exception, the corresponding `FlowController` is
+        rebuilt via `make_fc_instance` and its prior control point restored.
+        """
         LOGGER.info("MFC background task has started")
         self.last_acquire = {dev_name: 0 for dev_name in self.fcs.keys()}
         lastupdate = 0
@@ -173,7 +219,8 @@ class AliCatMFC:
                         LOGGER.info(f"!!Received unexpected dict: {resp_dict}")
                 await asyncio.sleep(0.001)
 
-    def list_gases(self, device_name: str):
+    def list_gases(self, device_name: str) -> dict:
+        """Return the cached gas-register dict for the named device."""
         return self.fcinfo.get(device_name, {}).get("gases", {})
 
     async def set_pressure(
@@ -183,8 +230,17 @@ class AliCatMFC:
         ramp_psi_sec: Optional[float] = 0,
         *args,
         **kwargs,
-    ):
-        """Set control mode to pressure, set point = pressure_psi, ramping psi/sec or zero to disable."""
+    ) -> list:
+        """Switch the device into pressure control and set the setpoint.
+
+        Args:
+            device_name: Key in `self.fcs`.
+            pressure_psia: Setpoint in psia.
+            ramp_psi_sec: Ramp rate in psi/s; zero disables ramping.
+
+        Returns:
+            List with the ramp-command response and the `set_pressure` reply.
+        """
         resp = []
         await self.stop_polling()
         resp.append(self._send(device_name, f"SR {ramp_psi_sec} 4"))
@@ -199,8 +255,17 @@ class AliCatMFC:
         ramp_sccm_sec: Optional[float] = 0,
         *args,
         **kwargs,
-    ):
-        """Set control mode to mass flow, set point = flowrate_scc, ramping flowrate_sccm or zero to disable."""
+    ) -> list:
+        """Switch the device into mass-flow control and set the setpoint.
+
+        Args:
+            device_name: Key in `self.fcs`.
+            flowrate_sccm: Setpoint in sccm.
+            ramp_sccm_sec: Ramp rate in sccm/s; zero disables ramping.
+
+        Returns:
+            List with the ramp-command response and the `set_flow_rate` reply.
+        """
         resp = []
         await self.stop_polling()
         resp.append(self._send(device_name, f"SR {ramp_sccm_sec} 4"))
@@ -209,14 +274,18 @@ class AliCatMFC:
         return resp
 
     async def set_gas(self, device_name: str, gas: Union[int, str]):
-        "Set MFC to pure gas"
+        """Set the device to a pure gas (by Alicat gas index or short name)."""
         await self.stop_polling()
         resp = self.fcs[device_name].set_gas(gas)
         await self.start_polling()
         return resp
 
     async def set_gas_mixture(self, device_name: str, gas_dict: dict):
-        "Set MFC to gas mixture defined in gas_dict {gasname: integer_pct}"
+        """Define and select a custom mix (slot 236) given `{gas_name: pct}`.
+
+        Returns an empty dict (without sending commands) if the percentages
+        do not sum to 100.
+        """
         if sum(gas_dict.values()) != 100:
             LOGGER.info("Gas mixture percentages do not add to 100.")
             return {}
@@ -231,7 +300,7 @@ class AliCatMFC:
             return resp
 
     async def lock_display(self, device_name: Optional[str] = None):
-        """Lock the front display."""
+        """Lock the front-panel display on one device, or on all when `device_name` is None."""
         await self.stop_polling()
         if device_name is None:
             resp = []
@@ -244,7 +313,7 @@ class AliCatMFC:
         return resp
 
     async def unlock_display(self, device_name: Optional[str] = None):
-        """Unlock the front display."""
+        """Unlock the front-panel display on one device, or on all when `device_name` is None."""
         await self.stop_polling()
         if device_name is None:
             resp = []
@@ -257,7 +326,7 @@ class AliCatMFC:
         return resp
 
     async def hold_valve(self, device_name: Optional[str] = None):
-        """Hold the valve in its current position."""
+        """Hold the valve at its current position on one device, or all when `device_name` is None."""
         await self.stop_polling()
         if device_name is None:
             resp = []
@@ -270,7 +339,7 @@ class AliCatMFC:
         return resp
 
     async def hold_valve_closed(self, device_name: Optional[str] = None):
-        """Close valve and hold."""
+        """Drive flow to zero, then issue a `hc` hold-closed on one device or all."""
         await self.stop_polling()
         if device_name is None:
             resp = []
@@ -284,7 +353,7 @@ class AliCatMFC:
         return resp
 
     async def hold_cancel(self, device_name: Optional[str] = None):
-        """Cancel the valve hold."""
+        """Cancel an active valve hold on one device, or on all when `device_name` is None."""
         await self.stop_polling()
         if device_name is None:
             resp = []
@@ -297,7 +366,7 @@ class AliCatMFC:
         return resp
 
     async def tare_volume(self, device_name: Optional[str] = None):
-        """Tare volumetric flow. Ensure mfc is isolated."""
+        """Tare volumetric flow on one device or all. Caller must isolate the MFC first."""
         await self.stop_polling()
         if device_name is None:
             resp = []
@@ -310,7 +379,7 @@ class AliCatMFC:
         return resp
 
     async def tare_pressure(self, device_name: Optional[str] = None):
-        """Tare absolute pressure."""
+        """Tare absolute pressure on one device, or on all when `device_name` is None."""
         await self.stop_polling()
         if device_name is None:
             resp = []
@@ -334,31 +403,40 @@ class AliCatMFC:
     #     return resp
 
     def manual_query_status(self, device_name: str):
+        """Return the most recent live-buffer entry for `device_name`."""
         return self.base.get_lbuf(device_name)
 
     async def async_shutdown(self):
-        """Await tasks prior to driver shutdown."""
+        """Stop polling and close all valves prior to driver shutdown."""
         await self.stop_polling()
         await asyncio.sleep(0.5)
         LOGGER.info("stopping MFC flows")
         await self.hold_valve_closed()
 
-    async def estop(self, *args, **kwargs):
+    async def estop(self, *args, **kwargs) -> bool:
+        """Close every valve and return True to indicate the estop was handled."""
         LOGGER.info("stopping MFC flows")
         await self.hold_valve_closed()
         return True
 
     def shutdown(self):
-        # this gets called when the server is shut down or reloaded to ensure a clean
-        # disconnect ... just restart or terminate the server
-        # self.poll_signalq.put_nowait(False)
+        """Close every Alicat serial connection. Invoked on action-server shutdown."""
         LOGGER.info("closing MFC connections")
         for fc in self.fcs.values():
             fc.close()
 
 
 class MfcExec(Executor):
+    """Executor for a fixed-flow MFC action.
+
+    Reads `device_name`, `duration`, `flowrate_sccm`, `ramp_sccm_sec`, and
+    `stay_open` from the action params. Sets the flow rate in `_pre_exec`,
+    cancels the valve hold in `_exec`, integrates total flow in `_poll`, and
+    optionally reasserts the valve hold in `_post_exec`.
+    """
+
     def __init__(self, *args, **kwargs):
+        """Initialize the executor and capture device name, duration, and start time."""
         super().__init__(*args, **kwargs)
         self.start_time = time.time()
         self.device_name = self.active.action.action_params["device_name"]
@@ -366,8 +444,8 @@ class MfcExec(Executor):
         LOGGER.info("MfcExec initialized.")
         self.duration = self.active.action.action_params.get("duration", -1)
 
-    async def _pre_exec(self):
-        "Set flow rate."
+    async def _pre_exec(self) -> dict:
+        """Set the flow rate (and ramp) for the configured device."""
         LOGGER.info("MfcExec running setup methods.")
         self.flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
         self.ramp_sccm_sec = self.active.action.action_params.get("ramp_sccm_sec", 0)
@@ -380,8 +458,8 @@ class MfcExec(Executor):
             LOGGER.info(f"set_flowrate returned: {rate_resp}")
         return {"error": ErrorCodes.none}
 
-    async def _exec(self):
-        "Cancel valve hold."
+    async def _exec(self) -> dict:
+        """Reset accumulators and cancel the valve hold to start flowing."""
         self.start_time = time.time()
         self.last_acq_time = self.start_time
         self.last_acq_flow = 0
@@ -393,8 +471,12 @@ class MfcExec(Executor):
             LOGGER.info(f"hold_cancel returned: {openvlv_resp}")
         return {"error": ErrorCodes.none}
 
-    async def _poll(self):
-        """Read flow from live buffer."""
+    async def _poll(self) -> dict:
+        """Read flow from the live buffer and integrate total volume.
+
+        Returns a dict with `error`, `status` (active until `duration`
+        elapses), and `data` containing the latest live-buffer record.
+        """
         live_dict, epoch_s = self.active.base.get_lbuf(self.device_name)
         live_dict["epoch_s"] = epoch_s
         live_flow = max(live_dict["mass_flow"], 0)
@@ -416,8 +498,8 @@ class MfcExec(Executor):
             "data": live_dict,
         }
 
-    async def _post_exec(self):
-        "Restore valve hold."
+    async def _post_exec(self) -> dict:
+        """Record `total_scc` on the action and close the valve unless `stay_open`."""
         LOGGER.info("MfcExec running cleanup methods.")
         self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
@@ -431,8 +513,14 @@ class MfcExec(Executor):
 
 
 class PfcExec(MfcExec):
-    async def _pre_exec(self):
-        "Set pressure."
+    """Executor for a fixed-pressure MFC action.
+
+    Reads `pressure_psia` and `ramp_psi_sec` instead of flow params and uses
+    `set_pressure` to drive the MFC in pressure mode.
+    """
+
+    async def _pre_exec(self) -> dict:
+        """Set the target pressure (and ramp) on the configured device."""
         LOGGER.info("PfcExec running setup methods.")
         self.pressure_psia = self.active.action.action_params.get("pressure_psia", None)
         self.ramp_psi_sec = self.active.action.action_params.get("ramp_psi_sec", 0)
@@ -445,8 +533,8 @@ class PfcExec(MfcExec):
             LOGGER.info(f"set_pressure returned: {rate_resp}")
         return {"error": ErrorCodes.none}
 
-    async def _exec(self):
-        "Cancel valve hold."
+    async def _exec(self) -> dict:
+        """Reset accumulators and cancel the valve hold to apply the pressure setpoint."""
         self.start_time = time.time()
         self.last_acq_time = self.start_time
         self.last_acq_flow = 0
@@ -460,7 +548,16 @@ class PfcExec(MfcExec):
 
 
 class MfcConstPresExec(MfcExec):
+    """Executor that pulses the MFC to maintain a target pressure in a fixed volume.
+
+    Reads `target_pressure`, `total_gas_scc`, `flowrate_sccm`, `ramp_sccm_sec`,
+    and `refill_freq_sec`. Each poll cycle, if the measured pressure is below
+    `target_pressure` and the refill cooldown has elapsed, opens the valve
+    for a computed time before closing it again.
+    """
+
     def __init__(self, *args, **kwargs):
+        """Initialize the executor and read its target-pressure parameters."""
         super().__init__(*args, **kwargs)
         self.last_fill = self.start_time
         action_params = self.active.action.action_params
@@ -472,7 +569,16 @@ class MfcConstPresExec(MfcExec):
         self.filling = False
         self.fill_end = self.start_time
 
-    def eval_pressure(self, pressure):
+    def eval_pressure(self, pressure) -> tuple:
+        """Compute the refill time and volume needed to reach `target_pressure`.
+
+        Args:
+            pressure: Measured pressure in the same units as `target_pressure`.
+
+        Returns:
+            `(False, False)` if already above target, otherwise
+            `(fill_time_seconds, fill_volume_scc)`.
+        """
         if pressure > self.target_pressure:
             return False, False
         else:
@@ -480,8 +586,8 @@ class MfcConstPresExec(MfcExec):
             fill_time = 60.0 * fill_scc / self.flowrate_sccm
             return fill_time, fill_scc
 
-    async def _pre_exec(self):
-        "Set flow rate."
+    async def _pre_exec(self) -> dict:
+        """Set the refill flow rate on the device before the loop starts."""
         LOGGER.info("MfcConstPresExec running setup methods.")
         rate_resp = await self.active.driver.set_flowrate(
             device_name=self.device_name,
@@ -491,16 +597,16 @@ class MfcConstPresExec(MfcExec):
         LOGGER.info(f"set_flowrate returned: {rate_resp}")
         return {"error": ErrorCodes.none}
 
-    async def _exec(self):
-        "Cancel valve hold."
+    async def _exec(self) -> dict:
+        """Reset accumulators; the loop opens the valve only on demand."""
         self.start_time = time.time()
         self.last_acq_time = self.start_time
         self.last_acq_flow = 0
         self.total_scc = 0
         return {"error": ErrorCodes.none}
 
-    async def _poll(self):
-        """Read flow from live buffer."""
+    async def _poll(self) -> dict:
+        """Decide whether to open or close the valve based on measured pressure."""
         iter_time = time.time()
         live_dict, _ = self.active.base.get_lbuf(self.device_name)
         live_flow = max(live_dict["mass_flow"], 0)
@@ -545,8 +651,8 @@ class MfcConstPresExec(MfcExec):
             "status": status,
         }
 
-    async def _post_exec(self):
-        "Restore valve hold."
+    async def _post_exec(self) -> dict:
+        """Record `total_scc` and close the valve unless `stay_open` is set."""
         LOGGER.info("MfcConstPresExec running cleanup methods.")
         self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
@@ -560,7 +666,16 @@ class MfcConstPresExec(MfcExec):
 
 
 class MfcConstConcExec(MfcExec):
+    """Executor that maintains a target CO2 concentration in a fixed headspace.
+
+    Subscribes to a configured CO2 sensor server's `ws_live` WebSocket and
+    pulses the MFC valve to inject CO2 until the headspace concentration
+    reaches `target_co2_ppm`. Reads `target_co2_ppm`, `headspace_scc`,
+    `flowrate_sccm`, `ramp_sccm_sec`, and `refill_freq_sec` from action params.
+    """
+
     def __init__(self, *args, **kwargs):
+        """Initialize the executor and connect to the CO2 sensor server WebSocket."""
         super().__init__(*args, **kwargs)
         self.last_fill = self.start_time
         action_params = self.active.action.action_params
@@ -587,7 +702,14 @@ class MfcConstConcExec(MfcExec):
 
         self.wsc = WSC(co2serv_host, co2serv_port, "ws_live")
 
-    def eval_conc(self):
+    def eval_conc(self) -> tuple:
+        """Read recent CO2 readings and compute the refill time and volume.
+
+        Blocks (with 1 s sleeps) until at least one CO2 packet arrives on the
+        WebSocket, then averages up to the last 10 `co2_ppm` samples and
+        returns `(fill_time_seconds, fill_volume_scc)` needed to reach
+        `target_co2_ppm` in `headspace_scc`.
+        """
         data_package = self.wsc.read_messages()
         while not data_package:
             data_package = self.wsc.read_messages()
@@ -617,8 +739,8 @@ class MfcConstConcExec(MfcExec):
         fill_time = fill_scc / self.flowrate_sccm * 60.0
         return fill_time, fill_scc
 
-    async def _pre_exec(self):
-        "Set flow rate."
+    async def _pre_exec(self) -> dict:
+        """Set the refill flow rate on the device before the loop starts."""
         LOGGER.info("MfcConstConcExec running setup methods.")
         rate_resp = await self.active.driver.set_flowrate(
             device_name=self.device_name,
@@ -628,16 +750,16 @@ class MfcConstConcExec(MfcExec):
         LOGGER.info(f"set_flowrate returned: {rate_resp}")
         return {"error": ErrorCodes.none}
 
-    async def _exec(self):
-        "Begin loop."
+    async def _exec(self) -> dict:
+        """Reset accumulators; the poll loop drives valve pulses."""
         self.start_time = time.time()
         self.last_acq_time = self.start_time
         self.last_acq_flow = 0
         self.total_scc = 0
         return {"error": ErrorCodes.none}
 
-    async def _poll(self):
-        """Read flow from live buffer."""
+    async def _poll(self) -> dict:
+        """Decide whether to open or close the valve based on measured CO2 ppm."""
         iter_time = time.time()
         live_dict, _ = self.active.base.get_lbuf(self.device_name)
         live_flow = max(live_dict["mass_flow"], 0)
@@ -681,8 +803,8 @@ class MfcConstConcExec(MfcExec):
             "status": status,
         }
 
-    async def _post_exec(self):
-        "Restore valve hold."
+    async def _post_exec(self) -> dict:
+        """Record `total_scc` and close the valve unless `stay_open` is set."""
         LOGGER.info("MfcConstConcExec running cleanup methods.")
         self.active.action.action_params["total_scc"] = self.total_scc
         if not self.active.action.action_params.get("stay_open", False):
@@ -810,13 +932,11 @@ Copyright (C) 2019 NuMat Technologies
 
 
 class FlowMeter(object):
-    """Python driver for Alicat Flow Meters.
+    """Serial driver for Alicat flow meters.
 
-    [Reference](http://www.alicat.com/
-    products/mass-flow-meters-and-controllers/mass-flow-meters/).
-
-    This communicates with the flow meter over a USB or RS-232/RS-485
-    connection using pyserial.
+    Communicates with the device over USB or RS-232/RS-485 using `pyserial`.
+    Multiple `FlowMeter` instances sharing the same serial port share a
+    single `serial.Serial` via `FlowMeter.open_ports` refcounting.
     """
 
     # A dictionary that maps port names to a tuple of connection
@@ -824,11 +944,11 @@ class FlowMeter(object):
     open_ports = {}
 
     def __init__(self, port="/dev/ttyUSB0", address="A"):
-        """Connect this driver with the appropriate USB / serial port.
+        """Open (or share) a 19200-baud serial connection to the flow meter.
 
         Args:
-            port: The serial port. Default '/dev/ttyUSB0'.
-            address: The Alicat-specified address, A-Z. Default 'A'.
+            port: Serial port name. Default '/dev/ttyUSB0'.
+            address: Alicat unit ID character, A-Z. Default 'A'.
         """
         self.address = address
         self.port = port
@@ -885,14 +1005,11 @@ class FlowMeter(object):
         self.flush()
 
     @classmethod
-    def is_connected(cls, port, address="A"):
-        """Return True if the specified port is connected to this device.
+    def is_connected(cls, port, address="A") -> bool:
+        """Probe a port/address and return True if the device matches `cls`.
 
-        This class can be used to automatically identify ports with connected
-        Alicats. Iterate through all connected interfaces, and use this to
-        test. Ports that come back True should be valid addresses.
-
-        Note that this distinguishes between `FlowController` and `FlowMeter`.
+        Useful for auto-discovery. The check distinguishes `FlowMeter` and
+        `FlowController` by whether `setpoint` appears in the status keys.
         """
         is_device = False
         try:
@@ -913,11 +1030,10 @@ class FlowMeter(object):
         return is_device
 
     def _test_controller_open(self):
-        """Raise an IOError if the FlowMeter has been closed.
+        """Raise IOError if the underlying serial connection has been closed.
 
-        Does nothing if the meter is open and good for read/write
-        otherwise raises an IOError. This only checks if the meter
-        has been closed by the FlowMeter.close method.
+        Raises:
+            IOError: When `self.open` is False.
         """
         if not self.open:
             raise IOError(
@@ -927,22 +1043,20 @@ class FlowMeter(object):
                 )
             )
 
-    def get_status(self, retries=5):
-        """Get the current state of the flow controller.
+    def get_status(self, retries=5) -> dict:
+        """Read the current device state.
 
-        From the Alicat mass flow controller documentation, this data is:
-         * Pressure (normally in psia)
-         * Temperature (normally in C)
-         * Volumetric flow (in units specified at time of order)
-         * Mass flow (in units specified at time of order)
-         * Total flow (only on models with the optional totalizer function)
-         * Currently selected gas
+        Per the Alicat documentation, the returned dict contains: pressure
+        (psia), temperature (C), volumetric flow, mass flow, optional total
+        flow, and the currently selected gas. `HLD` and `LCK` status flags
+        are surfaced as `hold_valve` and `lock_display` bools. An
+        `acquire_time` epoch timestamp is appended.
 
         Args:
-            retries: Number of times to re-attempt reading. Default 2.
-        Returns:
-            The state of the flow controller, as a dictionary.
+            retries: Maximum number of serial retries on no-response.
 
+        Returns:
+            Dict mapping status keys to floats (or strings for the gas field).
         """
         self._test_controller_open()
 
@@ -981,16 +1095,12 @@ class FlowMeter(object):
         return return_dict
 
     def set_gas(self, gas, retries=2):
-        """Set the gas type.
+        """Set the selected gas by name or by Alicat gas index.
 
         Args:
-            gas: The gas type, as a string or integer. Supported strings are:
-                'Air', 'Ar', 'CH4', 'CO', 'CO2', 'C2H6', 'H2', 'He', 'N2',
-                'N2O', 'Ne', 'O2', 'C3H8', 'n-C4H10', 'C2H2', 'C2H4',
-                'i-C2H10', 'Kr', 'Xe', 'SF6', 'C-25', 'C-10', 'C-8', 'C-2',
-                'C-75', 'A-75', 'A-25', 'A1025', 'Star29', 'P-5'
-
-                Gas mixes may only be called by their mix number.
+            gas: Gas name (one of `self.gases`) or integer gas index.
+                Gas mixtures must be referenced by index.
+            retries: Maximum number of serial retries.
         """
         self._test_controller_open()
 
@@ -1000,9 +1110,10 @@ class FlowMeter(object):
             return self._set_gas_name(gas, retries)
 
     def _set_gas_number(self, number, retries):
-        """Set flow controller gas type by number.
+        """Set the gas by Alicat gas index and verify via register 46.
 
-        See supported gases in 'FlowController.gases'.
+        Raises:
+            IOError: If the readback does not match the requested index.
         """
         self._test_controller_open()
         command = "{addr}$${index}\r".format(addr=self.address, index=number)
@@ -1015,9 +1126,11 @@ class FlowMeter(object):
             raise IOError("Cannot set gas.")
 
     def _set_gas_name(self, name, retries):
-        """Set flow controller gas type by name.
+        """Set the gas by name and verify via register 46.
 
-        See the Alicat manual for usage.
+        Raises:
+            ValueError: If `name` is not in `self.gases`.
+            IOError: If the readback does not match the requested gas.
         """
         self._test_controller_open()
         if name not in self.gases:
@@ -1034,17 +1147,21 @@ class FlowMeter(object):
             raise IOError("Cannot set gas.")
 
     def create_mix(self, mix_no, name, gases, retries=2):
-        """Create a gas mix.
+        """Create a COMPOSER gas mix in slots 236-255.
 
-        Gas mixes are made using COMPOSER software.
-        COMPOSER mixes are only allowed for firmware 5v or greater.
+        Requires firmware 5v or greater. Display names longer than six
+        characters are truncated by the device.
 
         Args:
-        mix_no: The mix number. Gas mixes are stored in slots 236-255.
-        name: A name for the gas that will appear on the front panel.
-        Names greater than six letters will be cut off.
-        gases: A dictionary of the gas by name along with the associated
-        percentage in the mix.
+            mix_no: Mix slot, in [236, 255].
+            name: Display name for the mix.
+            gases: Dict mapping gas name to its integer percentage; values
+                must sum to 100.
+            retries: Maximum number of serial retries.
+
+        Raises:
+            IOError: On unsupported firmware or device-reported failure.
+            ValueError: For bad slot, bad percentages, or unsupported gas.
         """
         self._test_controller_open()
 
@@ -1078,7 +1195,11 @@ class FlowMeter(object):
             raise IOError("Unable to create mix.")
 
     def delete_mix(self, mix_no, retries=2):
-        """Delete a gas mix."""
+        """Delete the gas mix in slot `mix_no`.
+
+        Raises:
+            IOError: If the device returns "?".
+        """
         self._test_controller_open()
         command = "{addr}GD{mixNumber}\r".format(addr=self.address, mixNumber=mix_no)
         line = self._write_and_read(command, retries)
@@ -1087,19 +1208,23 @@ class FlowMeter(object):
             raise IOError("Unable to delete mix.")
 
     def lock(self, retries=2):
-        """Lock the display."""
+        """Lock the front-panel display."""
         self._test_controller_open()
         command = "{addr}$$L\r".format(addr=self.address)
         self._write_and_read(command, retries)
 
     def unlock(self, retries=2):
-        """Unlock the display."""
+        """Unlock the front-panel display."""
         self._test_controller_open()
         command = "{addr}$$U\r".format(addr=self.address)
         self._write_and_read(command, retries)
 
     def tare_pressure(self, retries=2):
-        """Tare the pressure."""
+        """Tare absolute pressure.
+
+        Raises:
+            IOError: If the device returns "?".
+        """
         self._test_controller_open()
 
         command = "{addr}$$PC\r".format(addr=self.address)
@@ -1109,7 +1234,11 @@ class FlowMeter(object):
             raise IOError("Unable to tare pressure.")
 
     def tare_volumetric(self, retries=2):
-        """Tare volumetric flow."""
+        """Tare volumetric flow.
+
+        Raises:
+            IOError: If the device returns "?".
+        """
         self._test_controller_open()
         command = "{addr}$$V\r".format(addr=self.address)
         line = self._write_and_read(command, retries)
@@ -1118,13 +1247,13 @@ class FlowMeter(object):
             raise IOError("Unable to tare flow.")
 
     def reset_totalizer(self, retries=2):
-        """Reset the totalizer."""
+        """Reset the totalizer (only meaningful on totalizer-equipped units)."""
         self._test_controller_open()
         command = "{addr}T\r".format(addr=self.address)
         self._write_and_read(command, retries)
 
     def flush(self):
-        """Read all available information. Use to clear queue."""
+        """Flush the underlying serial input and output buffers."""
         self._test_controller_open()
 
         self.connection.flush()
@@ -1132,10 +1261,10 @@ class FlowMeter(object):
         self.connection.flushOutput()
 
     def close(self):
-        """Close the flow meter. Call this on program termination.
+        """Release this instance's reference to the shared serial port.
 
-        Also closes the serial port if no other FlowMeter object has
-        a reference to the port.
+        The underlying `serial.Serial` is only closed when no other
+        `FlowMeter` shares the same port.
         """
         if not self.open:
             return
@@ -1152,7 +1281,11 @@ class FlowMeter(object):
         self.open = False
 
     def _write_and_read(self, command, retries=2):
-        """Write a command and reads a response from the flow controller."""
+        """Send `command` and return the first non-empty response.
+
+        Raises:
+            IOError: If no response is received after `retries + 1` attempts.
+        """
         self._test_controller_open()
 
         for _ in range(retries + 1):
@@ -1165,11 +1298,7 @@ class FlowMeter(object):
             raise IOError("Could not read from flow controller.")
 
     def _readline(self):
-        """Read a line using a custom newline character (CR in this case).
-
-        Function from http://stackoverflow.com/questions/16470903/
-        pyserial-2-6-specify-end-of-line-in-readline
-        """
+        """Read bytes until a CR terminator and return the decoded string."""
         self._test_controller_open()
 
         line = bytearray()
@@ -1185,16 +1314,15 @@ class FlowMeter(object):
 
 
 class FlowController(FlowMeter):
-    """Python driver for Alicat Flow Controllers.
+    """Serial driver for Alicat flow controllers (extends `FlowMeter`).
 
-    [Reference](http://www.alicat.com/products/mass-flow-meters-and-
-    controllers/mass-flow-controllers/).
+    Adds setpoint, control-point, hold, and PID-tuning commands on top of
+    `FlowMeter`. The controller must be configured with serial setpoint input
+    (Menu-Control-Setpoint_setup-Setpoint_source = Serial).
 
-    This communicates with the flow controller over a USB or RS-232/RS-485
-    connection using pyserial.
-
-    To set up your Alicat flow controller, power on the device and make sure
-    that the "Input" option is set to "Serial".
+    Attributes:
+        registers: Mapping of control-point names to the register value
+            written to register 122 to select that control mode.
     """
 
     registers = {
@@ -1206,11 +1334,11 @@ class FlowController(FlowMeter):
     }
 
     def __init__(self, port="/dev/ttyUSB0", address="A"):
-        """Connect this driver with the appropriate USB / serial port.
+        """Open the serial link and cache the current control point.
 
         Args:
-            port: The serial port. Default '/dev/ttyUSB0'.
-            address: The Alicat-specified address, A-Z. Default 'A'.
+            port: Serial port name. Default '/dev/ttyUSB0'.
+            address: Alicat unit ID character, A-Z. Default 'A'.
         """
         FlowMeter.__init__(self, port, address)
         try:
@@ -1218,24 +1346,18 @@ class FlowController(FlowMeter):
         except Exception:
             self.control_point = None
 
-    def get_status(self, retries=5):
-        """Get the current state of the flow controller.
+    def get_status(self, retries=5) -> dict:
+        """Read current state and append the cached control point.
 
-        From the Alicat mass flow controller documentation, this data is:
-         * Pressure (normally in psia)
-         * Temperature (normally in C)
-         * Volumetric flow (in units specified at time of order)
-         * Mass flow (in units specified at time of order)
-         * Flow setpoint (in units of control point)
-         * Flow control point (either 'flow' or 'pressure')
-         * Total flow (only on models with the optional totalizer function)
-         * Currently selected gas
+        Extends `FlowMeter.get_status` with a `control_point` field that
+        identifies whether the device is currently controlling flow or
+        pressure.
 
         Args:
-            retries: Number of times to re-attempt reading. Default 2.
-        Returns:
-            The state of the flow controller, as a dictionary.
+            retries: Maximum number of serial retries.
 
+        Returns:
+            Dict of status values, or None if the underlying read returned None.
         """
         state = FlowMeter.get_status(self, retries)
         if state is None:
@@ -1244,10 +1366,11 @@ class FlowController(FlowMeter):
         return state
 
     def set_flow_rate(self, flow, retries=2):
-        """Set the target flow rate.
+        """Set the target mass-flow setpoint, switching control point if needed.
 
         Args:
-            flow: The target flow rate, in units specified at time of purchase
+            flow: Target flow rate in the device's configured flow units.
+            retries: Maximum number of serial retries.
         """
         if self.control_point in ["abs pressure", "gauge pressure", "diff pressure"]:
             self._set_setpoint(0, retries)
@@ -1255,11 +1378,12 @@ class FlowController(FlowMeter):
         self._set_setpoint(flow, retries)
 
     def set_pressure(self, pressure, retries=2):
-        """Set the target pressure.
+        """Set the target pressure setpoint, switching control point if needed.
 
         Args:
-            pressure: The target pressure, in units specified at time of
-                purchase. Likely in psia.
+            pressure: Target pressure in the device's configured pressure units
+                (typically psia).
+            retries: Maximum number of serial retries.
         """
         if self.control_point in ["mass flow", "vol flow"]:
             self._set_setpoint(0, retries)
@@ -1267,27 +1391,25 @@ class FlowController(FlowMeter):
         self._set_setpoint(pressure, retries)
 
     def hold(self, retries=2):
-        """Override command to issue a valve hold.
+        """Hold the valve(s) at their current position via `$$H`.
 
-        For a single valve controller, hold the valve at the present value.
-        For a dual valve flow controller, hold the valve at the present value.
-        For a dual valve pressure controller, close both valves.
+        For dual-valve pressure controllers this closes both valves.
         """
         self._test_controller_open()
         command = "{addr}$$H\r".format(addr=self.address)
         self._write_and_read(command, retries)
 
     def cancel_hold(self, retries=2):
-        """Cancel valve hold."""
+        """Cancel an active valve hold via `$$C`."""
         self._test_controller_open()
         command = "{addr}$$C\r".format(addr=self.address)
         self._write_and_read(command, retries)
 
-    def get_pid(self, retries=2):
-        """Read the current PID values on the controller.
+    def get_pid(self, retries=2) -> dict:
+        """Read the current PID configuration (loop type plus P/D/I gains).
 
-        Values include the loop type, P value, D value, and I value.
-        Values returned as a dictionary.
+        Returns:
+            Dict with keys `loop_type`, `P`, `D`, and `I`.
         """
         self._test_controller_open()
 
@@ -1311,15 +1433,17 @@ class FlowController(FlowMeter):
         }
 
     def set_pid(self, p=None, i=None, d=None, loop_type=None, retries=2):
-        """Set specified PID parameters.
+        """Write any subset of P/I/D/loop_type by writing the corresponding registers.
 
         Args:
-            p: Proportional gain
-            i: Integral gain. Only used in PD2I loop type.
-            d: Derivative gain
-            loop_type: Algorithm option, either 'PD/PDF' or 'PD2I'
+            p: Proportional gain (register 21).
+            i: Integral gain (register 23). Only meaningful for PD2I.
+            d: Derivative gain (register 22).
+            loop_type: Either 'PD/PDF' or 'PD2I'.
+            retries: Maximum number of serial retries.
 
-        This communication works by writing Alicat registers directly.
+        Raises:
+            ValueError: If `loop_type` is not one of the allowed strings.
         """
         self._test_controller_open()
         if loop_type is not None:
@@ -1341,10 +1465,10 @@ class FlowController(FlowMeter):
             self._write_and_read(command, retries)
 
     def _set_setpoint(self, setpoint, retries=2):
-        """Set the target setpoint.
+        """Issue the `S<setpoint>` command and log a warning if readback diverges.
 
-        Called by `set_flow_rate` and `set_pressure`, which both use the same
-        command once the appropriate register is set.
+        Called by `set_flow_rate` and `set_pressure` once the appropriate
+        control register has been selected.
         """
         self._test_controller_open()
 
@@ -1359,7 +1483,11 @@ class FlowController(FlowMeter):
             print("Could not set setpoint. Possibly ramping.")
 
     def _get_control_point(self, retries=2):
-        """Get the control point, and save to internal variable."""
+        """Read register 122 and return the matching `registers` key.
+
+        Raises:
+            ValueError: If the device returns an unmapped register value.
+        """
         command = "{addr}R122\r".format(addr=self.address)
         line = self._write_and_read(command, retries)
         if not line:
@@ -1371,10 +1499,14 @@ class FlowController(FlowMeter):
             raise ValueError("Unexpected register value: {:d}".format(value))
 
     def _set_control_point(self, point, retries=2):
-        """Set whether to control on mass flow or pressure.
+        """Switch the active control register to `point`.
 
         Args:
-            point: Either "flow" or "pressure".
+            point: A key of `self.registers` (e.g. "mass flow", "abs pressure").
+
+        Raises:
+            ValueError: If `point` is not one of the supported registers.
+            IOError: If the device readback differs from the requested value.
         """
         if point not in self.registers:
             raise ValueError("Control point must be 'flow' or 'pressure'.")
@@ -1389,7 +1521,11 @@ class FlowController(FlowMeter):
 
 
 def command_line(args):
-    """CLI interface, accessible when installed through pip."""
+    """CLI entry point used when the forked `alicat` driver is run directly.
+
+    Applies the requested gas/flow/pressure/lock/hold operations and either
+    streams readings or prints a single JSON status snapshot.
+    """
 
     flow_controller = FlowController(port=args.port, address=args.address)
 

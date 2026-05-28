@@ -1,8 +1,4 @@
-"""
-Action library for DEMO
-
-server_key must be a FastAPI action server defined in config
-"""
+"""Archived demo experiment library wrapping basic PSTAT techniques."""
 
 __all__ = [
     "DEMO_sub_CP",
@@ -35,8 +31,23 @@ def DEMO_sub_CP(
     SampleRate: float = 0.01,
     CP_duration_sec: float = 60,
     IErange: str = "auto",
-):
-    """last functionality test: -"""
+) -> list:
+    """Queue a PSTAT ``run_CP`` step with the supplied current and duration.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        WE_versus: Working-electrode reference frame label.
+        ref_type: Reference electrode type label.
+        pH: Solution pH (used for downstream RHE conversions).
+        CP_current: Applied current in amps.
+        SampleRate: Sample interval in seconds.
+        CP_duration_sec: Step duration in seconds.
+        IErange: Gamry current range string.
+
+    Returns:
+        List with a single PSTAT ``run_CP`` action.
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -68,7 +79,27 @@ def DEMO_sub_CA(
     ref_offset__V: float = 0.0,
     ref_type: str = "leakless",
     pH: float = 6.8,
-):
+) -> list:
+    """Queue a PSTAT ``run_CA`` step after converting the bias to vs. reference.
+
+    Converts ``WE_potential__V`` from the supplied frame to vs. reference using
+    ``REF_TABLE[ref_type]`` and the pH when ``WE_versus == 'rhe'``.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        WE_potential__V: Working-electrode bias in the chosen frame.
+        WE_versus: Frame label: ``"ref"`` or ``"rhe"``.
+        CA_duration_sec: Step duration in seconds.
+        SampleRate: Sample interval in seconds.
+        IErange: Gamry current range string.
+        ref_offset__V: Reference-electrode offset (V).
+        ref_type: Reference electrode type label (must be in ``REF_TABLE``).
+        pH: Solution pH.
+
+    Returns:
+        List with a single PSTAT ``run_CA`` action.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     if WE_versus == "ref":
@@ -98,7 +129,18 @@ def DEMO_sub_OCV(
     experiment_version: int = 1,
     Tval__s: float = 900.0,
     IErange: str = "auto",
-):
+) -> list:
+    """Queue a PSTAT ``run_OCV`` step with the supplied duration.
+
+    Args:
+        experiment: Parent experiment supplied by the orchestrator.
+        experiment_version: Sub-experiment version tag.
+        Tval__s: OCV duration in seconds.
+        IErange: Gamry current range string.
+
+    Returns:
+        List with a single PSTAT ``run_OCV`` action.
+    """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # OCV

@@ -1,11 +1,8 @@
-"""HelaoDriver for LeanCAT Fuel Cell Test Station
+"""HelaoDriver wrapping the LEANCAT fuel-cell test-station SDK.
 
-TODO:
-  1. Always disconnect from the station when the driver is shut down
-  2. Create_session should be an action so we can control OPC logging over the course of an experiment
-  3. Need to query postgresql database for latest job id
-
-
+Loads the LEANCAT app/node configuration from JSON files, wires up the
+LEANCAT logging subsystem, and connects to a single configured OPC UA
+station through ``leancat_helao.station.Station``.
 """
 
 import json
@@ -29,10 +26,32 @@ from helao.core.drivers.helao_driver import (
 
 
 class LeancatDriver(HelaoDriver):
+    """HelaoDriver for a LEANCAT fuel-cell test-station.
+
+    Loads the LEANCAT ``app.config.json`` and ``nodes.config.json`` files
+    referenced in the driver config, points the LEANCAT logger at this
+    driver's log file, imports the LEANCAT logger/station modules and
+    connects to ``station_name`` (default ``"Caltech_PBT_n1"``).
+
+    Attributes:
+        device_name: LEANCAT device name placeholder.
+        connection_raised: Tracks whether a connection error has been raised.
+    """
+
     device_name: str
     connection_raised: bool
 
     def __init__(self, config: dict = {}):
+        """Initialise the driver and connect to the configured LEANCAT station.
+
+        Args:
+            config: Driver config containing ``app_config_json_path``,
+                ``nodes_config_json_path`` and optional ``station_name``.
+
+        Raises:
+            ValueError: If either of the two config-file paths is missing
+                from ``config``.
+        """
         super().__init__(config=config)
         file_handlers = [
             x for x in LOGGER.handlers if isinstance(x, TimedRotatingFileHandler)
@@ -65,5 +84,6 @@ class LeancatDriver(HelaoDriver):
         LOGGER.info(f"Connected to LeanCAT station {self.station_name}.")
 
     def shutdown(self) -> None:
+        """Disconnect the LEANCAT station client."""
         self.station.disconnect()
         LOGGER.info(f"Disconnected from LeanCAT station {self.station_name}.")

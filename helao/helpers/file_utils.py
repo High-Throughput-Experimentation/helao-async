@@ -26,7 +26,20 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-def file_in_use(file_path):
+def file_in_use(file_path) -> bool:
+    """Return whether ``file_path`` is currently held open by another process.
+
+    Probes the file by attempting a no-op rename onto itself; on Windows
+    this raises :class:`PermissionError` while another process holds the
+    handle.
+
+    Args:
+        file_path: Path-like pointing at the file to probe.
+
+    Returns:
+        ``True`` if the file exists and is locked, ``False`` otherwise
+        (including when the file does not exist).
+    """
     path = Path(file_path)
 
     if not path.exists():
@@ -39,8 +52,13 @@ def file_in_use(file_path):
         return True
 
 
-async def rm_tree_async(pth: Union[anyio.Path, str]):
-    """Recursively remove a directory and its contents asynchronously."""
+async def rm_tree_async(pth: Union[anyio.Path, str]) -> None:
+    """Recursively delete a directory and its contents using :mod:`anyio`.
+
+    Args:
+        pth: Directory to remove; strings and :class:`pathlib.Path`
+            values are coerced to :class:`anyio.Path`.
+    """
     if isinstance(pth, str):
         pth = anyio.Path(pth)
     elif isinstance(pth, Path):
@@ -54,8 +72,12 @@ async def rm_tree_async(pth: Union[anyio.Path, str]):
     await pth.rmdir()
 
 
-def rm_tree(pth):
-    """Recursively remove a directory and its contents."""
+def rm_tree(pth) -> None:
+    """Recursively delete a directory and its contents.
+
+    Args:
+        pth: Path-like pointing at the directory to remove.
+    """
     pth = Path(pth)
     for child in pth.glob("*"):
         if child.is_file():
@@ -65,10 +87,15 @@ def rm_tree(pth):
     pth.rmdir()
 
 
-def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]):
-    """Compress the contents of a directory into a zip file, then remove the source dir.
+def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]) -> None:
+    """Zip ``target_dir`` into ``filename`` and delete the source on success.
 
-    Files with the ``.lock`` suffix are excluded.
+    Files with the ``.lock`` suffix are skipped. If zipping raises, the
+    source directory is left in place.
+
+    Args:
+        target_dir: Directory whose contents should be archived.
+        filename: Destination zip file path.
     """
     target_dir = Path(target_dir)
     success = False
@@ -90,14 +117,29 @@ def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]):
 
 
 def unzpickle(fpath):
-    """Decompress a zstd-compressed file and deserialize the contained pickle."""
+    """Load a zstandard-compressed pickle from disk.
+
+    Args:
+        fpath: Path to a file written by :func:`zpickle`.
+
+    Returns:
+        The deserialised Python object.
+    """
     data = pyzstd.ZstdFile(fpath, "rb")
     data = cPickle.load(data)
     return data
 
 
-def zpickle(fpath, data):
-    """Serialize ``data`` to ``fpath`` using zstandard compression."""
+def zpickle(fpath, data) -> bool:
+    """Pickle ``data`` to ``fpath`` with zstandard compression.
+
+    Args:
+        fpath: Destination file path.
+        data: Object to serialise.
+
+    Returns:
+        ``True`` once the write completes.
+    """
     with pyzstd.ZstdFile(fpath, "wb") as f:
         cPickle.dump(data, f)
     print(f"wrote to {os.path.abspath(f)}")

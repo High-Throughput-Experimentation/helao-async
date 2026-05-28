@@ -1,20 +1,34 @@
+"""Lightweight dynamic HTTP clients driven by an OpenAPI JSON spec.
+
+``OpenAPIClient`` (sync) and ``AsyncOpenAPIClient`` (async) fetch an
+``openapi.json`` document at construction time and, for each GET/POST
+operation, attach an instance method whose name is derived from the
+operation's ``summary`` (or its ``operationId``). Path, query and request
+body parameters declared by the spec are taken as keyword arguments.
+"""
+
 import httpx
 import json
 from urllib.parse import urljoin, quote
 
 
 class OpenAPIClient:
-    """
-    A client for interacting with an API described by an OpenAPI (JSON) specification.
-    Dynamically creates methods for GET and POST operations based on the 'operationId'.
+    """Synchronous httpx client that mirrors an OpenAPI spec's operations.
+
+    On construction the spec is downloaded and an instance method is
+    generated for every GET/POST operation. The generated methods accept
+    path/query parameters and an optional ``request_body`` keyword.
     """
 
     def __init__(self, openapi_json_url: str, api_key: str = ""):
-        """
-        Initializes the OpenAPIClient.
+        """Fetch the OpenAPI spec and bind dynamic methods.
 
         Args:
-            openapi_json_url: The URL to the openapi.json file.
+            openapi_json_url: URL of the ``openapi.json`` document.
+            api_key: Optional value sent as the ``X-Api-Key`` header.
+
+        Raises:
+            RuntimeError: If the spec cannot be fetched or parsed.
         """
         self.openapi_json_url = openapi_json_url
         self.api_key = api_key
@@ -52,12 +66,11 @@ class OpenAPIClient:
         self._create_methods()
 
     def _get_api_server_base_url(self) -> str:
-        """
-        Determines the absolute base URL for API calls.
-        It prioritizes the 'servers' array in the OpenAPI spec.
-        If a server URL is relative, it's resolved against the derived_base_url.
-        If 'servers' is not found or empty, it uses the derived_base_url,
-        or resolves "/" against derived_base_url if spec implies default server.
+        """Return the absolute base URL to use for API calls.
+
+        Honours the spec's ``servers`` array, resolving relative entries
+        against the URL containing ``openapi.json``. When ``servers`` is
+        omitted entirely, the OpenAPI default of ``/`` is applied.
         """
         final_server_url = self.derived_base_url  # Default to derived_base_url
 
@@ -77,9 +90,10 @@ class OpenAPIClient:
         return final_server_url
 
     def _create_methods(self):
-        """
-        Dynamically creates methods on the client instance for each GET or POST operation
-        defined in the OpenAPI specification.
+        """Bind one instance method per GET/POST operation in the spec.
+
+        Each generated method's name is derived from the operation's
+        ``summary`` (lower-cased with spaces replaced) or ``operationId``.
         """
         if "paths" not in self.spec:
             return
@@ -115,7 +129,7 @@ class OpenAPIClient:
                     ):
 
                         def dynamic_method(self_instance, **kwargs):
-                            """Dynamically generated API method."""
+                            """Generated method that dispatches a single API call."""
                             resolved_path_template = current_path_template
                             query_params = {}
                             request_body_data = {}
@@ -326,35 +340,35 @@ class OpenAPIClient:
                     )
 
     def close(self):
-        """
-        Closes the underlying httpx client.
-        It's good practice to call this when the client is no longer needed,
-        or use the client as a context manager.
-        """
+        """Close the underlying ``httpx.Client`` if it is still open."""
         if hasattr(self, "_client") and self._client and not self._client.is_closed:
             self._client.close()
 
-    def __enter__(self):
-        """Enter the runtime context related to this object."""
+    def __enter__(self) -> "OpenAPIClient":
+        """Return ``self`` for use as a context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit the runtime context related to this object."""
+        """Close the underlying ``httpx.Client``."""
         self.close()
 
 
 class AsyncOpenAPIClient:
-    """
-    An asynchronous client for interacting with an API described by an OpenAPI (JSON) specification.
-    Dynamically creates async methods for GET and POST operations based on the 'operationId'.
+    """Async variant of ``OpenAPIClient`` whose generated methods are coroutines.
+
+    A short-lived ``httpx.AsyncClient`` is opened per call rather than held
+    open for the lifetime of this object.
     """
 
     def __init__(self, openapi_json_url: str, api_key: str = ""):
-        """
-        Initializes the AsyncOpenAPIClient.
+        """Fetch the OpenAPI spec (synchronously) and bind dynamic async methods.
 
         Args:
-            openapi_json_url: The URL to the openapi.json file.
+            openapi_json_url: URL of the ``openapi.json`` document.
+            api_key: Optional value sent as the ``X-Api-Key`` header.
+
+        Raises:
+            RuntimeError: If the spec cannot be fetched or parsed.
         """
         self.openapi_json_url = openapi_json_url
         self.api_key = api_key
@@ -387,6 +401,7 @@ class AsyncOpenAPIClient:
         self._create_methods()
 
     def _get_api_server_base_url(self) -> str:
+        """Return the absolute base URL to use for API calls (see sync variant)."""
         final_server_url = self.derived_base_url
 
         if "servers" in self.spec and self.spec["servers"]:
@@ -400,6 +415,7 @@ class AsyncOpenAPIClient:
         return final_server_url
 
     def _create_methods(self):
+        """Bind one async instance method per GET/POST operation in the spec."""
         if "paths" not in self.spec:
             return
 
@@ -432,7 +448,7 @@ class AsyncOpenAPIClient:
                     ):
 
                         async def dynamic_method(self_instance, **kwargs):
-                            """Dynamically generated API method."""
+                            """Generated async method that dispatches a single API call."""
                             resolved_path_template = current_path_template
                             query_params = {}
                             request_body_data = {}
@@ -554,11 +570,14 @@ class AsyncOpenAPIClient:
                     )
 
     def close(self):
+        """Close the underlying ``httpx.Client`` if one is held open."""
         if hasattr(self, "_client") and self._client and not self._client.is_closed:
             self._client.close()
 
-    def __enter__(self):
+    def __enter__(self) -> "AsyncOpenAPIClient":
+        """Return ``self`` for use as a context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close any underlying ``httpx.Client``."""
         self.close()

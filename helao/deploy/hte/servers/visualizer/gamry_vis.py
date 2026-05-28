@@ -44,9 +44,56 @@ VALID_ACTION_NAME = [k for k in AXIS_MAP.keys()]
 
 
 class C_potvis:
-    """potentiostat visualizer module class"""
+    """Bokeh visualizer for a Gamry potentiostat action server.
+
+    Subscribes to the server's ``ws_data`` WebSocket and renders the active
+    run alongside up to ``max_prev`` recent runs in a side-by-side layout.
+    Provides radio-button axis selectors, max-points and max-previous
+    inputs, and a single stop button that aborts the current measurement.
+
+    Attributes:
+        vis: Host :class:`Vis` instance providing the Bokeh document.
+        config_dict: ``params`` block from the visualizer's server config.
+        max_points: Rolling window length for the live data source.
+        max_prev: Maximum number of previous action UUIDs to retain.
+        update_rate: Minimum seconds between WebSocket polls.
+        last_update_time: Epoch timestamp of the most recent poll.
+        potentiostat_key: Server key of the Gamry action server.
+        potserv_config: Mapping with ``host``/``port`` for the action server.
+        potserv_host: Action server hostname.
+        potserv_port: Action server port.
+        wss: :class:`WsSubscriber` connected to ``ws_data``.
+        data_url: Fully formed ``ws://`` URL for the data WebSocket.
+        IOloop_data_run: Liveness flag for the data ingestion task.
+        IOloop_stat_run: Liveness flag for the status ingestion task.
+        data_dict_keys: Column names streamed into the live data source.
+        datasource: :class:`ColumnDataSource` backing the active plot.
+        cur_action_uuid: Action UUID currently being plotted.
+        prev_datasources: Snapshotted sources keyed by previous action UUID.
+        prev_action_uuid: Most recent finished action UUID.
+        prev_action_uuids: Ordered list of retained previous UUIDs.
+        layout: Composed Bokeh layout mounted on the document.
+        input_max_points: Widget setting ``max_points``.
+        input_max_prev: Widget setting ``max_prev``.
+        button_stop_measure: Bokeh button that requests action cancellation.
+        xaxis_selector_group: Radio buttons selecting the x-axis variable.
+        yaxis_selector_group: Radio buttons selecting the y-axis variable.
+        plot: ``figure`` for the active action.
+        plot_prev: ``figure`` overlaying the previous N actions.
+        xselect: Cached active index of ``xaxis_selector_group``.
+        yselect: Cached active index of ``yaxis_selector_group``.
+        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Wire up data sources, widgets, plot layout, and start the WS ingest task.
+
+        Args:
+            vis_serv: Host :class:`Vis` server providing the Bokeh document.
+            serv_key: Configuration key of the Gamry action server to
+                subscribe to. If the server is not in the config,
+                ``__init__`` returns early without registering any roots.
+        """
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.max_points = 5000
@@ -172,6 +219,14 @@ class C_potvis:
         self.reset_plot(forceupdate=True)
 
     def callback_stop_measure(self, event):
+        """Dispatch a private ``stop`` call to the Gamry action server.
+
+        Fired when the user clicks the stop button. Schedules an asynchronous
+        private dispatch and resets the button label/style to ``Stopped``.
+
+        Args:
+            event: Bokeh ``ButtonClick`` event (unused).
+        """
         LOGGER.info("stopping gamry measurement")
         self.vis.doc.add_next_tick_callback(
             partial(
@@ -188,15 +243,38 @@ class C_potvis:
         self.button_stop_measure.button_type = "primary"
 
     def cleanup_session(self, session_context):
+        """Cancel the data ingest task when the Bokeh session is torn down.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.potentiostat_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def callback_selector_change(self, attr, old, new):
+        """Re-render plots after the user picks new x/y axes.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Previous selector index.
+            new: New selector index.
+        """
         self.reset_plot()
 
     def callback_input_max_points(self, attr, old, new, sender):
-        """callback for input_max_points"""
+        """Validate the ``max datapoints`` input and update the rolling window.
+
+        Parses ``new`` as an int, falls back to ``old`` (or ``500``) on bad
+        input, then clamps to ``[2, 10000]`` before storing it as
+        ``self.max_points`` and refreshing the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_int(val):
             try:
@@ -225,7 +303,17 @@ class C_potvis:
         )
 
     def callback_input_max_prev(self, attr, old, new, sender):
-        """callback for input_max_prev"""
+        """Validate the ``max previous plots`` input.
+
+        Parses ``new`` as an int (defaulting to ``old`` or ``4``), assigns it
+        to ``self.max_prev``, and writes the value back to the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_int(val):
             try:
@@ -249,9 +337,21 @@ class C_potvis:
         )
 
     def update_input_value(self, sender, value):
+        """Write ``value`` back onto a Bokeh input widget on the document thread.
+
+        Args:
+            sender: Bokeh input widget whose ``value`` is being updated.
+            value: New string value to assign.
+        """
         sender.value = value
 
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+    async def IOloop_data(self):
+        """Continuously pull WebSocket data packages and schedule plot updates.
+
+        Runs for the lifetime of the Bokeh session. Each iteration honors
+        ``self.update_rate`` and forwards messages to :meth:`add_points` on
+        the document thread.
+        """
         LOGGER.info(f" ... potentiostat visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
@@ -261,6 +361,17 @@ class C_potvis:
             await asyncio.sleep(0.01)
 
     def add_points(self, datapackage_list: list):
+        """Stream the latest data packages into the active plot's data source.
+
+        Skips packages with unknown ``status`` or ``action_name``, flips the
+        sign of ``Zimag`` so impedance plots render with ``-Zimag`` on the
+        positive axis, pads short columns with ``"NaN"``, and triggers
+        :meth:`reset_plot` when the action UUID changes.
+
+        Args:
+            datapackage_list: List of action-server data packages from the
+                WebSocket subscriber.
+        """
         for data_package in datapackage_list:
             data_dict = {k: [] for k in self.data_dict_keys}
             if (
@@ -290,6 +401,12 @@ class C_potvis:
             self.datasource.stream(data_dict, rollover=self.max_points)
 
     def _add_plots(self):
+        """Rebuild the active and "previous N" figures with the selected axes.
+
+        Clears existing renderers and legends, updates titles with the active
+        action UUID and the number of retained previous runs, then plots the
+        live data source plus one line per previous data source.
+        """
         # clear legend
         if self.plot.renderers:
             self.plot.legend.items = []
@@ -327,6 +444,21 @@ class C_potvis:
             )
 
     def reset_plot(self, new_data_package=None, forceupdate: bool = False):
+        """Promote live data to "previous" and start a new plot when the action changes.
+
+        Snapshots the current data source under its action UUID, evicts the
+        oldest snapshots if more than ``max_prev`` are retained, resets the
+        live data, applies axis defaults from :data:`AXIS_MAP` based on the
+        new action name, updates the stop-button label/style, and rebuilds
+        the plot. Also rebuilds the plot when only the axis selector changed.
+
+        Args:
+            new_data_package: Latest data package whose ``action_uuid`` /
+                ``action_name`` drive the reset. May be ``None`` to only
+                respond to axis-selector changes.
+            forceupdate: If ``True``, force a rebuild even when the UUID
+                hasn't changed.
+        """
         new_action_uuid = ""
         action_name = ""
         if new_data_package is not None:

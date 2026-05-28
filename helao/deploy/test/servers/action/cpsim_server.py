@@ -1,9 +1,10 @@
-"""CP simulation server
+"""Chronopotentiometry simulation server.
 
-FastAPI server host for the OER screening simulator.
-
-Loads a subset of 3 mA/cm2 CP measurement data from https://doi.org/10.1039/C8MH01641K
-
+Hosts :class:`CPSim`, which replays a subset of 3 mA/cm^2 CP measurements
+from https://doi.org/10.1039/C8MH01641K . The server exposes actions for
+running a simulated CP (``measure_cp``/``cancel_measure_cp``), switching
+plates (``change_plate``), and reporting the loaded plate together with
+the requesting orchestrator's coordinates (``get_loaded_plate``).
 """
 
 __all__ = ["makeApp"]
@@ -17,7 +18,19 @@ from ...drivers.pstat.cpsim_driver import CPSim, CPSimExec
 
 
 def makeApp(server_key):
+    """Build the CP-simulator FastAPI app.
 
+    Wires :class:`CPSim` into a :class:`BaseAPI` and registers actions:
+    ``measure_cp`` and ``cancel_measure_cp`` (driven by :class:`CPSimExec`),
+    ``get_loaded_plate``, and ``change_plate``, plus private listing
+    endpoints.
+
+    Args:
+        server_key: Server name in the launched config.
+
+    Returns:
+        Configured :class:`HelaoFastAPI` app.
+    """
     app = BaseAPI(
         server_key=server_key,
         server_title=server_key,
@@ -33,7 +46,7 @@ def makeApp(server_key):
         comp_vec: List[int] = [],
         acquisition_rate: float = 0.2,
     ):
-        """Record simulated data."""
+        """Start a :class:`CPSimExec` that streams the stored CP for ``comp_vec``."""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CPSIM"
         executor = CPSimExec(
@@ -49,7 +62,7 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stop running measure_cp."""
+        """Stop any running ``measure_cp`` executor."""
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():
             if exec_id.split()[0] == "measure_cp":
@@ -62,6 +75,7 @@ def makeApp(server_key):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
+        """Return the loaded plate id plus the requesting orchestrator's coords."""
         active = await app.base.setup_and_contain_action()
         plate_id = app.driver.loaded_plate
         data_dict = {
@@ -81,6 +95,7 @@ def makeApp(server_key):
         action_version: int = 1,
         plate_id: int = 0,
     ):
+        """Switch the simulator to a different plate."""
         active = await app.base.setup_and_contain_action()
         app.driver.change_plate(active.action.action_params["plate_id"])
         loaded_plate_id = app.driver.loaded_plate

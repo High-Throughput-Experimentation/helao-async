@@ -1,7 +1,8 @@
-"""Archive simulation server
+"""Analysis simulation server.
 
-FastAPI server host for the analysis simulator driver. Loads historical data.
-TODO: Returns FOM.
+Hosts :class:`AnalysisSim` behind a FastAPI app that exposes a single
+``calc_cpfom`` action returning the stored CP overpotential (vs O2/H2O) for
+a queried plate/sample/pH/current-density combination.
 """
 
 __all__ = ["makeApp"]
@@ -16,7 +17,29 @@ from helao.helpers.premodels import Action
 
 
 class AnalysisSim:
+    """Simulated analysis driver backed by a CSV archive of CP eta values.
+
+    Loads the CSV at ``params.data_path``, groups it by ``plate_id`` and
+    ``solution_ph``, and precomputes a per-plate description (elements
+    present and their composition fractions). The ``calc_cpfom`` method
+    returns the stored eta for the requested sample.
+
+    Attributes:
+        base: Hosting action server.
+        config_dict: ``params`` block from the server config.
+        world_config: Full world configuration.
+        df: Raw measurement dataframe loaded from CSV.
+        loaded_df: Reserved for future per-plate selections.
+        platespaces: List of per-plate descriptors with elements and
+            element fractions.
+    """
+
     def __init__(self, action_serv: Base):
+        """Load the CSV archive and precompute plate descriptors.
+
+        Args:
+            action_serv: Action server hosting this driver.
+        """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
@@ -56,7 +79,21 @@ class AnalysisSim:
 
     def calc_cpfom(
         self, plate_id: int, sample_no: int, ph: int, jmacm2: int, *args, **kwargs
-    ):
+    ) -> float:
+        """Return the stored CP overpotential for a queried sample.
+
+        Args:
+            plate_id: Plate identifier.
+            sample_no: Sample number on the plate.
+            ph: Solution pH used in the measurement.
+            jmacm2: Current density in mA/cm^2 selecting the ``EtaV_CP<j>``
+                column.
+            *args: Ignored extra positional arguments.
+            **kwargs: Ignored extra keyword arguments.
+
+        Returns:
+            Stored overpotential value for the first matching row.
+        """
         match = self.df.query(
             f"plate_id=={plate_id} & Sample=={sample_no} & solution_ph=={ph}"
         )
@@ -64,11 +101,23 @@ class AnalysisSim:
         return eta
 
     def shutdown(self):
+        """No-op shutdown hook."""
         pass
 
 
 def makeApp(server_key):
+    """Build the analysis-simulator FastAPI app.
 
+    Wires :class:`AnalysisSim` into a :class:`BaseAPI` instance and exposes
+    a single ``/<server_key>/calc_cpfom`` action that returns the stored
+    eta value for the queried sample.
+
+    Args:
+        server_key: Server name in the launched config.
+
+    Returns:
+        Configured :class:`HelaoFastAPI` app.
+    """
     app = BaseAPI(
         server_key=server_key,
         server_title=server_key,
@@ -86,7 +135,7 @@ def makeApp(server_key):
         ph: int = 0,
         jmacm2: int = 3,
     ):
-        """Calculate Eta vs O2/H2O potential."""
+        """Look up Eta vs O2/H2O for the queried sample and return the action."""
         active = await app.base.setup_and_contain_action()
         eta = app.driver.calc_cpfom(**active.action.action_params)
         active.action.action_params.update({f"_eta": eta})

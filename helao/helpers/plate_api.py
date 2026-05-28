@@ -1,3 +1,11 @@
+"""Plate/platemap lookups against the live HTE service with legacy fallback.
+
+``HTEPlateAPI`` queries the live HTE Plate API for plate ids at or above
+``legacy_plateid_threshold`` (10000 by default), and transparently delegates
+to ``HTELegacyAPI`` for older ids. Authentication and S3 access are
+provided by a ``HelaoLoader`` constructed from an environment file.
+"""
+
 __all__ = ["HTEPlateAPI"]
 
 import os
@@ -14,7 +22,24 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class HTEPlateAPI:
+    """Combined live + legacy accessor for HTE plate data.
+
+    Attributes:
+        loader: Optional ``HelaoLoader`` providing AWS/S3 credentials.
+        map_cache: Cache of parsed platemap DataFrames keyed by map id.
+        legacy_plateid_threshold: Plate ids below this value are served from
+            ``HTELegacyAPI`` rather than the live service.
+        legacy_api: ``HTELegacyAPI`` instance used for fallbacks.
+    """
+
     def __init__(self, env_file: str | None = None):
+        """Construct the API client and prime the legacy fallback.
+
+        Args:
+            env_file: Path to an environment file passed to ``HelaoLoader``.
+                When omitted, the ``HELAO_CREDENTIALS`` environment variable
+                is consulted instead.
+        """
         self.loader = None
         if "HELAO_CREDENTIALS" in os.environ:
             env_file = os.environ["HELAO_CREDENTIALS"]
@@ -31,7 +56,8 @@ class HTEPlateAPI:
         self.legacy_api = HTELegacyAPI()
 
     @property
-    def has_access(self):
+    def has_access(self) -> bool:
+        """Return ``True`` when AWS (or the legacy paths) can be reached."""
         if self.loader is None:
             return self.legacy_api.has_access
         try:
@@ -43,6 +69,14 @@ class HTEPlateAPI:
             return False
 
     def get_info(self, plateid: int) -> dict | None:
+        """Fetch the plate info record from the live Plate API.
+
+        Args:
+            plateid: Numeric plate identifier.
+
+        Returns:
+            The decoded JSON info dict, or ``None`` on error.
+        """
         try:
             headers = {"X-Api-Key": self.loader.hcred.PLATE_API_KEY}
             resp = httpx.get(
@@ -56,6 +90,14 @@ class HTEPlateAPI:
             return None
 
     def get_print_plateid(self, plateid: int) -> dict | None:
+        """Return the most recent PVD print record for ``plateid``.
+
+        Args:
+            plateid: Numeric plate identifier.
+
+        Returns:
+            The latest print dict (by ``print_date``), or ``None`` on error.
+        """
         try:
             headers = {"X-Api-Key": self.loader.hcred.PLATE_API_KEY}
             resp = httpx.get(
@@ -73,6 +115,15 @@ class HTEPlateAPI:
             return None
 
     def get_platemap(self, map_id: int) -> pd.DataFrame:
+        """Fetch and cache the platemap CSV for a given map id from S3.
+
+        Args:
+            map_id: Numeric platemap identifier.
+
+        Returns:
+            The platemap as a ``pandas.DataFrame`` with cleaned column
+            names.
+        """
         if map_id in self.map_cache:
             return self.map_cache[map_id]
         maps = [
@@ -92,6 +143,14 @@ class HTEPlateAPI:
         return map_df
 
     def get_platemapdlist(self, map_id: int) -> list[dict]:
+        """Return the platemap as a list of per-sample dicts.
+
+        Args:
+            map_id: Numeric platemap identifier.
+
+        Returns:
+            One dict per sample with a synthesised ``sample_no`` field.
+        """
         map_df = self.get_platemap(map_id)
         for col in "ABCDEFGH":
             try:
@@ -103,6 +162,11 @@ class HTEPlateAPI:
         return map_df.to_dict(orient="records")
 
     def get_info_plateid(self, plateid: int):
+        """Return the platemap dict-list associated with ``plateid``.
+
+        Falls back to ``HTELegacyAPI`` for legacy plate ids and to ``None``
+        when no ``screening_map_id`` is published for the plate.
+        """
         if plateid < self.legacy_plateid_threshold:
             return self.legacy_api.get_info_plateid(plateid)
         infod = self.get_info(plateid)
@@ -114,16 +178,19 @@ class HTEPlateAPI:
         return self.get_platemapdlist(screening_map_id)
 
     def get_platemap_plateid(self, plateid: int):
+        """Return the platemap for ``plateid``, using legacy paths when needed."""
         if plateid < self.legacy_plateid_threshold:
             return self.legacy_api.get_platemap_plateid(plateid)
         else:
             return self.get_info_plateid(plateid)
 
     def get_rcp_plateid(self, plateid: int):
+        """Forward an RCP lookup to ``HTELegacyAPI`` (currently a no-op)."""
         LOGGER.info(f" ... get rcp for plateid: {plateid}")
         return self.legacy_api.get_rcp_plateid(plateid)
 
-    def check_plateid(self, plateid: int):
+    def check_plateid(self, plateid: int) -> bool:
+        """Return ``True`` when an info record exists for ``plateid``."""
         if plateid < self.legacy_plateid_threshold:
             return self.legacy_api.check_plateid(plateid)
         infod = self.get_info(plateid)
@@ -134,6 +201,7 @@ class HTEPlateAPI:
             return False
 
     def check_printrecord_plateid(self, plateid: int):
+        """Return ``True`` when the info record has a ``screening_print_id``."""
         if plateid < self.legacy_plateid_threshold:
             return self.legacy_api.check_printrecord_plateid(plateid)
         infod = self.get_info(plateid)
@@ -144,6 +212,7 @@ class HTEPlateAPI:
                 return True
 
     def check_annealrecord_plateid(self, plateid: int):
+        """Return ``True`` when the info record contains an ``anneals`` block."""
         if plateid < self.legacy_plateid_threshold:
             return self.legacy_api.check_annealrecord_plateid(plateid)
         infod = self.get_info(plateid)
@@ -154,6 +223,14 @@ class HTEPlateAPI:
                 return True
 
     def get_print(self, print_id: str) -> dict | None:
+        """Fetch a print record by id from the live Plate API.
+
+        Args:
+            print_id: The print identifier.
+
+        Returns:
+            The decoded print dict, or ``None`` on error.
+        """
         try:
             headers = {"X-Api-Key": self.loader.hcred.PLATE_API_KEY}
             resp = httpx.get(
@@ -168,9 +245,24 @@ class HTEPlateAPI:
     def get_elements_plateid(
         self,
         plateid: int | dict,
-        exclude_elements_list: list = [""],
+        exclude_elements_list: list = [],
         **kwargs,
     ) -> list[str] | None:
+        """Return the symbols of the print elements for a plate.
+
+        For legacy plate ids the call is forwarded to ``HTELegacyAPI``.
+        Otherwise the screening print is fetched, its source ``chemical_id``
+        strings are mapped to element symbols via ``mendeleev``, and common
+        gas/noble-gas symbols are filtered out.
+
+        Args:
+            plateid: Numeric plate identifier or a pre-loaded info dict.
+            exclude_elements_list: Additional element symbols to drop.
+            **kwargs: Forwarded to the legacy fallback when applicable.
+
+        Returns:
+            The filtered list of element symbols, or ``None`` on failure.
+        """
         if isinstance(plateid, dict):
             infofiled = plateid
         else:
@@ -187,9 +279,9 @@ class HTEPlateAPI:
         if print_id is None:
             return None
 
-        try:
-            printd = self.get_print(print_id)
-        except Exception:
+        printd = self.get_print(print_id)
+        if "sources" not in printd.keys() and isinstance(plateid, int):
+            LOGGER.warning("No sources found in print record. Using alternate retrieval.")
             printd = self.get_print_plateid(plateid)
 
         if printd is not None and self.loader is not None:
@@ -200,7 +292,7 @@ class HTEPlateAPI:
             els = [
                 el
                 for el in els
-                if el not in ("O", "Ar", "N", "C", "He", "Ne", "Kr", "Xe", "Rn")
+                if el not in ("O", "Ar", "N", "C", "He", "Ne", "Kr", "Xe", "Rn", "")
             ]
             el_syms = [mendeleev.element(el).symbol for el in els]
 

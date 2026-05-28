@@ -1,3 +1,11 @@
+"""Helper for dynamically constructing string-valued enumerations.
+
+``make_str_enum`` builds a ``StrEnum`` from a name/value mapping. When the
+resulting enum has a single member it is patched with a custom
+``__get_pydantic_json_schema__`` so the value is emitted as an ``enum``
+list rather than a ``const`` literal.
+"""
+
 __all__ = ["make_str_enum"]
 
 from enum import StrEnum
@@ -11,6 +19,7 @@ from pydantic.json_schema import JsonSchemaValue
 def __get_pydantic_json_schema__(
     cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler
 ) -> JsonSchemaValue:
+    """Emit the enum value as an ``enum`` array instead of a ``const`` literal."""
     json_schema = handler(core_schema)
     json_schema = handler.resolve_ref_schema(json_schema)
     if "const" in json_schema:
@@ -20,16 +29,18 @@ def __get_pydantic_json_schema__(
     return json_schema
 
 
-def make_str_enum(enum_name, valdict):
-    """
-    Dynamically creates a string-based enumeration.
+def make_str_enum(enum_name, valdict) -> StrEnum:
+    """Build a ``StrEnum`` from a name/value mapping.
+
+    For single-member enums, attaches a custom Pydantic JSON-schema hook so
+    the value is serialised as an ``enum`` list rather than a ``const``.
 
     Args:
-        name (str): The name of the enumeration.
-        valdict (dict): A dictionary where keys are the enumeration names and values are the corresponding string values.
+        enum_name: Name of the generated enumeration class.
+        valdict: Mapping of member name to string value.
 
     Returns:
-        Enum: A new enumeration class with string values.
+        The newly created ``StrEnum`` subclass.
 
     Example:
         >>> Colors = make_str_enum('Colors', {'RED': 'red', 'GREEN': 'green', 'BLUE': 'blue'})

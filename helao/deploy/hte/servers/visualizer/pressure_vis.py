@@ -25,9 +25,46 @@ FWIN = 20
 
 
 class C_pressure:
-    """potentiostat visualizer module class"""
+    """Bokeh visualizer for analog pressure-sensor channels exposed by a Galil IO server.
+
+    Subscribes to the action server's ``ws_live`` WebSocket and renders one
+    raw and one rolling-mean trace per analog input channel listed under
+    ``params.dev_ai``, alongside a latest-values data table.
+
+    Attributes:
+        vis: Host :class:`Vis` instance providing the Bokeh document.
+        config_dict: ``params`` block from the visualizer's server config.
+        update_rate: Minimum seconds between WebSocket polls.
+        max_points: Rolling window length for the data source.
+        last_update_time: Epoch timestamp of the most recent poll.
+        live_key: Server key of the IO action server.
+        wss: :class:`WsSubscriber` connected to ``ws_live``.
+        data_url: Fully formed ``ws://`` URL for the live WebSocket.
+        IOloop_data_run: Liveness flag for the data ingestion task.
+        IOloop_stat_run: Liveness flag for the status ingestion task.
+        ai_keys: Sorted list of analog input channel names from the action
+            server's ``dev_ai`` parameter.
+        mean_ai_keys: ``"{name}_mean"`` partner columns for ``ai_keys``.
+        data_dict_keys: Combined ``datetime`` + raw + mean column names.
+        datasource: :class:`ColumnDataSource` backing the plot.
+        datasource_table: :class:`ColumnDataSource` backing the table.
+        layout: Composed Bokeh layout mounted on the document.
+        input_max_points: Widget setting ``max_points``.
+        input_update_rate: Widget setting ``update_rate``.
+        plot: Bokeh ``figure`` for pressure vs time.
+        table: Bokeh ``DataTable`` showing the latest values.
+        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
+    """
 
     def __init__(self, vis_serv: Vis, serv_key: str):
+        """Wire up data sources, widgets, plot layout, and start the WS ingest task.
+
+        Args:
+            vis_serv: Host :class:`Vis` server providing the Bokeh document.
+            serv_key: Configuration key of the pressure-sensor action server.
+                If the server is not in the config, ``__init__`` returns
+                early without registering any roots.
+        """
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.update_rate = self.config_dict.get("update_rate", 0.5)
@@ -122,12 +159,28 @@ class C_pressure:
         self._add_plots()
 
     def cleanup_session(self, session_context):
+        """Cancel the data ingest task when the Bokeh session is torn down.
+
+        Args:
+            session_context: Bokeh session context (unused).
+        """
         LOGGER.info(f"'{self.live_key}' Bokeh session closed")
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
     def callback_input_max_points(self, attr, old, new, sender):
-        """callback for input_max_points"""
+        """Validate the ``max datapoints`` input and update the rolling window.
+
+        Parses ``new`` as an int, falls back to ``old`` (or ``500``) on bad
+        input, then clamps to ``[2, 10000]`` before storing it as
+        ``self.max_points`` and refreshing the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_int(val):
             try:
@@ -156,10 +209,26 @@ class C_pressure:
         )
 
     def update_input_value(self, sender, value):
+        """Write ``value`` back onto a Bokeh input widget on the document thread.
+
+        Args:
+            sender: Bokeh input widget whose ``value`` is being updated.
+            value: New string value to assign.
+        """
         sender.value = value
 
     def callback_input_update_rate(self, attr, old, new, sender):
-        """callback for input_update_rate"""
+        """Validate the ``update sec`` input and adjust the polling cadence.
+
+        Parses ``new`` as a float (defaulting to ``0.5`` on bad input), stores
+        it as ``self.update_rate``, and writes the value back to the widget.
+
+        Args:
+            attr: Bokeh property name that changed.
+            old: Prior text value.
+            new: New text value typed by the user.
+            sender: The :class:`TextInput` to refresh.
+        """
 
         def to_float(val):
             try:
@@ -176,6 +245,15 @@ class C_pressure:
         )
 
     def add_points(self, datapackage_list: list):
+        """Stream live pressure samples into the data source and table.
+
+        Unpacks ``(value, epoch)`` tuples, expands ``sim_dict`` payloads,
+        computes a ``FWIN``-point rolling mean for each analog input, and
+        refreshes the latest-values table.
+
+        Args:
+            datapackage_list: List of dicts from the live WebSocket.
+        """
         latest_epoch = 0
         data_dict = {k: [] for k in self.data_dict_keys}
         for datapackage in datapackage_list:
@@ -206,7 +284,13 @@ class C_pressure:
         table_data_dict = {"name": keys, "value": values}
         self.datasource_table.stream(table_data_dict, rollover=len(keys))
 
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+    async def IOloop_data(self):
+        """Continuously read the live WebSocket and schedule plot updates.
+
+        Sleeps briefly each iteration, respects ``self.update_rate`` as a
+        minimum gap between polls, and dispatches non-empty message batches
+        to :meth:`add_points` on the document thread.
+        """
         LOGGER.info(f" ... Pressure sensor visualizer subscribing to: {self.data_url}")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
@@ -219,6 +303,7 @@ class C_pressure:
             await asyncio.sleep(0.01)
 
     def _add_plots(self):
+        """Rebuild the pressure figure with raw and rolling-mean traces per channel."""
         # clear legend
         if self.plot.renderers:
             self.plot.legend.items = []
@@ -251,4 +336,10 @@ class C_pressure:
             self.plot.legend.background_fill_alpha = 0.2
 
     def reset_plot(self, forceupdate: bool = False):
+        """Rebuild the figure renderers.
+
+        Args:
+            forceupdate: Accepted for parity with other visualizers; the plot
+                is always rebuilt.
+        """
         self._add_plots()

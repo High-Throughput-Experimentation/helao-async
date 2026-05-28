@@ -1,3 +1,10 @@
+"""FastAPI scaffolding for the HELAO orchestrator server.
+
+Provides the ``OrchAPI`` application class plus the built-in ``wait``,
+``cancel_wait``, ``interrupt``, ``estop`` and conditional flow-control
+action endpoints exposed by every orchestrator deployment.
+"""
+
 import time
 import asyncio
 from enum import Enum
@@ -28,6 +35,14 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class OrchAPI(HelaoFastAPI):
+    """FastAPI application class for the HELAO orchestrator server.
+
+    Mirrors :class:`BaseAPI` but binds an :class:`Orch` controller, exposes
+    orchestrator-specific endpoints (queue management, start/stop, conditional
+    flow, global params, wait helpers), and runs the orchestrator's Bokeh
+    operator UI when configured.
+    """
+
     orch: Orch
 
     def __init__(
@@ -39,16 +54,15 @@ class OrchAPI(HelaoFastAPI):
         driver_classes=None,
         poller_class=None,
     ):
-        """
-        Initialize the OrchAPI server.
+        """Initialize the OrchAPI app and register its endpoints and lifecycle events.
 
-            config (dict): Configuration dictionary for the server.
-            server_key (str): Unique key identifying the server.
-            server_title (str): Title of the server.
-            description (str): Description of the server.
-            version (str): Version of the server.
-            driver_class (Optional[type], optional): Class for the driver. Defaults to None.
-            poller_class (Optional[type], optional): Class for the poller. Defaults to None.
+        Args:
+            server_key: Unique server key in the world config.
+            server_title: Title surfaced to the OpenAPI docs.
+            description: OpenAPI description string.
+            version: Server/version string.
+            driver_classes: Optional iterable of driver classes constructed at startup.
+            poller_class: Optional ``DriverPoller`` subclass attached to the first driver.
         """
         super().__init__(
             helao_srv=server_key,
@@ -67,25 +81,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.on_event("startup")
         async def startup_event():
-            """
-            Asynchronous startup event for initializing the orchestrator and driver.
-
-            This method performs the following actions:
-            1. Initializes the orchestrator with the current FastAPI application instance.
-            2. Calls the `myinit` method on the orchestrator.
-            3. If a driver class is provided and it is a subclass of `HelaoDriver`,
-               initializes the driver with the server parameters and, if a poller class
-               is provided, initializes the poller with the driver and polling time.
-            4. If the driver class is not a subclass of `HelaoDriver`, initializes the
-               driver with the orchestrator.
-            5. Initializes the endpoint queues in the orchestrator.
-
-            Args:
-                None
-
-            Returns:
-                None
-            """
+            """Construct the :class:`Orch` controller, drivers, poller and endpoint queues on startup."""
             self.orch = Orch(fastapp=self)
 
             self.orch.myinit()
@@ -112,54 +108,22 @@ class OrchAPI(HelaoFastAPI):
         # --- BASE endpoints ---
         @self.websocket("/ws_status")
         async def websocket_status(websocket: WebSocket):
-            """
-            Handle the WebSocket connection for status updates.
-
-            Args:
-                websocket (WebSocket): The WebSocket connection instance.
-
-            Returns:
-                None
-            """
+            """Stream compressed status messages over ``websocket`` until disconnect."""
             await self.orch.ws_status(websocket)
 
         @self.websocket("/ws_data")
         async def websocket_data(websocket: WebSocket):
-            """
-            Handle incoming WebSocket data.
-
-            Args:
-                websocket (WebSocket): The WebSocket connection instance.
-
-            Returns:
-                None
-            """
+            """Stream compressed data packets over ``websocket`` until disconnect."""
             await self.orch.ws_data(websocket)
 
         @self.websocket("/ws_live")
         async def websocket_live(websocket: WebSocket):
-            """
-            Handle live WebSocket connections.
-
-            This asynchronous function manages the WebSocket connection by
-            delegating the handling to the `ws_live` method of the `orch` object.
-
-            Args:
-                websocket (WebSocket): The WebSocket connection to be managed.
-            """
+            """Stream compressed live-buffer updates over ``websocket`` until disconnect."""
             await self.orch.ws_live(websocket)
 
         @self.post("/get_status", tags=["private"])
         def get_status():
-            """
-            Retrieve the current status of the orchestrator and its driver.
-
-            Returns:
-                dict: A dictionary containing the status of the orchestrator and the driver.
-                  The dictionary includes the following keys:
-                  - All keys from the orchestrator's action server model.
-                  - '_driver_status': The status of the driver, or "not_implemented" if the driver is not an instance of HelaoDriver.
-            """
+            """Return the orchestrator's action-server status with the driver status appended."""
             status_dict = self.orch.actionservermodel.model_dump()
             driver_status = "not_implemented"
             if isinstance(self.driver, HelaoDriver):
@@ -172,153 +136,57 @@ class OrchAPI(HelaoFastAPI):
         async def attach_client(
             client_servkey: str, client_host: str, client_port: int
         ):
-            """
-            Asynchronously attaches a client to the orchestrator.
-
-            Args:
-                client_servkey (str): The service key of the client.
-                client_host (str): The hostname or IP address of the client.
-                client_port (int): The port number on which the client is running.
-
-            Returns:
-                The result of the attach_client method from the orchestrator.
-            """
+            """Subscribe a remote client to this orchestrator's status updates."""
             return await self.orch.attach_client(
                 client_servkey, client_host, client_port
             )
 
         @self.post("/detach_client", tags=["private"])
         def detach_client(client_servkey: str, client_host: str, client_port: int):
-            """
-            Detach a client from the base server.
-
-            Args:
-                client_servkey (str): The service key of the client to detach.
-
-            Returns:
-                The result of the base server's detach_client method.
-            """
+            """Remove a client from this orchestrator's status subscriber list."""
             return self.orch.detach_client(client_servkey, client_host, client_port)
 
         @self.post("/stop_executor", tags=["private"])
         def stop_executor(executor_id: str = ""):
-            """
-            Stops the executor with the given executor_id.
-
-            Args:
-                executor_id (str): The ID of the executor to stop. If not specified, an error message is returned.
-
-            Returns:
-                dict: A dictionary containing the result of the stop operation. If executor_id is not specified,
-                  returns a dictionary with an error message.
-            """
+            """Signal the executor with ``executor_id`` to stop, returning an error dict if missing."""
             if executor_id == "":
                 return {"error": "executor_id was not specified"}
             return self.orch.stop_executor(executor_id)
 
         @self.post("/endpoints", tags=["private"])
         def get_all_urls():
-            """
-            Return a list of all endpoints on this server.
-
-            Returns:
-                list: A list of endpoint URLs.
-            """
+            """Return the list of endpoints registered on this orchestrator."""
             return self.orch.get_endpoint_urls()
 
         @self.post("/get_lbuf", tags=["private"])
         def get_lbuf():
-            """
-            Retrieve the live buffer from the orchestrator.
-
-            Returns:
-                The live buffer object from the orchestrator.
-            """
+            """Return the orchestrator's current live buffer."""
             return self.orch.live_buffer
 
         @self.post("/list_executors", tags=["private"])
         def list_executors():
-            """
-            Retrieve a list of executor names.
-
-            Returns:
-                list: A list containing the keys of the executors dictionary from the orch attribute.
-            """
+            """Return the keys of every executor currently running on the orchestrator."""
             return list(self.orch.executors.keys())
 
         @self.post("/shutdown", tags=["private"])
         async def post_shutdown():
-            """
-            Handles the shutdown event by calling the shutdown_event function.
-            This function is typically used to perform any necessary cleanup
-            operations before the application is terminated.
-            """
+            """Trigger the FastAPI shutdown handler via an HTTP request."""
             await shutdown_event()
 
         # --- ORCH-specific endpoints ---
         @self.post("/global_status", tags=["private"])
         def global_status():
-            """
-            Retrieve the global status of the orchestrator.
-
-            Returns:
-                dict: A JSON representation of the global status model.
-            """
+            """Return the orchestrator's ``GlobalStatusModel`` as JSON."""
             return self.orch.globalstatusmodel.as_json()
 
         @self.post("/export_queues", tags=["private"])
         def export_queues(timestamp_pck: bool = False):
-            """
-            Exports the current state of various queues and active elements in the orchestrator to a pickle file.
-
-            The function collects the following data from the orchestrator:
-            - Sequence queue
-            - Experiment queue
-            - Action queue
-            - Active experiment
-            - Last experiment
-            - Active sequence
-            - Last sequence
-            - Active sequence-experiment counter
-            - Last action UUID
-            - Last dispatched action UUID
-            - Last 50 action UUIDs
-
-            The collected data is saved as a dictionary in a pickle file located in the "STATES" directory under the root path specified in the orchestrator's world configuration.
-
-            Returns:
-                str: The file path where the pickle file is saved.
-            """
+            """Persist the orchestrator's deques and current active/last state to a pickle file."""
             return self.orch.export_queues(timestamp_pck)
 
         @self.post("/import_queues", tags=["private"])
         def import_queues(pck_path: Optional[str] = None):
-            """
-            Imports and restores the state of various queues from a saved pickle file.
-
-            This function attempts to load a previously saved state of action, experiment,
-            and sequence queues from a pickle file located at "STATES/queues.pck" within
-            the directory specified by `self.orch.world_cfg["root"]`. If the file does not
-            exist, or if any of the current queues are not empty, the function will print
-            an appropriate message and will not restore the queues.
-
-            Upon successful restoration, the function updates the following attributes of
-            `self.orch`:
-            - action_dq
-            - experiment_dq
-            - sequence_dq
-            - active_experiment
-            - last_experiment
-            - active_sequence
-            - last_sequence
-            - active_seq_exp_counter
-            - last_action_uuid
-            - last_dispatched_action_uuid
-            - last_50_action_uuids
-
-            Returns:
-                str: The path to the pickle file used for restoring the queues.
-            """
+            """Restore the orchestrator's deques and active/last state from a pickle file."""
             return self.orch.import_queues(pck_path)
 
         @self.post("/update_status", tags=["private"])
@@ -326,14 +194,11 @@ class OrchAPI(HelaoFastAPI):
             actionservermodel: ActionServerModel = Body({}, embed=True),
             regular_task: str = "false",
         ):
-            """
-            Asynchronously updates the status of an action server.
+            """Apply a remote action-server status update to the global model.
 
             Args:
-                actionservermodel (ActionServerModel, optional): The model containing the action server's status information. Defaults to an empty dictionary.
-
-            Returns:
-                bool: Returns False if the actionservermodel is None, otherwise returns the result of the orch's update_status method.
+                actionservermodel: Reported status from a remote action server.
+                regular_task: ``"true"`` for periodic heartbeats (suppresses noisy logs).
             """
             if actionservermodel is None:
                 return False
@@ -345,17 +210,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/clear_actives", tags=["private"])
         async def clear_actives():
-            """
-            Asynchronously clears active actions from all action servers and updates their status.
-
-            This function iterates through all action servers in the global status model,
-            removes active actions from each server's endpoint models, and moves them to
-            the non-active dictionary with a status of 'skipped'. It then updates the
-            global status model and returns a list of cleared active action UUIDs.
-
-            Returns:
-                list: A list of UUIDs of the cleared active actions.
-            """
+            """Move every active action across all servers into ``skipped`` and return their UUIDs."""
             cleared_actives = []
             for actionservermodel in self.orch.globalstatusmodel.server_dict.values():
                 for endpointkey, endpointmodel in actionservermodel.endpoints.items():
@@ -379,17 +234,7 @@ class OrchAPI(HelaoFastAPI):
             server_host: str = "",
             server_port: int = 9000,
         ):
-            """
-            Asynchronously updates the non-blocking status of an action.
-
-            Args:
-                actionmodel (Action): The model representing the action to update.
-                server_host (str): The host of the server. Defaults to an empty string.
-                server_port (int): The port of the server. Defaults to 9000.
-
-            Returns:
-                dict: A dictionary containing the result of the update operation.
-            """
+            """Record a non-blocking action transition reported by ``server_host:server_port``."""
             LOGGER.info(
                 f"'{self.orch.server.server_name.upper()}' got nonblocking status from '{actionmodel.action_server.server_name}': exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status} on {server_host}:{server_port}"
             )
@@ -400,15 +245,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/update_global_params", tags=["private"])
         async def update_global_params(params: dict):
-            """
-            Updates the global parameters for the active experiment.
-
-            Args:
-                params (dict): A dictionary containing the parameters to update.
-
-            Returns:
-                bool: True if the parameters were successfully updated, False otherwise.
-            """
+            """Merge ``params`` into the orchestrator's ``global_params`` dictionary."""
             LOGGER.info(f"Updated global params with {params}.")
             # if self.orch.active_experiment is not None:
             #     self.orch.active_experiment.global_params.update(params)
@@ -423,57 +260,27 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/start", tags=["private"])
         async def start():
-            """
-            Asynchronously starts the orchestrator.
-
-            This method calls the `start` method of the orchestrator instance and
-            waits for it to complete. Once the orchestrator has started, it returns
-            an empty dictionary.
-
-            Returns:
-                dict: An empty dictionary.
-            """
+            """Start (or resume) the orchestrator's dispatch loop."""
             await self.orch.start()
             return {}
 
         @self.post("/get_active_experiment", tags=["private"])
         def get_active_experiment():
-            """
-            Retrieve the active experiment's clean dictionary representation.
-
-            Returns:
-                dict: A dictionary containing the cleaned data of the active experiment.
-            """
+            """Return the active experiment as a cleaned dict (empty dict if none)."""
             if self.orch.active_experiment is None:
                 return {}
             return self.orch.active_experiment.clean_dict()
 
         @self.post("/get_active_sequence", tags=["private"])
         def get_active_sequence():
-            """
-            Retrieve the active sequence from the orchestrator.
-
-            Returns:
-                dict: A dictionary representation of the active sequence.
-            """
+            """Return the active sequence as a cleaned dict (empty dict if none)."""
             if self.orch.active_sequence is None:
                 return {}
             return self.orch.active_sequence.clean_dict()
 
         @self.post("/estop_orch", tags=["private"])
         async def estop_orch():
-            """
-            Asynchronously handles the emergency stop (E-STOP) for the orchestrator.
-
-            This function checks the current loop state of the orchestrator and performs
-            the appropriate action based on the state:
-            - If the loop is currently running, it will trigger an emergency stop.
-            - If the loop is already in an emergency stop state, it will log a message indicating this.
-            - If the loop is not running, it will log a message indicating that the orchestrator is not running.
-
-            Returns:
-                dict: An empty dictionary.
-            """
+            """Trigger an emergency stop if the loop is running, otherwise log and return."""
             if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
                 await self.orch.estop_loop()
             elif self.orch.globalstatusmodel.loop_state == LoopStatus.estopped:
@@ -484,30 +291,13 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/stop", tags=["private"])
         async def stop():
-            """
-            Asynchronously stops the orchestrator.
-
-            This method calls the `stop` method on the orchestrator instance and
-            returns an empty dictionary upon completion.
-
-            Returns:
-                dict: An empty dictionary.
-            """
+            """Request a graceful stop of the orchestrator's dispatch loop."""
             await self.orch.stop()
             return {}
 
         @self.post("/clear_estop", tags=["private"])
         async def clear_estop():
-            """
-            Asynchronously clears the emergency stop (E-STOP) condition.
-
-            If the orchestrator is not currently in an E-STOP state, a message is printed
-            indicating that the orchestrator is not in E-STOP. Otherwise, it proceeds to
-            clear the E-STOP condition by calling the `clear_estop` method of the orchestrator.
-
-            Returns:
-                None
-            """
+            """Clear the orchestrator's E-STOP latch when in the estopped state."""
             if self.orch.globalstatusmodel.loop_state != LoopStatus.estopped:
                 LOGGER.info("orchestrator is not currently in E-STOP")
             else:
@@ -515,12 +305,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/clear_error", tags=["private"])
         async def clear_error():
-            """
-            Asynchronously clears the error state of the orchestrator.
-
-            If the orchestrator's loop state is not in an error state, it logs a message indicating that the orchestrator is not currently in an error state.
-            Otherwise, it calls the `clear_error` method of the orchestrator to clear the error state.
-            """
+            """Clear the orchestrator's error state when it is in the error state."""
             if self.orch.globalstatusmodel.loop_state != LoopStatus.error:
                 LOGGER.info("orchestrator is not currently in ERROR")
             else:
@@ -528,57 +313,25 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/skip_experiment", tags=["private"])
         async def skip_experiment():
-            """
-            Asynchronously skips the current experiment.
-
-            This method calls the `skip` method on the `orch` object to skip the
-            current experiment and returns an empty dictionary.
-
-            Returns:
-                dict: An empty dictionary.
-            """
+            """Request the orchestrator to skip the current experiment."""
             await self.orch.skip()
             return {}
 
         @self.post("/clear_actions", tags=["private"])
         async def clear_actions():
-            """
-            Asynchronously clears all actions in the orchestrator.
-
-            This method calls the `clear_actions` method of the orchestrator instance
-            and returns an empty dictionary upon completion.
-
-            Returns:
-                dict: An empty dictionary.
-            """
+            """Empty the orchestrator's action queue."""
             await self.orch.clear_actions()
             return {}
 
         @self.post("/clear_experiments", tags=["private"])
         async def clear_experiments():
-            """
-            Asynchronously clears all experiments in the orchestrator.
-
-            This method calls the `clear_experiments` method on the orchestrator
-            instance to remove all current experiments.
-
-            Returns:
-                dict: An empty dictionary indicating the operation was successful.
-            """
+            """Empty the orchestrator's experiment queue."""
             await self.orch.clear_experiments()
             return {}
 
         @self.post("/append_sequence", tags=["private"])
         async def append_sequence(sequence: Sequence = Body({}, embed=True)):
-            """
-            Asynchronously appends a sequence to the orchestrator.
-
-            Args:
-                sequence (Sequence, optional): The sequence to append. Defaults to an empty dictionary.
-
-            Returns:
-                dict: A dictionary containing the UUID of the appended sequence.
-            """
+            """Append a sequence to the orchestrator and return its UUID."""
             if not isinstance(sequence, Sequence):
                 sequence = Sequence(**sequence)
             seq_uuid = await self.orch.add_sequence(sequence=sequence)
@@ -586,16 +339,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/append_experiment", tags=["private"])
         async def append_experiment(experiment: Experiment = Body({}, embed=True)):
-            """
-            Add an experiment object to the end of the experiment queue.
-
-            Args:
-                experiment (Experiment): The experiment object to be added to the queue.
-
-            Returns:
-                dict: A dictionary containing the UUID of the added experiment.
-            """
-            """Add a experiment object to the end of the experiment queue."""
+            """Append an experiment to the active sequence and return its UUID."""
             exp_uuid = await self.orch.add_experiment(
                 seq=self.orch.seq_model, experimentmodel=experiment.get_exp()
             )
@@ -603,15 +347,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/prepend_experiment", tags=["private"])
         async def prepend_experiment(experiment: Experiment = Body({}, embed=True)):
-            """
-            Prepend an experiment to the sequence.
-
-            Args:
-                experiment (Experiment): The experiment to be prepended. It is expected to be passed in the request body.
-
-            Returns:
-                dict: A dictionary containing the UUID of the prepended experiment.
-            """
+            """Prepend an experiment to the active sequence and return its UUID."""
             exp_uuid = await self.orch.add_experiment(
                 seq=self.orch.seq_model,
                 experimentmodel=experiment.get_exp(),
@@ -624,16 +360,7 @@ class OrchAPI(HelaoFastAPI):
             experiment: Experiment = Body({}, embed=True),
             idx: int = 0,
         ):
-            """
-            Asynchronously inserts an experiment into the sequence at the specified index.
-
-            Args:
-                experiment (Experiment): The experiment to be inserted. Defaults to an empty Experiment.
-                idx (int): The index at which to insert the experiment. Defaults to 0.
-
-            Returns:
-                dict: A dictionary containing the UUID of the inserted experiment.
-            """
+            """Insert an experiment into the active sequence at ``idx`` and return its UUID."""
             exp_uuid = await self.orch.add_experiment(
                 seq=self.orch.seq_model,
                 experimentmodel=experiment.get_exp(),
@@ -643,127 +370,58 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/list_sequences", tags=["private"])
         def list_sequences():
-            """
-            Retrieve a list of sequences from the orchestrator.
-
-            Returns:
-                list: A list of sequences managed by the orchestrator.
-            """
+            """Return the queued sequences."""
             return self.orch.list_sequences()
 
         @self.post("/list_experiments", tags=["private"])
         def list_experiments():
-            """
-            Retrieve a list of experiments.
-
-            Returns:
-                list: A list of experiments from the orchestrator.
-            """
+            """Return the queued experiments."""
             return self.orch.list_experiments()
 
         @self.post("/list_all_experiments", tags=["private"])
         def list_all_experiments():
-            """
-            Retrieve a list of all experiments.
-
-            Returns:
-                list: A list containing all experiments.
-            """
+            """Return ``(index, name)`` tuples for every queued experiment."""
             return self.orch.list_all_experiments()
 
         @self.post("/drop_experiment_inds", tags=["private"])
         def drop_experiment_inds(inds: List[int]):
-            """
-            Drops experiments based on the provided indices.
-
-            Args:
-                inds (List[int]): A list of integer indices representing the experiments to be dropped.
-
-            Returns:
-                The result of the drop operation from the orchestrator.
-            """
+            """Drop queued experiments at the given indices and return the remaining queue."""
             return self.orch.drop_experiment_inds(inds)
 
         @self.post("/drop_experiment_range", tags=["private"])
         def drop_experiment_range(lower: int, upper: int):
-            """
-            Drops a range of experiments from the orchestrator.
-
-            Parameters:
-            lower (int): The lower bound of the range (inclusive).
-            upper (int): The upper bound of the range (inclusive).
-
-            Returns:
-            bool: True if the experiments were successfully dropped, False otherwise.
-            """
+            """Drop queued experiments in the inclusive ``[lower, upper]`` range."""
             inds = list(range(lower, upper + 1))
             return self.orch.drop_experiment_inds(inds)
 
         @self.post("/active_experiment", tags=["private"])
         def active_experiment():
-            """
-            Retrieve the currently active experiment.
-
-            Returns:
-                Experiment: The currently active experiment object.
-            """
+            """Return the orchestrator's currently active experiment."""
             return self.orch.get_experiment(last=False)
 
         @self.post("/last_experiment", tags=["private"])
         def last_experiment():
-            """
-            Retrieve the last experiment from the orchestrator.
-
-            Returns:
-                Experiment: The last experiment object managed by the orchestrator.
-            """
+            """Return the orchestrator's most recently finished experiment."""
             return self.orch.get_experiment(last=True)
 
         @self.post("/list_actions", tags=["private"])
         def list_actions():
-            """
-            Retrieve a list of actions from the orchestrator.
-
-            Returns:
-                list: A list of actions managed by the orchestrator.
-            """
+            """Return the queued actions."""
             return self.orch.list_actions()
 
         @self.post("/list_active_actions", tags=["private"])
         def list_active_actions():
-            """
-            List all active actions managed by the orchestrator.
-
-            Returns:
-                list: A list of active actions.
-            """
+            """Return the currently active actions."""
             return self.orch.list_active_actions()
 
         @self.post("/list_nonblocking", tags=["private"])
         def list_non_blocking():
-            """
-            Retrieve the list of non-blocking operations.
-
-            Returns:
-                list: A list containing non-blocking operations.
-            """
+            """Return tracked non-blocking executor identifiers."""
             return self.orch.nonblocking
 
         @self.post("/get_orch_state", tags=["private"])
         def get_orch_state() -> dict:
-            """
-            Retrieve the current state of the orchestrator.
-
-            Returns:
-                dict: A dictionary containing the following keys:
-                - "orch_state": The current state of the orchestrator.
-                - "loop_state": The current state of the loop.
-                - "loop_intent": The current intent of the loop.
-                - "active_sequence": A dictionary representation of the active sequence, if any.
-                - "last_sequence": A dictionary representation of the last sequence, if any.
-                - "active_experiment": A dictionary representation of the active experiment, if any.
-                - "last_experiment": A dictionary representation of the last experiment, if any.
-            """
+            """Return a snapshot of the orchestrator's loop state and active/last queues."""
 
             resp = {
                 "orch_state": self.orch.globalstatusmodel.orch_state,
@@ -785,32 +443,17 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/latest_sequence_uuids", tags=["private"])
         def latest_sequence_uuids():
-            """
-            Retrieve a list of 50 most recent sequence_uuids.
-
-            Returns:
-                list: A list of most recent sequence_uuids from the orchestrator.
-            """
+            """Return the orchestrator's recent dispatched sequence UUIDs."""
             return self.orch.last_50_sequence_uuids
 
         @self.post("/latest_experiment_uuids", tags=["private"])
         def latest_experiment_uuids():
-            """
-            Retrieve a list of 50 most recent experiment_uuids.
-
-            Returns:
-                list: A list of most recent experiment_uuids from the orchestrator.
-            """
+            """Return the orchestrator's recent dispatched experiment UUIDs."""
             return self.orch.last_50_experiment_uuids
 
         @self.post("/latest_action_uuids", tags=["private"])
         def latest_action_uuids():
-            """
-            Retrieve a list of 50 most recent action_uuids.
-
-            Returns:
-                list: A list of most recent action_uuids from the orchestrator.
-            """
+            """Return the orchestrator's recent dispatched action UUIDs."""
             return self.orch.last_50_action_uuids
 
         @self.post(f"/{server_key}/wait", tags=["action"])
@@ -819,17 +462,7 @@ class OrchAPI(HelaoFastAPI):
             action_version: int = 1,
             waittime: float = 10.0,
         ):
-            """
-            Asynchronous function to wait for a specified amount of time.
-
-            Args:
-                action (Action): The action to be performed, provided in the request body.
-                action_version (int): The version of the action. Default is 1.
-                waittime (float): The time to wait in seconds. Default is 10.0 seconds.
-
-            Returns:
-                dict: A dictionary containing the details of the active action.
-            """
+            """Action endpoint that sleeps ``waittime`` seconds via a ``WaitExec`` executor."""
             active = await self.orch.setup_and_contain_action()
             active.action.action_abbr = "wait"
             executor = WaitExec(
@@ -844,21 +477,7 @@ class OrchAPI(HelaoFastAPI):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
         ):
-            """
-            Stop a wait action.
-
-            This asynchronous function cancels an ongoing "wait" action by stopping the
-            associated executor tasks. It first sets up and contains the action, then
-            iterates through the executors to find and stop the "wait" action tasks.
-            Finally, it finishes the action and returns the result as a dictionary.
-
-            Args:
-                action (Action, optional): The action to be canceled. Defaults to an empty dictionary.
-                action_version (int, optional): The version of the action. Defaults to 1.
-
-            Returns:
-                dict: The finished action details as a dictionary.
-            """
+            """Action endpoint that stops every running ``wait`` executor and finishes the action."""
             active = await self.orch.setup_and_contain_action()
             for exec_id, executor in self.orch.executors.items():
                 if exec_id.split()[0] == "wait":
@@ -872,17 +491,7 @@ class OrchAPI(HelaoFastAPI):
             action_version: int = 1,
             reason: str = "wait",
         ):
-            """
-            Interrupts the current action and stops the orchestrator.
-
-            Args:
-                action (Action, optional): The action to be interrupted. Defaults to an empty Action.
-                action_version (int, optional): The version of the action. Defaults to 1.
-                reason (str, optional): The reason for the interruption. Defaults to "wait".
-
-            Returns:
-                dict: The finished action as a dictionary.
-            """
+            """Action endpoint that stops the orchestrator with the supplied ``reason`` and finishes."""
             active = await self.orch.setup_and_contain_action()
             self.orch.current_stop_message = active.action.action_params["reason"]
             LOGGER.warning(active.action.action_params["reason"])
@@ -897,22 +506,7 @@ class OrchAPI(HelaoFastAPI):
             action_version: int = 1,
             switch: bool = True,
         ):
-            """
-            Emergency stop (estop) action handler.
-
-            This asynchronous function handles the emergency stop action. It sets up
-            and contains the action, checks if the driver has an estop function, and
-            either calls it or sets the estop status directly. It also updates the
-            action status and stops all executors.
-
-            Args:
-                action (Action): The action object containing parameters for the estop action.
-                action_version (int): The version of the action. Default is 1.
-                switch (bool): A flag indicating whether to switch the estop status. Default is True.
-
-            Returns:
-                dict: A dictionary representation of the finished action.
-            """
+            """Trigger emergency stop on the orchestrator: invoke driver estop if any, latch when ``switch`` is True, mark the action as estopped, and stop all executors."""
             active = await self.orch.setup_and_contain_action(
                 json_data_keys=["estop"], action_abbr="estop"
             )
@@ -944,21 +538,7 @@ class OrchAPI(HelaoFastAPI):
             conditional_experiment_name: str = "",
             conditional_experiment_params: dict = {},
         ):
-            """
-            Executes a conditional experiment based on specified parameters and conditions.
-
-            Args:
-                action (Action): The action object containing parameters for the experiment.
-                action_version (int): The version of the action. Default is 1.
-                check_parameter (Optional[str]): The parameter to check against the condition. Default is an empty string.
-                check_condition (checkcond): The condition to check. Default is checkcond.equals.
-                check_value (Union[float, int, bool]): The value to compare the parameter against. Default is True.
-                conditional_experiment_name (str): The name of the conditional experiment. Default is an empty string.
-                conditional_experiment_params (dict): The parameters for the conditional experiment. Default is an empty dictionary.
-
-            Returns:
-                dict: The finished action as a dictionary.
-            """
+            """Action endpoint that prepends ``conditional_experiment_name`` when ``check_parameter`` satisfies ``check_condition`` against ``check_value``."""
             active = await self.orch.setup_and_contain_action()
             experiment_model = Experiment(
                 experiment_name=active.action.action_params[
@@ -1006,26 +586,7 @@ class OrchAPI(HelaoFastAPI):
             reason: str = "conditional stop",
             clear_queues: bool = False,
         ):
-            """
-            Asynchronously stops an action based on a specified condition.
-
-            Parameters:
-                action (Action): The action to be conditionally stopped. Defaults to an empty dictionary.
-                action_version (int): The version of the action. Defaults to 1.
-                stop_parameter (Optional[str]): The parameter to check against the stop condition. Defaults to an empty string.
-                stop_condition (checkcond): The condition to evaluate for stopping the action. Defaults to checkcond.equals.
-                stop_value (Union[str, float, int, bool]): The value to compare against the stop parameter. Defaults to True.
-                reason (str): The reason for stopping the action. Defaults to "conditional stop".
-
-            Returns:
-                dict: The dictionary representation of the finished action.
-
-            Behavior:
-                - Sets up and contains the action.
-                - Evaluates the stop condition against the specified parameter and value.
-                - If the condition is met, clears actions, experiments, and sequences, and updates the stop message.
-                - Finishes the action and returns its dictionary representation.
-            """
+            """Action endpoint that stops the orchestrator (and optionally clears all queues) when ``stop_parameter`` satisfies ``stop_condition`` against ``stop_value``."""
             active = await self.orch.setup_and_contain_action()
             cond = active.action.action_params["stop_condition"]
             param = active.action.action_params.get(
@@ -1071,22 +632,7 @@ class OrchAPI(HelaoFastAPI):
             skip_queued_experiments: bool = False,
             reason: str = "conditional skip",
         ):
-            """
-            Conditionally skips actions or experiments based on specified parameters.
-
-            Args:
-                action (Action): The action to be evaluated.
-                action_version (int): The version of the action.
-                skip_parameter (Optional[str]): The parameter to check for the skip condition.
-                skip_condition (checkcond): The condition to evaluate for skipping.
-                skip_value (Union[str, float, int, bool]): The value to compare against the parameter.
-                skip_queued_actions (bool): Whether to skip queued actions if the condition is met.
-                skip_queued_experiments (bool): Whether to skip queued experiments if the condition is met.
-                reason (str): The reason for the conditional skip.
-
-            Returns:
-                dict: The finished action as a dictionary.
-            """
+            """Action endpoint that clears queued actions and/or experiments when ``skip_parameter`` satisfies ``skip_condition`` against ``skip_value``."""
             active = await self.orch.setup_and_contain_action()
             cond = active.action.action_params["skip_condition"]
             param = active.action.action_params.get(
@@ -1123,17 +669,7 @@ class OrchAPI(HelaoFastAPI):
             param_name: str = "global_param_test",
             param_value: Union[str, float, int, bool] = True,
         ):
-            """
-            Adds a global experiment parameter to the orchestrator.
-
-            Args:
-                action (Action, optional): The action object containing parameters. Defaults to an empty Action object.
-                param_name (str, optional): The name of the parameter to add. Defaults to "global_param_test".
-                param_value (Union[str, float, int, bool], optional): The value of the parameter to add. Defaults to True.
-
-            Returns:
-                dict: The finished action as a dictionary.
-            """
+            """Action endpoint that writes ``param_name=param_value`` into the orchestrator's ``global_params``."""
             active = await self.orch.setup_and_contain_action()
             pdict = {
                 active.action.action_params["param_name"]: active.action.action_params[
@@ -1150,15 +686,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/clear_global_params_private", tags=["private"])
         def clear_global_params_private():
-            """
-            Clears the global parameters stored in the orchestrator.
-
-            This function resets the `global_params` dictionary in the orchestrator to an empty dictionary.
-            It returns a string indicating which parameters were removed or if the `global_params` was already empty.
-
-            Returns:
-                str: A message indicating the removed parameters or that `global_params` was empty.
-            """
+            """Reset ``global_params`` to an empty dict and return a summary message."""
             current_params = list(self.orch.global_params.keys())
             self.orch.global_params = {}
             if current_params:
@@ -1168,33 +696,12 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post("/get_global_params", tags=["private"])
         def get_global_params():
-            """
-            Retrieve the global parameters from the orchestrator.
-
-            Returns:
-                dict: A dictionary containing the global parameters.
-            """
+            """Return the orchestrator's ``global_params`` dictionary."""
             return self.orch.global_params
 
         @self.post(f"/{server_key}/clear_global_params", tags=["action"])
         async def clear_global_params(action: Action = Body({}, embed=True)):
-            """
-            Asynchronous endpoint to clear global parameters.
-
-            This function clears the global parameters stored in the orchestrator.
-            It sets up and contains an action, retrieves the current global parameters,
-            and then clears them. If there were any global parameters, it logs the removed
-            parameters; otherwise, it logs that the global parameters were already empty.
-            Finally, it updates the action parameters with the cleared parameters and
-            finishes the action.
-
-            Args:
-                action (Action, optional): The action object containing the parameters.
-                    Defaults to an empty dictionary.
-
-            Returns:
-                dict: The finished action as a dictionary.
-            """
+            """Action endpoint that clears the orchestrator's ``global_params`` and records the removed keys."""
             active = await self.orch.setup_and_contain_action()
             current_params = list(self.orch.global_params.keys())
             self.orch.global_params = {}
@@ -1210,15 +717,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.on_event("shutdown")
         async def shutdown_event():
-            """
-            Shuts down the operator and the Bokeh application.
-
-            This function performs the following steps:
-            1. Logs a message indicating that the operator is stopping.
-            2. Stops the Bokeh application.
-            3. Logs a message indicating that the orchestrator has shut down.
-            4. Waits for 0.75 seconds to ensure all processes have terminated properly.
-            """
+            """Stop the Bokeh operator UI and the orchestrator on application shutdown."""
             LOGGER.info("Stopping operator")
             self.orch.bokehapp.stop()
             LOGGER.info("orch shutdown")
@@ -1227,37 +726,15 @@ class OrchAPI(HelaoFastAPI):
 
 
 class WaitExec(Executor):
-    """
-    WaitExec is an executor class that performs a wait action for a specified duration.
-
-    Attributes:
-        poll_rate (float): The rate at which the poll method is called.
-        duration (float): The duration to wait, in seconds.
-        print_every_secs (int): The interval at which status messages are printed, in seconds.
-        start_time (float): The start time of the wait action.
-        last_print_time (float): The last time a status message was printed.
-
-    Methods:
-        _exec(): Logs the wait action and returns a result dictionary.
-        _poll(): Periodically checks the elapsed time and updates the status.
-        _post_exec(): Logs the completion of the wait action and returns a result dictionary.
-    """
+    """Executor implementing the orchestrator's ``wait`` action via polled timing."""
 
     def __init__(self, *args, **kwargs):
-        """
-        Initializes the WaitExec class.
+        """Initialize the wait executor from the active action's ``waittime`` parameter.
 
         Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-                - print_every_secs (int, optional): Interval in seconds for printing messages. Defaults to 5.
-
-        Attributes:
-            poll_rate (float): The rate at which the poll occurs, in seconds.
-            duration (int): The duration to wait, retrieved from action parameters.
-            print_every_secs (int): Interval in seconds for printing messages.
-            start_time (float): The start time of the wait execution.
-            last_print_time (float): The last time a message was printed.
+            *args: Positional arguments forwarded to :class:`Executor`.
+            **kwargs: Keyword arguments forwarded to :class:`Executor`; recognises
+                ``print_every_secs`` to control the progress log cadence.
         """
         super().__init__(*args, **kwargs)
         LOGGER.info("WaitExec initialized.")
@@ -1268,28 +745,12 @@ class WaitExec(Executor):
         self.last_print_time = self.start_time
 
     async def _exec(self):
-        """
-        Asynchronously executes an action and logs the duration.
-
-        Returns:
-            dict: A dictionary containing an empty "data" field and an "error" field with the value `ErrorCodes.none`.
-        """
+        """Log the wait duration and return an empty success result."""
         LOGGER.info(f" ... wait action: {self.duration}")
         return {"data": {}, "error": ErrorCodes.none}
 
     async def _poll(self):
-        """
-        Asynchronously polls the analog inputs from the live buffer and logs the elapsed time.
-
-        This method checks the current time and calculates the elapsed time since the start.
-        It logs the elapsed time at intervals specified by `self.print_every_secs`.
-        The method then determines the status based on the elapsed time and the specified duration.
-        Finally, it sleeps for a short duration to yield control back to the event loop.
-
-        Returns:
-            dict: A dictionary containing the error code and the status.
-        """
-        """Read analog inputs from live buffer."""
+        """Track elapsed time, log progress, and finish once the configured duration elapses."""
         check_time = time.time()
         elapsed_time = check_time - self.start_time
         if check_time - self.last_print_time > self.print_every_secs - 0.01:
@@ -1305,21 +766,13 @@ class WaitExec(Executor):
         return {"error": ErrorCodes.none, "status": status}
 
     async def _post_exec(self):
+        """Log completion and return a success result."""
         LOGGER.info(" ... wait action done")
         return {"error": ErrorCodes.none}
 
 
 class checkcond(str, Enum):
-    """
-    checkcond is an enumeration that represents different types of conditions.
-
-    Attributes:
-        equals (str): Represents a condition where values are equal.
-        below (str): Represents a condition where a value is below a certain threshold.
-        above (str): Represents a condition where a value is above a certain threshold.
-        isnot (str): Represents a condition where values are not equal.
-        uncond (str): Represents an unconditional state.
-    """
+    """Comparison conditions supported by the orchestrator's conditional action endpoints."""
 
     equals = "equals"
     below = "below"
