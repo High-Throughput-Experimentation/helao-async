@@ -203,39 +203,34 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         LOGGER.info(f"Added {str(calc_tup[0])} to syncer queue.")
 
     async def syncer(self):
-        """
-        Asynchronous method to process tasks from the syncer queue.
+        """Worker coroutine: pull one analysis tuple from the queue and await its sync.
 
-        This method continuously checks the task queue and processes tasks as long as the number of running tasks is less than the maximum allowed tasks. For each task, it creates an asynchronous analysis task and adds a callback for when the task is done.
-
-        The method performs the following steps:
-        1. Prints a message indicating the start of the syncer queue processor task.
-        2. Enters an infinite loop to continuously check the task queue.
-        3. If the number of running tasks is less than the maximum allowed tasks:
-            a. Retrieves a task from the task queue.
-            b. Prints a message indicating the creation of an analysis task.
-            c. Creates an asynchronous analysis task and adds it to the running tasks.
-            d. Adds a callback to the task for when it is done.
-            e. Marks the task as done in the task queue.
-        4. Sleeps for a short duration before checking the task queue again.
-
-        Note:
-            This method is designed to run indefinitely and should be managed appropriately to ensure it does not block other operations.
-
+        ``self.max_tasks`` instances run as parallel workers so up to ``max_tasks``
+        analyses can sync concurrently. Each worker owns one calc tuple at a time
+        and the worker count is the only concurrency bound.
         """
         LOGGER.info("Starting syncer queue processor task.")
         while True:
-            if len(self.running_tasks) < self.max_tasks:
-                calc_tup = await self.task_queue.get()
-                LOGGER.info(f"creating ana task for {calc_tup[0]}.")
-                self.running_tasks[str(calc_tup[0])] = asyncio.create_task(
-                    self.sync_ana(calc_tup), name=str(calc_tup[0])
-                )
-                self.running_tasks[str(calc_tup[0])].add_done_callback(
-                    self.sync_exit_callback
+            calc_tup = await self.task_queue.get()
+            proc_uuid_str = str(calc_tup[0])
+            LOGGER.info(f"creating ana task for {calc_tup[0]}.")
+            if proc_uuid_str in self.running_tasks:
+                LOGGER.debug(
+                    f"{proc_uuid_str} ana sync is already in progress, skipping."
                 )
                 self.task_queue.task_done()
-            await asyncio.sleep(0.1)
+                continue
+            self.running_tasks[proc_uuid_str] = asyncio.current_task()
+            try:
+                await self.sync_ana(calc_tup)
+            except Exception:
+                LOGGER.error(
+                    f"Error in ana syncer worker for {proc_uuid_str}", exc_info=True
+                )
+            finally:
+                self.running_tasks.pop(proc_uuid_str, None)
+                self.task_set.discard(calc_tup[0])
+                self.task_queue.task_done()
 
     async def sync_ana(
         self,
@@ -359,7 +354,6 @@ class HelaoAnalysisSyncer(HelaoSyncer):
         LOGGER.warning(
             f"Analysis {eua.analysis_uuid} sync failed for process_uuid {process_uuid}."
         )
-        self.running_tasks.pop(str(process_uuid))
         return False
 
     async def to_api(self, req_model: dict, retries: int = 3):
