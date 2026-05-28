@@ -41,6 +41,7 @@ from helao.deploy.hte.experiments.ADSS_xtraclean_exp import (
 )
 
 from helao.core.models.run_use import RunUse
+from helao.helpers.lib_decorators import experiment
 
 
 EXPERIMENTS = __all__
@@ -53,9 +54,9 @@ debug_save_data = True
 ### CONSOLIDATED EXPERIMENTS FOR SIMPLIFIED SEQUENCES
 
 
+@experiment(version=1)
 def CLAD_sub_recirculate_alternating(
     experiment: Experiment,
-    experiment_version: int = 1,
     forward_duration_s: float = 30.0,
     reverse_duration_s: float = 15.0,
     final_duration_s: float = 5.0,
@@ -64,7 +65,6 @@ def CLAD_sub_recirculate_alternating(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         forward_duration_s: Initial forward-recirc time (s).
         reverse_duration_s: Reverse-recirc time (s).
         final_duration_s: Final forward-recirc time (s).
@@ -95,9 +95,9 @@ def CLAD_sub_recirculate_alternating(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CLAD_sub_load_sample(
     experiment: Experiment,
-    experiment_version: int = 1,
     load_position: str = "cell1_we",
     clear_position: bool = True,
     solid_plate_id: Optional[int] = None,
@@ -115,7 +115,6 @@ def CLAD_sub_load_sample(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         load_position: PAL custom position name.
         clear_position: Unload existing samples first.
         solid_plate_id: Plate identifier of the legacy solid sample.
@@ -195,9 +194,9 @@ def CLAD_sub_load_sample(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CLAD_sub_fill_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
     fill_volume_ul: float = 3000,
     fill_rate_ul_s: float = 300,
     load_sample: bool = False,
@@ -210,7 +209,6 @@ def CLAD_sub_fill_cell(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         fill_volume_ul: Fill volume (uL).
         fill_rate_ul_s: Syringe rate (uL/s).
         load_sample: Query the cell sample before infusing.
@@ -260,9 +258,9 @@ def CLAD_sub_fill_cell(
 
 
 # 1. CLEAN CELL
+@experiment(version=1)
 def CLAD_sub_setup_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
     rinse_recirc_duration_s: float = 30.0,
     rinse_volume_ul: float = 3000.0,
     fill_rate_ul_s: float = 300.0,
@@ -272,7 +270,6 @@ def CLAD_sub_setup_cell(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         rinse_recirc_duration_s: Forward recirculation duration (s).
         rinse_volume_ul: Cell rinse volume (uL).
         fill_rate_ul_s: Syringe rate (uL/s).
@@ -346,9 +343,9 @@ def CLAD_sub_setup_cell(
 
 
 # 2. REFERENCE MEASUREMENT
+@experiment(version=1)
 def CLAD_sub_reference_setup(
     experiment: Experiment,
-    experiment_version: int = 1,
     reference_position_name: str = "builtin_ref_motorxy_2",
     reference_sample_label: str = "reference-fto__solid__11_1",
     load_position: str = "cell1_we",
@@ -367,7 +364,6 @@ def CLAD_sub_reference_setup(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         reference_position_name: Built-in specref position name.
         reference_sample_label: Informational solid label.
         load_position: PAL custom position for the reference assembly.
@@ -481,9 +477,9 @@ def CLAD_sub_reference_setup(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CLAD_sub_OCV_bubble_check(
     experiment: Experiment,
-    experiment_version: int = 1,
     ocv_duration_s: float = 30.0,
     ocv_sample_rate_s: float = 0.1,
     electrolyte_ph: float = 1.0,
@@ -497,7 +493,6 @@ def CLAD_sub_OCV_bubble_check(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         ocv_duration_s: Main OCV duration (s).
         ocv_sample_rate_s: OCV sample rate (s).
         electrolyte_ph: Solution pH.
@@ -517,7 +512,6 @@ def CLAD_sub_OCV_bubble_check(
         apm.add_actions(
             ADSS_sub_OCV(
                 experiment=experiment,
-                experiment_version=experiment_version,
                 check_bubble=True,
                 Tval__s=10,
                 samplerate_sec=ocv_sample_rate_s,
@@ -541,7 +535,6 @@ def CLAD_sub_OCV_bubble_check(
     apm.add_actions(
         ADSS_sub_OCV(
             experiment=experiment,
-            experiment_version=experiment_version,
             check_bubble=False,
             Tval__s=ocv_duration_s,
             samplerate_sec=ocv_sample_rate_s,
@@ -560,9 +553,9 @@ def CLAD_sub_OCV_bubble_check(
 
 
 # 3. SETUP SAMPLE
+@experiment(version=1)
 def CLAD_sub_load_assembly(
     experiment: Experiment,
-    experiment_version: int = 1,
     load_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -577,7 +570,6 @@ def CLAD_sub_load_assembly(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         load_position: PAL custom position name.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -673,9 +665,9 @@ def CLAD_sub_load_assembly(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CLAD_sub_clean_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
     nitric_volume_ul: float = 3000,
     water_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 300,
@@ -690,7 +682,6 @@ def CLAD_sub_clean_cell(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         nitric_volume_ul: Nitric flush volume (uL).
         water_volume_ul: Water rinse volume (uL).
         Syringe_rate_ulsec: Syringe rate (uL/s).
@@ -759,9 +750,9 @@ def CLAD_sub_clean_cell(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CLAD_sub_refill_syringe(
     experiment: Experiment,
-    experiment_version: int = 1,
     syringe: str = "clean",
     fill_volume_ul: float = 0,
     Syringe_rate_ulsec: float = 300,
@@ -770,7 +761,6 @@ def CLAD_sub_refill_syringe(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         syringe: ``"clean"``, ``"water"``, or ``"work"``.
         fill_volume_ul: Withdraw volume (uL).
         Syringe_rate_ulsec: Syringe rate (uL/s).
@@ -798,15 +788,14 @@ def CLAD_sub_refill_syringe(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CLAD_sub_standby(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Drive the station to a safe standby: peristaltic pump off, inlet gas valve closed.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.

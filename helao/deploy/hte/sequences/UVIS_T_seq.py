@@ -3,13 +3,14 @@
 __all__ = ["UVIS_T", "UVIS_T_postseq"]
 
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=5)
 def UVIS_T(
-    sequence_version: int = 5,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reference_mode: str = "internal",
@@ -38,7 +39,6 @@ def UVIS_T(
     reference block and the shutdown experiment finish the sequence.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         plate_id: Material library plate identifier.
         plate_sample_no_list: Sample numbers on the plate to measure.
         reference_mode: Reference mode passed to UVIS sub-experiments.
@@ -234,8 +234,8 @@ def UVIS_T(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def UVIS_T_postseq(
-    sequence_version: int = 1,
     analysis_seq_uuid: str = "",
     plate_id: int = 0,
     recent: bool = False,
@@ -243,7 +243,6 @@ def UVIS_T_postseq(
     """Build a post-sequence that runs the dry UVIS analysis.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         analysis_seq_uuid: UUID of the source sequence to analyze.
         plate_id: Plate identifier scoping the analysis.
         recent: Restrict to the most recent matching run when True.

@@ -13,6 +13,7 @@ from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
+from helao.helpers.lib_decorators import experiment
 
 
 # list valid experiment functions
@@ -23,9 +24,9 @@ ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 SIM_server = MachineModel(server_name="SIM", machine_name=ORCH_HOST).as_dict()
 
 
+@experiment(version=1)
 def SIM_websocket_data(
     experiment: Experiment,
-    experiment_version: int = 1,
     wait_time: float = 3.0,
     data_duration: float = 5.0,
 ) -> list:
@@ -36,7 +37,6 @@ def SIM_websocket_data(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Library version tag.
         wait_time: Orchestrator wait duration before each acquisition.
         data_duration: Duration of each simulated acquisition.
 

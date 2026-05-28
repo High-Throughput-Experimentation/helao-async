@@ -38,6 +38,7 @@ from helao.helpers.constants import REF_TABLE
 
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.deploy.hte.drivers.io.enum import TriggerType
+from helao.helpers.lib_decorators import experiment
 
 
 EXPERIMENTS = __all__
@@ -86,9 +87,9 @@ def ECHE_sub_unloadall_customs(experiment: Experiment) -> list:
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def ECHE_sub_add_liquid(
     experiment: Experiment,
-    experiment_version: int = 2,
     solid_custom_position: str = "cell1_we",
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "O2",
@@ -98,7 +99,6 @@ def ECHE_sub_add_liquid(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_custom_position: PAL custom position name.
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
         solution_bubble_gas: Bubbler-gas label passed to PAL.
@@ -131,9 +131,9 @@ def ECHE_sub_add_liquid(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ECHE_sub_load_solid(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -142,7 +142,6 @@ def ECHE_sub_load_solid(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_custom_position: PAL custom position name.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -172,9 +171,9 @@ def ECHE_sub_load_solid(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def ECHE_sub_startup(
     experiment: Experiment,
-    experiment_version: int = 2,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -186,7 +185,6 @@ def ECHE_sub_startup(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_custom_position: PAL custom position name.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -273,9 +271,9 @@ def ECHE_sub_shutdown(experiment: Experiment) -> list:
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=4)
 def ECHE_sub_CA_led(
     experiment: Experiment,
-    experiment_version: int = 4,
     CA_potential: float = 0.0,
     potential_versus: str = "rhe",
     ref_type: str = "inhouse",
@@ -305,7 +303,6 @@ def ECHE_sub_CA_led(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CA_potential: Applied potential before reference correction (V).
         potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
         ref_type: Reference electrode key into ``REF_TABLE``.
@@ -415,9 +412,9 @@ def ECHE_sub_CA_led(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ECHE_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 1,
     Tval__s: float = 1,
     SampleRate: float = 0.05,
 ) -> list:
@@ -425,7 +422,6 @@ def ECHE_sub_OCV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Tval__s: OCV duration (s).
         SampleRate: Acquisition interval (s).
 
@@ -468,9 +464,9 @@ def ECHE_sub_OCV(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ECHE_sub_preCV(
     experiment: Experiment,
-    experiment_version: int = 1,
     CA_potential: float = 0.0,  # need to get from CV initial
     samplerate_sec: float = 0.05,
     CA_duration_sec: float = 3,  # adjustable pre_CV time
@@ -479,7 +475,6 @@ def ECHE_sub_preCV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CA_potential: Applied potential (V).
         samplerate_sec: Acquisition interval (s).
         CA_duration_sec: Pre-CV CA duration (s).
@@ -527,9 +522,9 @@ def ECHE_sub_preCV(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=3)
 def ECHE_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 3,
     CA_potential: float = 0.0,
     potential_versus: str = "rhe",
     ref_type: str = "inhouse",
@@ -548,7 +543,6 @@ def ECHE_sub_CA(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CA_potential: Applied potential before reference correction (V).
         potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
         ref_type: Reference electrode key into ``REF_TABLE``.
@@ -625,9 +619,9 @@ def ECHE_sub_CA(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=4)
 def ECHE_sub_CV_led(
     experiment: Experiment,
-    experiment_version: int = 4,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -666,7 +660,6 @@ def ECHE_sub_CV_led(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Vinit_vsRHE: Initial CV potential vs RHE (V).
         Vapex1_vsRHE: Apex 1 vs RHE (V).
         Vapex2_vsRHE: Apex 2 vs RHE (V).
@@ -794,9 +787,9 @@ def ECHE_sub_CV_led(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=3)
 def ECHE_sub_CV(
     experiment: Experiment,
-    experiment_version: int = 3,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -820,7 +813,6 @@ def ECHE_sub_CV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Vinit_vsRHE: Initial CV potential vs RHE (V).
         Vapex1_vsRHE: Apex 1 vs RHE (V).
         Vapex2_vsRHE: Apex 2 vs RHE (V).
@@ -897,9 +889,9 @@ def ECHE_sub_CV(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=3)
 def ECHE_sub_CP(
     experiment: Experiment,
-    experiment_version: int = 3,
     CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -917,7 +909,6 @@ def ECHE_sub_CP(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CP_current: Applied current (A).
         solution_ph: Solution pH (informational here).
         reservoir_electrolyte: ``Electrolyte`` enum label (informational).
@@ -978,9 +969,9 @@ def ECHE_sub_CP(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=4)
 def ECHE_sub_CP_led(
     experiment: Experiment,
-    experiment_version: int = 4,
     CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -1009,7 +1000,6 @@ def ECHE_sub_CP_led(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CP_current: Applied current (A).
         solution_ph: Solution pH (informational here).
         reservoir_electrolyte: ``Electrolyte`` enum label (informational).
@@ -1105,9 +1095,9 @@ def ECHE_sub_CP_led(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ECHE_sub_movetosample(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -1115,7 +1105,6 @@ def ECHE_sub_movetosample(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
 
@@ -1156,9 +1145,9 @@ def ECHE_sub_movetosample(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ECHE_sub_rel_move(
     experiment: Experiment,
-    experiment_version: int = 1,
     offset_x_mm: float = 1.0,
     offset_y_mm: float = 1.0,
 ) -> list:
@@ -1166,7 +1155,6 @@ def ECHE_sub_rel_move(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         offset_x_mm: Relative X displacement (mm).
         offset_y_mm: Relative Y displacement (mm).
 

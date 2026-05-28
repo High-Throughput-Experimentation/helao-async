@@ -4,6 +4,7 @@ from socket import gethostname
 
 from helao.core.models.machine import MachineModel
 from helao.helpers.premodels import Experiment, ActionPlanMaker
+from helao.helpers.lib_decorators import experiment
 
 __all__ = ["PSTAT_exp_CP"]
 EXPERIMENTS = __all__
@@ -12,9 +13,9 @@ PSTAT_server = MachineModel(
 ).as_dict()
 
 
+@experiment(version=1)
 def PSTAT_exp_CP(
     experiment: Experiment,
-    experiment_version: int = 1,
     current: float = 0.0,
     duration_s: float = 60,
     acqinterval_s: float = 0.1,
@@ -37,7 +38,6 @@ def PSTAT_exp_CP(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         current: Applied current (A).
         duration_s: Duration of each CP step (s).
         acqinterval_s: Sample interval (s).

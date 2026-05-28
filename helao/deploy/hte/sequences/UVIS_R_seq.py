@@ -4,13 +4,14 @@ __all__ = ["UVIS_R", "UVIS_R_postseq", "UVIS_R_shutoff", "UVIS_GAIA_preset"]
 
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.deploy.priv.scripts.common.helao_nbio import PAPI
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=5)
 def UVIS_R(
-    sequence_version: int = 5,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reference_after_sample_list: list = [],
@@ -36,7 +37,6 @@ def UVIS_R(
     references block is inserted before continuing.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         plate_id: Material library plate identifier.
         plate_sample_no_list: Sample numbers on the plate to measure.
         reference_after_sample_list: Samples after which another
@@ -132,8 +132,8 @@ def UVIS_R(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def UVIS_R_postseq(
-    sequence_version: int = 1,
     analysis_seq_uuid: str = "",
     plate_id: int = 0,
     recent: bool = False,
@@ -141,7 +141,6 @@ def UVIS_R_postseq(
     """Build a post-sequence that runs the dry UVIS analysis.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         analysis_seq_uuid: UUID of the source sequence to analyze.
         plate_id: Plate identifier scoping the analysis.
         recent: Restrict to the most recent matching run when True.
@@ -162,14 +161,13 @@ def UVIS_R_postseq(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def UVIS_R_shutoff(
-    sequence_version: int = 1,
     outlet_number: int = 1,
 ) -> list:
     """Build a sequence that powers off the UVIS lamp at the given outlet.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         outlet_number: Power outlet number to switch off.
 
     Returns:
@@ -186,8 +184,8 @@ def UVIS_R_shutoff(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=5)
 def UVIS_GAIA_preset(
-    sequence_version: int = 5,
     plate_id: int = 1,
     reference_mode: str = "builtin",
     custom_position: str = "cell1_we",
@@ -211,7 +209,6 @@ def UVIS_GAIA_preset(
     elements are present (full map).
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         plate_id: Material library plate identifier.
         reference_mode: Reference mode passed to ``UVIS_R``.
         custom_position: Solid custom position name to address the cell.
@@ -693,7 +690,6 @@ def UVIS_GAIA_preset(
     
     if plate_id in REMAPPED_PLATES:
         return UVIS_R(
-            sequence_version=sequence_version,
             plate_id=plate_id,
             plate_sample_no_list=TOPREMAP if len(els) < 3 else FULLREMAP,
             reference_after_sample_list=TOPREREF if len(els) < 3 else FULLREREF,
@@ -712,7 +708,6 @@ def UVIS_GAIA_preset(
         )
     else:
         return UVIS_R(
-            sequence_version=sequence_version,
             plate_id=plate_id,
             plate_sample_no_list=TOPMAP if len(els) < 3 else FULLMAP,
             reference_after_sample_list=TOPREF if len(els) < 3 else FULLREF,

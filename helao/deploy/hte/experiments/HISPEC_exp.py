@@ -59,6 +59,7 @@ from helao.core.models.electrolyte import Electrolyte
 from helao.core.models.sample import SolidSample, LiquidSample
 
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
+from helao.helpers.lib_decorators import experiment
 
 EXPERIMENTS = __all__
 # these must all be defined but you may not use any of them in the experiment
@@ -142,9 +143,9 @@ def HISPEC_sub_unloadall_customs(experiment: Experiment) -> list:
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def HISPEC_sub_add_liquid(
     experiment: Experiment,
-    experiment_version: int = 2,
     solid_custom_position: str = "cell1_we",
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "O2",
@@ -154,7 +155,6 @@ def HISPEC_sub_add_liquid(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         solid_custom_position: Target custom position holding the solid sample.
         reservoir_liquid_sample_no: Liquid sample number in the local PAL db.
         solution_bubble_gas: Reservoir headspace gas label.
@@ -187,9 +187,9 @@ def HISPEC_sub_add_liquid(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def HISPEC_sub_load_solid(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -198,7 +198,6 @@ def HISPEC_sub_load_solid(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         solid_custom_position: Target custom position name.
         solid_plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
@@ -228,9 +227,9 @@ def HISPEC_sub_load_solid(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def HISPEC_sub_engage(
     experiment: Experiment,
-    experiment_version: int = 1,
     flow_we: bool = True,
     flow_ce: bool = True,
     z_height: float = 1.5,
@@ -248,7 +247,6 @@ def HISPEC_sub_engage(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         flow_we: If True, enable working-electrode flow during the fill step.
         flow_ce: If True, enable counter-electrode pump during the fill step.
         z_height: Absolute Z position in millimetres for the K-motor.
@@ -303,16 +301,15 @@ def HISPEC_sub_engage(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def HISPEC_sub_interrupt(
     experiment: Experiment,
-    experiment_version: int = 1,
     reason: str = "wait",
 ) -> list:
     """Pause the orchestrator with a human-readable reason.
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         reason: Message displayed by the operator UI when the interrupt fires.
 
     Returns:
@@ -323,9 +320,9 @@ def HISPEC_sub_interrupt(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def HISPEC_sub_disengage(
     experiment: Experiment,
-    experiment_version: int = 1,
     clear_we: bool = True,
     clear_ce: bool = False,
     z_height: float = 0,
@@ -339,7 +336,6 @@ def HISPEC_sub_disengage(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         clear_we: If True, energise WE vent/pump during the clear step.
         clear_ce: If True, energise CE vent/pump during the clear step.
         z_height: Absolute Z position in millimetres for the K-motor.
@@ -377,9 +373,9 @@ def HISPEC_sub_disengage(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def HISPEC_sub_startup(
     experiment: Experiment,
-    experiment_version: int = 2,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -395,7 +391,6 @@ def HISPEC_sub_startup(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         solid_custom_position: Custom position used for the working electrode.
         solid_plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
@@ -477,15 +472,14 @@ def HISPEC_sub_shutdown(experiment: Experiment) -> list:
     apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
     return apm.planned_actions  # returns complete action list to orch
 
+@experiment(version=1)
 def HISPEC_sub_check_CP_Ewe_bounds(experiment: Experiment,
-    experiment_version: int = 1,
     Ewe_V__mean_final: float = 0.3,
 ) -> list:
     """Bound the final CP Ewe value through the CALC server.
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         Ewe_V__mean_final: Candidate final mean Ewe to bound.
 
     Returns:
@@ -500,9 +494,9 @@ def HISPEC_sub_check_CP_Ewe_bounds(experiment: Experiment,
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def HISPEC_calculate_lower_vertex_potential(
     experiment: Experiment,
-    experiment_version: int = 1,
     min_offset_ocv: float = 3,
     new_ocv: float = 3,
     offset_value: float = -0.2,
@@ -511,7 +505,6 @@ def HISPEC_calculate_lower_vertex_potential(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         min_offset_ocv: Running minimum OCV (with offset already applied).
         new_ocv: Latest OCV measurement to compare against ``min_offset_ocv``.
         offset_value: Offset applied to the OCV before bookkeeping.
@@ -546,9 +539,9 @@ def HISPEC_calculate_lower_vertex_potential(
 # HISPEC_sub_PD_LoSpEC
 
 
+@experiment(version=1)
 def HISPEC_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 1,
     Vval__V: float = 0.0,
     Tval__s: float = 10.0,
     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
@@ -563,7 +556,6 @@ def HISPEC_sub_CA(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         Vval__V: Applied potential (V).
         Tval__s: Step duration in seconds.
         AcqInterval__s: Sample interval in seconds.
@@ -605,9 +597,9 @@ def HISPEC_sub_CA(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def HISPEC_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 1,
     Tval__s: float = 1,
     SampleRate: float = 0.05,
 ) -> list:
@@ -615,7 +607,6 @@ def HISPEC_sub_OCV(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         Tval__s: OCV measurement duration in seconds.
         SampleRate: Sample interval in seconds.
 
@@ -671,9 +662,9 @@ def HISPEC_sub_OCV(
 
 
 # spectral electrochemistry experiment
+@experiment(version=1)
 def HISPEC_sub_SpEC(
     experiment: Experiment,
-    experiment_version: int = 1,
     # OCV_vsRef: float = 0.2,
     # Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.2,  # Apex 1 value in volts or amps.
@@ -711,7 +702,6 @@ def HISPEC_sub_SpEC(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         Vapex1_vsRHE: First CV vertex vs RHE in volts.
         Vapex2_vsRHE: Second CV vertex vs RHE in volts.
         scanrate_voltsec: Scan rate in V/s.
@@ -858,9 +848,9 @@ def HISPEC_sub_SpEC(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def HISPEC_sub_CP(
     experiment: Experiment,
-    experiment_version: int = 1,
     Ival__A: float = 0.0,
     Tval__s: float = 10.0,
     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
@@ -880,7 +870,6 @@ def HISPEC_sub_CP(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         Ival__A: Applied current in amps.
         Tval__s: Step duration in seconds.
         AcqInterval__s: Sample interval in seconds.
@@ -951,9 +940,9 @@ def HISPEC_sub_CP(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def HISPEC_sub_PEIS(
     experiment: Experiment,
-    experiment_version: int = 1,
     Vinit__V: float = 0.0,  # Initial value in volts or amps.
     Vamp__V: float = 0.01,  # Amplitude value in volts
     Finit__Hz: float = 1,  # Initial frequency in Hz.
@@ -977,7 +966,6 @@ def HISPEC_sub_PEIS(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         Vinit__V: DC bias for the EIS sweep (V).
         Vamp__V: AC amplitude (V).
         Finit__Hz: Initial frequency (Hz).

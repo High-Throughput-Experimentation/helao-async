@@ -8,6 +8,7 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.core.models.machine import MachineModel as MM
+from helao.helpers.lib_decorators import experiment
 
 
 EXPERIMENTS = __all__
@@ -15,9 +16,9 @@ EXPERIMENTS = __all__
 ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
 
+@experiment(version=1)
 def ICPMS_analysis_concentration(
     experiment: Experiment,
-    experiment_version: int = 1,
     sequence_zip_path: str = "",
     params: dict = {},
 ) -> list:
@@ -25,7 +26,6 @@ def ICPMS_analysis_concentration(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         sequence_zip_path: Path to a zipped sequence archive on disk.
         params: Free-form parameter dict forwarded to the analyzer.
 

@@ -20,13 +20,14 @@ __all__ = [
 
 from typing import List
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=8)
 def ADSS_CA_cell_1potential(
-    sequence_version: int = 8,  # v3 move led off to exp v4 electrolyte insertion v7 keep electrolyte
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -77,7 +78,6 @@ def ADSS_CA_cell_1potential(
     ``led_illumination`` is true the OCV/CA steps use the ``*_photo`` variants.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id of the solid sample.
         plate_sample_no: Sample number on the plate.
         same_sample: If True, skip the move-to-sample step.
@@ -386,8 +386,8 @@ def ADSS_CA_cell_1potential(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=5)
 def ADSS_PA_CVs_CAs_cell(
-    sequence_version: int = 5,
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -447,7 +447,6 @@ def ADSS_PA_CVs_CAs_cell(
     flushed, cleaned, and refilled at the end.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id of the solid sample.
         plate_sample_no: Sample number on the plate.
         same_sample: Skip the move-to-sample step.
@@ -707,8 +706,8 @@ def ADSS_PA_CVs_CAs_cell(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=8)
 def ADSS_PA_CVs_CAs_CVs_cell_simple(
-    sequence_version: int = 8,  # make sample list
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: List[int] = [16304],  #  instead of map select
@@ -794,7 +793,6 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     cell is cleaned between samples.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id holding the samples.
         plate_sample_no: List of plate sample numbers to iterate.
         same_sample: Skip the move-to-sample step.
@@ -1099,8 +1097,8 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=2)
 def ADSS_CA_cell_multipotential(
-    sequence_version: int = 2,
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -1145,7 +1143,6 @@ def ADSS_CA_cell_multipotential(
     measurement the cell is drained and optionally flushed/cleaned/refilled.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id of the solid sample.
         plate_sample_no: Sample number on the plate.
         same_sample: Skip the move-to-sample step.
@@ -1424,8 +1421,8 @@ def ADSS_CA_cell_multipotential(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def ADSS_PA_CVs_testing(
-    sequence_version: int = 1,
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -1498,7 +1495,6 @@ def ADSS_PA_CVs_testing(
     first CV list is repeated with another interrupt to swap back to N2.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id holding the samples.
         plate_sample_no: Primary sample number.
         second_sample_no: Sample number used after the cleaning step.
@@ -1841,8 +1837,8 @@ def ADSS_PA_CVs_testing(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def ADSS_PA_CVs_CAs_CVs_autogasswitching(
-    sequence_version: int = 1,
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -1921,7 +1917,6 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     counter rotates the rinse profile across aliquots.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id holding the sample.
         plate_sample_no: Sample number on the plate.
         same_sample: Skip the move-to-sample step.
@@ -2288,8 +2283,8 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=4)
 def ADSS_PA_CV_TRI(
-    sequence_version: int = 4,  # bubble removal
     # note: str = "need as many samples as you expect combinations of UPL and LPL",
     # sample info
     # solid_custom_position: str = "cell1_we",
@@ -2438,7 +2433,6 @@ def ADSS_PA_CV_TRI(
       ``aliquote_after_CV_init``, ``aliquote_CV_O2``, and ``aliquote_CV_final``.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id holding the working-electrode samples.
         plate_id_ref_Pt: Plate id used for the reference Pt sample.
         plate_sample_no_list: Sample numbers paired with LPL/UPL entries.
@@ -3658,8 +3652,8 @@ def ADSS_PA_CV_TRI(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=8)
 def ADSS_PA_CV_TRI_new(
-    sequence_version: int = 8,  # 8 pal deepclean and empty vial xfer #6 new transfer syringe#5 shift aliquots to expts, bubble removal
     # note: str = "need as many samples as you expect combinations of UPL and LPL",
     # sample info
     # solid_custom_position: str = "cell1_we",
@@ -3809,7 +3803,6 @@ def ADSS_PA_CV_TRI_new(
       ``rinse_with_electrolyte_bf_prefill`` to toggle sub-blocks.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id holding working-electrode samples.
         plate_id_ref_Pt: Plate id used for reference Pt samples.
         plate_sample_no_list: Sample numbers paired with LPL/UPL entries.
@@ -5212,8 +5205,8 @@ def ADSS_PA_CV_TRI_new(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def ADSS_PA_CV_single(
-    sequence_version: int = 1,
     # sample info
     plate_id: int = 6307,
     plate_sample_no: int = 16304,
@@ -5283,7 +5276,6 @@ def ADSS_PA_CV_single(
     reference Pt blocks.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id of the solid sample.
         plate_sample_no: Sample number on the plate.
         same_sample: Skip move-to-sample.

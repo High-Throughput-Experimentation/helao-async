@@ -45,6 +45,7 @@ from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.machine import MachineModel as MM
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.electrolyte import Electrolyte
+from helao.helpers.lib_decorators import experiment
 
 
 EXPERIMENTS = __all__
@@ -98,9 +99,9 @@ def ECHEUVIS_sub_shutdown(experiment: Experiment) -> list:
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=6)
 def ECHEUVIS_sub_CV_led(
     experiment: Experiment,
-    experiment_version: int = 6,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -148,7 +149,6 @@ def ECHEUVIS_sub_CV_led(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Vinit_vsRHE: Initial CV potential vs RHE (V).
         Vapex1_vsRHE: Apex 1 vs RHE (V).
         Vapex2_vsRHE: Apex 2 vs RHE (V).
@@ -339,9 +339,9 @@ def ECHEUVIS_sub_CV_led(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=6)
 def ECHEUVIS_sub_CA_led(
     experiment: Experiment,
-    experiment_version: int = 6,
     CA_potential_vsRHE: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -378,7 +378,6 @@ def ECHEUVIS_sub_CA_led(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CA_potential_vsRHE: Applied potential vs RHE (V).
         solution_ph: Solution pH used for the Nernst conversion.
         reservoir_electrolyte: ``Electrolyte`` enum label (informational).
@@ -560,9 +559,9 @@ def ECHEUVIS_sub_CA_led(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=6)
 def ECHEUVIS_sub_CP_led(
     experiment: Experiment,
-    experiment_version: int = 6,
     CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -599,7 +598,6 @@ def ECHEUVIS_sub_CP_led(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CP_current: Applied current (A).
         solution_ph: Solution pH (informational here).
         reservoir_electrolyte: ``Electrolyte`` enum label (informational).
@@ -774,16 +772,15 @@ def ECHEUVIS_sub_CP_led(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ECHEUVIS_sub_interrupt(
     experiment: Experiment,
-    experiment_version: int = 1,
     reason: str = "wait",
 ) -> list:
     """Emit a single orchestrator interrupt action with the given reason.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         reason: Human-readable reason string for the interrupt.
 
     Returns:
@@ -794,9 +791,9 @@ def ECHEUVIS_sub_interrupt(
     return apm.planned_actions
 
 
+@experiment(version=6)
 def ECHEUVIS_sub_OCV_led(
     experiment: Experiment,
-    experiment_version: int = 6,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -832,7 +829,6 @@ def ECHEUVIS_sub_OCV_led(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solution_ph: Solution pH (informational here).
         reservoir_electrolyte: ``Electrolyte`` enum label (informational).
         reservoir_liquid_sample_no: Liquid sample number (informational).
@@ -1008,9 +1004,9 @@ def ECHEUVIS_sub_OCV_led(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ECHEUVIS_sub_disengage(
     experiment: Experiment,
-    experiment_version: int = 1,
     clear_we: bool = True,
     clear_ce: bool = False,
     z_height: float = 0,
@@ -1020,7 +1016,6 @@ def ECHEUVIS_sub_disengage(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         clear_we: Run the WE chamber vent + pump.
         clear_ce: Run the CE chamber vent + pump.
         z_height: Absolute Z position to lower to (mm).
@@ -1058,9 +1053,9 @@ def ECHEUVIS_sub_disengage(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ECHEUVIS_sub_engage(
     experiment: Experiment,
-    experiment_version: int = 1,
     flow_we: bool = True,
     flow_ce: bool = True,
     z_height: float = 1.5,
@@ -1073,7 +1068,6 @@ def ECHEUVIS_sub_engage(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         flow_we: Flow the WE chamber.
         flow_ce: Flow the CE chamber.
         z_height: Absolute Z position to raise to (mm).
@@ -1152,9 +1146,9 @@ def ECHEUVIS_sub_engage(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def ECHEUVIS_analysis_stability(
     experiment: Experiment,
-    experiment_version: int = 2,
     sequence_uuid: str = "",
     plate_id: int = 0,
     recent: bool = True,
@@ -1164,7 +1158,6 @@ def ECHEUVIS_analysis_stability(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         sequence_uuid: UUID of the sequence to analyze.
         plate_id: Plate identifier.
         recent: Operate on the most recent sequence when True.

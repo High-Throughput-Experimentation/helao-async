@@ -53,6 +53,7 @@ from helao.helpers.constants import REF_TABLE
 # from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.deploy.hte.drivers.io.enum import TriggerType
 from typing import List
+from helao.helpers.lib_decorators import experiment
 
 # list valid experiment functions
 EXPERIMENTS = __all__
@@ -83,12 +84,12 @@ CALIBRATIONMFCSECOND_server = MachineModel(
 toggle_triggertype = TriggerType.fallingedge
 
 
-def ECMS_sub_unload_cell(experiment: Experiment, experiment_version: int = 1) -> list:
+@experiment(version=1)
+def ECMS_sub_unload_cell(experiment: Experiment) -> list:
     """Unload every sample at the ``cell1_we`` PAL custom position.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -99,9 +100,9 @@ def ECMS_sub_unload_cell(experiment: Experiment, experiment_version: int = 1) ->
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_load_solid(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -109,7 +110,6 @@ def ECMS_sub_load_solid(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
 
@@ -136,9 +136,9 @@ def ECMS_sub_load_solid(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def ECMS_sub_load_liquid(
     experiment: Experiment,
-    experiment_version: int = 2,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
     water_True_False: bool = False,
@@ -148,7 +148,6 @@ def ECMS_sub_load_liquid(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
         volume_ul_cell_liquid: Volume added (uL).
         water_True_False: Forwarded as ``dilute_liquids`` to PAL.
@@ -177,9 +176,9 @@ def ECMS_sub_load_liquid(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def ECMS_sub_load_gas(
     experiment: Experiment,
-    experiment_version: int = 2,
     reservoir_gas_sample_no: int = 1,
     volume_ul_cell_gas: int = 1000,
 ) -> list:
@@ -187,7 +186,6 @@ def ECMS_sub_load_gas(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         reservoir_gas_sample_no: Gas sample number in the reservoir.
         volume_ul_cell_gas: Volume added (uL).
 
@@ -210,9 +208,9 @@ def ECMS_sub_load_gas(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_normal_state(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Drive the ECMS station to its idle/normal state.
 
@@ -222,7 +220,6 @@ def ECMS_sub_normal_state(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -292,15 +289,14 @@ def ECMS_sub_normal_state(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_alloff(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Turn off both peristaltic pumps, close MFC valves, and close every NI valve.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -374,16 +370,15 @@ def ECMS_sub_alloff(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_electrolyte_fill_recirculationreservoir(
     experiment: Experiment,
-    experiment_version: int = 1,
     liquid_fill_time: float = 30,
 ) -> list:
     """Run the reservoir peristaltic pump forward to fill the recirculation reservoir.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         liquid_fill_time: Pump-on duration (s).
 
     Returns:
@@ -400,9 +395,9 @@ def ECMS_sub_electrolyte_fill_recirculationreservoir(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_electrolyte_fill_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
     # liquid_forward_time: float = 20,
     liquid_backward_time: float = 10,
     reservoir_liquid_sample_no: int = 1,
@@ -412,7 +407,6 @@ def ECMS_sub_electrolyte_fill_cell(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         liquid_backward_time: Reverse pump-on duration (s).
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
         volume_ul_cell_liquid: Volume archived to the cell (mL forwarded to PAL).
@@ -490,9 +484,9 @@ def ECMS_sub_electrolyte_fill_cell(
 #     )
 #     return apm.planned_actions
 # =============================================================================
+@experiment(version=1)
 def ECMS_sub_electrolyte_fill_cell_recirculation(
     experiment: Experiment,
-    experiment_version: int = 1,
     liquid_backward_time: float = 80,
     reservoir_liquid_sample_no: int = 2,
     volume_ul_cell_liquid: float = 1.0,
@@ -501,7 +495,6 @@ def ECMS_sub_electrolyte_fill_cell_recirculation(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         liquid_backward_time: Reverse pump-on duration (s).
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
         volume_ul_cell_liquid: Volume archived to the cell.
@@ -579,16 +572,15 @@ def ECMS_sub_electrolyte_fill_cell_recirculation(
 # =============================================================================
 
 
+@experiment(version=2)
 def ECMS_sub_prevacuum_cell(
     experiment: Experiment,
-    experiment_version: int = 2,
     vacuum_time: float = 10,
 ) -> list:
     """Open the vacuum path to evacuate the gas side and pull electrolyte against the GDE.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         vacuum_time: Vacuum duration (s).
 
     Returns:
@@ -609,9 +601,9 @@ def ECMS_sub_prevacuum_cell(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_headspace_purge_and_CO2baseline(
     experiment: Experiment,
-    experiment_version: int = 1,
     CO2equilibrium_duration: float = 30,
     flowrate_sccm: float = 5.0,
     flow_ramp_sccm: float = 0,
@@ -623,7 +615,6 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CO2equilibrium_duration: Wait after starting CO2 flow (s).
         flowrate_sccm: CO2 flow rate (sccm).
         flow_ramp_sccm: MFC ramp rate (sccm/s).
@@ -677,9 +668,9 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_headspace_purge_and_Arbaseline(
     experiment: Experiment,
-    experiment_version: int = 1,
     Arequilibrium_duration: float = 30,
     flowrate_sccm: float = 5.0,
     flow_ramp_sccm: float = 0,
@@ -691,7 +682,6 @@ def ECMS_sub_headspace_purge_and_Arbaseline(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Arequilibrium_duration: Wait after starting flow (s).
         flowrate_sccm: Inert-gas flow rate (sccm).
         flow_ramp_sccm: MFC ramp rate (sccm/s).
@@ -732,15 +722,14 @@ def ECMS_sub_headspace_purge_and_Arbaseline(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_electrolyte_recirculation_on(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Open the recirculation valves and start the recirculation pump in reverse direction.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -756,15 +745,14 @@ def ECMS_sub_electrolyte_recirculation_on(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_electrolyte_recirculation_off(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Stop the recirculation pump and close the recirculation valves.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -778,9 +766,9 @@ def ECMS_sub_electrolyte_recirculation_off(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -795,7 +783,6 @@ def ECMS_sub_CA(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_potential__V: Working-electrode potential (V).
         WE_versus: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: CA duration (s).
@@ -852,9 +839,9 @@ def ECMS_sub_CA(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def ECMS_sub_pulseCA(
     experiment: Experiment,
-    experiment_version: int = 2,
     Vinit__V: float = 0.0,
     Tinit__s: float = 0.5,
     Vstep__V: float = 0.5,
@@ -877,7 +864,6 @@ def ECMS_sub_pulseCA(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Vinit__V: Initial step potential (V) (ignored when ``run_OCV`` is True).
         Tinit__s: Initial step duration (s).
         Vstep__V: Step potential delta (V).
@@ -987,9 +973,9 @@ def ECMS_sub_pulseCA(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_CV(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1008,7 +994,6 @@ def ECMS_sub_CV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_versus: ``"ref"`` or ``"rhe"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
@@ -1094,9 +1079,9 @@ def ECMS_sub_CV(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_drain_recirculation(
     experiment: Experiment,
-    experiment_version: int = 1,
     tube_clear_time: float = 20,
     liquid_drain_time: float = 80,
 ) -> list:
@@ -1104,7 +1089,6 @@ def ECMS_sub_drain_recirculation(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         tube_clear_time: Tube-clearing pump duration (s).
         liquid_drain_time: Liquid drain pump duration (s).
 
@@ -1156,9 +1140,9 @@ def ECMS_sub_drain_recirculation(
 #     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
 #     return apm.planned_actions
 # =============================================================================
+@experiment(version=1)
 def ECMS_sub_clean_cell_recirculation(
     experiment: Experiment,
-    experiment_version: int = 1,
     cleaning_times: int = 2,
     liquid_fill_time: float = 30,
     volume_ul_cell_liquid: int = 1,
@@ -1172,7 +1156,6 @@ def ECMS_sub_clean_cell_recirculation(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         cleaning_times: Number of fill/drain cycles.
         liquid_fill_time: Reservoir-fill pump duration (s).
         volume_ul_cell_liquid: Per-fill cell volume (uL forwarded).
@@ -1228,16 +1211,15 @@ def ECMS_sub_clean_cell_recirculation(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_drain(
     experiment: Experiment,
-    experiment_version: int = 1,
     liquid_drain_time: float = 30,
 ) -> list:
     """Drain the cell using the reservoir pump (peripump 1) in reverse direction.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         liquid_drain_time: Drain pump duration (s).
 
     Returns:
@@ -1259,9 +1241,9 @@ def ECMS_sub_drain(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_final_clean_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
     liquid_backward_time_1: float = 300,
     liquid_backward_time_2: float = 300,
     reservoir_liquid_sample_no: int = 1,
@@ -1271,7 +1253,6 @@ def ECMS_sub_final_clean_cell(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         liquid_backward_time_1: First-stage reverse-pump duration (s).
         liquid_backward_time_2: Second-stage reverse-pump duration (s).
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
@@ -1314,9 +1295,9 @@ def ECMS_sub_final_clean_cell(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_cali(
     experiment: Experiment,
-    experiment_version: int = 1,
     CO2flowrate_sccm: float = 20.0,
     Califlowrate_sccm: float = 0.0,
     flow_ramp_sccm: float = 0,
@@ -1326,7 +1307,6 @@ def ECMS_sub_cali(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CO2flowrate_sccm: CO2 flow rate (sccm).
         Califlowrate_sccm: Calibration-gas flow rate (sccm).
         flow_ramp_sccm: MFC ramp rate (sccm/s).
@@ -1378,9 +1358,9 @@ def ECMS_sub_cali(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_threegascali(
     experiment: Experiment,
-    experiment_version: int = 1,
     CO2flowrate_sccm: float = 5.0,
     Califlowrate_sccm: float = 5.0,  # O2
     Califlowrate_two_sccm: float = 0.0,  # Ar
@@ -1391,7 +1371,6 @@ def ECMS_sub_threegascali(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CO2flowrate_sccm: CO2 flow rate (sccm).
         Califlowrate_sccm: First calibration-gas flow rate (sccm).
         Califlowrate_two_sccm: Second calibration-gas flow rate (sccm).
@@ -1463,9 +1442,9 @@ def ECMS_sub_threegascali(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_inertgascali(
     experiment: Experiment,
-    experiment_version: int = 1,
     CO2flowrate_sccm: float = 5.0,
     Califlowrate_two_sccm: float = 0.0,  # Ar
     flow_ramp_sccm: float = 0,
@@ -1475,7 +1454,6 @@ def ECMS_sub_inertgascali(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CO2flowrate_sccm: CO2 flow rate (sccm).
         Califlowrate_two_sccm: Second calibration-gas (inert) flow rate (sccm).
         flow_ramp_sccm: MFC ramp rate (sccm/s).
@@ -1530,9 +1508,9 @@ def ECMS_sub_inertgascali(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_pulsecali(
     experiment: Experiment,
-    experiment_version: int = 1,
     # CO2flowrate_sccm: float = 20.0,
     Califlowrate_sccm: float = 0.0,
     flow_ramp_sccm: float = 0,
@@ -1542,7 +1520,6 @@ def ECMS_sub_pulsecali(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Califlowrate_sccm: Calibration-gas flow rate (sccm).
         flow_ramp_sccm: MFC ramp rate (sccm/s).
         MSsignal_quilibrium_time: Equilibration wait (s).
@@ -1675,9 +1652,9 @@ def ECMS_sub_pulsecali(
 #     return apm.planned_actions
 #
 # =============================================================================
+@experiment(version=1)
 def ECMS_sub_preCA_CO2flow(
     experiment: Experiment,
-    experiment_version: int = 1,
     MS_equilibrium_time: float = 10.0,
     total_MFC_flow_rate_sccm: float = 10.0,
     flow_change_duration_sec: List[float] = [10.0, 60.0],
@@ -1691,7 +1668,6 @@ def ECMS_sub_preCA_CO2flow(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         MS_equilibrium_time: Final MS equilibration wait (s).
         total_MFC_flow_rate_sccm: Combined CO2 + inert MFC budget (sccm).
         flow_change_duration_sec: Step durations (s).
@@ -1757,9 +1733,9 @@ def ECMS_sub_preCA_CO2flow(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ECMS_sub_CA_CO2flow(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -1782,7 +1758,6 @@ def ECMS_sub_CA_CO2flow(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_potential__V: Working-electrode potential (V).
         WE_versus: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: CA duration (s).
