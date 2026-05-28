@@ -19,6 +19,7 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.core.models.machine import MachineModel as MM
+from helao.helpers.lib_decorators import experiment
 
 
 EXPERIMENTS = __all__
@@ -28,9 +29,9 @@ CPSIM_server = MM(server_name="CPSIM", machine_name=gethostname().lower()).as_di
 GPSIM_server = MM(server_name="GPSIM", machine_name=gethostname().lower()).as_dict()
 
 
+@experiment(version=1)
 def OERSIM_sub_load_plate(
     experiment: Experiment,
-    experiment_version: int = 1,
     plate_id: int = 0,
     init_random_points: int = 5,
 ):
@@ -38,7 +39,6 @@ def OERSIM_sub_load_plate(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Library version tag.
         plate_id: Plate to load on CPSIM.
         init_random_points: Number of random initial compositions for GPSIM
             to acquire when initializing priors.
@@ -57,16 +57,15 @@ def OERSIM_sub_load_plate(
     )
 
 
+@experiment(version=1)
 def OERSIM_sub_measure_CP(
     experiment: Experiment,
-    experiment_version: int = 1,
     init_random_points: int = 5,
 ) -> list:
     """Acquire the GPSIM-selected composition with a simulated CP and refit.
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Library version tag.
         init_random_points: Forwarded through the plan for downstream
             initialization steps.
 
@@ -95,9 +94,9 @@ def OERSIM_sub_measure_CP(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def OERSIM_sub_decision(
     experiment: Experiment,
-    experiment_version: int = 1,
     stop_condition: str = "max_iters",  # {"none", "max_iters", "max_stdev", "max_ei"}
     thresh_value: Union[float, int] = 10,
     repeat_experiment_name: str = "OERSIM_sub_activelearn",
@@ -108,7 +107,6 @@ def OERSIM_sub_decision(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Library version tag.
         stop_condition: One of ``"none"``, ``"max_iters"``, ``"max_stdev"``,
             ``"max_ei"``.
         thresh_value: Threshold compared against the chosen stop condition.
@@ -154,9 +152,9 @@ def OERSIM_sub_decision(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def OERSIM_sub_activelearn(
     experiment: Experiment,
-    experiment_version: int = 1,
     init_random_points: int = 5,
     stop_condition: str = "max_iters",  # {"none", "max_iters", "max_stdev", "max_ei"}
     thresh_value: Union[float, int] = 10,
@@ -170,7 +168,6 @@ def OERSIM_sub_activelearn(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Library version tag.
         init_random_points: Number of random initial compositions if the GP
             has not yet been initialized for the loaded plate.
         stop_condition: One of ``"none"``, ``"max_iters"``, ``"max_stdev"``,

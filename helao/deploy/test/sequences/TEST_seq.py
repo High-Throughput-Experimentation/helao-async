@@ -4,13 +4,14 @@ __all__ = ["TEST_consecutive_noblocking"]
 
 from typing import List
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=1)
 def TEST_consecutive_noblocking(
-    sequence_version: int = 1,
     wait_time: float = 3.0,
     cycles: int = 5,
     dummy_list: List[List[float]] = [[0.0, 1.0], [2.0, 3.0]],
@@ -25,7 +26,6 @@ def TEST_consecutive_noblocking(
     the prior cycle's ``test_wait`` global to exercise param hand-off.
 
     Args:
-        sequence_version: Library version tag.
         wait_time: Base wait used inside each sub-experiment.
         cycles: Number of cycles per sample.
         dummy_list: Unused placeholder list, kept for parameter-typing tests.

@@ -9,13 +9,14 @@ __all__ = [
 
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.core.models.electrolyte import Electrolyte
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=1)
 def HISPEC_CV(
-    sequence_version: int = 1,  # @Dan - what is this? -- this is a version number for the sequence, you should increment it when you modify sequence arguments and the experiment list
     plate_id: int = 1,  # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [
         2
@@ -77,7 +78,6 @@ def HISPEC_CV(
     solution if the z-motor is in use, then a shutdown experiment runs.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         plate_id: Material library plate identifier.
         plate_sample_no_list: Sample numbers on the plate to visit.
         cycles: Number of CV cycles in the SpEC scan.
@@ -288,8 +288,8 @@ def HISPEC_CV(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def HISPEC_EIS_only(
-    sequence_version: int = 1,  # @Dan - what is this? -- this is a version number for the sequence, you should increment it when you modify sequence arguments and the experiment list
     plate_id: int = 1,  # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [
         2
@@ -332,7 +332,6 @@ def HISPEC_EIS_only(
     finally sealed with electrolyte for storage when the z-motor is used.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         plate_id: Material library plate identifier.
         plate_sample_no_list: Sample numbers on the plate to visit.
         reservoir_electrolyte: Electrolyte enum for the reservoir.
@@ -1350,8 +1349,8 @@ def HISPEC_EIS_only(
 #     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def ECHEUVIS_postseq(
-    sequence_version: int = 1,
     analysis_seq_uuid: str = "",
     plate_id: int = 0,
     recent: bool = False,
@@ -1359,7 +1358,6 @@ def ECHEUVIS_postseq(
     """Build a post-sequence that runs the ECHEUVIS stability analysis.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         analysis_seq_uuid: UUID of the source sequence to analyze.
         plate_id: Plate identifier scoping the analysis.
         recent: Restrict to the most recent matching run when True.

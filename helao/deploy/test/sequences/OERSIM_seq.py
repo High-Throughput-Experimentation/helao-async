@@ -6,13 +6,14 @@ __all__ = [
 
 from typing import Union
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=1)
 def OERSIM_activelearn(
-    sequence_version: int = 1,
     init_random_points: int = 5,
     stop_condition: str = "max_iters",  # {"none", "max_iters", "max_stdev", "max_ei"}
     thresh_value: Union[float, int] = 10,
@@ -23,7 +24,6 @@ def OERSIM_activelearn(
     inserts further copies of itself until the stop condition is met.
 
     Args:
-        sequence_version: Library version tag.
         init_random_points: Number of random initial compositions before the
             first EI iteration on a fresh plate.
         stop_condition: One of ``"none"``, ``"max_iters"``, ``"max_stdev"``,

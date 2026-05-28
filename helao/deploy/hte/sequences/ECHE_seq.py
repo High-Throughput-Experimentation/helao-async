@@ -25,13 +25,14 @@ __all__ = [
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.core.models.electrolyte import Electrolyte
 from helao.helpers.constants import REF_TABLE
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=1)
 def ECHE_movetosample(
-    sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no: int = 1,
 ) -> list:
@@ -40,7 +41,6 @@ def ECHE_movetosample(
     Issues one ``ECHE_sub_movetosample`` followed by an ``ECHE_sub_shutdown``.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no: Parameter passed through to the sub-experiments.
 
@@ -64,8 +64,8 @@ def ECHE_movetosample(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def ECHE_move(
-    sequence_version: int = 1,
     move_x_mm: float = 1.0,
     move_y_mm: float = 1.0,
 ) -> list:
@@ -74,7 +74,6 @@ def ECHE_move(
     Calls ``ECHE_sub_rel_move`` then ``ECHE_sub_shutdown``.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         move_x_mm: Parameter passed through to the sub-experiments.
         move_y_mm: Parameter passed through to the sub-experiments.
 
@@ -97,8 +96,8 @@ def ECHE_move(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=4)
 def ECHE_4CA_led_1CV_led(
-    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -155,7 +154,6 @@ def ECHE_4CA_led_1CV_led(
     For each sample: startup, OCV, four CA-LED steps with OCVs between them, then a CV-LED scan and shutdown.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -431,8 +429,8 @@ def ECHE_4CA_led_1CV_led(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=4)
 def ECHE_CV_CA_CV(
-    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -469,7 +467,6 @@ def ECHE_CV_CA_CV(
     Loads sample, runs preCV, CA, then CV with LED toggling and shutdown.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -622,8 +619,8 @@ def ECHE_CV_CA_CV(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=4)
 def ECHE_CV(
-    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -649,7 +646,6 @@ def ECHE_CV(
     Loads the sample, runs OCV, performs a CV scan, and shuts down.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -730,8 +726,8 @@ def ECHE_CV(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=4)
 def ECHE_CA(
-    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -753,7 +749,6 @@ def ECHE_CA(
     Loads the sample, runs OCV, performs a CA hold, and shuts down.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -823,8 +818,8 @@ def ECHE_CA(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=4)
 def ECHE_CA_led(
-    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -858,7 +853,6 @@ def ECHE_CA_led(
     Loads the sample, runs OCV, performs a CA-LED hold, and shuts down.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -954,8 +948,8 @@ def ECHE_CA_led(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=4)
 def ECHE_CV_led(
-    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -993,7 +987,6 @@ def ECHE_CV_led(
     Loads the sample, runs OCV, performs a CV-LED sweep, and shuts down.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -1101,8 +1094,8 @@ def ECHE_CV_led(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=3)
 def ECHE_CP(
-    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -1123,7 +1116,6 @@ def ECHE_CP(
     Loads the sample, runs OCV, performs a CP hold, and shuts down.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -1185,8 +1177,8 @@ def ECHE_CP(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=3)
 def ECHE_CP_led(
-    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -1219,7 +1211,6 @@ def ECHE_CP_led(
     Loads the sample, runs OCV, performs a CP-LED hold, and shuts down.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -1307,8 +1298,8 @@ def ECHE_CP_led(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def ECHE_CVs_CAs(
-    sequence_version: int = 1,
     plate_id: int = 6307,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "perchloric acid",
@@ -1354,7 +1345,6 @@ def ECHE_CVs_CAs(
     Iterates over CV cycle/potential lists then CA potential/duration lists.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -1552,8 +1542,8 @@ def ECHE_CVs_CAs(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def ECHE_cleanCVs_regCVs_CAs(
-    sequence_version: int = 1,
     plate_id: int = 6307,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "perchloric acid",
@@ -1606,7 +1596,6 @@ def ECHE_cleanCVs_regCVs_CAs(
     Loads each sample, runs N cleaning CV cycles, then the main CV list, then the CA list.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.

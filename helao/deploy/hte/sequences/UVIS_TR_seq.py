@@ -4,13 +4,14 @@ __all__ = ["UVIS_TR"]
 
 
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=3)
 def UVIS_TR(
-    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reference_mode: str = "internal",
@@ -42,7 +43,6 @@ def UVIS_TR(
     the sequence.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         plate_id: Material library plate identifier.
         plate_sample_no_list: Sample numbers on the plate to measure.
         reference_mode: Reference mode passed to UVIS sub-experiments.

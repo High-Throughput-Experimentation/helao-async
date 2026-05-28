@@ -5,12 +5,13 @@ reference setup, cell cleaning, and a multi-potential CA loop for each sample.
 """
 
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 SEQUENCES = ["CLAD_seq"]
 
 
+@sequence(version=1)
 def CLAD_seq(
-    sequence_version: int = 1,
     solid_plate_id: int = 6307,
     plate_sample_no_list: list = [],
     ca_potential_list: list = [0.6, 0.7, 0.8],
@@ -63,7 +64,6 @@ def CLAD_seq(
     The sequence ends with a filled cell at the reference sample position.
 
     Args:
-        sequence_version: Sequence version tag.
         solid_plate_id: Plate id holding the working-electrode samples.
         plate_sample_no_list: Plate sample numbers to iterate through.
         ca_potential_list: CA potentials (V) to apply per sample.

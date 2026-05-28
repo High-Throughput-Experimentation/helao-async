@@ -27,13 +27,14 @@ __all__ = [
 
 from typing import List
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=2)
 def ECMS_initiation(
-    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 2,
@@ -53,7 +54,6 @@ def ECMS_initiation(
     Performs the standard pre-run housekeeping followed by two CO2 baseline acquisitions at fast and slow flow rates.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -118,8 +118,8 @@ def ECMS_initiation(
     return epm.planned_experiments
 
 
+@sequence(version=2)
 def ECMS_initiation_recirculation(
-    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     liquid_fill_time: float = 15,
@@ -140,7 +140,6 @@ def ECMS_initiation_recirculation(
     Same shape as :func:`ECMS_initiation` but fills a recirculation reservoir before the cell and drains via the recirculation loop.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         liquid_fill_time: Parameter passed through to the sub-experiments.
@@ -214,8 +213,8 @@ def ECMS_initiation_recirculation(
     return epm.planned_experiments
 
 
+@sequence(version=2)
 def ECMS_initiation_recirculation_mixedreactant(
-    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     liquid_fill_time: float = 15,
@@ -237,7 +236,6 @@ def ECMS_initiation_recirculation_mixedreactant(
     Like :func:`ECMS_initiation_recirculation` but replaces the second CO2 baseline with a ``ECMS_sub_cali`` mixed-reactant calibration.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         liquid_fill_time: Parameter passed through to the sub-experiments.
@@ -311,8 +309,8 @@ def ECMS_initiation_recirculation_mixedreactant(
     return epm.planned_experiments
 
 
+@sequence(version=2)
 def ECMS_repeat_CV(
-    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 2,
@@ -349,7 +347,6 @@ def ECMS_repeat_CV(
     For ``num_repeats`` iterations: fill, run two CO2 baselines, then run CV at ``ScanRate_V_s_1`` and CV at ``ScanRate_V_s_2``, return to normal state and drain.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -479,8 +476,8 @@ def ECMS_repeat_CV(
 
 
 # =============================================================================
+@sequence(version=2)
 def ECMS_repeat_CV_recirculation(
-    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 2,
@@ -520,7 +517,6 @@ def ECMS_repeat_CV_recirculation(
     Adds ``cleaning_times`` clean cycles between CVs and uses the recirculation drain.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -796,8 +792,8 @@ def ECMS_repeat_CV_recirculation(
 # =============================================================================
 
 
+@sequence(version=2)
 def ECMS_repeat_CV_recirculation_mixedreactant(
-    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 2,
@@ -838,7 +834,6 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
     Adapts :func:`ECMS_repeat_CV_recirculation` to take a calibration baseline at each iteration.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -989,8 +984,8 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
     return epm.planned_experiments
 
 
+@sequence(version=3)
 def ECMS_CV_recirculation_mixedreactant(
-    sequence_version: int = 3,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 2,
@@ -1029,7 +1024,6 @@ def ECMS_CV_recirculation_mixedreactant(
     One-shot variant of the recirculating mixed-reactant CV protocol.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -1160,8 +1154,8 @@ def ECMS_CV_recirculation_mixedreactant(
     return epm.planned_experiments
 
 
+@sequence(version=2)
 def ECMS_series_CA(
-    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 2,
@@ -1192,7 +1186,6 @@ def ECMS_series_CA(
     For each potential: fill, run CO2 baselines, run CA, then drain.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -1387,8 +1380,8 @@ def ECMS_series_CA(
 #         epm.add("ECMS_sub_drain_recirculation", {"liquid_drain_time": liquid_drain_time})
 #     return epm.planned_experiments
 # =============================================================================
+@sequence(version=3)
 def ECMS_series_CA_recirculation(
-    sequence_version: int = 3,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 2,
@@ -1422,7 +1415,6 @@ def ECMS_series_CA_recirculation(
     Adds the recirculation reservoir fill and drain and inserts cleaning cycles.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -1547,8 +1539,8 @@ def ECMS_series_CA_recirculation(
     return epm.planned_experiments
 
 
+@sequence(version=3)
 def ECMS_series_CA_recirculation_mixedreactant(
-    sequence_version: int = 3,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 2,
@@ -1583,7 +1575,6 @@ def ECMS_series_CA_recirculation_mixedreactant(
     Same loop as :func:`ECMS_series_CA_recirculation` but with ``ECMS_sub_cali`` baselines.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -1708,8 +1699,8 @@ def ECMS_series_CA_recirculation_mixedreactant(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ECMS_series_CA_recirculation_mixedthreereactant(
-    sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
@@ -1745,7 +1736,6 @@ def ECMS_series_CA_recirculation_mixedthreereactant(
     Three-gas variant of the mixed-reactant CA protocol.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -1873,8 +1863,8 @@ def ECMS_series_CA_recirculation_mixedthreereactant(
     return epm.planned_experiments
 
 
+@sequence(version=2)
 def ECMS_series_pulseCA(
-    sequence_version: int = 2,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 2,
@@ -1908,7 +1898,6 @@ def ECMS_series_pulseCA(
     Runs sequence of pulsed CA segments separated by recovery holds.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -1998,8 +1987,8 @@ def ECMS_series_pulseCA(
     return epm.planned_experiments
 
 
+@sequence(version=2)
 def ECMS_MS_calibration_recirculation(
-    sequence_version: int = 2,
     reservoir_liquid_sample_no: int = 2,
     liquid_fill_time: float = 15,
     volume_ul_cell_liquid: float = 600,
@@ -2021,7 +2010,6 @@ def ECMS_MS_calibration_recirculation(
     Cycles through calibration mixtures and records the resulting MS signal levels.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
         liquid_fill_time: Parameter passed through to the sub-experiments.
         volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
@@ -2190,8 +2178,8 @@ def ECMS_MS_calibration_recirculation(
 # =============================================================================
 
 
+@sequence(version=1)
 def ECMS_MS_calibration(
-    sequence_version: int = 1,
     reservoir_liquid_sample_no: int = 2,
     volume_ul_cell_liquid: float = 600,
     # liquid_forward_time: float = 20,
@@ -2211,7 +2199,6 @@ def ECMS_MS_calibration(
     Single-pass variant of the MS calibration sequence.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
         volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
         liquid_backward_time: Parameter passed through to the sub-experiments.
@@ -2275,8 +2262,8 @@ def ECMS_MS_calibration(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ECMS_MS_pulsecalibration(
-    sequence_version: int = 1,
     reservoir_liquid_sample_no: int = 2,
     volume_ul_cell_liquid: float = 600,
     # liquid_forward_time: float = 20,
@@ -2297,7 +2284,6 @@ def ECMS_MS_pulsecalibration(
     Calibrates the MS by toggling between calibration gases.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
         volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
         liquid_backward_time: Parameter passed through to the sub-experiments.
@@ -2354,8 +2340,8 @@ def ECMS_MS_pulsecalibration(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ECMS_series_CA_change_gasflow(
-    sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     # =============================================================================
@@ -2399,7 +2385,6 @@ def ECMS_series_CA_change_gasflow(
     Allows the operator to study the flow-rate dependence of the products with one sequence.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         CO2equilibrium_duration: Parameter passed through to the sub-experiments.

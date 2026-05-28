@@ -14,6 +14,7 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.core.models.machine import MachineModel as MM
+from helao.helpers.lib_decorators import experiment
 
 # from helao.core.models.action_start_condition import ActionStartCondition
 # from helao.core.models.process_contrib import ProcessContrib
@@ -26,9 +27,9 @@ PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 
 
+@experiment(version=1)
 def TEST_sub_noblocking(
     experiment: Experiment,
-    experiment_version: int = 1,
     wait_time: float = 3.0,
     dummy_param: float = 0.0,
 ):
@@ -36,7 +37,6 @@ def TEST_sub_noblocking(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Library version tag.
         wait_time: Base wait duration; the non-blocking wait uses 10x this.
         dummy_param: Unused placeholder parameter exposed for sequence
             wiring tests.
@@ -59,9 +59,9 @@ def TEST_sub_noblocking(
     return exp
 
 
+@experiment(version=1)
 def TEST_sub_conditional_stop(
     experiment: Experiment,
-    experiment_version: int = 1,
 ):
     """Build an experiment that sets a global param and conditionally stops.
 
@@ -70,7 +70,6 @@ def TEST_sub_conditional_stop(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Library version tag.
 
     Returns:
         The configured ``Experiment``.

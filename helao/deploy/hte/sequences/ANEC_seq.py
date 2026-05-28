@@ -37,13 +37,14 @@ __all__ = [
 from typing import List
 from typing import Optional
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=2)
 def ANEC_sample_ready(
-    sequence_version: int = 2,
     num_repeats: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -67,7 +68,6 @@ def ANEC_sample_ready(
     sample, then repeats fill/CA/drain ``num_repeats`` times.
 
     Args:
-        sequence_version: Sequence version tag.
         num_repeats: Number of fill/CA/drain repeats.
         plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
@@ -146,8 +146,8 @@ def ANEC_sample_ready(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_series_CA(
-    sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
@@ -179,7 +179,6 @@ def ANEC_series_CA(
     ``ANEC_sub_alloff``.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
         reservoir_liquid_sample_no: Reservoir liquid sample number.
@@ -272,8 +271,8 @@ def ANEC_series_CA(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_series_CAliquidOnly(
-    sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
@@ -301,7 +300,6 @@ def ANEC_series_CAliquidOnly(
     headspace injection is taken.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
         reservoir_liquid_sample_no: Reservoir liquid sample number.
@@ -390,8 +388,8 @@ def ANEC_series_CAliquidOnly(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_OCV(
-    sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
@@ -409,7 +407,6 @@ def ANEC_OCV(
     """Load, fill, run a single OCV, take a liquid archive aliquot, then drain.
 
     Args:
-        sequence_version: Sequence version tag.
         plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
         reservoir_liquid_sample_no: Reservoir liquid sample number.
@@ -475,8 +472,8 @@ def ANEC_OCV(
     return epm.planned_experiments
 
 
+@sequence(version=3)
 def ANEC_photo_CA(
-    sequence_version: int = 3,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
@@ -516,7 +513,6 @@ def ANEC_photo_CA(
     Iterates over ``WE_potential__V`` running ``ANEC_sub_photo_CA`` at each potential with the matching duration and LED toggle settings, taking a GC+archive aliquot between cycles.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -631,8 +627,8 @@ def ANEC_photo_CA(
     return epm.planned_experiments
 
 
+@sequence(version=3)
 def ANEC_photo_CAgasonly(
-    sequence_version: int = 3,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
@@ -666,7 +662,6 @@ def ANEC_photo_CAgasonly(
     Same flow as :func:`ANEC_photo_CA` but the aliquot step uses ``ANEC_sub_GCLiquid_archive`` for a GC-only sample.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -769,8 +764,8 @@ def ANEC_photo_CAgasonly(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_photo_CV(
-    sequence_version: int = 1,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -807,7 +802,6 @@ def ANEC_photo_CV(
     Loads the sample, fills the cell, then runs ``ANEC_sub_photo_CV`` with the configured vertices and LED parameters before draining.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         WE_versus: Parameter passed through to the sub-experiments.
         ref_type: Parameter passed through to the sub-experiments.
         pH: Parameter passed through to the sub-experiments.
@@ -901,11 +895,11 @@ def ANEC_photo_CV(
     return epm.planned_experiments
 
 
-def ANEC_cleanup_disengage(sequence_version: int = 1) -> list:
+@sequence(version=1)
+def ANEC_cleanup_disengage() -> list:
     """Run two cleanup passes, switch everything off, and disengage the cell.
 
     Args:
-        sequence_version: Sequence version tag.
 
     Returns:
         List of planned experiments performing two cleanups followed by
@@ -923,8 +917,8 @@ def ANEC_cleanup_disengage(sequence_version: int = 1) -> list:
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_CA_pretreat(
-    sequence_version: int = 1,
     num_repeats: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -946,7 +940,6 @@ def ANEC_CA_pretreat(
     Loads the solid sample, flushes/fills the cell, runs one ``ANEC_sub_CA`` at ``WE_potential__V`` for ``CA_duration_sec`` seconds, and drains.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         num_repeats: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
@@ -1011,8 +1004,8 @@ def ANEC_CA_pretreat(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_CA_DOE_demo(
-    sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     WE_potential__V: float = 0.0,
@@ -1038,7 +1031,6 @@ def ANEC_CA_DOE_demo(
     Single-shot variant used in the DOE demo: load sample, fill cell, run one CA, take optional aliquots, then drain.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         WE_potential__V: Parameter passed through to the sub-experiments.
@@ -1107,8 +1099,8 @@ def ANEC_CA_DOE_demo(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_CA_DOE_demo_headspace(
-    sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     WE_potential__V: float = 0.0,
@@ -1128,7 +1120,6 @@ def ANEC_CA_DOE_demo_headspace(
     Variant of the DOE demo that uses ``ANEC_sub_GCLiquid_archive`` for a single headspace sample after the CA.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         WE_potential__V: Parameter passed through to the sub-experiments.
@@ -1185,8 +1176,8 @@ def ANEC_CA_DOE_demo_headspace(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_repeat_CA(
-    sequence_version: int = 1,
     num_repeats: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1216,7 +1207,6 @@ def ANEC_repeat_CA(
     Loads the sample once, then repeats fill -> CA -> aliquot -> drain ``num_repeats`` times.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         num_repeats: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
@@ -1303,8 +1293,8 @@ def ANEC_repeat_CA(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_repeat_TentHeatCAgasonly(
-    sequence_version: int = 1,
     num_repeats: int = 1,
     plate_id: int = 6284,
     solid_sample_no: int = 1,
@@ -1329,7 +1319,6 @@ def ANEC_repeat_TentHeatCAgasonly(
     For ``num_repeats`` iterations: heat the tent, fill, run CA, take a GC-only aliquot, drain.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         num_repeats: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
@@ -1410,8 +1399,8 @@ def ANEC_repeat_TentHeatCAgasonly(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_heatOCV(
-    sequence_version: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
@@ -1427,7 +1416,6 @@ def ANEC_heatOCV(
     For ``num_repeats`` iterations: heat the tent, fill, run OCV, take an archive aliquot, drain.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -1484,8 +1472,8 @@ def ANEC_heatOCV(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_repeat_TentHeatCA(
-    sequence_version: int = 1,
     num_repeats: int = 1,
     plate_id: int = 6284,
     solid_sample_no: int = 1,
@@ -1516,7 +1504,6 @@ def ANEC_repeat_TentHeatCA(
     For ``num_repeats`` iterations: heat the tent, fill, run CA, take GC+archive aliquots, drain.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         num_repeats: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
@@ -1609,8 +1596,8 @@ def ANEC_repeat_TentHeatCA(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_repeat_HeatCA(
-    sequence_version: int = 1,
     num_repeats: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1641,7 +1628,6 @@ def ANEC_repeat_HeatCA(
     For ``num_repeats`` iterations: heat the cell, fill, run CA, take aliquots, drain.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         num_repeats: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
@@ -1730,8 +1716,8 @@ def ANEC_repeat_HeatCA(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_gasonly_CA(
-    sequence_version: int = 1,
     num_repeats: int = 1,
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1755,7 +1741,6 @@ def ANEC_gasonly_CA(
     Loads the sample, fills the cell, runs one CA and one GC-only aliquot, then drains.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         num_repeats: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
@@ -1830,8 +1815,8 @@ def ANEC_gasonly_CA(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def ANEC_repeat_CV(
-    sequence_version: int = 1,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1856,7 +1841,6 @@ def ANEC_repeat_CV(
     Loads the sample once and repeats fill -> CV -> drain ``num_repeats`` times.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         WE_versus: Parameter passed through to the sub-experiments.
         ref_type: Parameter passed through to the sub-experiments.
         pH: Parameter passed through to the sub-experiments.
@@ -1927,8 +1911,8 @@ def ANEC_repeat_CV(
     return epm.planned_experiments
 
 
+@sequence(version=2)
 def ANEC_ferricyanide_simpleprotocol(
-    sequence_version: int = 2,
     num_repeats: int = 1,
     plate_id: int = 5740,
     solid_sample_no: int = 1,
@@ -1956,7 +1940,6 @@ def ANEC_ferricyanide_simpleprotocol(
     Runs a fixed fill/CA/aliquot/drain protocol used to validate the ANEC potentiostat with a ferricyanide standard.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         num_repeats: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
@@ -2032,8 +2015,8 @@ def ANEC_ferricyanide_simpleprotocol(
     return epm.planned_experiments
 
 
+@sequence(version=2)
 def ANEC_ferricyanide_protocol(
-    sequence_version: int = 2,
     plate_id: int = 5740,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
@@ -2062,7 +2045,6 @@ def ANEC_ferricyanide_protocol(
     Extended ferricyanide diagnostic: fills the cell, runs CA and CV with archive aliquots, then drains and cleans.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
@@ -2254,8 +2236,8 @@ def ANEC_create_and_load_liquid_sample(
 # =============================================================================
 
 
+@sequence(version=1)
 def GC_Archiveliquid_analysis(
-    experiment_version: int = 1,
     source_tray: int = 2,
     source_slot: int = 1,
     source_vial_from: int = 1,
@@ -2270,7 +2252,6 @@ def GC_Archiveliquid_analysis(
     inclusive and queues one ``ANEC_sub_GCLiquid_analysis`` experiment per vial.
 
     Args:
-        experiment_version: Experiment version tag (unused beyond bookkeeping).
         source_tray: PAL source tray index.
         source_slot: PAL source slot index.
         source_vial_from: First vial number (inclusive).
@@ -2301,8 +2282,8 @@ def GC_Archiveliquid_analysis(
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def HPLC_Archiveliquid_analysis(
-    experiment_version: int = 1,
     source_tray: int = 2,
     source_slot: int = 1,
     source_vial_from: int = 1,
@@ -2317,7 +2298,6 @@ def HPLC_Archiveliquid_analysis(
     vial with all wash positions enabled except wash4.
 
     Args:
-        experiment_version: Experiment version tag (unused beyond bookkeeping).
         source_tray: PAL source tray index.
         source_slot: PAL source slot index.
         source_vial_from: First vial number (inclusive).

@@ -53,6 +53,7 @@ from helao.core.models.sample import SolidSample, LiquidSample, GasSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.deploy.hte.drivers.io.enum import TriggerType
+from helao.helpers.lib_decorators import experiment
 
 # list valid experiment functions
 EXPERIMENTS = __all__
@@ -81,12 +82,12 @@ WATERSYRINGE_server = MachineModel(
 toggle_triggertype = TriggerType.fallingedge
 
 
-def CCSI_sub_unload_cell(experiment: Experiment, experiment_version: int = 1) -> list:
+@experiment(version=1)
+def CCSI_sub_unload_cell(experiment: Experiment) -> list:
     """Unload every sample currently tracked at the ``cell1_we`` PAL custom position.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -97,9 +98,9 @@ def CCSI_sub_unload_cell(experiment: Experiment, experiment_version: int = 1) ->
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CCSI_sub_load_solid(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -107,7 +108,6 @@ def CCSI_sub_load_solid(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
 
@@ -140,9 +140,9 @@ def CCSI_sub_load_solid(
     return apm.planned_actions
 
 
+@experiment(version=3)
 def CCSI_sub_load_liquid(
     experiment: Experiment,
-    experiment_version: int = 3,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
     water_True_False: bool = False,
@@ -152,7 +152,6 @@ def CCSI_sub_load_liquid(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
         volume_ul_cell_liquid: Volume added (uL).
         water_True_False: Forwarded as ``dilute_liquids`` to PAL.
@@ -187,9 +186,9 @@ def CCSI_sub_load_liquid(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def CCSI_sub_load_gas(
     experiment: Experiment,
-    experiment_version: int = 2,
     reservoir_gas_sample_no: int = 1,
     volume_ul_cell_gas: int = 1000,
 ) -> list:
@@ -197,7 +196,6 @@ def CCSI_sub_load_gas(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         reservoir_gas_sample_no: Gas sample number in the reservoir.
         volume_ul_cell_gas: Volume added (uL).
 
@@ -226,15 +224,14 @@ def CCSI_sub_load_gas(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CCSI_sub_alloff(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Turn the recirculating pump off and close every CCSI gas/liquid valve.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -259,9 +256,9 @@ def CCSI_sub_alloff(
     return apm.planned_actions
 
 
+@experiment(version=7)
 def CCSI_sub_headspace_purge_and_measure(
     experiment: Experiment,
-    experiment_version: int = 7,
     HSpurge_duration: float = 20,
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
@@ -276,7 +273,6 @@ def CCSI_sub_headspace_purge_and_measure(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         HSpurge_duration: Headspace purge time (s).
         DeltaDilute1_duration: Initial dilution-recirc time (s); ``0`` skips.
         initialization: Toggle initialization-specific valve sequencing.
@@ -373,9 +369,9 @@ def CCSI_sub_headspace_purge_and_measure(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CCSI_sub_headspace_measure(
     experiment: Experiment,
-    experiment_version: int = 1,
     recirculation_rate_uL_min: int = 10000,
     co2measure_duration: float = 10,
     co2measure_acqrate: float = 0.5,
@@ -384,7 +380,6 @@ def CCSI_sub_headspace_measure(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         recirculation_rate_uL_min: Recirculation rate (informational).
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
@@ -434,9 +429,9 @@ def CCSI_sub_headspace_measure(
     return apm.planned_actions
 
 
+@experiment(version=8)
 def CCSI_sub_drain(
     experiment: Experiment,
-    experiment_version: int = 8,  # 7empty cell accounting, 8 added more valve actions
     HSpurge_duration: float = 20,
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
@@ -448,7 +443,6 @@ def CCSI_sub_drain(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         HSpurge_duration: Headspace purge duration (s).
         DeltaDilute1_duration: Optional dilution-recirc time (s); ``0`` skips.
         initialization: Toggle initialization-specific valve sequencing.
@@ -583,9 +577,9 @@ def CCSI_sub_drain(
     return apm.planned_actions
 
 
+@experiment(version=4)
 def CCSI_sub_n2drain(
     experiment: Experiment,
-    experiment_version: int = 4,  # new recirculation 3 new wait 4 rename recirculation
     n2flowrate_sccm: float = 10,
     HSpurge_duration: float = 240,
     DeltaDilute1_duration: float = 0,
@@ -598,7 +592,6 @@ def CCSI_sub_n2drain(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         n2flowrate_sccm: N2 flow rate (sccm).
         HSpurge_duration: N2 purge duration (s).
         DeltaDilute1_duration: Optional dilution-recirc time (s); ``0`` skips.
@@ -694,15 +687,14 @@ def CCSI_sub_n2drain(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CCSI_sub_initialization_end_state(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Place the system into its post-initialization state: pump off and valve 1A closed.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -730,15 +722,14 @@ def CCSI_sub_initialization_end_state(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CCSI_sub_peripumpoff(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Stop the recirculation dose pump (CSIL variant).
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -757,9 +748,9 @@ def CCSI_sub_peripumpoff(
     return apm.planned_actions
 
 
+@experiment(version=4)
 def CCSI_sub_initialization_firstpart(
     experiment: Experiment,
-    experiment_version: int = 4,
     HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
     Alphapurge1_duration: float = 10,
@@ -772,7 +763,6 @@ def CCSI_sub_initialization_firstpart(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         HSpurge1_duration: Main headspace purge duration (s).
         Manpurge1_duration: Manifold/solvent purge duration (s).
         Alphapurge1_duration: Line/alpha purge duration (s).
@@ -877,10 +867,10 @@ def CCSI_sub_initialization_firstpart(
 ### multivalve on ccsi2 4 gas, 5 solution, 6 clean
 
 
+@experiment(version=10)
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 10,  # 10 add option, #9 add water dilution
     # move co2 monitoring to separate exp, #3  n2 push, #4 change multivalve positions,5-syringepushwait, 6 co2afterpush
     # 7 waterfill wait 8 rearrange ordering
     Solution_description: str = "KOH",
@@ -914,7 +904,6 @@ def CCSI_sub_cellfill(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Solution_description: Free-text solution label.
         Solution_reservoir_sample_no: Liquid sample number for the solution.
         Solution_volume_ul: Solution volume to inject (uL); ``0`` skips.
@@ -1410,9 +1399,9 @@ def CCSI_sub_cellfill(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def CCSI_sub_co2monitoring(
     experiment: Experiment,
-    experiment_version: int = 2,  # move co2 monitoring to separate exp
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
     recirculation_rate_uL_min: int = 10000,
@@ -1421,7 +1410,6 @@ def CCSI_sub_co2monitoring(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
@@ -1465,9 +1453,9 @@ def CCSI_sub_co2monitoring(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def CCSI_sub_co2monitoring_mfcmasscotwo(
     experiment: Experiment,
-    experiment_version: int = 2,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
@@ -1479,7 +1467,6 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         co2measure_duration: Total CO2 acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         flowrate_sccm: Steady MFC flow rate (sccm).
@@ -1552,9 +1539,9 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CCSI_sub_co2topup_mfcmassdose(
     experiment: Experiment,
-    experiment_version: int = 1,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
     flowramp_sccm: float = 9,
@@ -1567,7 +1554,6 @@ def CCSI_sub_co2topup_mfcmassdose(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         co2measure_acqrate: Acquisition rate (s).
         flowrate_sccm: MFC flow rate (sccm).
         flowramp_sccm: MFC ramp rate (sccm/s).
@@ -1617,9 +1603,9 @@ def CCSI_sub_co2topup_mfcmassdose(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def CCSI_sub_co2constantpressure(
     experiment: Experiment,
-    experiment_version: int = 2,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
     atm_pressure: float = 14.27,
@@ -1630,7 +1616,6 @@ def CCSI_sub_co2constantpressure(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         atm_pressure: Pressure setpoint (psia).
@@ -1694,9 +1679,9 @@ def CCSI_sub_co2constantpressure(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def CCSI_sub_co2mass_temp(
     experiment: Experiment,
-    experiment_version: int = 2,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
@@ -1708,7 +1693,6 @@ def CCSI_sub_co2mass_temp(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         co2measure_duration: Total acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         flowrate_sccm: Steady MFC flow rate (sccm).
@@ -1793,9 +1777,9 @@ def CCSI_sub_co2mass_temp(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def CCSI_sub_co2massdose(
     experiment: Experiment,
-    experiment_version: int = 2,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
@@ -1809,7 +1793,6 @@ def CCSI_sub_co2massdose(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         co2measure_duration: CO2 acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         flowrate_sccm: MFC flow rate (sccm).
@@ -1896,9 +1879,9 @@ def CCSI_sub_co2massdose(
     return apm.planned_actions
 
 
+@experiment(version=3)
 def CCSI_sub_co2maintainconcentration(
     experiment: Experiment,
-    experiment_version: int = 3,  # time into acquire
     pureco2_sample_no: int = 1,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
@@ -1913,7 +1896,6 @@ def CCSI_sub_co2maintainconcentration(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         pureco2_sample_no: Gas sample number of the pure CO2 source.
         co2measure_duration: Total acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
@@ -2041,9 +2023,9 @@ def CCSI_sub_co2maintainconcentration(
     return apm.planned_actions
 
 
+@experiment(version=4)
 def CCSI_sub_flowflush(
     experiment: Experiment,
-    experiment_version: int = 4,
     co2measure_duration: float = 3600,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
@@ -2054,7 +2036,6 @@ def CCSI_sub_flowflush(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         flowrate_sccm: MFC flow rate (sccm).
@@ -2117,9 +2098,9 @@ def CCSI_sub_flowflush(
 #
 
 
+@experiment(version=9)
 def CCSI_sub_clean_inject(
     experiment: Experiment,
-    experiment_version: int = 9,  # ver 2 implements multivalve, ver 3 conditional, ver6 co2checktargetvolumerefills
     Clean_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 500,
     LiquidCleanWait_s: float = 15,
@@ -2139,7 +2120,6 @@ def CCSI_sub_clean_inject(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Clean_volume_ul: Clean water volume (uL).
         Syringe_rate_ulsec: Syringe rate (uL/s).
         LiquidCleanWait_s: Wait after liquid fill before measurement (s).
@@ -2306,9 +2286,9 @@ def CCSI_sub_clean_inject(
     return apm.planned_actions
 
 
+@experiment(version=3)
 def CCSI_sub_refill_clean(
     experiment: Experiment,
-    experiment_version: int = 3,  # v3 1ml backlash volume v2 no backlash volume
     Clean_volume_ul: int = 5000,
     Syringe_rate_ulsec: int = 100,
 ) -> list:
@@ -2316,7 +2296,6 @@ def CCSI_sub_refill_clean(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Clean_volume_ul: Target net withdraw volume (uL).
         Syringe_rate_ulsec: Syringe rate (uL/s).
 
@@ -2436,9 +2415,9 @@ def CCSI_sub_refill_clean(
 #     return apm.planned_actions
 
 
+@experiment(version=3)
 def CCSI_debug_co2purge(
     experiment: Experiment,
-    experiment_version: int = 3,
     co2measure_duration: float = 10,
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
@@ -2448,7 +2427,6 @@ def CCSI_debug_co2purge(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         co2_ppm_thresh: CO2 threshold for the repeat check.
@@ -2488,9 +2466,9 @@ def CCSI_debug_co2purge(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def CCSI_leaktest_co2(
     experiment: Experiment,
-    experiment_version: int = 2,
     co2measure_duration: float = 600,
     co2measure_acqrate: float = 1,
     recirculate: bool = True,
@@ -2500,7 +2478,6 @@ def CCSI_leaktest_co2(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         recirculate: Run the DOSEPUMP recirculation during the test.
@@ -2533,9 +2510,9 @@ def CCSI_leaktest_co2(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CCSI_sub_monitorcell(
     experiment: Experiment,
-    experiment_version: int = 1,
     co2measure_duration: float = 1200,
     co2measure_acqrate: float = 1,
     recirculation: bool = False,
@@ -2545,7 +2522,6 @@ def CCSI_sub_monitorcell(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         recirculation: Run the DOSEPUMP recirculation in parallel when True.
@@ -2588,9 +2564,9 @@ def CCSI_sub_monitorcell(
     return apm.planned_actions
 
 
+@experiment(version=5)
 def CCSI_sub_n2flush(
     experiment: Experiment,
-    experiment_version: int = 5,  # 3 delayed co2 measurement, 4 repeatcheck, 5 fixed cycles
     flush_cycles: int = 0,
     n2flowrate_sccm: float = 10,
     HSpurge1_duration: float = 60,
@@ -2617,7 +2593,6 @@ def CCSI_sub_n2flush(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         flush_cycles: Number of full purge cycles; ``0`` disables fixed cycles.
         n2flowrate_sccm: N2 flow rate (sccm).
         HSpurge1_duration: First headspace-purge duration (s).
@@ -2879,9 +2854,9 @@ def CCSI_sub_n2flush(
     return apm.planned_actions
 
 
+@experiment(version=10)
 def CCSI_sub_n2clean(
     experiment: Experiment,
-    experiment_version: int = 10,  # added n2headspace, n2 push remove n2headspace, 5 measure delay 6 add rinses/7agitation/8renamevolumeparam
     # 9change to no recirc drains, add one, 10 remove rinses
     Clean_reservoir_sample_no: int = 1,
     Clean_volume_ul: float = 10000,
@@ -2918,7 +2893,6 @@ def CCSI_sub_n2clean(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Clean_reservoir_sample_no: Liquid sample number for the clean reservoir.
         Clean_volume_ul: Clean injection volume (uL).
         Syringe_rate_ulsec: Syringe rate (uL/s).
@@ -3017,9 +2991,9 @@ def CCSI_sub_n2clean(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def CCSI_sub_n2rinse(
     experiment: Experiment,
-    experiment_version: int = 2,  # 2 rinse agitation added
     rinse_cycles: int = 3,
     Clean_reservoir_sample_no: int = 1,
     Clean_volume_ul: float = 10000,
@@ -3039,7 +3013,6 @@ def CCSI_sub_n2rinse(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         rinse_cycles: Number of clean-water rinse cycles.
         Clean_reservoir_sample_no: Liquid sample number for the clean reservoir.
         Clean_volume_ul: Clean injection volume (uL).
@@ -3106,9 +3079,9 @@ def CCSI_sub_n2rinse(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def CCSI_sub_n2headspace(
     experiment: Experiment,
-    experiment_version: int = 1,
     n2flowrate_sccm: float = 50,
     HSpurge_duration: float = 120,
     recirculation: bool = True,
@@ -3119,7 +3092,6 @@ def CCSI_sub_n2headspace(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         n2flowrate_sccm: N2 flow rate (sccm).
         HSpurge_duration: Total N2 purge duration (s).
         recirculation: Run a recirculation stage mid-purge when True.

@@ -35,6 +35,7 @@ from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.deploy.hte.drivers.io.enum import TriggerType
 from helao.deploy.hte.drivers.spec.enum import SpecType
+from helao.helpers.lib_decorators import experiment
 
 
 EXPERIMENTS = __all__
@@ -72,9 +73,9 @@ def UVIS_sub_unloadall_customs(experiment: Experiment) -> list:
     return apm.planned_actions
 
 
+@experiment(version=1)
 def UVIS_sub_load_solid(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -83,7 +84,6 @@ def UVIS_sub_load_solid(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         solid_custom_position: PAL custom position name.
         solid_plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
@@ -107,9 +107,9 @@ def UVIS_sub_load_solid(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def UVIS_sub_startup(
     experiment: Experiment,
-    experiment_version: int = 2,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -121,7 +121,6 @@ def UVIS_sub_startup(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         solid_custom_position: PAL custom position name.
         solid_plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
@@ -197,9 +196,9 @@ def UVIS_sub_shutdown(experiment: Experiment, toggle_source: str = "lamp_shutter
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def UVIS_sub_movetosample(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -207,7 +206,6 @@ def UVIS_sub_movetosample(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         solid_plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
 
@@ -242,9 +240,9 @@ def UVIS_sub_movetosample(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def UVIS_sub_relmove(
     experiment: Experiment,
-    experiment_version: int = 1,
     offset_x_mm: float = 1.0,
     offset_y_mm: float = 1.0,
 ) -> list:
@@ -252,7 +250,6 @@ def UVIS_sub_relmove(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         offset_x_mm: Relative X offset in millimetres.
         offset_y_mm: Relative Y offset in millimetres.
 
@@ -273,9 +270,9 @@ def UVIS_sub_relmove(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def UVIS_sub_measure(
     experiment: Experiment,
-    experiment_version: int = 2,
     spec_type: SpecType = SpecType.T,
     spec_n_avg: int = 1,
     spec_int_time_ms: int = 10,
@@ -303,7 +300,6 @@ def UVIS_sub_measure(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         spec_type: Spectrometer family (T or R).
         spec_n_avg: Number of spectra averaged per acquisition.
         spec_int_time_ms: Integration time in milliseconds.
@@ -421,9 +417,9 @@ def UVIS_sub_measure(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def UVIS_sub_setup_ref(
     experiment: Experiment,
-    experiment_version: int = 1,
     reference_mode: str = "internal",
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 1,
@@ -447,7 +443,6 @@ def UVIS_sub_setup_ref(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         reference_mode: One of ``"internal"``, ``"builtin"``, ``"blank"``.
         solid_custom_position: PAL custom position used to host the reference.
         solid_plate_id: Plate id used to look up the reference sample.
@@ -547,9 +542,9 @@ def UVIS_sub_setup_ref(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def UVIS_calc_abs(
     experiment: Experiment,
-    experiment_version: int = 2,
     ev_parts: list = [1.5, 2.0, 2.5, 3.0],
     bin_width: int = 3,
     window_length: int = 45,
@@ -565,7 +560,6 @@ def UVIS_calc_abs(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         ev_parts: Energy partition points (eV) for the calculator.
         bin_width: Spectral bin width (samples).
         window_length: Savitzky-Golay window length.
@@ -600,9 +594,9 @@ def UVIS_calc_abs(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def UVIS_analysis_dry(
     experiment: Experiment,
-    experiment_version: int = 2,
     sequence_uuid: str = "",
     plate_id: int = 0,
     recent: bool = True,
@@ -612,7 +606,6 @@ def UVIS_analysis_dry(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         sequence_uuid: Sequence UUID to analyse.
         plate_id: Plate id to filter on.
         recent: If True, restrict the analysis to recent runs.
@@ -635,9 +628,9 @@ def UVIS_analysis_dry(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def UVIS_measure_references(
     experiment: Experiment,
-    experiment_version: int = 2,
     plate_id: int = 1,
     custom_position: str = "cell1_we",
     spec_n_avg: int = 5,
@@ -661,7 +654,6 @@ def UVIS_measure_references(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         plate_id: Plate id used for builtin reference lookups.
         custom_position: PAL custom position for the reference solid.
         spec_n_avg: Number of spectra averaged per acquisition.

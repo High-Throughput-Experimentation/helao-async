@@ -12,6 +12,7 @@ from socket import gethostname
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.core.models.machine import MachineModel
 from helao.helpers.constants import REF_TABLE
+from helao.helpers.lib_decorators import experiment
 
 # list valid experiment functions
 EXPERIMENTS = __all__
@@ -21,9 +22,9 @@ PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 
 
+@experiment(version=1)
 def DEMO_sub_CP(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -36,7 +37,6 @@ def DEMO_sub_CP(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         WE_versus: Working-electrode reference frame label.
         ref_type: Reference electrode type label.
         pH: Solution pH (used for downstream RHE conversions).
@@ -68,9 +68,9 @@ def DEMO_sub_CP(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def DEMO_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -87,7 +87,6 @@ def DEMO_sub_CA(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         WE_potential__V: Working-electrode bias in the chosen frame.
         WE_versus: Frame label: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: Step duration in seconds.
@@ -124,9 +123,9 @@ def DEMO_sub_CA(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def DEMO_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 1,
     Tval__s: float = 900.0,
     IErange: str = "auto",
 ) -> list:
@@ -134,7 +133,6 @@ def DEMO_sub_OCV(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         Tval__s: OCV duration in seconds.
         IErange: Gamry current range string.
 

@@ -57,6 +57,7 @@ from helao.deploy.hte.drivers.motion.galil_motion_driver import (
     TransformationModes,
 )
 from helao.deploy.hte.drivers.io.enum import TriggerType
+from helao.helpers.lib_decorators import experiment
 
 # list valid experiment functions
 EXPERIMENTS = __all__
@@ -81,9 +82,9 @@ z_engage = 2.5
 z_seal = 4.5
 
 
+@experiment(version=1)
 def ANEC_sub_startup(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
     z_move_mm: float = 3.5,
@@ -92,7 +93,6 @@ def ANEC_sub_startup(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
         z_move_mm: Final absolute Z (motorxy frame).
@@ -160,12 +160,12 @@ def ANEC_sub_startup(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def ANEC_sub_disengage(experiment: Experiment, experiment_version: int = 1) -> list:
+@experiment(version=1)
+def ANEC_sub_disengage(experiment: Experiment) -> list:
     """Lower Z to disengage the electrochemical cell.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -189,9 +189,9 @@ def ANEC_sub_disengage(experiment: Experiment, experiment_version: int = 1) -> l
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ANEC_sub_load_solid(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -199,7 +199,6 @@ def ANEC_sub_load_solid(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
 
@@ -226,15 +225,14 @@ def ANEC_sub_load_solid(
     return apm.planned_actions
 
 
+@experiment(version=4)
 def ANEC_sub_alloff(
     experiment: Experiment,
-    experiment_version: int = 4,
 ) -> list:
     """Turn off both peristaltic pumps and close every NI gas/liquid valve.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -259,15 +257,14 @@ def ANEC_sub_alloff(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def ANEC_sub_heatoff(
     experiment: Experiment,
-    experiment_version: int = 2,
 ) -> list:
     """Cancel TEC recording and disable the TEC controller.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -281,16 +278,15 @@ def ANEC_sub_heatoff(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def ANEC_sub_setheat(
     experiment: Experiment,
-    experiment_version: int = 2,
     target_temperature_degc: float = 25.0,
 ) -> list:
     """Set a TEC setpoint, start non-blocking recording, enable TEC, wait until stable.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         target_temperature_degc: TEC setpoint in degrees Celsius.
 
     Returns:
@@ -316,9 +312,9 @@ def ANEC_sub_setheat(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def ANEC_sub_normal_state(
     experiment: Experiment,
-    experiment_version: int = 2,
 ) -> list:
     """Drive the ANEC valves and pumps to the canonical idle/normal state.
 
@@ -332,7 +328,6 @@ def ANEC_sub_normal_state(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -351,9 +346,9 @@ def ANEC_sub_normal_state(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_flush_fill_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
     liquid_flush_time: float = 70,
     co2_purge_time: float = 15,
     equilibration_time: float = 1.0,
@@ -368,7 +363,6 @@ def ANEC_sub_flush_fill_cell(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         liquid_flush_time: Liquid flush duration (s).
         co2_purge_time: CO2 purge duration (s).
         equilibration_time: Post-purge equilibration time (s).
@@ -419,12 +413,12 @@ def ANEC_sub_flush_fill_cell(
     return apm.planned_actions
 
 
-def ANEC_sub_unload_cell(experiment: Experiment, experiment_version: int = 1) -> list:
+@experiment(version=1)
+def ANEC_sub_unload_cell(experiment: Experiment) -> list:
     """Unload every sample currently tracked at the ``cell1_we`` PAL custom position.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -435,15 +429,14 @@ def ANEC_sub_unload_cell(experiment: Experiment, experiment_version: int = 1) ->
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_unload_liquid(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Unload all samples then re-load the previously tracked solid at ``cell1_we``.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -465,16 +458,15 @@ def ANEC_sub_unload_liquid(
     return apm.planned_actions
 
 
+@experiment(version=3)
 def ANEC_sub_drain_cell(
     experiment: Experiment,
-    experiment_version: int = 3,
     drain_time: float = 60.0,
 ) -> list:
     """Return ANEC to normal state, unload the liquid, and wait for the cell to drain.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         drain_time: Drain wait time (s).
 
     Returns:
@@ -489,16 +481,15 @@ def ANEC_sub_drain_cell(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_cleanup(
     experiment: Experiment,
-    experiment_version: int = 1,
     reservoir_liquid_sample_no: int = 1511,
 ) -> list:
     """Flush+fill the cell and then drain it.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         reservoir_liquid_sample_no: Liquid sample number used to flush the cell.
 
     Returns:
@@ -516,9 +507,9 @@ def ANEC_sub_cleanup(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_GC_headspacealiquot_nomixing(
     experiment: Experiment,
-    experiment_version: int = 1,
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
 ) -> list:
@@ -526,7 +517,6 @@ def ANEC_sub_GC_headspacealiquot_nomixing(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         toolGC: PAL headspace tool identifier.
         volume_ul_GC: GC injection volume (uL).
 
@@ -556,9 +546,9 @@ def ANEC_sub_GC_headspacealiquot_nomixing(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_GC_preparation(
     experiment: Experiment,
-    experiment_version: int = 1,
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
 ) -> list:
@@ -570,7 +560,6 @@ def ANEC_sub_GC_preparation(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         toolGC: PAL headspace tool identifier.
         volume_ul_GC: GC injection volume (uL).
 
@@ -608,9 +597,9 @@ def ANEC_sub_GC_preparation(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_load_solid_only(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_plate_id: int = 1,
     solid_sample_no: int = 1,
 ) -> list:
@@ -618,7 +607,6 @@ def ANEC_sub_load_solid_only(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
 
@@ -643,9 +631,9 @@ def ANEC_sub_load_solid_only(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_load_solid_and_clean_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_plate_id: int = 1,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
@@ -657,7 +645,6 @@ def ANEC_sub_load_solid_and_clean_cell(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
         reservoir_liquid_sample_no: Liquid sample number used for flushing.
@@ -714,9 +701,9 @@ def ANEC_sub_load_solid_and_clean_cell(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_liquidarchive(
     experiment: Experiment,
-    experiment_version: int = 1,
     toolarchive: str = "LS 3",
     volume_ul_archive: int = 500,
     wash1: bool = True,
@@ -728,7 +715,6 @@ def ANEC_sub_liquidarchive(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         toolarchive: PAL liquid syringe tool identifier.
         volume_ul_archive: Archived volume (uL).
         wash1: Enable PAL wash slot 1.
@@ -773,9 +759,9 @@ def ANEC_sub_liquidarchive(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_aliquot_nomixing(
     experiment: Experiment,
-    experiment_version: int = 1,
     toolGC: str = "HS 2",
     toolarchive: str = "LS 3",
     volume_ul_GC: int = 300,
@@ -789,7 +775,6 @@ def ANEC_sub_aliquot_nomixing(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         toolGC: PAL headspace tool identifier.
         toolarchive: PAL liquid archive tool identifier.
         volume_ul_GC: GC injection volume (uL).
@@ -839,9 +824,9 @@ def ANEC_sub_aliquot_nomixing(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_aliquot(
     experiment: Experiment,
-    experiment_version: int = 1,
     toolGC: str = "HS 2",
     toolarchive: str = "LS 3",
     volume_ul_GC: int = 300,
@@ -855,7 +840,6 @@ def ANEC_sub_aliquot(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         toolGC: PAL headspace tool identifier.
         toolarchive: PAL liquid archive tool identifier.
         volume_ul_GC: GC injection volume (uL).
@@ -913,9 +897,9 @@ def ANEC_sub_aliquot(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_CP(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -928,7 +912,6 @@ def ANEC_sub_CP(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_versus: Reference frame label.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH.
@@ -977,9 +960,9 @@ def ANEC_sub_CP(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ANEC_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -993,7 +976,6 @@ def ANEC_sub_CA(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_potential__V: Working-electrode potential (V).
         WE_versus: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: CA duration (s).
@@ -1044,9 +1026,9 @@ def ANEC_sub_CA(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def ANEC_sub_HeatCA(
     experiment: Experiment,
-    experiment_version: int = 2,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -1061,7 +1043,6 @@ def ANEC_sub_HeatCA(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_potential__V: Working-electrode potential (V).
         WE_versus: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: CA duration (s).
@@ -1126,9 +1107,9 @@ def ANEC_sub_HeatCA(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 1,
     Tval__s: float = 900.0,
     IErange: str = "auto",
 ) -> list:
@@ -1136,7 +1117,6 @@ def ANEC_sub_OCV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Tval__s: OCV duration (s).
         IErange: Gamry current-range setting.
 
@@ -1180,9 +1160,9 @@ def ANEC_sub_OCV(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def ANEC_sub_photo_CA(
     experiment: Experiment,
-    experiment_version: int = 2,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -1211,7 +1191,6 @@ def ANEC_sub_photo_CA(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_potential__V: Working-electrode potential (V).
         WE_versus: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: CA duration (s).
@@ -1303,9 +1282,9 @@ def ANEC_sub_photo_CA(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_CV(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1323,7 +1302,6 @@ def ANEC_sub_CV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_versus: ``"ref"`` or ``"rhe"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
@@ -1408,9 +1386,9 @@ def ANEC_sub_CV(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def ANEC_sub_HeatCV(
     experiment: Experiment,
-    experiment_version: int = 2,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1429,7 +1407,6 @@ def ANEC_sub_HeatCV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_versus: ``"ref"`` or ``"rhe"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
@@ -1531,9 +1508,9 @@ def ANEC_sub_HeatCV(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_photo_CV(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1566,7 +1543,6 @@ def ANEC_sub_photo_CV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_versus: ``"ref"`` or ``"rhe"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH.
@@ -1706,9 +1682,9 @@ def ANEC_sub_photo_CV(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_GCLiquid_analysis(
     experiment: Experiment,
-    experiment_version: int = 1,
     # startGC: Optional[bool] = None,
     # sampletype: Optional[str] = None,
     tool: str = "LS 1",
@@ -1727,7 +1703,6 @@ def ANEC_sub_GCLiquid_analysis(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         tool: PAL liquid syringe tool identifier.
         source_tray: PAL tray index.
         source_slot: PAL slot index.
@@ -1773,9 +1748,9 @@ def ANEC_sub_GCLiquid_analysis(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_HPLCLiquid_analysis(
     experiment: Experiment,
-    experiment_version: int = 1,
     # startGC: Optional[bool] = None,
     # sampletype: Optional[str] = None,
     tool: str = "LS 1",
@@ -1794,7 +1769,6 @@ def ANEC_sub_HPLCLiquid_analysis(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         tool: PAL liquid syringe tool identifier.
         source_tray: PAL tray index.
         source_slot: PAL slot index.
@@ -1840,9 +1814,9 @@ def ANEC_sub_HPLCLiquid_analysis(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_photo_LSV(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1873,7 +1847,6 @@ def ANEC_sub_photo_LSV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_versus: ``"ref"`` or ``"rhe"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH.
@@ -1981,9 +1954,9 @@ def ANEC_sub_photo_LSV(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ANEC_sub_photo_CP(
     experiment: Experiment,
-    experiment_version: int = 1,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -2011,7 +1984,6 @@ def ANEC_sub_photo_CP(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         WE_versus: Reference frame label.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH.

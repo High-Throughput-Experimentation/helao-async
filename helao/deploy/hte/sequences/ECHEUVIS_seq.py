@@ -20,13 +20,14 @@ from typing import List
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.helpers.constants import SPEC_MAP
 from helao.core.models.electrolyte import Electrolyte
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=5)
 def ECHEUVIS_CV_led(
-    sequence_version: int = 5,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -80,7 +81,6 @@ def ECHEUVIS_CV_led(
     Loads the sample, performs reference measurements, then runs CV with synchronized LED illumination and spectrometer triggering.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -432,8 +432,8 @@ def ECHEUVIS_CV_led(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=5)
 def ECHEUVIS_CA_led(
-    sequence_version: int = 5,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -483,7 +483,6 @@ def ECHEUVIS_CA_led(
     Loads the sample, performs reference measurements, then runs CA with synchronized LED illumination and spectrometer triggering.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -825,8 +824,8 @@ def ECHEUVIS_CA_led(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=5)
 def ECHEUVIS_CP_led(
-    sequence_version: int = 5,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -875,7 +874,6 @@ def ECHEUVIS_CP_led(
     Loads the sample, performs reference measurements, then runs CP with synchronized LED illumination and spectrometer triggering.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -1208,8 +1206,8 @@ def ECHEUVIS_CP_led(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def ECHEUVIS_diagnostic_CV(
-    sequence_version: int = 1,
     plate_id: int = 0,
     solid_sample_no: int = 0,
     reservoir_electrolyte: Electrolyte = "OER10",
@@ -1244,7 +1242,6 @@ def ECHEUVIS_diagnostic_CV(
     Loads a reference sample and runs a standard CV scan with the configured spectrometer reference.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         solid_sample_no: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -1393,8 +1390,8 @@ def ECHEUVIS_diagnostic_CV(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=5)
 def ECHEUVIS_multiCA_led(
-    sequence_version: int = 5,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "OER10",
@@ -1439,7 +1436,6 @@ def ECHEUVIS_multiCA_led(
     Iterates through the supplied CA potential list running photo-CA and UV-Vis acquisition at each value.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         plate_sample_no_list: Parameter passed through to the sub-experiments.
         reservoir_electrolyte: Parameter passed through to the sub-experiments.
@@ -1819,8 +1815,8 @@ def ECHEUVIS_multiCA_led(
     return epm.planned_experiments  # returns complete experiment list
 
 
+@sequence(version=1)
 def ECHEUVIS_postseq(
-    sequence_version: int = 1,
     analysis_seq_uuid: str = "",
     plate_id: int = 0,
     recent: bool = False,
@@ -1830,7 +1826,6 @@ def ECHEUVIS_postseq(
     Forwards the sequence UUID and parameters to the ECHEUVIS analyzer.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         analysis_seq_uuid: Parameter passed through to the sub-experiments.
         plate_id: Parameter passed through to the sub-experiments.
         recent: Parameter passed through to the sub-experiments.
