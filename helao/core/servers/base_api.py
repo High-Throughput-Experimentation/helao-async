@@ -2,10 +2,15 @@ import os
 import json
 import time
 import asyncio
+import inspect
+import functools
 import faulthandler
+from contextvars import ContextVar
 from copy import copy
+from dataclasses import dataclass
 from socket import gethostname
 from collections import namedtuple
+from typing import Callable, Optional
 from typing_extensions import Annotated
 
 from helao.core.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
@@ -51,6 +56,127 @@ ACTION_PARAM_KEYS = [
     "campaign_uuid",
     "sync_data",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Action context: lets Base.setup_action / Base.setup_and_contain_action
+# recover the route's Action + endpoint reference without inspecting frames.
+# Populated by the per-request wrapper installed via ActionAPIRoute.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ActionInvocation:
+    """Per-request snapshot of an action-tagged endpoint invocation."""
+
+    action: Action
+    endpoint_func: Callable
+
+
+ACTION_CTX: ContextVar[Optional[ActionInvocation]] = ContextVar(
+    "helao_action_ctx", default=None
+)
+
+
+def _build_action_from_kwargs(kwargs: dict) -> Action:
+    """Reconstruct the Action that frame-inspection used to scrape from locals.
+
+    Picks the first ``Action``-typed kwarg (matching the historical
+    "found Action BaseModel under parameter '<name>'" behavior) and folds
+    every remaining kwarg into ``action.action_params`` unless that key is
+    already set (e.g. by the orchestrator dispatcher).
+    """
+    action: Optional[Action] = None
+    seen_action_param: Optional[str] = None
+    for name, val in kwargs.items():
+        if isinstance(val, Action):
+            if action is None:
+                action = val
+                seen_action_param = name
+            else:
+                LOGGER.error(
+                    f"critical error: found another Action BaseModel under parameter '{name}', skipping it"
+                )
+    if action is None:
+        LOGGER.error(
+            "critical error: no Action BaseModel was found by setup_action, using blank Action."
+        )
+        action = Action()
+    else:
+        LOGGER.info(f"found Action BaseModel under parameter '{seen_action_param}'")
+
+    for name, val in kwargs.items():
+        if isinstance(val, Action):
+            continue
+        if name not in action.action_params:
+            LOGGER.info(
+                f"local var '{name}' not found in action.action_params, adding it."
+            )
+            action.action_params[name] = val
+    LOGGER.info(f"Action.action_params: {action.action_params}")
+    return action
+
+
+def wrap_action_endpoint(fn: Callable) -> Callable:
+    """Wrap *fn* so its invocation populates ``ACTION_CTX``.
+
+    The wrapper mirrors the original signature exactly, which keeps both
+    FastAPI's parameter resolution and the ZMQ-RPC fast-path
+    (``_coerce_args`` in ``helao.core.rpc.zmq_rpc``) working unchanged.
+    Inside the wrapper, the parsed kwargs are rebuilt into an ``Action``
+    (matching what ``_get_action``'s frame-walk used to do) and stored in
+    a ContextVar so ``Base.setup_action`` and
+    ``Base.setup_and_contain_action`` can read it without inspecting
+    caller frames.
+    """
+    sig = inspect.signature(fn)
+    is_async = asyncio.iscoroutinefunction(fn)
+
+    if is_async:
+
+        @functools.wraps(fn)
+        async def wrapper(**kwargs):
+            action = _build_action_from_kwargs(kwargs)
+            token = ACTION_CTX.set(
+                ActionInvocation(action=action, endpoint_func=fn)
+            )
+            try:
+                return await fn(**kwargs)
+            finally:
+                ACTION_CTX.reset(token)
+
+    else:
+
+        @functools.wraps(fn)
+        def wrapper(**kwargs):
+            action = _build_action_from_kwargs(kwargs)
+            token = ACTION_CTX.set(
+                ActionInvocation(action=action, endpoint_func=fn)
+            )
+            try:
+                return fn(**kwargs)
+            finally:
+                ACTION_CTX.reset(token)
+
+    wrapper.__signature__ = sig  # type: ignore[attr-defined]
+    return wrapper
+
+
+class ActionAPIRoute(APIRoute):
+    """APIRoute that auto-wraps endpoints tagged ``"action"``.
+
+    Installing this as the router's ``route_class`` means every
+    ``@app.post(..., tags=["action"])`` handler is transparently wrapped
+    at registration time, with no churn in deployment endpoint files.
+    """
+
+    def __init__(self, *args, **kwargs):
+        tags = kwargs.get("tags") or []
+        if "action" in tags:
+            endpoint = kwargs.get("endpoint")
+            if endpoint is not None:
+                kwargs["endpoint"] = wrap_action_endpoint(endpoint)
+        super().__init__(*args, **kwargs)
 
 
 def _make_app_entry_middleware(server_key: str, get_srv):

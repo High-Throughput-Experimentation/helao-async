@@ -53,6 +53,13 @@ class HelaoFastAPI(FastAPI):
             server_params (dict): Parameters for the server configuration.
         """
         super().__init__(*args, **kwargs, openapi_tags=TAGS)
+        # Install the action-aware route class so endpoints tagged
+        # "action" are auto-wrapped to populate the per-request
+        # ActionInvocation ContextVar. Defer the import to avoid
+        # circular imports (base_api -> base -> server_api).
+        from helao.core.servers.base_api import ActionAPIRoute
+
+        self.router.route_class = ActionAPIRoute
         self.helao_cfg = CONFIG
         self.helao_srv = helao_srv
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
