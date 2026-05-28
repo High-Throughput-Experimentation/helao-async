@@ -26,13 +26,14 @@ __all__ = [
 from typing import List
 from typing import Union
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=5)
 def CCSI_initialization(
-    sequence_version: int = 5,  # removed subdrain, added clean inject/made cleaninjects optional
     headspace_purge_cycles: int = 6,
     HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
@@ -60,7 +61,6 @@ def CCSI_initialization(
     Performs the main headspace/aux probe/PCO2 sensor purges, a dilution-and-measure step, optional clean injects, optional cell fill check, and the final shutdown.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         added clean inject/made cleaninjects optional
     headspace_purge_cycles: Parameter passed through to the sub-experiments.
         HSpurge1_duration: Parameter passed through to the sub-experiments.
@@ -680,8 +680,8 @@ def CCSI_initialization(
 #     return epm.planned_experiments
 
 
+@sequence(version=8)
 def CCSI_Solution_testing(  # assumes initialization performed previously
-    sequence_version: int = 8,  # 6 split of liquidfill to cellfill and co2monitoring exps v8 moves sample loads to cellfill expt
     gas_sample_no: int = 2,
     Solution_volume_ul: List[float] = [0, 500, 50],
     Solution_reservoir_sample_no: int = 2,
@@ -996,8 +996,8 @@ def CCSI_Solution_testing(  # assumes initialization performed previously
 # =============================================================================
 
 
+@sequence(version=21)
 def CCSI_Solution_co2maintainconcentration(  # assumes initialization performed previously
-    sequence_version: int = 21,  # 9 n2 purge/drains, 10 co2check cleans, 11 initialization included 13 measure delay
     #                   v 14, list for solution/total sample volumes+ extra clean 15 added rinses/16agitation
     #                   17 repeat cleans/rinses/flushes
     #                   18 water injection options
@@ -1372,8 +1372,8 @@ def CCSI_Solution_co2maintainconcentration(  # assumes initialization performed 
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def CCSI_cleancycles(
-    sequence_version: int = 1,
     drain_first: bool = False,
     prerinse_cleans: int = 2,
     LiquidClean_full_rinses: int = 5,
@@ -1427,7 +1427,6 @@ def CCSI_cleancycles(
     Useful as a standalone cell-cleaning routine between long campaigns.
 
     Args:
-        sequence_version: Parameter passed through to the sub-experiments.
         drain_first: Parameter passed through to the sub-experiments.
         prerinse_cleans: Parameter passed through to the sub-experiments.
         LiquidClean_full_rinses: Parameter passed through to the sub-experiments.
@@ -1607,8 +1606,8 @@ def CCSI_cleancycles(
     return epm.planned_experiments
 
 
+@sequence(version=2)
 def CCSI_Solution_testing_fixed_cleans(  # assumes initialization performed previously
-    sequence_version: int = 2,  # v2 elim front refill
     gas_sample_no: int = 2,
     Solution_volume_ul: List[float] = [0, 500, 50],
     Solution_reservoir_sample_no: int = 2,
@@ -1773,8 +1772,8 @@ def CCSI_Solution_testing_fixed_cleans(  # assumes initialization performed prev
     return epm.planned_experiments
 
 
+@sequence(version=1)
 def CCSI_priming(  # assumes initialization performed previously
-    sequence_version: int = 1,
     Solution_volume_ul: List[float] = [2000],
     Solution_reservoir_sample_no: int = 2,
     Solution_name: str = "",

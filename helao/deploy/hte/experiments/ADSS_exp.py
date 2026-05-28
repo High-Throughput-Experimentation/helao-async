@@ -80,6 +80,7 @@ from helao.deploy.hte.drivers.motion.galil_motion_driver import (
 from helao.deploy.hte.drivers.robot.pal_driver import Spacingmethod, PALtools
 
 from helao.core.models.run_use import RunUse
+from helao.helpers.lib_decorators import experiment
 
 
 EXPERIMENTS = __all__
@@ -127,15 +128,14 @@ def ADSS_sub_unloadall_customs(experiment: Experiment) -> list:
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def ADSS_sub_unload_liquid(
     experiment: Experiment,
-    experiment_version: int = 2,  # newer unload via keep, also no_wait
 ) -> list:
     """Unload the liquid sample at ``cell1_we`` while keeping the solid in place.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -161,15 +161,14 @@ def ADSS_sub_unload_liquid(
     return apm.planned_actions
 
 
+@experiment(version=2)
 def ADSS_sub_unload_solid(
     experiment: Experiment,
-    experiment_version: int = 2,  # newer via keep
 ) -> list:
     """Unload the solid sample at ``cell1_we`` while keeping the liquid in place.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -195,9 +194,9 @@ def ADSS_sub_unload_solid(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ADSS_sub_load_solid(
     experiment: Experiment,
-    experiment_version: int = 1,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -208,7 +207,6 @@ def ADSS_sub_load_solid(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_custom_position: PAL custom position the solid is loaded into.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -251,9 +249,9 @@ def ADSS_sub_load_solid(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=3)
 def ADSS_sub_load_liquid(
     experiment: Experiment,
-    experiment_version: int = 3,  # v2 changes from archive_custom_load, v3 combine/dilute
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
@@ -264,7 +262,6 @@ def ADSS_sub_load_liquid(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         liquid_custom_position: Target PAL custom position.
         liquid_sample_no: Liquid sample number registered to this host.
         volume_ul_cell_liquid: Volume to add in microliters.
@@ -295,9 +292,9 @@ def ADSS_sub_load_liquid(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_load_liquid_only(
     experiment: Experiment,
-    experiment_version: int = 1,
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     liquid_sample_volume_ul: float = 4000,
@@ -308,7 +305,6 @@ def ADSS_sub_load_liquid_only(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         liquid_custom_position: Target PAL custom position.
         liquid_sample_no: Liquid sample number registered to this host.
         liquid_sample_volume_ul: Volume to add in microliters.
@@ -350,9 +346,9 @@ def ADSS_sub_load_liquid_only(
 
 
 ######
+@experiment(version=1)
 def ADSS_sub_PAL_load_gas(
     experiment: Experiment,
-    experiment_version: int = 1,
     custom_position: str = "cell1_we",
     bubbled_gas: str = "N2",
     reservoir_gas_sample_no: int = 1,
@@ -362,7 +358,6 @@ def ADSS_sub_PAL_load_gas(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         custom_position: Target PAL custom position.
         bubbled_gas: Label for the bubbled gas.
         reservoir_gas_sample_no: Gas sample number in the source reservoir.
@@ -397,15 +392,14 @@ def ADSS_sub_PAL_load_gas(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_unload_gas_only(
     experiment: Experiment,
-    experiment_version: int = 1,  # newer via keep? need testing
 ) -> list:
     """Unload only the gas sample at ``cell1_we`` while keeping liquid and solid.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -435,9 +429,9 @@ def ADSS_sub_unload_gas_only(
 #######
 
 
+@experiment(version=3)
 def ADSS_sub_load(
     experiment: Experiment,
-    experiment_version: int = 3,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -453,7 +447,6 @@ def ADSS_sub_load(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_custom_position: PAL custom position for the solid.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -529,9 +522,9 @@ def ADSS_sub_load(
     return apm.planned_actions
 
 
+@experiment(version=4)
 def ADSS_sub_move_to_sample(
     experiment: Experiment,
-    experiment_version: int = 4,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -545,7 +538,6 @@ def ADSS_sub_move_to_sample(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_custom_position: PAL custom position label (informational).
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -614,9 +606,9 @@ def ADSS_sub_move_to_sample(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=4)
 def ADSS_sub_sample_start(
     experiment: Experiment,
-    experiment_version: int = 4,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -634,7 +626,6 @@ def ADSS_sub_sample_start(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         solid_custom_position: PAL custom position for the solid.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -805,9 +796,9 @@ def ADSS_sub_drain(experiment: Experiment) -> list:
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_clean_PALtool(
     experiment: Experiment,
-    experiment_version: int = 1,
     clean_tool: str = PALtools.LS3,
     clean_volume_ul: int = 500,
 ) -> list:
@@ -815,7 +806,6 @@ def ADSS_sub_clean_PALtool(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         clean_tool: PAL tool identifier (e.g. ``PALtools.LS3``).
         clean_volume_ul: Cleaning volume per wash in microliters.
 
@@ -839,9 +829,9 @@ def ADSS_sub_clean_PALtool(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_fillfixed(
     experiment: Experiment,
-    experiment_version: int = 1,
     fill_vol_ul: int = 10000,
     filltime_sec: float = 10.0,
     PAL_Injector: str = "PALtools.LS3",
@@ -850,7 +840,6 @@ def ADSS_sub_fillfixed(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         fill_vol_ul: Fixed fill volume in microliters.
         filltime_sec: Time the peristaltic pump runs after the PAL fill.
         PAL_Injector: PAL tool identifier.
@@ -912,9 +901,9 @@ def ADSS_sub_fillfixed(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_fill(
     experiment: Experiment,
-    experiment_version: int = 1,
     fill_vol_ul: int = 1000,
     PAL_Injector: str = "PALtools.LS3",
 ) -> list:
@@ -922,7 +911,6 @@ def ADSS_sub_fill(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         fill_vol_ul: Fill volume in microliters.
         PAL_Injector: PAL tool identifier.
 
@@ -951,9 +939,9 @@ def ADSS_sub_fill(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=12)
 def ADSS_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 12,  # v12 all aliquots v10 insitu sub 11 bubbler/injected flags
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -986,7 +974,6 @@ def ADSS_sub_CA(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CA_potential: Applied potential before reference correction (V).
         ph: Solution pH used for Nernst conversion.
         potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
@@ -1136,9 +1123,9 @@ def ADSS_sub_CA(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=8)
 def ADSS_sub_CA_photo(
     experiment: Experiment,
-    experiment_version: int = 8,  # 8all aliquots v4 add electrolyte add v6 insitu sub, 7 bubbler/injected flags
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -1172,7 +1159,6 @@ def ADSS_sub_CA_photo(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         CA_potential: Applied potential before reference correction (V).
         ph: Solution pH used for Nernst conversion.
         potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
@@ -1328,9 +1314,9 @@ def ADSS_sub_CA_photo(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=8)
 def ADSS_sub_CV(
     experiment: Experiment,
-    experiment_version: int = 8,  # 8all aliquots 6 in situ actions replace, 7 bubbler/injected flags
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -1368,7 +1354,6 @@ def ADSS_sub_CV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Vinit_vsRHE: Initial potential vs RHE (V).
         Vapex1_vsRHE: First apex potential vs RHE (V).
         Vapex2_vsRHE: Second apex potential vs RHE (V).
@@ -1519,9 +1504,9 @@ def ADSS_sub_CV(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=8)
 def ADSS_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 8,  # 8 all aliquot 6in situ aliquot sub 7, bubbler/injected flag
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
@@ -1558,7 +1543,6 @@ def ADSS_sub_OCV(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Tval__s: OCV duration (s).
         gamry_i_range: Gamry current-range setting.
         samplerate_sec: Acquisition interval (s).
@@ -1721,9 +1705,9 @@ def ADSS_sub_OCV(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=9)
 def ADSS_sub_OCV_photo(
     experiment: Experiment,
-    experiment_version: int = 9,  # 9allaliquot 7 in situ aliquot sub,8 bubbler/injected flags
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
@@ -1752,7 +1736,6 @@ def ADSS_sub_OCV_photo(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Tval__s: OCV duration (s).
         gamry_i_range: Gamry current-range setting.
         samplerate_sec: Acquisition interval (s).
@@ -1879,9 +1862,9 @@ def ADSS_sub_OCV_photo(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=3)
 def ADSS_sub_insitu_actions(
     experiment: Experiment,
-    experiment_version: int = 3,  # washmod in
     insert_electrolyte_bool: bool = False,
     insert_electrolyte_volume_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
@@ -1902,7 +1885,6 @@ def ADSS_sub_insitu_actions(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         insert_electrolyte_bool: Insert electrolyte at ``insert_electrolyte_time_sec``.
         insert_electrolyte_volume_ul: Volume to insert (uL).
         insert_electrolyte_time_sec: Insertion time after start (s).
@@ -2099,9 +2081,9 @@ def ADSS_sub_insitu_actions(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_add_liquid(
     experiment: Experiment,
-    experiment_version: int = 1,
     virtual_add: bool = False,
     added_liquid_volume_ul: int = 0,
     liquid_sample_no: int = 1,
@@ -2110,7 +2092,6 @@ def ADSS_sub_add_liquid(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         virtual_add: Skip the syringe infusion when True (archive-only update).
         added_liquid_volume_ul: Volume to add (uL).
         liquid_sample_no: Liquid sample number on this host.
@@ -2150,9 +2131,9 @@ def ADSS_sub_add_liquid(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_tray_unload(
     experiment: Experiment,
-    experiment_version: int = 1,
     tray: int = 2,
     slot: int = 1,
     survey_runs: int = 1,
@@ -2163,7 +2144,6 @@ def ADSS_sub_tray_unload(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         tray: PAL tray index.
         slot: PAL slot index on that tray.
         survey_runs: ICPMS rough sweep count over the partial-molarity range.
@@ -2222,9 +2202,9 @@ def ADSS_sub_tray_unload(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_tray_icpms_export(
     experiment: Experiment,
-    experiment_version: int = 1,
     tray: int = 2,
     slot: int = 1,
     survey_runs: int = 1,
@@ -2236,7 +2216,6 @@ def ADSS_sub_tray_icpms_export(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         tray: PAL tray index.
         slot: PAL slot index.
         survey_runs: ICPMS rough sweep count.
@@ -2266,16 +2245,15 @@ def ADSS_sub_tray_icpms_export(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_z_move(
     experiment: Experiment,
-    experiment_version: int = 1,
     offset_z_mm: float = -8.0,
 ) -> list:
     """Move the motor Z axis by a relative offset (platexy transformation).
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         offset_z_mm: Relative Z displacement (mm).
 
     Returns:
@@ -2301,9 +2279,9 @@ def ADSS_sub_z_move(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_rel_move(
     experiment: Experiment,
-    experiment_version: int = 1,
     offset_x_mm: float = 1.0,
     offset_y_mm: float = 1.0,
     offset_z_mm: float = 0.0,
@@ -2312,7 +2290,6 @@ def ADSS_sub_rel_move(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         offset_x_mm: Relative X displacement (mm).
         offset_y_mm: Relative Y displacement (mm).
         offset_z_mm: Relative Z displacement (mm).
@@ -2340,9 +2317,9 @@ def ADSS_sub_rel_move(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_abs_move(
     experiment: Experiment,
-    experiment_version: int = 1,
     x_mm: float = 80.0,
     y_mm: float = 50.0,
     #    offset_z_mm: float = 0.0,
@@ -2351,7 +2328,6 @@ def ADSS_sub_abs_move(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         x_mm: Absolute X position (mm).
         y_mm: Absolute Y position (mm).
 
@@ -2379,9 +2355,9 @@ def ADSS_sub_abs_move(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_heat(
     experiment: Experiment,
-    experiment_version: int = 1,
     duration_hrs: float = 2.0,
     celltemp_min_C: float = 74.5,
     celltemp_max_C: float = 75.5,
@@ -2392,7 +2368,6 @@ def ADSS_sub_heat(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         duration_hrs: Heat-loop duration (hours).
         celltemp_min_C: Cell low-temperature setpoint (deg C).
         celltemp_max_C: Cell high-temperature setpoint (deg C).
@@ -2428,15 +2403,14 @@ def ADSS_sub_heat(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_stopheat(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Stop the heat loop and the monitoring loop.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -2457,9 +2431,9 @@ def ADSS_sub_stopheat(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_cellfill_prefilled_nosampleload(
     experiment: Experiment,
-    experiment_version: int = 1,
     Solution_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     #    deadvolume_ul: int = 0,
@@ -2473,7 +2447,6 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Solution_volume_ul: Volume to infuse (uL).
         Syringe_rate_ulsec: Syringe infuse rate (uL/s).
         ReturnLineWait_s: Optional pump-forward time after infusion (s).
@@ -2546,9 +2519,9 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ADSS_sub_cellfill_prefilled(
     experiment: Experiment,
-    experiment_version: int = 1,
     Solution_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     #    deadvolume_ul: int = 0,
@@ -2559,7 +2532,6 @@ def ADSS_sub_cellfill_prefilled(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Solution_volume_ul: Volume to infuse (uL).
         Syringe_rate_ulsec: Syringe infuse rate (uL/s).
         ReturnLineWait_s: Optional pump-forward time after infusion (s).
@@ -2642,9 +2614,9 @@ def ADSS_sub_cellfill_prefilled(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ADSS_sub_cellfill_flush(
     experiment: Experiment,
-    experiment_version: int = 1,
     Solution_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     #    deadvolume_ul: int = 0,
@@ -2655,7 +2627,6 @@ def ADSS_sub_cellfill_flush(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Solution_volume_ul: Volume to infuse (uL).
         Syringe_rate_ulsec: Syringe infuse rate (uL/s).
         ReturnLineWait_s: Optional pump-forward time after infusion (s).
@@ -2694,9 +2665,9 @@ def ADSS_sub_cellfill_flush(
     return apm.planned_actions
 
 
+@experiment(version=3)
 def ADSS_sub_drain_cell(
     experiment: Experiment,
-    experiment_version: int = 3,  # v2 remove residual part v3 add waterpurge
     DrainWait_s: float = 60,
     ReturnLineReverseWait_s: float = 5,
     #    ResidualWait_s: float = 15,
@@ -2705,7 +2676,6 @@ def ADSS_sub_drain_cell(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         DrainWait_s: Total drain time, split before/after gas inlet purge (s).
         ReturnLineReverseWait_s: Time to run the pump in reverse to clear the
             return line (s).
@@ -2738,9 +2708,9 @@ def ADSS_sub_drain_cell(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ADSS_sub_keep_electrolyte(
     experiment: Experiment,
-    experiment_version: int = 1,
     ReturnLineReverseWait_s: float = 5,
     #    ResidualWait_s: float = 15,
 ) -> list:
@@ -2748,7 +2718,6 @@ def ADSS_sub_keep_electrolyte(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         ReturnLineReverseWait_s: Reverse-pump duration (s).
 
     Returns:
@@ -2785,9 +2754,9 @@ def ADSS_sub_keep_electrolyte(
 
 
 # need to move to clean spot first before beginning clean
+@experiment(version=3)
 def ADSS_sub_clean_cell(
     experiment: Experiment,
-    experiment_version: int = 3,
     Clean_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     PurgeWait_s: float = 3,
@@ -2804,7 +2773,6 @@ def ADSS_sub_clean_cell(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         Clean_volume_ul: Total clean-syringe volume (uL).
         Syringe_rate_ulsec: Clean syringe infuse rate (uL/s).
         PurgeWait_s: Gas purge wait between infuse and drain (s).
@@ -2880,15 +2848,14 @@ def ADSS_sub_clean_cell(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ADSS_sub_move_to_clean_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
 ) -> list:
     """Lift Z, query the built-in clean-cell reference XY, move there, then seal.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -2917,9 +2884,9 @@ def ADSS_sub_move_to_clean_cell(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ADSS_sub_move_to_ref_measurement(
     experiment: Experiment,
-    experiment_version: int = 1,
     reference_position_name: str = "builtin_ref_motorxy_2",
 ) -> list:
     """Move to a named built-in reference position and seal the cell.
@@ -2929,7 +2896,6 @@ def ADSS_sub_move_to_ref_measurement(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         reference_position_name: Name of the builtin specref position.
 
     Returns:
@@ -3021,9 +2987,9 @@ def ADSS_sub_move_to_ref_measurement(
 #     return apm.planned_actions
 
 
+@experiment(version=4)
 def ADSS_sub_sample_aliquot(
     experiment: Experiment,
-    experiment_version: int = 4,
     aliquot_volume_ul: int = 200,
     EquilibrationTime_s: float = 30,
     PAL_Injector: str = "LS 4",
@@ -3041,7 +3007,6 @@ def ADSS_sub_sample_aliquot(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         aliquot_volume_ul: Aliquot volume (uL).
         EquilibrationTime_s: Pump equilibration time before sampling (s).
         PAL_Injector: PAL injector tool identifier.
@@ -3101,9 +3066,9 @@ def ADSS_sub_sample_aliquot(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def ADSS_sub_recirculate(
     experiment: Experiment,
-    experiment_version: int = 2,
     direction_forward_or_reverse: str = "forward",
     wait_time_s: float = 10,
 ) -> list:
@@ -3111,7 +3076,6 @@ def ADSS_sub_recirculate(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         direction_forward_or_reverse: ``"forward"`` (0) or any other value (1).
         wait_time_s: Recirculation duration (s).
 
@@ -3130,9 +3094,9 @@ def ADSS_sub_recirculate(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_cell_illumination(
     experiment: Experiment,
-    experiment_version: int = 1,
     led_wavelength: str = "385",
     illumination_on: bool = False,
 ) -> list:
@@ -3140,7 +3104,6 @@ def ADSS_sub_cell_illumination(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         led_wavelength: Informational wavelength label.
         illumination_on: Set the LED on when True, off otherwise.
 
@@ -3174,16 +3137,15 @@ def ADSS_sub_cell_illumination(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_interrupt(
     experiment: Experiment,
-    experiment_version: int = 1,
     reason: str = "wait",
 ) -> list:
     """Emit a single orchestrator interrupt action with the given reason.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         reason: Human-readable reason string for the interrupt.
 
     Returns:
@@ -3194,9 +3156,9 @@ def ADSS_sub_interrupt(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ADSS_sub_refill_syringe(
     experiment: Experiment,
-    experiment_version: int = 1,
     syringe: str = "waterclean",
     fill_volume_ul: float = 0,
     Syringe_rate_ulsec: float = 1000,
@@ -3205,7 +3167,6 @@ def ADSS_sub_refill_syringe(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         syringe: ``"waterclean"`` for the clean syringe or ``"electrolyte"``
             for the work syringe; other values produce no actions.
         fill_volume_ul: Withdraw volume (uL).
@@ -3247,16 +3208,15 @@ def ADSS_sub_refill_syringe(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ADSS_sub_gasvalve_toggle(
     experiment: Experiment,
-    experiment_version: int = 1,
     open: bool = True,
 ) -> list:
     """Toggle the gas-inlet valve open or closed.
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         open: True to open, False to close.
 
     Returns:
@@ -3269,16 +3229,15 @@ def ADSS_sub_gasvalve_toggle(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_gasvalve_N2flow(
     experiment: Experiment,
-    experiment_version: int = 1,
     open: bool = True,
 ) -> list:
     """Toggle the O2/N2 selector valve (True selects N2 flow).
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         open: True selects N2, False selects O2.
 
     Returns:
@@ -3291,9 +3250,9 @@ def ADSS_sub_gasvalve_N2flow(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_transfer_liquid_in(
     experiment: Experiment,
-    experiment_version: int = 1,
     liquid_sample_no: int = 1,
     aliquot_volume_ul: int = 200,
     source_tray: int = 2,
@@ -3311,7 +3270,6 @@ def ADSS_sub_transfer_liquid_in(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         liquid_sample_no: Liquid sample number to register in the archive.
         aliquot_volume_ul: Transfer volume (uL).
         source_tray: PAL source tray index.
@@ -3444,9 +3402,9 @@ def ADSS_sub_remove_bubble(
     return apm.planned_actions
 
 
+@experiment(version=1)
 def ADSS_sub_PAL_deep_clean(
     experiment: Experiment,
-    experiment_version: int = 1,
     clean_volume_ul: int = 500,
     PAL_Injector: str = "LS 4",
     rinse_1: int = 1,
@@ -3458,7 +3416,6 @@ def ADSS_sub_PAL_deep_clean(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         clean_volume_ul: Cleaning volume per wash (uL).
         PAL_Injector: PAL injector tool identifier.
         rinse_1: PAL wash slot 1 count.
@@ -3487,9 +3444,9 @@ def ADSS_sub_PAL_deep_clean(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_PAL_tray_to_tray(
     experiment: Experiment,
-    experiment_version: int = 1,
     volume_ul: int = 500,
     source_tray: int = 2,
     source_slot: int = 2,
@@ -3508,7 +3465,6 @@ def ADSS_sub_PAL_tray_to_tray(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         volume_ul: Transfer volume (uL).
         source_tray: PAL source tray index.
         source_slot: PAL source slot index.
@@ -3550,9 +3506,9 @@ def ADSS_sub_PAL_tray_to_tray(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_PAL_export_icpms(
     experiment: Experiment,
-    experiment_version: int = 1,
     tray: int = 2,
     slot: int = 1,
     survey_runs: int = 1,
@@ -3564,7 +3520,6 @@ def ADSS_sub_PAL_export_icpms(
 
     Args:
         experiment: Orchestrator-provided experiment context.
-        experiment_version: Version tag of the sub-experiment.
         tray: PAL tray index.
         slot: PAL slot index.
         survey_runs: ICPMS rough sweep count.

@@ -22,6 +22,7 @@ from typing import Optional, List
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.core.models.machine import MachineModel
+from helao.helpers.lib_decorators import experiment
 
 
 # list valid experiment functions
@@ -36,9 +37,9 @@ PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 
 
 # given solution pH, element space, and element fractions, measure CP at 3 and 10 mA/cm2
+@experiment(version=1)
 def SIM_measure_CP(
     experiment: Experiment,
-    experiment_version: int = 1,
     solution_ph: int = 13,
     elements: List[str] = [],
     element_fracs: List[float] = [],
@@ -52,7 +53,6 @@ def SIM_measure_CP(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         solution_ph: Target pH used in PAL ``query_plate`` and CP FOM calls.
         elements: Element-space identifiers used when querying plates.
         element_fracs: Target composition fractions for the sample acquire.

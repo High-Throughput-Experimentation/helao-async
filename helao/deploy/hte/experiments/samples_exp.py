@@ -25,6 +25,7 @@ from helao.core.models.sample import (
     SolidSample,
 )
 from helao.core.models.machine import MachineModel
+from helao.helpers.lib_decorators import experiment
 
 
 EXPERIMENTS = __all__
@@ -37,9 +38,9 @@ ORCH_HOST = gethostname()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 
 
+@experiment(version=1)
 def create_liquid_sample(
     experiment: Experiment,
-    experiment_version: int = 1,
     volume_ml: float = 1.0,
     source: List[str] = ["source1", "source2"],
     partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
@@ -55,7 +56,6 @@ def create_liquid_sample(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         volume_ml: Sample volume in millilitres.
         source: List of source labels for the constituents.
         partial_molarity: Per-constituent partial molarity strings.
@@ -99,9 +99,9 @@ def create_liquid_sample(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def create_gas_sample(
     experiment: Experiment,
-    experiment_version: int = 1,
     volume_ml: float = 1.0,
     source: List[str] = ["source1", "source2"],
     partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
@@ -115,7 +115,6 @@ def create_gas_sample(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         volume_ml: Sample volume in millilitres.
         source: Source labels for the gas constituents.
         partial_molarity: Per-constituent partial molarity strings.
@@ -155,9 +154,9 @@ def create_gas_sample(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def create_assembly_sample(
     experiment: Experiment,
-    experiment_version: int = 1,
     liquid_sample_nos: List[int] = [1, 2],
     gas_sample_nos: List[int] = [1, 2],
     solid_plate_ids: List[int] = [1, 2],
@@ -179,7 +178,6 @@ def create_assembly_sample(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         liquid_sample_nos: Liquid sample numbers from the local liquid db.
         gas_sample_nos: Gas sample numbers from the local gas db.
         solid_plate_ids: Plate ids paired with ``solid_sample_nos``.
@@ -247,16 +245,15 @@ def create_assembly_sample(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def sort_plate_sample_no_list(
     experiment: Experiment,
-    experiment_version: int = 1,
     plate_sample_no_list: list = [2],
 ) -> list:
     """Placeholder that returns an empty plan; reserved for plate-sample sorting.
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         plate_sample_no_list: Plate sample numbers (currently unused).
 
     Returns:
@@ -268,9 +265,9 @@ def sort_plate_sample_no_list(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def generate_sample_no_list(
     experiment: Experiment,
-    experiment_version: int = 1,
     plate_id: int = 1,
     sample_code: int = 0,
     skip_n_samples: int = 0,
@@ -288,7 +285,6 @@ def generate_sample_no_list(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         plate_id: Plate id to enumerate.
         sample_code: Sample code filter passed to PAL.
         skip_n_samples: Number of samples to skip in the resulting list.
@@ -317,9 +313,9 @@ def generate_sample_no_list(
     )
 
 
+@experiment(version=1)
 def load_liquid_sample(
     experiment: Experiment,
-    experiment_version: int = 1,
     liquid_sample_no: int = 0,
     machine_name: str = "hte-xxxx-xx",
     tray: int = 0,
@@ -330,7 +326,6 @@ def load_liquid_sample(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         liquid_sample_no: Sample number to load.
         machine_name: Machine the sample is registered against.
         tray: PAL tray index.
@@ -353,9 +348,9 @@ def load_liquid_sample(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def create_and_load_liquid_sample(
     experiment: Experiment,
-    experiment_version: int = 1,
     volume_ml: float = 1.0,
     source: List[str] = ["source1", "source2"],
     partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
@@ -378,7 +373,6 @@ def create_and_load_liquid_sample(
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         volume_ml: Sample volume in millilitres.
         source: List of source labels.
         partial_molarity: Per-constituent partial molarity strings.
@@ -433,16 +427,15 @@ def create_and_load_liquid_sample(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=2)
 def orch_sub_wait(
     experiment: Experiment,
-    experiment_version: int = 2,
     wait_time_s: float = 10,
 ) -> list:
     """Ask the orchestrator to pause for ``wait_time_s`` seconds.
 
     Args:
         experiment: Parent experiment supplied by the orchestrator.
-        experiment_version: Sub-experiment version tag.
         wait_time_s: Wait duration in seconds.
 
     Returns:

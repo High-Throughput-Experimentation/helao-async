@@ -3,20 +3,20 @@ __all__ = [
 ]
 
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=1)
 def XRFS_postseq(
-    sequence_version: int = 1,
     sequence_zip_path: str = "",
     params: dict = {},
 ) -> list:
     """Build a post-sequence that runs the XRFS standards calibration.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         sequence_zip_path: Path to the zipped sequence archive to analyze.
         params: Extra parameters forwarded to the calibration experiment.
 

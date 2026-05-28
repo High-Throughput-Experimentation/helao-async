@@ -6,13 +6,14 @@ __all__ = [
 
 
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.lib_decorators import sequence
 
 
 SEQUENCES = __all__
 
 
+@sequence(version=1)
 def CP_loop(
-    sequence_version: int = 1,
     CP_current: float = 0.001,
     CP_duration_sec: float = 3600,
     CP_samplerate_sec: float = 0.1,
@@ -35,7 +36,6 @@ def CP_loop(
     parameters to the underlying potentiostat action.
 
     Args:
-        sequence_version: Version tag for the sequence definition.
         CP_current: CP current setpoint in amps.
         CP_duration_sec: Duration of one CP loop iteration in seconds.
         CP_samplerate_sec: Data acquisition interval in seconds.
