@@ -1669,7 +1669,10 @@ class BokehOperator:
 
     def update_input_value(self, sender, value):
         """Assign ``value`` to ``sender.value`` (Bokeh next-tick safe setter)."""
-        sender.value = value
+        if sender is not None:
+            sender.value = value
+        else:
+            LOGGER.warning("tried to update value of nonexistant sender")
 
     def flip_stepwise_flag(self, sender_type):
         """Toggle the orchestrator's step-through flag for actions/experiments/sequences."""
