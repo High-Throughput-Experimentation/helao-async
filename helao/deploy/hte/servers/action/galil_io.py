@@ -41,6 +41,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
         app: The :class:`BaseAPI` instance being constructed by ``makeApp``.
     """
     server_key = app.base.server.server_name
+    app.driver: Galil
 
     if app.driver.galil_enabled is True:
 
