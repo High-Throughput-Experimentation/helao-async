@@ -103,7 +103,7 @@ class HelaoFastAPI(FastAPI):
                     self.rpc_dispatcher.register(route.path, route.endpoint)
 
             await self.rpc_dispatcher.serve(
-                host="0.0.0.0",
+                host=self.server_cfg["host"],
                 port=derive_rpc_port(self.server_cfg["port"]),
             )
 
