@@ -134,6 +134,53 @@ def base_api_unit_test() -> bool:
             lambda: ACTION_CTX.get() is None,
         )
 
+        reporter.section(
+            "wrap_action_endpoint folds fn defaults into action_params"
+        )
+        # Simulates the ZMQ-RPC fast path: caller supplies only `action` and
+        # `payload`; `switch` falls back to its Python default and must still
+        # appear in action.action_params so the action record matches what
+        # the endpoint actually ran with.
+        defaults_captured = {}
+
+        def endpoint_with_defaults(
+            action: Action, payload: str = "p", switch: bool = True
+        ):
+            defaults_captured["ctx"] = ACTION_CTX.get()
+            return payload, switch
+
+        wrapped_defaults = wrap_action_endpoint(endpoint_with_defaults)
+        wrapped_defaults(action=Action(action_name="defaults_call"), payload="hi")
+        reporter.check(
+            "supplied kwarg appears in action.action_params",
+            lambda: defaults_captured["ctx"].action.action_params.get("payload")
+            == "hi",
+        )
+        reporter.check(
+            "fn default appears in action.action_params when kwarg omitted",
+            lambda: defaults_captured["ctx"].action.action_params.get("switch")
+            is True,
+        )
+
+        reporter.section(
+            "caller-supplied value still wins over fn default"
+        )
+        defaults_overridden = {}
+
+        def endpoint_with_overrideable_default(
+            action: Action, switch: bool = True
+        ):
+            defaults_overridden["ctx"] = ACTION_CTX.get()
+            return switch
+
+        wrapped_override = wrap_action_endpoint(endpoint_with_overrideable_default)
+        wrapped_override(action=Action(action_name="override"), switch=False)
+        reporter.check(
+            "explicit kwarg value overrides fn default in action_params",
+            lambda: defaults_overridden["ctx"].action.action_params.get("switch")
+            is False,
+        )
+
         reporter.section("wrap_action_endpoint (async) also sets ACTION_CTX")
         captured_async = {}
 

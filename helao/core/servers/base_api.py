@@ -91,15 +91,24 @@ ACTION_CTX: ContextVar[Optional[ActionInvocation]] = ContextVar(
 )
 
 
-def _build_action_from_kwargs(kwargs: dict) -> Action:
+def _build_action_from_kwargs(
+    kwargs: dict, default_params: Optional[dict] = None
+) -> Action:
     """Build an ``Action`` from an endpoint's parsed keyword arguments.
 
     Picks the first ``Action``-typed kwarg as the base action and folds every
     remaining kwarg into ``action.action_params`` unless that key has already
-    been provided (for example by the orchestrator dispatcher).
+    been provided (for example by the orchestrator dispatcher). Endpoint
+    parameters with Python defaults that were not supplied by the caller
+    (e.g. omitted by the ZMQ-RPC fast path, which does not synthesize
+    defaults) are also folded in via ``default_params`` so the action
+    record reflects the values the endpoint actually ran with.
 
     Args:
         kwargs: Mapping of parameter name to value as resolved by FastAPI.
+        default_params: Optional mapping of parameter name to default value
+            collected from the wrapped function's signature. Used to fill
+            in defaults that were not supplied via ``kwargs``.
 
     Returns:
         The reconstructed ``Action`` instance.
@@ -131,8 +140,46 @@ def _build_action_from_kwargs(kwargs: dict) -> Action:
                 f"local var '{name}' not found in action.action_params, adding it."
             )
             action.action_params[name] = val
+
+    if default_params:
+        for name, val in default_params.items():
+            if name in kwargs:
+                continue
+            if name in action.action_params:
+                continue
+            LOGGER.info(
+                f"default for '{name}' not supplied in kwargs, adding to action.action_params."
+            )
+            action.action_params[name] = val
+
     LOGGER.info(f"Action.action_params: {action.action_params}")
     return action
+
+
+def _collect_default_params(sig: inspect.Signature) -> dict:
+    """Return ``{name: default}`` for sig parameters with usable Python defaults.
+
+    Skips ``Action``-typed parameters (the Action itself is handled separately)
+    and FastAPI parameter markers (``Body``/``Query``/``Path``/``Depends``/…),
+    whose "default" is a sentinel rather than the value the endpoint sees.
+    """
+    try:
+        from fastapi.params import Param as _FastAPIParam, Depends as _FastAPIDepends
+        marker_types: tuple = (_FastAPIParam, _FastAPIDepends)
+    except ImportError:
+        marker_types = ()
+
+    defaults: dict = {}
+    for name, param in sig.parameters.items():
+        if param.default is inspect.Parameter.empty:
+            continue
+        if marker_types and isinstance(param.default, marker_types):
+            continue
+        ann = param.annotation
+        if isinstance(ann, type) and issubclass(ann, Action):
+            continue
+        defaults[name] = param.default
+    return defaults
 
 
 def wrap_action_endpoint(fn: Callable) -> Callable:
@@ -152,13 +199,14 @@ def wrap_action_endpoint(fn: Callable) -> Callable:
         for the duration of the call.
     """
     sig = inspect.signature(fn)
+    default_params = _collect_default_params(sig)
     is_async = asyncio.iscoroutinefunction(fn)
 
     if is_async:
 
         @functools.wraps(fn)
         async def wrapper(**kwargs):
-            action = _build_action_from_kwargs(kwargs)
+            action = _build_action_from_kwargs(kwargs, default_params)
             token = ACTION_CTX.set(
                 ActionInvocation(action=action, endpoint_func=fn)
             )
@@ -171,7 +219,7 @@ def wrap_action_endpoint(fn: Callable) -> Callable:
 
         @functools.wraps(fn)
         def wrapper(**kwargs):
-            action = _build_action_from_kwargs(kwargs)
+            action = _build_action_from_kwargs(kwargs, default_params)
             token = ACTION_CTX.set(
                 ActionInvocation(action=action, endpoint_func=fn)
             )
