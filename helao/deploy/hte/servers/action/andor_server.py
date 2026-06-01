@@ -17,7 +17,7 @@ from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.file import HloHeaderModel
 
-from helao.core.servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI, action_version
 from helao.helpers.premodels import Action
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
@@ -245,9 +245,8 @@ async def andor_dyn_endpoints(app: BaseAPI):
     app.base.server_params["allow_concurrent_actions"] = False
 
     @app.post(f"/{server_key}/acquire", tags=["action"])
+    @action_version(2)
     async def acquire(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         external_trigger: bool = True,
         duration: float = 10.0,
         frames_per_poll: int = 100,
@@ -284,8 +283,6 @@ async def andor_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/cancel_acquire", tags=["action"])
     async def cancel_acquire(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Stop any running ``acquire`` executor on this server."""
         active = await app.base.setup_and_contain_action()
@@ -297,8 +294,6 @@ async def andor_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/cooling", tags=["action"])
     async def cooling(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         cooldown: bool = True,
         timeout: int = 600,
     ):
@@ -312,8 +307,6 @@ async def andor_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/adjust_nd", tags=["action"])
     async def adjust_nd(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Run the ND-filter auto-selection routine via :class:`AndorAdjustND`."""
         active = await app.base.setup_and_contain_action()

@@ -44,8 +44,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/acquire_image", tags=["action"])
     async def acquire_image(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 1,
         fast_samples_in: List[
@@ -69,8 +67,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/cancel_acquire_image", tags=["action"])
     async def cancel_acquire_image(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Stop the running Axis webcam executor (registered as ``axis``)."""
         active = await app.base.setup_and_contain_action()

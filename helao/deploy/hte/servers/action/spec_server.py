@@ -14,7 +14,7 @@ import time
 from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
-from helao.core.servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI, action_version
 from helao.core.models.sample import (
     AssemblySample,
     LiquidSample,
@@ -51,9 +51,8 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         return app.driver.pxwl  # type: ignore
 
     @app.post(f"/{server_key}/acquire_spec", tags=["action"])
+    @action_version(2)
     async def acquire_spec(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -100,9 +99,8 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         return finished_act.as_dict()
 
     @app.post(f"/{server_key}/acquire_spec_adv", tags=["action"])
+    @action_version(2)
     async def acquire_spec_adv(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -160,8 +158,6 @@ async def sm303_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/calibrate_intensity", tags=["action"])
     async def calibrate_intensity(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         int_time_ms: int = 35,
         n_avg: int = 3,
         peak_lower_wl: Optional[float] = 400,
@@ -243,8 +239,6 @@ async def sm303_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/acquire_spec_extrig", tags=["action"])
     async def acquire_spec_extrig(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -283,8 +277,6 @@ async def sm303_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/stop_extrig_after", tags=["action"])
     async def stop_extrig_after(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         delay: int = 0,
     ):
         """Schedule a delayed stop of any running external-trigger capture.

@@ -13,7 +13,7 @@ __all__ = ["makeApp"]
 
 from typing import Optional, Union, List
 from fastapi import Body
-from helao.core.servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI, action_version
 from ...drivers.io.galil_io_driver import Galil, TriggerType, AiMonExec
 from helao.helpers.premodels import Action
 from helao.core.models.sample import (
@@ -48,9 +48,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
         if app.driver.dev_ai:
 
             @app.post(f"/{server_key}/get_analog_in", tags=["action"])
+            @action_version(2)
             async def get_analog_in(
-                action: Action = Body({}, embed=True),
-                action_version: int = 2,
                 ai_item: app.driver.dev_aiitems = None,
             ):
                 """Read a single analog input channel identified by ``ai_item``."""
@@ -69,8 +68,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/acquire_analog_in", tags=["action"])
             async def acquire_analog_in(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
                 duration: float = -1,
                 acquisition_rate: float = 0.2,
                 fast_samples_in: List[
@@ -94,8 +91,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/cancel_acquire_analog_in", tags=["action"])
             async def cancel_acquire_analog_in(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
             ):
                 """Stop any running ``acquire_analog_in`` executors on this server."""
                 active = await app.base.setup_and_contain_action()
@@ -108,9 +103,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
         if app.driver.dev_ao:
 
             @app.post(f"/{server_key}/set_analog_out", tags=["action"])
+            @action_version(2)
             async def set_analog_out(
-                action: Action = Body({}, embed=True),
-                action_version: int = 2,
                 ao_item: app.driver.dev_aoitems = None,
                 value: Optional[float] = None,
             ):
@@ -133,9 +127,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
         if app.driver.dev_di:
 
             @app.post(f"/{server_key}/get_digital_in", tags=["action"])
+            @action_version(2)
             async def get_digital_in(
-                action: Action = Body({}, embed=True),
-                action_version: int = 2,
                 di_item: app.driver.dev_diitems = None,
             ):
                 """Read the state of a digital input ``di_item``."""
@@ -157,9 +150,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
         if app.driver.dev_do:
 
             @app.post(f"/{server_key}/get_digital_out", tags=["action"])
+            @action_version(2)
             async def get_digital_out(
-                action: Action = Body({}, embed=True),
-                action_version: int = 2,
                 do_item: app.driver.dev_doitems = None,
             ):
                 """Read the current setpoint of a digital output ``do_item``."""
@@ -181,9 +173,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
         if app.driver.dev_do:
 
             @app.post(f"/{server_key}/set_digital_out", tags=["action"])
+            @action_version(2)
             async def set_digital_out(
-                action: Action = Body({}, embed=True),
-                action_version: int = 2,
                 do_item: app.driver.dev_doitems = None,
                 on: bool = False,
             ):
@@ -206,9 +197,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
         if app.driver.dev_di and app.driver.dev_do:
 
             @app.post(f"/{server_key}/set_digital_cycle", tags=["action"])
+            @action_version(2)
             async def set_digital_cycle(
-                action: Action = Body({}, embed=True),
-                action_version: int = 2,
                 trigger_name: app.driver.dev_diitems = "gamry_ttl0",
                 triggertype: TriggerType = TriggerType.fallingedge,
                 out_name: Optional[
@@ -261,9 +251,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
         if app.driver.dev_di and app.driver.dev_do:
 
             @app.post(f"/{server_key}/stop_digital_cycle", tags=["action"])
+            @action_version(2)
             async def stop_digital_cycle(
-                action: Action = Body({}, embed=True),
-                action_version: int = 2,
             ):
                 """Stop the currently running digital toggle cycle."""
                 active = await app.base.setup_and_contain_action()
@@ -278,8 +267,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/reset", tags=["action"])
         async def reset(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
         ):
             """Reset the Galil controller. Emergency use only."""
             active = await app.base.setup_and_contain_action(action_abbr="reset")

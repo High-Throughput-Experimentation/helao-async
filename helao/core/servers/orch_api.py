@@ -25,6 +25,7 @@ from helao.core.models.hlostatus import HloStatus
 
 from helao.helpers import helao_logging as logging
 from helao.core.servers.base_api import (
+    action_version,
     _make_app_entry_middleware,
     _make_http_exception_handler,
     _add_default_head_endpoints,
@@ -458,8 +459,6 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post(f"/{server_key}/wait", tags=["action"])
         async def wait(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             waittime: float = 10.0,
         ):
             """Action endpoint that sleeps ``waittime`` seconds via a ``WaitExec`` executor."""
@@ -474,8 +473,6 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post(f"/{server_key}/cancel_wait", tags=["action"])
         async def cancel_wait(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
         ):
             """Action endpoint that stops every running ``wait`` executor and finishes the action."""
             active = await self.orch.setup_and_contain_action()
@@ -487,8 +484,6 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post(f"/{server_key}/interrupt", tags=["action"])
         async def interrupt(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             reason: str = "wait",
         ):
             """Action endpoint that stops the orchestrator with the supplied ``reason`` and finishes."""
@@ -502,8 +497,6 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post(f"/{server_key}/estop", tags=["action"])
         async def estop(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             switch: bool = True,
         ):
             """Trigger emergency stop on the orchestrator: invoke driver estop if any, latch when ``switch`` is True, mark the action as estopped, and stop all executors."""
@@ -530,8 +523,6 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post(f"/{server_key}/conditional_exp", tags=["action"])
         async def conditional_exp(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             check_parameter: Optional[str] = "",
             check_condition: checkcond = checkcond.equals,
             check_value: Union[float, int, bool] = True,
@@ -577,9 +568,8 @@ class OrchAPI(HelaoFastAPI):
             return finished_action.as_dict()
 
         @self.post(f"/{server_key}/conditional_stop", tags=["action"])
+        @action_version(2)
         async def conditional_stop(
-            action: Action = Body({}, embed=True),
-            action_version: int = 2,
             stop_parameter: Optional[str] = "",
             stop_condition: checkcond = checkcond.equals,
             stop_value: Union[str, float, int, bool] = True,
@@ -623,8 +613,6 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post(f"/{server_key}/conditional_skip", tags=["action"])
         async def conditional_skip(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             skip_parameter: Optional[str] = "",
             skip_condition: checkcond = checkcond.equals,
             skip_value: Union[str, float, int, bool] = True,
@@ -665,7 +653,6 @@ class OrchAPI(HelaoFastAPI):
 
         @self.post(f"/{server_key}/add_global_param", tags=["action"])
         async def add_global_param(
-            action: Action = Body({}, embed=True),
             param_name: str = "global_param_test",
             param_value: Union[str, float, int, bool] = True,
         ):
@@ -700,7 +687,7 @@ class OrchAPI(HelaoFastAPI):
             return self.orch.global_params
 
         @self.post(f"/{server_key}/clear_global_params", tags=["action"])
-        async def clear_global_params(action: Action = Body({}, embed=True)):
+        async def clear_global_params():
             """Action endpoint that clears the orchestrator's ``global_params`` and records the removed keys."""
             active = await self.orch.setup_and_contain_action()
             current_params = list(self.orch.global_params.keys())

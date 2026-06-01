@@ -182,25 +182,154 @@ def _collect_default_params(sig: inspect.Signature) -> dict:
     return defaults
 
 
+#: Attribute used to carry a per-endpoint action_version set via the
+#: :func:`action_version` decorator until :func:`wrap_action_endpoint` reads it.
+ACTION_VERSION_ATTR = "__helao_action_version__"
+
+#: Default action schema version injected when an endpoint declares none.
+DEFAULT_ACTION_VERSION = 1
+
+
+def action_version(version: int) -> Callable:
+    """Declare the schema version for a ``tags=["action"]`` endpoint.
+
+    Apply below the route decorator on an action endpoint whose schema version
+    differs from the default of ``1``. The value is injected as the endpoint's
+    ``action_version`` parameter by :func:`wrap_action_endpoint`, so it appears
+    in the request schema, in :meth:`Base.get_endpoint_urls`, and on the
+    recorded action exactly as an inline ``action_version: int = N`` declaration
+    used to. Endpoints that still declare ``action_version`` inline keep that
+    value and ignore this decorator.
+
+    Example::
+
+        @app.post(f"/{server_key}/stop", tags=["action"])
+        @action_version(2)
+        async def stop():
+            ...
+
+    Args:
+        version: The action schema version to advertise for the endpoint.
+
+    Returns:
+        A decorator that stamps ``version`` onto the endpoint function.
+    """
+
+    def decorator(fn: Callable) -> Callable:
+        setattr(fn, ACTION_VERSION_ATTR, version)
+        return fn
+
+    return decorator
+
+
+def _is_action_param(param: inspect.Parameter) -> bool:
+    """Return True if ``param`` is annotated as an ``Action`` (sub)class."""
+    ann = param.annotation
+    return isinstance(ann, type) and issubclass(ann, Action)
+
+
+def _build_action_endpoint_signature(fn: Callable, sig: inspect.Signature):
+    """Augment ``fn``'s signature with injected ``action``/``action_version`` params.
+
+    Action endpoints used to declare ``action: Action = Body({}, embed=True)``
+    and ``action_version: int = N`` by hand. Those parameters exist purely so
+    FastAPI builds the request body/query schema and so the orchestrator can
+    introspect them; the endpoint body recovers the action from ``ACTION_CTX``
+    instead. This helper synthesizes the same parameters on the
+    FastAPI-visible signature when the endpoint omits them, keeping the
+    generated schema and ``Base.get_endpoint_urls`` output identical to the
+    old inline form.
+
+    The ``action_version`` value is taken from an inline declaration if present,
+    otherwise from the :func:`action_version` decorator attribute, otherwise
+    :data:`DEFAULT_ACTION_VERSION`.
+
+    Args:
+        fn: The endpoint function being wrapped (source of the version attr).
+        sig: ``fn``'s own signature.
+
+    Returns:
+        Tuple of ``(exposed_sig, accepts_var_keyword, accepted_names)`` where
+        ``exposed_sig`` is the signature FastAPI should see, ``accepts_var_keyword``
+        indicates whether ``fn`` has a ``**kwargs`` parameter, and
+        ``accepted_names`` is the set of parameter names ``fn`` itself declares.
+    """
+    params = list(sig.parameters.values())
+    accepts_var_keyword = any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in params
+    )
+    accepted_names = {
+        p.name
+        for p in params
+        if p.kind is not inspect.Parameter.VAR_KEYWORD
+        and p.kind is not inspect.Parameter.VAR_POSITIONAL
+    }
+    has_action = any(_is_action_param(p) for p in params)
+    has_version = "action_version" in sig.parameters
+
+    injected = []
+    if not has_action:
+        injected.append(
+            inspect.Parameter(
+                "action",
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                default=Body({}, embed=True),
+                annotation=Action,
+            )
+        )
+    if not has_version:
+        version = getattr(fn, ACTION_VERSION_ATTR, DEFAULT_ACTION_VERSION)
+        injected.append(
+            inspect.Parameter(
+                "action_version",
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                default=version,
+                annotation=int,
+            )
+        )
+
+    if not injected:
+        return sig, accepts_var_keyword, accepted_names
+
+    # KEYWORD_ONLY injected params must precede any VAR_KEYWORD (**kwargs) param.
+    non_var = [p for p in params if p.kind is not inspect.Parameter.VAR_KEYWORD]
+    var_kw = [p for p in params if p.kind is inspect.Parameter.VAR_KEYWORD]
+    exposed_sig = sig.replace(parameters=non_var + injected + var_kw)
+    return exposed_sig, accepts_var_keyword, accepted_names
+
+
 def wrap_action_endpoint(fn: Callable) -> Callable:
     """Wrap an action endpoint so each invocation populates ``ACTION_CTX``.
 
-    The wrapper preserves ``fn``'s original signature so FastAPI parameter
-    resolution and the ZMQ-RPC fast-path continue to work. The parsed kwargs
-    are rebuilt into an ``Action`` and stored in a ``ContextVar`` so
-    ``Base.setup_action`` and ``Base.setup_and_contain_action`` can recover
-    the action without inspecting caller frames.
+    The wrapper exposes ``fn``'s signature (augmented with synthesized
+    ``action``/``action_version`` parameters when the endpoint omits them; see
+    :func:`_build_action_endpoint_signature`) so FastAPI parameter resolution,
+    schema generation, and the ZMQ-RPC fast-path continue to work. The parsed
+    kwargs are rebuilt into an ``Action`` and stored in a ``ContextVar`` so
+    ``Base.setup_action`` and ``Base.setup_and_contain_action`` can recover the
+    action without inspecting caller frames. Only the parameters ``fn`` actually
+    declares are forwarded to it, so the injected envelope parameters never leak
+    into endpoints that do not declare them.
 
     Args:
         fn: The action endpoint function to wrap.
 
     Returns:
-        A wrapper with the same signature as ``fn`` that sets ``ACTION_CTX``
+        A wrapper exposing the augmented signature that sets ``ACTION_CTX``
         for the duration of the call.
     """
     sig = inspect.signature(fn)
-    default_params = _collect_default_params(sig)
+    exposed_sig, accepts_var_keyword, accepted_names = (
+        _build_action_endpoint_signature(fn, sig)
+    )
+    default_params = _collect_default_params(exposed_sig)
     is_async = asyncio.iscoroutinefunction(fn)
+
+    def _forward_kwargs(kwargs: dict) -> dict:
+        """Keep only the kwargs ``fn`` declares (all of them if it has **kwargs)."""
+        if accepts_var_keyword:
+            return kwargs
+        return {k: v for k, v in kwargs.items() if k in accepted_names}
 
     if is_async:
 
@@ -211,7 +340,7 @@ def wrap_action_endpoint(fn: Callable) -> Callable:
                 ActionInvocation(action=action, endpoint_func=fn)
             )
             try:
-                return await fn(**kwargs)
+                return await fn(**_forward_kwargs(kwargs))
             finally:
                 ACTION_CTX.reset(token)
 
@@ -224,11 +353,11 @@ def wrap_action_endpoint(fn: Callable) -> Callable:
                 ActionInvocation(action=action, endpoint_func=fn)
             )
             try:
-                return fn(**kwargs)
+                return fn(**_forward_kwargs(kwargs))
             finally:
                 ACTION_CTX.reset(token)
 
-    wrapper.__signature__ = sig  # type: ignore[attr-defined]
+    wrapper.__signature__ = exposed_sig  # type: ignore[attr-defined]
     return wrapper
 
 
@@ -681,7 +810,6 @@ class BaseAPI(HelaoFastAPI):
 
         @self.post(f"/{server_key}/estop", tags=["action"])
         async def estop(
-            action: Action = Body({}, embed=True),
             switch: bool = True,
         ):
             """Trigger an emergency stop: call the driver's estop hook (if any), latch the

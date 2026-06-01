@@ -14,7 +14,7 @@ __all__ = ["makeApp"]
 from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
-from helao.core.servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI, action_version
 from helao.core.models.sample import (
     AssemblySample,
     LiquidSample,
@@ -54,8 +54,6 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/maintain_concentration", tags=["action"])
         async def maintain_concentration(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
             target_co2_ppm: float = 1e5,
             headspace_scc: float = 7.5,
@@ -99,8 +97,6 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/cancel_maintain_concentration", tags=["action"])
         async def cancel_maintain_concentration(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             device_name: Optional[str] = None,
             exec_id: Optional[str] = None,
         ):
@@ -139,9 +135,8 @@ async def mfc_dyn_endpoints(app: BaseAPI):
     if devices:
 
         @app.post(f"/{server_key}/acquire_flowrate", tags=["action"])
+        @action_version(2)
         async def acquire_flowrate(
-            action: Action = Body({}, embed=True),
-            action_version: int = 2,
             device_name: app.driver.dev_mfcs = devices[0],
             flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
@@ -184,8 +179,6 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/cancel_acquire_flowrate", tags=["action"])
         async def cancel_acquire_flowrate(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             device_name: Optional[str] = None,
             exec_id: Optional[str] = None,
         ):
@@ -218,9 +211,8 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
         @app.post(f"/{server_key}/acquire_pressure", tags=["action"])
+        @action_version(2)
         async def acquire_pressure(
-            action: Action = Body({}, embed=True),
-            action_version: int = 2,
             device_name: app.driver.dev_mfcs = devices[0],
             pressure_psia: Optional[float] = None,
             ramp_psi_sec: float = 0,
@@ -263,8 +255,6 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/cancel_acquire_pressure", tags=["action"])
         async def cancel_acquire_pressure(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             device_name: Optional[str] = None,
             exec_id: Optional[str] = None,
         ):
@@ -298,8 +288,6 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/set_flowrate", tags=["action"])
         async def set_flowrate(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
             flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
@@ -323,8 +311,6 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/set_pressure", tags=["action"])
         async def set_pressure(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
             pressure_psia: Optional[float] = None,
             ramp_psi_sec: float = 0,
@@ -348,8 +334,6 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/hold_valve_action", tags=["action"])
         async def hold_valve_action(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             """Hold the valve open at its current position on the selected device.
@@ -371,8 +355,6 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/cancel_hold_valve_action", tags=["action"])
         async def cancel_hold_valve_action(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             """Release a previously held valve on the selected device.
@@ -394,8 +376,6 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/hold_valve_closed_action", tags=["action"])
         async def hold_valve_closed_action(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             """Hold the valve fully closed on the selected device.
@@ -416,9 +396,8 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
         @app.post(f"/{server_key}/maintain_pressure", tags=["action"])
+        @action_version(2)
         async def maintain_pressure(
-            action: Action = Body({}, embed=True),
-            action_version: int = 2,
             device_name: app.driver.dev_mfcs = devices[0],
             target_pressure: float = 14.7,
             total_gas_scc: float = 7.0,
@@ -462,8 +441,6 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/cancel_maintain_pressure", tags=["action"])
         async def cancel_maintain_pressure(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             device_name: Optional[str] = None,
             exec_id: Optional[str] = None,
         ):

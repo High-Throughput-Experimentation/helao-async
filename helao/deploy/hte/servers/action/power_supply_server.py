@@ -445,8 +445,6 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/apply_voltage", tags=["action"])
     async def apply_voltage(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         voltage: float = 1.0,
         sleep_time: float = 0.05,
     ):
@@ -490,8 +488,6 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/square_wave", tags=["action"])
     async def square_wave(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         voltage: float = 1.0,
         sleep_time: float = 0.05,
     ):
@@ -536,8 +532,6 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/constant_current_square_wave", tags=["action"])
     async def constant_current_square_wave(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         current: float = 0.01,
         sleep_time: float = 0.05,
         sleep_time1: float = 1,
