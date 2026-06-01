@@ -107,9 +107,6 @@ debug_save_data = True
 def ADSS_sub_unloadall_customs() -> list:
     """Unload every custom-position sample currently tracked by PAL.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -132,9 +129,6 @@ def ADSS_sub_unloadall_customs() -> list:
 def ADSS_sub_unload_liquid(
 ) -> list:
     """Unload the liquid sample at ``cell1_we`` while keeping the solid in place.
-
-    Args:
-        experiment: Orchestrator-provided experiment context.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -164,9 +158,6 @@ def ADSS_sub_unload_liquid(
 def ADSS_sub_unload_solid(
 ) -> list:
     """Unload the solid sample at ``cell1_we`` while keeping the liquid in place.
-
-    Args:
-        experiment: Orchestrator-provided experiment context.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -203,7 +194,6 @@ def ADSS_sub_load_solid(
     Re-loads any previously unloaded liquid back into the same cell position.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_custom_position: PAL custom position the solid is loaded into.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -257,7 +247,6 @@ def ADSS_sub_load_liquid(
     """Add a liquid sample to a custom cell position.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         liquid_custom_position: Target PAL custom position.
         liquid_sample_no: Liquid sample number registered to this host.
         volume_ul_cell_liquid: Volume to add in microliters.
@@ -299,7 +288,6 @@ def ADSS_sub_load_liquid_only(
     """Add a liquid sample to a custom cell position and finish a liquid-addition process.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         liquid_custom_position: Target PAL custom position.
         liquid_sample_no: Liquid sample number registered to this host.
         liquid_sample_volume_ul: Volume to add in microliters.
@@ -351,7 +339,6 @@ def ADSS_sub_PAL_load_gas(
     """Add gas volume to a cell position and finish a bubbling-gas process.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         custom_position: Target PAL custom position.
         bubbled_gas: Label for the bubbled gas.
         reservoir_gas_sample_no: Gas sample number in the source reservoir.
@@ -390,9 +377,6 @@ def ADSS_sub_PAL_load_gas(
 def ADSS_sub_unload_gas_only(
 ) -> list:
     """Unload only the gas sample at ``cell1_we`` while keeping liquid and solid.
-
-    Args:
-        experiment: Orchestrator-provided experiment context.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -438,7 +422,6 @@ def ADSS_sub_load(
     instead of a freshly resolved liquid sample.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_custom_position: PAL custom position for the solid.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -528,7 +511,6 @@ def ADSS_sub_move_to_sample(
     resolves plate XY for the sample, moves there, and lowers to seal.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_custom_position: PAL custom position label (informational).
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -615,7 +597,6 @@ def ADSS_sub_sample_start(
     Z to load, moves to the plate XY for the sample, and lowers to seal.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_custom_position: PAL custom position for the solid.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -705,9 +686,6 @@ def ADSS_sub_sample_start(
 def ADSS_sub_shutdown() -> list:
     """Run a shutdown sequence: deep-clean PAL, reverse pump, wait, then stop pump.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -776,9 +754,6 @@ def ADSS_sub_shutdown() -> list:
 def ADSS_sub_drain() -> list:
     """Placeholder drain sub-experiment that currently emits no actions.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         Empty list of planned actions.
     """
@@ -795,7 +770,6 @@ def ADSS_sub_clean_PALtool(
     """Perform a deep clean of the selected PAL tool.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         clean_tool: PAL tool identifier (e.g. ``PALtools.LS3``).
         clean_volume_ul: Cleaning volume per wash in microliters.
 
@@ -828,7 +802,6 @@ def ADSS_sub_fillfixed(
     """Fill ``cell1_we`` from ``elec_res1`` using PAL fixed-volume fill, then run pump.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         fill_vol_ul: Fixed fill volume in microliters.
         filltime_sec: Time the peristaltic pump runs after the PAL fill.
         PAL_Injector: PAL tool identifier.
@@ -898,7 +871,6 @@ def ADSS_sub_fill(
     """Fill ``cell1_we`` from ``elec_res1`` using PAL variable fill (no wash).
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         fill_vol_ul: Fill volume in microliters.
         PAL_Injector: PAL tool identifier.
 
@@ -960,7 +932,6 @@ def ADSS_sub_CA(
     aliquot.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CA_potential: Applied potential before reference correction (V).
         ph: Solution pH used for Nernst conversion.
         potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
@@ -1141,7 +1112,6 @@ def ADSS_sub_CA_photo(
     match the non-photo CA variant.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CA_potential: Applied potential before reference correction (V).
         ph: Solution pH used for Nernst conversion.
         potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
@@ -1333,7 +1303,6 @@ def ADSS_sub_CV(
     post-aliquot branch also issues a PAL deep-clean.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Vinit_vsRHE: Initial potential vs RHE (V).
         Vapex1_vsRHE: First apex potential vs RHE (V).
         Vapex2_vsRHE: Second apex potential vs RHE (V).
@@ -1528,7 +1497,6 @@ def ADSS_sub_OCV(
     deep-clean to keep the injector tip clean for sensitive measurements.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Tval__s: OCV duration (s).
         gamry_i_range: Gamry current-range setting.
         samplerate_sec: Acquisition interval (s).
@@ -1729,7 +1697,6 @@ def ADSS_sub_OCV_photo(
     off after any in-situ aliquots.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Tval__s: OCV duration (s).
         gamry_i_range: Gamry current-range setting.
         samplerate_sec: Acquisition interval (s).
@@ -1874,7 +1841,6 @@ def ADSS_sub_insitu_actions(
     interleaves electrolyte additions via ``ADSS_sub_cellfill_prefilled``.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         insert_electrolyte_bool: Insert electrolyte at ``insert_electrolyte_time_sec``.
         insert_electrolyte_volume_ul: Volume to insert (uL).
         insert_electrolyte_time_sec: Insertion time after start (s).
@@ -2078,7 +2044,6 @@ def ADSS_sub_add_liquid(
     """Add liquid to ``cell1_we`` and optionally infuse via the work syringe.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         virtual_add: Skip the syringe infusion when True (archive-only update).
         added_liquid_volume_ul: Volume to add (uL).
         liquid_sample_no: Liquid sample number on this host.
@@ -2128,7 +2093,6 @@ def ADSS_sub_tray_unload(
     """Export a PAL tray (JSON, CSV, ICPMS) and then unload it.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         tray: PAL tray index.
         slot: PAL slot index on that tray.
         survey_runs: ICPMS rough sweep count over the partial-molarity range.
@@ -2199,7 +2163,6 @@ def ADSS_sub_tray_icpms_export(
     """Export a single PAL tray to ICPMS without unloading it.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         tray: PAL tray index.
         slot: PAL slot index.
         survey_runs: ICPMS rough sweep count.
@@ -2236,7 +2199,6 @@ def ADSS_sub_z_move(
     """Move the motor Z axis by a relative offset (platexy transformation).
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         offset_z_mm: Relative Z displacement (mm).
 
     Returns:
@@ -2271,7 +2233,6 @@ def ADSS_sub_rel_move(
     """Move the motor X/Y/Z axes by relative offsets (platexy transformation).
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         offset_x_mm: Relative X displacement (mm).
         offset_y_mm: Relative Y displacement (mm).
         offset_z_mm: Relative Z displacement (mm).
@@ -2308,7 +2269,6 @@ def ADSS_sub_abs_move(
     """Lift Z to load and move X/Y to an absolute position (platexy frame).
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         x_mm: Absolute X position (mm).
         y_mm: Absolute Y position (mm).
 
@@ -2347,7 +2307,6 @@ def ADSS_sub_heat(
     """Start the NI monitoring loop and a temperature-control heat loop.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         duration_hrs: Heat-loop duration (hours).
         celltemp_min_C: Cell low-temperature setpoint (deg C).
         celltemp_max_C: Cell high-temperature setpoint (deg C).
@@ -2388,9 +2347,6 @@ def ADSS_sub_stopheat(
 ) -> list:
     """Stop the heat loop and the monitoring loop.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -2424,7 +2380,6 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
     forward for ``ReturnLineWait_s`` seconds to clear the return line.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Solution_volume_ul: Volume to infuse (uL).
         Syringe_rate_ulsec: Syringe infuse rate (uL/s).
         ReturnLineWait_s: Optional pump-forward time after infusion (s).
@@ -2508,7 +2463,6 @@ def ADSS_sub_cellfill_prefilled(
     """Query the cell sample, close gas inlet, infuse the work syringe, run return-line pump.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Solution_volume_ul: Volume to infuse (uL).
         Syringe_rate_ulsec: Syringe infuse rate (uL/s).
         ReturnLineWait_s: Optional pump-forward time after infusion (s).
@@ -2602,7 +2556,6 @@ def ADSS_sub_cellfill_flush(
     """Close gas inlet, infuse the work syringe (no process tagging), run return-line pump.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Solution_volume_ul: Volume to infuse (uL).
         Syringe_rate_ulsec: Syringe infuse rate (uL/s).
         ReturnLineWait_s: Optional pump-forward time after infusion (s).
@@ -2650,7 +2603,6 @@ def ADSS_sub_drain_cell(
     """Drain the cell: reverse the return line, switch to drain valve, gas purge.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         DrainWait_s: Total drain time, split before/after gas inlet purge (s).
         ReturnLineReverseWait_s: Time to run the pump in reverse to clear the
             return line (s).
@@ -2691,7 +2643,6 @@ def ADSS_sub_keep_electrolyte(
     """Reverse the return line briefly then interrupt to save electrolyte in reservoir.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         ReturnLineReverseWait_s: Reverse-pump duration (s).
 
     Returns:
@@ -2748,7 +2699,6 @@ def ADSS_sub_clean_cell(
     Optionally lifts Z to load at the end.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Clean_volume_ul: Total clean-syringe volume (uL).
         Syringe_rate_ulsec: Clean syringe infuse rate (uL/s).
         PurgeWait_s: Gas purge wait between infuse and drain (s).
@@ -2845,9 +2795,6 @@ def ADSS_sub_move_to_clean_cell(
 ) -> list:
     """Lift Z, query the built-in clean-cell reference XY, move there, then seal.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -2885,7 +2832,6 @@ def ADSS_sub_move_to_ref_measurement(
     ``"builtin_ref_motorxy"``; otherwise uses the motorxy transformation.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         reference_position_name: Name of the builtin specref position.
 
     Returns:
@@ -2995,7 +2941,6 @@ def ADSS_sub_sample_aliquot(
     inlet.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         aliquot_volume_ul: Aliquot volume (uL).
         EquilibrationTime_s: Pump equilibration time before sampling (s).
         PAL_Injector: PAL injector tool identifier.
@@ -3063,7 +3008,6 @@ def ADSS_sub_recirculate(
     """Open the gas inlet and run the peristaltic pump for a fixed duration.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         direction_forward_or_reverse: ``"forward"`` (0) or any other value (1).
         wait_time_s: Recirculation duration (s).
 
@@ -3090,7 +3034,6 @@ def ADSS_sub_cell_illumination(
     """Turn the NI LED on or off and tag the action with a process technique.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         led_wavelength: Informational wavelength label.
         illumination_on: Set the LED on when True, off otherwise.
 
@@ -3131,7 +3074,6 @@ def ADSS_sub_interrupt(
     """Emit a single orchestrator interrupt action with the given reason.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         reason: Human-readable reason string for the interrupt.
 
     Returns:
@@ -3151,7 +3093,6 @@ def ADSS_sub_refill_syringe(
     """Refill the clean or electrolyte (work) syringe via its refill liquid valve.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         syringe: ``"waterclean"`` for the clean syringe or ``"electrolyte"``
             for the work syringe; other values produce no actions.
         fill_volume_ul: Withdraw volume (uL).
@@ -3200,7 +3141,6 @@ def ADSS_sub_gasvalve_toggle(
     """Toggle the gas-inlet valve open or closed.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         open: True to open, False to close.
 
     Returns:
@@ -3220,7 +3160,6 @@ def ADSS_sub_gasvalve_N2flow(
     """Toggle the O2/N2 selector valve (True selects N2 flow).
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         open: True selects N2, False selects O2.
 
     Returns:
@@ -3251,7 +3190,6 @@ def ADSS_sub_transfer_liquid_in(
     """Archive an added liquid then PAL-transfer it from a tray vial to a cell.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         liquid_sample_no: Liquid sample number to register in the archive.
         aliquot_volume_ul: Transfer volume (uL).
         source_tray: PAL source tray index.
@@ -3335,7 +3273,6 @@ def ADSS_sub_remove_bubble(
     """Reverse-then-forward the pump to dislodge a bubble, then re-check via OCV.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         pump_reverse_time_s: Reverse-pump duration (s).
         pump_forward_time_s: Forward-pump duration after reverse (s).
         Tval__s: Duration of the follow-up OCV (s).
@@ -3395,7 +3332,6 @@ def ADSS_sub_PAL_deep_clean(
     """Deep-clean the PAL injector with configurable wash counts.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         clean_volume_ul: Cleaning volume per wash (uL).
         PAL_Injector: PAL injector tool identifier.
         rinse_1: PAL wash slot 1 count.
@@ -3443,7 +3379,6 @@ def ADSS_sub_PAL_tray_to_tray(
     """Transfer liquid between two PAL tray vials.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         volume_ul: Transfer volume (uL).
         source_tray: PAL source tray index.
         source_slot: PAL source slot index.
@@ -3497,7 +3432,6 @@ def ADSS_sub_PAL_export_icpms(
     """Export a PAL tray slot to ICPMS without unloading it.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         tray: PAL tray index.
         slot: PAL slot index.
         survey_runs: ICPMS rough sweep count.

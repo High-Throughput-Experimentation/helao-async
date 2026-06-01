@@ -35,7 +35,6 @@ def TEST_sub_noblocking(
     """Build an experiment with a non-blocking wait followed by a blocking wait.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         wait_time: Base wait duration; the non-blocking wait uses 10x this.
         dummy_param: Unused placeholder parameter exposed for sequence
             wiring tests.
@@ -65,9 +64,6 @@ def TEST_sub_conditional_stop(
 
     Sets ``global_test`` then calls ``conditional_stop`` to halt the
     sequence before the trailing wait actions execute.
-
-    Args:
-        experiment: Parent experiment supplied by the orchestrator.
 
     Returns:
         The configured ``Experiment``.

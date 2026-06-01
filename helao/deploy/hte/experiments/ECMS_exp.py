@@ -88,9 +88,6 @@ toggle_triggertype = TriggerType.fallingedge
 def ECMS_sub_unload_cell() -> list:
     """Unload every sample at the ``cell1_we`` PAL custom position.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -108,7 +105,6 @@ def ECMS_sub_load_solid(
     """Load a legacy solid plate sample into ``cell1_we``.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
 
@@ -145,7 +141,6 @@ def ECMS_sub_load_liquid(
     """Archive a liquid sample addition into ``cell1_we``.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
         volume_ul_cell_liquid: Volume added (uL).
         water_True_False: Forwarded as ``dilute_liquids`` to PAL.
@@ -182,7 +177,6 @@ def ECMS_sub_load_gas(
     """Load a gas sample into ``cell1_we``.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         reservoir_gas_sample_no: Gas sample number in the reservoir.
         volume_ul_cell_gas: Volume added (uL).
 
@@ -213,9 +207,6 @@ def ECMS_sub_normal_state(
     Closes all CO2 / calibration-gas MFC valves, closes every NI gas valve
     except ``6B`` (which is opened to route flow past the GDE cell to the
     MS).
-
-    Args:
-        experiment: Orchestrator-provided experiment context.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -289,9 +280,6 @@ def ECMS_sub_normal_state(
 def ECMS_sub_alloff(
 ) -> list:
     """Turn off both peristaltic pumps, close MFC valves, and close every NI valve.
-
-    Args:
-        experiment: Orchestrator-provided experiment context.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -372,7 +360,6 @@ def ECMS_sub_electrolyte_fill_recirculationreservoir(
     """Run the reservoir peristaltic pump forward to fill the recirculation reservoir.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         liquid_fill_time: Pump-on duration (s).
 
     Returns:
@@ -399,7 +386,6 @@ def ECMS_sub_electrolyte_fill_cell(
     """Reverse-pump electrolyte from reservoir into the cell and archive the addition.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         liquid_backward_time: Reverse pump-on duration (s).
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
         volume_ul_cell_liquid: Volume archived to the cell (mL forwarded to PAL).
@@ -486,7 +472,6 @@ def ECMS_sub_electrolyte_fill_cell_recirculation(
     """Reverse-pump electrolyte into the cell via the recirculation path and archive the addition.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         liquid_backward_time: Reverse pump-on duration (s).
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
         volume_ul_cell_liquid: Volume archived to the cell.
@@ -571,7 +556,6 @@ def ECMS_sub_prevacuum_cell(
     """Open the vacuum path to evacuate the gas side and pull electrolyte against the GDE.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         vacuum_time: Vacuum duration (s).
 
     Returns:
@@ -604,7 +588,6 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     """Open the CO2 gas path, set the MFC flow, equilibrate, then route to MS for a baseline.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CO2equilibrium_duration: Wait after starting CO2 flow (s).
         flowrate_sccm: CO2 flow rate (sccm).
         flow_ramp_sccm: MFC ramp rate (sccm/s).
@@ -670,7 +653,6 @@ def ECMS_sub_headspace_purge_and_Arbaseline(
     """Open the Ar/inert gas path, set the calibration MFC flow, then route to MS for a baseline.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Arequilibrium_duration: Wait after starting flow (s).
         flowrate_sccm: Inert-gas flow rate (sccm).
         flow_ramp_sccm: MFC ramp rate (sccm/s).
@@ -716,9 +698,6 @@ def ECMS_sub_electrolyte_recirculation_on(
 ) -> list:
     """Open the recirculation valves and start the recirculation pump in reverse direction.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -737,9 +716,6 @@ def ECMS_sub_electrolyte_recirculation_on(
 def ECMS_sub_electrolyte_recirculation_off(
 ) -> list:
     """Stop the recirculation pump and close the recirculation valves.
-
-    Args:
-        experiment: Orchestrator-provided experiment context.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -768,7 +744,6 @@ def ECMS_sub_CA(
     """Run a CA experiment then wait for the MS signal to equilibrate.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_potential__V: Working-electrode potential (V).
         WE_versus: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: CA duration (s).
@@ -848,7 +823,6 @@ def ECMS_sub_pulseCA(
     into ``run_RCA`` as the starting potential.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Vinit__V: Initial step potential (V) (ignored when ``run_OCV`` is True).
         Tinit__s: Initial step duration (s).
         Vstep__V: Step potential delta (V).
@@ -977,7 +951,6 @@ def ECMS_sub_CV(
     """Run a CV experiment then wait for the MS signal to equilibrate.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_versus: ``"ref"`` or ``"rhe"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
@@ -1071,7 +1044,6 @@ def ECMS_sub_drain_recirculation(
     """Clear the recirculation tubes then drain the cell via the recirculation pump.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         tube_clear_time: Tube-clearing pump duration (s).
         liquid_drain_time: Liquid drain pump duration (s).
 
@@ -1137,7 +1109,6 @@ def ECMS_sub_clean_cell_recirculation(
     """Repeat fill-reservoir + recirc-fill + drain cycles to clean the cell.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         cleaning_times: Number of fill/drain cycles.
         liquid_fill_time: Reservoir-fill pump duration (s).
         volume_ul_cell_liquid: Per-fill cell volume (uL forwarded).
@@ -1198,7 +1169,6 @@ def ECMS_sub_drain(
     """Drain the cell using the reservoir pump (peripump 1) in reverse direction.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         liquid_drain_time: Drain pump duration (s).
 
     Returns:
@@ -1230,7 +1200,6 @@ def ECMS_sub_final_clean_cell(
     """Run a two-stage final clean: reservoir-to-cell then cell-to-cell, then archive.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         liquid_backward_time_1: First-stage reverse-pump duration (s).
         liquid_backward_time_2: Second-stage reverse-pump duration (s).
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
@@ -1283,7 +1252,6 @@ def ECMS_sub_cali(
     """Set CO2 and calibration-gas MFC flow rates and wait for the MS to equilibrate.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CO2flowrate_sccm: CO2 flow rate (sccm).
         Califlowrate_sccm: Calibration-gas flow rate (sccm).
         flow_ramp_sccm: MFC ramp rate (sccm/s).
@@ -1346,7 +1314,6 @@ def ECMS_sub_threegascali(
     """Set CO2, calibration-gas, and second calibration-gas MFC flow rates simultaneously.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CO2flowrate_sccm: CO2 flow rate (sccm).
         Califlowrate_sccm: First calibration-gas flow rate (sccm).
         Califlowrate_two_sccm: Second calibration-gas flow rate (sccm).
@@ -1428,7 +1395,6 @@ def ECMS_sub_inertgascali(
     """Set CO2 and second calibration-gas (inert) MFC flow rates and wait for the MS.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CO2flowrate_sccm: CO2 flow rate (sccm).
         Califlowrate_two_sccm: Second calibration-gas (inert) flow rate (sccm).
         flow_ramp_sccm: MFC ramp rate (sccm/s).
@@ -1493,7 +1459,6 @@ def ECMS_sub_pulsecali(
     """Set the calibration-gas MFC flow rate and wait for the MS to equilibrate.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Califlowrate_sccm: Calibration-gas flow rate (sccm).
         flow_ramp_sccm: MFC ramp rate (sccm/s).
         MSsignal_quilibrium_time: Equilibration wait (s).
@@ -1640,7 +1605,6 @@ def ECMS_sub_preCA_CO2flow(
     ``total_MFC_flow_rate_sccm - CO2_flow_rate``.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         MS_equilibrium_time: Final MS equilibration wait (s).
         total_MFC_flow_rate_sccm: Combined CO2 + inert MFC budget (sccm).
         flow_change_duration_sec: Step durations (s).
@@ -1729,7 +1693,6 @@ def ECMS_sub_CA_CO2flow(
     ``total_MFC_flow_rate_sccm - CO2_flow_rate``.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_potential__V: Working-electrode potential (V).
         WE_versus: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: CA duration (s).

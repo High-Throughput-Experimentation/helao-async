@@ -58,9 +58,6 @@ toggle_triggertype = TriggerType.fallingedge
 def UVIS_sub_unloadall_customs() -> list:
     """Unload every sample from every custom position via PAL.
 
-    Args:
-        experiment: Parent experiment supplied by the orchestrator.
-
     Returns:
         List with a single PAL ``archive_custom_unloadall`` action.
     """
@@ -83,7 +80,6 @@ def UVIS_sub_load_solid(
     """Load a solid sample into the named PAL custom position.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         solid_custom_position: PAL custom position name.
         solid_plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
@@ -119,7 +115,6 @@ def UVIS_sub_startup(
     queries the plate XY coordinates and moves the motor stage there.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         solid_custom_position: PAL custom position name.
         solid_plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
@@ -175,7 +170,6 @@ def UVIS_sub_shutdown(toggle_source: str = "lamp_shutter") -> list:
     """Shutdown: unload custom positions and switch off the lamp shutter line.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         toggle_source: IO digital-out name driven low to close the shutter.
 
     Returns:
@@ -204,7 +198,6 @@ def UVIS_sub_movetosample(
     """Query a plate's XY for the given sample and move the motor stage to it.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         solid_plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
 
@@ -247,7 +240,6 @@ def UVIS_sub_relmove(
     """Issue a relative platexy move on the MOTOR server.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         offset_x_mm: Relative X offset in millimetres.
         offset_y_mm: Relative Y offset in millimetres.
 
@@ -296,7 +288,6 @@ def UVIS_sub_measure(
     interrupt to prompt the operator to load the sample library.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         spec_type: Spectrometer family (T or R).
         spec_n_avg: Number of spectra averaged per acquisition.
         spec_int_time_ms: Integration time in milliseconds.
@@ -438,7 +429,6 @@ def UVIS_sub_setup_ref(
     stage using either platexy (internal/blank) or motorxy (builtin).
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         reference_mode: One of ``"internal"``, ``"builtin"``, ``"blank"``.
         solid_custom_position: PAL custom position used to host the reference.
         solid_plate_id: Plate id used to look up the reference sample.
@@ -554,7 +544,6 @@ def UVIS_calc_abs(
     """Run the CALC server's UV-Vis absorption calculator.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         ev_parts: Energy partition points (eV) for the calculator.
         bin_width: Spectral bin width (samples).
         window_length: Savitzky-Golay window length.
@@ -599,7 +588,6 @@ def UVIS_analysis_dry(
     """Run the ANA server's dry UV-Vis analysis for a sequence/plate.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         sequence_uuid: Sequence UUID to analyse.
         plate_id: Plate id to filter on.
         recent: If True, restrict the analysis to recent runs.
@@ -646,7 +634,6 @@ def UVIS_measure_references(
     white target, and captures a light reference.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         plate_id: Plate id used for builtin reference lookups.
         custom_position: PAL custom position for the reference solid.
         spec_n_avg: Number of spectra averaged per acquisition.
@@ -752,7 +739,6 @@ def UVIS_sub_shutoff_lamp(outlet_number: int = 1) -> list:
     """Switch a PDU outlet off (intended for the UV-Vis lamp).
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         outlet_number: PDU outlet index.
 
     Returns:

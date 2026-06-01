@@ -24,7 +24,6 @@ def XRFS_standards_calibration(
     """Run the ANA server's local XRFS standards calibration.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         sequence_zip_path: Path to a zipped sequence archive on disk.
         params: Free-form parameter dict forwarded to the analyzer.
 

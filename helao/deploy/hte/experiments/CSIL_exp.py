@@ -86,9 +86,6 @@ toggle_triggertype = TriggerType.fallingedge
 def CCSI_sub_unload_cell() -> list:
     """Unload every sample currently tracked at the ``cell1_we`` PAL custom position.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -106,7 +103,6 @@ def CCSI_sub_load_solid(
     """Load a legacy solid plate sample into ``cell1_we`` and finish a process record.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
 
@@ -149,7 +145,6 @@ def CCSI_sub_load_liquid(
     """Archive a liquid sample addition into ``cell1_we`` and finish a process record.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
         volume_ul_cell_liquid: Volume added (uL).
         water_True_False: Forwarded as ``dilute_liquids`` to PAL.
@@ -192,7 +187,6 @@ def CCSI_sub_load_gas(
     """Load a gas sample into ``cell1_we`` and finish a process record.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         reservoir_gas_sample_no: Gas sample number in the reservoir.
         volume_ul_cell_gas: Volume added (uL).
 
@@ -225,9 +219,6 @@ def CCSI_sub_load_gas(
 def CCSI_sub_alloff(
 ) -> list:
     """Turn the recirculating pump off and close every CCSI gas/liquid valve.
-
-    Args:
-        experiment: Orchestrator-provided experiment context.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -267,7 +258,6 @@ def CCSI_sub_headspace_purge_and_measure(
     """Run a headspace purge and then take an MFC flow + CO2 sensor measurement.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         HSpurge_duration: Headspace purge time (s).
         DeltaDilute1_duration: Initial dilution-recirc time (s); ``0`` skips.
         initialization: Toggle initialization-specific valve sequencing.
@@ -373,7 +363,6 @@ def CCSI_sub_headspace_measure(
     """Query the cell sample, then acquire MFC flow and CO2 ppm in parallel with recirculation.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         recirculation_rate_uL_min: Recirculation rate (informational).
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
@@ -435,7 +424,6 @@ def CCSI_sub_drain(
     """Drain the cell with a long valve sequence, optionally recirculating in stages.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         HSpurge_duration: Headspace purge duration (s).
         DeltaDilute1_duration: Optional dilution-recirc time (s); ``0`` skips.
         initialization: Toggle initialization-specific valve sequencing.
@@ -583,7 +571,6 @@ def CCSI_sub_n2drain(
     """Drain the cell using a metered N2 purge via the N2 MFC, with optional recirculation.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         n2flowrate_sccm: N2 flow rate (sccm).
         HSpurge_duration: N2 purge duration (s).
         DeltaDilute1_duration: Optional dilution-recirc time (s); ``0`` skips.
@@ -684,9 +671,6 @@ def CCSI_sub_initialization_end_state(
 ) -> list:
     """Place the system into its post-initialization state: pump off and valve 1A closed.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -718,9 +702,6 @@ def CCSI_sub_peripumpoff(
 ) -> list:
     """Stop the recirculation dose pump (CSIL variant).
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -751,7 +732,6 @@ def CCSI_sub_initialization_firstpart(
     """Run the first-time CSIL initialization purge sequence (headspace → probe → sensor).
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         HSpurge1_duration: Main headspace purge duration (s).
         Manpurge1_duration: Manifold/solvent purge duration (s).
         Alphapurge1_duration: Line/alpha purge duration (s).
@@ -891,7 +871,6 @@ def CCSI_sub_cellfill(
     N2 or CO2 push depending on ``n2_push``.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Solution_description: Free-text solution label.
         Solution_reservoir_sample_no: Liquid sample number for the solution.
         Solution_volume_ul: Solution volume to inject (uL); ``0`` skips.
@@ -1392,7 +1371,6 @@ def CCSI_sub_co2monitoring(
     """Acquire CO2 in the recirculated headspace using the DOSEPUMP recirculator.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         recirculation_rate_uL_min: DOSEPUMP rate (uL/min).
@@ -1448,7 +1426,6 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
     """Step up MFC flow then ramp while measuring CO2 and recirculating via DOSEPUMP.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         co2measure_duration: Total CO2 acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         flowrate_sccm: Steady MFC flow rate (sccm).
@@ -1534,7 +1511,6 @@ def CCSI_sub_co2topup_mfcmassdose(
     """Hold the cell at a target pressure by topping up CO2 via the MFC.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         co2measure_acqrate: Acquisition rate (s).
         flowrate_sccm: MFC flow rate (sccm).
         flowramp_sccm: MFC ramp rate (sccm/s).
@@ -1595,7 +1571,6 @@ def CCSI_sub_co2constantpressure(
     """Hold a target pressure via the MFC while recording CO2 and recirculating via DOSEPUMP.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         atm_pressure: Pressure setpoint (psia).
@@ -1671,7 +1646,6 @@ def CCSI_sub_co2mass_temp(
     """Step up flow then ramp while measuring CO2 and recirculating via DOSEPUMP.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         co2measure_duration: Total acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         flowrate_sccm: Steady MFC flow rate (sccm).
@@ -1770,7 +1744,6 @@ def CCSI_sub_co2massdose(
     """Dose CO2 to a pressure setpoint while measuring CO2 and recirculating via DOSEPUMP.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         co2measure_duration: CO2 acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         flowrate_sccm: MFC flow rate (sccm).
@@ -1872,7 +1845,6 @@ def CCSI_sub_co2maintainconcentration(
     """Maintain a target CO2 concentration in the recirculated headspace via DOSEPUMP.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         pureco2_sample_no: Gas sample number of the pure CO2 source.
         co2measure_duration: Total acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
@@ -2011,7 +1983,6 @@ def CCSI_sub_flowflush(
     """Run a long flow-and-flush diagnostic with valve-toggle cycles and CO2 logging.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         flowrate_sccm: MFC flow rate (sccm).
@@ -2094,7 +2065,6 @@ def CCSI_sub_clean_inject(
     """Inject clean water, recirculate, measure CO2, then drain — repeating via calc if needed.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Clean_volume_ul: Clean water volume (uL).
         Syringe_rate_ulsec: Syringe rate (uL/s).
         LiquidCleanWait_s: Wait after liquid fill before measurement (s).
@@ -2268,7 +2238,6 @@ def CCSI_sub_refill_clean(
     """Refill the water syringe with backlash correction.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Clean_volume_ul: Target net withdraw volume (uL).
         Syringe_rate_ulsec: Syringe rate (uL/s).
 
@@ -2398,7 +2367,6 @@ def CCSI_debug_co2purge(
     """Debug helper that acquires CO2 and conditionally re-queues itself via CALC.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         co2_ppm_thresh: CO2 threshold for the repeat check.
@@ -2448,7 +2416,6 @@ def CCSI_leaktest_co2(
     """Run a long CO2 acquisition (optionally with DOSEPUMP recirculation) as a leak test.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         recirculate: Run the DOSEPUMP recirculation during the test.
@@ -2491,7 +2458,6 @@ def CCSI_sub_monitorcell(
     """Concurrently acquire MFC flow and CO2 ppm to monitor the cell (DOSEPUMP recirc).
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         co2measure_duration: Acquisition duration (s).
         co2measure_acqrate: Acquisition rate (s).
         recirculation: Run the DOSEPUMP recirculation in parallel when True.
@@ -2561,7 +2527,6 @@ def CCSI_sub_n2flush(
     """Multi-stage N2 flush of headspace, lines, probe, and pCO2 sensor.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         flush_cycles: Number of full purge cycles; ``0`` disables fixed cycles.
         n2flowrate_sccm: N2 flow rate (sccm).
         HSpurge1_duration: First headspace-purge duration (s).
@@ -2860,7 +2825,6 @@ def CCSI_sub_n2clean(
     """Full N2 cleaning sequence: clean-fill the cell, N2 drain, refill syringe, N2 flush.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Clean_reservoir_sample_no: Liquid sample number for the clean reservoir.
         Clean_volume_ul: Clean injection volume (uL).
         Syringe_rate_ulsec: Syringe rate (uL/s).
@@ -2975,7 +2939,6 @@ def CCSI_sub_n2rinse(
     """Run ``rinse_cycles`` of clean-fill + optional agitation + N2 drain + syringe refill.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         rinse_cycles: Number of clean-water rinse cycles.
         Clean_reservoir_sample_no: Liquid sample number for the clean reservoir.
         Clean_volume_ul: Clean injection volume (uL).
@@ -3050,7 +3013,6 @@ def CCSI_sub_n2headspace(
     """Open the gas path, run an N2 purge through the headspace, then optionally recirculate.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         n2flowrate_sccm: N2 flow rate (sccm).
         HSpurge_duration: Total N2 purge duration (s).
         recirculation: Run a recirculation stage mid-purge when True.

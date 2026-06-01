@@ -73,9 +73,6 @@ TOGGLE_TRIGGERTYPE = TriggerType.risingedge
 def ECHEUVIS_sub_startup() -> list:
     """Unload PAL custom position samples and enable the IR emitter.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -88,9 +85,6 @@ def ECHEUVIS_sub_startup() -> list:
 @experiment(version=1)
 def ECHEUVIS_sub_shutdown() -> list:
     """Unload PAL custom position samples and disable the IR emitter.
-
-    Args:
-        experiment: Orchestrator-provided experiment context.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -149,7 +143,6 @@ def ECHEUVIS_sub_CV_led(
     in parallel, and dispatches ``run_CV`` to the potentiostat.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Vinit_vsRHE: Initial CV potential vs RHE (V).
         Vapex1_vsRHE: Apex 1 vs RHE (V).
         Vapex2_vsRHE: Apex 2 vs RHE (V).
@@ -377,7 +370,6 @@ def ECHEUVIS_sub_CA_led(
     """Run a CA experiment with hardware-triggered LED + spec triggering and spectroscopy.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CA_potential_vsRHE: Applied potential vs RHE (V).
         solution_ph: Solution pH used for the Nernst conversion.
         reservoir_electrolyte: ``Electrolyte`` enum label (informational).
@@ -596,7 +588,6 @@ def ECHEUVIS_sub_CP_led(
     """Run a CP experiment with hardware-triggered LED + spec triggering and spectroscopy.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CP_current: Applied current (A).
         solution_ph: Solution pH (informational here).
         reservoir_electrolyte: ``Electrolyte`` enum label (informational).
@@ -778,7 +769,6 @@ def ECHEUVIS_sub_interrupt(
     """Emit a single orchestrator interrupt action with the given reason.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         reason: Human-readable reason string for the interrupt.
 
     Returns:
@@ -825,7 +815,6 @@ def ECHEUVIS_sub_OCV_led(
     """Run an OCV experiment with hardware-triggered LED + spec triggering and spectroscopy.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solution_ph: Solution pH (informational here).
         reservoir_electrolyte: ``Electrolyte`` enum label (informational).
         reservoir_liquid_sample_no: Liquid sample number (informational).
@@ -1011,7 +1000,6 @@ def ECHEUVIS_sub_disengage(
     """Vent/pump the CE and WE chambers, lower Z to disengage, then turn vent and pumps off.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         clear_we: Run the WE chamber vent + pump.
         clear_ce: Run the CE chamber vent + pump.
         z_height: Absolute Z position to lower to (mm).
@@ -1062,7 +1050,6 @@ def ECHEUVIS_sub_engage(
     """Raise Z to engage, pull electrolyte through WE/CE chambers, optionally calibrate the spec.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         flow_we: Flow the WE chamber.
         flow_ce: Flow the CE chamber.
         z_height: Absolute Z position to raise to (mm).
@@ -1151,7 +1138,6 @@ def ECHEUVIS_analysis_stability(
     """Dispatch an ECHE+UVIS stability analysis action to the analysis server.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         sequence_uuid: UUID of the sequence to analyze.
         plate_id: Plate identifier.
         recent: Operate on the most recent sequence when True.

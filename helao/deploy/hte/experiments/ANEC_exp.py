@@ -91,7 +91,6 @@ def ANEC_sub_startup(
     """Lower Z, move XY to a plate sample, then raise Z to the engage position.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
         z_move_mm: Final absolute Z (motorxy frame).
@@ -163,9 +162,6 @@ def ANEC_sub_startup(
 def ANEC_sub_disengage() -> list:
     """Lower Z to disengage the electrochemical cell.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -196,7 +192,6 @@ def ANEC_sub_load_solid(
     """Load a legacy solid sample into the ``cell1_we`` PAL custom position.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
 
@@ -228,9 +223,6 @@ def ANEC_sub_alloff(
 ) -> list:
     """Turn off both peristaltic pumps and close every NI gas/liquid valve.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -259,9 +251,6 @@ def ANEC_sub_heatoff(
 ) -> list:
     """Cancel TEC recording and disable the TEC controller.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -281,7 +270,6 @@ def ANEC_sub_setheat(
     """Set a TEC setpoint, start non-blocking recording, enable TEC, wait until stable.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         target_temperature_degc: TEC setpoint in degrees Celsius.
 
     Returns:
@@ -320,9 +308,6 @@ def ANEC_sub_normal_state(
         - Liquid reservoir and gas flow-through valves closed.
         - WE CO2 inlet open.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -355,7 +340,6 @@ def ANEC_sub_flush_fill_cell(
     then archives a combined+diluted liquid into ``cell1_we``.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         liquid_flush_time: Liquid flush duration (s).
         co2_purge_time: CO2 purge duration (s).
         equilibration_time: Post-purge equilibration time (s).
@@ -410,9 +394,6 @@ def ANEC_sub_flush_fill_cell(
 def ANEC_sub_unload_cell() -> list:
     """Unload every sample currently tracked at the ``cell1_we`` PAL custom position.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -426,9 +407,6 @@ def ANEC_sub_unload_cell() -> list:
 def ANEC_sub_unload_liquid(
 ) -> list:
     """Unload all samples then re-load the previously tracked solid at ``cell1_we``.
-
-    Args:
-        experiment: Orchestrator-provided experiment context.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -457,7 +435,6 @@ def ANEC_sub_drain_cell(
     """Return ANEC to normal state, unload the liquid, and wait for the cell to drain.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         drain_time: Drain wait time (s).
 
     Returns:
@@ -479,7 +456,6 @@ def ANEC_sub_cleanup(
     """Flush+fill the cell and then drain it.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         reservoir_liquid_sample_no: Liquid sample number used to flush the cell.
 
     Returns:
@@ -504,7 +480,6 @@ def ANEC_sub_GC_headspacealiquot_nomixing(
     """Stop PeriPump1 and sample the cell1_we headspace into the GC (no mixing pass).
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         toolGC: PAL headspace tool identifier.
         volume_ul_GC: GC injection volume (uL).
 
@@ -546,7 +521,6 @@ def ANEC_sub_GC_preparation(
     injection.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         toolGC: PAL headspace tool identifier.
         volume_ul_GC: GC injection volume (uL).
 
@@ -592,7 +566,6 @@ def ANEC_sub_load_solid_only(
     """Unload the cell and load a legacy solid sample into ``cell1_we``.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
 
@@ -629,7 +602,6 @@ def ANEC_sub_load_solid_and_clean_cell(
     """Unload, load solid, drain+flush, recirculate, run GC, then drain again.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
         reservoir_liquid_sample_no: Liquid sample number used for flushing.
@@ -697,7 +669,6 @@ def ANEC_sub_liquidarchive(
     """Stop PeriPump1, archive a liquid aliquot from the cell to a PAL tray, restart pump.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         toolarchive: PAL liquid syringe tool identifier.
         volume_ul_archive: Archived volume (uL).
         wash1: Enable PAL wash slot 1.
@@ -756,7 +727,6 @@ def ANEC_sub_aliquot_nomixing(
     """Take a combined GC + liquid-archive aliquot from the cell without pre-mixing.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         toolGC: PAL headspace tool identifier.
         toolarchive: PAL liquid archive tool identifier.
         volume_ul_GC: GC injection volume (uL).
@@ -820,7 +790,6 @@ def ANEC_sub_aliquot(
     """Mix the cell by reversing the pump, then take a GC + liquid-archive aliquot.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         toolGC: PAL headspace tool identifier.
         toolarchive: PAL liquid archive tool identifier.
         volume_ul_GC: GC injection volume (uL).
@@ -891,7 +860,6 @@ def ANEC_sub_CP(
     """Run a chronopotentiometry (CP) experiment with the cell sample tracked.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_versus: Reference frame label.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH.
@@ -954,7 +922,6 @@ def ANEC_sub_CA(
     """Run a chronoamperometry (CA) experiment versus REF or RHE.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_potential__V: Working-electrode potential (V).
         WE_versus: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: CA duration (s).
@@ -1020,7 +987,6 @@ def ANEC_sub_HeatCA(
     """Stabilize TEC at a target temperature then run a CA experiment.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_potential__V: Working-electrode potential (V).
         WE_versus: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: CA duration (s).
@@ -1093,7 +1059,6 @@ def ANEC_sub_OCV(
     """Run an open-circuit voltage measurement with the cell sample tracked.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Tval__s: OCV duration (s).
         IErange: Gamry current-range setting.
 
@@ -1166,7 +1131,6 @@ def ANEC_sub_photo_CA(
     when ``-1``), runs CA with TTL handshake, then stops the digital cycle.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_potential__V: Working-electrode potential (V).
         WE_versus: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: CA duration (s).
@@ -1276,7 +1240,6 @@ def ANEC_sub_CV(
     """Run a cyclic voltammetry (CV) experiment versus REF or RHE.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_versus: ``"ref"`` or ``"rhe"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
@@ -1380,7 +1343,6 @@ def ANEC_sub_HeatCV(
     """Stabilize TEC at a target temperature then run a CV experiment.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_versus: ``"ref"`` or ``"rhe"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
@@ -1515,7 +1477,6 @@ def ANEC_sub_photo_CV(
     digital cycle, runs CV with TTL handshake, then stops the digital cycle.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_versus: ``"ref"`` or ``"rhe"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH.
@@ -1674,7 +1635,6 @@ def ANEC_sub_GCLiquid_analysis(
     """Inject a liquid aliquot from a PAL tray vial into the GC injector and wait.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         tool: PAL liquid syringe tool identifier.
         source_tray: PAL tray index.
         source_slot: PAL slot index.
@@ -1739,7 +1699,6 @@ def ANEC_sub_HPLCLiquid_analysis(
     """Inject a liquid aliquot from a PAL tray vial into the HPLC injector and wait.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         tool: PAL liquid syringe tool identifier.
         source_tray: PAL tray index.
         source_slot: PAL slot index.
@@ -1816,7 +1775,6 @@ def ANEC_sub_photo_LSV(
     digital cycle.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_versus: ``"ref"`` or ``"rhe"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH.
@@ -1952,7 +1910,6 @@ def ANEC_sub_photo_CP(
     with TTL handshake, and stops the digital cycle.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         WE_versus: Reference frame label.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH.

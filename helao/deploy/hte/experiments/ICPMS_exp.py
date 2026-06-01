@@ -24,7 +24,6 @@ def ICPMS_analysis_concentration(
     """Run the ANA server's local ICP-MS concentration analysis.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         sequence_zip_path: Path to a zipped sequence archive on disk.
         params: Free-form parameter dict forwarded to the analyzer.
 

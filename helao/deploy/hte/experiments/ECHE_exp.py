@@ -67,9 +67,6 @@ toggle_triggertype = TriggerType.fallingedge
 def ECHE_sub_unloadall_customs() -> list:
     """Unload every sample from PAL custom positions and destroy any tracked liquid.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -98,7 +95,6 @@ def ECHE_sub_add_liquid(
     """Add liquid (combined + diluted) to the ECHE cell position.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_custom_position: PAL custom position name.
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
         solution_bubble_gas: Bubbler-gas label passed to PAL.
@@ -140,7 +136,6 @@ def ECHE_sub_load_solid(
     """Load a legacy solid plate sample into a PAL custom position.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_custom_position: PAL custom position name.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -182,7 +177,6 @@ def ECHE_sub_startup(
     """Unload customs, load a solid sample, add liquid, then move to that sample.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_custom_position: PAL custom position name.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -253,9 +247,6 @@ def ECHE_sub_startup(
 def ECHE_sub_shutdown() -> list:
     """Unload all samples from PAL custom positions.
 
-    Args:
-        experiment: Orchestrator-provided experiment context.
-
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -298,7 +289,6 @@ def ECHE_sub_CA_led(
     """Run a CA experiment with hardware-triggered LED toggling.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CA_potential: Applied potential before reference correction (V).
         potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
         ref_type: Reference electrode key into ``REF_TABLE``.
@@ -416,7 +406,6 @@ def ECHE_sub_OCV(
     """Run an OCV experiment and store the mean final Ewe to ``HISPEC_OCV`` globals.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Tval__s: OCV duration (s).
         SampleRate: Acquisition interval (s).
 
@@ -468,7 +457,6 @@ def ECHE_sub_preCV(
     """Run a short CA pre-conditioning step before a CV.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CA_potential: Applied potential (V).
         samplerate_sec: Acquisition interval (s).
         CA_duration_sec: Pre-CV CA duration (s).
@@ -535,7 +523,6 @@ def ECHE_sub_CA(
     """Run a CA experiment without illumination.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CA_potential: Applied potential before reference correction (V).
         potential_versus: ``"rhe"`` or ``"oer"`` reference frame.
         ref_type: Reference electrode key into ``REF_TABLE``.
@@ -651,7 +638,6 @@ def ECHE_sub_CV_led(
     digital cycle, dispatches ``run_CV``, and stops the digital cycle.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Vinit_vsRHE: Initial CV potential vs RHE (V).
         Vapex1_vsRHE: Apex 1 vs RHE (V).
         Vapex2_vsRHE: Apex 2 vs RHE (V).
@@ -803,7 +789,6 @@ def ECHE_sub_CV(
     """Run a CV experiment without illumination.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         Vinit_vsRHE: Initial CV potential vs RHE (V).
         Vapex1_vsRHE: Apex 1 vs RHE (V).
         Vapex2_vsRHE: Apex 2 vs RHE (V).
@@ -898,7 +883,6 @@ def ECHE_sub_CP(
     """Run a CP experiment without illumination.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CP_current: Applied current (A).
         solution_ph: Solution pH (informational here).
         reservoir_electrolyte: ``Electrolyte`` enum label (informational).
@@ -988,7 +972,6 @@ def ECHE_sub_CP_led(
     """Run a CP experiment with hardware-triggered LED toggling.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         CP_current: Applied current (A).
         solution_ph: Solution pH (informational here).
         reservoir_electrolyte: ``Electrolyte`` enum label (informational).
@@ -1092,7 +1075,6 @@ def ECHE_sub_movetosample(
     """Resolve plate XY for a sample and move there in platexy frame.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
 
@@ -1141,7 +1123,6 @@ def ECHE_sub_rel_move(
     """Move X/Y by relative offsets (platexy transformation).
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         offset_x_mm: Relative X displacement (mm).
         offset_y_mm: Relative Y displacement (mm).
 
