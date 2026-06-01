@@ -37,7 +37,7 @@ from helao.core.models.hlostatus import HloStatus
 from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
 from helao.helpers import helao_logging as logging
-from helao.helpers.gen_uuid import gen_uuid
+from helao.helpers.time_utils import gen_uuid
 from helao.helpers.premodels import Action, Experiment
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
