@@ -51,7 +51,6 @@ def SIM_measure_CP(
     PSTAT ``run_CP`` steps with intervening CALC ``calc_cpfom`` calls.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         solution_ph: Target pH used in PAL ``query_plate`` and CP FOM calls.
         elements: Element-space identifiers used when querying plates.
         element_fracs: Target composition fractions for the sample acquire.

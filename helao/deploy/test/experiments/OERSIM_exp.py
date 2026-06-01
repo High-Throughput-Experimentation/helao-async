@@ -37,7 +37,6 @@ def OERSIM_sub_load_plate(
     """Switch CPSIM to ``plate_id`` and seed GPSIM priors for that plate.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         plate_id: Plate to load on CPSIM.
         init_random_points: Number of random initial compositions for GPSIM
             to acquire when initializing priors.
@@ -63,7 +62,6 @@ def OERSIM_sub_measure_CP(
     """Acquire the GPSIM-selected composition with a simulated CP and refit.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         init_random_points: Forwarded through the plan for downstream
             initialization steps.
 
@@ -103,7 +101,6 @@ def OERSIM_sub_decision(
     """Evaluate the active-learning stop condition and optionally requeue.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         stop_condition: One of ``"none"``, ``"max_iters"``, ``"max_stdev"``,
             ``"max_ei"``.
         thresh_value: Threshold compared against the chosen stop condition.
@@ -163,7 +160,6 @@ def OERSIM_sub_activelearn(
     condition is met.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         init_random_points: Number of random initial compositions if the GP
             has not yet been initialized for the loaded plate.
         stop_condition: One of ``"none"``, ``"max_iters"``, ``"max_stdev"``,

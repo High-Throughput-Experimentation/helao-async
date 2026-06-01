@@ -35,7 +35,6 @@ def DEMO_sub_CP(
     """Queue a PSTAT ``run_CP`` step with the supplied current and duration.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         WE_versus: Working-electrode reference frame label.
         ref_type: Reference electrode type label.
         pH: Solution pH (used for downstream RHE conversions).
@@ -84,7 +83,6 @@ def DEMO_sub_CA(
     ``REF_TABLE[ref_type]`` and the pH when ``WE_versus == 'rhe'``.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         WE_potential__V: Working-electrode bias in the chosen frame.
         WE_versus: Frame label: ``"ref"`` or ``"rhe"``.
         CA_duration_sec: Step duration in seconds.
@@ -129,7 +127,6 @@ def DEMO_sub_OCV(
     """Queue a PSTAT ``run_OCV`` step with the supplied duration.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         Tval__s: OCV duration in seconds.
         IErange: Gamry current range string.
 

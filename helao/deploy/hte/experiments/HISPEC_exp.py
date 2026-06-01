@@ -83,9 +83,6 @@ toggle_triggertype = TriggerType.risingedge
 def HISPEC_sub_cooldown() -> list:
     """Run the Andor detector cooling action.
 
-    Args:
-        experiment: Parent experiment supplied by the orchestrator.
-
     Returns:
         List of planned actions invoking the Andor server `cooling` endpoint.
     """
@@ -97,9 +94,6 @@ def HISPEC_sub_cooldown() -> list:
 @experiment(version=1)
 def HISPEC_sub_stop_flow() -> list:
     """Switch off the working- and counter-electrode flow/pump digital outputs.
-
-    Args:
-        experiment: Parent experiment supplied by the orchestrator.
 
     Returns:
         List of `set_digital_out` actions on the IO server clearing
@@ -123,9 +117,6 @@ def HISPEC_sub_stop_flow() -> list:
 @experiment(version=1)
 def HISPEC_sub_unloadall_customs() -> list:
     """Unload every sample from every custom position via the PAL server.
-
-    Args:
-        experiment: Parent experiment supplied by the orchestrator.
 
     Returns:
         List containing a single PAL ``archive_custom_unloadall`` action
@@ -156,7 +147,6 @@ def HISPEC_sub_add_liquid(
     """Inject a liquid aliquot from a reservoir sample into a custom position.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         solid_custom_position: Target custom position holding the solid sample.
         reservoir_liquid_sample_no: Liquid sample number in the local PAL db.
         solution_bubble_gas: Reservoir headspace gas label.
@@ -198,7 +188,6 @@ def HISPEC_sub_load_solid(
     """Load a solid sample (plate_id/sample_no) into a custom PAL position.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         solid_custom_position: Target custom position name.
         solid_plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
@@ -246,7 +235,6 @@ def HISPEC_sub_engage(
     while keeping the WE flow on when requested.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         flow_we: If True, enable working-electrode flow during the fill step.
         flow_ce: If True, enable counter-electrode pump during the fill step.
         z_height: Absolute Z position in millimetres for the K-motor.
@@ -308,7 +296,6 @@ def HISPEC_sub_interrupt(
     """Pause the orchestrator with a human-readable reason.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         reason: Message displayed by the operator UI when the interrupt fires.
 
     Returns:
@@ -333,7 +320,6 @@ def HISPEC_sub_disengage(
     closes every WE/CE vent and pump.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         clear_we: If True, energise WE vent/pump during the clear step.
         clear_ce: If True, energise CE vent/pump during the clear step.
         z_height: Absolute Z position in millimetres for the K-motor.
@@ -387,7 +373,6 @@ def HISPEC_sub_startup(
     sample and moves the motor stage to that position.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         solid_custom_position: Custom position used for the working electrode.
         solid_plate_id: Plate id of the solid sample.
         solid_sample_no: Sample number on the plate.
@@ -458,9 +443,6 @@ def HISPEC_sub_startup(
 def HISPEC_sub_shutdown() -> list:
     """Shutdown sequence: unload every custom position and destroy liquid.
 
-    Args:
-        experiment: Parent experiment supplied by the orchestrator.
-
     Returns:
         List containing a single PAL ``archive_custom_unloadall`` action.
     """
@@ -475,7 +457,6 @@ def HISPEC_sub_check_CP_Ewe_bounds(
     """Bound the final CP Ewe value through the CALC server.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         Ewe_V__mean_final: Candidate final mean Ewe to bound.
 
     Returns:
@@ -499,7 +480,6 @@ def HISPEC_calculate_lower_vertex_potential(
     """Track the minimum OCV and compute a lower vertex potential.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         min_offset_ocv: Running minimum OCV (with offset already applied).
         new_ocv: Latest OCV measurement to compare against ``min_offset_ocv``.
         offset_value: Offset applied to the OCV before bookkeeping.
@@ -549,7 +529,6 @@ def HISPEC_sub_CA(
     """Run a single chronoamperometry step on the PSTAT server.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         Vval__V: Applied potential (V).
         Tval__s: Step duration in seconds.
         AcqInterval__s: Sample interval in seconds.
@@ -599,7 +578,6 @@ def HISPEC_sub_OCV(
     """Query the loaded sample then run an OCV step and update the min-OCV tracker.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         Tval__s: OCV measurement duration in seconds.
         SampleRate: Sample interval in seconds.
 
@@ -693,7 +671,6 @@ def HISPEC_sub_SpEC(
     against the supplied reference and pH.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         Vapex1_vsRHE: First CV vertex vs RHE in volts.
         Vapex2_vsRHE: Second CV vertex vs RHE in volts.
         scanrate_voltsec: Scan rate in V/s.
@@ -860,7 +837,6 @@ def HISPEC_sub_CP(
     """Query the cell sample then run a chronopotentiometry step with bounds check.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         Ival__A: Applied current in amps.
         Tval__s: Step duration in seconds.
         AcqInterval__s: Sample interval in seconds.
@@ -955,7 +931,6 @@ def HISPEC_sub_PEIS(
     """Run a potentio-EIS sweep on the PSTAT server.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         Vinit__V: DC bias for the EIS sweep (V).
         Vamp__V: AC amplitude (V).
         Finit__Hz: Initial frequency (Hz).
