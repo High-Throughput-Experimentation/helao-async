@@ -1,4 +1,4 @@
-"""Unit tests for :class:`helao.core.runners.micro_client.MicroOrch`.
+"""Unit tests for :class:`helao.core.runners.micro_orch.MicroOrch`.
 
 Exercises the small surface that ``MicroOrch`` exposes on top of the
 RPC client cache:
@@ -27,7 +27,7 @@ from typing import Any, Dict
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
 from helao.core.rpc import RPCDispatcher, derive_rpc_port
-from helao.core.runners.micro_client import MicroOrch, _is_terminal
+from helao.core.runners.micro_orch import MicroOrch, _is_terminal
 from helao.helpers.premodels import Action
 from helao.core.tests._test_utils import TestReporter
 
