@@ -46,8 +46,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/initialize_global", tags=["action"])
     async def initialize_global(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         num_random_points: int = 5,
         random_seed: int = 9999,
     ):
@@ -59,8 +57,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/initialize_plate", tags=["action"])
     async def initialize_plate(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plate_id: int = 0,
         num_random_points: int = 5,
         reinitialize: bool = False,
@@ -83,8 +79,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/get_progress", tags=["action"])
     async def get_progress(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plate_id: int = 0,
     ):
         """Return the latest progress record for a plate, refitting if empty."""
@@ -100,8 +94,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/acquire_point", tags=["action"])
     async def acquire_point(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plate_id: int = 0,
     ):
         """Pick the next EI composition for a plate and stamp it on the action."""
@@ -121,8 +113,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/update_model", tags=["action"])
     async def update_model(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plate_id: int = 0,
     ):
         """Refit the surrogate model for a plate via :class:`GPSimExec`."""
@@ -140,8 +130,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/check_condition", tags=["action"])
     async def check_condition(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plate_id: int = 0,
         stop_condition: str = "max_iters",
         thresh_value: Union[float, int] = 10,

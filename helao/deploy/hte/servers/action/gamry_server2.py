@@ -34,7 +34,7 @@ from helao.core.models.sample import (
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.file import HloFileGroup
 
-from helao.core.servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI, action_version
 from helao.helpers.premodels import Action
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
@@ -615,9 +615,8 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     model_ierange = app.driver.model.ierange
 
     @app.post(f"/{server_key}/run_LSV", tags=["action"])
+    @action_version(3)
     async def run_LSV(
-        action: Action = Body({}, embed=True),
-        action_version: int = 3,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -692,9 +691,8 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_CA", tags=["action"])
+    @action_version(3)
     async def run_CA(
-        action: Action = Body({}, embed=True),
-        action_version: int = 3,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -758,9 +756,8 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_CP", tags=["action"])
+    @action_version(3)
     async def run_CP(
-        action: Action = Body({}, embed=True),
-        action_version: int = 3,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -824,9 +821,8 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_CV", tags=["action"])
+    @action_version(3)
     async def run_CV(
-        action: Action = Body({}, embed=True),
-        action_version: int = 3,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -899,9 +895,8 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_OCV", tags=["action"])
+    @action_version(3)
     async def run_OCV(
-        action: Action = Body({}, embed=True),
-        action_version: int = 3,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -959,9 +954,8 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_RCA", tags=["action"])
+    @action_version(3)
     async def run_RCA(
-        action: Action = Body({}, embed=True),
-        action_version: int = 3,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -1031,8 +1025,6 @@ async def gamry_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/run_PEIS", tags=["action"])
     async def run_PEIS(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -1083,8 +1075,6 @@ async def gamry_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/run_GEIS", tags=["action"])
     async def run_GEIS(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -1152,7 +1142,7 @@ def makeApp(server_key) -> BaseAPI:
     )
 
     @app.post(f"/{server_key}/get_meas_status", tags=["action"])
-    async def get_meas_status(action: Action = Body({}, embed=True)):
+    async def get_meas_status():
         """Report the dtaq sink's current state.
 
         Use together with the eta-driven sleep loop to poll for completion.
@@ -1171,8 +1161,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/stop", tags=["action"])
     async def stop(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Stop every active executor on the server in a controlled way.
 

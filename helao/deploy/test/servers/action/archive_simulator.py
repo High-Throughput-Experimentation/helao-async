@@ -275,8 +275,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/load_space", tags=["action"])
     async def load_space(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plate_id: int = 0,
     ):
         active = await app.base.setup_and_contain_action()
@@ -288,8 +286,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/query_plate", tags=["action"])
     async def query_plate(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         elements: List[str] = ["Ni", "Fe", "La", "Ce", "Co", "Ta"],
         ph: int = 13,
     ):
@@ -314,8 +310,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/acquire", tags=["action"])
     async def acquire(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         element_fracs: List[int] = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     ):
         active = await app.base.setup_and_contain_action()

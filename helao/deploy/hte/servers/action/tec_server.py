@@ -48,8 +48,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/record_tec", tags=["action"])
     async def record_tec(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: List[
@@ -83,8 +81,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/cancel_record_tec", tags=["action"])
     async def cancel_record_tec(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Stop any running ``record_tec`` executors.
 
@@ -106,8 +102,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/set_temperature", tags=["action"])
     async def set_temperature(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         target_temperature_degc: float = 25.0,
     ):
         """Write a new temperature setpoint to the TEC controller.
@@ -129,8 +123,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/enable_tec", tags=["action"])
     async def enable_tec(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Enable the TEC controller output.
 
@@ -148,8 +140,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/disable_tec", tags=["action"])
     async def disable_tec(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Disable the TEC controller output.
 
@@ -167,8 +157,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/wait_till_stable", tags=["action"])
     async def wait_till_stable(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         acquisition_rate: float = 0.2,
     ):
         """Start a :class:`TECWaitExec` that returns once the TEC is stable.
@@ -196,8 +184,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/cancel_wait_till_stable", tags=["action"])
     async def cancel_wait_till_stable(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Stop any running ``wait_till_stable`` executors.
 

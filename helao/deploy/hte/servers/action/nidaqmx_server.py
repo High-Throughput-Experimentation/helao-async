@@ -112,8 +112,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/mastercell", tags=["action"])
         async def mastercell(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             cell: dev_mastercellitems = None,
             on: bool = True,
         ):
@@ -147,8 +145,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/activecell", tags=["action"])
         async def activecell(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             cell: dev_activecellitems = None,
             on: bool = True,
         ):
@@ -182,8 +178,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/pump", tags=["action"])
         async def pump(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             pump: dev_pumpitems = None,
             on: bool = True,
         ):
@@ -217,8 +211,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/gasvalve", tags=["action"])
         async def gasvalve(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             gasvalve: dev_gasvalveitems = None,
             on: bool = True,
         ):
@@ -254,8 +246,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/liquidvalve", tags=["action"])
         async def liquidvalve(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             liquidvalve: dev_liquidvalveitems = None,
             on: bool = True,
         ):
@@ -291,8 +281,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/multivalve", tags=["action"])
         async def multivalve(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             multivalve: dev_multivalveitems = None,
             on: bool = True,
         ):
@@ -328,8 +316,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/led", tags=["action"])
         async def led(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             led: dev_leditems = None,
             on: bool = True,
         ):
@@ -363,8 +349,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/fswbcd", tags=["action"])
         async def fswbcd(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             fswbcd: dev_fswbcditems = None,
             on: bool = True,
         ):
@@ -400,8 +384,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/fsw", tags=["action"])
         async def fsw(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             fsw: dev_fswitems = None,
         ):
             """Read the digital input wired to the chosen foot switch.
@@ -433,8 +415,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/cellIV", tags=["action"])
         async def cellIV(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             fast_samples_in: List[
                 Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
             ] = Body([], embed=True),
@@ -467,8 +447,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/acquire_monitors", tags=["action"])
         async def acquire_monitors(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             duration: float = -1,
             acquisition_rate: float = 0.2,
             fast_samples_in: List[
@@ -501,8 +479,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/cancel_acquire_monitors", tags=["action"])
         async def cancel_acquire_monitors(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
         ):
             """Stop any running ``acquire_monitors`` executor.
 
@@ -536,8 +512,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/heater", tags=["action"])
         async def heater(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             heater: dev_heatitems = None,
             on: bool = True,
         ):
@@ -661,8 +635,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/stop", tags=["action"])
     async def stop(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Stop driver activity in a controlled way and record the result.
 

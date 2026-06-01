@@ -147,8 +147,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/acquire_data", tags=["action"])
     async def acquire_data(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: List[
@@ -168,8 +166,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/cancel_acquire_data", tags=["action"])
     async def cancel_acquire_data(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Stop any running ``acquire_data`` executor."""
         active = await app.base.setup_and_contain_action()

@@ -40,8 +40,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/get_elements_plateid", tags=["action"])
     async def get_elements_plateid(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plateid: Optional[int] = None,
     ):
         """Return the element list from the screening-print record in the plate info file."""
@@ -58,8 +56,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/get_platemap_plateid", tags=["action"])
     async def get_platemap_plateid(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plateid: Optional[int] = None,
     ):
         """Return the platemap for the requested ``plateid``."""
@@ -76,8 +72,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/get_platexycalibration", tags=["action"])
     async def get_platexycalibration(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plateid: Optional[int] = None,
     ):
         """Return the stored plate XY alignment matrix for ``plateid``."""
@@ -94,8 +88,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/save_platexycalibration", tags=["action"])
     async def save_platexycalibration(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plateid: Optional[int] = None,
     ):
         """Persist the plate XY alignment matrix for ``plateid``."""
@@ -112,8 +104,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/check_plateid", tags=["action"])
     async def check_plateid(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plateid: Optional[int] = None,
     ):
         """Check whether an info file exists for the given ``plateid``."""
@@ -128,8 +118,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/check_printrecord_plateid", tags=["action"])
     async def check_printrecord_plateid(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plateid: Optional[int] = None,
     ):
         """Check whether a print record is present in the plate info file."""
@@ -146,8 +134,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/check_annealrecord_plateid", tags=["action"])
     async def check_annealrecord_plateid(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plateid: Optional[int] = None,
     ):
         """Check whether an anneal record is present in the plate info file."""
@@ -164,8 +150,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/get_info_plateid", tags=["action"])
     async def get_info_plateid(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plateid: Optional[int] = None,
     ):
         """Return the parsed info-file contents for ``plateid``."""
@@ -180,8 +164,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/get_rcp_plateid", tags=["action"])
     async def get_rcp_plateid(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plateid: Optional[int] = None,
     ):
         """Return the RCP (recipe) record associated with ``plateid``."""

@@ -41,8 +41,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/measure_cp", tags=["action"])
     async def measure_cp(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         comp_vec: List[int] = [],
         acquisition_rate: float = 0.2,
     ):
@@ -59,8 +57,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/cancel_measure_cp", tags=["action"])
     async def cancel_measure_cp(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Stop any running ``measure_cp`` executor."""
         active = await app.base.setup_and_contain_action()
@@ -72,8 +68,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/get_loaded_plate", tags=["action"])
     async def get_loaded_plate(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Return the loaded plate id plus the requesting orchestrator's coords."""
         active = await app.base.setup_and_contain_action()
@@ -91,8 +85,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/change_plate", tags=["action"])
     async def change_plate(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plate_id: int = 0,
     ):
         """Switch the simulator to a different plate."""

@@ -16,7 +16,7 @@ from fastapi import Body
 
 from helao.core.models.file import HloHeaderModel, HloFileGroup
 from helao.helpers.premodels import Action
-from helao.core.servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI, action_version
 from ...drivers.data.calc_driver import Calc
 from helao.helpers import helao_logging as logging
 
@@ -46,9 +46,8 @@ def makeApp(server_key) -> BaseAPI:
     )
 
     @app.post(f"/{server_key}/calc_uvis_abs", tags=["action"])
+    @action_version(2)
     async def calc_uvis_abs(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         ev_parts: list = [1.8, 2.2, 2.6, 3.0],
         bin_width: int = 3,
         window_length: int = 45,
@@ -107,9 +106,8 @@ def makeApp(server_key) -> BaseAPI:
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/check_co2_purge", tags=["action"])
+    @action_version(2)
     async def check_co2_purge(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         co2_ppm_thresh: float = 95000,
         purge_if: Union[str, float] = "below",
         present_syringe_volume_ul: float = 0,
@@ -131,8 +129,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/fill_syringe_volume_check", tags=["action"])
     async def fill_syringe_volume_check(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         check_volume_ul: float = 0,
         target_volume_ul: float = 0,
         present_volume_ul: float = 0,
@@ -155,9 +151,8 @@ def makeApp(server_key) -> BaseAPI:
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/keep_min_ocv", tags=["action"])
+    @action_version(2)
     async def keep_min_ocv(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         min_offset_ocv: float | bool = False,
         new_ocv: float | bool = False,
         lower_limit: float = 0.2,
@@ -212,9 +207,8 @@ def makeApp(server_key) -> BaseAPI:
 
 
     @app.post(f"/{server_key}/check_CP_Ewe_bounds", tags=["action"])
+    @action_version(2)
     async def check_CP_Ewe_bounds(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         CP_Ewe_V__mean_final: float | bool = False,
         limted_Ewe_V__mean_final: float | bool = False,
         lower_limit: float = -1,

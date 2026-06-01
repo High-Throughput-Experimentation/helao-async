@@ -31,7 +31,7 @@ from helao.core.models.sample import (
 )
 from helao.core.models.hlostatus import HloStatus
 
-from helao.core.servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI, action_version
 from helao.helpers.premodels import Action
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
@@ -328,9 +328,8 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         await asyncio.sleep(1)
 
     @app.post(f"/{server_key}/run_CA", tags=["action"])
+    @action_version(2)
     async def run_CA(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -373,9 +372,8 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_CP", tags=["action"])
+    @action_version(2)
     async def run_CP(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -417,9 +415,8 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_CV", tags=["action"])
+    @action_version(2)
     async def run_CV(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -470,9 +467,8 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_OCV", tags=["action"])
+    @action_version(2)
     async def run_OCV(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -501,9 +497,8 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_PEIS", tags=["action"])
+    @action_version(3)
     async def run_PEIS(
-        action: Action = Body({}, embed=True),
-        action_version: int = 3,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -547,9 +542,8 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_GEIS", tags=["action"])
+    @action_version(3)
     async def run_GEIS(
-        action: Action = Body({}, embed=True),
-        action_version: int = 3,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -593,9 +587,8 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/run_CAOCV", tags=["action"])
+    @action_version(2)
     async def run_CAOCV(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -663,7 +656,7 @@ def makeApp(server_key) -> BaseAPI:
     )
 
     @app.post(f"/{server_key}/get_meas_status", tags=["action"])
-    async def get_meas_status(action: Action = Body({}, embed=True)):
+    async def get_meas_status():
         """Report the dtaq sink status (e.g. ``idle``/``measuring``).
 
         Intended for use alongside an estimated ETA in an
@@ -676,8 +669,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/stop", tags=["action"])
     async def stop(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         channel: Optional[int] = None,
     ):
         """Stop the measurement on ``channel`` via :meth:`BiologicDriver.stop`."""

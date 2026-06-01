@@ -42,8 +42,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/switch_outlet", tags=["action"])
     async def switch_outlet(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         outlet_number: int = 1,
         on: bool = False,
     ):
@@ -72,8 +70,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/switch_all", tags=["action"])
     async def switch_all(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         on: bool = False,
     ):
         """Toggle every PDU outlet on or off.

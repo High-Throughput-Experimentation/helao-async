@@ -128,8 +128,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/calc_cpfom", tags=["action"])
     async def calc_cpfom(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plate_id: int = 0,
         sample_no: int = 0,
         ph: int = 0,
