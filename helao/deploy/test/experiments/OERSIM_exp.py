@@ -31,7 +31,6 @@ GPSIM_server = MM(server_name="GPSIM", machine_name=gethostname().lower()).as_di
 
 @experiment(version=1)
 def OERSIM_sub_load_plate(
-    experiment: Experiment,
     plate_id: int = 0,
     init_random_points: int = 5,
 ):
@@ -59,7 +58,6 @@ def OERSIM_sub_load_plate(
 
 @experiment(version=1)
 def OERSIM_sub_measure_CP(
-    experiment: Experiment,
     init_random_points: int = 5,
 ) -> list:
     """Acquire the GPSIM-selected composition with a simulated CP and refit.
@@ -96,7 +94,6 @@ def OERSIM_sub_measure_CP(
 
 @experiment(version=1)
 def OERSIM_sub_decision(
-    experiment: Experiment,
     stop_condition: str = "max_iters",  # {"none", "max_iters", "max_stdev", "max_ei"}
     thresh_value: Union[float, int] = 10,
     repeat_experiment_name: str = "OERSIM_sub_activelearn",
@@ -154,7 +151,6 @@ def OERSIM_sub_decision(
 
 @experiment(version=1)
 def OERSIM_sub_activelearn(
-    experiment: Experiment,
     init_random_points: int = 5,
     stop_condition: str = "max_iters",  # {"none", "max_iters", "max_stdev", "max_ei"}
     thresh_value: Union[float, int] = 10,
@@ -183,13 +179,11 @@ def OERSIM_sub_activelearn(
     apm = ActionPlanMaker()
     apm.add_actions(
         OERSIM_sub_measure_CP(
-            experiment=experiment,
             init_random_points=init_random_points,
         )
     )
     apm.add_actions(
         OERSIM_sub_decision(
-            experiment=experiment,
             stop_condition=stop_condition,
             thresh_value=thresh_value,
             repeat_experiment_name="OERSIM_sub_activelearn",

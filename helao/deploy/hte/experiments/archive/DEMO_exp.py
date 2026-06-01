@@ -24,7 +24,6 @@ ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 
 @experiment(version=1)
 def DEMO_sub_CP(
-    experiment: Experiment,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -70,7 +69,6 @@ def DEMO_sub_CP(
 
 @experiment(version=1)
 def DEMO_sub_CA(
-    experiment: Experiment,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -125,7 +123,6 @@ def DEMO_sub_CA(
 
 @experiment(version=1)
 def DEMO_sub_OCV(
-    experiment: Experiment,
     Tval__s: float = 900.0,
     IErange: str = "auto",
 ) -> list:
