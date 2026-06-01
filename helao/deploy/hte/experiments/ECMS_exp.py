@@ -85,7 +85,7 @@ toggle_triggertype = TriggerType.fallingedge
 
 
 @experiment(version=1)
-def ECMS_sub_unload_cell(experiment: Experiment) -> list:
+def ECMS_sub_unload_cell() -> list:
     """Unload every sample at the ``cell1_we`` PAL custom position.
 
     Args:
@@ -102,7 +102,6 @@ def ECMS_sub_unload_cell(experiment: Experiment) -> list:
 
 @experiment(version=1)
 def ECMS_sub_load_solid(
-    experiment: Experiment,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -138,7 +137,6 @@ def ECMS_sub_load_solid(
 
 @experiment(version=2)
 def ECMS_sub_load_liquid(
-    experiment: Experiment,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
     water_True_False: bool = False,
@@ -178,7 +176,6 @@ def ECMS_sub_load_liquid(
 
 @experiment(version=2)
 def ECMS_sub_load_gas(
-    experiment: Experiment,
     reservoir_gas_sample_no: int = 1,
     volume_ul_cell_gas: int = 1000,
 ) -> list:
@@ -210,7 +207,6 @@ def ECMS_sub_load_gas(
 
 @experiment(version=1)
 def ECMS_sub_normal_state(
-    experiment: Experiment,
 ) -> list:
     """Drive the ECMS station to its idle/normal state.
 
@@ -291,7 +287,6 @@ def ECMS_sub_normal_state(
 
 @experiment(version=1)
 def ECMS_sub_alloff(
-    experiment: Experiment,
 ) -> list:
     """Turn off both peristaltic pumps, close MFC valves, and close every NI valve.
 
@@ -372,7 +367,6 @@ def ECMS_sub_alloff(
 
 @experiment(version=1)
 def ECMS_sub_electrolyte_fill_recirculationreservoir(
-    experiment: Experiment,
     liquid_fill_time: float = 30,
 ) -> list:
     """Run the reservoir peristaltic pump forward to fill the recirculation reservoir.
@@ -397,7 +391,6 @@ def ECMS_sub_electrolyte_fill_recirculationreservoir(
 
 @experiment(version=1)
 def ECMS_sub_electrolyte_fill_cell(
-    experiment: Experiment,
     # liquid_forward_time: float = 20,
     liquid_backward_time: float = 10,
     reservoir_liquid_sample_no: int = 1,
@@ -486,7 +479,6 @@ def ECMS_sub_electrolyte_fill_cell(
 # =============================================================================
 @experiment(version=1)
 def ECMS_sub_electrolyte_fill_cell_recirculation(
-    experiment: Experiment,
     liquid_backward_time: float = 80,
     reservoir_liquid_sample_no: int = 2,
     volume_ul_cell_liquid: float = 1.0,
@@ -574,7 +566,6 @@ def ECMS_sub_electrolyte_fill_cell_recirculation(
 
 @experiment(version=2)
 def ECMS_sub_prevacuum_cell(
-    experiment: Experiment,
     vacuum_time: float = 10,
 ) -> list:
     """Open the vacuum path to evacuate the gas side and pull electrolyte against the GDE.
@@ -603,7 +594,6 @@ def ECMS_sub_prevacuum_cell(
 
 @experiment(version=1)
 def ECMS_sub_headspace_purge_and_CO2baseline(
-    experiment: Experiment,
     CO2equilibrium_duration: float = 30,
     flowrate_sccm: float = 5.0,
     flow_ramp_sccm: float = 0,
@@ -670,7 +660,6 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
 
 @experiment(version=1)
 def ECMS_sub_headspace_purge_and_Arbaseline(
-    experiment: Experiment,
     Arequilibrium_duration: float = 30,
     flowrate_sccm: float = 5.0,
     flow_ramp_sccm: float = 0,
@@ -724,7 +713,6 @@ def ECMS_sub_headspace_purge_and_Arbaseline(
 
 @experiment(version=1)
 def ECMS_sub_electrolyte_recirculation_on(
-    experiment: Experiment,
 ) -> list:
     """Open the recirculation valves and start the recirculation pump in reverse direction.
 
@@ -747,7 +735,6 @@ def ECMS_sub_electrolyte_recirculation_on(
 
 @experiment(version=1)
 def ECMS_sub_electrolyte_recirculation_off(
-    experiment: Experiment,
 ) -> list:
     """Stop the recirculation pump and close the recirculation valves.
 
@@ -768,7 +755,6 @@ def ECMS_sub_electrolyte_recirculation_off(
 
 @experiment(version=1)
 def ECMS_sub_CA(
-    experiment: Experiment,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -841,7 +827,6 @@ def ECMS_sub_CA(
 
 @experiment(version=2)
 def ECMS_sub_pulseCA(
-    experiment: Experiment,
     Vinit__V: float = 0.0,
     Tinit__s: float = 0.5,
     Vstep__V: float = 0.5,
@@ -975,7 +960,6 @@ def ECMS_sub_pulseCA(
 
 @experiment(version=1)
 def ECMS_sub_CV(
-    experiment: Experiment,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1081,7 +1065,6 @@ def ECMS_sub_CV(
 
 @experiment(version=1)
 def ECMS_sub_drain_recirculation(
-    experiment: Experiment,
     tube_clear_time: float = 20,
     liquid_drain_time: float = 80,
 ) -> list:
@@ -1142,7 +1125,6 @@ def ECMS_sub_drain_recirculation(
 # =============================================================================
 @experiment(version=1)
 def ECMS_sub_clean_cell_recirculation(
-    experiment: Experiment,
     cleaning_times: int = 2,
     liquid_fill_time: float = 30,
     volume_ul_cell_liquid: int = 1,
@@ -1174,12 +1156,11 @@ def ECMS_sub_clean_cell_recirculation(
     for cycle in range(cleaning_times):
         apm.add_actions(
             ECMS_sub_electrolyte_fill_recirculationreservoir(
-                experiment=experiment, liquid_fill_time=liquid_fill_time
+                liquid_fill_time=liquid_fill_time
             )
         )
         apm.add_actions(
             ECMS_sub_electrolyte_fill_cell_recirculation(
-                experiment=experiment,
                 volume_ul_cell_liquid=volume_ul_cell_liquid,
                 liquid_backward_time=liquid_backward_time,
                 reservoir_liquid_sample_no=reservoir_liquid_sample_no,
@@ -1203,7 +1184,6 @@ def ECMS_sub_clean_cell_recirculation(
         # =============================================================================
         apm.add_actions(
             ECMS_sub_drain_recirculation(
-                experiment=experiment,
                 tube_clear_time=tube_clear_time,
                 liquid_drain_time=liquid_drain_time,
             )
@@ -1213,7 +1193,6 @@ def ECMS_sub_clean_cell_recirculation(
 
 @experiment(version=1)
 def ECMS_sub_drain(
-    experiment: Experiment,
     liquid_drain_time: float = 30,
 ) -> list:
     """Drain the cell using the reservoir pump (peripump 1) in reverse direction.
@@ -1243,7 +1222,6 @@ def ECMS_sub_drain(
 
 @experiment(version=1)
 def ECMS_sub_final_clean_cell(
-    experiment: Experiment,
     liquid_backward_time_1: float = 300,
     liquid_backward_time_2: float = 300,
     reservoir_liquid_sample_no: int = 1,
@@ -1297,7 +1275,6 @@ def ECMS_sub_final_clean_cell(
 
 @experiment(version=1)
 def ECMS_sub_cali(
-    experiment: Experiment,
     CO2flowrate_sccm: float = 20.0,
     Califlowrate_sccm: float = 0.0,
     flow_ramp_sccm: float = 0,
@@ -1360,7 +1337,6 @@ def ECMS_sub_cali(
 
 @experiment(version=1)
 def ECMS_sub_threegascali(
-    experiment: Experiment,
     CO2flowrate_sccm: float = 5.0,
     Califlowrate_sccm: float = 5.0,  # O2
     Califlowrate_two_sccm: float = 0.0,  # Ar
@@ -1444,7 +1420,6 @@ def ECMS_sub_threegascali(
 
 @experiment(version=1)
 def ECMS_sub_inertgascali(
-    experiment: Experiment,
     CO2flowrate_sccm: float = 5.0,
     Califlowrate_two_sccm: float = 0.0,  # Ar
     flow_ramp_sccm: float = 0,
@@ -1510,7 +1485,6 @@ def ECMS_sub_inertgascali(
 
 @experiment(version=1)
 def ECMS_sub_pulsecali(
-    experiment: Experiment,
     # CO2flowrate_sccm: float = 20.0,
     Califlowrate_sccm: float = 0.0,
     flow_ramp_sccm: float = 0,
@@ -1654,7 +1628,6 @@ def ECMS_sub_pulsecali(
 # =============================================================================
 @experiment(version=1)
 def ECMS_sub_preCA_CO2flow(
-    experiment: Experiment,
     MS_equilibrium_time: float = 10.0,
     total_MFC_flow_rate_sccm: float = 10.0,
     flow_change_duration_sec: List[float] = [10.0, 60.0],
@@ -1735,7 +1708,6 @@ def ECMS_sub_preCA_CO2flow(
 
 @experiment(version=1)
 def ECMS_sub_CA_CO2flow(
-    experiment: Experiment,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,

@@ -19,6 +19,7 @@ __all__ = ["Sequence", "Experiment", "Action", "ActionPlanMaker", "ExperimentPla
 
 import os
 import inspect
+from contextvars import ContextVar
 from copy import deepcopy
 from socket import gethostname
 from typing import Optional
@@ -42,6 +43,16 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 HOST = gethostname()
+
+#: Active :class:`Experiment` for the currently executing experiment-library
+#: function. The ``@experiment`` decorator (see
+#: ``helao.helpers.lib_decorators``) sets this before invoking a library
+#: function so the function body no longer needs to declare an
+#: ``experiment: Experiment`` parameter and so :class:`ActionPlanMaker` can
+#: recover the parent experiment without scanning the caller's frame.
+EXPERIMENT_CTX: "ContextVar[Optional[Experiment]]" = ContextVar(
+    "helao_active_experiment", default=None
+)
 
 
 class Sequence(SequenceModel):
@@ -379,11 +390,13 @@ class ActionPlanMaker:
     """Helper used inside experiment-library functions to plan actions.
 
     Construct an ``ActionPlanMaker`` at the top of an experiment function;
-    it inspects the caller's frame, locates the ``Experiment`` argument and
-    exposes every other argument plus every ``experiment_params`` entry on
-    ``self.pars`` (string ``"true"``/``"false"`` values are coerced to
-    booleans). Calls to ``add`` append fully-built ``Action`` objects to
-    ``planned_actions``.
+    it reads the parent :class:`Experiment` from :data:`EXPERIMENT_CTX` (set by
+    the ``@experiment`` decorator), falling back to scanning the caller's frame
+    for an ``Experiment`` argument for any function not routed through the
+    decorator. It exposes every other caller argument plus every
+    ``experiment_params`` entry on ``self.pars`` (string ``"true"``/``"false"``
+    values are coerced to booleans). Calls to ``add`` append fully-built
+    ``Action`` objects to ``planned_actions``.
 
     Attributes:
         expname: Name of the enclosing experiment function.
@@ -405,8 +418,14 @@ class ActionPlanMaker:
         LOGGER.debug(f"args {_args}")
         LOGGER.debug(f"locals {_locals}")
 
-        # find the Experiment Basemodel
-        # and add all other params to a dict
+        # prefer the Experiment supplied by the @experiment decorator's context
+        ctx_experiment = EXPERIMENT_CTX.get(None)
+        if ctx_experiment is not None:
+            self._experiment = deepcopy(ctx_experiment)
+
+        # collect the caller's other params, and (for any function not routed
+        # through the decorator) fall back to discovering the Experiment among
+        # the declared arguments
         for arg in _args:
             argparam = _locals.get(arg, None)
             if isinstance(argparam, Experiment):
@@ -415,10 +434,7 @@ class ActionPlanMaker:
                         f"{self.expname}: found Experiment BaseModel under parameter '{arg}'"
                     )
                     self._experiment = deepcopy(argparam)
-                else:
-                    LOGGER.error(
-                        f"{self.expname}: critical error: found another Experiment BaseModel under parameter '{arg}', skipping it"
-                    )
+                # an Experiment-typed argument is never exposed as a param
             else:
                 exp_paramdict.update({arg: argparam})
         LOGGER.debug(f"exp_paramdict {exp_paramdict}")

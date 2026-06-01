@@ -56,7 +56,6 @@ debug_save_data = True
 
 @experiment(version=1)
 def CLAD_sub_recirculate_alternating(
-    experiment: Experiment,
     forward_duration_s: float = 30.0,
     reverse_duration_s: float = 15.0,
     final_duration_s: float = 5.0,
@@ -97,7 +96,6 @@ def CLAD_sub_recirculate_alternating(
 
 @experiment(version=1)
 def CLAD_sub_load_sample(
-    experiment: Experiment,
     load_position: str = "cell1_we",
     clear_position: bool = True,
     solid_plate_id: Optional[int] = None,
@@ -196,7 +194,6 @@ def CLAD_sub_load_sample(
 
 @experiment(version=1)
 def CLAD_sub_fill_cell(
-    experiment: Experiment,
     fill_volume_ul: float = 3000,
     fill_rate_ul_s: float = 300,
     load_sample: bool = False,
@@ -260,7 +257,6 @@ def CLAD_sub_fill_cell(
 # 1. CLEAN CELL
 @experiment(version=1)
 def CLAD_sub_setup_cell(
-    experiment: Experiment,
     rinse_recirc_duration_s: float = 30.0,
     rinse_volume_ul: float = 3000.0,
     fill_rate_ul_s: float = 300.0,
@@ -303,7 +299,6 @@ def CLAD_sub_setup_cell(
     # FILL CELL WITHOUT SAMPLE LOAD
     apm.add_actions(
         CLAD_sub_fill_cell(
-            experiment=experiment,
             fill_volume_ul=rinse_volume_ul,
             fill_rate_ul_s=fill_rate_ul_s,
             load_sample=False,
@@ -319,7 +314,6 @@ def CLAD_sub_setup_cell(
     # DRAIN CELL
     apm.add_actions(
         ADSS_sub_drain_cell(
-            experiment=experiment,
             DrainWait_s=drain_wait_duration_s,
             ReturnLineReverseWait_s=5.0,
         )
@@ -345,7 +339,6 @@ def CLAD_sub_setup_cell(
 # 2. REFERENCE MEASUREMENT
 @experiment(version=1)
 def CLAD_sub_reference_setup(
-    experiment: Experiment,
     reference_position_name: str = "builtin_ref_motorxy_2",
     reference_sample_label: str = "reference-fto__solid__11_1",
     load_position: str = "cell1_we",
@@ -444,7 +437,6 @@ def CLAD_sub_reference_setup(
     # FILL CELL WITH LIQUID
     apm.add_actions(
         CLAD_sub_fill_cell(
-            experiment=experiment,
             fill_volume_ul=fill_volume_ul,
             fill_rate_ul_s=fill_rate_ul_s,
             load_sample=True,
@@ -457,7 +449,6 @@ def CLAD_sub_reference_setup(
     # RECIRCULATE
     apm.add_actions(
         CLAD_sub_recirculate_alternating(
-            experiment=experiment,
             forward_duration_s=fill_recirc_fwd_duration_s,
             reverse_duration_s=fill_recirc_rev_duration_s,
             final_duration_s=5.0,
@@ -467,7 +458,6 @@ def CLAD_sub_reference_setup(
     # REFILL SYRINGE
     apm.add_actions(
         CLAD_sub_refill_syringe(
-            experiment=experiment,
             syringe="work",
             fill_volume_ul=fill_volume_ul,
             Syringe_rate_ulsec=300.0,
@@ -479,7 +469,6 @@ def CLAD_sub_reference_setup(
 
 @experiment(version=1)
 def CLAD_sub_OCV_bubble_check(
-    experiment: Experiment,
     ocv_duration_s: float = 30.0,
     ocv_sample_rate_s: float = 0.1,
     electrolyte_ph: float = 1.0,
@@ -511,7 +500,6 @@ def CLAD_sub_OCV_bubble_check(
         # RUN BUBBLE-CHECK OCV
         apm.add_actions(
             ADSS_sub_OCV(
-                experiment=experiment,
                 check_bubble=True,
                 Tval__s=10,
                 samplerate_sec=ocv_sample_rate_s,
@@ -534,7 +522,6 @@ def CLAD_sub_OCV_bubble_check(
     # OCV WITH ALIQUOT
     apm.add_actions(
         ADSS_sub_OCV(
-            experiment=experiment,
             check_bubble=False,
             Tval__s=ocv_duration_s,
             samplerate_sec=ocv_sample_rate_s,
@@ -555,7 +542,6 @@ def CLAD_sub_OCV_bubble_check(
 # 3. SETUP SAMPLE
 @experiment(version=1)
 def CLAD_sub_load_assembly(
-    experiment: Experiment,
     load_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -640,7 +626,6 @@ def CLAD_sub_load_assembly(
 
     apm.add_actions(
         CLAD_sub_load_sample(
-            experiment=experiment,
             load_position=load_position,
             clear_position=False,
             solid_plate_id=solid_plate_id,
@@ -655,7 +640,6 @@ def CLAD_sub_load_assembly(
 
     apm.add_actions(
         CLAD_sub_fill_cell(
-            experiment=experiment,
             fill_volume_ul=fill_volume_ul,
             fill_rate_ul_s=fill_rate_ul_s,
             load_sample=False,  # load whatever sample is in _fast_samples_in
@@ -667,7 +651,6 @@ def CLAD_sub_load_assembly(
 
 @experiment(version=1)
 def CLAD_sub_clean_cell(
-    experiment: Experiment,
     nitric_volume_ul: float = 3000,
     water_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 300,
@@ -714,7 +697,6 @@ def CLAD_sub_clean_cell(
 
     apm.add_actions(
         ADSS_sub_drain_cell(
-            experiment=experiment,
             DrainWait_s=DrainWait_s,
             ReturnLineReverseWait_s=ReturnLineReverseWait_s,
             # ResidualWait_s=ResidualWait_s,
@@ -737,7 +719,6 @@ def CLAD_sub_clean_cell(
 
     apm.add_actions(
         ADSS_sub_drain_cell(
-            experiment=experiment,
             DrainWait_s=DrainWait_s,
             ReturnLineReverseWait_s=ReturnLineReverseWait_s,
             # ResidualWait_s=ResidualWait_s,
@@ -752,7 +733,6 @@ def CLAD_sub_clean_cell(
 
 @experiment(version=1)
 def CLAD_sub_refill_syringe(
-    experiment: Experiment,
     syringe: str = "clean",
     fill_volume_ul: float = 0,
     Syringe_rate_ulsec: float = 300,
@@ -790,7 +770,6 @@ def CLAD_sub_refill_syringe(
 
 @experiment(version=1)
 def CLAD_sub_standby(
-    experiment: Experiment,
 ) -> list:
     """Drive the station to a safe standby: peristaltic pump off, inlet gas valve closed.
 

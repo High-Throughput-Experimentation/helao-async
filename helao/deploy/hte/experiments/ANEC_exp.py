@@ -84,7 +84,6 @@ z_seal = 4.5
 
 @experiment(version=1)
 def ANEC_sub_startup(
-    experiment: Experiment,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
     z_move_mm: float = 3.5,
@@ -161,7 +160,7 @@ def ANEC_sub_startup(
 
 
 @experiment(version=1)
-def ANEC_sub_disengage(experiment: Experiment) -> list:
+def ANEC_sub_disengage() -> list:
     """Lower Z to disengage the electrochemical cell.
 
     Args:
@@ -191,7 +190,6 @@ def ANEC_sub_disengage(experiment: Experiment) -> list:
 
 @experiment(version=1)
 def ANEC_sub_load_solid(
-    experiment: Experiment,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -227,7 +225,6 @@ def ANEC_sub_load_solid(
 
 @experiment(version=4)
 def ANEC_sub_alloff(
-    experiment: Experiment,
 ) -> list:
     """Turn off both peristaltic pumps and close every NI gas/liquid valve.
 
@@ -259,7 +256,6 @@ def ANEC_sub_alloff(
 
 @experiment(version=2)
 def ANEC_sub_heatoff(
-    experiment: Experiment,
 ) -> list:
     """Cancel TEC recording and disable the TEC controller.
 
@@ -280,7 +276,6 @@ def ANEC_sub_heatoff(
 
 @experiment(version=2)
 def ANEC_sub_setheat(
-    experiment: Experiment,
     target_temperature_degc: float = 25.0,
 ) -> list:
     """Set a TEC setpoint, start non-blocking recording, enable TEC, wait until stable.
@@ -314,7 +309,6 @@ def ANEC_sub_setheat(
 
 @experiment(version=2)
 def ANEC_sub_normal_state(
-    experiment: Experiment,
 ) -> list:
     """Drive the ANEC valves and pumps to the canonical idle/normal state.
 
@@ -348,7 +342,6 @@ def ANEC_sub_normal_state(
 
 @experiment(version=1)
 def ANEC_sub_flush_fill_cell(
-    experiment: Experiment,
     liquid_flush_time: float = 70,
     co2_purge_time: float = 15,
     equilibration_time: float = 1.0,
@@ -414,7 +407,7 @@ def ANEC_sub_flush_fill_cell(
 
 
 @experiment(version=1)
-def ANEC_sub_unload_cell(experiment: Experiment) -> list:
+def ANEC_sub_unload_cell() -> list:
     """Unload every sample currently tracked at the ``cell1_we`` PAL custom position.
 
     Args:
@@ -431,7 +424,6 @@ def ANEC_sub_unload_cell(experiment: Experiment) -> list:
 
 @experiment(version=1)
 def ANEC_sub_unload_liquid(
-    experiment: Experiment,
 ) -> list:
     """Unload all samples then re-load the previously tracked solid at ``cell1_we``.
 
@@ -460,7 +452,6 @@ def ANEC_sub_unload_liquid(
 
 @experiment(version=3)
 def ANEC_sub_drain_cell(
-    experiment: Experiment,
     drain_time: float = 60.0,
 ) -> list:
     """Return ANEC to normal state, unload the liquid, and wait for the cell to drain.
@@ -474,8 +465,8 @@ def ANEC_sub_drain_cell(
     """
 
     apm = ActionPlanMaker()
-    apm.add_actions(ANEC_sub_normal_state(experiment))
-    apm.add_actions(ANEC_sub_unload_liquid(experiment))
+    apm.add_actions(ANEC_sub_normal_state())
+    apm.add_actions(ANEC_sub_unload_liquid())
     apm.add(ORCH_server, "wait", {"waittime": drain_time})
 
     return apm.planned_actions
@@ -483,7 +474,6 @@ def ANEC_sub_drain_cell(
 
 @experiment(version=1)
 def ANEC_sub_cleanup(
-    experiment: Experiment,
     reservoir_liquid_sample_no: int = 1511,
 ) -> list:
     """Flush+fill the cell and then drain it.
@@ -499,17 +489,15 @@ def ANEC_sub_cleanup(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add_actions(
         ANEC_sub_flush_fill_cell(
-            experiment=experiment,
             reservoir_liquid_sample_no=reservoir_liquid_sample_no,
         )
     )
-    apm.add_actions(ANEC_sub_drain_cell(experiment))
+    apm.add_actions(ANEC_sub_drain_cell())
     return apm.planned_actions
 
 
 @experiment(version=1)
 def ANEC_sub_GC_headspacealiquot_nomixing(
-    experiment: Experiment,
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
 ) -> list:
@@ -548,7 +536,6 @@ def ANEC_sub_GC_headspacealiquot_nomixing(
 
 @experiment(version=1)
 def ANEC_sub_GC_preparation(
-    experiment: Experiment,
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
 ) -> list:
@@ -599,7 +586,6 @@ def ANEC_sub_GC_preparation(
 
 @experiment(version=1)
 def ANEC_sub_load_solid_only(
-    experiment: Experiment,
     solid_plate_id: int = 1,
     solid_sample_no: int = 1,
 ) -> list:
@@ -615,7 +601,7 @@ def ANEC_sub_load_solid_only(
     """
 
     apm = ActionPlanMaker()
-    apm.add_actions(ANEC_sub_unload_cell(experiment))
+    apm.add_actions(ANEC_sub_unload_cell())
     apm.add(
         PAL_server,
         "archive_custom_load",
@@ -633,7 +619,6 @@ def ANEC_sub_load_solid_only(
 
 @experiment(version=1)
 def ANEC_sub_load_solid_and_clean_cell(
-    experiment: Experiment,
     solid_plate_id: int = 1,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
@@ -657,7 +642,7 @@ def ANEC_sub_load_solid_and_clean_cell(
     """
 
     apm = ActionPlanMaker()
-    apm.add_actions(ANEC_sub_unload_cell(experiment))
+    apm.add_actions(ANEC_sub_unload_cell())
     apm.add(
         PAL_server,
         "archive_custom_load",
@@ -670,10 +655,9 @@ def ANEC_sub_load_solid_and_clean_cell(
             ),
         },
     )
-    apm.add_actions(ANEC_sub_drain_cell(experiment))
+    apm.add_actions(ANEC_sub_drain_cell())
     apm.add_actions(
         ANEC_sub_flush_fill_cell(
-            experiment=experiment,
             reservoir_liquid_sample_no=reservoir_liquid_sample_no,
         )
     )
@@ -697,13 +681,12 @@ def ANEC_sub_load_solid_and_clean_cell(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
-    apm.add_actions(ANEC_sub_drain_cell(experiment))
+    apm.add_actions(ANEC_sub_drain_cell())
     return apm.planned_actions
 
 
 @experiment(version=1)
 def ANEC_sub_liquidarchive(
-    experiment: Experiment,
     toolarchive: str = "LS 3",
     volume_ul_archive: int = 500,
     wash1: bool = True,
@@ -761,7 +744,6 @@ def ANEC_sub_liquidarchive(
 
 @experiment(version=1)
 def ANEC_sub_aliquot_nomixing(
-    experiment: Experiment,
     toolGC: str = "HS 2",
     toolarchive: str = "LS 3",
     volume_ul_GC: int = 300,
@@ -826,7 +808,6 @@ def ANEC_sub_aliquot_nomixing(
 
 @experiment(version=1)
 def ANEC_sub_aliquot(
-    experiment: Experiment,
     toolGC: str = "HS 2",
     toolarchive: str = "LS 3",
     volume_ul_GC: int = 300,
@@ -899,7 +880,6 @@ def ANEC_sub_aliquot(
 
 @experiment(version=1)
 def ANEC_sub_CP(
-    experiment: Experiment,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -962,7 +942,6 @@ def ANEC_sub_CP(
 
 @experiment(version=1)
 def ANEC_sub_CA(
-    experiment: Experiment,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -1028,7 +1007,6 @@ def ANEC_sub_CA(
 
 @experiment(version=2)
 def ANEC_sub_HeatCA(
-    experiment: Experiment,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -1109,7 +1087,6 @@ def ANEC_sub_HeatCA(
 
 @experiment(version=1)
 def ANEC_sub_OCV(
-    experiment: Experiment,
     Tval__s: float = 900.0,
     IErange: str = "auto",
 ) -> list:
@@ -1162,7 +1139,6 @@ def ANEC_sub_OCV(
 
 @experiment(version=2)
 def ANEC_sub_photo_CA(
-    experiment: Experiment,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -1284,7 +1260,6 @@ def ANEC_sub_photo_CA(
 
 @experiment(version=1)
 def ANEC_sub_CV(
-    experiment: Experiment,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1388,7 +1363,6 @@ def ANEC_sub_CV(
 
 @experiment(version=2)
 def ANEC_sub_HeatCV(
-    experiment: Experiment,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1510,7 +1484,6 @@ def ANEC_sub_HeatCV(
 
 @experiment(version=1)
 def ANEC_sub_photo_CV(
-    experiment: Experiment,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1684,7 +1657,6 @@ def ANEC_sub_photo_CV(
 
 @experiment(version=1)
 def ANEC_sub_GCLiquid_analysis(
-    experiment: Experiment,
     # startGC: Optional[bool] = None,
     # sampletype: Optional[str] = None,
     tool: str = "LS 1",
@@ -1750,7 +1722,6 @@ def ANEC_sub_GCLiquid_analysis(
 
 @experiment(version=1)
 def ANEC_sub_HPLCLiquid_analysis(
-    experiment: Experiment,
     # startGC: Optional[bool] = None,
     # sampletype: Optional[str] = None,
     tool: str = "LS 1",
@@ -1816,7 +1787,6 @@ def ANEC_sub_HPLCLiquid_analysis(
 
 @experiment(version=1)
 def ANEC_sub_photo_LSV(
-    experiment: Experiment,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1956,7 +1926,6 @@ def ANEC_sub_photo_LSV(
 
 @experiment(version=1)
 def ANEC_sub_photo_CP(
-    experiment: Experiment,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,

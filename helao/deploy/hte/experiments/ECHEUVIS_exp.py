@@ -69,7 +69,8 @@ TOGGLE_TRIGGERTYPE = TriggerType.risingedge
 # lowspec sequence: no XYZ; no pump
 
 
-def ECHEUVIS_sub_startup(experiment: Experiment) -> list:
+@experiment(version=1)
+def ECHEUVIS_sub_startup() -> list:
     """Unload PAL custom position samples and enable the IR emitter.
 
     Args:
@@ -84,7 +85,8 @@ def ECHEUVIS_sub_startup(experiment: Experiment) -> list:
     return apm.planned_actions  # returns complete action list to orch
 
 
-def ECHEUVIS_sub_shutdown(experiment: Experiment) -> list:
+@experiment(version=1)
+def ECHEUVIS_sub_shutdown() -> list:
     """Unload PAL custom position samples and disable the IR emitter.
 
     Args:
@@ -101,7 +103,6 @@ def ECHEUVIS_sub_shutdown(experiment: Experiment) -> list:
 
 @experiment(version=6)
 def ECHEUVIS_sub_CV_led(
-    experiment: Experiment,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -341,7 +342,6 @@ def ECHEUVIS_sub_CV_led(
 
 @experiment(version=6)
 def ECHEUVIS_sub_CA_led(
-    experiment: Experiment,
     CA_potential_vsRHE: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -561,7 +561,6 @@ def ECHEUVIS_sub_CA_led(
 
 @experiment(version=6)
 def ECHEUVIS_sub_CP_led(
-    experiment: Experiment,
     CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -774,7 +773,6 @@ def ECHEUVIS_sub_CP_led(
 
 @experiment(version=1)
 def ECHEUVIS_sub_interrupt(
-    experiment: Experiment,
     reason: str = "wait",
 ) -> list:
     """Emit a single orchestrator interrupt action with the given reason.
@@ -793,7 +791,6 @@ def ECHEUVIS_sub_interrupt(
 
 @experiment(version=6)
 def ECHEUVIS_sub_OCV_led(
-    experiment: Experiment,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -1006,7 +1003,6 @@ def ECHEUVIS_sub_OCV_led(
 
 @experiment(version=1)
 def ECHEUVIS_sub_disengage(
-    experiment: Experiment,
     clear_we: bool = True,
     clear_ce: bool = False,
     z_height: float = 0,
@@ -1055,7 +1051,6 @@ def ECHEUVIS_sub_disengage(
 
 @experiment(version=1)
 def ECHEUVIS_sub_engage(
-    experiment: Experiment,
     flow_we: bool = True,
     flow_ce: bool = True,
     z_height: float = 1.5,
@@ -1148,7 +1143,6 @@ def ECHEUVIS_sub_engage(
 
 @experiment(version=2)
 def ECHEUVIS_analysis_stability(
-    experiment: Experiment,
     sequence_uuid: str = "",
     plate_id: int = 0,
     recent: bool = True,

@@ -18,7 +18,6 @@ ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
 @experiment(version=1)
 def ICPMS_analysis_concentration(
-    experiment: Experiment,
     sequence_zip_path: str = "",
     params: dict = {},
 ) -> list:

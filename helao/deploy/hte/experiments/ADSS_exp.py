@@ -104,7 +104,8 @@ debug_save_act = True
 debug_save_data = True
 
 
-def ADSS_sub_unloadall_customs(experiment: Experiment) -> list:
+@experiment(version=1)
+def ADSS_sub_unloadall_customs() -> list:
     """Unload every custom-position sample currently tracked by PAL.
 
     Args:
@@ -130,7 +131,6 @@ def ADSS_sub_unloadall_customs(experiment: Experiment) -> list:
 
 @experiment(version=2)
 def ADSS_sub_unload_liquid(
-    experiment: Experiment,
 ) -> list:
     """Unload the liquid sample at ``cell1_we`` while keeping the solid in place.
 
@@ -163,7 +163,6 @@ def ADSS_sub_unload_liquid(
 
 @experiment(version=2)
 def ADSS_sub_unload_solid(
-    experiment: Experiment,
 ) -> list:
     """Unload the solid sample at ``cell1_we`` while keeping the liquid in place.
 
@@ -196,7 +195,6 @@ def ADSS_sub_unload_solid(
 
 @experiment(version=1)
 def ADSS_sub_load_solid(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -251,7 +249,6 @@ def ADSS_sub_load_solid(
 
 @experiment(version=3)
 def ADSS_sub_load_liquid(
-    experiment: Experiment,
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
@@ -294,7 +291,6 @@ def ADSS_sub_load_liquid(
 
 @experiment(version=1)
 def ADSS_sub_load_liquid_only(
-    experiment: Experiment,
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     liquid_sample_volume_ul: float = 4000,
@@ -348,7 +344,6 @@ def ADSS_sub_load_liquid_only(
 ######
 @experiment(version=1)
 def ADSS_sub_PAL_load_gas(
-    experiment: Experiment,
     custom_position: str = "cell1_we",
     bubbled_gas: str = "N2",
     reservoir_gas_sample_no: int = 1,
@@ -394,7 +389,6 @@ def ADSS_sub_PAL_load_gas(
 
 @experiment(version=1)
 def ADSS_sub_unload_gas_only(
-    experiment: Experiment,
 ) -> list:
     """Unload only the gas sample at ``cell1_we`` while keeping liquid and solid.
 
@@ -431,7 +425,6 @@ def ADSS_sub_unload_gas_only(
 
 @experiment(version=3)
 def ADSS_sub_load(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -524,7 +517,6 @@ def ADSS_sub_load(
 
 @experiment(version=4)
 def ADSS_sub_move_to_sample(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -608,7 +600,6 @@ def ADSS_sub_move_to_sample(
 
 @experiment(version=4)
 def ADSS_sub_sample_start(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -642,7 +633,6 @@ def ADSS_sub_sample_start(
 
     apm.add_actions(
         ADSS_sub_load(
-            experiment=experiment,
             solid_custom_position=solid_custom_position,
             solid_plate_id=solid_plate_id,
             solid_sample_no=solid_sample_no,
@@ -712,7 +702,8 @@ def ADSS_sub_sample_start(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def ADSS_sub_shutdown(experiment: Experiment) -> list:
+@experiment(version=1)
+def ADSS_sub_shutdown() -> list:
     """Run a shutdown sequence: deep-clean PAL, reverse pump, wait, then stop pump.
 
     Args:
@@ -726,7 +717,7 @@ def ADSS_sub_shutdown(experiment: Experiment) -> list:
 
     # deep clean
     apm.add_actions(
-        ADSS_sub_clean_PALtool(experiment, clean_tool=PALtools.LS3, clean_volume_ul=500)
+        ADSS_sub_clean_PALtool(clean_tool=PALtools.LS3, clean_volume_ul=500)
     )
 
     # set pump flow backward
@@ -751,7 +742,7 @@ def ADSS_sub_shutdown(experiment: Experiment) -> list:
     )
 
     # drain, TODO
-    # apm.add_actions(ADSS_sub_drain(experiment))
+    # apm.add_actions(ADSS_sub_drain())
 
     # turn pump off
     apm.add(
@@ -777,12 +768,13 @@ def ADSS_sub_shutdown(experiment: Experiment) -> list:
 
     # move z to home
     # cannot do this without proper drain for now
-    # apm.add_actions(ADSS_sub_disengage(experiment))
+    # apm.add_actions(ADSS_sub_disengage())
 
     return apm.planned_actions  # returns complete action list to orch
 
 
-def ADSS_sub_drain(experiment: Experiment) -> list:
+@experiment(version=1)
+def ADSS_sub_drain() -> list:
     """Placeholder drain sub-experiment that currently emits no actions.
 
     Args:
@@ -798,7 +790,6 @@ def ADSS_sub_drain(experiment: Experiment) -> list:
 
 @experiment(version=1)
 def ADSS_sub_clean_PALtool(
-    experiment: Experiment,
     clean_tool: str = PALtools.LS3,
     clean_volume_ul: int = 500,
 ) -> list:
@@ -831,7 +822,6 @@ def ADSS_sub_clean_PALtool(
 
 @experiment(version=1)
 def ADSS_sub_fillfixed(
-    experiment: Experiment,
     fill_vol_ul: int = 10000,
     filltime_sec: float = 10.0,
     PAL_Injector: str = "PALtools.LS3",
@@ -903,7 +893,6 @@ def ADSS_sub_fillfixed(
 
 @experiment(version=1)
 def ADSS_sub_fill(
-    experiment: Experiment,
     fill_vol_ul: int = 1000,
     PAL_Injector: str = "PALtools.LS3",
 ) -> list:
@@ -941,7 +930,6 @@ def ADSS_sub_fill(
 
 @experiment(version=12)
 def ADSS_sub_CA(
-    experiment: Experiment,
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -1042,7 +1030,6 @@ def ADSS_sub_CA(
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
-                experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
@@ -1085,7 +1072,6 @@ def ADSS_sub_CA(
 
         apm.add_actions(
             ADSS_sub_insitu_actions(
-                experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
                 insert_electrolyte_bool=insert_electrolyte_bool,
                 insert_electrolyte_volume_ul=insert_electrolyte_volume_ul,
@@ -1108,7 +1094,6 @@ def ADSS_sub_CA(
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
-                experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
@@ -1125,7 +1110,6 @@ def ADSS_sub_CA(
 
 @experiment(version=8)
 def ADSS_sub_CA_photo(
-    experiment: Experiment,
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -1213,7 +1197,6 @@ def ADSS_sub_CA_photo(
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
-                experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
@@ -1274,7 +1257,6 @@ def ADSS_sub_CA_photo(
 
         apm.add_actions(
             ADSS_sub_insitu_actions(
-                experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
                 insert_electrolyte_bool=insert_electrolyte_bool,
                 insert_electrolyte_volume_ul=insert_electrolyte_volume_ul,
@@ -1299,7 +1281,6 @@ def ADSS_sub_CA_photo(
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
-                experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
@@ -1316,7 +1297,6 @@ def ADSS_sub_CA_photo(
 
 @experiment(version=8)
 def ADSS_sub_CV(
-    experiment: Experiment,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -1411,7 +1391,6 @@ def ADSS_sub_CV(
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
-                experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
@@ -1466,7 +1445,6 @@ def ADSS_sub_CV(
 
         apm.add_actions(
             ADSS_sub_insitu_actions(
-                experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
                 insert_electrolyte_bool=insert_electrolyte_bool,
                 insert_electrolyte_volume_ul=insert_electrolyte_volume_ul,
@@ -1489,7 +1467,6 @@ def ADSS_sub_CV(
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
-                experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
@@ -1506,7 +1483,6 @@ def ADSS_sub_CV(
 
 @experiment(version=8)
 def ADSS_sub_OCV(
-    experiment: Experiment,
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
@@ -1600,7 +1576,6 @@ def ADSS_sub_OCV(
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
-                experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
@@ -1643,7 +1618,6 @@ def ADSS_sub_OCV(
 
         apm.add_actions(
             ADSS_sub_insitu_actions(
-                experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
                 aliquot_volume_ul=aliquot_volume_ul,
                 aliquot_times_sec=aliquot_times_sec,
@@ -1690,7 +1664,6 @@ def ADSS_sub_OCV(
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
-                experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
@@ -1707,7 +1680,6 @@ def ADSS_sub_OCV(
 
 @experiment(version=9)
 def ADSS_sub_OCV_photo(
-    experiment: Experiment,
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
@@ -1787,7 +1759,6 @@ def ADSS_sub_OCV_photo(
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
-                experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
@@ -1826,7 +1797,6 @@ def ADSS_sub_OCV_photo(
 
         apm.add_actions(
             ADSS_sub_insitu_actions(
-                experiment=experiment,
                 aliquot_insitu=aliquot_insitu,
                 aliquot_volume_ul=aliquot_volume_ul,
                 aliquot_times_sec=aliquot_times_sec,
@@ -1847,7 +1817,6 @@ def ADSS_sub_OCV_photo(
 
         apm.add_actions(
             ADSS_sub_sample_aliquot(
-                experiment=experiment,
                 aliquot_volume_ul=aliquot_volume_ul,
                 EquilibrationTime_s=0,
                 PAL_Injector=PAL_Injector,
@@ -1864,7 +1833,6 @@ def ADSS_sub_OCV_photo(
 
 @experiment(version=3)
 def ADSS_sub_insitu_actions(
-    experiment: Experiment,
     insert_electrolyte_bool: bool = False,
     insert_electrolyte_volume_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
@@ -2032,7 +2000,6 @@ def ADSS_sub_insitu_actions(
                 )
                 apm.add_actions(
                     ADSS_sub_cellfill_prefilled(
-                        experiment=experiment,
                         Solution_volume_ul=insert_electrolyte_volume_ul,
                         Syringe_rate_ulsec=300,
                     )
@@ -2065,7 +2032,6 @@ def ADSS_sub_insitu_actions(
         )
         apm.add_actions(
             ADSS_sub_cellfill_prefilled(
-                experiment=experiment,
                 Solution_volume_ul=insert_electrolyte_volume_ul,
                 Syringe_rate_ulsec=300,
             )
@@ -2083,7 +2049,6 @@ def ADSS_sub_insitu_actions(
 
 @experiment(version=1)
 def ADSS_sub_add_liquid(
-    experiment: Experiment,
     virtual_add: bool = False,
     added_liquid_volume_ul: int = 0,
     liquid_sample_no: int = 1,
@@ -2122,7 +2087,6 @@ def ADSS_sub_add_liquid(
     if not virtual_add:
         apm.add_actions(
             ADSS_sub_cellfill_prefilled(
-                experiment=experiment,
                 Solution_volume_ul=added_liquid_volume_ul,
                 Syringe_rate_ulsec=300,
             )
@@ -2133,7 +2097,6 @@ def ADSS_sub_add_liquid(
 
 @experiment(version=1)
 def ADSS_sub_tray_unload(
-    experiment: Experiment,
     tray: int = 2,
     slot: int = 1,
     survey_runs: int = 1,
@@ -2204,7 +2167,6 @@ def ADSS_sub_tray_unload(
 
 @experiment(version=1)
 def ADSS_sub_tray_icpms_export(
-    experiment: Experiment,
     tray: int = 2,
     slot: int = 1,
     survey_runs: int = 1,
@@ -2247,7 +2209,6 @@ def ADSS_sub_tray_icpms_export(
 
 @experiment(version=1)
 def ADSS_sub_z_move(
-    experiment: Experiment,
     offset_z_mm: float = -8.0,
 ) -> list:
     """Move the motor Z axis by a relative offset (platexy transformation).
@@ -2281,7 +2242,6 @@ def ADSS_sub_z_move(
 
 @experiment(version=1)
 def ADSS_sub_rel_move(
-    experiment: Experiment,
     offset_x_mm: float = 1.0,
     offset_y_mm: float = 1.0,
     offset_z_mm: float = 0.0,
@@ -2319,7 +2279,6 @@ def ADSS_sub_rel_move(
 
 @experiment(version=1)
 def ADSS_sub_abs_move(
-    experiment: Experiment,
     x_mm: float = 80.0,
     y_mm: float = 50.0,
     #    offset_z_mm: float = 0.0,
@@ -2357,7 +2316,6 @@ def ADSS_sub_abs_move(
 
 @experiment(version=1)
 def ADSS_sub_heat(
-    experiment: Experiment,
     duration_hrs: float = 2.0,
     celltemp_min_C: float = 74.5,
     celltemp_max_C: float = 75.5,
@@ -2405,7 +2363,6 @@ def ADSS_sub_heat(
 
 @experiment(version=1)
 def ADSS_sub_stopheat(
-    experiment: Experiment,
 ) -> list:
     """Stop the heat loop and the monitoring loop.
 
@@ -2433,7 +2390,6 @@ def ADSS_sub_stopheat(
 
 @experiment(version=1)
 def ADSS_sub_cellfill_prefilled_nosampleload(
-    experiment: Experiment,
     Solution_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     #    deadvolume_ul: int = 0,
@@ -2521,7 +2477,6 @@ def ADSS_sub_cellfill_prefilled_nosampleload(
 
 @experiment(version=1)
 def ADSS_sub_cellfill_prefilled(
-    experiment: Experiment,
     Solution_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     #    deadvolume_ul: int = 0,
@@ -2616,7 +2571,6 @@ def ADSS_sub_cellfill_prefilled(
 
 @experiment(version=1)
 def ADSS_sub_cellfill_flush(
-    experiment: Experiment,
     Solution_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     #    deadvolume_ul: int = 0,
@@ -2667,7 +2621,6 @@ def ADSS_sub_cellfill_flush(
 
 @experiment(version=3)
 def ADSS_sub_drain_cell(
-    experiment: Experiment,
     DrainWait_s: float = 60,
     ReturnLineReverseWait_s: float = 5,
     #    ResidualWait_s: float = 15,
@@ -2710,7 +2663,6 @@ def ADSS_sub_drain_cell(
 
 @experiment(version=1)
 def ADSS_sub_keep_electrolyte(
-    experiment: Experiment,
     ReturnLineReverseWait_s: float = 5,
     #    ResidualWait_s: float = 15,
 ) -> list:
@@ -2756,7 +2708,6 @@ def ADSS_sub_keep_electrolyte(
 # need to move to clean spot first before beginning clean
 @experiment(version=3)
 def ADSS_sub_clean_cell(
-    experiment: Experiment,
     Clean_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     PurgeWait_s: float = 3,
@@ -2808,7 +2759,6 @@ def ADSS_sub_clean_cell(
 
         apm.add_actions(
             ADSS_sub_drain_cell(
-                experiment=experiment,
                 DrainWait_s=40,
                 ReturnLineReverseWait_s=ReturnLineReverseWait_s,
                 # ResidualWait_s=ResidualWait_s,
@@ -2836,7 +2786,6 @@ def ADSS_sub_clean_cell(
 
     apm.add_actions(
         ADSS_sub_drain_cell(
-            experiment=experiment,
             DrainWait_s=DrainWait_s,
             ReturnLineReverseWait_s=ReturnLineReverseWait_s,
             # ResidualWait_s=ResidualWait_s,
@@ -2850,7 +2799,6 @@ def ADSS_sub_clean_cell(
 
 @experiment(version=1)
 def ADSS_sub_move_to_clean_cell(
-    experiment: Experiment,
 ) -> list:
     """Lift Z, query the built-in clean-cell reference XY, move there, then seal.
 
@@ -2886,7 +2834,6 @@ def ADSS_sub_move_to_clean_cell(
 
 @experiment(version=1)
 def ADSS_sub_move_to_ref_measurement(
-    experiment: Experiment,
     reference_position_name: str = "builtin_ref_motorxy_2",
 ) -> list:
     """Move to a named built-in reference position and seal the cell.
@@ -2989,7 +2936,6 @@ def ADSS_sub_move_to_ref_measurement(
 
 @experiment(version=4)
 def ADSS_sub_sample_aliquot(
-    experiment: Experiment,
     aliquot_volume_ul: int = 200,
     EquilibrationTime_s: float = 30,
     PAL_Injector: str = "LS 4",
@@ -3068,7 +3014,6 @@ def ADSS_sub_sample_aliquot(
 
 @experiment(version=2)
 def ADSS_sub_recirculate(
-    experiment: Experiment,
     direction_forward_or_reverse: str = "forward",
     wait_time_s: float = 10,
 ) -> list:
@@ -3096,7 +3041,6 @@ def ADSS_sub_recirculate(
 
 @experiment(version=1)
 def ADSS_sub_cell_illumination(
-    experiment: Experiment,
     led_wavelength: str = "385",
     illumination_on: bool = False,
 ) -> list:
@@ -3139,7 +3083,6 @@ def ADSS_sub_cell_illumination(
 
 @experiment(version=1)
 def ADSS_sub_interrupt(
-    experiment: Experiment,
     reason: str = "wait",
 ) -> list:
     """Emit a single orchestrator interrupt action with the given reason.
@@ -3158,7 +3101,6 @@ def ADSS_sub_interrupt(
 
 @experiment(version=1)
 def ADSS_sub_refill_syringe(
-    experiment: Experiment,
     syringe: str = "waterclean",
     fill_volume_ul: float = 0,
     Syringe_rate_ulsec: float = 1000,
@@ -3210,7 +3152,6 @@ def ADSS_sub_refill_syringe(
 
 @experiment(version=1)
 def ADSS_sub_gasvalve_toggle(
-    experiment: Experiment,
     open: bool = True,
 ) -> list:
     """Toggle the gas-inlet valve open or closed.
@@ -3231,7 +3172,6 @@ def ADSS_sub_gasvalve_toggle(
 
 @experiment(version=1)
 def ADSS_sub_gasvalve_N2flow(
-    experiment: Experiment,
     open: bool = True,
 ) -> list:
     """Toggle the O2/N2 selector valve (True selects N2 flow).
@@ -3252,7 +3192,6 @@ def ADSS_sub_gasvalve_N2flow(
 
 @experiment(version=1)
 def ADSS_sub_transfer_liquid_in(
-    experiment: Experiment,
     liquid_sample_no: int = 1,
     aliquot_volume_ul: int = 200,
     source_tray: int = 2,
@@ -3331,8 +3270,8 @@ def ADSS_sub_transfer_liquid_in(
     return apm.planned_actions  # returns complete action list to orch
 
 
+@experiment(version=1)
 def ADSS_sub_remove_bubble(
-    experiment: Experiment,
     pump_reverse_time_s: float = 15,
     pump_forward_time_s: float = 10,
     Tval__s: float = 10.0,
@@ -3382,7 +3321,6 @@ def ADSS_sub_remove_bubble(
     apm.add(ORCH_server, "wait", {"waittime": pump_forward_time_s})
     apm.add_actions(
         ADSS_sub_OCV(
-            experiment=experiment,
             Tval__s=Tval__s,
             gamry_i_range=gamry_i_range,
             samplerate_sec=samplerate_sec,
@@ -3404,7 +3342,6 @@ def ADSS_sub_remove_bubble(
 
 @experiment(version=1)
 def ADSS_sub_PAL_deep_clean(
-    experiment: Experiment,
     clean_volume_ul: int = 500,
     PAL_Injector: str = "LS 4",
     rinse_1: int = 1,
@@ -3446,7 +3383,6 @@ def ADSS_sub_PAL_deep_clean(
 
 @experiment(version=1)
 def ADSS_sub_PAL_tray_to_tray(
-    experiment: Experiment,
     volume_ul: int = 500,
     source_tray: int = 2,
     source_slot: int = 2,
@@ -3508,7 +3444,6 @@ def ADSS_sub_PAL_tray_to_tray(
 
 @experiment(version=1)
 def ADSS_sub_PAL_export_icpms(
-    experiment: Experiment,
     tray: int = 2,
     slot: int = 1,
     survey_runs: int = 1,

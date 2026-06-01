@@ -76,7 +76,7 @@ toggle_triggertype = TriggerType.fallingedge
 
 
 @experiment(version=1)
-def CCSI_sub_unload_cell(experiment: Experiment) -> list:
+def CCSI_sub_unload_cell() -> list:
     """Unload every sample currently tracked at the ``cell1_we`` PAL custom position.
 
     Args:
@@ -93,7 +93,6 @@ def CCSI_sub_unload_cell(experiment: Experiment) -> list:
 
 @experiment(version=1)
 def CCSI_sub_load_solid(
-    experiment: Experiment,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -129,7 +128,6 @@ def CCSI_sub_load_solid(
 
 @experiment(version=2)
 def CCSI_sub_load_liquid(
-    experiment: Experiment,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
     water_True_False: bool = False,
@@ -169,7 +167,6 @@ def CCSI_sub_load_liquid(
 
 @experiment(version=2)
 def CCSI_sub_load_gas(
-    experiment: Experiment,
     reservoir_gas_sample_no: int = 1,
     volume_ul_cell_gas: int = 1000,
 ) -> list:
@@ -201,7 +198,6 @@ def CCSI_sub_load_gas(
 
 @experiment(version=1)
 def CCSI_sub_alloff(
-    experiment: Experiment,
 ) -> list:
     """Turn the recirculating pump off and close every CCSI gas/liquid valve.
 
@@ -240,7 +236,6 @@ def CCSI_sub_alloff(
 
 @experiment(version=6)
 def CCSI_sub_headspace_purge_and_measure(
-    experiment: Experiment,
     HSpurge_duration: float = 20,
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
@@ -322,7 +317,6 @@ def CCSI_sub_headspace_purge_and_measure(
 
 @experiment(version=5)
 def CCSI_sub_drain(
-    experiment: Experiment,
     HSpurge_duration: float = 20,
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
@@ -386,7 +380,6 @@ def CCSI_sub_drain(
 
 @experiment(version=1)
 def CCSI_sub_initialization_end_state(
-    experiment: Experiment,
 ) -> list:
     """Place the system into its post-initialization state by turning the pump off.
 
@@ -421,7 +414,6 @@ def CCSI_sub_initialization_end_state(
 
 @experiment(version=1)
 def CCSI_sub_peripumpoff(
-    experiment: Experiment,
 ) -> list:
     """Turn the recirculating peristaltic pump off.
 
@@ -447,7 +439,6 @@ def CCSI_sub_peripumpoff(
 
 @experiment(version=3)
 def CCSI_sub_initialization_firstpart(
-    experiment: Experiment,
     HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
     Alphapurge1_duration: float = 10,
@@ -554,7 +545,6 @@ def CCSI_sub_initialization_firstpart(
 @experiment(version=1)
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
-    experiment: Experiment,
     #    experiment_version: int = 10, #ver 6to7 implements multivalve, #10 gas push between
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
@@ -706,7 +696,6 @@ def CCSI_sub_cellfill(
 
 @experiment(version=1)
 def CCSI_sub_co2monitoring(
-    experiment: Experiment,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
 ) -> list:
@@ -750,7 +739,6 @@ def CCSI_sub_co2monitoring(
 
 @experiment(version=1)
 def CCSI_sub_co2monitoring_mfcmasscotwo(
-    experiment: Experiment,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
@@ -825,7 +813,6 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
 
 @experiment(version=1)
 def CCSI_sub_co2topup_mfcmassdose(
-    experiment: Experiment,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
     flowramp_sccm: float = 9,
@@ -889,7 +876,6 @@ def CCSI_sub_co2topup_mfcmassdose(
 
 @experiment(version=1)
 def CCSI_sub_co2constantpressure(
-    experiment: Experiment,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
     atm_pressure: float = 14.27,
@@ -955,7 +941,6 @@ def CCSI_sub_co2constantpressure(
 
 @experiment(version=1)
 def CCSI_sub_co2mass_temp(
-    experiment: Experiment,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
@@ -1042,7 +1027,6 @@ def CCSI_sub_co2mass_temp(
 
 @experiment(version=1)
 def CCSI_sub_co2massdose(
-    experiment: Experiment,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
@@ -1134,7 +1118,6 @@ def CCSI_sub_co2massdose(
 
 @experiment(version=1)
 def CCSI_sub_co2maintainconcentration(
-    experiment: Experiment,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
@@ -1235,7 +1218,6 @@ def CCSI_sub_co2maintainconcentration(
 
 @experiment(version=3)
 def CCSI_sub_flowflush(
-    experiment: Experiment,
     co2measure_duration: float = 3600,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
@@ -1308,7 +1290,6 @@ def CCSI_sub_flowflush(
 
 @experiment(version=7)
 def CCSI_sub_clean_inject(
-    experiment: Experiment,
     Clean_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 500,
     LiquidCleanWait_s: float = 15,
@@ -1462,7 +1443,6 @@ def CCSI_sub_clean_inject(
     # LIQUID DRAIN
     apm.add_actions(
         CCSI_sub_drain(
-            experiment=experiment,
             HSpurge_duration=LiquidCleanPurge_duration,
             recirculation=drainrecirc,
         )
@@ -1473,7 +1453,6 @@ def CCSI_sub_clean_inject(
 
 @experiment(version=2)
 def CCSI_sub_refill_clean(
-    experiment: Experiment,
     Clean_volume_ul: float = 5000,
     Syringe_rate_ulsec: float = 1000,
 ) -> list:
@@ -1522,7 +1501,6 @@ def CCSI_sub_refill_clean(
 
 @experiment(version=2)
 def CCSI_sub_full_fill_syringe(
-    experiment: Experiment,
     syringe: str = "waterclean",
     target_volume_ul: float = 50000,
     Syringe_rate_ulsec: float = 1000,
@@ -1565,7 +1543,6 @@ def CCSI_sub_full_fill_syringe(
 
 @experiment(version=1)
 def CCSI_sub_fill_syringe(
-    experiment: Experiment,
     syringe: str = "waterclean",
     fill_volume_ul: float = 0,
     Syringe_rate_ulsec: float = 1000,
@@ -1615,7 +1592,6 @@ def CCSI_sub_fill_syringe(
 
 @experiment(version=3)
 def CCSI_debug_co2purge(
-    experiment: Experiment,
     co2measure_duration: float = 10,
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
@@ -1666,7 +1642,6 @@ def CCSI_debug_co2purge(
 
 @experiment(version=1)
 def CCSI_leaktest_co2(
-    experiment: Experiment,
     co2measure_duration: float = 600,
     co2measure_acqrate: float = 1,
     recirculate: bool = True,

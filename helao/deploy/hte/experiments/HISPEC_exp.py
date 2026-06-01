@@ -79,7 +79,8 @@ CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict
 toggle_triggertype = TriggerType.risingedge
 
 
-def HISPEC_sub_cooldown(experiment: Experiment) -> list:
+@experiment(version=1)
+def HISPEC_sub_cooldown() -> list:
     """Run the Andor detector cooling action.
 
     Args:
@@ -93,7 +94,8 @@ def HISPEC_sub_cooldown(experiment: Experiment) -> list:
     return apm.planned_actions
 
 
-def HISPEC_sub_stop_flow(experiment: Experiment) -> list:
+@experiment(version=1)
+def HISPEC_sub_stop_flow() -> list:
     """Switch off the working- and counter-electrode flow/pump digital outputs.
 
     Args:
@@ -118,7 +120,8 @@ def HISPEC_sub_stop_flow(experiment: Experiment) -> list:
     return apm.planned_actions
 
 
-def HISPEC_sub_unloadall_customs(experiment: Experiment) -> list:
+@experiment(version=1)
+def HISPEC_sub_unloadall_customs() -> list:
     """Unload every sample from every custom position via the PAL server.
 
     Args:
@@ -145,7 +148,6 @@ def HISPEC_sub_unloadall_customs(experiment: Experiment) -> list:
 
 @experiment(version=2)
 def HISPEC_sub_add_liquid(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "O2",
@@ -189,7 +191,6 @@ def HISPEC_sub_add_liquid(
 
 @experiment(version=1)
 def HISPEC_sub_load_solid(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -229,7 +230,6 @@ def HISPEC_sub_load_solid(
 
 @experiment(version=1)
 def HISPEC_sub_engage(
-    experiment: Experiment,
     flow_we: bool = True,
     flow_ce: bool = True,
     z_height: float = 1.5,
@@ -303,7 +303,6 @@ def HISPEC_sub_engage(
 
 @experiment(version=1)
 def HISPEC_sub_interrupt(
-    experiment: Experiment,
     reason: str = "wait",
 ) -> list:
     """Pause the orchestrator with a human-readable reason.
@@ -322,7 +321,6 @@ def HISPEC_sub_interrupt(
 
 @experiment(version=1)
 def HISPEC_sub_disengage(
-    experiment: Experiment,
     clear_we: bool = True,
     clear_ce: bool = False,
     z_height: float = 0,
@@ -375,7 +373,6 @@ def HISPEC_sub_disengage(
 
 @experiment(version=2)
 def HISPEC_sub_startup(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -405,12 +402,11 @@ def HISPEC_sub_startup(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_actions(HISPEC_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(HISPEC_sub_unloadall_customs())
 
     # load new requested solid samples
     apm.add_actions(
         HISPEC_sub_load_solid(
-            experiment=experiment,
             solid_custom_position=solid_custom_position,
             solid_plate_id=solid_plate_id,
             solid_sample_no=solid_sample_no,
@@ -420,7 +416,6 @@ def HISPEC_sub_startup(
     # add liquid to solid
     apm.add_actions(
         HISPEC_sub_add_liquid(
-            experiment=experiment,
             solid_custom_position=solid_custom_position,
             reservoir_liquid_sample_no=reservoir_liquid_sample_no,
             solution_bubble_gas=solution_bubble_gas,
@@ -459,7 +454,8 @@ def HISPEC_sub_startup(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def HISPEC_sub_shutdown(experiment: Experiment) -> list:
+@experiment(version=1)
+def HISPEC_sub_shutdown() -> list:
     """Shutdown sequence: unload every custom position and destroy liquid.
 
     Args:
@@ -473,7 +469,7 @@ def HISPEC_sub_shutdown(experiment: Experiment) -> list:
     return apm.planned_actions  # returns complete action list to orch
 
 @experiment(version=1)
-def HISPEC_sub_check_CP_Ewe_bounds(experiment: Experiment,
+def HISPEC_sub_check_CP_Ewe_bounds(
     Ewe_V__mean_final: float = 0.3,
 ) -> list:
     """Bound the final CP Ewe value through the CALC server.
@@ -496,7 +492,6 @@ def HISPEC_sub_check_CP_Ewe_bounds(experiment: Experiment,
 
 @experiment(version=1)
 def HISPEC_calculate_lower_vertex_potential(
-    experiment: Experiment,
     min_offset_ocv: float = 3,
     new_ocv: float = 3,
     offset_value: float = -0.2,
@@ -541,7 +536,6 @@ def HISPEC_calculate_lower_vertex_potential(
 
 @experiment(version=1)
 def HISPEC_sub_CA(
-    experiment: Experiment,
     Vval__V: float = 0.0,
     Tval__s: float = 10.0,
     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
@@ -599,7 +593,6 @@ def HISPEC_sub_CA(
 
 @experiment(version=1)
 def HISPEC_sub_OCV(
-    experiment: Experiment,
     Tval__s: float = 1,
     SampleRate: float = 0.05,
 ) -> list:
@@ -664,7 +657,6 @@ def HISPEC_sub_OCV(
 # spectral electrochemistry experiment
 @experiment(version=1)
 def HISPEC_sub_SpEC(
-    experiment: Experiment,
     # OCV_vsRef: float = 0.2,
     # Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.2,  # Apex 1 value in volts or amps.
@@ -850,7 +842,6 @@ def HISPEC_sub_SpEC(
 
 @experiment(version=1)
 def HISPEC_sub_CP(
-    experiment: Experiment,
     Ival__A: float = 0.0,
     Tval__s: float = 10.0,
     AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
@@ -942,7 +933,6 @@ def HISPEC_sub_CP(
 
 @experiment(version=1)
 def HISPEC_sub_PEIS(
-    experiment: Experiment,
     Vinit__V: float = 0.0,  # Initial value in volts or amps.
     Vamp__V: float = 0.01,  # Amplitude value in volts
     Finit__Hz: float = 1,  # Initial frequency in Hz.
