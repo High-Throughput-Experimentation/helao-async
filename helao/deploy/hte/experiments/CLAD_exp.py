@@ -63,7 +63,6 @@ def CLAD_sub_recirculate_alternating(
     """Recirculate by alternating peristaltic-pump direction forward, reverse, then forward again.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         forward_duration_s: Initial forward-recirc time (s).
         reverse_duration_s: Reverse-recirc time (s).
         final_duration_s: Final forward-recirc time (s).
@@ -112,7 +111,6 @@ def CLAD_sub_load_sample(
     not None is loaded; ``clear_position`` first unloads existing samples.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         load_position: PAL custom position name.
         clear_position: Unload existing samples first.
         solid_plate_id: Plate identifier of the legacy solid sample.
@@ -205,7 +203,6 @@ def CLAD_sub_fill_cell(
     that into the cell-fill technique.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         fill_volume_ul: Fill volume (uL).
         fill_rate_ul_s: Syringe rate (uL/s).
         load_sample: Query the cell sample before infusing.
@@ -265,7 +262,6 @@ def CLAD_sub_setup_cell(
     """Move to the rinse position, fill+forward-recirc, drain, then refill the work syringe.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         rinse_recirc_duration_s: Forward recirculation duration (s).
         rinse_volume_ul: Cell rinse volume (uL).
         fill_rate_ul_s: Syringe rate (uL/s).
@@ -356,7 +352,6 @@ def CLAD_sub_reference_setup(
     """Move to a reference position, load a reference solid+liquid, fill, flow O2, recirculate, refill.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         reference_position_name: Built-in specref position name.
         reference_sample_label: Informational solid label.
         load_position: PAL custom position for the reference assembly.
@@ -481,7 +476,6 @@ def CLAD_sub_OCV_bubble_check(
     """Optionally run a short OCV with bubble detection then run the main OCV (with aliquot).
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         ocv_duration_s: Main OCV duration (s).
         ocv_sample_rate_s: OCV sample rate (s).
         electrolyte_ph: Solution pH.
@@ -555,7 +549,6 @@ def CLAD_sub_load_assembly(
     """Move to the plate sample, seal, register solid+liquid+gas, then infuse the cell.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         load_position: PAL custom position name.
         solid_plate_id: Plate identifier of the legacy solid sample.
         solid_sample_no: Sample index on the plate.
@@ -664,7 +657,6 @@ def CLAD_sub_clean_cell(
     """Sequentially flush the cell with nitric acid then water, draining between each.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         nitric_volume_ul: Nitric flush volume (uL).
         water_volume_ul: Water rinse volume (uL).
         Syringe_rate_ulsec: Syringe rate (uL/s).
@@ -740,7 +732,6 @@ def CLAD_sub_refill_syringe(
     """Refill one of the named syringes (clean, water, work) via its refill liquid valve.
 
     Args:
-        experiment: Orchestrator-provided experiment context.
         syringe: ``"clean"``, ``"water"``, or ``"work"``.
         fill_volume_ul: Withdraw volume (uL).
         Syringe_rate_ulsec: Syringe rate (uL/s).
@@ -772,9 +763,6 @@ def CLAD_sub_refill_syringe(
 def CLAD_sub_standby(
 ) -> list:
     """Drive the station to a safe standby: peristaltic pump off, inlet gas valve closed.
-
-    Args:
-        experiment: Orchestrator-provided experiment context.
 
     Returns:
         List of planned actions for the orchestrator.

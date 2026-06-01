@@ -36,7 +36,6 @@ def PSTAT_exp_CP(
     and appends one ``run_CP`` action per iteration of ``num_repeats``.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         current: Applied current (A).
         duration_s: Duration of each CP step (s).
         acqinterval_s: Sample interval (s).

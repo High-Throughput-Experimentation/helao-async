@@ -35,7 +35,6 @@ def SIM_websocket_data(
     two complete processes per experiment.
 
     Args:
-        experiment: Parent experiment supplied by the orchestrator.
         wait_time: Orchestrator wait duration before each acquisition.
         data_duration: Duration of each simulated acquisition.
 
