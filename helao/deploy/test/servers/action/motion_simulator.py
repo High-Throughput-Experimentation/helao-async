@@ -133,8 +133,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/solid_get_samples_xy", tags=["action"])
     async def solid_get_samples_xy(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plate_id: Optional[int] = None,
         sample_no: Optional[int] = None,
     ):
@@ -147,8 +145,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/move", tags=["action"])
     async def move(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         d_mm: List[float] = [0, 0],
         axis: List[str] = ["x", "y"],
         speed: Optional[int] = None,

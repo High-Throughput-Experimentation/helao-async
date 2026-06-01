@@ -50,8 +50,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/infuse", tags=["action"])
     async def infuse(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         rate_uL_sec: int = 0,
         volume_uL: int = 0,
     ):
@@ -73,8 +71,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/withdraw", tags=["action"])
     async def withdraw(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         rate_uL_sec: int = 0,
         volume_uL: int = 0,
     ):
@@ -96,8 +92,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/get_present_volume", tags=["action"])
     async def get_present_volume(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Read and record the driver's tracked syringe volume.
 

@@ -106,8 +106,6 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/run_CP", tags=["action"])
     async def run_CP(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         Ival: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: Optional[

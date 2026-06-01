@@ -74,7 +74,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
         if dev_axis:
 
             @app.post(f"/{server_key}/setmotionref", tags=["action"])
-            async def setmotionref(action: Action = Body({}, embed=True)):
+            async def setmotionref():
                 """Establish the xyz reference position.
 
                 Homes xyz, sets absolute zero, moves back by the configured
@@ -90,7 +90,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 return finished_action.as_dict()
 
         @app.post(f"/{server_key}/reset_plate_alignment", tags=["action"])
-        async def reset_plate_alignment(action: Action = Body({}, embed=True)):
+        async def reset_plate_alignment():
             """Reset the plate transform matrix back to identity."""
             active = await app.base.setup_and_contain_action()
             app.driver.reset_plate_transfermatrix()
@@ -99,8 +99,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/load_plate_alignment", tags=["action"])
         async def load_plate_alignment(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             matrix: List = [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
         ):
             """Install ``matrix`` as the plate-to-motor transform matrix."""
@@ -114,8 +112,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/run_aligner", tags=["action"])
         async def run_aligner(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             plateid_or_pmpath: int | str = 6353,  # None
         ):
             """Start the interactive plate-alignment routine.
@@ -128,8 +124,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/stop_aligner", tags=["action"])
         async def stop_aligner(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
         ):
             """Abort an in-progress plate-alignment routine."""
             active = await app.base.setup_and_contain_action()
@@ -140,8 +134,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
         # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(platexy).tolist())}
         @app.post(f"/{server_key}/toMotorXY", tags=["action"])
         async def toMotorXY(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             platexy: Optional[str] = None,
         ):
             """Transform plate (sample) XY coordinates into motor XY coordinates."""
@@ -159,8 +151,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
         # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(motorxy).tolist())}
         @app.post(f"/{server_key}/toPlateXY", tags=["action"])
         async def toPlateXY(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             motorxy: Optional[str] = None,
         ):
             """Transform motor XY coordinates into plate (sample) XY coordinates."""
@@ -177,8 +167,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/MxytoMPlate", tags=["action"])
         async def MxytoMPlate(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             Mxy: Optional[str] = None,
         ):
             """Strip the instrument matrix from a system matrix to obtain ``Mplate``."""
@@ -197,8 +185,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/move", tags=["action"])
             async def move(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
                 d_mm: List[float] = [0, 0],
                 axis: List[str] = ["x", "y"],
                 speed: Optional[int] = None,
@@ -225,8 +211,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/easymove", tags=["action"])
             async def easymove(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
                 axis: dev_axisitems = None,
                 d_mm: float = 0,
                 speed: Optional[int] = None,
@@ -248,8 +232,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/easymove_to_solid", tags=["action"])
             async def easymove_to_solid(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
                 plate_id: Optional[int] = None,
                 sample_no: Optional[int] = None,
                 speed: Optional[int] = None,
@@ -287,8 +269,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/disconnect", tags=["action"])
         async def disconnect(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
         ):
             """Disconnect from the Galil motion controller."""
             active = await app.base.setup_and_contain_action(action_abbr="disconnect")
@@ -300,8 +280,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/query_positions", tags=["action"])
             async def query_positions(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
             ):
                 """Return the current position of every configured axis."""
                 active = await app.base.setup_and_contain_action(
@@ -319,8 +297,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/query_position", tags=["action"])
             async def query_position(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
                 # axis: Union[List[str], str] = None
                 axis: dev_axisitems = None,
             ):
@@ -340,8 +316,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/query_moving", tags=["action"])
             async def query_moving(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
                 axis: Union[List[str], str] = None,
             ):
                 """Return whether the given axis or list of axes is currently moving."""
@@ -362,8 +336,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/axis_off", tags=["action"])
             async def axis_off(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
                 # axis: Union[List[str], str] = None
                 axis: dev_axisitems = None,
             ):
@@ -382,8 +354,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/axis_on", tags=["action"])
             async def axis_on(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
                 axis: dev_axisitems = None,
             ):
                 """Energise (turn on) the named motor axis."""
@@ -398,8 +368,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/solid_get_platemap", tags=["action"])
         async def solid_get_platemap(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             plate_id: Optional[int] = None,
         ):
             """Return the platemap rows for ``plate_id`` via the driver."""
@@ -413,8 +381,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/solid_get_samples_xy", tags=["action"])
         async def solid_get_samples_xy(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             plate_id: Optional[int] = None,
             sample_no: Optional[int] = None,
         ):
@@ -438,8 +404,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/solid_get_builtin_specref", tags=["action"])
         async def solid_get_builtin_specref(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             specref_code: int = 1,
             ref_position_name: str = "builtin_ref_motorxy",
         ):
@@ -457,8 +421,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/solid_get_nearest_specref", tags=["action"])
         async def solid_get_nearest_specref(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             plate_id: Optional[int] = None,
             sample_no: Optional[int] = None,
             specref_code: int = 1,
@@ -505,8 +467,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/stop", tags=["action"])
         async def stop(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
         ):
             """De-energise every configured motor axis."""
             active = await app.base.setup_and_contain_action(action_abbr="stop")
@@ -520,8 +480,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/reset", tags=["action"])
         async def reset(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
         ):
             """Reset the Galil controller. Emergency use only."""
             active = await app.base.setup_and_contain_action(action_abbr="reset")
@@ -537,8 +495,6 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/z_move", tags=["action"])
             async def z_move(
-                action: Action = Body({}, embed=True),
-                action_version: int = 1,
                 z_position: Zpos = "NA",
             ):
                 """Move the z-axis to a named cell height from the server config.

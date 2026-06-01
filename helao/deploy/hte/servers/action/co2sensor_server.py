@@ -44,8 +44,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/acquire_co2", tags=["action"])
     async def acquire_co2(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: List[
@@ -69,8 +67,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/cancel_acquire_co2", tags=["action"])
     async def cancel_acquire_co2(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Stop any active ``acquire_co2`` executors on this server."""
         active = await app.base.setup_and_contain_action()

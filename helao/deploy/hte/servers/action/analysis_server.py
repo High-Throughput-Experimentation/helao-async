@@ -82,8 +82,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/analyze_dryuvis", tags=["action"])
     async def analyze_dryuvis(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         sequence_uuid: str = "",
         plate_id: Union[int, None] = None,
         recent: bool = False,
@@ -107,8 +105,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/analyze_echeuvis", tags=["action"])
     async def analyze_echeuvis(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         sequence_uuid: str = "",
         plate_id: Union[int, None] = None,
         recent: bool = False,
@@ -133,8 +129,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/analyze_icpms_local", tags=["action"])
     async def analyze_icpms_local(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         sequence_zip_path: str = "",
         params: dict = {},
     ):
@@ -152,8 +146,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/analyze_xrfs_local", tags=["action"])
     async def analyze_xrfs_local(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         sequence_zip_path: str = "",
         params: dict = {},
     ):

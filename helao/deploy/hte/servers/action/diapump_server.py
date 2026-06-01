@@ -61,8 +61,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/run_continuous", tags=["action"])
     async def run_continuous(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         rate_uL_min: int = 0,
         duration_sec: float = -1,
     ):
@@ -77,8 +75,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/cancel_run_continuous", tags=["action"])
     async def cancel_run_continuous(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         exec_id: Optional[str] = None,
     ):
         """Stop the targeted ``run_continuous`` executor, or all of them.

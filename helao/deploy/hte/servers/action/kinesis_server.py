@@ -164,8 +164,6 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/kmove", tags=["action"])
         async def kmove(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             axis: app.driver.dev_kinesis = motors[0],
             move_mode: MoveModes = "relative",
             value_mm: float = 0.0,
@@ -202,8 +200,6 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/cancel_kmove", tags=["action"])
         async def cancel_kmove(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             axis: app.driver.dev_kinesis = motors[0],
             exec_id: Optional[str] = None,
         ):
@@ -236,8 +232,6 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/set_velocity", tags=["action"])
         async def set_velocity(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             axis: app.driver.dev_kinesis = motors[0],
             velocity_mm_s: Optional[float] = None,
             acceleration_mm_s2: Optional[float] = None,

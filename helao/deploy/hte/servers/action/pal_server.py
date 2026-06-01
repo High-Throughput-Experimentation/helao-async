@@ -18,7 +18,7 @@ from time import strftime
 from fastapi import Body, Query
 from typing import Optional, List, Union
 
-from helao.core.servers.base_api import BaseAPI
+from helao.core.servers.base_api import BaseAPI, action_version
 from ...drivers.robot.pal_driver import (
     PAL,
     Spacingmethod,
@@ -92,8 +92,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/stop", tags=["action"])
     async def stop(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Request a controlled stop on the PAL driver.
 
@@ -111,8 +109,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/kill_PAL", tags=["action"])
     async def kill_PAL(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Kill the PAL process via the driver and record the error code.
 
@@ -131,7 +127,7 @@ def makeApp(server_key) -> BaseAPI:
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/convert_v1DB", tags=["action"])
-    async def convert_v1DB(action: Action = Body({}, embed=True)) -> dict:
+    async def convert_v1DB() -> dict:
         """Convert the legacy liquid JSON database to the SQLite schema.
 
         Args:
@@ -148,8 +144,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_run_method", tags=["action"])
         async def PAL_run_method(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             micropal: list = [
                 PalMicroCam(
                     **{
@@ -248,8 +242,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_ANEC_aliquot", tags=["action"])
         async def PAL_ANEC_aliquot(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             toolGC: PALtools = PALtools.HS2,
             toolarchive: PALtools = PALtools.LS3,
             source: dev_customitems = "cell1_we",
@@ -292,8 +284,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_ANEC_GC", tags=["action"])
         async def PAL_ANEC_GC(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             toolGC: PALtools = PALtools.HS2,
             source: dev_customitems = "cell1_we",
             volume_ul_GC: int = 300,
@@ -324,8 +314,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_injection_tray_GC", tags=["action"])
         async def PAL_injection_tray_GC(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             startGC: bool = True,
             sampletype: GCsampletype = "liquid",
             tool: PALtools = PALtools.LS1,
@@ -374,8 +362,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_injection_custom_GC", tags=["action"])
         async def PAL_injection_custom_GC(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             startGC: Optional[bool] = None,
             sampletype: Optional[GCsampletype] = None,
             tool: Optional[PALtools] = None,
@@ -415,8 +401,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_injection_custom_HPLC", tags=["action"])
         async def PAL_injection_custom_HPLC(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             dest: dev_customitems = None,
@@ -452,8 +436,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_injection_tray_HPLC", tags=["action"])
         async def PAL_injection_tray_HPLC(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             tool: PALtools = PALtools.LS1,
             source_tray: int = 1,
             source_slot: int = 1,
@@ -494,8 +476,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_transfer_tray_tray", tags=["action"])
         async def PAL_transfer_tray_tray(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             sampleperiod: List[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
@@ -548,8 +528,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_transfer_tray_custom", tags=["action"])
         async def PAL_transfer_tray_custom(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             sampleperiod: List[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
@@ -598,8 +576,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_transfer_custom_tray", tags=["action"])
         async def PAL_transfer_custom_tray(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             sampleperiod: List[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
@@ -647,8 +623,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_transfer_custom_custom", tags=["action"])
         async def PAL_transfer_custom_custom(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             sampleperiod: List[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
@@ -692,8 +666,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_archive", tags=["action"])
         async def PAL_archive(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             volume_ul: int = 200,
@@ -773,8 +745,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_deepclean", tags=["action"])
         async def PAL_deepclean(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             tool: Optional[PALtools] = None,
             volume_ul: Optional[
                 int
@@ -809,8 +779,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_dilute", tags=["action"])
         async def PAL_dilute(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             volume_ul: int = 200,
@@ -858,8 +826,6 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_autodilute", tags=["action"])
         async def PAL_autodilute(
-            action: Action = Body({}, embed=True),
-            action_version: int = 1,
             tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             volume_ul: int = 200,
@@ -899,8 +865,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_tray_query_sample", tags=["action"])
     async def archive_tray_query_sample(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         vial: Optional[int] = None,
@@ -937,7 +901,7 @@ def makeApp(server_key) -> BaseAPI:
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/archive_tray_unloadall", tags=["action"])
-    async def archive_tray_unloadall(action: Action = Body({}, embed=True)):
+    async def archive_tray_unloadall():
         """Unload every position from every tray and reset the vial table.
 
         The previously loaded samples are appended to ``samples_in`` and the
@@ -967,8 +931,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_tray_load", tags=["action"])
     async def archive_tray_load(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         load_sample_in: Union[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
             dict,
@@ -1013,8 +975,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_tray_unload", tags=["action"])
     async def archive_tray_unload(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
     ):
@@ -1046,8 +1006,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_tray_new_position", tags=["action"])
     async def archive_tray_new(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         req_vol: Optional[float] = None,
     ):
         """Find an empty vial position large enough to hold a given volume.
@@ -1076,8 +1034,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_tray_update_position", tags=["action"])
     async def archive_tray_update_position(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         sample: Union[
             AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
         ] = Body(
@@ -1118,8 +1074,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_tray_export_json", tags=["action"])
     async def archive_tray_export_json(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
     ):
@@ -1148,8 +1102,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_tray_export_icpms", tags=["action"])
     async def archive_tray_export_icpms(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         survey_runs: Optional[int] = None,
@@ -1189,8 +1141,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_tray_export_csv", tags=["action"])
     async def archive_tray_export_csv(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
     ):
@@ -1219,8 +1169,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_load_solid", tags=["action"])
     async def archive_custom_load_solid(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         custom: dev_customitems = None,
         sample_no: int = 1,
         plate_id: int = 1,
@@ -1256,8 +1204,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_load", tags=["action"])
     async def archive_custom_load(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         custom: dev_customitems = None,
         load_sample_in: Union[
             AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
@@ -1294,8 +1240,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_unload", tags=["action"])
     async def archive_custom_unload(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         custom: dev_customitems = None,
         destroy_liquid: bool = False,
         destroy_gas: bool = False,
@@ -1341,8 +1285,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_unloadall", tags=["action"])
     async def archive_custom_unloadall(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         destroy_liquid: bool = False,
         destroy_gas: bool = False,
         destroy_solid: bool = False,
@@ -1405,8 +1347,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_query_sample", tags=["action"])
     async def archive_custom_query_sample(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         custom: dev_customitems = None,
     ):
         """Look up the sample currently loaded at a custom position.
@@ -1437,8 +1377,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_add_liquid", tags=["action"])
     async def archive_custom_add_liquid(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         custom: dev_customitems = None,
         source_liquid_in: LiquidSample = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
@@ -1490,9 +1428,8 @@ def makeApp(server_key) -> BaseAPI:
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/archive_custom_add_gas", tags=["action"])
+    @action_version(2)
     async def archive_custom_add_gas(
-        action: Action = Body({}, embed=True),
-        action_version: int = 2,
         custom: dev_customitems = None,
         source_gas_in: GasSample = Body(
             GasSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
@@ -1545,8 +1482,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/db_get_samples", tags=["action"])
     async def db_get_samples(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body(
@@ -1583,8 +1518,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/db_new_samples", tags=["action"])
     async def db_new_samples(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body(
@@ -1641,8 +1574,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/generate_plate_sample_no_list", tags=["action"])
     async def generate_plate_sample_no_list(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
         plate_id: int = 1,
         sample_code: int = Query(0, ge=0, le=2),
         skip_n_samples: int = Query(0, ge=0),
@@ -1695,8 +1626,6 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/get_loaded_positions", tags=["action"])
     async def get_positions(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
     ):
         """Snapshot the archive's loaded positions into ``action_params``.
 
