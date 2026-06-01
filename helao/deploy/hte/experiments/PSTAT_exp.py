@@ -15,7 +15,6 @@ PSTAT_server = MachineModel(
 
 @experiment(version=1)
 def PSTAT_exp_CP(
-    experiment: Experiment,
     current: float = 0.0,
     duration_s: float = 60,
     acqinterval_s: float = 0.1,

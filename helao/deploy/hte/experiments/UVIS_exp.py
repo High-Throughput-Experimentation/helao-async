@@ -54,7 +54,8 @@ PDU_server = MM(server_name="PDU", machine_name=gethostname().lower()).as_dict()
 toggle_triggertype = TriggerType.fallingedge
 
 
-def UVIS_sub_unloadall_customs(experiment: Experiment) -> list:
+@experiment(version=1)
+def UVIS_sub_unloadall_customs() -> list:
     """Unload every sample from every custom position via PAL.
 
     Args:
@@ -75,7 +76,6 @@ def UVIS_sub_unloadall_customs(experiment: Experiment) -> list:
 
 @experiment(version=1)
 def UVIS_sub_load_solid(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -109,7 +109,6 @@ def UVIS_sub_load_solid(
 
 @experiment(version=2)
 def UVIS_sub_startup(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -129,7 +128,7 @@ def UVIS_sub_startup(
         List of PAL, MOTOR query, and motion actions composing the start-up.
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add_actions(UVIS_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(UVIS_sub_unloadall_customs())
 
     # load new requested solid samples
     apm.add(
@@ -171,7 +170,8 @@ def UVIS_sub_startup(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def UVIS_sub_shutdown(experiment: Experiment, toggle_source: str = "lamp_shutter") -> list:
+@experiment(version=1)
+def UVIS_sub_shutdown(toggle_source: str = "lamp_shutter") -> list:
     """Shutdown: unload custom positions and switch off the lamp shutter line.
 
     Args:
@@ -183,7 +183,7 @@ def UVIS_sub_shutdown(experiment: Experiment, toggle_source: str = "lamp_shutter
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # unload all samples from custom positions
-    apm.add_actions(UVIS_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(UVIS_sub_unloadall_customs())
     apm.add(
         IO_server,
         "set_digital_out",
@@ -198,7 +198,6 @@ def UVIS_sub_shutdown(experiment: Experiment, toggle_source: str = "lamp_shutter
 
 @experiment(version=1)
 def UVIS_sub_movetosample(
-    experiment: Experiment,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -242,7 +241,6 @@ def UVIS_sub_movetosample(
 
 @experiment(version=1)
 def UVIS_sub_relmove(
-    experiment: Experiment,
     offset_x_mm: float = 1.0,
     offset_y_mm: float = 1.0,
 ) -> list:
@@ -272,7 +270,6 @@ def UVIS_sub_relmove(
 
 @experiment(version=2)
 def UVIS_sub_measure(
-    experiment: Experiment,
     spec_type: SpecType = SpecType.T,
     spec_n_avg: int = 1,
     spec_int_time_ms: int = 10,
@@ -419,7 +416,6 @@ def UVIS_sub_measure(
 
 @experiment(version=1)
 def UVIS_sub_setup_ref(
-    experiment: Experiment,
     reference_mode: str = "internal",
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 1,
@@ -544,7 +540,6 @@ def UVIS_sub_setup_ref(
 
 @experiment(version=2)
 def UVIS_calc_abs(
-    experiment: Experiment,
     ev_parts: list = [1.5, 2.0, 2.5, 3.0],
     bin_width: int = 3,
     window_length: int = 45,
@@ -596,7 +591,6 @@ def UVIS_calc_abs(
 
 @experiment(version=2)
 def UVIS_analysis_dry(
-    experiment: Experiment,
     sequence_uuid: str = "",
     plate_id: int = 0,
     recent: bool = True,
@@ -630,7 +624,6 @@ def UVIS_analysis_dry(
 
 @experiment(version=2)
 def UVIS_measure_references(
-    experiment: Experiment,
     plate_id: int = 1,
     custom_position: str = "cell1_we",
     spec_n_avg: int = 5,
@@ -674,11 +667,10 @@ def UVIS_measure_references(
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # 0) unregister samples from measurement location
-    apm.add_actions(UVIS_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(UVIS_sub_unloadall_customs())
     # 1) move to zero reflectance (black) reference
     apm.add_actions(
         UVIS_sub_setup_ref(
-            experiment=experiment,
             reference_mode="builtin",
             solid_custom_position=custom_position,
             solid_plate_id=plate_id,
@@ -690,7 +682,6 @@ def UVIS_measure_references(
     # 2a) measure detector background (shutter closed)
     apm.add_actions(
         UVIS_sub_measure(
-            experiment=experiment,
             spec_type=spec_type,
             spec_int_time_ms=spec_int_time_ms,
             spec_n_avg=spec_n_avg,
@@ -709,7 +700,6 @@ def UVIS_measure_references(
     # 2b) measure dark reference
     apm.add_actions(
         UVIS_sub_measure(
-            experiment=experiment,
             spec_type=spec_type,
             spec_int_time_ms=spec_int_time_ms,
             spec_n_avg=spec_n_avg,
@@ -728,7 +718,6 @@ def UVIS_measure_references(
     # 3) move to full reflectance (white) reference
     apm.add_actions(
         UVIS_sub_setup_ref(
-            experiment=experiment,
             reference_mode="builtin",
             solid_custom_position=custom_position,
             solid_plate_id=plate_id,
@@ -740,7 +729,6 @@ def UVIS_measure_references(
     # 3) measure light reference
     apm.add_actions(
         UVIS_sub_measure(
-            experiment=experiment,
             spec_type=spec_type,
             spec_int_time_ms=spec_int_time_ms,
             spec_n_avg=spec_n_avg,
@@ -759,7 +747,8 @@ def UVIS_measure_references(
     return apm.planned_actions
 
 
-def UVIS_sub_shutoff_lamp(experiment: Experiment, outlet_number: int = 1) -> list:
+@experiment(version=1)
+def UVIS_sub_shutoff_lamp(outlet_number: int = 1) -> list:
     """Switch a PDU outlet off (intended for the UV-Vis lamp).
 
     Args:

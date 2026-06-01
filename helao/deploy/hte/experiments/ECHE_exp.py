@@ -63,7 +63,8 @@ PAL_server = MachineModel(
 toggle_triggertype = TriggerType.fallingedge
 
 
-def ECHE_sub_unloadall_customs(experiment: Experiment) -> list:
+@experiment(version=1)
+def ECHE_sub_unloadall_customs() -> list:
     """Unload every sample from PAL custom positions and destroy any tracked liquid.
 
     Args:
@@ -89,7 +90,6 @@ def ECHE_sub_unloadall_customs(experiment: Experiment) -> list:
 
 @experiment(version=2)
 def ECHE_sub_add_liquid(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "O2",
@@ -133,7 +133,6 @@ def ECHE_sub_add_liquid(
 
 @experiment(version=1)
 def ECHE_sub_load_solid(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -173,7 +172,6 @@ def ECHE_sub_load_solid(
 
 @experiment(version=2)
 def ECHE_sub_startup(
-    experiment: Experiment,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -199,12 +197,11 @@ def ECHE_sub_startup(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_actions(ECHE_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(ECHE_sub_unloadall_customs())
 
     # load new requested solid samples
     apm.add_actions(
         ECHE_sub_load_solid(
-            experiment=experiment,
             solid_custom_position=solid_custom_position,
             solid_plate_id=solid_plate_id,
             solid_sample_no=solid_sample_no,
@@ -214,7 +211,6 @@ def ECHE_sub_startup(
     # add liquid to solid
     apm.add_actions(
         ECHE_sub_add_liquid(
-            experiment=experiment,
             solid_custom_position=solid_custom_position,
             reservoir_liquid_sample_no=reservoir_liquid_sample_no,
             solution_bubble_gas=solution_bubble_gas,
@@ -253,7 +249,8 @@ def ECHE_sub_startup(
     return apm.planned_actions  # returns complete action list to orch
 
 
-def ECHE_sub_shutdown(experiment: Experiment) -> list:
+@experiment(version=1)
+def ECHE_sub_shutdown() -> list:
     """Unload all samples from PAL custom positions.
 
     Args:
@@ -266,14 +263,13 @@ def ECHE_sub_shutdown(experiment: Experiment) -> list:
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_actions(ECHE_sub_unloadall_customs(experiment=experiment))
+    apm.add_actions(ECHE_sub_unloadall_customs())
 
     return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=4)
 def ECHE_sub_CA_led(
-    experiment: Experiment,
     CA_potential: float = 0.0,
     potential_versus: str = "rhe",
     ref_type: str = "inhouse",
@@ -414,7 +410,6 @@ def ECHE_sub_CA_led(
 
 @experiment(version=1)
 def ECHE_sub_OCV(
-    experiment: Experiment,
     Tval__s: float = 1,
     SampleRate: float = 0.05,
 ) -> list:
@@ -466,7 +461,6 @@ def ECHE_sub_OCV(
 
 @experiment(version=1)
 def ECHE_sub_preCV(
-    experiment: Experiment,
     CA_potential: float = 0.0,  # need to get from CV initial
     samplerate_sec: float = 0.05,
     CA_duration_sec: float = 3,  # adjustable pre_CV time
@@ -524,7 +518,6 @@ def ECHE_sub_preCV(
 
 @experiment(version=3)
 def ECHE_sub_CA(
-    experiment: Experiment,
     CA_potential: float = 0.0,
     potential_versus: str = "rhe",
     ref_type: str = "inhouse",
@@ -621,7 +614,6 @@ def ECHE_sub_CA(
 
 @experiment(version=4)
 def ECHE_sub_CV_led(
-    experiment: Experiment,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -789,7 +781,6 @@ def ECHE_sub_CV_led(
 
 @experiment(version=3)
 def ECHE_sub_CV(
-    experiment: Experiment,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -891,7 +882,6 @@ def ECHE_sub_CV(
 
 @experiment(version=3)
 def ECHE_sub_CP(
-    experiment: Experiment,
     CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -971,7 +961,6 @@ def ECHE_sub_CP(
 
 @experiment(version=4)
 def ECHE_sub_CP_led(
-    experiment: Experiment,
     CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -1097,7 +1086,6 @@ def ECHE_sub_CP_led(
 
 @experiment(version=1)
 def ECHE_sub_movetosample(
-    experiment: Experiment,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -1147,7 +1135,6 @@ def ECHE_sub_movetosample(
 
 @experiment(version=1)
 def ECHE_sub_rel_move(
-    experiment: Experiment,
     offset_x_mm: float = 1.0,
     offset_y_mm: float = 1.0,
 ) -> list:

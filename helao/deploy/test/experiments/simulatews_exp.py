@@ -26,7 +26,6 @@ SIM_server = MachineModel(server_name="SIM", machine_name=ORCH_HOST).as_dict()
 
 @experiment(version=1)
 def SIM_websocket_data(
-    experiment: Experiment,
     wait_time: float = 3.0,
     data_duration: float = 5.0,
 ) -> list:

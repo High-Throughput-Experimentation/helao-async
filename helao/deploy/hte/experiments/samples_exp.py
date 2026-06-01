@@ -40,7 +40,6 @@ ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 
 @experiment(version=1)
 def create_liquid_sample(
-    experiment: Experiment,
     volume_ml: float = 1.0,
     source: List[str] = ["source1", "source2"],
     partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
@@ -101,7 +100,6 @@ def create_liquid_sample(
 
 @experiment(version=1)
 def create_gas_sample(
-    experiment: Experiment,
     volume_ml: float = 1.0,
     source: List[str] = ["source1", "source2"],
     partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
@@ -156,7 +154,6 @@ def create_gas_sample(
 
 @experiment(version=1)
 def create_assembly_sample(
-    experiment: Experiment,
     liquid_sample_nos: List[int] = [1, 2],
     gas_sample_nos: List[int] = [1, 2],
     solid_plate_ids: List[int] = [1, 2],
@@ -247,7 +244,6 @@ def create_assembly_sample(
 
 @experiment(version=1)
 def sort_plate_sample_no_list(
-    experiment: Experiment,
     plate_sample_no_list: list = [2],
 ) -> list:
     """Placeholder that returns an empty plan; reserved for plate-sample sorting.
@@ -267,7 +263,6 @@ def sort_plate_sample_no_list(
 
 @experiment(version=1)
 def generate_sample_no_list(
-    experiment: Experiment,
     plate_id: int = 1,
     sample_code: int = 0,
     skip_n_samples: int = 0,
@@ -315,7 +310,6 @@ def generate_sample_no_list(
 
 @experiment(version=1)
 def load_liquid_sample(
-    experiment: Experiment,
     liquid_sample_no: int = 0,
     machine_name: str = "hte-xxxx-xx",
     tray: int = 0,
@@ -350,7 +344,6 @@ def load_liquid_sample(
 
 @experiment(version=1)
 def create_and_load_liquid_sample(
-    experiment: Experiment,
     volume_ml: float = 1.0,
     source: List[str] = ["source1", "source2"],
     partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
@@ -429,7 +422,6 @@ def create_and_load_liquid_sample(
 
 @experiment(version=2)
 def orch_sub_wait(
-    experiment: Experiment,
     wait_time_s: float = 10,
 ) -> list:
     """Ask the orchestrator to pause for ``wait_time_s`` seconds.

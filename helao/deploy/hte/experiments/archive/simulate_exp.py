@@ -39,7 +39,6 @@ PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 # given solution pH, element space, and element fractions, measure CP at 3 and 10 mA/cm2
 @experiment(version=1)
 def SIM_measure_CP(
-    experiment: Experiment,
     solution_ph: int = 13,
     elements: List[str] = [],
     element_fracs: List[float] = [],

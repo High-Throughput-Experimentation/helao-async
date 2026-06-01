@@ -29,7 +29,6 @@ CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict
 
 @experiment(version=1)
 def TEST_sub_noblocking(
-    experiment: Experiment,
     wait_time: float = 3.0,
     dummy_param: float = 0.0,
 ):
@@ -61,7 +60,6 @@ def TEST_sub_noblocking(
 
 @experiment(version=1)
 def TEST_sub_conditional_stop(
-    experiment: Experiment,
 ):
     """Build an experiment that sets a global param and conditionally stops.
 

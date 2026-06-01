@@ -83,7 +83,7 @@ toggle_triggertype = TriggerType.fallingedge
 
 
 @experiment(version=1)
-def CCSI_sub_unload_cell(experiment: Experiment) -> list:
+def CCSI_sub_unload_cell() -> list:
     """Unload every sample currently tracked at the ``cell1_we`` PAL custom position.
 
     Args:
@@ -100,7 +100,6 @@ def CCSI_sub_unload_cell(experiment: Experiment) -> list:
 
 @experiment(version=1)
 def CCSI_sub_load_solid(
-    experiment: Experiment,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ) -> list:
@@ -142,7 +141,6 @@ def CCSI_sub_load_solid(
 
 @experiment(version=3)
 def CCSI_sub_load_liquid(
-    experiment: Experiment,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
     water_True_False: bool = False,
@@ -188,7 +186,6 @@ def CCSI_sub_load_liquid(
 
 @experiment(version=2)
 def CCSI_sub_load_gas(
-    experiment: Experiment,
     reservoir_gas_sample_no: int = 1,
     volume_ul_cell_gas: int = 1000,
 ) -> list:
@@ -226,7 +223,6 @@ def CCSI_sub_load_gas(
 
 @experiment(version=1)
 def CCSI_sub_alloff(
-    experiment: Experiment,
 ) -> list:
     """Turn the recirculating pump off and close every CCSI gas/liquid valve.
 
@@ -258,7 +254,6 @@ def CCSI_sub_alloff(
 
 @experiment(version=7)
 def CCSI_sub_headspace_purge_and_measure(
-    experiment: Experiment,
     HSpurge_duration: float = 20,
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
@@ -371,7 +366,6 @@ def CCSI_sub_headspace_purge_and_measure(
 
 @experiment(version=1)
 def CCSI_sub_headspace_measure(
-    experiment: Experiment,
     recirculation_rate_uL_min: int = 10000,
     co2measure_duration: float = 10,
     co2measure_acqrate: float = 0.5,
@@ -431,7 +425,6 @@ def CCSI_sub_headspace_measure(
 
 @experiment(version=8)
 def CCSI_sub_drain(
-    experiment: Experiment,
     HSpurge_duration: float = 20,
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
@@ -579,7 +572,6 @@ def CCSI_sub_drain(
 
 @experiment(version=4)
 def CCSI_sub_n2drain(
-    experiment: Experiment,
     n2flowrate_sccm: float = 10,
     HSpurge_duration: float = 240,
     DeltaDilute1_duration: float = 0,
@@ -689,7 +681,6 @@ def CCSI_sub_n2drain(
 
 @experiment(version=1)
 def CCSI_sub_initialization_end_state(
-    experiment: Experiment,
 ) -> list:
     """Place the system into its post-initialization state: pump off and valve 1A closed.
 
@@ -724,7 +715,6 @@ def CCSI_sub_initialization_end_state(
 
 @experiment(version=1)
 def CCSI_sub_peripumpoff(
-    experiment: Experiment,
 ) -> list:
     """Stop the recirculation dose pump (CSIL variant).
 
@@ -750,7 +740,6 @@ def CCSI_sub_peripumpoff(
 
 @experiment(version=4)
 def CCSI_sub_initialization_firstpart(
-    experiment: Experiment,
     HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
     Alphapurge1_duration: float = 10,
@@ -870,7 +859,6 @@ def CCSI_sub_initialization_firstpart(
 @experiment(version=10)
 def CCSI_sub_cellfill(
     #   formerly def CCSI_sub_liquidfill_syringes(
-    experiment: Experiment,
     # move co2 monitoring to separate exp, #3  n2 push, #4 change multivalve positions,5-syringepushwait, 6 co2afterpush
     # 7 waterfill wait 8 rearrange ordering
     Solution_description: str = "KOH",
@@ -957,7 +945,6 @@ def CCSI_sub_cellfill(
 
                 apm.add_actions(
                     CCSI_sub_load_liquid(
-                        experiment=experiment,
                         reservoir_liquid_sample_no=secondliquid_injection_reservoir_sample_no,
                         volume_ul_cell_liquid=secondliquid_injection_volume_ul,
                         water_True_False=True,
@@ -1047,7 +1034,6 @@ def CCSI_sub_cellfill(
 
         apm.add_actions(
             CCSI_sub_load_liquid(
-                experiment=experiment,
                 reservoir_liquid_sample_no=Solution_reservoir_sample_no,
                 volume_ul_cell_liquid=Solution_volume_ul,
                 water_True_False=previous_liquid,
@@ -1175,7 +1161,6 @@ def CCSI_sub_cellfill(
 
                 apm.add_actions(
                     CCSI_sub_load_liquid(
-                        experiment=experiment,
                         reservoir_liquid_sample_no=secondliquid_injection_reservoir_sample_no,
                         volume_ul_cell_liquid=secondliquid_injection_volume_ul,
                         water_True_False=True,
@@ -1265,7 +1250,6 @@ def CCSI_sub_cellfill(
 
         apm.add_actions(
             CCSI_sub_load_liquid(
-                experiment=experiment,
                 reservoir_liquid_sample_no=Clean_reservoir_sample_no,
                 volume_ul_cell_liquid=Clean_volume_ul,
                 water_True_False=True,
@@ -1401,7 +1385,6 @@ def CCSI_sub_cellfill(
 
 @experiment(version=2)
 def CCSI_sub_co2monitoring(
-    experiment: Experiment,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
     recirculation_rate_uL_min: int = 10000,
@@ -1455,7 +1438,6 @@ def CCSI_sub_co2monitoring(
 
 @experiment(version=2)
 def CCSI_sub_co2monitoring_mfcmasscotwo(
-    experiment: Experiment,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
@@ -1541,7 +1523,6 @@ def CCSI_sub_co2monitoring_mfcmasscotwo(
 
 @experiment(version=1)
 def CCSI_sub_co2topup_mfcmassdose(
-    experiment: Experiment,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
     flowramp_sccm: float = 9,
@@ -1605,7 +1586,6 @@ def CCSI_sub_co2topup_mfcmassdose(
 
 @experiment(version=2)
 def CCSI_sub_co2constantpressure(
-    experiment: Experiment,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
     atm_pressure: float = 14.27,
@@ -1681,7 +1661,6 @@ def CCSI_sub_co2constantpressure(
 
 @experiment(version=2)
 def CCSI_sub_co2mass_temp(
-    experiment: Experiment,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
@@ -1779,7 +1758,6 @@ def CCSI_sub_co2mass_temp(
 
 @experiment(version=2)
 def CCSI_sub_co2massdose(
-    experiment: Experiment,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
@@ -1881,7 +1859,6 @@ def CCSI_sub_co2massdose(
 
 @experiment(version=3)
 def CCSI_sub_co2maintainconcentration(
-    experiment: Experiment,
     pureco2_sample_no: int = 1,
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 0.5,
@@ -2025,7 +2002,6 @@ def CCSI_sub_co2maintainconcentration(
 
 @experiment(version=4)
 def CCSI_sub_flowflush(
-    experiment: Experiment,
     co2measure_duration: float = 3600,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
@@ -2100,7 +2076,6 @@ def CCSI_sub_flowflush(
 
 @experiment(version=9)
 def CCSI_sub_clean_inject(
-    experiment: Experiment,
     Clean_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 500,
     LiquidCleanWait_s: float = 15,
@@ -2276,7 +2251,6 @@ def CCSI_sub_clean_inject(
     # LIQUID DRAIN
     apm.add_actions(
         CCSI_sub_drain(
-            experiment=experiment,
             HSpurge_duration=LiquidCleanPurge_duration,
             recirculation=drainrecirc,
             recirculation_rate_uL_min=recirculation_rate_uL_min,
@@ -2288,7 +2262,6 @@ def CCSI_sub_clean_inject(
 
 @experiment(version=3)
 def CCSI_sub_refill_clean(
-    experiment: Experiment,
     Clean_volume_ul: int = 5000,
     Syringe_rate_ulsec: int = 100,
 ) -> list:
@@ -2417,7 +2390,6 @@ def CCSI_sub_refill_clean(
 
 @experiment(version=3)
 def CCSI_debug_co2purge(
-    experiment: Experiment,
     co2measure_duration: float = 10,
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
@@ -2468,7 +2440,6 @@ def CCSI_debug_co2purge(
 
 @experiment(version=2)
 def CCSI_leaktest_co2(
-    experiment: Experiment,
     co2measure_duration: float = 600,
     co2measure_acqrate: float = 1,
     recirculate: bool = True,
@@ -2512,7 +2483,6 @@ def CCSI_leaktest_co2(
 
 @experiment(version=1)
 def CCSI_sub_monitorcell(
-    experiment: Experiment,
     co2measure_duration: float = 1200,
     co2measure_acqrate: float = 1,
     recirculation: bool = False,
@@ -2566,7 +2536,6 @@ def CCSI_sub_monitorcell(
 
 @experiment(version=5)
 def CCSI_sub_n2flush(
-    experiment: Experiment,
     flush_cycles: int = 0,
     n2flowrate_sccm: float = 10,
     HSpurge1_duration: float = 60,
@@ -2856,7 +2825,6 @@ def CCSI_sub_n2flush(
 
 @experiment(version=10)
 def CCSI_sub_n2clean(
-    experiment: Experiment,
     # 9change to no recirc drains, add one, 10 remove rinses
     Clean_reservoir_sample_no: int = 1,
     Clean_volume_ul: float = 10000,
@@ -2927,7 +2895,6 @@ def CCSI_sub_n2clean(
 
     apm.add_actions(
         CCSI_sub_cellfill(
-            experiment=experiment,
             Solution_reservoir_sample_no=1,
             Solution_volume_ul=0,
             Clean_reservoir_sample_no=Clean_reservoir_sample_no,
@@ -2938,7 +2905,6 @@ def CCSI_sub_n2clean(
     )
     apm.add_actions(
         CCSI_sub_n2drain(
-            experiment=experiment,
             n2flowrate_sccm=n2flowrate_sccm,
             HSpurge_duration=drain_HSpurge_duration,
             DeltaDilute1_duration=DeltaDilute1_duration,
@@ -2950,7 +2916,6 @@ def CCSI_sub_n2clean(
 
     apm.add_actions(
         CCSI_sub_refill_clean(
-            experiment=experiment,
             Clean_volume_ul=Clean_volume_ul,
             # Syringe_rate_ulsec=100,
         )
@@ -2958,7 +2923,6 @@ def CCSI_sub_n2clean(
 
     apm.add_actions(
         CCSI_sub_n2flush(
-            experiment=experiment,
             n2flowrate_sccm=n2flowrate_sccm,
             HSpurge1_duration=flush_HSpurge1_duration,
             HSpurge_duration=flush_HSpurge_duration,
@@ -2993,7 +2957,6 @@ def CCSI_sub_n2clean(
 
 @experiment(version=2)
 def CCSI_sub_n2rinse(
-    experiment: Experiment,
     rinse_cycles: int = 3,
     Clean_reservoir_sample_no: int = 1,
     Clean_volume_ul: float = 10000,
@@ -3037,7 +3000,6 @@ def CCSI_sub_n2rinse(
     for i in range(rinse_cycles):
         apm.add_actions(
             CCSI_sub_cellfill(
-                experiment=experiment,
                 Solution_reservoir_sample_no=1,
                 Solution_volume_ul=0,
                 Clean_reservoir_sample_no=Clean_reservoir_sample_no,
@@ -3060,7 +3022,6 @@ def CCSI_sub_n2rinse(
 
         apm.add_actions(
             CCSI_sub_n2drain(
-                experiment=experiment,
                 n2flowrate_sccm=n2flowrate_sccm,
                 HSpurge_duration=drain_HSpurge_duration,
                 # DeltaDilute1_duration=DeltaDilute1_duration,
@@ -3071,7 +3032,6 @@ def CCSI_sub_n2rinse(
         )
         apm.add_actions(
             CCSI_sub_refill_clean(
-                experiment=experiment,
                 Clean_volume_ul=Clean_volume_ul,
                 # Syringe_rate_ulsec=100,
             )
@@ -3081,7 +3041,6 @@ def CCSI_sub_n2rinse(
 
 @experiment(version=1)
 def CCSI_sub_n2headspace(
-    experiment: Experiment,
     n2flowrate_sccm: float = 50,
     HSpurge_duration: float = 120,
     recirculation: bool = True,
