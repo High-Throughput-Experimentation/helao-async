@@ -110,13 +110,15 @@ def base_api_unit_test() -> bool:
             return action.action_name, payload
 
         wrapped = wrap_action_endpoint(sync_endpoint)
-        # The wrapper preserves the signature so FastAPI can introspect it.
+        # The wrapper exposes the wrapped endpoint's declared parameters so
+        # FastAPI can introspect them, augmenting the signature with the
+        # synthesized ``action_version`` parameter the endpoint omitted.
         import inspect
 
         reporter.check(
             "wrap_action_endpoint preserves the wrapped signature",
             lambda: list(inspect.signature(wrapped).parameters.keys())
-            == ["action", "payload"],
+            == ["action", "payload", "action_version"],
         )
 
         result = wrapped(action=Action(action_name="sync_call"), payload="hello")
