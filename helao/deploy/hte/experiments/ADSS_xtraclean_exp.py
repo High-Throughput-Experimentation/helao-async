@@ -3483,3 +3483,44 @@ def ADSS_sub_PAL_tray_to_tray(
     )
 
     return apm.planned_actions  # returns complete action list to orch
+
+
+@experiment(version=1)
+def ADSS_sub_PAL_export_icpms(
+    tray: int = 2,
+    slot: int = 1,
+    survey_runs: int = 1,
+    main_runs: int = 3,
+    rack: int = 2,
+    dilution_factor: float = 10,
+) -> list:
+    """Export a PAL tray slot to ICPMS without unloading it.
+
+    Args:
+        experiment: Orchestrator-provided experiment context.
+        tray: PAL tray index.
+        slot: PAL slot index.
+        survey_runs: ICPMS rough sweep count.
+        main_runs: ICPMS centered sweeps count.
+        rack: ICPMS rack position.
+        dilution_factor: Sample dilution factor.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
+    apm = ActionPlanMaker()
+
+    apm.add(
+        PAL_server,
+        "archive_tray_export_icpms",
+        {
+            "tray": tray,
+            "slot": slot,
+            "survey_runs": survey_runs,
+            "main_runs": main_runs,
+            "rack": rack,
+            "dilution_factor": dilution_factor,
+        },
+    )
+
+    return apm.planned_actions  # returns complete action list to orch
