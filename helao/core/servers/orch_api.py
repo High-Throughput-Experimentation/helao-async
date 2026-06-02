@@ -540,12 +540,28 @@ class OrchAPI(HelaoFastAPI):
                 ],
             )
             cond = active.action.action_params["check_condition"]
-            param = active.action.action_params.get(
-                active.action.action_params["check_parameter"], None
-            )
+            check_key = active.action.action_params.get("check_parameter") or ""
+            # Prefer orchestrator global_params (e.g. Ewe_V__mean_final from last run_CP);
+            # action_params may omit values if the HTTP payload did not round-trip globals.
+            param = None
+            if check_key:
+                param = self.orch.global_params.get(check_key)
+                if param is None:
+                    param = active.action.action_params.get(check_key)
             thresh = active.action.action_params["check_value"]
             check = False
-            if cond == checkcond.equals:
+            if cond == checkcond.uncond:
+                check = True
+            elif cond is None:
+                check = False
+            elif param is None:
+                LOGGER.warning(
+                    "conditional_exp: parameter %r is missing (not in global_params or "
+                    "action_params); condition cannot be evaluated -> treating as False.",
+                    check_key,
+                )
+                check = False
+            elif cond == checkcond.equals:
                 check = param == thresh
             elif cond == checkcond.above:
                 check = param > thresh
@@ -553,10 +569,6 @@ class OrchAPI(HelaoFastAPI):
                 check = param < thresh
             elif cond == checkcond.isnot:
                 check = param != thresh
-            elif cond == checkcond.uncond:
-                check = True
-            elif cond is None:
-                check = False
 
             if check:
                 await self.orch.add_experiment(

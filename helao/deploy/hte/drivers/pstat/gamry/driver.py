@@ -440,8 +440,15 @@ class GamryDriver(HelaoDriver):
         return response
 
     async def stop(self) -> DriverResponse:
-        """Abort the currently running dtaq and mark the sink as done."""
+        """General stop method to abort all active methods e.g. motion, I/O, compute.
+
+        CV/CP/etc. use ``dtaqsink``; PEIS/GEIS use ``readz`` with ``dtaqsink`` still
+        ``DummySink``, so we must stop ``readz`` here (same as GamryEisExec._manual_stop)
+        or the visualizer ``stop_private`` path would not halt EIS.
+        """
         try:
+            if self.readz is not None:
+                return await self.readz.stop()
             if not self.stopping:
                 if self.dtaqsink.dtaq is not None:
                     self.stopping = True

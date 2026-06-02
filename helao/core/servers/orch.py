@@ -273,11 +273,19 @@ class Orch(Base):
         servPort = self.server_params.get("bokeh_port", self.server_cfg["port"] + 1000)
         servPy = "BokehOperator"
 
+        # Allow both 127.0.0.1 and localhost so the operator works from either URL
+        origins = [f"{servHost}:{servPort}"]
+        if servHost == "127.0.0.1":
+            origins.append(f"localhost:{servPort}")
+        # Bokeh session token: default 300s; use 7 days so /BokehOperator/ws does not expire during use
+        session_token_expiration = self.server_params.get("bokeh_session_token_expiration", 604800)
+
         self.bokehapp = Server(
             {f"/{servPy}": partial(self.makeBokehApp, orch=self)},
             port=servPort,
             address=servHost,
-            allow_websocket_origin=[f"{servHost}:{servPort}"],
+            allow_websocket_origin=origins,
+            session_token_expiration=session_token_expiration,
         )
         LOGGER.info(f"started bokeh server {self.bokehapp}")
         self.bokehapp.start()
