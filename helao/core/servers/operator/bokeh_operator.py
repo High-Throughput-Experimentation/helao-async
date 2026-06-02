@@ -55,6 +55,10 @@ from bokeh.models.widgets import FileInput
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
+# Params for which we do not attach the "red if edited" TextInput callback. List-like
+# defaults are often customized; string defaults with single quotes also break naive JS.
+_SEQ_EXP_PARAM_SKIP_DEFAULT_HIGHLIGHT = frozenset({"sample_no_list", "xy_list"})
+
 BUILTIN_TYPES = [
     getattr(builtins, d)
     for d in dir(builtins)
@@ -1770,18 +1774,19 @@ class BokehOperator:
                 height=40,
                 stylesheets=initial_stylesheet,
             )
-            color_callback_js = CustomJS(
-                args=dict(input=text_input),
-                code=f"""
+            if args[idx] not in _SEQ_EXP_PARAM_SKIP_DEFAULT_HIGHLIGHT:
+                color_callback_js = CustomJS(
+                    args=dict(input=text_input),
+                    code=f"""
 var new_color = "black";
 if (cb_obj.value_input !== '{def_val}') {{
     new_color = "red";
 }}
 cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 """,
-            )
-            text_input.js_on_change("value", color_callback_js)
-            text_input.js_on_change("value_input", color_callback_js)
+                )
+                text_input.js_on_change("value", color_callback_js)
+                text_input.js_on_change("value_input", color_callback_js)
             param_input.append(text_input)
             argtype_list.append(argtypes[idx])
             param_layout.append(

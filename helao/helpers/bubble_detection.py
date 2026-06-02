@@ -38,43 +38,60 @@ def bubble_detection(
     Returns:
         ``True`` if any heuristic indicates a bubble, otherwise ``False``.
     """
-    # relative standard deviation test
-    SD = statistics.stdev(list(data["Ewe_V"]))
-    mean = statistics.mean(list(data["Ewe_V"]))
-    RSD = (SD / mean) * 100
-    RSD_test_result = RSD > RSD_threshold
+    required_cols = {"t_s", "Ewe_V"}
+    missing_cols = required_cols.difference(set(data.columns))
+    if missing_cols:
+        LOGGER.warning(
+            f"bubble_detection skipped: missing columns {sorted(missing_cols)} in OCV data."
+        )
+        return False
 
-    # simple threshold test
-    # checks whether last value is higher than set threshold
-    last_val = data["Ewe_V"].iloc[-1]
-    simple_test_result = last_val < simple_threshold
+    if data.empty or len(data["Ewe_V"]) < 2:
+        LOGGER.warning("bubble_detection skipped: not enough OCV points for analysis.")
+        return False
 
-    # change in signal test
-    # takes every 1s data and compared the change in signal average and whether that is above a threshold
-    modulo_seconds = 0.5
-    idx = []
-    for index, row in data.iterrows():
-        if row["t_s"] % modulo_seconds == 0:
-            idx.append(index)
+    try:
+        # relative standard deviation test
+        SD = statistics.stdev(list(data["Ewe_V"]))
+        mean = statistics.mean(list(data["Ewe_V"]))
+        if mean == 0:
+            RSD_test_result = False
+            LOGGER.warning("bubble_detection: Ewe_V mean is zero; skipping RSD test.")
+        else:
+            RSD = (SD / mean) * 100
+            RSD_test_result = RSD > RSD_threshold
 
-    modulo_E = data.loc[idx]["Ewe_V"]
+        # simple threshold test
+        # checks whether last value is higher than set threshold
+        last_val = data["Ewe_V"].iloc[-1]
+        simple_test_result = last_val < simple_threshold
 
-    E_changes = []
-    for i in range(len(modulo_E) - 1):
-        E_changes.append(abs(modulo_E.iloc[i] - modulo_E.iloc[i + 1]))
-    signal_change_result = any(i > signal_change_threshold for i in E_changes)
+        # change in signal test
+        # takes every 1s data and compared the change in signal average and whether that is above a threshold
+        modulo_seconds = 0.5
+        idx = []
+        for index, row in data.iterrows():
+            if row["t_s"] % modulo_seconds == 0:
+                idx.append(index)
 
-    # peak finding test
-    # Find peaks (maxima)
-    peaks, properties_peaks = find_peaks(data["Ewe_V"])
-    peak_avg = data["Ewe_V"].iloc[peaks].mean()
-    # Find troughs (minima) - by finding peaks in the inverted signal
-    troughs, properties_troughs = find_peaks(-data["Ewe_V"])
-    troughs_avg = data["Ewe_V"].iloc[troughs].mean()
+        modulo_E = data.loc[idx]["Ewe_V"]
 
-    mean_amplitude = abs(peak_avg - troughs_avg)
+        E_changes = []
+        for i in range(len(modulo_E) - 1):
+            E_changes.append(abs(modulo_E.iloc[i] - modulo_E.iloc[i + 1]))
+        signal_change_result = any(i > signal_change_threshold for i in E_changes)
 
-    amplitude_test_result = mean_amplitude > amplitude_threshold
+        # peak finding test
+        # Find peaks (maxima)
+        peaks, properties_peaks = find_peaks(data["Ewe_V"])
+        peak_avg = data["Ewe_V"].iloc[peaks].mean()
+        # Find troughs (minima) - by finding peaks in the inverted signal
+        troughs, properties_troughs = find_peaks(-data["Ewe_V"])
+        troughs_avg = data["Ewe_V"].iloc[troughs].mean()
+
+        mean_amplitude = abs(peak_avg - troughs_avg)
+
+        amplitude_test_result = mean_amplitude > amplitude_threshold
 
     # print("peaks at t:")
     # print(test_red["t_s"].iloc[peaks])
@@ -104,18 +121,21 @@ def bubble_detection(
     # print("signal change test: " + str(signal_change_result))
     # print("amplitude test: " + str(amplitude_test_result))
 
-    has_bubble = (
-        RSD_test_result
-        or simple_test_result
-        or signal_change_result
-        or amplitude_test_result
-    )
-    for label, test in [
-        ("RSD_test", RSD_test_result),
-        ("simple_test", simple_test_result),
-        ("single_change_test", signal_change_result),
-        ("amplitude_test", amplitude_test_result),
-    ]:
-        LOGGER.debug(f"{label}: {test}")
+        has_bubble = (
+            RSD_test_result
+            or simple_test_result
+            or signal_change_result
+            or amplitude_test_result
+        )
+        for label, test in [
+            ("RSD_test", RSD_test_result),
+            ("simple_test", simple_test_result),
+            ("single_change_test", signal_change_result),
+            ("amplitude_test", amplitude_test_result),
+        ]:
+            LOGGER.debug(f"{label}: {test}")
 
-    return bool(has_bubble)
+        return bool(has_bubble)
+    except Exception:
+        LOGGER.error("bubble_detection failed; returning has_bubble=False", exc_info=True)
+        return False
