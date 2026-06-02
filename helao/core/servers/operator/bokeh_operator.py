@@ -55,10 +55,6 @@ from bokeh.models.widgets import FileInput
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-# Params for which we do not attach the "red if edited" TextInput callback. List-like
-# defaults are often customized; string defaults with single quotes also break naive JS.
-_SEQ_EXP_PARAM_SKIP_DEFAULT_HIGHLIGHT = frozenset({"sample_no_list", "xy_list"})
-
 BUILTIN_TYPES = [
     getattr(builtins, d)
     for d in dir(builtins)
@@ -245,6 +241,9 @@ class BokehOperator:
         if specs_folder is not None:
             if os.path.exists(specs_folder) and os.path.isdir(specs_folder):
                 self.seqspec_folder = specs_folder
+        self.skip_default_highlights = set(
+            self.config_dict.get("skip_default_highlights", [])
+        )
 
         # FastAPI calls
         self.get_sequence_lib()
@@ -289,8 +288,8 @@ class BokehOperator:
         self.action_history_source, self.action_history_table = self._make_table(
             self.action_history_lists, fit_columns=True
         )
-        self.experiment_history_source, self.experiment_history_table = self._make_table(
-            self.experiment_history_lists, fit_columns=True
+        self.experiment_history_source, self.experiment_history_table = (
+            self._make_table(self.experiment_history_lists, fit_columns=True)
         )
         self.sequence_history_source, self.sequence_history_table = self._make_table(
             self.sequence_history_lists, fit_columns=True
@@ -313,7 +312,13 @@ class BokehOperator:
             title="Sequence History",
         )
         self.planhistory_tabs = Tabs(
-            tabs=[self.planner_tab, self.action_history_tab, self.experiment_history_tab, self.sequence_history_tab], height_policy="min"
+            tabs=[
+                self.planner_tab,
+                self.action_history_tab,
+                self.experiment_history_tab,
+                self.sequence_history_tab,
+            ],
+            height_policy="min",
         )
 
         self.sequence_dropdown = Select(
@@ -1198,14 +1203,16 @@ class BokehOperator:
         action_tups = sorted(self.orch.action_history.items(), key=lambda x: x[0])[::-1]
         for actuuid, actdict in action_tups:
             self.action_history_lists["action_uuid"].append(str(actuuid)[-8:])
-            self.action_history_lists["action_endpoint"].append(f"{actdict['action_server']}/{actdict['action_name']}")
-            self.action_history_lists["start"].append(actdict.get("action_timestamp", None))
-            self.action_history_lists["finish"].append(actdict.get("action_finished_timestamp", None))
-            for k in [
-                "action_status",
-                "experiment_name",
-                "sequence_label"
-            ]:
+            self.action_history_lists["action_endpoint"].append(
+                f"{actdict['action_server']}/{actdict['action_name']}"
+            )
+            self.action_history_lists["start"].append(
+                actdict.get("action_timestamp", None)
+            )
+            self.action_history_lists["finish"].append(
+                actdict.get("action_finished_timestamp", None)
+            )
+            for k in ["action_status", "experiment_name", "sequence_label"]:
                 if k in actdict:
                     self.action_history_lists[k].append(
                         actdict[k][-1] if isinstance(actdict[k], list) else actdict[k]
@@ -1213,13 +1220,21 @@ class BokehOperator:
 
         for key in self.experiment_history_lists:
             self.experiment_history_lists[key] = []
-        exp_tups = sorted(self.orch.experiment_history.items(), key=lambda x: x[0])[::-1]
+        exp_tups = sorted(self.orch.experiment_history.items(), key=lambda x: x[0])[
+            ::-1
+        ]
         LOGGER.debug(f"Experiment tuples: {exp_tups}")
         for expuuid, expdict in exp_tups:
             self.experiment_history_lists["experiment_uuid"].append(str(expuuid)[-8:])
-            self.experiment_history_lists["experiment_name"].append(expdict["experiment_name"])
-            self.experiment_history_lists["start"].append(expdict.get("experiment_timestamp", None))
-            self.experiment_history_lists["finish"].append(expdict.get("experiment_finished_timestamp", None))
+            self.experiment_history_lists["experiment_name"].append(
+                expdict["experiment_name"]
+            )
+            self.experiment_history_lists["start"].append(
+                expdict.get("experiment_timestamp", None)
+            )
+            self.experiment_history_lists["finish"].append(
+                expdict.get("experiment_finished_timestamp", None)
+            )
             for k in [
                 "experiment_status",
                 "sequence_label",
@@ -1236,9 +1251,15 @@ class BokehOperator:
         LOGGER.debug(f"Sequence tuples: {seq_tups}")
         for sequuid, seqdict in seq_tups:
             self.sequence_history_lists["sequence_uuid"].append(str(sequuid)[-8:])
-            self.sequence_history_lists["sequence_name"].append(seqdict["sequence_name"])
-            self.sequence_history_lists["start"].append(seqdict.get("sequence_timestamp", None))
-            self.sequence_history_lists["finish"].append(seqdict.get("sequence_finished_timestamp", None))
+            self.sequence_history_lists["sequence_name"].append(
+                seqdict["sequence_name"]
+            )
+            self.sequence_history_lists["start"].append(
+                seqdict.get("sequence_timestamp", None)
+            )
+            self.sequence_history_lists["finish"].append(
+                seqdict.get("sequence_finished_timestamp", None)
+            )
             for k in [
                 "sequence_status",
                 "sequence_label",
@@ -1774,7 +1795,7 @@ class BokehOperator:
                 height=40,
                 stylesheets=initial_stylesheet,
             )
-            if args[idx] not in _SEQ_EXP_PARAM_SKIP_DEFAULT_HIGHLIGHT:
+            if args[idx] not in self.skip_default_highlights:
                 color_callback_js = CustomJS(
                     args=dict(input=text_input),
                     code=f"""
