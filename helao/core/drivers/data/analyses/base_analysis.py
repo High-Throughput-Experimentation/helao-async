@@ -60,6 +60,22 @@ class BaseAnalysis:
     inputs: AnalysisInput
     outputs: AnalysisOutput
 
+    @classmethod
+    def select_process_uuids(cls, local_loader) -> list:
+        """Return the process UUIDs this analysis should run on for a loader.
+
+        Default behaviour enqueues every process in the loader. Subclasses
+        override this to filter (e.g. by ``run_use``) when only a subset of the
+        sequence's processes are valid inputs.
+
+        Args:
+            local_loader: ``LocalLoader`` bound to a sequence zip.
+
+        Returns:
+            List of process UUIDs to enqueue for analysis.
+        """
+        return list(local_loader.processes.process_uuid)
+
     def gen_uuid(self, global_sample_label: Optional[str] = None) -> UUID:
         """Derive a stable analysis UUID from analysis identity and inputs.
 

@@ -44,3 +44,4 @@ servers:
     fast: analysis_server
     params:
       local_only: false
+      analyses: [icpms_local, xrfs_local]
