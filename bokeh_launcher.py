@@ -85,7 +85,10 @@ if __name__ == "__main__":
     detected_deployment = os.path.basename(
         os.path.dirname(os.path.dirname(config_path))
     )
-    deployment = server_config.get("deployment", detected_deployment)
+    # `app_deployment` is where the bokeh app module physically lives; it may
+    # differ from the config's own deployment when a generic app (e.g.
+    # action_visualizer / live_visualizer) is reused across deployments.
+    app_deployment = server_config.get("deployment", detected_deployment)
     if "deployment" not in server_config:
         possible_deployments = glob(
             os.path.join(
@@ -97,12 +100,12 @@ if __name__ == "__main__":
             )
         )
         if len(possible_deployments) == 1:
-            deployment = os.path.basename(
+            app_deployment = os.path.basename(
                 os.path.dirname(
                     os.path.dirname(os.path.dirname(possible_deployments[0]))
                 )
             )
-            LOGGER.info(f"Auto-detected deployment: {deployment}")
+            LOGGER.info(f"Auto-detected deployment: {app_deployment}")
         elif len(possible_deployments) > 1:
             # prefer detected deployment
             filter_possible = [
@@ -110,18 +113,22 @@ if __name__ == "__main__":
                 for x in possible_deployments
                 if x.startswith(os.path.dirname(os.path.dirname(config_path)))
             ][0]
-            deployment = os.path.basename(
+            app_deployment = os.path.basename(
                 os.path.dirname(os.path.dirname(os.path.dirname(filter_possible)))
             )
-            LOGGER.info(f"Auto-detected deployment from multiple options: {deployment}")
+            LOGGER.info(
+                f"Auto-detected deployment from multiple options: {app_deployment}"
+            )
         else:
             raise FileNotFoundError(
                 f"Could not find deployment for {server_config['bokeh']} in {server_config['group']}"
             )
-    CONFIG["deployment"] = deployment
+    # CONFIG["deployment"] tracks the config's own deployment so generic
+    # visualizers resolve per-server vis modules starting from the right place.
+    CONFIG["deployment"] = server_config.get("deployment", detected_deployment)
 
     makeApp = import_module(
-        f"helao.deploy.{deployment}.servers.{server_config['group']}.{server_config['bokeh']}"
+        f"helao.deploy.{app_deployment}.servers.{server_config['group']}.{server_config['bokeh']}"
     ).makeBokehApp
     root = CONFIG.get("root", None)
     if root is not None:

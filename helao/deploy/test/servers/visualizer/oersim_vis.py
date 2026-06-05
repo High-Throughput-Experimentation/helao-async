@@ -5,8 +5,6 @@ in-flight CP trace alongside the previous trace as the action UUID
 changes.
 """
 
-import time
-import asyncio
 from functools import partial
 from copy import deepcopy
 
@@ -23,7 +21,7 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.vis import Vis
-from helao.helpers.ws_utils import WsSubscriber as Wss
+from helao.core.servers.vis_subscriber import ActionVisualizer
 
 
 VALID_DATA_STATUS = (
@@ -35,25 +33,25 @@ VALID_DATA_STATUS = (
 VALID_ACTION_NAME = ("measure_cp",)
 
 
-class C_oersimvis:
+class C_vis(ActionVisualizer):
     """Live OER CP visualizer for the CP simulator action server.
 
     Subscribes to the action server's ``ws_data`` websocket and maintains
     a "current" plot for the in-flight trace plus a "previous" plot
     holding the most recent prior action's trace, switching whenever the
-    streamed ``action_uuid`` changes.
+    streamed ``action_uuid`` changes. Common subscriber bring-up, the
+    ``max datapoints`` callback, and the ingest loop are inherited from
+    :class:`ActionVisualizer`.
 
     Attributes:
-        vis: Hosting visualizer server.
-        max_points: Rolling buffer size for the streamed datasource.
-        server_key: Name of the action server being visualized.
-        wss: ``WsSubscriber`` consumer for ``ws_data`` packages.
         datasource: ``ColumnDataSource`` backing the live plot.
         prev_datasources: Per-uuid snapshots backing the previous plot.
         cur_action_uuid: Currently-streamed action UUID.
         cur_comp: Currently-streamed composition string.
         layout: Top-level Bokeh layout.
     """
+
+    SUBSCRIBE_LABEL = "OER CP simulator visualizer"
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         """Build the layout and start the websocket polling task.
@@ -62,26 +60,11 @@ class C_oersimvis:
             vis_serv: Hosting visualizer server.
             serv_key: Name of the action server to visualize.
         """
-        self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg.get("params", {})
-        self.max_points = 500
-        self.update_rate = 1e-3
-        self.last_update_time = time.time()
-
-        self.server_key = serv_key
-        actserv_config = self.vis.world_cfg["servers"].get(self.server_key, None)
-        if actserv_config is None:
+        super().__init__(vis_serv, serv_key)
+        if not self.connected:
             return
-        actserv_host = actserv_config.get("host", None)
-        actserv_port = actserv_config.get("port", None)
-        self.wss = Wss(actserv_host, actserv_port, "ws_data")
-
-        self.data_url = (
-            f"ws://{actserv_config['host']}:{actserv_config['port']}/ws_data"
-        )
-
-        self.IOloop_data_run = False
-        self.IOloop_stat_run = False
+        actserv_host = self.host
+        actserv_port = self.port
 
         self.data_dict_keys = ["t_s", "erhe_v"]
         self.datasource = ColumnDataSource(
@@ -120,7 +103,7 @@ class C_oersimvis:
 
         # combine all sublayouts into a single one
         docs_url = f"http://{actserv_host}:{actserv_port}/docs#/"
-        server_link = f'<a href="{docs_url}" target="_blank">\'{self.server_key}\'</a>'
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.serv_key}\'</a>'
         headerbar = f"<b>OER CP simulator for server {server_link}</b>"
         self.layout = layout(
             [
@@ -136,76 +119,8 @@ class C_oersimvis:
             width=1024,
         )
 
-        self.vis.doc.add_root(self.layout)
-        self.vis.doc.add_root(Spacer(height=10))
-        self.IOtask = asyncio.create_task(self.IOloop_data())
-        self.vis.doc.on_session_destroyed(self.cleanup_session)
+        self._mount()
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
-
-    def cleanup_session(self, session_context):
-        """Cancel the IO loop when the Bokeh session ends.
-
-        Args:
-            session_context: Bokeh session context (unused).
-        """
-        LOGGER.info(f"'{self.server_key}' Bokeh session closed")
-        self.IOloop_data_run = False
-        self.IOtask.cancel()
-
-    def callback_input_max_points(self, attr, old, new, sender):
-        """Validate and apply a new ``max_points`` input, then echo it back.
-
-        Args:
-            attr: Bokeh attribute name (unused).
-            old: Previous string value.
-            new: New string value.
-            sender: The source widget.
-        """
-
-        def to_int(val):
-            try:
-                return int(val)
-            except ValueError:
-                return None
-
-        newpts = to_int(new)
-        oldpts = to_int(old)
-
-        if newpts is None:
-            if oldpts is not None:
-                newpts = oldpts
-            else:
-                newpts = 500
-
-        if newpts < 2:
-            newpts = 2
-        if newpts > 10000:
-            newpts = 10000
-
-        self.max_points = newpts
-
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.max_points}")
-        )
-
-    def update_input_value(self, sender, value):
-        """Push ``value`` back into the source widget.
-
-        Args:
-            sender: Bokeh widget to update.
-            value: New value to assign.
-        """
-        sender.value = value
-
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        """Poll the data websocket and schedule UI updates on the document."""
-        LOGGER.info(f" ... potentiostat visualizer subscribing to: {self.data_url}")
-        while True:
-            if time.time() - self.last_update_time >= self.update_rate:
-                messages = await self.wss.read_messages()
-                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
-                self.last_update_time = time.time()
-            await asyncio.sleep(0.001)
 
     def add_points(self, datapackage_list: list):
         """Stream a batch of websocket data packages into the live plot.

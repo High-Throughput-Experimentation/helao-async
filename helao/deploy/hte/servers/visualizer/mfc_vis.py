@@ -1,5 +1,3 @@
-import time
-import asyncio
 from functools import partial
 from datetime import datetime
 
@@ -19,12 +17,12 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.vis import Vis
-from helao.helpers.ws_utils import WsSubscriber as Wss
+from helao.core.servers.vis_subscriber import LiveVisualizer
 
 FWIN = 20
 
 
-class C_mfc:
+class C_vis(LiveVisualizer):
     """Bokeh visualizer for a multi-device mass flow controller server.
 
     Subscribes to the action server's ``ws_live`` WebSocket and renders per
@@ -32,20 +30,12 @@ class C_mfc:
     pressure) together with a setpoint reference and a rolling mean. A
     side-by-side data table summarises the latest sample. The y-axis label
     and active variable switch automatically when the device's
-    ``control_point`` reports a different control mode.
+    ``control_point`` reports a different control mode. Common subscriber
+    bring-up, widget callbacks, and the ingest loop are inherited from
+    :class:`LiveVisualizer`.
 
     Attributes:
-        vis: Host :class:`Vis` instance providing the Bokeh document.
         actsrv_cfg: ``params`` block from the MFC action server's config.
-        config_dict: ``params`` block from the visualizer's server config.
-        update_rate: Minimum seconds between WebSocket polls.
-        max_points: Rolling window length for the data source.
-        last_update_time: Epoch timestamp of the most recent poll.
-        live_key: Server key of the MFC action server.
-        wss: :class:`WsSubscriber` connected to ``ws_live``.
-        data_url: Fully formed ``ws://`` URL for the live WebSocket.
-        IOloop_data_run: Liveness flag for the data ingestion task.
-        IOloop_stat_run: Liveness flag for the status ingestion task.
         data_suffices: Per-device measurement field suffixes.
         data_dict_keys: Combined ``datetime`` + per-device columns.
         devices: Sorted list of device names from the action server.
@@ -58,8 +48,9 @@ class C_mfc:
         table: Bokeh ``DataTable`` showing the latest values.
         control_mode: Last observed device ``control_point`` value.
         yvar: Currently plotted variable (``"mass_flow"`` or ``"pressure"``).
-        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
     """
+
+    SUBSCRIBE_LABEL = "Mass flow controller visualizer"
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         """Wire up data sources, widgets, plot layout, and start the WS ingest task.
@@ -70,25 +61,12 @@ class C_mfc:
                 to. If the server is not in the config, ``__init__`` returns
                 early without registering any roots.
         """
-        self.vis = vis_serv
-        self.actsrv_cfg = self.vis.world_cfg["servers"][serv_key]["params"]
-        self.config_dict = self.vis.server_cfg.get("params", {})
-        self.update_rate = self.config_dict.get("update_rate", 0.5)
-        self.max_points = 500
-        self.last_update_time = time.time()
-
-        self.live_key = serv_key
-        tserv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
-        if tserv_config is None:
+        super().__init__(vis_serv, serv_key)
+        if not self.connected:
             return
-        tserv_host = tserv_config.get("host", None)
-        tserv_port = tserv_config.get("port", None)
-        self.wss = Wss(tserv_host, tserv_port, "ws_live")
-
-        self.data_url = f"ws://{tserv_config['host']}:{tserv_config['port']}/ws_live"
-
-        self.IOloop_data_run = False
-        self.IOloop_stat_run = False
+        self.actsrv_cfg = self.serv_config["params"]
+        tserv_host = self.host
+        tserv_port = self.port
 
         self.data_suffices = [
             # "epoch_s",
@@ -164,7 +142,7 @@ class C_mfc:
         )
         # combine all sublayouts into a single one
         docs_url = f"http://{tserv_host}:{tserv_port}/docs#/"
-        server_link = f'<a href="{docs_url}" target="_blank">\'{self.live_key}\'</a>'
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.serv_key}\'</a>'
         headerbar = f"<b>Live vis module for server {server_link}</b>"
         self.layout = layout(
             [
@@ -180,97 +158,8 @@ class C_mfc:
         self.control_mode = "mass flow"
         self.yvar = "mass_flow"
 
-        self.vis.doc.add_root(self.layout)
-        self.vis.doc.add_root(Spacer(height=10))
-        self.IOtask = asyncio.create_task(self.IOloop_data())
-        self.vis.doc.on_session_destroyed(self.cleanup_session)
+        self._mount()
         self._add_plots()
-
-    def cleanup_session(self, session_context):
-        """Cancel the data ingest task when the Bokeh session is torn down.
-
-        Args:
-            session_context: Bokeh session context (unused).
-        """
-        LOGGER.info(f"'{self.live_key}' Bokeh session closed")
-        self.IOloop_data_run = False
-        self.IOtask.cancel()
-
-    def callback_input_max_points(self, attr, old, new, sender):
-        """Validate the ``max datapoints`` input and update the rolling window.
-
-        Parses ``new`` as an int, falls back to ``old`` (or ``500``) on bad
-        input, then clamps to ``[2, 10000]`` before storing it as
-        ``self.max_points`` and refreshing the widget.
-
-        Args:
-            attr: Bokeh property name that changed.
-            old: Prior text value.
-            new: New text value typed by the user.
-            sender: The :class:`TextInput` to refresh.
-        """
-
-        def to_int(val):
-            try:
-                return int(val)
-            except ValueError:
-                return None
-
-        newpts = to_int(new)
-        oldpts = to_int(old)
-
-        if newpts is None:
-            if oldpts is not None:
-                newpts = oldpts
-            else:
-                newpts = 500
-
-        if newpts < 2:
-            newpts = 2
-        if newpts > 10000:
-            newpts = 10000
-
-        self.max_points = newpts
-
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.max_points}")
-        )
-
-    def update_input_value(self, sender, value):
-        """Write ``value`` back onto a Bokeh input widget on the document thread.
-
-        Args:
-            sender: Bokeh input widget whose ``value`` is being updated.
-            value: New string value to assign.
-        """
-        sender.value = value
-
-    def callback_input_update_rate(self, attr, old, new, sender):
-        """Validate the ``update sec`` input and adjust the polling cadence.
-
-        Parses ``new`` as a float (defaulting to ``0.5`` on bad input), stores
-        it as ``self.update_rate``, and writes the value back to the widget.
-
-        Args:
-            attr: Bokeh property name that changed.
-            old: Prior text value.
-            new: New text value typed by the user.
-            sender: The :class:`TextInput` to refresh.
-        """
-
-        def to_float(val):
-            try:
-                return float(val)
-            except ValueError:
-                return 0.5
-
-        newpts = to_float(new)
-
-        self.update_rate = newpts
-
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.update_rate}")
-        )
 
     def add_points(self, datapackage_list: list):
         """Stream live MFC samples into the data source and switch axes on mode change.
@@ -339,26 +228,6 @@ class C_mfc:
             LOGGER.info(f"{self.control_mode} changed to {control_mode}")
             self.control_mode = control_mode
             self._add_plots()
-
-    async def IOloop_data(self):
-        """Continuously read the live WebSocket and schedule plot updates.
-
-        Sleeps briefly each iteration, respects ``self.update_rate`` as a
-        minimum gap between polls, and dispatches non-empty message batches
-        to :meth:`add_points` on the document thread.
-        """
-        LOGGER.info(
-            f" ... Mass flow controller visualizer subscribing to: {self.data_url}"
-        )
-        while True:
-            if time.time() - self.last_update_time >= self.update_rate:
-                messages = await self.wss.read_messages()
-                if messages:
-                    self.vis.doc.add_next_tick_callback(
-                        partial(self.add_points, messages)
-                    )
-                    self.last_update_time = time.time()
-            await asyncio.sleep(0.01)
 
     def _add_plots(self):
         """Rebuild the flow/pressure figure with one trace group per device.

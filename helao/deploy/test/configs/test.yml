@@ -28,6 +28,7 @@ servers:
     port: 8002
     group: action
     fast: ws_simulator
+    live_vis: wssim_live_vis
     params: {}
     hlo_postprocess_libs:
       - hlo_to_csv
@@ -35,6 +36,6 @@ servers:
     host: 127.0.0.1
     port: 5002
     group: visualizer
-    bokeh: livesim_visualizer
+    bokeh: live_visualizer
     params:
       doc_name: Websocket Live Visualizer

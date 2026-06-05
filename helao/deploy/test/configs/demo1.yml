@@ -23,13 +23,14 @@ servers:
     port: 8012
     group: action
     fast: cpsim_server
+    action_vis: oersim_vis
     params:
       plate_id: 3851
   ACTVIS:
     host: 127.0.0.1
     port: 5012
     group: visualizer
-    bokeh: actionsim_visualizer
+    bokeh: action_visualizer
     params:
       doc_name: 'demo1: OER Simulation Visualizer'
       launch_browser: true
