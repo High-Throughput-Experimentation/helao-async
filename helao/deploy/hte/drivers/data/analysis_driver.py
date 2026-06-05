@@ -14,7 +14,6 @@ __all__ = ["HelaoAnalysisSyncer"]
 
 from helao.helpers import helao_logging as logging
 
-LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import time
 import asyncio
 import os
@@ -42,6 +41,8 @@ from ...drivers.data.analyses.echeuvis_stability import (
 from ...drivers.data.analyses.uvis_bkgsubnorm import DryUvisAnalysis, DRYUVIS_QUERY
 from ...drivers.data.analyses.icpms_local import IcpmsAnalysis
 from ...drivers.data.analyses.xrfs_local import XrfsAnalysis
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 class HelaoAnalysisSyncer(HelaoSyncer):
