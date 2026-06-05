@@ -1,5 +1,3 @@
-import time
-import asyncio
 from copy import deepcopy
 from datetime import datetime
 from functools import partial
@@ -21,8 +19,8 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 from helao.core.models.hlostatus import HloStatus
 
 from helao.core.servers.vis import Vis
+from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import private_dispatcher
-from helao.helpers.ws_utils import WsSubscriber as Wss
 
 
 VALID_DATA_STATUS = (
@@ -39,34 +37,23 @@ VALID_ACTION_NAME = (
 )
 
 
-class C_specvis:
+class C_vis(ActionVisualizer):
     """Bokeh visualizer for a spectrometer action server.
 
     Subscribes to the server's ``ws_data`` WebSocket and renders the active
     action's spectra plus a snapshot of the previous action's spectra side
     by side. Wavelength and energy axes are fetched once from the action
     server via :func:`private_dispatcher`; the displayed traces fade across
-    a configurable colormap as new spectra are appended.
+    a configurable colormap as new spectra are appended. Common subscriber
+    bring-up and the ingest loop are inherited from :class:`ActionVisualizer`.
 
     Attributes:
-        vis: Host :class:`Vis` instance providing the Bokeh document.
-        config_dict: ``params`` block from the visualizer's server config.
         max_spectra: Maximum number of spectra retained per action.
         downsample: Stride applied to ``wl``, ``ev``, and ``trans`` data.
-        update_rate: Minimum seconds between WebSocket polls.
-        last_update_time: Epoch timestamp of the most recent poll.
-        spec_key: Server key of the spectrometer action server.
-        specserv_config: Mapping with ``host``/``port`` for the action server.
-        specserv_host: Action server hostname.
-        specserv_port: Action server port.
-        wss: :class:`WsSubscriber` connected to ``ws_data``.
         cmap: Matplotlib colormap used to colour individual spectra.
         latest_coloridx: Reserved counter for the newest spectrum's colour.
-        data_url: Fully formed ``ws://`` URL for the data WebSocket.
         wl: Wavelength axis fetched from the action server.
         ev: Energy axis derived from ``wl``.
-        IOloop_data_run: Liveness flag for the data ingestion task.
-        IOloop_stat_run: Liveness flag for the status ingestion task.
         data_dict_keys: Column names streamed per spectrum.
         datasource: Live :class:`ColumnDataSource` for the current action.
         prev_datasource: Snapshotted source for the previous action.
@@ -77,8 +64,9 @@ class C_specvis:
         input_downsample: Widget setting ``downsample``.
         plot: Active spectra ``figure``.
         plot_prev: Previous spectra ``figure``.
-        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
     """
+
+    SUBSCRIBE_LABEL = "spectrometer visualizer"
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         """Wire up data sources, widgets, plot layout, and start the WS ingest task.
@@ -89,38 +77,25 @@ class C_specvis:
                 If the server is not in the config, ``__init__`` returns
                 early without registering any roots.
         """
-        self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg.get("params", {})
+        super().__init__(vis_serv, serv_key)
+        if not self.connected:
+            return
         self.max_spectra = 5
         self.downsample = 2
-        self.update_rate = 1e-3
-        self.last_update_time = time.time()
-
-        self.spec_key = serv_key
-        self.specserv_config = self.vis.world_cfg["servers"].get(self.spec_key, None)
-        if self.specserv_config is None:
-            return
-        self.specserv_host = self.specserv_config.get("host", None)
-        self.specserv_port = self.specserv_config.get("port", None)
-        self.wss = Wss(self.specserv_host, self.specserv_port, "ws_data")
 
         self.cmap = cm.get_cmap("Reds_r", self.max_spectra)
         self.latest_coloridx = 0
 
-        self.data_url = f"ws://{self.specserv_config['host']}:{self.specserv_config['port']}/ws_data"
-
         self.wl = private_dispatcher(
-            self.spec_key,
-            self.specserv_host,
-            self.specserv_port,
+            self.serv_key,
+            self.host,
+            self.port,
             "get_wl",
             params_dict={},
             json_dict={},
         )[0]
         LOGGER.info(self.wl)
         self.ev = [1239.8 / x for x in self.wl]
-        self.IOloop_data_run = False
-        self.IOloop_stat_run = False
 
         self.data_dict_keys = ["wl", "ev", "trans", "color", "time"]
         self.datasource = ColumnDataSource(
@@ -174,8 +149,8 @@ class C_specvis:
         self.plot_prev.xaxis.axis_label = "Wavelength (nm)"
         self.plot_prev.yaxis.axis_label = "Transmittance (counts/sec)"
         # combine all sublayouts into a single one
-        docs_url = f"http://{self.specserv_host}:{self.specserv_port}/docs#/"
-        server_link = f'<a href="{docs_url}" target="_blank">\'{self.spec_key}\'</a>'
+        docs_url = f"http://{self.host}:{self.port}/docs#/"
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.serv_key}\'</a>'
         headerbar = f"<b>Spectrometer Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [
@@ -194,21 +169,8 @@ class C_specvis:
         # self.yselect = self.yaxis_selector_group.active
         # self._add_plots()
 
-        self.vis.doc.add_root(self.layout)
-        self.vis.doc.add_root(Spacer(height=10))
-        self.IOtask = asyncio.create_task(self.IOloop_data())
-        self.vis.doc.on_session_destroyed(self.cleanup_session)
+        self._mount()
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
-
-    def cleanup_session(self, session_context):
-        """Cancel the data ingest task when the Bokeh session is torn down.
-
-        Args:
-            session_context: Bokeh session context (unused).
-        """
-        LOGGER.info(f"'{self.spec_key}' Bokeh session closed")
-        self.IOloop_data_run = False
-        self.IOtask.cancel()
 
     def callback_input_max_spectra(self, attr, old, new, sender):
         """Validate the ``max num spectra`` input and resize the colormap.
@@ -283,29 +245,6 @@ class C_specvis:
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value, sender, f"{self.downsample}")
         )
-
-    def update_input_value(self, sender, value):
-        """Write ``value`` back onto a Bokeh input widget on the document thread.
-
-        Args:
-            sender: Bokeh input widget whose ``value`` is being updated.
-            value: New string value to assign.
-        """
-        sender.value = value
-
-    async def IOloop_data(self):
-        """Continuously pull WebSocket data packages and schedule plot updates.
-
-        Runs for the lifetime of the Bokeh session and honors
-        ``self.update_rate`` as a minimum gap between polls.
-        """
-        LOGGER.info(f" ... spectrometer visualizer subscribing to: {self.data_url}")
-        while True:
-            if time.time() - self.last_update_time >= self.update_rate:
-                messages = await self.wss.read_messages()
-                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
-                self.last_update_time = time.time()
-            await asyncio.sleep(0.01)
 
     def add_points(self, datapackage_list: list):
         """Append new spectra to the live source and roll older colours.

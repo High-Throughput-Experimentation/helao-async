@@ -9,6 +9,7 @@ servers:
     port: 8001
     group: action
     fast: gamry_server2
+    action_vis: gamry_vis
     params:
       allow_no_sample: true
       dev_id: 0

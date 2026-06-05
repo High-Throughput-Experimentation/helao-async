@@ -48,6 +48,7 @@ servers:
     port: 8006
     group: action
     fast: nidaqmx_server
+    action_vis: nidaqmx_vis
     params:
       dev_gasvalve:
         1: dev1/port0/line0
@@ -69,6 +70,7 @@ servers:
     port: 8007
     group: action
     fast: pal_server
+    action_vis: pal_vis
     params:
       positions:
         custom:
@@ -93,6 +95,7 @@ servers:
     port: 8009
     group: action
     fast: mfc_server
+    live_vis: mfc_vis
     params:
       devices:
         CO2:
