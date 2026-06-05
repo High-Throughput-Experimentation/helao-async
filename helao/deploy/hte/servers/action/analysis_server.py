@@ -43,89 +43,9 @@ def makeApp(server_key) -> BaseAPI:
         server_key=server_key,
         server_title=server_key,
         description="Analysis server",
-        version=0.1,
+        version=1.0,
         driver_classes=[HelaoAnalysisSyncer],
     )
-    app.driver: HelaoAnalysisSyncer  # type hint for driver attribute
-
-    @app.post("/batch_calc_echeuvis", tags=["private"])
-    async def batch_calc_echeuvis(
-        sequence_uuid: str,
-        plate_id: Union[int, None] = None,
-        recent: bool = True,
-        params: dict = {},
-    ) -> str:
-        """Generate ECHEUVIS stability analyses for actions in ``sequence_uuid``."""
-        await app.driver.batch_calc_echeuvis(
-            plate_id=plate_id,
-            sequence_uuid=UUID(sequence_uuid),
-            params=params,
-            recent=recent,
-        )
-        return sequence_uuid
-
-    @app.post("/batch_calc_dryuvis", tags=["private"])
-    async def batch_calc_dryuvis(
-        sequence_uuid: Union[str, None] = None,
-        plate_id: Union[int, None] = None,
-        recent: bool = True,
-        params: dict = {},
-    ) -> Union[str, None]:
-        """Generate dry UVIS-T analyses for actions in ``sequence_uuid``."""
-        await app.driver.batch_calc_dryuvis(
-            plate_id=plate_id,
-            sequence_uuid=UUID(sequence_uuid),
-            params=params,
-            recent=recent,
-        )
-        return sequence_uuid
-
-    @app.post(f"/{server_key}/analyze_dryuvis", tags=["action"])
-    async def analyze_dryuvis(
-        sequence_uuid: str = "",
-        plate_id: Union[int, None] = None,
-        recent: bool = False,
-        params: dict = {},
-    ):
-        """Action endpoint: generate dry UVIS-T analyses for a prior sequence.
-
-        Wraps ``batch_calc_dryuvis`` inside an active action so the run is
-        recorded in HELAO's action history.
-        """
-        active = await app.base.setup_and_contain_action()
-
-        await app.driver.batch_calc_dryuvis(
-            plate_id=active.action.action_params["plate_id"],
-            sequence_uuid=UUID(active.action.action_params["sequence_uuid"]),
-            params=active.action.action_params["params"],
-            recent=active.action.action_params["recent"],
-        )
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
-    @app.post(f"/{server_key}/analyze_echeuvis", tags=["action"])
-    async def analyze_echeuvis(
-        sequence_uuid: str = "",
-        plate_id: Union[int, None] = None,
-        recent: bool = False,
-        params: dict = {},
-    ):
-        """Action endpoint: generate ECHEUVIS stability analyses for a prior sequence.
-
-        Wraps ``batch_calc_echeuvis`` inside an active action so the run is
-        recorded in HELAO's action history.
-        """
-        active = await app.base.setup_and_contain_action()
-
-        await app.driver.batch_calc_echeuvis(
-            plate_id=active.action.action_params["plate_id"],
-            sequence_uuid=UUID(active.action.action_params["sequence_uuid"]),
-            params=active.action.action_params["params"],
-            recent=active.action.action_params["recent"],
-            analysis_action_uuid=active.action.action_uuid,
-        )
-        finished_action = await active.finish()
-        return finished_action.as_dict()
 
     @app.post(f"/{server_key}/analyze_icpms_local", tags=["action"])
     async def analyze_icpms_local(
