@@ -164,6 +164,7 @@ servers:
     fast: analysis_server
     params:
       local_only: false
+      analyses: [icpms_local, xrfs_local]
   CAM:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8013
