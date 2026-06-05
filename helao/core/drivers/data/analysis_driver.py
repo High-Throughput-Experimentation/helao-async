@@ -32,6 +32,7 @@ import pandas as pd
 
 from helao.core.servers.base import Base
 from helao.core.servers.base_api import BaseAPI
+from helao.helpers import config_loader
 from helao.helpers.time_utils import set_time
 from helao.helpers.yml_tools import yml_dumps
 from helao.helpers.executor import Executor
@@ -52,6 +53,89 @@ _PROCESS_METADATA_KEYS = (
 )
 
 
+def _resolve_analysis_class(module, module_name: str, class_name: str):
+    """Return the configured :class:`BaseAnalysis` subclass from ``module``.
+
+    When ``class_name`` is given it is looked up directly; otherwise the module
+    is scanned for the single :class:`BaseAnalysis` subclass defined in it.
+    Returns ``None`` (after logging) when no valid class is found.
+    """
+    if class_name:
+        ana_cls = getattr(module, class_name, None)
+        if ana_cls is None or not (
+            inspect.isclass(ana_cls) and issubclass(ana_cls, BaseAnalysis)
+        ):
+            LOGGER.error(
+                f"'{class_name}' in '{module_name}' is not a BaseAnalysis "
+                "subclass; skipping."
+            )
+            return None
+        return ana_cls
+    candidates = [
+        obj
+        for _, obj in inspect.getmembers(module, inspect.isclass)
+        if issubclass(obj, BaseAnalysis)
+        and obj is not BaseAnalysis
+        and obj.__module__ == module.__name__
+    ]
+    if not candidates:
+        LOGGER.error(f"No BaseAnalysis subclass found in '{module_name}'; skipping.")
+        return None
+    if len(candidates) > 1:
+        LOGGER.error(
+            f"Multiple BaseAnalysis subclasses found in '{module_name}': "
+            f"{[c.__name__ for c in candidates]}. Specify 'module:ClassName' "
+            "in config; skipping."
+        )
+        return None
+    return candidates[0]
+
+
+def load_analysis_classes(analyses, deployment: Optional[str]) -> dict:
+    """Import and map the analysis classes named in an ``analyses`` config list.
+
+    Each entry is either a module name (e.g. ``"icpms_local"``) or an explicit
+    ``"module:ClassName"``. Modules are imported from
+    ``helao.deploy.<deployment>.drivers.data.analyses`` and the resolved
+    :class:`BaseAnalysis` subclass is mapped to the endpoint name
+    ``analyze_<module>``. Entries that fail to import or do not resolve to a
+    :class:`BaseAnalysis` subclass are logged and skipped.
+
+    Args:
+        analyses: Iterable of module/class specifiers from the server config.
+        deployment: Deployment name used to locate the analyses package.
+
+    Returns:
+        Mapping from endpoint name (``analyze_<module>``) to analysis class.
+    """
+    if not deployment:
+        LOGGER.error(
+            "No 'deployment' set in world config; cannot load analysis classes."
+        )
+        return {}
+    base_pkg = f"helao.deploy.{deployment}.drivers.data.analyses"
+    loaded = {}
+    for entry in analyses or []:
+        module_name, _, class_name = entry.partition(":")
+        try:
+            module = import_module(f"{base_pkg}.{module_name}")
+        except Exception:
+            LOGGER.error(
+                f"Failed to import analysis module '{module_name}' from {base_pkg}.",
+                exc_info=True,
+            )
+            continue
+        ana_cls = _resolve_analysis_class(module, module_name, class_name)
+        if ana_cls is None:
+            continue
+        endpoint_name = f"analyze_{module_name}"
+        loaded[endpoint_name] = ana_cls
+        LOGGER.info(
+            f"Loaded analysis class {ana_cls.__name__} as endpoint '{endpoint_name}'."
+        )
+    return loaded
+
+
 class AnalysisSyncer(HelaoSyncer):
     """Queue-based worker that runs analyses and syncs outputs to S3.
 
@@ -61,9 +145,9 @@ class AnalysisSyncer(HelaoSyncer):
     ANALYSES tree, and (when not running in ``local_only`` mode) uploads them to
     the configured S3 bucket. ``max_tasks`` worker coroutines run in parallel.
 
-    The analysis classes this syncer can run are loaded from the server config
-    ``params.analyses`` list and exposed on :attr:`analysis_classes`, keyed by
-    the action endpoint name (``analyze_<module>``).
+    The analysis class to run is passed per call (via :meth:`batch_calc`); the
+    set of classes a server exposes as endpoints is resolved by
+    :func:`make_analysis_app` from the server config ``params.analyses`` list.
 
     Attributes:
         base: Owning action server.
@@ -73,7 +157,6 @@ class AnalysisSyncer(HelaoSyncer):
         world_config: Full world config dict.
         local_ana_root: Local ``ANALYSES`` root path.
         max_tasks: Number of concurrent worker coroutines.
-        analysis_classes: Mapping from endpoint name to analysis class.
         task_queue: FIFO queue of pending analysis tuples.
         task_set: Set of enqueued process UUIDs used to deduplicate.
         running_tasks: Mapping from process UUID string to worker task.
@@ -108,8 +191,6 @@ class AnalysisSyncer(HelaoSyncer):
         self.max_tasks = self.config_dict.get("max_tasks", 1)
         # declare global loader for analysis models used by driver.batch_calc
         self.get_loader()
-        # load the analysis classes this server is configured to expose
-        self.analysis_classes = self._load_analysis_classes()
 
         self.task_queue = asyncio.Queue()
         self.task_set = set()
@@ -138,91 +219,6 @@ class AnalysisSyncer(HelaoSyncer):
         self.s3r = self.loader.res
         self.bucket = self.loader.s3_bucket
         self.region = self.loader.s3_region
-
-    def _load_analysis_classes(self) -> dict:
-        """Import and map the analysis classes named in ``config.analyses``.
-
-        Each entry in ``config_dict["analyses"]`` is either a module name
-        (e.g. ``"icpms_local"``) or an explicit ``"module:ClassName"``. Modules
-        are imported from ``helao.deploy.<deployment>.drivers.data.analyses`` and
-        the single :class:`BaseAnalysis` subclass defined there (or the named
-        class) is mapped to the endpoint name ``analyze_<module>``. Entries that
-        fail to import or do not subclass :class:`BaseAnalysis` are logged and
-        skipped.
-
-        Returns:
-            Mapping from endpoint name to analysis class.
-        """
-        deployment = self.world_config.get("deployment")
-        analyses = self.config_dict.get("analyses", [])
-        if not deployment:
-            LOGGER.error(
-                "No 'deployment' set in world config; cannot load analysis classes."
-            )
-            return {}
-        base_pkg = f"helao.deploy.{deployment}.drivers.data.analyses"
-        loaded = {}
-        for entry in analyses:
-            module_name, _, class_name = entry.partition(":")
-            try:
-                module = import_module(f"{base_pkg}.{module_name}")
-            except Exception:
-                LOGGER.error(
-                    f"Failed to import analysis module '{module_name}' "
-                    f"from {base_pkg}.",
-                    exc_info=True,
-                )
-                continue
-            ana_cls = self._resolve_analysis_class(module, module_name, class_name)
-            if ana_cls is None:
-                continue
-            endpoint_name = f"analyze_{module_name}"
-            loaded[endpoint_name] = ana_cls
-            LOGGER.info(
-                f"Loaded analysis class {ana_cls.__name__} as endpoint "
-                f"'{endpoint_name}'."
-            )
-        return loaded
-
-    @staticmethod
-    def _resolve_analysis_class(module, module_name: str, class_name: str):
-        """Return the configured :class:`BaseAnalysis` subclass from ``module``.
-
-        When ``class_name`` is given it is looked up directly; otherwise the
-        module is scanned for the single :class:`BaseAnalysis` subclass defined
-        in it. Returns ``None`` (after logging) when no valid class is found.
-        """
-        if class_name:
-            ana_cls = getattr(module, class_name, None)
-            if ana_cls is None or not (
-                inspect.isclass(ana_cls) and issubclass(ana_cls, BaseAnalysis)
-            ):
-                LOGGER.error(
-                    f"'{class_name}' in '{module_name}' is not a BaseAnalysis "
-                    "subclass; skipping."
-                )
-                return None
-            return ana_cls
-        candidates = [
-            obj
-            for _, obj in inspect.getmembers(module, inspect.isclass)
-            if issubclass(obj, BaseAnalysis)
-            and obj is not BaseAnalysis
-            and obj.__module__ == module.__name__
-        ]
-        if not candidates:
-            LOGGER.error(
-                f"No BaseAnalysis subclass found in '{module_name}'; skipping."
-            )
-            return None
-        if len(candidates) > 1:
-            LOGGER.error(
-                f"Multiple BaseAnalysis subclasses found in '{module_name}': "
-                f"{[c.__name__ for c in candidates]}. Specify 'module:ClassName' "
-                "in config; skipping."
-            )
-            return None
-        return candidates[0]
 
     def sync_exit_callback(self, task: asyncio.Task):
         """Drop the completed ``task`` from ``running_tasks`` and ``task_set``.
@@ -496,12 +492,21 @@ def make_analysis_app(server_key) -> BaseAPI:
     server config ``params.analyses`` list, plus the private ``list_running_tasks``
     and ``list_queued_tasks`` endpoints.
 
+    The analysis classes are resolved from the global ``CONFIG`` at app-build
+    time (the driver instance is not created until the FastAPI ``startup``
+    event, so it cannot be queried here).
+
     Args:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
         The configured :class:`BaseAPI` application.
     """
+    world_cfg = config_loader.CONFIG or {}
+    server_cfg = world_cfg.get("servers", {}).get(server_key, {})
+    analyses = server_cfg.get("params", {}).get("analyses", [])
+    analysis_classes = load_analysis_classes(analyses, world_cfg.get("deployment"))
+
     app = BaseAPI(
         server_key=server_key,
         server_title=server_key,
@@ -532,7 +537,7 @@ def make_analysis_app(server_key) -> BaseAPI:
         _analyze.__name__ = endpoint_name
         return _analyze
 
-    for endpoint_name, ana_cls in app.driver.analysis_classes.items():
+    for endpoint_name, ana_cls in analysis_classes.items():
         _register_endpoint(endpoint_name, ana_cls)
 
     @app.post("/list_running_tasks", tags=["private"])
