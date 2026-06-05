@@ -5,8 +5,6 @@ Subscribes to the simulator's ``ws_live`` websocket, plots the rolling
 two-column table.
 """
 
-import time
-import asyncio
 from datetime import datetime
 from functools import partial
 
@@ -23,27 +21,24 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.vis import Vis
-from helao.helpers.ws_utils import WsSubscriber as Wss
+from helao.core.servers.vis_subscriber import LiveVisualizer
 
 
-class C_simlivevis:
+class C_vis(LiveVisualizer):
     """Live Bokeh visualizer for the websocket simulator action server.
 
     Builds widgets for ``max_points`` and ``update_rate``, a line plot of
     the synthetic series against time, and a key/value table for the
-    latest sample. A background coroutine reads from the action server's
-    ``ws_live`` websocket and streams the new points to both.
+    latest sample. Common subscriber bring-up, widget callbacks, and the
+    ingest loop are inherited from :class:`LiveVisualizer`.
 
     Attributes:
-        vis: Hosting visualizer server.
-        update_rate: Polling period (seconds) between websocket reads.
-        max_points: Rolling buffer size for the streamed plot.
-        live_key: Name of the action server being visualized.
-        wss: ``WsSubscriber`` consumer for ``ws_live`` messages.
         datasource: ``ColumnDataSource`` backing the line plot.
         datasource_table: ``ColumnDataSource`` backing the key/value table.
         layout: Top-level Bokeh layout.
     """
+
+    SUBSCRIBE_LABEL = "Live visualizer"
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         """Build the layout and start the polling coroutine.
@@ -52,22 +47,11 @@ class C_simlivevis:
             vis_serv: Hosting visualizer server.
             serv_key: Name of the action server to visualize.
         """
-        self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg.get("params", {})
-        self.update_rate = self.config_dict.get("update_rate", 0.5)
-        self.max_points = 500
-        self.last_update_time = time.time()
-
-        self.live_key = serv_key
-        psrv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
-        if psrv_config is None:
+        super().__init__(vis_serv, serv_key)
+        if not self.connected:
             return
-        host = psrv_config.get("host", None)
-        port = psrv_config.get("port", None)
-        self.wss = Wss(host, port, "ws_live")
-
-        self.IOloop_data_run = False
-        self.IOloop_stat_run = False
+        host = self.host
+        port = self.port
 
         self.data_dict_keys = ["datetime"] + [f"series_{i}" for i in range(6)]
 
@@ -122,7 +106,7 @@ class C_simlivevis:
         )
         # combine all sublayouts into a single one
         docs_url = f"http://{host}:{port}/docs#/"
-        server_link = f'<a href="{docs_url}" target="_blank">\'{self.live_key}\'</a>'
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.serv_key}\'</a>'
         headerbar = f"<b>Live vis module for server {server_link}</b>"
         self.layout = layout(
             [
@@ -136,90 +120,8 @@ class C_simlivevis:
             width=1024,
         )
 
-        self.vis.doc.add_root(self.layout)
-        self.vis.doc.add_root(Spacer(height=10))
-        self.IOtask = asyncio.create_task(self.IOloop_data())
-        self.vis.doc.on_session_destroyed(self.cleanup_session)
+        self._mount()
         self._add_plots()
-
-    def cleanup_session(self, session_context):
-        """Cancel the IO loop when the Bokeh session ends.
-
-        Args:
-            session_context: Bokeh session context (unused).
-        """
-        LOGGER.info(f"'{self.live_key}' Bokeh session closed")
-        self.IOloop_data_run = False
-        self.IOtask.cancel()
-
-    def callback_input_max_points(self, attr, old, new, sender):
-        """Validate and apply a new ``max_points`` input, then echo it back.
-
-        Args:
-            attr: Bokeh attribute name (unused).
-            old: Previous string value.
-            new: New string value.
-            sender: The source widget.
-        """
-
-        def to_int(val):
-            try:
-                return int(val)
-            except ValueError:
-                return None
-
-        newpts = to_int(new)
-        oldpts = to_int(old)
-
-        if newpts is None:
-            if oldpts is not None:
-                newpts = oldpts
-            else:
-                newpts = 500
-
-        if newpts < 2:
-            newpts = 2
-        if newpts > 10000:
-            newpts = 10000
-
-        self.max_points = newpts
-
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.max_points}")
-        )
-
-    def update_input_value(self, sender, value):
-        """Push ``value`` back into the source widget.
-
-        Args:
-            sender: Bokeh widget to update.
-            value: New value to assign.
-        """
-        sender.value = value
-
-    def callback_input_update_rate(self, attr, old, new, sender):
-        """Validate and apply a new update-rate input, then echo it back.
-
-        Args:
-            attr: Bokeh attribute name (unused).
-            old: Previous string value.
-            new: New string value.
-            sender: The source widget.
-        """
-
-        def to_float(val):
-            try:
-                return float(val)
-            except ValueError:
-                return 0.5
-
-        newpts = to_float(new)
-
-        self.update_rate = newpts
-
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.update_rate}")
-        )
 
     def add_points(self, datapackage_list: list):
         """Stream a batch of websocket messages into the plot and table.
@@ -251,16 +153,6 @@ class C_simlivevis:
             values = [data_dict[k][-1] for k in keys]
             table_data_dict = {"name": keys, "value": values}
             self.datasource_table.stream(table_data_dict, rollover=len(keys))
-
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        """Poll the live websocket and schedule UI updates on the document."""
-        LOGGER.info(" ... Live visualizer receiving messages.")
-        while True:
-            if time.time() - self.last_update_time >= self.update_rate:
-                messages = await self.wss.read_messages()
-                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
-                self.last_update_time = time.time()
-            await asyncio.sleep(0.01)
 
     def _add_plots(self):
         """Redraw the line plot, one renderer per non-time series."""

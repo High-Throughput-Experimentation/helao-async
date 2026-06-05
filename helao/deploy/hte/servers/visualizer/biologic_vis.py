@@ -1,5 +1,3 @@
-import time
-import asyncio
 from functools import partial
 from copy import deepcopy
 
@@ -20,7 +18,7 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.vis import Vis
-from helao.helpers.ws_utils import WsSubscriber as Wss
+from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import async_private_dispatcher
 
 VALID_DATA_STATUS = (
@@ -41,29 +39,17 @@ AXIS_MAP = {
 VALID_ACTION_NAME = [k for k in AXIS_MAP.keys()]
 
 
-class C_biovis:
+class C_vis(ActionVisualizer):
     """Bokeh visualizer for a multi-channel Biologic potentiostat server.
 
     Subscribes to the action server's ``ws_data`` WebSocket and streams
     per-channel time-series plots (active and previous run side-by-side) with
     radio-button x/y selectors, a max-points input, and per-channel stop
-    buttons.
+    buttons. Common subscriber bring-up, the ``max datapoints`` callback, and
+    the ingest loop are inherited from :class:`ActionVisualizer`.
 
     Attributes:
-        vis: Host :class:`Vis` instance providing the Bokeh document.
-        config_dict: ``params`` block from the visualizer's server config.
         num_channels: Number of Biologic channels to render plots for.
-        max_points: Rolling window length per data source.
-        update_rate: Minimum seconds between WebSocket polls.
-        last_update_time: Epoch timestamp of the most recent poll.
-        potentiostat_key: Server key of the action server being visualized.
-        potserv_config: Mapping with ``host``/``port`` for the action server.
-        potserv_host: Action server hostname.
-        potserv_port: Action server port.
-        wss: :class:`WsSubscriber` connected to ``ws_data``.
-        data_url: Fully formed ``ws://`` URL for the data WebSocket.
-        IOloop_data_run: Liveness flag for the data ingestion task.
-        IOloop_stat_run: Liveness flag for the status ingestion task.
         data_dict_keys: Keys streamed per channel data source.
         channel_datasources: Live :class:`ColumnDataSource` per channel.
         channel_datasources_prev: Snapshot of the prior run per channel.
@@ -78,8 +64,9 @@ class C_biovis:
         stop_buttons: Per-channel danger buttons that abort the channel.
         xselect: Cached active index of ``xaxis_selector_group``.
         yselect: Cached active index of ``yaxis_selector_group``.
-        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
     """
+
+    SUBSCRIBE_LABEL = "potentiostat visualizer"
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         """Wire up data sources, widgets, plot layout, and start the WS ingest task.
@@ -90,33 +77,14 @@ class C_biovis:
                 subscribe to. If the server is not in the config, ``__init__``
                 returns early without registering any roots.
         """
-        self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg.get("params", {})
-        self.num_channels = self.config_dict.get("num_channels", 1)
-        self.max_points = 5000
-        self.update_rate = 1e-3
-        self.last_update_time = time.time()
-
-        self.potentiostat_key = serv_key
-        self.potserv_config = self.vis.world_cfg["servers"].get(
-            self.potentiostat_key, None
-        )
-        if self.potserv_config is None:
+        super().__init__(vis_serv, serv_key, max_points=5000)
+        if not self.connected:
             return
-        self.potserv_host = self.potserv_config.get("host", None)
-        self.potserv_port = self.potserv_config.get("port", None)
-        self.wss = Wss(self.potserv_host, self.potserv_port, "ws_data")
-
-        self.data_url = (
-            f"ws://{self.potserv_config['host']}:{self.potserv_config['port']}/ws_data"
-        )
-
-        self.IOloop_data_run = False
-        self.IOloop_stat_run = False
+        self.num_channels = self.config_dict.get("num_channels", 1)
 
         self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "P_W", "R_ohm", "X_ohm"]
 
-        # separate data sources for each channel (biologic channel) 
+        # separate data sources for each channel (biologic channel)
         # this is the important part - we don't redefine the data sources, we just stream into it
         self.channel_datasources = {
             ch: ColumnDataSource(data={key: [] for key in self.data_dict_keys})
@@ -205,9 +173,9 @@ class C_biovis:
         ]
 
         # combine all sublayouts into a single one
-        docs_url = f"http://{self.potserv_host}:{self.potserv_port}/docs#/"
+        docs_url = f"http://{self.host}:{self.port}/docs#/"
         server_link = (
-            f'<a href="{docs_url}" target="_blank">\'{self.potentiostat_key}\'</a>'
+            f'<a href="{docs_url}" target="_blank">\'{self.serv_key}\'</a>'
         )
         headerbar = f"<b>Potentiostat Visualizer module for server {server_link}</b>"
         self.layout = layout(
@@ -230,22 +198,9 @@ class C_biovis:
         self.xselect = self.xaxis_selector_group.active
         self.yselect = self.yaxis_selector_group.active
 
-        self.vis.doc.add_root(self.layout)
-        self.vis.doc.add_root(Spacer(height=10))
-        self.IOtask = asyncio.create_task(self.IOloop_data())
-        self.vis.doc.on_session_destroyed(self.cleanup_session)
+        self._mount()
         for ch, _ in self.channel_action_uuid.items():
             self.reset_plot(ch, forceupdate=True)
-
-    def cleanup_session(self, session_context):
-        """Cancel the data ingest task when the Bokeh session is torn down.
-
-        Args:
-            session_context: Bokeh session context (unused).
-        """
-        LOGGER.info(f"'{self.potentiostat_key}' Bokeh session closed")
-        self.IOloop_data_run = False
-        self.IOtask.cancel()
 
     def callback_selector_change(self, attr, old, new):
         """Re-render every channel plot after the user picks new axes.
@@ -257,71 +212,6 @@ class C_biovis:
         """
         for ch in self.channel_action_uuid:
             self.reset_plot(ch)
-
-    def callback_input_max_points(self, attr, old, new, sender):
-        """Validate the ``max datapoints`` input and update the rolling window.
-
-        Parses ``new`` as an int, falls back to ``old`` (or ``500``) on bad
-        input, then clamps the result to ``[2, 10000]`` before storing it as
-        ``self.max_points`` and writing the normalized value back to the
-        input widget.
-
-        Args:
-            attr: Bokeh property name that changed (``"value"``).
-            old: Prior text value.
-            new: New text value typed by the user.
-            sender: The :class:`TextInput` to refresh with the clamped value.
-        """
-
-        def to_int(val):
-            try:
-                return int(val)
-            except ValueError:
-                return None
-
-        newpts = to_int(new)
-        oldpts = to_int(old)
-
-        if newpts is None:
-            if oldpts is not None:
-                newpts = oldpts
-            else:
-                newpts = 500
-
-        if newpts < 2:
-            newpts = 2
-        if newpts > 10000:
-            newpts = 10000
-
-        self.max_points = newpts
-
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.max_points}")
-        )
-
-    def update_input_value(self, sender, value):
-        """Write ``value`` back onto a Bokeh input widget on the document thread.
-
-        Args:
-            sender: Bokeh input widget whose ``value`` is being updated.
-            value: New string value to assign.
-        """
-        sender.value = value
-
-    async def IOloop_data(self):
-        """Continuously pull WebSocket data packages and schedule plot updates.
-
-        Runs for the lifetime of the Bokeh session. Each iteration honors
-        ``self.update_rate``, reads messages from the subscriber, and
-        schedules :meth:`add_points` on the document thread.
-        """
-        LOGGER.info(f" ... potentiostat visualizer subscribing to: {self.data_url}")
-        while True:
-            if time.time() - self.last_update_time >= self.update_rate:
-                messages = await self.wss.read_messages() # where the data is coming from - reads messages in websocket
-                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
-                self.last_update_time = time.time()
-            await asyncio.sleep(0.01)
 
     def add_points(self, datapackage_list: list):
         """Stream a batch of incoming data packages into the per-channel sources.
@@ -337,7 +227,7 @@ class C_biovis:
         """
         for data_package in datapackage_list:
             if (
-                data_package.datamodel.status in VALID_DATA_STATUS 
+                data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
             ):
                 for _, uuid_dict in data_package.datamodel.data.items():
@@ -490,9 +380,9 @@ class C_biovis:
         self.vis.doc.add_next_tick_callback(
             partial(
                 async_private_dispatcher,
-                server_key=self.potentiostat_key,
-                host=self.potserv_host,
-                port=self.potserv_port,
+                server_key=self.serv_key,
+                host=self.host,
+                port=self.port,
                 private_action="stop_private",
                 params_dict={"channel": channel},
                 json_dict={},

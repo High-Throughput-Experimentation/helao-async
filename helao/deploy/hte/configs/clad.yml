@@ -101,6 +101,7 @@ servers:
     #switch for biologic
     #    fast: biologic_server
     fast: gamry_server2 #
+    action_vis: gamry_vis
     params:
       #      address: 192.168.200.100
       #      num_channels: 1
@@ -113,6 +114,7 @@ servers:
     port: 8006
     group: action
     fast: nidaqmx_server
+    action_vis: nidaqmx_vis
     params:
       allow_no_sample: true
       dev_liquidvalve:
@@ -141,6 +143,7 @@ servers:
     group: action
     verbose: true
     fast: pal_server
+    action_vis: pal_vis
     regular_update: true
     params:
       user: RSHS

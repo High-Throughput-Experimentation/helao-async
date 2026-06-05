@@ -87,6 +87,7 @@ servers:
     port: 8004
     group: action
     fast: gamry_server2
+    action_vis: gamry_vis
     params:
       allow_no_sample: true
       dev_id: 0
@@ -123,6 +124,7 @@ servers:
     port: 8007
     group: action
     fast: pal_server
+    action_vis: pal_vis
     params:
       positions:
         custom:
@@ -132,6 +134,7 @@ servers:
     port: 8011
     group: action
     fast: spec_server
+    action_vis: spec_vis
     params:
       dev_num: 0
       lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll

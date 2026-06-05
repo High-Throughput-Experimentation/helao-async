@@ -48,6 +48,7 @@ servers:
     port: 8006
     group: action
     fast: nidaqmx_server
+    action_vis: nidaqmx_vis
     params:
       dev_gasvalve:
         1A: cDAQ1Mod1/port0/line0
@@ -76,6 +77,7 @@ servers:
     port: 8007
     group: action
     fast: pal_server
+    action_vis: pal_vis
     params:
       positions:
         custom:
@@ -100,6 +102,7 @@ servers:
     port: 8012
     group: action
     fast: co2sensor_server
+    live_vis: co2_vis
     params:
       port: COM3
       start_margin: 0
@@ -131,6 +134,7 @@ servers:
     port: 8009
     group: action
     fast: mfc_server
+    live_vis: mfc_vis
     params:
       devices:
         CO2:

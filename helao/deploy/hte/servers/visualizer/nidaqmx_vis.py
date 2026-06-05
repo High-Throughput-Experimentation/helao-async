@@ -1,5 +1,3 @@
-import time
-import asyncio
 from functools import partial
 from copy import deepcopy
 
@@ -18,7 +16,7 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.vis import Vis
-from helao.helpers.ws_utils import WsSubscriber as Wss
+from helao.core.servers.vis_subscriber import ActionVisualizer
 
 VALID_DATA_STATUS = (
     None,
@@ -29,23 +27,16 @@ VALID_DATA_STATUS = (
 VALID_ACTION_NAME = ("cellIV",)
 
 
-class C_nidaqmxvis:
+class C_vis(ActionVisualizer):
     """Bokeh visualizer for a NI-DAQmx ``cellIV`` action server.
 
     Subscribes to the server's ``ws_data`` WebSocket and renders nine
     selectable cell voltages and currents (``E``/``I`` per cell) across the
-    active and previous actions, each on a dedicated figure.
+    active and previous actions, each on a dedicated figure. Common subscriber
+    bring-up, the ``max datapoints`` callback, and the ingest loop are
+    inherited from :class:`ActionVisualizer`.
 
     Attributes:
-        vis: Host :class:`Vis` instance providing the Bokeh document.
-        config_dict: ``params`` block from the visualizer's server config.
-        max_points: Rolling window length for the data sources.
-        update_rate: Minimum seconds between WebSocket polls.
-        last_update_time: Epoch timestamp of the most recent poll.
-        nidaqmx_key: Server key of the NI-DAQmx action server.
-        wss: :class:`WsSubscriber` connected to ``ws_data``.
-        data_url: Fully formed ``ws://`` URL for the data WebSocket.
-        IOloop_data_run: Liveness flag for the data ingestion task.
         activeCell: Per-cell visibility flags (length 9).
         data_dict_keys: ``t_s`` plus 9 ``Icell{n}_A`` and 9 ``Ecell{n}_V`` keys.
         datasource: Live :class:`ColumnDataSource`.
@@ -61,8 +52,9 @@ class C_nidaqmxvis:
         plot_CURRENT: Active current figure.
         plot_VOLT_prev: Previous voltage figure.
         plot_CURRENT_prev: Previous current figure.
-        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
     """
+
+    SUBSCRIBE_LABEL = "NImax visualizer"
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         """Wire up data sources, widgets, plot layout, and start the WS ingest task.
@@ -73,25 +65,11 @@ class C_nidaqmxvis:
                 server is not in the config, ``__init__`` returns early
                 without registering any roots.
         """
-        self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg.get("params", {})
-        self.max_points = 500
-        self.update_rate = 1e-3
-        self.last_update_time = time.time()
-        self.nidaqmx_key = serv_key
-        nidaqmxserv_config = self.vis.world_cfg["servers"].get(self.nidaqmx_key, None)
-        if nidaqmxserv_config is None:
+        super().__init__(vis_serv, serv_key)
+        if not self.connected:
             return
-        nidaqmxserv_host = nidaqmxserv_config.get("host", None)
-        nidaqmxserv_port = nidaqmxserv_config.get("port", None)
-        self.wss = Wss(nidaqmxserv_port, nidaqmxserv_host, "ws_data")
-
-        self.data_url = (
-            f"ws://{nidaqmxserv_config['host']}:{nidaqmxserv_config['port']}/ws_data"
-        )
-        # self.stat_url = f"ws://{nidaqmxserv_config["host"]}:{nidaqmxserv_config["port"]}/ws_status"
-
-        self.IOloop_data_run = False
+        nidaqmxserv_host = self.host
+        nidaqmxserv_port = self.port
 
         self.activeCell = [True for _ in range(9)]
 
@@ -161,7 +139,7 @@ class C_nidaqmxvis:
 
         # combine all sublayouts into a single one
         docs_url = f"http://{nidaqmxserv_host}:{nidaqmxserv_port}/docs#/"
-        server_link = f'<a href="{docs_url}" target="_blank">\'{self.nidaqmx_key}\'</a>'
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.serv_key}\'</a>'
         headerbar = f"<b>NImax Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [
@@ -179,84 +157,7 @@ class C_nidaqmxvis:
             width=1024,
         )
 
-        self.vis.doc.add_root(self.layout)
-        self.vis.doc.add_root(Spacer(height=10))
-        self.IOtask = asyncio.create_task(self.IOloop_data())
-        self.vis.doc.on_session_destroyed(self.cleanup_session)
-
-    def cleanup_session(self, session_context):
-        """Cancel the data ingest task when the Bokeh session is torn down.
-
-        Args:
-            session_context: Bokeh session context (unused).
-        """
-        LOGGER.info(f"'{self.nidaqmx_key}' Bokeh session closed")
-        self.IOloop_data_run = False
-        self.IOtask.cancel()
-
-    def callback_input_max_points(self, attr, old, new, sender):
-        """Validate the ``max datapoints`` input and update the rolling window.
-
-        Parses ``new`` as an int, falls back to ``old`` (or ``500``) on bad
-        input, then clamps to ``[2, 10000]`` before storing it as
-        ``self.max_points`` and refreshing the widget.
-
-        Args:
-            attr: Bokeh property name that changed.
-            old: Prior text value.
-            new: New text value typed by the user.
-            sender: The :class:`TextInput` to refresh.
-        """
-
-        def to_int(val):
-            try:
-                return int(val)
-            except ValueError:
-                return None
-
-        newpts = to_int(new)
-        oldpts = to_int(old)
-
-        if newpts is None:
-            if oldpts is not None:
-                newpts = oldpts
-            else:
-                newpts = 500
-
-        if newpts < 2:
-            newpts = 2
-        if newpts > 10000:
-            newpts = 10000
-
-        self.max_points = newpts
-
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.max_points}")
-        )
-
-    def update_input_value(self, sender, value):
-        """Write ``value`` back onto a Bokeh input widget on the document thread.
-
-        Args:
-            sender: Bokeh input widget whose ``value`` is being updated.
-            value: New string value to assign.
-        """
-        sender.value = value
-
-    async def IOloop_data(self):
-        """Continuously pull WebSocket data packages and schedule plot updates.
-
-        Runs for the lifetime of the Bokeh session. Each iteration honors
-        ``self.update_rate`` and forwards messages to :meth:`add_points` on
-        the document thread.
-        """
-        LOGGER.info(f" ... NImax visualizer subscribing to: {self.data_url}")
-        while True:
-            if time.time() - self.last_update_time >= self.update_rate:
-                messages = await self.wss.read_messages()
-                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
-                self.last_update_time = time.time()
-            await asyncio.sleep(0.01)
+        self._mount()
 
     def add_points(self, datapackage_list: list):
         """Stream a batch of action-server data packages into the active source.

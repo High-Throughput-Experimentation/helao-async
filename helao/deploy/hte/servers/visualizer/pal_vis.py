@@ -19,6 +19,7 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.data import DataPackageModel
 from helao.core.servers.vis import Vis
+from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.core.error import ErrorCodes
 
@@ -53,26 +54,20 @@ def async_partial(f, *args):
     return f2
 
 
-class C_palvis:
+class C_vis(ActionVisualizer):
     """Bokeh visualizer for a PAL/archive sample server.
 
     Polls the PAL server's ``list_new_samples`` private endpoint whenever
     new data is observed on the ``ws_data`` WebSocket and renders one
     Bokeh ``DataTable`` per sample type (solid, liquid, gas, assembly)
-    showing the newest entries.
+    showing the newest entries. This visualizer manages its own WebSocket
+    connection (``USE_WSS = False``) and overrides :meth:`IOloop_data`, but
+    inherits the shared bring-up, :meth:`cleanup_session`, and
+    :meth:`update_input_value` from :class:`ActionVisualizer`.
 
     Attributes:
-        vis: Host :class:`Vis` instance providing the Bokeh document.
-        config_dict: ``params`` block from the visualizer's server config.
         max_width: Maximum layout width in pixels.
         max_smps: Number of latest samples to request per type.
-        pal_key: Server key of the PAL action server.
-        palserv_config: Mapping with ``host``/``port`` for the PAL server.
-        palserv_host: PAL server hostname.
-        palserv_port: PAL server port.
-        data_url: Fully formed ``ws://`` URL for the data WebSocket.
-        IOloop_data_run: Liveness flag for the data ingestion task.
-        IOloop_stat_run: Liveness flag for the status ingestion task.
         data_dict_keys: Column names rendered per sample table.
         data_dict: Backing dict-of-dicts keyed by sample type.
         datasource: :class:`ColumnDataSource` per sample type.
@@ -82,8 +77,9 @@ class C_palvis:
         inheritance_selector_group: Checkbox controlling the ``give_only``
             filter on the PAL request.
         inheritance_select: Cached active list of the inheritance selector.
-        IOtask: ``asyncio`` task running :meth:`IOloop_data`.
     """
+
+    USE_WSS = False
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         """Wire up data sources, tables, widgets, and start the WS ingest task.
@@ -94,25 +90,11 @@ class C_palvis:
                 server is not in the config, ``__init__`` returns early
                 without registering any roots.
         """
-        self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg.get("params", {})
+        super().__init__(vis_serv, serv_key)
+        if not self.connected:
+            return
         self.max_width = 1024
         self.max_smps = 10
-
-        self.pal_key = serv_key
-        self.palserv_config = self.vis.world_cfg["servers"].get(self.pal_key, None)
-        if self.palserv_config is None:
-            return
-        self.palserv_host = self.palserv_config.get("host", None)
-        self.palserv_port = self.palserv_config.get("port", None)
-
-        self.data_url = (
-            f"ws://{self.palserv_config['host']}:{self.palserv_config['port']}/ws_data"
-        )
-        # self.stat_url = f"ws://{self.palserv_config["host"]}:{self.palserv_config["port"]}/ws_status"
-
-        self.IOloop_data_run = False
-        self.IOloop_stat_run = False
 
         smptypes = ["solid", "liquid", "gas", "assembly"]
 
@@ -180,7 +162,7 @@ class C_palvis:
                 [
                     Spacer(width=20),
                     Div(
-                        text=f'<b>PAL Visualizer module for server <a href="http://{self.palserv_host}:{self.palserv_port}/docs#/" target="_blank">\'{self.pal_key}\'</a></b>',
+                        text=f'<b>PAL Visualizer module for server <a href="http://{self.host}:{self.port}/docs#/" target="_blank">\'{self.serv_key}\'</a></b>',
                         width=1004,
                         height=15,
                     ),
@@ -227,20 +209,7 @@ class C_palvis:
 
         self.reset_plot()
 
-        self.vis.doc.add_root(self.layout)
-        self.vis.doc.add_root(Spacer(height=10))
-        self.IOtask = asyncio.create_task(self.IOloop_data())
-        self.vis.doc.on_session_destroyed(self.cleanup_session)
-
-    def cleanup_session(self, session_context):
-        """Cancel the data ingest task when the Bokeh session is torn down.
-
-        Args:
-            session_context: Bokeh session context (unused).
-        """
-        LOGGER.info(f"'{self.pal_key}' Bokeh session closed")
-        self.IOloop_data_run = False
-        self.IOtask.cancel()
+        self._mount()
 
     def callback_input_max_smps(self, attr, old, new, sender):
         """Validate the ``num latest samples`` input and refresh the tables.
@@ -269,15 +238,6 @@ class C_palvis:
         )
         self.reset_plot()
 
-    def update_input_value(self, sender, value):
-        """Write ``value`` back onto a Bokeh input widget on the document thread.
-
-        Args:
-            sender: Bokeh input widget whose ``value`` is being updated.
-            value: New string value to assign.
-        """
-        sender.value = value
-
     def update_inheritance_selector(self):
         """Cache the current state of the ``give_only`` checkbox selector."""
         self.inheritance_select = self.inheritance_selector_group.active
@@ -305,9 +265,9 @@ class C_palvis:
         # pull latest sample lists from PAL server and populate self.datasource.data
         # keep global_label, sample_creation_timecode, comment, volume, ph, electrolyte
         resp, err = await async_private_dispatcher(
-            self.pal_key,
-            self.palserv_host,
-            self.palserv_port,
+            self.serv_key,
+            self.host,
+            self.port,
             "list_new_samples",
             {
                 "num_smps": self.max_smps,

@@ -5,8 +5,6 @@ running acquisition table together with predicted-vs-acquired histograms
 per plate.
 """
 
-import time
-import asyncio
 from functools import partial
 
 from bokeh.models import (
@@ -24,26 +22,24 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.vis import Vis
-from helao.helpers.ws_utils import WsSubscriber as Wss
+from helao.core.servers.vis_subscriber import LiveVisualizer
 
 
-class C_gpsimlivevis:
+class C_vis(LiveVisualizer):
     """Live Bokeh visualizer for the GP-simulator action server.
 
     Builds a layout with an update-rate input, a status toggle, a
     predicted-vs-ground-truth histogram plot, and a recent-acquisitions
-    table. A background coroutine reads from the action server's
-    ``ws_live`` websocket and streams new entries to the document.
+    table. Common subscriber bring-up, the ``update sec`` callback, and the
+    ingest loop are inherited from :class:`LiveVisualizer`.
 
     Attributes:
-        vis: Hosting visualizer server.
-        update_rate: Polling period (seconds) between websocket reads.
-        live_key: Name of the action server being visualized.
-        wss: ``WsSubscriber`` consumer for ``ws_live`` messages.
         datasource_table: ``ColumnDataSource`` backing the table.
         hists: Per-plate cached histogram quads (predicted/ground truth).
         layout: Top-level Bokeh layout.
     """
+
+    SUBSCRIBE_LABEL = "Live visualizer"
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         """Set up subscriber, widgets, plot, and table; start the IO loop.
@@ -52,21 +48,11 @@ class C_gpsimlivevis:
             vis_serv: Hosting visualizer server.
             serv_key: Name of the action server to visualize.
         """
-        self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg.get("params", {})
-        self.update_rate = self.config_dict.get("update_rate", 0.5)
-        self.last_update_time = time.time()
-
-        self.live_key = serv_key
-        psrv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
-        if psrv_config is None:
+        super().__init__(vis_serv, serv_key)
+        if not self.connected:
             return
-        host = psrv_config.get("host", None)
-        port = psrv_config.get("port", None)
-        self.wss = Wss(host, port, "ws_live")
-
-        self.IOloop_data_run = False
-        self.IOloop_stat_run = False
+        host = self.host
+        port = self.port
 
         self.data_dict_keys = [
             "plate_id",
@@ -127,7 +113,7 @@ class C_gpsimlivevis:
         )
         # combine all sublayouts into a single one
         docs_url = f"http://{host}:{port}/docs#/"
-        server_link = f'<a href="{docs_url}" target="_blank">\'{self.live_key}\'</a>'
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.serv_key}\'</a>'
         headerbar = f"<b>Live vis module for server {server_link}</b>"
         tableheader = f"<b>Last 20 acquisitions across all Orchestrators:</b>"
         self.layout = layout(
@@ -150,54 +136,8 @@ class C_gpsimlivevis:
             width=1024,
         )
 
-        self.vis.doc.add_root(self.layout)
-        self.vis.doc.add_root(Spacer(height=10))
-        self.IOtask = asyncio.create_task(self.IOloop_data())
-        self.vis.doc.on_session_destroyed(self.cleanup_session)
+        self._mount()
         self._add_plots()
-
-    def cleanup_session(self, session_context):
-        """Cancel the IO loop when the Bokeh session ends.
-
-        Args:
-            session_context: Bokeh session context (unused).
-        """
-        LOGGER.info(f"'{self.live_key}' Bokeh session closed")
-        self.IOloop_data_run = False
-        self.IOtask.cancel()
-
-    def update_input_value(self, sender, value):
-        """Push ``value`` back into the source widget.
-
-        Args:
-            sender: Bokeh widget to update.
-            value: New value to assign.
-        """
-        sender.value = value
-
-    def callback_input_update_rate(self, attr, old, new, sender):
-        """Validate and apply a new update-rate input, then echo it back.
-
-        Args:
-            attr: Bokeh attribute name (unused).
-            old: Previous string value.
-            new: New string value.
-            sender: The source widget.
-        """
-
-        def to_float(val):
-            try:
-                return float(val)
-            except ValueError:
-                return 0.5
-
-        newpts = to_float(new)
-
-        self.update_rate = newpts
-
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.update_rate}")
-        )
 
     def add_points(self, datapackage_list: list):
         """Stream a batch of websocket messages into the table and histograms.
@@ -262,16 +202,6 @@ class C_gpsimlivevis:
         if latest_epoch != 0 and histquads and data_dict:
             self.datasource_table.stream(data_dict, rollover=20)
             self._add_plots()
-
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        """Poll the live websocket and schedule UI updates on the document."""
-        LOGGER.info(" ... Live visualizer receiving messages.")
-        while True:
-            if time.time() - self.last_update_time >= self.update_rate:
-                messages = await self.wss.read_messages()
-                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
-                self.last_update_time = time.time()
-            await asyncio.sleep(0.001)
 
     def _add_plots(self):
         """Redraw the histogram plot from the cached per-plate quads."""

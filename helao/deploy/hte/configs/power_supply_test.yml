@@ -54,6 +54,7 @@ servers:
     port: 8002
     group: action
     fast: power_supply_server
+    action_vis: power_supply_vis
     params:
       resource_name:  'ASRL/dev/cu.usbmodem0031012B04581::INSTR'
       timeout_ms: 10000

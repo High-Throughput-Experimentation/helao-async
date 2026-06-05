@@ -84,6 +84,7 @@ servers:
     port: 8004
     group: action
     fast: gamry_server2
+    action_vis: gamry_vis
     params:
       allow_no_sample: true
       dev_id: 0
@@ -113,6 +114,7 @@ servers:
     port: 8007
     group: action
     fast: pal_server
+    action_vis: pal_vis
     params:
       positions:
         custom:

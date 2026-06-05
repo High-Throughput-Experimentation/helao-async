@@ -83,6 +83,7 @@ servers:
     port: 8004
     group: action
     fast: gamry_server
+    action_vis: gamry_vis
     params:
       dev_id: 0
       filterfreq_hz: 1000.0
@@ -113,6 +114,7 @@ servers:
     port: 8007
     group: action
     fast: pal_server
+    action_vis: pal_vis
     params:
       positions:
         custom:
