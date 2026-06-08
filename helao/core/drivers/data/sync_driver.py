@@ -30,6 +30,7 @@ from datetime import datetime
 from typing import Union, Optional, Dict, List
 import traceback
 from collections import defaultdict
+from contextlib import AsyncExitStack, asynccontextmanager
 from copy import copy
 
 import boto3
@@ -149,6 +150,51 @@ def revert_to_finished(file_path: Path) -> Union[Path, bool]:
     except PermissionError:
         LOGGER.info(f"Permission error when moving {file_path} to {target_path}")
         return False
+
+
+class AsyncRWLock:
+    """A minimal asyncio reader/writer lock.
+
+    Any number of readers may hold the lock concurrently, but a writer has it
+    exclusively. This is reader-preferring: a waiting writer does not block new
+    readers from entering. That matters for the syncer's sequence locks -- a
+    sequence (writer) can only finish once its descendants (readers) have, so a
+    writer must never stall the very readers it is waiting on.
+    """
+
+    def __init__(self):
+        self._cond = asyncio.Condition()
+        self._readers = 0
+        self._writer = False
+
+    @asynccontextmanager
+    async def read_locked(self):
+        """Acquire shared (reader) access for the duration of the context."""
+        async with self._cond:
+            while self._writer:
+                await self._cond.wait()
+            self._readers += 1
+        try:
+            yield
+        finally:
+            async with self._cond:
+                self._readers -= 1
+                if self._readers == 0:
+                    self._cond.notify_all()
+
+    @asynccontextmanager
+    async def write_locked(self):
+        """Acquire exclusive (writer) access for the duration of the context."""
+        async with self._cond:
+            while self._writer or self._readers > 0:
+                await self._cond.wait()
+            self._writer = True
+        try:
+            yield
+        finally:
+            async with self._cond:
+                self._writer = False
+                self._cond.notify_all()
 
 
 class HelaoYml:
@@ -668,9 +714,18 @@ class SyncDriver:
         self.task_queue = asyncio.PriorityQueue()
         self.task_set = set()
         self.running_tasks = {}
-        # per-experiment locks; actions sharing an experiment must serialize so
-        # the parent experiment's progress dict / process metas are not raced.
+        # Hierarchical sync locks, keyed by each yml's path relative to RUNS_*
+        # (so the key is stable as the yml moves between RUNS_FINISHED/SYNCED):
+        #   - exp_locks: an exclusive per-experiment mutex held by the
+        #     experiment sync AND every one of its child actions, so they never
+        #     race the shared experiment progress dict / process metas.
+        #   - seq_locks: a per-sequence reader/writer lock. Experiments and
+        #     actions hold it as readers, so siblings still sync in parallel;
+        #     the sequence sync holds it as the writer, which waits for every
+        #     in-flight descendant and blocks until it owns the subtree --
+        #     guaranteeing a parent never syncs concurrently with a descendant.
         self.exp_locks: Dict[str, asyncio.Lock] = {}
+        self.seq_locks: Dict[str, AsyncRWLock] = {}
         self.aiolock = asyncio.Lock()
         # push happens via async task queue
         # processes are checked after each action push
@@ -769,31 +824,95 @@ class SyncDriver:
         except KeyError:
             pass
 
-    def _get_exp_lock_for_action(self, yml_path: Path) -> Optional[asyncio.Lock]:
-        """Return the per-experiment lock for an action yml, or ``None`` otherwise.
+    @staticmethod
+    def _rel_under_runs(path: Path) -> Optional[str]:
+        """Return ``path`` relative to its ``RUNS_*`` root, or ``None`` if absent.
 
-        Action ymls live at
-        ``<runs_root>/<seq_dir>/<exp_dir>/<act_dir>/<name>-act.yml``; the
-        experiment directory (``yml_path.parent.parent``) is used as the lock
-        key so two actions of the same experiment serialize their syncs.
-        Non-action ymls (experiment/sequence/process/analysis) return ``None``
-        and may run in parallel.
+        Keying locks by a yml's position under the ``RUNS_*`` root keeps the
+        key stable across the ``RUNS_{ACTIVE,FINISHED,SYNCED}`` trees, so the
+        same logical record always maps to the same lock as it is moved.
         """
-        if not yml_path.stem.endswith("-act"):
+        parts = list(path.parts)
+        run_idxs = [i for i, x in enumerate(parts) if x.startswith("RUNS_")]
+        if not run_idxs:
             return None
-        exp_key = str(yml_path.parent.parent)
+        return "/".join(parts[run_idxs[0] + 1 :])
+
+    def _node_keys(self, yml_path: Path) -> tuple:
+        """Return ``(seq_key, exp_key)`` lock keys for ``yml_path``.
+
+        Keys are the sequence and experiment *directory* paths relative to the
+        ``RUNS_*`` root. ``exp_key`` is ``None`` for sequences (which have no
+        experiment level). Returns ``(None, None)`` when the path is not under
+        a ``RUNS_*`` tree.
+
+        The layout is ``<runs>/<week>/<date>/<seq>/<exp>/<act>/<name>-*.yml``,
+        so the directory levels are counted back from the file name and are
+        independent of the week/date naming above the sequence.
+        """
+        rel = self._rel_under_runs(yml_path)
+        if rel is None:
+            return None, None
+        parts = rel.split("/")
+        stem = yml_path.stem
+        if stem.endswith("-seq"):
+            return "/".join(parts[:-1]), None
+        if stem.endswith("-exp"):
+            return "/".join(parts[:-2]), "/".join(parts[:-1])
+        if stem.endswith("-act"):
+            return "/".join(parts[:-3]), "/".join(parts[:-2])
+        return None, None
+
+    def _get_seq_lock(self, seq_key: str) -> AsyncRWLock:
+        """Get-or-create the per-sequence reader/writer lock for ``seq_key``."""
+        lock = self.seq_locks.get(seq_key)
+        if lock is None:
+            lock = AsyncRWLock()
+            self.seq_locks[seq_key] = lock
+        return lock
+
+    def _get_exp_lock(self, exp_key: str) -> asyncio.Lock:
+        """Get-or-create the exclusive per-experiment mutex for ``exp_key``."""
         lock = self.exp_locks.get(exp_key)
         if lock is None:
             lock = asyncio.Lock()
             self.exp_locks[exp_key] = lock
         return lock
 
+    async def _acquire_hierarchy_locks(self, stack: AsyncExitStack, yml_path: Path):
+        """Enter the hierarchical sync locks for ``yml_path`` into ``stack``.
+
+        Locks are always taken outermost-first (sequence before experiment),
+        giving a single global acquisition order that rules out deadlock:
+
+        - a **sequence** takes its sequence lock as a *writer*, so it waits for
+          every running descendant and excludes new ones;
+        - an **experiment** takes its sequence lock as a *reader* (siblings run
+          in parallel) plus its own experiment mutex;
+        - an **action** takes its sequence lock as a *reader* plus its parent
+          experiment's mutex, so it serializes with that experiment's sync and
+          its sibling actions while staying concurrent with other experiments.
+
+        Anything not under a ``RUNS_*`` tree (or an unrecognized type) is left
+        unlocked.
+        """
+        seq_key, exp_key = self._node_keys(yml_path)
+        if seq_key is None:
+            return
+        seq_lock = self._get_seq_lock(seq_key)
+        if exp_key is None:  # sequence yml
+            await stack.enter_async_context(seq_lock.write_locked())
+            return
+        await stack.enter_async_context(seq_lock.read_locked())
+        await stack.enter_async_context(self._get_exp_lock(exp_key))
+
     async def syncer(self):
         """Worker coroutine: pop one yml off the queue and run :meth:`sync_yml`.
 
-        ``self.max_tasks`` copies of this coroutine run concurrently. Action
-        ymls of the same experiment are serialized through a per-experiment
-        lock; other yml types run without that lock.
+        ``self.max_tasks`` copies of this coroutine run concurrently. The
+        hierarchical sync locks (see :meth:`_acquire_hierarchy_locks`) serialize
+        a record against its ancestors and descendants while still letting
+        unrelated subtrees sync in parallel.
         """
         while True:
             rank, yml_path = await self.task_queue.get()
@@ -804,11 +923,8 @@ class SyncDriver:
                 continue
             self.running_tasks[yml_path.name] = asyncio.current_task()
             try:
-                exp_lock = self._get_exp_lock_for_action(yml_path)
-                if exp_lock is not None:
-                    async with exp_lock:
-                        await self.sync_yml(yml_path=yml_path, rank=rank)
-                else:
+                async with AsyncExitStack() as locks:
+                    await self._acquire_hierarchy_locks(locks, yml_path)
                     await self.sync_yml(yml_path=yml_path, rank=rank)
             except Exception:
                 LOGGER.error(
@@ -944,7 +1060,10 @@ class SyncDriver:
 
         LOGGER.debug(f"{str(prog.yml.target)} status is finished, proceeding.")
 
-        # first check if child objects are registered with API (non-actions)
+        # first check if child objects are registered with API (non-actions).
+        # Concurrency with descendants is prevented by the hierarchical sync
+        # locks acquired in the syncer worker, so this method only needs to
+        # gate on child *sync status*, not on whether children are running.
         if prog.yml.type != "action":
             if prog.yml.active_children:
                 LOGGER.debug(
@@ -955,27 +1074,33 @@ class SyncDriver:
                 LOGGER.debug(
                     f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
                 )
+                # Re-queue this parent *below* its children, and decrement the
+                # rank on every pass so the rank_limit floor in enqueue_yml
+                # eventually bounds the retries. Re-queuing at a higher rank
+                # (rank + 1) never approaches the floor, so a child that keeps
+                # failing (or can't be synced) would re-queue the parent
+                # forever -- the infinite loop this method must avoid.
+                parent_rank = rank - 1
+                child_rank = parent_rank - 1
                 LOGGER.debug(
-                    "Adding 'finished' children to sync queue with highest priority."
+                    f"Adding 'finished' children to sync queue at rank {child_rank} "
+                    f"(higher priority than parent rank {parent_rank})."
                 )
+                # Re-submit every unsynced child. enqueue_yml is the single
+                # dedup point: a child still queued/running is skipped, while a
+                # child whose sync failed (and so left task_set/running_tasks)
+                # is re-queued at strictly higher priority than this parent.
                 for child in prog.yml.finished_children:
-                    if (
-                        child.target.name not in self.running_tasks
-                        and child.target.name not in self.task_set
-                    ):
-                        await self.enqueue_yml(
-                            child.target,
-                            rank - 1,
-                        )
-                        LOGGER.info(str(child.target))
+                    await self.enqueue_yml(child.target, child_rank)
+                    LOGGER.info(str(child.target))
                 LOGGER.debug(
-                    f"Re-adding {str(prog.yml.target)} to sync queue with high priority."
+                    f"Re-adding {str(prog.yml.target)} to sync queue at rank {parent_rank}."
                 )
                 if prog.yml.target.name in self.running_tasks:
                     async with self.aiolock:
                         self.running_tasks.pop(prog.yml.target.name)
                 self.task_set.discard(prog.yml.target.name)
-                await self.enqueue_yml(prog.yml.target, rank + 1)
+                await self.enqueue_yml(prog.yml.target, parent_rank)
                 LOGGER.debug(f"{str(prog.yml.target)} re-queued, exiting.")
                 return False
 
