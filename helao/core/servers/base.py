@@ -873,6 +873,32 @@ class Base:
         await self.detach_subscribers()
         self.status_logger.cancel()
 
+    async def _write_meta_atomic(self, output_file: str, output_str: str):
+        """Atomically write ``output_str`` to ``output_file``.
+
+        Meta writers (``write_act``/``write_exp``/``write_seq``) can be driven
+        concurrently for the same file -- e.g. a driver polling loop and the
+        action loop both reaching ``finish()``, or a manual action's ``myinit``
+        racing its ``finish_manual_action``. A plain ``"w+"`` truncate-then-write
+        from two coroutines interleaves at the same offset and yields a torn
+        meta file (e.g. a partially copied ``samples_in`` block), and a reader
+        (syncer/move_dir) or a crash mid-write can also observe a truncated
+        file. Writing to a unique temp file in the same directory and
+        ``os.replace()``-ing it in makes the swap atomic: readers only ever see
+        a complete file and the last writer wins cleanly.
+        """
+        if not output_str.endswith("\n"):
+            output_str += "\n"
+        output_path = os.path.dirname(output_file)
+        os.makedirs(output_path, exist_ok=True)
+        tmp_file = os.path.join(
+            output_path,
+            f".{os.path.basename(output_file)}.{uuid1().hex}.tmp",
+        )
+        async with aiofiles.open(tmp_file, mode="w") as f:
+            await f.write(output_str)
+        os.replace(tmp_file, output_file)
+
     async def write_act(self, action: Action):
         """Write the action's metadata to ``<output_dir>/<timestamp>-act.yml`` if ``save_act``.
 
@@ -892,12 +918,9 @@ class Base:
 
             LOGGER.info(f"writing to act meta file: {output_path}")
 
-            os.makedirs(output_path, exist_ok=True)
-
             output_dict = {"file_type": "action"}
             output_dict.update(act_dict)
-            async with aiofiles.open(output_file, mode="w+") as f:
-                await f.write(yml_dumps(output_dict))
+            await self._write_meta_atomic(output_file, yml_dumps(output_dict))
         else:
             LOGGER.info(
                 f"writing meta file for action '{action.action_name}' is disabled."
@@ -922,14 +945,7 @@ class Base:
         LOGGER.info(f"writing to exp meta file: {output_file}")
         output_dict = {"file_type": "experiment"}
         output_dict.update(exp_dict)
-        output_str = yml_dumps(output_dict)
-        if not output_str.endswith("\n"):
-            output_str += "\n"
-
-        os.makedirs(output_path, exist_ok=True)
-
-        async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(output_str)
+        await self._write_meta_atomic(output_file, yml_dumps(output_dict))
 
     async def write_seq(self, sequence: Sequence):
         """Write the sequence's metadata to ``<sequence_dir>/<timestamp>-seq.yml``.
@@ -951,38 +967,7 @@ class Base:
         LOGGER.info(f"writing to seq meta file: {output_file}")
         output_dict = {"file_type": "sequence"}
         output_dict.update(seq_dict)
-        output_str = yml_dumps(output_dict)
-        if not output_str.endswith("\n"):
-            output_str += "\n"
-
-        os.makedirs(output_path, exist_ok=True)
-
-        async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(output_str)
-
-    async def append_exp_to_seq(self, exp, seq):
-        """Append a one-line YAML record describing ``exp`` to the sequence meta file for ``seq``."""
-        append_dict = {
-            "experiment_uuid": str(exp.experiment_uuid),
-            "experiment_name": exp.experiment_name,
-            "experiment_output_dir": str(exp.experiment_output_dir),
-            "orch_key": str(exp.orch_key),
-            "orch_host": str(exp.orch_host),
-            "orch_port": int(exp.orch_port),
-            "data_request_id": str(exp.data_request_id),
-        }
-        append_str = yml_dumps([append_dict])
-        sequence_dir = seq.get_sequence_dir()
-        save_root = str(self.helaodirs.save_root)
-        if seq.manual_action:
-            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
-        output_path = os.path.join(save_root, sequence_dir)
-        output_file = os.path.join(
-            output_path,
-            f"{seq.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.yml",
-        )
-        async with aiofiles.open(output_file, mode="a") as f:
-            await f.write(append_str)
+        await self._write_meta_atomic(output_file, yml_dumps(output_dict))
 
     def new_file_conn_key(self, key: str) -> UUID:
         """Return a UUID derived from the MD5 hash of ``key``.
@@ -1197,6 +1182,9 @@ class Active:
         self.manual_stop = False
         self.action_loop_running = False
         self.action_task = None
+        # serialize finish() so the action loop and a driver polling loop can't
+        # both run the finalization (and its write_act) for this active at once
+        self.finish_lock = asyncio.Lock()
 
     def executor_done_callback(self, futr):
         """Log any exception raised by the executor task on completion."""
@@ -2005,12 +1993,24 @@ class Active:
         post-processors, closes file connections, schedules the run directory
         move, and broadcasts the final status for each finished action.
 
+        Serialized via ``finish_lock`` so the action loop and a driver polling
+        loop cannot run finalization (and its ``write_act``) concurrently for
+        the same active.
+
         Args:
             finish_uuid_list: UUIDs to finish; ``None`` finishes every action.
 
         Returns:
             The current ``self.action`` after finalisation.
         """
+        async with self.finish_lock:
+            return await self._finish(finish_uuid_list=finish_uuid_list)
+
+    async def _finish(
+        self,
+        finish_uuid_list: Optional[List[UUID]] = None,
+    ) -> Action:
+        """Finalization body for :meth:`finish`; must be called under ``finish_lock``."""
         if finish_uuid_list is None:
             finish_uuid_list = [action.action_uuid for action in self.action_list]
 
