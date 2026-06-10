@@ -518,7 +518,9 @@ def make_analysis_app(server_key) -> BaseAPI:
     def _register_endpoint(endpoint_name: str, ana_cls: BaseAnalysis):
         """Register one analysis action endpoint bound to ``ana_cls``."""
 
-        @app.post(f"/{server_key}/{endpoint_name}", tags=["action"])
+        @app.post(
+            f"/{server_key}/{endpoint_name}", tags=["action"], name=endpoint_name
+        )
         async def _analyze(
             sequence_zip_path: str = "",
             params: dict = {},
