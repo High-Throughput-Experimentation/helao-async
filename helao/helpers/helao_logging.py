@@ -19,6 +19,7 @@ import tempfile
 import os
 import subprocess
 import logging
+import time
 import requests
 from socket import gethostname
 from queue import Queue
@@ -37,6 +38,13 @@ from helao.helpers.time_utils import read_saved_offset
 
 ALERT_LEVEL = 60
 logging.addLevelName(ALERT_LEVEL, "ALERT")
+
+# Default minimum number of seconds between two outgoing alert emails. Alert
+# records that arrive while an email is still "cooling down" are suppressed
+# (counted, then summarised in the next email's subject). ``0`` disables
+# throttling entirely. Overridden per-deployment via the ``email_interval``
+# key in the alert config referenced by ``alert_config_path``.
+DEFAULT_EMAIL_INTERVAL = 600
 
 
 def alert(self, message, *args, **kws):
@@ -63,15 +71,56 @@ class GZipRotator:
 
 
 class TitledSMTPHandler(SMTPHandler):
-    """SMTP handler that derives a structured subject line from the record."""
+    """SMTP handler that derives a structured subject line from the record.
+
+    Adds rate limiting so that at most one email is sent per
+    ``min_interval`` seconds. Records that arrive during the cooldown window
+    are dropped rather than mailed, but are counted so the next email that
+    does go out can report how many alerts were suppressed in the meantime.
+    """
+
+    def __init__(self, *args, min_interval: float = 0, **kwargs):
+        """Build the handler.
+
+        Args:
+            *args: Positional arguments forwarded to ``SMTPHandler``.
+            min_interval: Minimum seconds between outgoing emails. ``0`` (the
+                default) disables throttling and restores stock behaviour.
+            **kwargs: Keyword arguments forwarded to ``SMTPHandler``.
+        """
+        super().__init__(*args, **kwargs)
+        self.min_interval = min_interval
+        self._last_emit_monotonic = None
+        self._suppressed_count = 0
 
     def getSubject(self, record) -> str:
-        """Return ``"<LEVEL> - <title> on <HOST>"`` for ``record``."""
+        """Return ``"<LEVEL> - <title> on <HOST>"`` for ``record``.
+
+        When alerts were suppressed by throttling since the last email, a
+        ``"(+N suppressed)"`` note is appended to the subject.
+        """
         if "~" in record.message:
             title = record.message.split("~")[0].strip()
         else:
             title = record.message.split()[0].strip()
-        return f"{record.levelname} - {title} on {HOST}"
+        subject = f"{record.levelname} - {title} on {HOST}"
+        if self._suppressed_count:
+            subject += f" (+{self._suppressed_count} suppressed)"
+        return subject
+
+    def emit(self, record):
+        """Send ``record`` by email unless still within the cooldown window."""
+        if self.min_interval and self.min_interval > 0:
+            now = time.monotonic()
+            if (
+                self._last_emit_monotonic is not None
+                and now - self._last_emit_monotonic < self.min_interval
+            ):
+                self._suppressed_count += 1
+                return
+            self._last_emit_monotonic = now
+        super().emit(record)
+        self._suppressed_count = 0
 
 
 class HTTPPostHandler(logging.Handler):
@@ -210,7 +259,9 @@ def make_logger(
         email_config: Configuration dict that may contain SMTP credentials
             (``mailhost``, ``mailport``, ``fromaddr``, ``username``,
             ``password``, ``recipients``, ``subject``) and/or a ``webhook``
-            URL with associated ``payload``.
+            URL with associated ``payload``. An optional ``email_interval``
+            key (seconds) throttles outgoing alert emails to at most one per
+            interval, defaulting to :data:`DEFAULT_EMAIL_INTERVAL`.
         show_debug_console: If ``True``, the console handler is set to
             ``DEBUG`` level.
 
@@ -283,6 +334,7 @@ def make_logger(
     password = email_config.get("password", None)
     recipients = email_config.get("recipients", None)
     subject = email_config.get("subject", "Error in Helao")
+    email_interval = email_config.get("email_interval", DEFAULT_EMAIL_INTERVAL)
     email_conditions = [
         x is not None
         for x in [mailhost, mailport, fromaddr, username, password, recipients]
@@ -301,13 +353,17 @@ def make_logger(
             subject=subject,
             credentials=(username, password),
             secure=(),
+            min_interval=email_interval,
         )
         email_handler.setLevel(ALERT_LEVEL)
         email_handler.setFormatter(formatter)
         # logger_instance.addHandler(email_handler)
         queue_listener = QueueListener(email_queue, email_handler)
         queue_listener.start()
-        logger_instance.info(f"Email alerts enabled at log level: {ALERT_LEVEL}")
+        logger_instance.info(
+            f"Email alerts enabled at log level: {ALERT_LEVEL} "
+            f"(throttled to 1 email per {email_interval}s)"
+        )
     else:
         logger_instance.info(f"Email alerts not enabled using config: {email_config}")
 
