@@ -271,7 +271,7 @@ class AnalysisSyncer(HelaoSyncer):
             try:
                 await self.sync_ana(calc_tup)
             except Exception:
-                LOGGER.error(
+                LOGGER.alert(
                     f"Error in ana syncer worker for {proc_uuid_str}", exc_info=True
                 )
             finally:
