@@ -12,6 +12,7 @@ record and asserting the log file is created.
 __all__ = ["logging_unit_test"]
 
 import logging
+import logging.handlers
 import os
 import sys
 import tempfile
@@ -186,6 +187,71 @@ def logging_unit_test() -> bool:
         reporter.check(
             "print_message concatenates positional args with spaces",
             lambda: capture2.records[0].getMessage() == "hi there",
+        )
+
+        reporter.section("TitledSMTPHandler throttles alert emails")
+        sent_subjects = []
+
+        def _capture_super_emit(self, record):
+            sent_subjects.append(self.getSubject(record))
+
+        def _alert_record(message):
+            rec = logging.LogRecord(
+                name="t",
+                level=ALERT_LEVEL,
+                pathname=__file__,
+                lineno=1,
+                msg=message,
+                args=(),
+                exc_info=None,
+            )
+            # mimic QueueHandler.prepare, which sets record.message
+            rec.message = message
+            return rec
+
+        throttled = helao_log.TitledSMTPHandler(
+            mailhost=("localhost", 25),
+            fromaddr="a@b.c",
+            toaddrs=["d@e.f"],
+            subject="s",
+            min_interval=3600,
+        )
+        original_emit = logging.handlers.SMTPHandler.emit
+        logging.handlers.SMTPHandler.emit = _capture_super_emit
+        try:
+            throttled.emit(_alert_record("FIRST ~ one"))
+            throttled.emit(_alert_record("SECOND ~ two"))
+            throttled.emit(_alert_record("THIRD ~ three"))
+        finally:
+            logging.handlers.SMTPHandler.emit = original_emit
+
+        reporter.check(
+            "only the first alert is mailed within the interval",
+            lambda: len(sent_subjects) == 1,
+        )
+        reporter.check(
+            "throttled handler counts the suppressed alerts",
+            lambda: throttled._suppressed_count == 2,
+        )
+
+        unthrottled = helao_log.TitledSMTPHandler(
+            mailhost=("localhost", 25),
+            fromaddr="a@b.c",
+            toaddrs=["d@e.f"],
+            subject="s",
+            min_interval=0,
+        )
+        sent_subjects.clear()
+        logging.handlers.SMTPHandler.emit = _capture_super_emit
+        try:
+            for idx in range(4):
+                unthrottled.emit(_alert_record(f"MSG{idx} ~ body"))
+        finally:
+            logging.handlers.SMTPHandler.emit = original_emit
+
+        reporter.check(
+            "min_interval=0 disables throttling (all alerts mailed)",
+            lambda: len(sent_subjects) == 4,
         )
 
         return reporter.success()
