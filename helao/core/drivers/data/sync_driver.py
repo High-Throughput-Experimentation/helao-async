@@ -56,7 +56,6 @@ from helao.core.models.helaodirs import HelaoDirs
 from helao.helpers.dispatcher import async_action_dispatcher
 from helao.core.models.machine import MachineModel
 
-from time import sleep
 from glob import glob
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -1130,7 +1129,9 @@ class SyncDriver:
                                 file_s3_key += ".gz"
                             LOGGER.debug("Parsing hlo dicts.")
                             try:
-                                file_meta, file_data = read_hlo(sp)
+                                file_meta, file_data = await asyncio.to_thread(
+                                    read_hlo, sp
+                                )
                             except Exception:
                                 LOGGER.error(
                                     f"Failed to read hlo file {fp}, skipping upload.",
@@ -1148,7 +1149,7 @@ class SyncDriver:
                             )
                             try:
                                 parquet_path = str(fp).replace(".hlo", ".parquet")
-                                hlo_to_parquet(fp, parquet_path)
+                                await asyncio.to_thread(hlo_to_parquet, fp, parquet_path)
                                 msg = Path(parquet_path)
                             except Exception:
                                 LOGGER.error(
@@ -1266,11 +1267,11 @@ class SyncDriver:
                 lock_path.unlink()
             for file_path in prog.yml.misc_files + prog.yml.hlo_files:
                 LOGGER.debug(f"Moving {str(file_path)}")
-                move_success = move_to_synced(file_path)
+                move_success = await asyncio.to_thread(move_to_synced, file_path)
                 while not move_success:
                     LOGGER.debug(f"{file_path} is in use, retrying.")
-                    sleep(1)
-                    move_success = move_to_synced(file_path)
+                    await asyncio.sleep(1)
+                    move_success = await asyncio.to_thread(move_to_synced, file_path)
 
             # finally move yaml and update target
             LOGGER.debug(f"Moving {yml_target_name} to RUNS_SYNCED")
@@ -1308,7 +1309,7 @@ class SyncDriver:
                     f"Full sequence has synced, creating zip: {str(zip_target)}"
                 )
                 path_parts = prog.yml.target.parts
-                zip_dir(prog.yml.target.parent, zip_target)
+                await asyncio.to_thread(zip_dir, prog.yml.target.parent, zip_target)
                 root_path = Path(
                     *path_parts[: path_parts.index("RUNS_SYNCED")]
                 ).as_posix()
@@ -1618,7 +1619,7 @@ class SyncDriver:
                 if i > 0:
                     LOGGER.info(f"S3 retry [{i}/{retries}]: {self.bucket}, {target}")
                 try:
-                    uploader(uploadee, self.bucket, target)
+                    await asyncio.to_thread(uploader, uploadee, self.bucket, target)
                     return True
                 except Exception:
                     LOGGER.error(
