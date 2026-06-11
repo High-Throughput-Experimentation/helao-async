@@ -155,6 +155,7 @@ class SampleModel(BaseModel, HelaoDict):
     source: List[str] = Field(default=[])
     prep_date: Optional[datetime.date] = None
     comment: Optional[str] = None
+    etc: dict = Field(default={})
 
     def create_initial_exp_dict(self) -> dict:
         """Return a dict of the shared sample fields used in experiment records."""
