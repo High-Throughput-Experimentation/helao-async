@@ -120,6 +120,7 @@ class SampleModel(BaseModel, HelaoDict):
         source (List[str]): Source labels.
         prep_date (Optional[datetime.date]): Preparation date.
         comment (Optional[str]): Free-form comment.
+        etc (dict): Catch-all for additional fields not in the standard schema.
     """
 
     _hashinclude_ = {"global_label", "sample_type"}
