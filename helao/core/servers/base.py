@@ -371,8 +371,9 @@ class Base:
 
                 for sample in tmp_fast_samples_in:
                     sample_obj = object_to_sample(sample)
-                    if sample_obj.action_uuid is None:
-                        sample_obj.action_uuid = action.action_uuid
+                    sample_actuuid_list = getattr(sample_obj, "action_uuid", [])
+                    if not sample_actuuid_list:
+                        sample_obj.action_uuid = [action.action_uuid]
                     action.samples_in.append(sample_obj)
 
         if action.action_abbr is None:
