@@ -151,14 +151,20 @@ class _BaseOpenAPIClient:
         relative_path_for_join = resolved_path_template.lstrip("/")
         full_url = urljoin(base_url, relative_path_for_join)
 
-        quoted_query_params = {}
+        return full_url, query_params, request_body_data
+
+    @staticmethod
+    def _quote_query(query_params):
+        """Percent-quote string keys/values of a query-params dict."""
+        quoted = {}
         for _key, value in query_params.items():
             key = quote(_key, safe="") if isinstance(_key, str) else _key
-            quoted_query_params[key] = (
-                quote(value, safe="") if isinstance(value, str) else value
-            )
+            quoted[key] = quote(value, safe="") if isinstance(value, str) else value
+        return quoted
 
-        return full_url, quoted_query_params, request_body_data
+    def _raw_request(self, op_id, http_method, url, raw_query, body):
+        """Issue one request, returning the raw httpx.Response. Subclass impl."""
+        raise NotImplementedError
 
     def _handle_response(self, op_id, response):
         """Raise for HTTP errors and decode a successful response.
@@ -332,25 +338,26 @@ class OpenAPIClient(_BaseOpenAPIClient):
         response.raise_for_status()
         return response.json()
 
+    def _raw_request(self, op_id, http_method, url, raw_query, body):
+        params = self._quote_query(raw_query)
+        try:
+            if http_method == "get":
+                return self._client.get(url, params=params)
+            return self._client.post(url, params=params, json=body)
+        except httpx.RequestError as e:
+            raise RuntimeError(
+                f"Request failed for operation '{op_id}' to {e.request.url}: {e}"
+            )
+
     def _make_method(
         self, op_id, http_method, path_template, params_spec, req_body_spec, base_url, op_details
     ):
         def dynamic_method(self_instance, **kwargs):
             """Generated method that dispatches a single API call."""
-            full_url, query_params, request_body_data = self_instance._build_request(
+            full_url, raw_query, body = self_instance._build_request(
                 op_id, http_method, path_template, params_spec, req_body_spec, base_url, kwargs
             )
-            try:
-                if http_method == "get":
-                    response = self_instance._client.get(full_url, params=query_params)
-                else:
-                    response = self_instance._client.post(
-                        full_url, params=query_params, json=request_body_data
-                    )
-            except httpx.RequestError as e:
-                raise RuntimeError(
-                    f"Request failed for operation '{op_id}' to {e.request.url}: {e}"
-                )
+            response = self_instance._raw_request(op_id, http_method, full_url, raw_query, body)
             return self_instance._handle_response(op_id, response)
 
         return dynamic_method
@@ -370,28 +377,29 @@ class AsyncOpenAPIClient(_BaseOpenAPIClient):
         response.raise_for_status()
         return response.json()
 
+    async def _raw_request(self, op_id, http_method, url, raw_query, body):
+        params = self._quote_query(raw_query)
+        try:
+            async with httpx.AsyncClient(headers=self.headers, timeout=30) as client:
+                if http_method == "get":
+                    return await client.get(url, params=params)
+                return await client.post(url, params=params, json=body)
+        except httpx.RequestError as e:
+            raise RuntimeError(
+                f"Request failed for operation '{op_id}' to {e.request.url}: {e}"
+            )
+
     def _make_method(
         self, op_id, http_method, path_template, params_spec, req_body_spec, base_url, op_details
     ):
         async def dynamic_method(self_instance, **kwargs):
             """Generated async method that dispatches a single API call."""
-            full_url, query_params, request_body_data = self_instance._build_request(
+            full_url, raw_query, body = self_instance._build_request(
                 op_id, http_method, path_template, params_spec, req_body_spec, base_url, kwargs
             )
-            try:
-                async with httpx.AsyncClient(
-                    headers=self_instance.headers, timeout=30
-                ) as client:
-                    if http_method == "get":
-                        response = await client.get(full_url, params=query_params)
-                    else:
-                        response = await client.post(
-                            full_url, params=query_params, json=request_body_data
-                        )
-            except httpx.RequestError as e:
-                raise RuntimeError(
-                    f"Request failed for operation '{op_id}' to {e.request.url}: {e}"
-                )
+            response = await self_instance._raw_request(
+                op_id, http_method, full_url, raw_query, body
+            )
             return self_instance._handle_response(op_id, response)
 
         return dynamic_method
