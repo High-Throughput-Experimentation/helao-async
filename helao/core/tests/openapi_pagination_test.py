@@ -39,7 +39,14 @@ def test_locate_items():
 
 def test_base_total_hint_default():
     print("test_base_total_hint_default")
-    check(PaginationStrategy().total_hint(resp({}), {}) is None,
+
+    class _Stub(PaginationStrategy):
+        def extract_items(self, response, body):
+            return None
+        def next_request(self, response, body, sent_params):
+            return None
+
+    check(_Stub().total_hint(resp({}), {}) is None,
           "base total_hint defaults to None")
 
 
