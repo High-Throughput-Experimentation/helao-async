@@ -9,6 +9,7 @@ from helao.helpers.openapi_pagination import (
     PaginationStrategy,
     CursorPagination,
     OffsetPagination,
+    PagePagination,
     _locate_items,
 )
 
@@ -86,11 +87,26 @@ def test_offset():
     check(s.next_request(resp(b4), b4, {}) is None, "no total + short page -> stop")
 
 
+def test_page():
+    print("test_page")
+    s = PagePagination(page_size=2)  # page/per_page/total_pages
+    b1 = {"items": [1, 2], "total_pages": 3}
+    check(s.extract_items(resp(b1), b1) == [1, 2], "page extracts items (total_pages present)")
+    check(s.next_request(resp(b1), b1, {}) == {"page": 2}, "page advances from default 1")
+    check(s.next_request(resp(b1), b1, {"page": 3}) is None, "stop at last page")
+    check(s.total_hint(resp(b1), b1) == 6, "total_hint = total_pages * page_size")
+    b2 = {"items": [1, 2]}
+    check(s.next_request(resp(b2), b2, {}) == {"page": 2}, "full page without total -> continue")
+    b3 = {"items": [1]}
+    check(s.next_request(resp(b3), b3, {}) is None, "short page without total -> stop")
+
+
 def main():
     test_locate_items()
     test_base_total_hint_default()
     test_cursor()
     test_offset()
+    test_page()
     if _failures:
         print(f"\n{len(_failures)} FAILED")
         raise SystemExit(1)
