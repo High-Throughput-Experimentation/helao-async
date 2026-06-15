@@ -386,6 +386,7 @@ class AssemblySample(SampleModel):
             GasSample,
             SolidSample,
             NoneSample,
+            SampleModel,
         ]
     ] = Field(default=[])
     sample_position: Optional[str] = "cell1_we"  # usual default assembly position
