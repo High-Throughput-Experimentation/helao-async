@@ -449,6 +449,7 @@ class SampleList(BaseModel, HelaoDict):
                 GasSample,
                 SolidSample,
                 NoneSample,
+                SampleModel,
             ]
         ]
     ] = Field(default=[])
@@ -460,6 +461,7 @@ SampleUnion = Union[
     GasSample,
     SolidSample,
     NoneSample,
+    SampleModel,
 ]
 
 
