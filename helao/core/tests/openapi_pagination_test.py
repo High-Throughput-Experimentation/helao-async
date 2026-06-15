@@ -87,6 +87,9 @@ def test_offset():
           "no total + full page -> continue")
     b4 = {"items": [1]}
     check(s.next_request(resp(b4), b4, {}) is None, "no total + short page -> stop")
+    b5 = {"items": []}
+    check(s.next_request(resp(b5), b5, {"offset": 4}) is None,
+          "empty page without total -> stop")
 
 
 def test_page():
@@ -138,6 +141,13 @@ def test_auto():
     # not paginated
     b4 = {"id": 7, "name": "x"}
     check(s.extract_items(resp(b4), b4) is None, "auto: plain object not paginated")
+    # DRF-style next URL in body field -> __next_url__ (not a cursor param)
+    b5 = {"results": [1, 2], "next": "https://api.test/x?page=2"}
+    check(s.extract_items(resp(b5), b5) == [1, 2], "auto DRF extracts results")
+    check(s.next_request(resp(b5), b5, {}) == {"__next_url__": "https://api.test/x?page=2"},
+          "auto DRF next-url -> __next_url__")
+    b6 = {"results": [3], "next": None}
+    check(s.next_request(resp(b6), b6, {}) is None, "auto DRF null next -> stop")
 
 
 def main():

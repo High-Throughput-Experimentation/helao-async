@@ -101,15 +101,11 @@ class OffsetPagination(PaginationStrategy):
         return _locate_items(body, self.items_field)
 
     def extract_items(self, response, body):
-        items = self._items(body)
-        if items is None:
-            return None
-        has_total = isinstance(body, dict) and self.total_field in body
-        if has_total or len(items) >= self.page_size:
-            return items
-        # No total and a short page: treat as a single, complete result set.
-        # Still return items so the loop runs once; next_request returns None.
-        return items
+        # Always returns the items list when present; termination is decided by
+        # next_request (which returns None once total is reached or a short page
+        # arrives). A short page without a total is treated as a single complete
+        # result set.
+        return self._items(body)
 
     def next_request(self, response, body, sent_params):
         items = self._items(body) or []
@@ -192,6 +188,22 @@ class LinkHeaderPagination(PaginationStrategy):
 _CURSOR_FIELDS = ("next_cursor", "next", "next_page_token", "nextPageToken")
 
 
+class _BodyNextUrlPagination(PaginationStrategy):
+    """Internal: next-page absolute URL carried in a body field (e.g. DRF's
+    ``next``). Used by AutoPagination when a cursor-ish field holds a URL."""
+
+    def __init__(self, url_field, items_field=None):
+        self.url_field = url_field
+        self.items_field = items_field
+
+    def extract_items(self, response, body):
+        return _locate_items(body, self.items_field)
+
+    def next_request(self, response, body, sent_params):
+        url = body.get(self.url_field) if isinstance(body, dict) else None
+        return {"__next_url__": url} if url else None
+
+
 class AutoPagination(PaginationStrategy):
     """Heuristic strategy for unknown APIs. Per response, probes in order:
     ``Link`` header next -> cursor-ish body field -> ``total``/``count`` body
@@ -204,6 +216,9 @@ class AutoPagination(PaginationStrategy):
         if isinstance(body, dict):
             for field in _CURSOR_FIELDS:
                 if field in body:
+                    value = body.get(field)
+                    if isinstance(value, str) and value.startswith(("http://", "https://")):
+                        return _BodyNextUrlPagination(url_field=field)
                     if field == "next":
                         param = "cursor"
                     elif field.startswith("next_"):
