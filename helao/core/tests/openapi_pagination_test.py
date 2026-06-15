@@ -11,6 +11,7 @@ from helao.helpers.openapi_pagination import (
     OffsetPagination,
     PagePagination,
     LinkHeaderPagination,
+    AutoPagination,
     _locate_items,
 )
 
@@ -118,6 +119,27 @@ def test_link_header():
           "non-list body without items -> not paginated")
 
 
+def test_auto():
+    print("test_auto")
+    s = AutoPagination()
+    # cursor body
+    b1 = {"items": [1], "next_cursor": "z"}
+    check(s.extract_items(resp(b1), b1) == [1], "auto detects cursor items")
+    check(s.next_request(resp(b1), b1, {}) == {"cursor": "z"}, "auto cursor next param")
+    # link header
+    body = [1, 2]
+    headers = {"Link": '<https://api.test/next>; rel="next"'}
+    check(s.next_request(resp(body, headers), body, {}) == {"__next_url__": "https://api.test/next"},
+          "auto detects link header")
+    # offset/total body
+    b3 = {"items": [1, 2], "total": 4}
+    check(s.extract_items(resp(b3), b3) == [1, 2], "auto detects offset items")
+    check(s.total_hint(resp(b3), b3) == 4, "auto offset total_hint")
+    # not paginated
+    b4 = {"id": 7, "name": "x"}
+    check(s.extract_items(resp(b4), b4) is None, "auto: plain object not paginated")
+
+
 def main():
     test_locate_items()
     test_base_total_hint_default()
@@ -125,6 +147,7 @@ def main():
     test_offset()
     test_page()
     test_link_header()
+    test_auto()
     if _failures:
         print(f"\n{len(_failures)} FAILED")
         raise SystemExit(1)
