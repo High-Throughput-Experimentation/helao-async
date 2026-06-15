@@ -187,3 +187,44 @@ class LinkHeaderPagination(PaginationStrategy):
         link = response.headers.get("link", "")
         match = _LINK_NEXT_RE.search(link)
         return {"__next_url__": match.group(1)} if match else None
+
+
+_CURSOR_FIELDS = ("next_cursor", "next", "next_page_token", "nextPageToken")
+
+
+class AutoPagination(PaginationStrategy):
+    """Heuristic strategy for unknown APIs. Per response, probes in order:
+    ``Link`` header next -> cursor-ish body field -> ``total``/``count`` body
+    field. Falls back to "not paginated" when nothing matches.
+    """
+
+    def _detect(self, response, body):
+        if _LINK_NEXT_RE.search(response.headers.get("link", "")):
+            return LinkHeaderPagination()
+        if isinstance(body, dict):
+            for field in _CURSOR_FIELDS:
+                if field in body:
+                    if field == "next":
+                        param = "cursor"
+                    elif field.startswith("next_"):
+                        param = field[len("next_"):]
+                    else:
+                        param = field
+                    return CursorPagination(cursor_field=field, param=param)
+            if "total" in body:
+                return OffsetPagination(total_field="total")
+            if "count" in body:
+                return OffsetPagination(total_field="count")
+        return None
+
+    def extract_items(self, response, body):
+        strat = self._detect(response, body)
+        return strat.extract_items(response, body) if strat else None
+
+    def next_request(self, response, body, sent_params):
+        strat = self._detect(response, body)
+        return strat.next_request(response, body, sent_params) if strat else None
+
+    def total_hint(self, response, body):
+        strat = self._detect(response, body)
+        return strat.total_hint(response, body) if strat else None
