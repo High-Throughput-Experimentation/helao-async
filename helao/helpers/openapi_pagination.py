@@ -124,3 +124,46 @@ class OffsetPagination(PaginationStrategy):
         if isinstance(body, dict):
             return body.get(self.total_field)
         return None
+
+
+class PagePagination(PaginationStrategy):
+    """Page-number pagination. Paginated when ``total_pages_field`` is present
+    or a full page (``page_size`` items) is returned.
+
+    Args:
+        page_param: Query param carrying the 1-based page number.
+        size_param: Query param carrying the page size.
+        total_pages_field: Body key holding the total page count.
+        page_size: Expected server page size, used to detect "more pages" when
+            no total is given.
+        items_field: Optional explicit items key (else auto-located).
+    """
+
+    def __init__(self, page_param="page", size_param="per_page",
+                 total_pages_field="total_pages", page_size=100, items_field=None):
+        self.page_param = page_param
+        self.size_param = size_param
+        self.total_pages_field = total_pages_field
+        self.page_size = page_size
+        self.items_field = items_field
+
+    def _items(self, body):
+        return _locate_items(body, self.items_field)
+
+    def extract_items(self, response, body):
+        items = self._items(body)
+        if items is None:
+            return None
+        return items
+
+    def next_request(self, response, body, sent_params):
+        items = self._items(body) or []
+        current = sent_params.get(self.page_param, 1)
+        if isinstance(body, dict) and self.total_pages_field in body:
+            return {self.page_param: current + 1} if current < body[self.total_pages_field] else None
+        return {self.page_param: current + 1} if len(items) >= self.page_size else None
+
+    def total_hint(self, response, body):
+        if isinstance(body, dict) and self.total_pages_field in body:
+            return body[self.total_pages_field] * self.page_size
+        return None
