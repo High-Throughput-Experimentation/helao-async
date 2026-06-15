@@ -167,3 +167,23 @@ class PagePagination(PaginationStrategy):
         if isinstance(body, dict) and self.total_pages_field in body:
             return body[self.total_pages_field] * self.page_size
         return None
+
+
+class LinkHeaderPagination(PaginationStrategy):
+    """RFC 5988 ``Link`` header pagination (GitHub-style). The body is the item
+    list; the next page is the ``rel="next"`` URL in the ``Link`` header.
+
+    Args:
+        items_field: Optional explicit items key (else auto-located).
+    """
+
+    def __init__(self, items_field=None):
+        self.items_field = items_field
+
+    def extract_items(self, response, body):
+        return _locate_items(body, self.items_field)
+
+    def next_request(self, response, body, sent_params):
+        link = response.headers.get("link", "")
+        match = _LINK_NEXT_RE.search(link)
+        return {"__next_url__": match.group(1)} if match else None
