@@ -10,6 +10,7 @@ from helao.helpers.openapi_pagination import (
     CursorPagination,
     OffsetPagination,
     PagePagination,
+    LinkHeaderPagination,
     _locate_items,
 )
 
@@ -101,12 +102,29 @@ def test_page():
     check(s.next_request(resp(b3), b3, {}) is None, "short page without total -> stop")
 
 
+def test_link_header():
+    print("test_link_header")
+    s = LinkHeaderPagination()
+    body = [1, 2, 3]
+    headers = {"Link": '<https://api.test/items?page=2>; rel="next"'}
+    check(s.extract_items(resp(body, headers), body) == [1, 2, 3], "link extracts list body")
+    check(
+        s.next_request(resp(body, headers), body, {})
+        == {"__next_url__": "https://api.test/items?page=2"},
+        "link header next url parsed",
+    )
+    check(s.next_request(resp(body, {}), body, {}) is None, "no link header -> stop")
+    check(s.extract_items(resp({"x": 1}, {}), {"x": 1}) is None,
+          "non-list body without items -> not paginated")
+
+
 def main():
     test_locate_items()
     test_base_total_hint_default()
     test_cursor()
     test_offset()
     test_page()
+    test_link_header()
     if _failures:
         print(f"\n{len(_failures)} FAILED")
         raise SystemExit(1)
