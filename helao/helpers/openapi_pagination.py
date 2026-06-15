@@ -8,6 +8,7 @@ response body unchanged.
 """
 
 import re
+from abc import ABC, abstractmethod
 
 _ITEM_FIELDS = ("items", "data", "results", "records")
 _LINK_NEXT_RE = re.compile(r'<([^>]+)>\s*;\s*rel="?next"?')
@@ -32,13 +33,15 @@ def _locate_items(body, items_field=None):
     return None
 
 
-class PaginationStrategy:
+class PaginationStrategy(ABC):
     """Contract for runtime pagination handling."""
 
+    @abstractmethod
     def extract_items(self, response, body):
         """Return items list if the response IS paginated, else ``None``."""
         raise NotImplementedError
 
+    @abstractmethod
     def next_request(self, response, body, sent_params):
         """Return query params to merge for the next page, or ``None`` when
         exhausted. Return ``{"__next_url__": <abs url>}`` to follow a URL."""
