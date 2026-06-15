@@ -50,3 +50,27 @@ class PaginationStrategy(ABC):
     def total_hint(self, response, body):
         """Optional total item count for a progress bar; ``None`` if unknown."""
         return None
+
+
+class CursorPagination(PaginationStrategy):
+    """Body carries an opaque next cursor (null/absent when done).
+
+    Args:
+        cursor_field: Body key holding the next cursor.
+        param: Query param name used to send the cursor on the next request.
+        items_field: Optional explicit items key (else auto-located).
+    """
+
+    def __init__(self, cursor_field="next_cursor", param="cursor", items_field=None):
+        self.cursor_field = cursor_field
+        self.param = param
+        self.items_field = items_field
+
+    def extract_items(self, response, body):
+        if isinstance(body, dict) and self.cursor_field in body:
+            return _locate_items(body, self.items_field)
+        return None
+
+    def next_request(self, response, body, sent_params):
+        cursor = body.get(self.cursor_field) if isinstance(body, dict) else None
+        return {self.param: cursor} if cursor else None
