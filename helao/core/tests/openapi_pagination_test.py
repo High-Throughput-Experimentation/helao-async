@@ -7,6 +7,7 @@ import httpx
 
 from helao.helpers.openapi_pagination import (
     PaginationStrategy,
+    CursorPagination,
     _locate_items,
 )
 
@@ -50,9 +51,26 @@ def test_base_total_hint_default():
           "base total_hint defaults to None")
 
 
+def test_cursor():
+    print("test_cursor")
+    s = CursorPagination()  # next_cursor / cursor
+    b1 = {"items": [1, 2], "next_cursor": "abc"}
+    check(s.extract_items(resp(b1), b1) == [1, 2], "cursor extracts items")
+    check(s.next_request(resp(b1), b1, {}) == {"cursor": "abc"}, "cursor builds next param")
+    b2 = {"items": [3], "next_cursor": None}
+    check(s.next_request(resp(b2), b2, {}) is None, "null cursor ends pagination")
+    b3 = {"foo": 1}  # no cursor field
+    check(s.extract_items(resp(b3), b3) is None, "missing cursor field -> not paginated")
+    s2 = CursorPagination(cursor_field="next", param="c", items_field="data")
+    b4 = {"data": [9], "next": "tok"}
+    check(s2.extract_items(resp(b4), b4) == [9], "configurable fields work")
+    check(s2.next_request(resp(b4), b4, {}) == {"c": "tok"}, "configurable param works")
+
+
 def main():
     test_locate_items()
     test_base_total_hint_default()
+    test_cursor()
     if _failures:
         print(f"\n{len(_failures)} FAILED")
         raise SystemExit(1)
