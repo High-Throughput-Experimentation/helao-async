@@ -370,7 +370,10 @@ class Base:
                 del action.action_params["fast_samples_in"]
 
                 for sample in tmp_fast_samples_in:
-                    action.samples_in.append(object_to_sample(sample))
+                    sample_obj = object_to_sample(sample)
+                    if sample_obj.action_uuid is None:
+                        sample_obj.action_uuid = action.action_uuid
+                    action.samples_in.append(sample_obj)
 
         if action.action_abbr is None:
             action.action_abbr = action.action_name
