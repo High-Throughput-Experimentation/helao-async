@@ -317,6 +317,11 @@ class _BaseOpenAPIClient:
                     rb_type = rb_schema.get("type", "object")
             param_docs_list.append(f"    request_body ({rb_type}, {rb_req}): {rb_desc}")
 
+        param_docs_list.append(
+            "    limit (int|None, optional): Max objects to return across pages; "
+            "None fetches all pages with a progress bar (default 100)."
+        )
+
         docstring_parts.append(
             "\n\nArgs:\n"
             + ("\n".join(param_docs_list) if param_docs_list else "    None")

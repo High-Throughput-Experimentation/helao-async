@@ -168,6 +168,8 @@ def test_sync():
                   "sync 500 response raises RuntimeError")
     check("Get Item" in (client.get_item.__doc__ or ""),
           "sync method has generated docstring from summary")
+    check("limit (" in (client.get_item.__doc__ or ""),
+          "generated docstring documents the limit parameter")
     client.close()
 
 
