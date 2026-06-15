@@ -64,6 +64,13 @@ SPEC = {
                 "responses": {"200": {"description": "A page of things."}},
             }
         },
+        "/loop": {
+            "get": {
+                "operationId": "list_loop",
+                "summary": "List Loop",
+                "responses": {"200": {"description": "Never-ending page."}},
+            }
+        },
     },
 }
 
@@ -90,6 +97,8 @@ def _handler(request: httpx.Request) -> httpx.Response:
             200,
             json={"items": page, "next_cursor": str(nxt) if nxt < 25 else None},
         )
+    if request.method == "GET" and path == "/loop":
+        return httpx.Response(200, json={"items": [1], "next_cursor": "x"})
     return httpx.Response(404, json={"detail": "nope"})
 
 
@@ -208,6 +217,10 @@ def test_sync_pagination():
     with capture_stdout():
         res = client.list_things(limit=None)
     check(res == list(range(25)), "sync limit=None fetches all items")
+
+    with capture_stdout():
+        res = client.list_loop(limit=None)
+    check(res == [1, 1], "sync constant-cursor loop terminates via repeat guard")
 
     plain = OpenAPIClient(URL)
     res = plain.list_things()

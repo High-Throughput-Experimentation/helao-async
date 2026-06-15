@@ -196,6 +196,7 @@ class _BaseOpenAPIClient:
             return body  # not paginated
         strat = self.pagination
         response, params = first_response, dict(sent_params)
+        seen_requests = set()
         bar = tqdm(total=strat.total_hint(first_response, body)) if limit is None else None
         try:
             while True:
@@ -206,6 +207,10 @@ class _BaseOpenAPIClient:
                     return collected[:limit]
                 if nxt is None:
                     return collected
+                signature = tuple(sorted(nxt.items()))
+                if signature in seen_requests:
+                    return collected  # next request repeated -> no progress, stop
+                seen_requests.add(signature)
                 response = do_request(nxt)
                 body = self._handle_response(op_id, response)
                 page = strat.extract_items(response, body) or []
@@ -226,6 +231,7 @@ class _BaseOpenAPIClient:
             return body
         strat = self.pagination
         response, params = first_response, dict(sent_params)
+        seen_requests = set()
         bar = tqdm(total=strat.total_hint(first_response, body)) if limit is None else None
         try:
             while True:
@@ -236,6 +242,10 @@ class _BaseOpenAPIClient:
                     return collected[:limit]
                 if nxt is None:
                     return collected
+                signature = tuple(sorted(nxt.items()))
+                if signature in seen_requests:
+                    return collected  # next request repeated -> no progress, stop
+                seen_requests.add(signature)
                 response = await do_request(nxt)
                 body = self._handle_response(op_id, response)
                 page = strat.extract_items(response, body) or []

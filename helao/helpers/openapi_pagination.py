@@ -44,7 +44,10 @@ class PaginationStrategy(ABC):
     @abstractmethod
     def next_request(self, response, body, sent_params):
         """Return query params to merge for the next page, or ``None`` when
-        exhausted. Return ``{"__next_url__": <abs url>}`` to follow a URL."""
+        exhausted. Return ``{"__next_url__": <abs url>}`` to follow a URL.
+        Returned params are treated as REPLACEMENT values merged over the
+        running params (built-in strategies emit absolute values like
+        offset=N / page=N / cursor=token), not deltas."""
         raise NotImplementedError
 
     def total_hint(self, response, body):
@@ -82,17 +85,17 @@ class OffsetPagination(PaginationStrategy):
 
     Args:
         offset_param: Query param carrying the running offset.
-        limit_param: Query param carrying the server page size (set per request).
         total_field: Body key holding the total item count.
-        page_size: Expected server page size, used to detect "more pages" when
-            no total is given.
+        page_size: Client-side heuristic only — the number of items that
+            constitutes a "full page", used to detect whether more pages exist
+            when no ``total`` field is present. This strategy does NOT send a
+            page-size param to the server.
         items_field: Optional explicit items key (else auto-located).
     """
 
-    def __init__(self, offset_param="offset", limit_param="limit",
+    def __init__(self, offset_param="offset",
                  total_field="total", page_size=100, items_field=None):
         self.offset_param = offset_param
-        self.limit_param = limit_param
         self.total_field = total_field
         self.page_size = page_size
         self.items_field = items_field
@@ -128,17 +131,17 @@ class PagePagination(PaginationStrategy):
 
     Args:
         page_param: Query param carrying the 1-based page number.
-        size_param: Query param carrying the page size.
         total_pages_field: Body key holding the total page count.
-        page_size: Expected server page size, used to detect "more pages" when
-            no total is given.
+        page_size: Client-side heuristic only — the number of items that
+            constitutes a "full page", used to detect whether more pages exist
+            when no ``total_pages_field`` is present. This strategy does NOT
+            send a page-size param to the server.
         items_field: Optional explicit items key (else auto-located).
     """
 
-    def __init__(self, page_param="page", size_param="per_page",
+    def __init__(self, page_param="page",
                  total_pages_field="total_pages", page_size=100, items_field=None):
         self.page_param = page_param
-        self.size_param = size_param
         self.total_pages_field = total_pages_field
         self.page_size = page_size
         self.items_field = items_field
@@ -147,10 +150,8 @@ class PagePagination(PaginationStrategy):
         return _locate_items(body, self.items_field)
 
     def extract_items(self, response, body):
-        items = self._items(body)
-        if items is None:
-            return None
-        return items
+        # Returns items when present; termination is decided by next_request.
+        return self._items(body)
 
     def next_request(self, response, body, sent_params):
         items = self._items(body) or []
