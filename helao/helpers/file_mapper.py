@@ -3,9 +3,10 @@
 import os
 from pathlib import Path
 from typing import Union
+from zipfile import ZipFile
 
 from .yml_tools import yml_load
-from .hlo_data import read_hlo
+from .hlo_data import read_hlo, read_hlo_stream
 
 
 class FileMapper:
@@ -78,15 +79,21 @@ class FileMapper:
 
         If ``p`` already contains ``"PROCESSES"`` it is returned unchanged.
         Otherwise the method tries ``<prestr>/RUNS_<state>/<p>`` for each
-        state in :attr:`states` and returns the first existing path.
+        state in :attr:`states` and returns the first existing path. When no
+        loose file is found, it falls back to the synced sequence zip:
+        a fully-synced sequence directory is archived to
+        ``<prestr>/RUNS_SYNCED/<seq_dir>.zip`` (members stored relative to the
+        sequence dir), so ``p``'s first segment names the zip and the
+        remainder names the member.
 
         Args:
             p: Path relative to the ``RUNS_<state>`` root.
 
         Returns:
             A :class:`Path` (or ``p`` unchanged for ``PROCESSES`` inputs)
-            pointing at an existing file, or ``None`` if no state contains
-            it.
+            pointing at an existing loose file; a ``(zip_path, member)`` tuple
+            when the file lives inside a synced sequence zip; or ``None`` if it
+            cannot be found.
         """
         if "PROCESSES" in p:
             return p
@@ -94,6 +101,31 @@ class FileMapper:
             testp = Path(os.path.join(self.prestr, f"RUNS_{state}", p))
             if testp.exists():
                 return testp
+        return self._locate_in_zip(p)
+
+    def _locate_in_zip(self, p: str):
+        """Locate ``p`` inside the synced sequence zip under ``RUNS_SYNCED``.
+
+        Args:
+            p: Path relative to the ``RUNS_<state>`` root. Its first segment
+                names the sequence directory (hence the zip); the remaining
+                segments name the member relative to that directory.
+
+        Returns:
+            A ``(zip_path, member)`` tuple if a matching synced zip contains
+            the member, otherwise ``None``.
+        """
+        parts = Path(p).parts
+        if len(parts) < 2:
+            return None
+        seq_dir = parts[0]
+        member = "/".join(parts[1:])
+        zip_path = Path(os.path.join(self.prestr, "RUNS_SYNCED", f"{seq_dir}.zip"))
+        if not zip_path.is_file():
+            return None
+        with ZipFile(zip_path, "r") as zf:
+            if member in zf.namelist():
+                return (zip_path, member)
         return None
 
     def read_hlo(self, p: str, retries: int = 3):
@@ -117,6 +149,11 @@ class FileMapper:
         lp = self.locate(p)
         if lp is None:
             raise FileNotFoundError
+        elif isinstance(lp, tuple):
+            zip_path, member = lp
+            with ZipFile(zip_path, "r") as zf:
+                with zf.open(member) as f:
+                    return read_hlo_stream(f)
         else:
             retry_counter = 0
             read_success = False
@@ -144,6 +181,11 @@ class FileMapper:
         lp = self.locate(p)
         if lp is None:
             raise FileNotFoundError
+        elif isinstance(lp, tuple):
+            zip_path, member = lp
+            with ZipFile(zip_path, "r") as zf:
+                content = zf.read(member).replace(b"\x89", b"%").decode("utf-8")
+            return dict(yml_load(content))
         else:
             # print(lp)
             return dict(yml_load(Path(lp)))
@@ -163,12 +205,20 @@ class FileMapper:
         lp = self.locate(p)
         if lp is None:
             raise FileNotFoundError
+        elif isinstance(lp, tuple):
+            zip_path, member = lp
+            with ZipFile(zip_path, "r") as zf:
+                return zf.read(member).decode().split("\n")
         else:
             lines = lp.read_text().split("\n")
             return lines
 
     def read_bytes(self, p: str) -> bytes:
         """Resolve and read a binary file from the run tree.
+
+        Reads from a loose file when one exists, or from the synced sequence
+        zip when :meth:`locate` resolves ``p`` to a ``(zip_path, member)``
+        tuple.
 
         Args:
             p: Path relative to the ``RUNS_<state>`` root.
@@ -182,5 +232,9 @@ class FileMapper:
         lp = self.locate(p)
         if lp is None:
             raise FileNotFoundError
+        elif isinstance(lp, tuple):
+            zip_path, member = lp
+            with ZipFile(zip_path, "r") as zf:
+                return zf.read(member)
         else:
             return lp.read_bytes()

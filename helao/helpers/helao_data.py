@@ -15,14 +15,15 @@ from collections import defaultdict
 import os
 import builtins
 from glob import glob
+from pathlib import Path
 from tempfile import TemporaryDirectory
+from io import BytesIO
 import zipfile
 import re
 
 import orjson
 import pandas as pd
 from .yml_tools import yml_load
-from .hlo_data import read_hlo
 from .file_mapper import FileMapper
 
 
@@ -164,7 +165,7 @@ class HelaoData:
                 self._data_files = [
                     x
                     for x in glob(os.path.join(yml_reldir, "**", "*"), recursive=True)
-                    if x.split(".")[-1] not in skip_exts
+                    if x.split(".")[-1] not in skip_exts and os.path.isfile(x)
                 ]
                 nosync_path = self.ymldir.replace("RUNS_SYNCED", "RUNS_NOSYNC")
 
@@ -216,23 +217,44 @@ class HelaoData:
 
     @property
     def data_files(self) -> list:
-        """Return paths of associated data files (excluding ``RUNS_NOSYNC``)."""
+        """Return paths of associated data files (excluding ``RUNS_NOSYNC``).
+
+        In directory mode these are the run-tree paths as discovered; the
+        ``read_*`` methods resolve them through :class:`FileMapper` at read
+        time, so a file that has since been synced into a sequence zip is
+        still read correctly.
+        """
         if self.target.endswith(".zip"):
             return self._data_files
-        return [
-            str(FileMapper(p).locate(p))
-            for p in self._data_files
-            if "RUNS_NOSYNC" not in p
-        ]
+        return [p for p in self._data_files if "RUNS_NOSYNC" not in p]
 
     @property
     def nosync_files(self) -> list:
         """Return paths of data files that live under ``RUNS_NOSYNC``."""
         if self.target.endswith(".zip"):
             return self._nosync_files
-        return [
-            str(FileMapper(p).locate(p)) for p in self._data_files if "RUNS_NOSYNC" in p
-        ]
+        return [p for p in self._data_files if "RUNS_NOSYNC" in p]
+
+    @staticmethod
+    def _runs_relpath(p: str) -> str:
+        """Return ``p`` relative to its ``RUNS_<state>``/``PROCESSES`` root.
+
+        ``FileMapper.read_*`` expect a path relative to the run-state root so
+        they can try each state (and the synced sequence zip) in turn.
+
+        Args:
+            p: An absolute path inside a ``RUNS_<state>`` or ``PROCESSES`` tree.
+
+        Returns:
+            The path with the run-state root and everything above it stripped.
+        """
+        parts = Path(p).parts
+        runpos = next(
+            i
+            for i, v in enumerate(parts)
+            if v.startswith("RUNS_") or v == "PROCESSES"
+        )
+        return os.path.join(*parts[runpos + 1 :])
 
     @property
     def ls(self):
@@ -289,7 +311,8 @@ class HelaoData:
                 meta = {}
             return meta, data
         else:
-            return read_hlo(hlotarget)
+            fm = FileMapper(hlotarget)
+            return fm.read_hlo(self._runs_relpath(hlotarget))
 
     def read_parquet(
         self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
@@ -312,7 +335,9 @@ class HelaoData:
                     parquet_path = zf.extract(hlotarget, tmpdir)
                     parquet_df = pd.read_parquet(parquet_path)
         else:
-            parquet_df = pd.read_parquet(hlotarget)
+            fm = FileMapper(hlotarget)
+            parbytes = fm.read_bytes(self._runs_relpath(hlotarget))
+            parquet_df = pd.read_parquet(BytesIO(parbytes))
 
         return {}, parquet_df.to_dict(orient="list")
 
@@ -333,8 +358,8 @@ class HelaoData:
         if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
             json_dict = orjson.loads(self.read_file(hlotarget))
         else:
-            with open(hlotarget, "rb") as f:
-                json_dict = orjson.loads(f.read())
+            fm = FileMapper(hlotarget)
+            json_dict = orjson.loads(fm.read_bytes(self._runs_relpath(hlotarget)))
 
         return {}, json_dict
 
