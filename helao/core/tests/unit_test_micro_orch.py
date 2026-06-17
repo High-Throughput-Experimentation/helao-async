@@ -348,6 +348,53 @@ async def _drive_zip_runs(reporter: TestReporter) -> None:
         shutil.rmtree(root, ignore_errors=True)
 
 
+async def _drive_zip_roundtrip(reporter: TestReporter) -> None:
+    """A MicroOrch zip loads back through LocalLoader."""
+    root = tempfile.mkdtemp(prefix="micro_ziprt_")
+    fake_port = _free_port()
+    fake = _FakeDataActionServer("FAKE", "ping", root)
+    await fake.dispatcher.serve("127.0.0.1", derive_rpc_port(fake_port))
+    experiment_lib = {"demo_exp": _demo_exp_func}
+    try:
+        async with _make_orch(
+            root, {"FAKE": {"host": "127.0.0.1", "port": fake_port}}
+        ) as orch:
+            seq_loaded = await orch.run_sequence(
+                _demo_seq_func, experiment_lib, cycles=1
+            )
+            zip_path = os.path.join(root, "artifacts.zip")
+            orch.zip_runs(zip_path)
+
+        from helao.core.drivers.data.loaders.localfs import LocalLoader
+        loader = LocalLoader(zip_path)
+        reporter.check(
+            "loader indexed exactly one sequence",
+            lambda: len(loader.sequences) == 1,
+        )
+        reporter.check(
+            "loader indexed one experiment",
+            lambda: len(loader.experiments) == 1,
+        )
+        reporter.check(
+            "loader indexed two actions",
+            lambda: len(loader.actions) == 2,
+        )
+        seq = loader.get_seq(0)
+        reporter.check(
+            "round-tripped sequence_uuid matches",
+            lambda: str(seq.sequence_uuid) == str(seq_loaded.sequence_uuid),
+        )
+        act = loader.get_act(0)
+        meta, data = act.hlo
+        reporter.check(
+            "round-tripped action hlo data is readable",
+            lambda: "v" in data and list(data["v"]) == [1.0],
+        )
+    finally:
+        await fake.dispatcher.close()
+        shutil.rmtree(root, ignore_errors=True)
+
+
 async def _drive_micro_orch(reporter: TestReporter) -> None:
     """Build a fake action server + MicroOrch, run an action, assert state."""
     server_key = "FAKE"
@@ -641,6 +688,9 @@ def micro_orch_unit_test() -> bool:
 
         reporter.section("MicroOrch zip_runs")
         asyncio.run(_drive_zip_runs(reporter))
+
+        reporter.section("MicroOrch zip <-> LocalLoader round-trip")
+        asyncio.run(_drive_zip_roundtrip(reporter))
 
         return reporter.success()
 
