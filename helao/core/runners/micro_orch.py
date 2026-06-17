@@ -40,7 +40,7 @@ import aiofiles
 import zmq
 
 from helao.core.models.action_start_condition import ActionStartCondition
-from helao.core.models.experiment import ShortExperimentModel
+from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
@@ -757,11 +757,14 @@ class MicroOrch:
                 **(exp.experiment_params),
             )
             if await_completion:
-                # exp_result is a HelaoExperiment; fold the persisted model in.
+                # exp_result is a HelaoExperiment whose .json is the persisted
+                # ExperimentModel dict (already carrying aggregated
+                # samples_in/out/files). Build the model directly; do NOT
+                # re-run get_exp(), which would reset the aggregates.
                 sequence.dispatched_experiments.append(
-                    Experiment(
+                    ExperimentModel(
                         **{k: v for k, v in exp_result.json.items() if k != "file_type"}
-                    ).get_exp()
+                    )
                 )
             else:
                 raw_results.append(exp_result)
