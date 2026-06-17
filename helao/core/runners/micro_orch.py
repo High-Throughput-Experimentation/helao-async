@@ -29,6 +29,7 @@ import asyncio
 import glob as glob_module
 import inspect
 import os
+import zipfile
 from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from uuid import UUID, uuid1
@@ -1027,6 +1028,52 @@ class MicroOrch:
         }
         self.runs.append(record)
         return record
+
+    # ------------------------------------------------------------------
+    # archiving
+    # ------------------------------------------------------------------
+
+    def zip_runs(self, zip_path: str, include_diag: bool = True) -> str:
+        """Zip every tracked artifact, preserving structure relative to RUNS_FINISHED.
+
+        Each file's archive name is its path relative to its state root
+        (RUNS_FINISHED or RUNS_DIAG), so the archive reproduces the on-disk
+        seq/exp/act tree without the ``RUNS_*`` prefix. Overlapping records
+        (a sequence dir contains its experiment/action dirs) are deduplicated
+        by archive name. ``.lock`` files are skipped.
+
+        Args:
+            zip_path: Destination ``.zip`` path.
+            include_diag: When False, skip RUNS_DIAG (manual) artifacts.
+
+        Returns:
+            ``zip_path``.
+        """
+        root = self.world_cfg.get("root")
+        if not root:
+            raise RuntimeError("world_cfg['root'] is required to zip artifacts")
+
+        seen: set = set()
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for record in self.runs:
+                state = record["state"]
+                if state == "RUNS_DIAG" and not include_diag:
+                    continue
+                state_root = os.path.join(root, state)
+                rec_dir = os.path.join(state_root, record["rel_dir"])
+                if not os.path.isdir(rec_dir):
+                    continue
+                for dirpath, _dirnames, filenames in os.walk(rec_dir):
+                    for fn in filenames:
+                        if fn.endswith(".lock"):
+                            continue
+                        abs_path = os.path.join(dirpath, fn)
+                        arcname = os.path.relpath(abs_path, state_root)
+                        if arcname in seen:
+                            continue
+                        seen.add(arcname)
+                        zf.write(abs_path, arcname)
+        return zip_path
 
     # ------------------------------------------------------------------
     # introspection
