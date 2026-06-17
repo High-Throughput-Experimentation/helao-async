@@ -26,6 +26,7 @@ can resolve the callback endpoint with the same offset rule used by
 from __future__ import annotations
 
 import asyncio
+import glob as glob_module
 import inspect
 import os
 from copy import deepcopy
@@ -754,6 +755,10 @@ class MicroOrch:
         )
         output_dict = {"file_type": "experiment"}
         output_dict.update(exp_dict)
+        # clean_dict drops empty dicts, but the localfs loader indexes
+        # ``experiment_params`` strictly; keep an empty mapping so read-back
+        # of a no-param experiment doesn't KeyError.
+        output_dict.setdefault("experiment_params", {})
         await self._write_meta_atomic(output_file, yml_dumps(output_dict))
         return output_file
 
@@ -768,8 +773,55 @@ class MicroOrch:
         )
         output_dict = {"file_type": "sequence"}
         output_dict.update(seq_dict)
+        # See _write_exp: keep an empty sequence_params for strict read-back.
+        output_dict.setdefault("sequence_params", {})
         await self._write_meta_atomic(output_file, yml_dumps(output_dict))
         return output_file
+
+    # ------------------------------------------------------------------
+    # finished-artifact read-back
+    # ------------------------------------------------------------------
+
+    # suffix -> loader getter name
+    _LOADER_GETTERS = {"act": "get_act", "exp": "get_exp", "seq": "get_seq"}
+
+    def _candidate_yml(self, rel_dir: str, suffix: str) -> Optional[str]:
+        """Return the first matching ``*-<suffix>.yml`` under FINISHED or DIAG."""
+        root = self.world_cfg.get("root")
+        if not root:
+            raise RuntimeError("world_cfg['root'] is required to read back artifacts")
+        for state in ("RUNS_FINISHED", "RUNS_DIAG"):
+            pattern = os.path.join(root, state, rel_dir, f"*-{suffix}.yml")
+            matches = sorted(glob_module.glob(pattern))
+            if matches:
+                return matches[0]
+        return None
+
+    async def _await_finished(self, rel_dir: str, suffix: str) -> str:
+        """Poll until ``*-<suffix>.yml`` exists under ``rel_dir`` in FINISHED/DIAG.
+
+        Raises:
+            TimeoutError: If nothing appears within ``self.finished_timeout``.
+        """
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self.finished_timeout
+        while True:
+            found = self._candidate_yml(rel_dir, suffix)
+            if found is not None:
+                return found
+            if loop.time() >= deadline:
+                raise TimeoutError(
+                    f"timed out after {self.finished_timeout}s waiting for "
+                    f"*-{suffix}.yml under {rel_dir!r} in RUNS_FINISHED/RUNS_DIAG"
+                )
+            await asyncio.sleep(self.poll_interval)
+
+    async def _load_finished(self, rel_dir: str, suffix: str) -> Any:
+        """Wait for the finished yml then return the loader-wrapped object."""
+        yml_path = await self._await_finished(rel_dir, suffix)
+        loader = self.loader_factory(yml_path)
+        getter = getattr(loader, self._LOADER_GETTERS[suffix])
+        return getter(path=yml_path)
 
     # ------------------------------------------------------------------
     # introspection
