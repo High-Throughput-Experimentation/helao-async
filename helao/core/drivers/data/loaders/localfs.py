@@ -39,7 +39,15 @@ def parse_seq_path(ymlp, target) -> tuple:
         yml_dir = os.path.basename(os.path.dirname(ymlp))
         yml_file = os.path.basename(ymlp)
         if target.endswith(".zip"):
-            yml_dir = os.path.basename(target).replace(".zip", "")
+            # Legacy single-sequence zips store the seq yml at the archive root
+            # (no parent dir), so fall back to the zip filename. MicroOrch zips
+            # are rooted at RUNS_FINISHED, so the entry's own parent dir IS the
+            # sequence dir and must be used.
+            entry_dir = os.path.basename(os.path.dirname(ymlp))
+            if entry_dir:
+                yml_dir = entry_dir
+            else:
+                yml_dir = os.path.basename(target).replace(".zip", "")
             yml_file = os.path.basename(ymlp)
     else:
         yml_dir = os.path.basename(ymlp)
@@ -477,9 +485,14 @@ class LocalLoader:
             Raw file bytes.
         """
         if self.target.endswith(".zip") and yml_path == "":
-            rel_seqzip_path = fn.split(self.sequences.iloc[0].sequence_dir)[-1].lstrip(
-                "/"
-            )
+            rel_seqzip_path = fn
+            for seq_dir in sorted(
+                self.sequences.sequence_dir, key=len, reverse=True
+            ):
+                if seq_dir and seq_dir in fn:
+                    rel_seqzip_path = fn.split(seq_dir, 1)[-1].lstrip("/")
+                    rel_seqzip_path = f"{seq_dir}/{rel_seqzip_path}".rstrip("/")
+                    break
             with ZipFile(self.target, "r") as zf:
                 fbytes = zf.open(rel_seqzip_path).read()
         else:
