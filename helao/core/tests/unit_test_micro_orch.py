@@ -64,10 +64,20 @@ def _build_experiment(name: str = "exp_demo") -> Experiment:
 
 
 def _free_port() -> int:
-    """Return an ephemeral free TCP port chosen by the OS."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    """Return a free TCP port low enough that ``derive_rpc_port`` stays in range.
+
+    The RPC dispatcher binds ``port + RPC_PORT_OFFSET`` (10000), so an OS
+    ephemeral port above 55535 would push the derived port past 65535 and the
+    bind would fail with a flaky ``Permission denied``. Retry until the chosen
+    port leaves room for the offset.
+    """
+    for _ in range(50):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        if port <= 55000:
+            return port
+    raise RuntimeError("could not obtain a free port <= 55000 for RPC offset")
 
 
 class _FakeActionServer:
