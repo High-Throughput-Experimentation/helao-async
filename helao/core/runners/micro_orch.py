@@ -824,6 +824,43 @@ class MicroOrch:
         return getter(path=yml_path)
 
     # ------------------------------------------------------------------
+    # run tracking
+    # ------------------------------------------------------------------
+
+    def _track_run(
+        self, run_type: str, uuid: Any, name: str, yml_path: str
+    ) -> dict:
+        """Append a RunRecord for a finished artifact and return it.
+
+        ``state`` (RUNS_FINISHED/RUNS_DIAG) and ``rel_dir`` (the artifact's
+        directory relative to that state root) are derived from ``yml_path``.
+        """
+        norm = os.path.normpath(yml_path)
+        parts = norm.split(os.sep)
+        state = "RUNS_FINISHED"
+        for candidate in ("RUNS_FINISHED", "RUNS_DIAG"):
+            if candidate in parts:
+                state = candidate
+                break
+        state_idx = parts.index(state)
+        # rel_dir = directory of the yml, relative to <root>/<state>
+        rel_dir = (
+            os.path.join(*parts[state_idx + 1 : -1])
+            if len(parts) - 1 > state_idx + 1
+            else ""
+        )
+        record = {
+            "type": run_type,
+            "uuid": uuid,
+            "name": name,
+            "state": state,
+            "rel_dir": rel_dir,
+            "yml_path": norm,
+        }
+        self.runs.append(record)
+        return record
+
+    # ------------------------------------------------------------------
     # introspection
     # ------------------------------------------------------------------
 
