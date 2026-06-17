@@ -9,6 +9,8 @@ file to Parquet (carrying the optional header as schema metadata).
 
 __all__ = [
     "read_hlo",
+    "read_hlo_stream",
+    "read_hlo_bytes",
     "read_hlo_header",
     "read_hlo_data_chunks",
     "hlo_to_parquet",
@@ -18,6 +20,7 @@ __all__ = [
 
 import json
 from collections import defaultdict
+from io import BytesIO
 from pathlib import Path
 from typing import Tuple
 
@@ -38,8 +41,12 @@ def read_hlo(
 ) -> Tuple[dict, dict]:
     """Read a ``.hlo`` file and return its header and body as dicts.
 
+    Accepts either a filesystem path or the raw file content as ``bytes``
+    (e.g. as returned by :meth:`FileMapper.read_bytes`), so a caller that has
+    already pulled the bytes out of a zip member need not write them to disk.
+
     Args:
-        path: Filesystem path to the ``.hlo`` file.
+        path: Filesystem path to the ``.hlo`` file, or its raw ``bytes``.
         keep_keys: When non-empty, only these keys are kept from the body.
         omit_keys: Keys to omit from the body (ignored when ``keep_keys`` is
             populated, which takes precedence).
@@ -48,6 +55,8 @@ def read_hlo(
         A ``(meta, data)`` tuple where ``meta`` is the parsed YAML header
         and ``data`` is a dict of column lists assembled from the body.
     """
+    if isinstance(path, (bytes, bytearray)):
+        return read_hlo_bytes(path, keep_keys=keep_keys, omit_keys=omit_keys)
     path_to_hlo = Path(path)
     with open(str(path_to_hlo), "rb") as f:
         return read_hlo_stream(f, keep_keys=keep_keys, omit_keys=omit_keys)
@@ -84,7 +93,7 @@ def read_hlo_stream(
 
     for line in stream:
         if header_end:
-            line_dict = orjson.loads(line.decode("utf8"))
+            line_dict = orjson.loads(line)
             for k in line_dict:
                 if k in keep_keys or k not in omit_keys:
                     v = line_dict[k]
@@ -95,13 +104,34 @@ def read_hlo_stream(
         elif line.decode("utf8").startswith("%%"):
             header_end = True
         elif not header_end:
-            header_lines.append(line.decode("utf8"))
+            header_lines.append(line)
     if header_lines:
-        meta = dict(yml_load("".join([x for x in header_lines])))
+        meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
     else:
         meta = {}
 
     return meta, data
+
+
+def read_hlo_bytes(
+    content, keep_keys: list = [], omit_keys: list = []
+) -> Tuple[dict, dict]:
+    """Parse an HLO ``(meta, data)`` pair from the raw file content.
+
+    Thin wrapper over :func:`read_hlo_stream` for callers that hold the whole
+    file as ``bytes`` (e.g. :meth:`FileMapper.read_bytes` of a zip member).
+
+    Args:
+        content: Raw bytes of an entire ``.hlo`` file.
+        keep_keys: When non-empty, only these keys are kept from the body.
+        omit_keys: Keys to omit from the body (ignored when ``keep_keys`` is
+            populated, which takes precedence).
+
+    Returns:
+        A ``(meta, data)`` tuple where ``meta`` is the parsed YAML header
+        and ``data`` is a dict of column lists assembled from the body.
+    """
+    return read_hlo_stream(BytesIO(content), keep_keys=keep_keys, omit_keys=omit_keys)
 
 
 def read_hlo_header(file_path) -> tuple:
