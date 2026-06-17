@@ -243,6 +243,49 @@ async def _drive_yml_writers(reporter: TestReporter) -> None:
         shutil.rmtree(root, ignore_errors=True)
 
 
+def _check_stage_experiment(reporter: TestReporter) -> None:
+    """_stage_experiment synthesizes a manual sequence and nests the exp dir."""
+    root = tempfile.mkdtemp(prefix="micro_stage_")
+    try:
+        orch = _make_orch(root)
+
+        # standalone: no sequence supplied -> manual sequence synthesized
+        exp = Experiment(experiment_name="stage_exp")
+        orch._stage_experiment(exp, order=0, sequence=None)
+        reporter.check(
+            "standalone experiment is flagged manual",
+            lambda: exp.manual_action is True and exp.access == "manual",
+        )
+        reporter.check(
+            "experiment has a sequence_output_dir",
+            lambda: bool(exp.sequence_output_dir),
+        )
+        reporter.check(
+            "experiment_output_dir nests under sequence_output_dir",
+            lambda: exp.get_experiment_dir().startswith(str(exp.sequence_output_dir)),
+        )
+
+        # with a supplied sequence -> identity copied, not manual
+        seq = Sequence(sequence_name="parent_seq", sequence_label="lbl")
+        seq.init_seq(time_offset=0)
+        exp2 = Experiment(experiment_name="child_exp")
+        orch._stage_experiment(exp2, order=0, sequence=seq)
+        reporter.check(
+            "child experiment inherits parent sequence_uuid",
+            lambda: str(exp2.sequence_uuid) == str(seq.sequence_uuid),
+        )
+        reporter.check(
+            "child experiment inherits parent sequence_output_dir",
+            lambda: exp2.sequence_output_dir == seq.sequence_output_dir,
+        )
+        reporter.check(
+            "child experiment is not manual",
+            lambda: not exp2.manual_action,
+        )
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def micro_orch_unit_test() -> bool:
     """Run all MicroOrch assertions and report pass/fail."""
     reporter = TestReporter("micro_orch")
@@ -279,6 +322,9 @@ def micro_orch_unit_test() -> bool:
 
         reporter.section("MicroOrch yml writers")
         asyncio.run(_drive_yml_writers(reporter))
+
+        reporter.section("MicroOrch _stage_experiment")
+        _check_stage_experiment(reporter)
 
         return reporter.success()
 
