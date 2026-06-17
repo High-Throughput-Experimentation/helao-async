@@ -41,7 +41,7 @@ from helao.core.models.hlostatus import HloStatus
 from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
 from helao.helpers import helao_logging as logging
-from helao.helpers.time_utils import gen_uuid
+from helao.helpers.time_utils import gen_uuid, set_time
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.yml_tools import yml_dumps
 
@@ -490,20 +490,12 @@ class MicroOrch:
         params: Optional[dict] = None,
         dispatch_timeout: float = 60.0,
         wait_timeout: Optional[float] = None,
-    ) -> dict:
-        """Dispatch ``action`` and wait for it to reach a terminal state.
+        await_completion: bool = True,
+    ) -> Any:
+        """Dispatch ``action``, wait for terminal, then return a loaded HelaoAction.
 
-        Combines :meth:`dispatch_action` and :meth:`wait_for_action`. If
-        the dispatch reply is already terminal it is returned directly.
-
-        Args:
-            action: Action to run.
-            params: Extra keyword arguments forwarded to the RPC method.
-            dispatch_timeout: Timeout for the dispatch RPC call.
-            wait_timeout: Optional timeout for the post-dispatch wait.
-
-        Returns:
-            The terminal action dump.
+        When ``await_completion`` is False the raw terminal/dispatch dump is
+        returned instead (no finished artifact to load).
         """
         result = await self.dispatch_action(
             action, params=params, timeout=dispatch_timeout
@@ -511,11 +503,46 @@ class MicroOrch:
         action_status = (
             result.get("action_status") if isinstance(result, dict) else None
         )
-        if _is_terminal(action_status):
+        if not _is_terminal(action_status):
+            action_uuid = action.action_uuid
+            assert action_uuid is not None
+            result = await self.wait_for_action(action_uuid, timeout=wait_timeout)
+
+        if not await_completion:
             return result
-        action_uuid = action.action_uuid
-        assert action_uuid is not None
-        return await self.wait_for_action(action_uuid, timeout=wait_timeout)
+
+        # init_act (run inside dispatch_action) has assigned the output dir and,
+        # for a standalone action, synthesized a parent experiment identity. The
+        # localfs loader resolves every action to a parent experiment yml, so
+        # write that experiment's yml before reading the action back.
+        await self._write_action_parent_exp(action)
+        rel_dir = action.get_action_dir()
+        loaded = await self._load_finished(rel_dir, "act")
+        self._track_run("action", action.action_uuid, action.action_name, loaded.yml_path)
+        return loaded
+
+    async def _write_action_parent_exp(self, action: Action) -> None:
+        """Persist the action's parent experiment yml if it is not on disk yet.
+
+        A standalone :meth:`run_action` synthesizes (via ``init_act``) a manual
+        parent experiment but never writes its yml. The localfs loader, however,
+        resolves each action to a parent experiment yml one directory up. Build
+        an :class:`Experiment` from the action's stamped experiment/sequence
+        identity and write it (idempotently) so the loader can index the action.
+        """
+        exp_dir = action.experiment_output_dir
+        if not exp_dir:
+            return
+        # Already written (e.g. by run_experiment)? then nothing to do.
+        if self._candidate_yml(str(exp_dir), "exp") is not None:
+            return
+        dump = action.model_dump()
+        exp_fields = set(Experiment.model_fields)
+        exp_kwargs = {k: v for k, v in dump.items() if k in exp_fields}
+        experiment = Experiment(**exp_kwargs)
+        experiment.experiment_status = [HloStatus.finished]
+        experiment.experiment_finished_timestamp = set_time(offset=0)
+        await self._write_exp(experiment)
 
     # ------------------------------------------------------------------
     # experiment running
@@ -528,8 +555,9 @@ class MicroOrch:
         await_completion: bool = True,
         dispatch_timeout: float = 60.0,
         wait_timeout: Optional[float] = None,
+        _sequence: Optional["Sequence"] = None,
         **exp_params: Any,
-    ) -> List[dict]:
+    ) -> Any:
         """Run a HELAO experiment function end-to-end.
 
         Replicates the action-unpacking + per-action dispatch logic from
@@ -573,14 +601,21 @@ class MicroOrch:
         if experiment is None:
             experiment = Experiment()
 
+        # Stamp experiment + sequence identity BEFORE calling exp_func so that
+        # ActionPlanMaker copies the stamped identity into each planned action.
+        self._stage_experiment(experiment, order=0, sequence=_sequence)
+
         func_args = inspect.getfullargspec(exp_func).args
         supplied = {k: v for k, v in exp_params.items() if k in func_args}
         exp_return = exp_func(experiment, **supplied)
 
-        if isinstance(exp_return, list):
+        if isinstance(exp_return, Experiment):
+            # apm.experiment returns a (deep)copy carrying the stamped identity;
+            # adopt it as the canonical object to persist.
+            experiment = exp_return
+            actions = experiment.planned_actions
+        elif isinstance(exp_return, list):
             actions = exp_return
-        elif isinstance(exp_return, Experiment):
-            actions = exp_return.planned_actions
         else:
             raise TypeError(
                 f"exp_func {exp_func.__name__!r} returned "
@@ -588,6 +623,20 @@ class MicroOrch:
             )
 
         if not actions:
+            if await_completion:
+                experiment.experiment_status = [HloStatus.finished]
+                experiment.experiment_finished_timestamp = set_time(offset=0)
+                yml_path = await self._write_exp(experiment)
+                loaded = await self._load_finished(
+                    experiment.get_experiment_dir(), "exp"
+                )
+                self._track_run(
+                    "experiment",
+                    experiment.experiment_uuid,
+                    experiment.experiment_name,
+                    yml_path,
+                )
+                return loaded
             return []
 
         for i, act in enumerate(actions):
@@ -611,13 +660,32 @@ class MicroOrch:
             )
             if _is_terminal(status) or act.nonblocking:
                 terminal_results.append(immediate)
-                continue
-            action_uuid = act.action_uuid
-            assert action_uuid is not None
-            terminal_results.append(
-                await self.wait_for_action(action_uuid, timeout=wait_timeout)
-            )
-        return terminal_results
+            else:
+                action_uuid = act.action_uuid
+                assert action_uuid is not None
+                terminal_results.append(
+                    await self.wait_for_action(action_uuid, timeout=wait_timeout)
+                )
+
+        # Build full-fidelity ExperimentModel: fold each finished action back in.
+        for dump in terminal_results:
+            if isinstance(dump, dict):
+                try:
+                    experiment.dispatched_actions.append(Action(**dump))
+                except Exception:
+                    LOGGER.exception("could not rebuild Action from terminal dump")
+
+        experiment.experiment_status = [HloStatus.finished]
+        experiment.experiment_finished_timestamp = set_time(offset=0)
+        yml_path = await self._write_exp(experiment)
+        loaded = await self._load_finished(experiment.get_experiment_dir(), "exp")
+        self._track_run(
+            "experiment",
+            experiment.experiment_uuid,
+            experiment.experiment_name,
+            yml_path,
+        )
+        return loaded
 
     # ------------------------------------------------------------------
     # helpers shared by run_experiment
@@ -817,9 +885,21 @@ class MicroOrch:
             await asyncio.sleep(self.poll_interval)
 
     async def _load_finished(self, rel_dir: str, suffix: str) -> Any:
-        """Wait for the finished yml then return the loader-wrapped object."""
+        """Wait for the finished yml then return the loader-wrapped object.
+
+        The localfs loader joins every action to a parent experiment yml. When
+        pointed at a single ``*-act.yml`` file it only globs that action's own
+        directory and never sees the parent experiment, so for the ``act`` suffix
+        we initialise the loader against the parent experiment directory (which
+        indexes both the exp and act ymls) before fetching the action by path.
+        """
         yml_path = await self._await_finished(rel_dir, suffix)
-        loader = self.loader_factory(yml_path)
+        if suffix == "act":
+            # parent experiment dir = two levels up from the act.yml file
+            loader_target = os.path.dirname(os.path.dirname(yml_path))
+        else:
+            loader_target = yml_path
+        loader = self.loader_factory(loader_target)
         getter = getattr(loader, self._LOADER_GETTERS[suffix])
         return getter(path=yml_path)
 

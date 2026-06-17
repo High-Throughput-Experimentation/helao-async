@@ -34,7 +34,9 @@ from helao.core.tests._test_utils import TestReporter
 import os
 import tempfile
 import shutil
+from datetime import datetime as _dt
 from helao.helpers.premodels import Experiment, Sequence
+from helao.helpers.yml_tools import yml_dumps as _yml_dumps
 from helao.core.runners.micro_orch import MicroOrch as _MO  # alias to reach new methods
 
 
@@ -136,6 +138,123 @@ class _FakeActionServer:
         return action_dict
 
 
+class _FakeDataActionServer:
+    """Fake action server that writes a finished act.yml + .hlo to disk.
+
+    Mirrors what a real action server does on finish: writes its action meta
+    yml and one HLO data file into ``<root>/<state>/<action_output_dir>/`` and
+    returns a terminal dump (so MicroOrch resolves off the reply).
+    """
+
+    def __init__(self, server_key: str, action_name: str, root: str):
+        self.server_key = server_key
+        self.action_name = action_name
+        self.root = root
+        self.dispatcher = RPCDispatcher(server_key)
+        self.action_calls = []
+        self.dispatcher.register(f"{server_key}/{action_name}", self._run_action)
+        self.dispatcher.register("attach_client", self._noop)
+        self.dispatcher.register("detach_client", self._noop)
+
+    async def _noop(self, **kwargs) -> bool:
+        return True
+
+    async def _run_action(self, action: dict = None, **kwargs):
+        action_dict = action or {}
+        self.action_calls.append(deepcopy(action_dict))
+        action_dict["action_status"] = [HloStatus.finished.value]
+        # produce a sample_out so the experiment aggregates something
+        action_dict.setdefault("samples_out", [])
+        # write artifacts to disk like a real server would
+        state = "RUNS_DIAG" if action_dict.get("manual_action") else "RUNS_FINISHED"
+        out_dir = action_dict.get("action_output_dir")
+        if out_dir:
+            abs_dir = os.path.join(self.root, state, out_dir)
+            os.makedirs(abs_dir, exist_ok=True)
+            ts = _dt.now().strftime("%y%m%d.%H%M%S%f")
+            hlo_name = f"{ts}__data.hlo"
+            # the .hlo file (yml header + %% + one json line)
+            with open(os.path.join(abs_dir, hlo_name), "w") as f:
+                f.write("epoch_ns: 0\n%%\n")
+                f.write('{"t": [0.0], "v": [1.0]}\n')
+            # the act.yml, referencing the hlo file
+            act_meta = {"file_type": "action"}
+            act_meta.update(action_dict)
+            act_meta["files"] = [
+                {
+                    "file_name": hlo_name,
+                    "file_type": "helao__file",
+                    "data_keys": ["t", "v"],
+                    "action_uuid": action_dict.get("action_uuid"),
+                }
+            ]
+            with open(os.path.join(abs_dir, f"{ts}-act.yml"), "w") as f:
+                f.write(_yml_dumps(act_meta))
+        return action_dict
+
+
+def _demo_exp_func(experiment, wait_time: float = 0.0):
+    """Experiment function: plan two actions on the FAKE server via ActionPlanMaker."""
+    from helao.helpers.premodels import ActionPlanMaker
+    apm = ActionPlanMaker()
+    apm.add("FAKE", "ping", {"wait_time": wait_time})
+    apm.add("FAKE", "ping", {"wait_time": wait_time})
+    return apm.planned_actions
+
+
+async def _drive_run_experiment(reporter: TestReporter) -> None:
+    root = tempfile.mkdtemp(prefix="micro_runexp_")
+    fake_port = _free_port()
+    fake = _FakeDataActionServer("FAKE", "ping", root)
+    await fake.dispatcher.serve("127.0.0.1", derive_rpc_port(fake_port))
+    try:
+        async with _make_orch(
+            root, {"FAKE": {"host": "127.0.0.1", "port": fake_port}}
+        ) as orch:
+            loaded = await orch.run_experiment(
+                _demo_exp_func, experiment=Experiment(experiment_name="runexp")
+            )
+            from helao.core.drivers.data.loaders.localfs import HelaoExperiment
+            reporter.check(
+                "run_experiment returns a HelaoExperiment",
+                lambda: isinstance(loaded, HelaoExperiment),
+            )
+            reporter.check(
+                "fake server received two dispatches",
+                lambda: len(fake.action_calls) == 2,
+            )
+            reporter.check(
+                "both actions nested under the same experiment dir",
+                lambda: all(
+                    "__runexp" in c.get("action_output_dir", "")
+                    for c in fake.action_calls
+                ),
+            )
+            reporter.check(
+                "exp run was tracked",
+                lambda: any(r["type"] == "experiment" for r in orch.runs),
+            )
+
+            # standalone run_action -> HelaoAction
+            act = Action(
+                action_name="ping",
+                action_server=MachineModel(server_name="FAKE"),
+            )
+            aloaded = await orch.run_action(act)
+            from helao.core.drivers.data.loaders.localfs import HelaoAction
+            reporter.check(
+                "run_action returns a HelaoAction",
+                lambda: isinstance(aloaded, HelaoAction),
+            )
+            reporter.check(
+                "action run was tracked",
+                lambda: any(r["type"] == "action" for r in orch.runs),
+            )
+    finally:
+        await fake.dispatcher.close()
+        shutil.rmtree(root, ignore_errors=True)
+
+
 async def _drive_micro_orch(reporter: TestReporter) -> None:
     """Build a fake action server + MicroOrch, run an action, assert state."""
     server_key = "FAKE"
@@ -170,7 +289,9 @@ async def _drive_micro_orch(reporter: TestReporter) -> None:
                 action_server=MachineModel(server_name=server_key),
             )
 
-            result = await orch.run_action(action, wait_timeout=3.0)
+            result = await orch.run_action(
+                action, wait_timeout=3.0, await_completion=False
+            )
 
             reporter.check(
                 "run_action returns the finished action dump",
@@ -418,6 +539,9 @@ def micro_orch_unit_test() -> bool:
 
         reporter.section("MicroOrch run tracking")
         _check_track_run(reporter)
+
+        reporter.section("MicroOrch run_experiment / run_action end-to-end")
+        asyncio.run(_drive_run_experiment(reporter))
 
         return reporter.success()
 
