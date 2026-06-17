@@ -286,6 +286,50 @@ def _check_stage_experiment(reporter: TestReporter) -> None:
         shutil.rmtree(root, ignore_errors=True)
 
 
+async def _drive_load_finished(reporter: TestReporter) -> None:
+    """_await_finished finds a written yml; _load_finished wraps it."""
+    root = tempfile.mkdtemp(prefix="micro_load_")
+    try:
+        orch = _make_orch(root)
+        exp = _build_experiment("load_exp")  # manual -> RUNS_DIAG
+        await orch._write_exp(exp)
+
+        rel_dir = exp.get_experiment_dir()
+        found = await orch._await_finished(rel_dir, "exp")
+        reporter.check(
+            "_await_finished locates the manual exp yml in RUNS_DIAG",
+            lambda: os.path.isfile(found)
+            and os.sep + "RUNS_DIAG" + os.sep in found,
+        )
+
+        loaded = await orch._load_finished(rel_dir, "exp")
+        from helao.core.drivers.data.loaders.localfs import HelaoExperiment
+        reporter.check(
+            "_load_finished returns a HelaoExperiment",
+            lambda: isinstance(loaded, HelaoExperiment),
+        )
+        reporter.check(
+            "loaded experiment_uuid matches",
+            lambda: str(loaded.experiment_uuid) == str(exp.experiment_uuid),
+        )
+
+        # timeout path: a relative dir that never appears
+        async def _expect_timeout():
+            try:
+                await orch._await_finished("99.99/9999/000000__nope__none", "exp")
+                return False
+            except TimeoutError:
+                return True
+
+        timed_out = await _expect_timeout()
+        reporter.check(
+            "_await_finished raises TimeoutError when nothing appears",
+            lambda: timed_out,
+        )
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def micro_orch_unit_test() -> bool:
     """Run all MicroOrch assertions and report pass/fail."""
     reporter = TestReporter("micro_orch")
@@ -325,6 +369,9 @@ def micro_orch_unit_test() -> bool:
 
         reporter.section("MicroOrch _stage_experiment")
         _check_stage_experiment(reporter)
+
+        reporter.section("MicroOrch loader read-back")
+        asyncio.run(_drive_load_finished(reporter))
 
         return reporter.success()
 
