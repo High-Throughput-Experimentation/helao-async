@@ -106,26 +106,30 @@ class FileMapper:
     def _locate_in_zip(self, p: str):
         """Locate ``p`` inside the synced sequence zip under ``RUNS_SYNCED``.
 
+        A fully-synced sequence directory (``.../YY.WW/MMDD/<seq_dir>``) is
+        archived to ``RUNS_SYNCED/YY.WW/MMDD/<seq_dir>.zip`` with members
+        stored relative to the sequence dir. ``p`` is run-state-root-relative,
+        so some prefix of it names the sequence dir (hence the zip) and the
+        remainder names the member. Each prefix is tried (shortest first)
+        until a synced zip that contains the member is found.
+
         Args:
-            p: Path relative to the ``RUNS_<state>`` root. Its first segment
-                names the sequence directory (hence the zip); the remaining
-                segments name the member relative to that directory.
+            p: Path relative to the ``RUNS_<state>`` root.
 
         Returns:
             A ``(zip_path, member)`` tuple if a matching synced zip contains
             the member, otherwise ``None``.
         """
         parts = Path(p).parts
-        if len(parts) < 2:
-            return None
-        seq_dir = parts[0]
-        member = "/".join(parts[1:])
-        zip_path = Path(os.path.join(self.prestr, "RUNS_SYNCED", f"{seq_dir}.zip"))
-        if not zip_path.is_file():
-            return None
-        with ZipFile(zip_path, "r") as zf:
-            if member in zf.namelist():
-                return (zip_path, member)
+        synced_root = os.path.join(self.prestr, "RUNS_SYNCED")
+        for i in range(1, len(parts)):
+            zip_path = Path(os.path.join(synced_root, *parts[:i]) + ".zip")
+            if not zip_path.is_file():
+                continue
+            member = "/".join(parts[i:])
+            with ZipFile(zip_path, "r") as zf:
+                if member in zf.namelist():
+                    return (zip_path, member)
         return None
 
     def read_hlo(self, p: str, retries: int = 3):
