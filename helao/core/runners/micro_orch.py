@@ -37,6 +37,7 @@ import aiofiles
 import zmq
 
 from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.experiment import ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
@@ -684,6 +685,93 @@ class MicroOrch:
             experiment.experiment_uuid,
             experiment.experiment_name,
             yml_path,
+        )
+        return loaded
+
+    # ------------------------------------------------------------------
+    # sequence running
+    # ------------------------------------------------------------------
+
+    async def run_sequence(
+        self,
+        seq_func: Callable[..., List["ShortExperimentModel"]],
+        experiment_lib: Dict[str, Callable[..., Union[List[Action], Experiment]]],
+        sequence: Optional["Sequence"] = None,
+        await_completion: bool = True,
+        dispatch_timeout: float = 60.0,
+        wait_timeout: Optional[float] = None,
+        **seq_params: Any,
+    ) -> Any:
+        """Expand a sequence-library function and run its planned experiments.
+
+        ``seq_func`` returns ``List[ShortExperimentModel]`` (via
+        ``ExperimentPlanMaker``); ``experiment_lib`` maps each plan's
+        ``experiment_name`` to its experiment function. Each experiment runs
+        under this sequence's identity. The finished sequence is written to
+        ``RUNS_FINISHED`` and returned loader-wrapped (or, when
+        ``await_completion`` is False, the per-experiment raw dump lists).
+        """
+        if sequence is None:
+            sequence = Sequence()
+        if sequence.sequence_name is None:
+            sequence.sequence_name = getattr(seq_func, "__name__", "sequence")
+
+        func_args = inspect.getfullargspec(seq_func).args
+        supplied = {k: v for k, v in seq_params.items() if k in func_args}
+
+        sequence.init_seq(time_offset=0)
+
+        planned = seq_func(**supplied)
+
+        raw_results: List[Any] = []
+        for plan in planned:
+            exp_func = experiment_lib.get(plan.experiment_name)
+            if exp_func is None:
+                raise KeyError(
+                    f"experiment {plan.experiment_name!r} not in experiment_lib"
+                )
+            exp = Experiment(
+                experiment_name=plan.experiment_name,
+                experiment_params=dict(plan.experiment_params or {}),
+            )
+            # experiment-level global hand-off (mirrors Orch)
+            for k, v in (plan.from_global_exp_params or {}).items():
+                if k in self.global_params:
+                    val = self.global_params[k]
+                    if isinstance(v, list):
+                        for vv in v:
+                            exp.experiment_params[vv] = val
+                    else:
+                        exp.experiment_params[v] = val
+
+            exp_result = await self.run_experiment(
+                exp_func,
+                experiment=exp,
+                await_completion=await_completion,
+                dispatch_timeout=dispatch_timeout,
+                wait_timeout=wait_timeout,
+                _sequence=sequence,
+                **(exp.experiment_params),
+            )
+            if await_completion:
+                # exp_result is a HelaoExperiment; fold the persisted model in.
+                sequence.dispatched_experiments.append(
+                    Experiment(
+                        **{k: v for k, v in exp_result.json.items() if k != "file_type"}
+                    ).get_exp()
+                )
+            else:
+                raw_results.append(exp_result)
+
+        if not await_completion:
+            return raw_results
+
+        sequence.sequence_status = [HloStatus.finished]
+        sequence.sequence_finished_timestamp = set_time(offset=0)
+        yml_path = await self._write_seq(sequence)
+        loaded = await self._load_finished(sequence.get_sequence_dir(), "seq")
+        self._track_run(
+            "sequence", sequence.sequence_uuid, sequence.sequence_name, yml_path
         )
         return loaded
 

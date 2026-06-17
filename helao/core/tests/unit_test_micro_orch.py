@@ -255,6 +255,53 @@ async def _drive_run_experiment(reporter: TestReporter) -> None:
         shutil.rmtree(root, ignore_errors=True)
 
 
+def _demo_seq_func(cycles: int = 2):
+    """Sequence function: plan ``cycles`` demo experiments via ExperimentPlanMaker."""
+    from helao.helpers.premodels import ExperimentPlanMaker
+    epm = ExperimentPlanMaker()
+    for _ in range(cycles):
+        epm.add("demo_exp", {"wait_time": 0.0})
+    return epm.planned_experiments
+
+
+async def _drive_run_sequence(reporter: TestReporter) -> None:
+    root = tempfile.mkdtemp(prefix="micro_runseq_")
+    fake_port = _free_port()
+    fake = _FakeDataActionServer("FAKE", "ping", root)
+    await fake.dispatcher.serve("127.0.0.1", derive_rpc_port(fake_port))
+    experiment_lib = {"demo_exp": _demo_exp_func}
+    try:
+        async with _make_orch(
+            root, {"FAKE": {"host": "127.0.0.1", "port": fake_port}}
+        ) as orch:
+            loaded = await orch.run_sequence(
+                _demo_seq_func, experiment_lib, cycles=2
+            )
+            from helao.core.drivers.data.loaders.localfs import HelaoSequence
+            reporter.check(
+                "run_sequence returns a HelaoSequence",
+                lambda: isinstance(loaded, HelaoSequence),
+            )
+            reporter.check(
+                "two experiments * two actions = four dispatches",
+                lambda: len(fake.action_calls) == 4,
+            )
+            reporter.check(
+                "sequence run tracked",
+                lambda: any(r["type"] == "sequence" for r in orch.runs),
+            )
+            reporter.check(
+                "all experiments nested under one sequence dir",
+                lambda: len(
+                    {c["action_output_dir"].split(os.sep)[2] for c in fake.action_calls}
+                )
+                == 1,
+            )
+    finally:
+        await fake.dispatcher.close()
+        shutil.rmtree(root, ignore_errors=True)
+
+
 async def _drive_micro_orch(reporter: TestReporter) -> None:
     """Build a fake action server + MicroOrch, run an action, assert state."""
     server_key = "FAKE"
@@ -542,6 +589,9 @@ def micro_orch_unit_test() -> bool:
 
         reporter.section("MicroOrch run_experiment / run_action end-to-end")
         asyncio.run(_drive_run_experiment(reporter))
+
+        reporter.section("MicroOrch run_sequence end-to-end")
+        asyncio.run(_drive_run_sequence(reporter))
 
         return reporter.success()
 
