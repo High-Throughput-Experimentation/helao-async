@@ -330,6 +330,39 @@ async def _drive_load_finished(reporter: TestReporter) -> None:
         shutil.rmtree(root, ignore_errors=True)
 
 
+def _check_track_run(reporter: TestReporter) -> None:
+    """_track_run appends a normalized RunRecord derived from a yml path."""
+    root = tempfile.mkdtemp(prefix="micro_track_")
+    try:
+        orch = _make_orch(root)
+        yml_path = os.path.join(
+            root, "RUNS_DIAG", "26.24", "0616",
+            "120000__seq--x__manual", "260616.120001000000__exp--x",
+            "260616.120001000000-exp.yml",
+        )
+        os.makedirs(os.path.dirname(yml_path), exist_ok=True)
+        with open(yml_path, "w") as f:
+            f.write("file_type: experiment\n")
+
+        rec = orch._track_run("experiment", "uuid-1", "exp--x", yml_path)
+        reporter.check("_track_run returns the record", lambda: rec in orch.runs)
+        reporter.check(
+            "record state derived from path",
+            lambda: rec["state"] == "RUNS_DIAG",
+        )
+        reporter.check(
+            "record rel_dir is relative to the state root",
+            lambda: rec["rel_dir"]
+            == os.path.join(
+                "26.24", "0616", "120000__seq--x__manual",
+                "260616.120001000000__exp--x",
+            ),
+        )
+        reporter.check("runs list has one entry", lambda: len(orch.runs) == 1)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def micro_orch_unit_test() -> bool:
     """Run all MicroOrch assertions and report pass/fail."""
     reporter = TestReporter("micro_orch")
@@ -372,6 +405,9 @@ def micro_orch_unit_test() -> bool:
 
         reporter.section("MicroOrch loader read-back")
         asyncio.run(_drive_load_finished(reporter))
+
+        reporter.section("MicroOrch run tracking")
+        _check_track_run(reporter)
 
         return reporter.success()
 
