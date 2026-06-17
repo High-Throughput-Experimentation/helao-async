@@ -189,6 +189,7 @@ class _FakeDataActionServer:
                     "action_uuid": action_dict.get("action_uuid"),
                 }
             ]
+            action_dict["files"] = act_meta["files"]
             with open(os.path.join(abs_dir, f"{ts}-act.yml"), "w") as f:
                 f.write(_yml_dumps(act_meta))
         return action_dict
@@ -250,6 +251,10 @@ async def _drive_run_experiment(reporter: TestReporter) -> None:
             reporter.check(
                 "action run was tracked",
                 lambda: any(r["type"] == "action" for r in orch.runs),
+            )
+            reporter.check(
+                "exp.yml aggregates files from both dispatched actions",
+                lambda: len(loaded.json.get("files", [])) == 2,
             )
     finally:
         await fake.dispatcher.close()
