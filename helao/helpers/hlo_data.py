@@ -84,7 +84,7 @@ def read_hlo_stream(
 
     for line in stream:
         if header_end:
-            line_dict = orjson.loads(line)
+            line_dict = orjson.loads(line.decode("utf8"))
             for k in line_dict:
                 if k in keep_keys or k not in omit_keys:
                     v = line_dict[k]
@@ -95,9 +95,9 @@ def read_hlo_stream(
         elif line.decode("utf8").startswith("%%"):
             header_end = True
         elif not header_end:
-            header_lines.append(line)
+            header_lines.append(line.decode("utf8"))
     if header_lines:
-        meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
+        meta = dict(yml_load("".join([x for x in header_lines])))
     else:
         meta = {}
 
