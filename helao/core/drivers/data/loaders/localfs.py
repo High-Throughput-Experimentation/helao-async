@@ -780,7 +780,24 @@ class HelaoProcess(HelaoModel):
         ]
 
     def read_action_file(self, relative_path: str) -> bytes:
-        """Read the raw bytes of an action file at ``relative_path``."""
+        """Read the raw bytes of an action file by its run-tree-relative path.
+
+        Process yml files live in the ``PROCESSES`` tree, not beside the
+        action files they reference, so the file is resolved against the run
+        tree rather than relative to ``self.yml_path``. ``relative_path`` (as
+        produced by :attr:`files`) is rooted at the ``RUNS_<state>`` directory
+        — ``YY.WW/MMDD/<seq_dir>/<exp>/<act>/<file>`` — which is enough for
+        :class:`FileMapper` to deduce and read from the owning synced sequence
+        zip (``RUNS_SYNCED/YY.WW/MMDD/<seq_dir>.zip``) once the loose file is
+        gone. Only the run root is taken from ``self.yml_path``.
+
+        Args:
+            relative_path: Action file path relative to the ``RUNS_<state>``
+                root.
+
+        Returns:
+            Raw file bytes.
+        """
         fm = FileMapper(self.yml_path)
         return fm.read_bytes(relative_path)
 
