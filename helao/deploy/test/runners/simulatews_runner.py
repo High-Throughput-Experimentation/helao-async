@@ -2,22 +2,21 @@
 
 Reproduces the action series of
 ``helao/deploy/test/experiments/simulatews_exp.py::SIM_websocket_data`` --
-``wait, acquire_data, wait, acquire_data`` -- against the ``SIM`` websocket
-simulator action server, without the full orchestrator.
+``wait, acquire_data, wait, acquire_data`` -- without the full orchestrator.
 
-The ``wait`` actions in the original are hosted by the orchestrator itself
-(``ORCH/wait``); MicroOrch hosts no action endpoints, so each wait becomes an
-``asyncio.sleep`` in this script. The ``acquire_data`` actions dispatch to the
-``SIM`` server exactly as before.
+Both servers are treated as plain action servers. The ``wait`` action is hosted
+by ``ORCH`` itself (``OrchAPI`` inherits ``BaseAPI``, so the orchestrator
+exposes ``/ORCH/wait`` as an RPC action endpoint just like any driver), and
+``acquire_data`` is hosted by the ``SIM`` websocket simulator. MicroOrch
+dispatches to both directly.
 
 Prerequisites
 -------------
-- The ``SIM`` (``ws_simulator``) action server must be running and share this
-  script's ``root``. Launch the ``test`` group::
+- ``ORCH`` and ``SIM`` must be running and share this script's ``root``. Launch
+  the ``test`` group (its Bokeh/operator pages are unused)::
 
-      ./helao.sh test           # starts ORCH (unused here) + SIM:8002 + LIVE vis
+      ./helao.sh test           # ORCH:8001 + SIM:8002 + LIVE vis
 
-  MicroOrch dispatches directly to SIM; the ORCH and live-visualizer are unused.
 - ``root`` defaults to ``C:/INST_hlo``; override with ``HELAO_ROOT``.
 
 Run::
@@ -29,6 +28,7 @@ from __future__ import annotations
 
 import os
 import asyncio
+from typing import Optional
 
 from helao.core.runners.micro_orch import MicroOrch
 from helao.helpers.premodels import Action
@@ -39,7 +39,8 @@ ROOT = os.environ.get("HELAO_ROOT", "C:/INST_hlo")
 WORLD_CFG = {
     "root": ROOT,
     "servers": {
-        "SIM": {"host": "127.0.0.1", "port": 8002},  # matches test.yml SIM
+        "ORCH": {"host": "127.0.0.1", "port": 8001},  # hosts the wait action
+        "SIM": {"host": "127.0.0.1", "port": 8002},  # hosts acquire_data
     },
 }
 
@@ -47,17 +48,17 @@ WAIT_TIME = 3.0
 DATA_DURATION = 5.0
 
 
-def _acquire_action(duration: float) -> Action:
-    """Build a standalone ``SIM/acquire_data`` action."""
+def _act(server: str, name: str, params: Optional[dict] = None) -> Action:
+    """Build a one-off action targeting ``server`` (host/port resolved from cfg)."""
     return Action(
-        action_name="acquire_data",
-        action_server=MachineModel(server_name="SIM"),
-        action_params={"duration": duration},
+        action_name=name,
+        action_server=MachineModel(server_name=server),
+        action_params=params or {},
     )
 
 
 async def main() -> None:
-    """wait -> acquire -> wait -> acquire, dispatching acquires to SIM."""
+    """wait -> acquire -> wait -> acquire, all dispatched over RPC."""
     async with MicroOrch(
         server_key="micro_ws",
         host="127.0.0.1",
@@ -66,11 +67,10 @@ async def main() -> None:
     ) as orch:
         acquisitions = []
         for i in range(2):
-            # orchestrator "wait" -> plain Python sleep (no ORCH to dispatch to)
-            print(f"wait {WAIT_TIME}s ...")
-            await asyncio.sleep(WAIT_TIME)
-
-            act = await orch.run_action(_acquire_action(DATA_DURATION))
+            await orch.run_action(_act("ORCH", "wait", {"waittime": WAIT_TIME}))
+            act = await orch.run_action(
+                _act("SIM", "acquire_data", {"duration": DATA_DURATION})
+            )
             acquisitions.append(act)
             print(f"acquire {i + 1}/2: action {act.action_uuid} -> {act.yml_path}")
 

@@ -1,43 +1,47 @@
 """MicroOrch equivalent of the OER active-learning simulation (demo0).
 
-This script reproduces, without the full orchestrator service, the action and
-experiment series that the ``OERSIM_activelearn`` sequence
+This script reproduces, without the full orchestrator service, the action
+series that the ``OERSIM_activelearn`` sequence
 (``helao/deploy/test/sequences/OERSIM_seq.py``) drives through the
 ``OERSIM_sub_*`` experiments (``helao/deploy/test/experiments/OERSIM_exp.py``)
 against the ``CPSIM`` (chronopotentiometry) and ``GPSIM`` (Gaussian-process)
 simulator action servers.
 
-What it does
-------------
-1. Loads a plate on ``CPSIM`` and seeds ``GPSIM`` priors (mirrors
-   ``OERSIM_sub_load_plate``).
-2. Repeatedly runs ``OERSIM_sub_measure_CP`` -- get loaded plate, pick the next
-   composition, run a simulated CP, refit the model -- as a Python loop.
+to_global / from_global in a standalone script
+----------------------------------------------
+Under the orchestrator, actions declare ``to_global_params`` /
+``from_global_act_params`` and the Orch shuttles values through
+``Orch.global_params``. In a self-contained MicroOrch script you do the same
+thing explicitly, which is the whole point of MicroOrch -- no Orch needed:
 
-The orchestrator-driven version self-requeues via ``GPSIM/check_condition``
-calling ``insert_experiment`` back on the Orch. MicroOrch hosts no
-``insert_experiment`` endpoint and keeps no experiment queue, so the
-active-learning loop is expressed directly in Python here (the script *is* the
-orchestrator replacement). The default stop rule mirrors ``"max_iters"``.
+* **to_global**: read the object returned by :meth:`MicroOrch.run_action`,
+  pull the value out of its ``action_params``, and store it in a plain dict in
+  this script (:data:`GLOBALS`).
+* **from_global**: copy the value from :data:`GLOBALS` into the next action's
+  params before dispatching it.
 
-Cross-action parameter hand-off (``to_global_params`` /
-``from_global_act_params``) works exactly as under the orchestrator:
-``MicroOrch.run_experiment`` captures outputs into ``orch.global_params`` and
-re-injects them into later actions, and those globals persist across loop
-iterations on the ``MicroOrch`` instance.
+The :func:`_capture` and :func:`_inject` helpers below implement exactly that,
+mirroring the ``to_global_params`` / ``from_global_act_params`` declarations in
+``OERSIM_exp.py``. The simulator servers stamp their outputs onto the action's
+``action_params`` (e.g. ``get_loaded_plate`` -> ``_loaded_plate_id``,
+``acquire_point`` -> ``_feature``), so the returned ``HelaoAction.action_params``
+is the source of every captured value.
+
+The orchestrator version self-requeues via ``GPSIM/check_condition`` calling
+``insert_experiment`` on the Orch. MicroOrch has no queue, so the
+active-learning loop is a plain Python loop here (default stop rule mirrors
+``"max_iters"``).
 
 Prerequisites
 -------------
-- The ``CPSIM`` and ``GPSIM`` action servers must already be running and must
-  use the SAME ``root`` as this script (MicroOrch reads finished artifacts off
-  the shared filesystem). The simplest way is to launch the ``demo0`` group::
+- ``CPSIM`` and ``GPSIM`` must be running and share this script's ``root``.
+  Launch the ``demo0`` group (its ORCH/Bokeh are unused -- MicroOrch talks
+  straight to the action servers)::
 
-      ./helao.sh demo0          # starts ORCH (unused here), CPSIM:8002, GPSIM:8003
+      ./helao.sh demo0          # CPSIM:8002, GPSIM:8003
 
-  MicroOrch talks directly to CPSIM/GPSIM over RPC; the demo0 ORCH and Bokeh
-  pages are simply unused.
-- ``root`` defaults to the demo configs' ``C:/INST_hlo``; override with the
-  ``HELAO_ROOT`` env var to match your servers' configured root.
+- ``root`` defaults to the demo configs' ``C:/INST_hlo``; override with
+  ``HELAO_ROOT`` to match your servers' configured root.
 
 Run::
 
@@ -48,11 +52,11 @@ from __future__ import annotations
 
 import os
 import asyncio
-from typing import List
+from typing import Any, Dict, Optional
 
 from helao.core.runners.micro_orch import MicroOrch
-from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helao.deploy.test.experiments.OERSIM_exp import OERSIM_sub_measure_CP
+from helao.helpers.premodels import Action
+from helao.core.models.machine import MachineModel
 
 
 # --- wiring (matches demo0.yml CPSIM/GPSIM host:port) ----------------------
@@ -67,59 +71,104 @@ WORLD_CFG = {
 
 PLATE_ID = 2750
 INIT_RANDOM_POINTS = 5
-ITERATIONS = 8  # active-learning steps to run (orchestrator default: max_iters)
+ITERATIONS = 8  # active-learning steps (orchestrator default stop: max_iters)
+
+# Script-level global store -- the MicroOrch-script stand-in for
+# Orch.global_params. to_global writes here; from_global reads from here.
+GLOBALS: Dict[str, Any] = {}
 
 
-def oersim_load_plate(experiment: Experiment, init_random_points: int = 5):
-    """Switch CPSIM to a plate and seed GPSIM priors for it.
-
-    Mirrors ``OERSIM_exp.OERSIM_sub_load_plate`` but returns its planned
-    actions so ``MicroOrch.run_experiment`` can dispatch them (the library
-    version builds the same plan without returning it).
-    """
-    apm = ActionPlanMaker()
-    apm.add("CPSIM", "change_plate", {"plate_id": PLATE_ID})
-    apm.add("CPSIM", "get_loaded_plate", {}, to_global_params=["_loaded_plate_id"])
-    apm.add(
-        "GPSIM",
-        "initialize_plate",
-        {"num_random_points": init_random_points, "reinitialize": False},
-        from_global_act_params={"_loaded_plate_id": "plate_id"},
+def _act(server: str, name: str, params: Optional[dict] = None) -> Action:
+    """Build a one-off action targeting ``server`` (host/port resolved from cfg)."""
+    return Action(
+        action_name=name,
+        action_server=MachineModel(server_name=server),
+        action_params=params or {},
     )
-    return apm.planned_actions
+
+
+def _inject(params: dict, mapping: Dict[str, str]) -> dict:
+    """from_global: copy ``GLOBALS[gkey]`` into ``params[param_name]``.
+
+    ``mapping`` is ``{global_key: action_param_name}`` -- the same shape as an
+    action's ``from_global_act_params``.
+    """
+    for gkey, pname in mapping.items():
+        params[pname] = GLOBALS[gkey]
+    return params
+
+
+async def _capture(
+    orch: MicroOrch, action: Action, to_global: Optional[Dict[str, str]] = None
+):
+    """run_action, then to_global: copy named ``action_params`` into ``GLOBALS``.
+
+    ``to_global`` is ``{action_param_key: global_key}``. With a 1:1 name it
+    matches an action's ``to_global_params`` list entry.
+    """
+    result = await orch.run_action(action)
+    for src_key, gkey in (to_global or {}).items():
+        GLOBALS[gkey] = result.action_params[src_key]
+    return result
 
 
 async def main() -> None:
-    """Run load-plate then the active-learning measurement loop via MicroOrch."""
+    """Load-plate then the active-learning loop, all via explicit run_action."""
     async with MicroOrch(
         server_key="micro_oersim",
         host="127.0.0.1",
         port=9100,
         world_cfg=WORLD_CFG,
     ) as orch:
-        # 1) initialize the plate / GP priors
-        loaded = await orch.run_experiment(
-            oersim_load_plate, init_random_points=INIT_RANDOM_POINTS
+        # --- load plate (mirrors OERSIM_sub_load_plate) --------------------
+        await orch.run_action(_act("CPSIM", "change_plate", {"plate_id": PLATE_ID}))
+        # to_global: get_loaded_plate -> _loaded_plate_id
+        await _capture(
+            orch,
+            _act("CPSIM", "get_loaded_plate"),
+            to_global={"_loaded_plate_id": "_loaded_plate_id"},
         )
-        print(f"loaded plate -> experiment {loaded.experiment_uuid}")
-        print(f"  global_params now: {sorted(orch.global_params)}")
-
-        # 2) active-learning loop (replaces the orchestrator self-requeue)
-        results: List = []
-        for step in range(ITERATIONS):
-            exp = await orch.run_experiment(
-                OERSIM_sub_measure_CP, init_random_points=INIT_RANDOM_POINTS
+        # from_global: _loaded_plate_id -> initialize_plate.plate_id
+        await orch.run_action(
+            _act(
+                "GPSIM",
+                "initialize_plate",
+                _inject(
+                    {"num_random_points": INIT_RANDOM_POINTS, "reinitialize": False},
+                    {"_loaded_plate_id": "plate_id"},
+                ),
             )
-            results.append(exp)
-            feature = orch.global_params.get("_feature")
-            print(f"step {step + 1}/{ITERATIONS}: exp {exp.experiment_uuid} "
-                  f"feature={feature}")
+        )
+        print(f"loaded plate {GLOBALS.get('_loaded_plate_id')}")
 
-        # 3) archive every produced artifact relative to RUNS_FINISHED
+        # --- active-learning loop (mirrors OERSIM_sub_measure_CP) -----------
+        for step in range(ITERATIONS):
+            # to_global: get_loaded_plate -> _loaded_plate_id
+            await _capture(
+                orch,
+                _act("CPSIM", "get_loaded_plate"),
+                to_global={"_loaded_plate_id": "_loaded_plate_id"},
+            )
+            # from_global plate_id; to_global: acquire_point -> _feature
+            await _capture(
+                orch,
+                _act("GPSIM", "acquire_point", _inject({}, {"_loaded_plate_id": "plate_id"})),
+                to_global={"_feature": "_feature"},
+            )
+            # from_global: _feature -> measure_cp.comp_vec
+            await orch.run_action(
+                _act("CPSIM", "measure_cp", _inject({}, {"_feature": "comp_vec"}))
+            )
+            # from_global: _loaded_plate_id -> update_model.plate_id
+            await orch.run_action(
+                _act("GPSIM", "update_model", _inject({}, {"_loaded_plate_id": "plate_id"}))
+            )
+            print(f"step {step + 1}/{ITERATIONS}: feature={GLOBALS.get('_feature')}")
+
+        # --- archive every produced artifact relative to RUNS_FINISHED -----
         zip_path = os.path.join(ROOT, "oersim_microorch_runs.zip")
         orch.zip_runs(zip_path)
-        print(f"\nran {len(results)} measurement experiments")
-        print(f"tracked {len(orch.runs)} artifacts; archived -> {zip_path}")
+        print(f"\ntracked {len(orch.runs)} artifacts; archived -> {zip_path}")
 
 
 if __name__ == "__main__":
