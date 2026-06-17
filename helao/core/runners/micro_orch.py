@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import os
+from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from uuid import UUID, uuid1
 
@@ -620,6 +621,50 @@ class MicroOrch:
     # ------------------------------------------------------------------
     # helpers shared by run_experiment
     # ------------------------------------------------------------------
+
+    # Sequence-identity fields copied parent->child when an experiment runs
+    # inside a known sequence context.
+    _SEQ_IDENTITY_FIELDS = (
+        "sequence_uuid",
+        "sequence_timestamp",
+        "sequence_name",
+        "sequence_label",
+        "sequence_output_dir",
+        "sequence_params",
+        "sequence_status",
+        "manual_action",
+        "access",
+    )
+
+    def _stage_experiment(
+        self,
+        exp: Experiment,
+        order: int,
+        sequence: Optional["Sequence"] = None,
+    ) -> None:
+        """Stamp experiment + sequence identity before the experiment function runs.
+
+        When ``sequence`` is given, the experiment inherits that sequence's
+        identity. Otherwise the experiment is promoted to a manual run with a
+        synthetic sequence (mirrors ``Action.init_act``'s manual promotion).
+        ``init_exp`` then assigns the experiment timestamp/uuid/status and the
+        nested ``experiment_output_dir``. Must run BEFORE the experiment
+        function so ``ActionPlanMaker`` copies the stamped identity into each
+        planned action.
+        """
+        exp.orch_key = self.server_key
+        exp.orch_host = self.host
+        exp.orch_port = self.port
+        if sequence is not None:
+            for field in self._SEQ_IDENTITY_FIELDS:
+                setattr(exp, field, deepcopy(getattr(sequence, field)))
+        elif exp.sequence_timestamp is None:
+            exp.manual_action = True
+            exp.access = "manual"
+            exp.sequence_name = f"seq--{exp.experiment_name}"
+            exp.sequence_label = "manual"
+            exp.init_seq(time_offset=0)
+        exp.init_exp(time_offset=0)
 
     def _stage_action(self, act: Action, order: int) -> None:
         """Assign UUID, ordering, orch identity, and server address (from world_cfg)."""
