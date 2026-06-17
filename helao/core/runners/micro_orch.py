@@ -11,9 +11,11 @@ Example:
                      world_cfg=world_cfg)
     await orch.start()
     try:
-        result = await orch.run_action(action)              # one-shot
-        results = await orch.run_experiment(my_exp_func,    # full experiment
-                                            experiment=exp)
+        action = await orch.run_action(action)              # -> HelaoAction
+        experiment = await orch.run_experiment(my_exp_func) # -> HelaoExperiment
+        sequence = await orch.run_sequence(                 # -> HelaoSequence
+            my_seq_func, experiment_lib={"my_exp": my_exp_func})
+        orch.zip_runs("artifacts.zip")                      # archive all of it
     finally:
         await orch.stop()
 
