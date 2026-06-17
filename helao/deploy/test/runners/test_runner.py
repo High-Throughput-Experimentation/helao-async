@@ -1,25 +1,46 @@
 """MicroOrch equivalent of the TEST scheduling library (TEST_seq / TEST_exp).
 
-The TEST library exercises *orchestrator-internal* behaviour only: every action
-in ``TEST_exp.py`` targets the ``ORCH`` server (``wait``, ``add_global_param``,
-``conditional_stop``) and ``TEST_seq.py`` chains those experiments to verify
-non-blocking dispatch, global-parameter hand-off, and conditional sequence
-termination.
+The TEST library's actions all target the ``ORCH`` server (``wait``,
+``add_global_param``, ``conditional_stop``). Because ``OrchAPI`` inherits
+``BaseAPI``, the running orchestrator exposes those as ordinary RPC action
+endpoints, so MicroOrch treats ``ORCH`` exactly like any other action server
+and dispatches to it directly.
 
-Because those actions are hosted by the orchestrator itself -- not by an
-external action server -- there is nothing for MicroOrch to dispatch over RPC.
-The faithful MicroOrch equivalent therefore expresses each orchestrator
-primitive in Python:
+This script reproduces:
 
-    ORCH/wait              -> asyncio.sleep
-    ORCH/add_global_param  -> orch.global_params[name] = value
-    ORCH/conditional_stop  -> read orch.global_params, break the loop
-    to_global_params       -> write orch.global_params
-    from_global_*_params   -> read orch.global_params
+* ``TEST_seq.TEST_consecutive_noblocking`` -> for each (sample, cycle), a
+  ``TEST_sub_noblocking`` pair: a non-blocking ``ORCH/wait`` (10x base time)
+  overlapping a blocking ``ORCH/wait``.
+* ``TEST_exp.TEST_sub_conditional_stop`` -> ``ORCH/add_global_param`` then
+  ``ORCH/conditional_stop``.
 
-This module needs NO running servers. It uses a ``MicroOrch`` instance purely
-as the global-parameter store (the same role ``Orch.global_params`` plays), so
-the param hand-off semantics match the orchestrator version.
+to_global / from_global (script-managed)
+----------------------------------------
+The same hand-off the orchestrator does via ``Orch.global_params`` is done
+explicitly here through the script-level :data:`GLOBALS` dict:
+
+* **to_global**: read the object returned by ``run_action`` /
+  ``dispatch_action``, pull a value out of its ``action_params``, store it in
+  :data:`GLOBALS`.
+* **from_global**: copy a value from :data:`GLOBALS` into the next action's
+  params before dispatch.
+
+Flow control note
+-----------------
+``ORCH/conditional_stop`` halts the *orchestrator's own* loop -- but MicroOrch
+replaces that loop, so the "skip the rest of the sequence" effect is realised
+here by the script reading the same condition out of :data:`GLOBALS` and
+breaking. (Dispatching it still exercises the real endpoint; on an idle ORCH it
+simply marks that server stopped.)
+
+Prerequisites
+-------------
+- ``ORCH`` must be running and share this script's ``root``. Launch the
+  ``test`` group (SIM/visualizers are unused here)::
+
+      ./helao.sh test           # ORCH:8001
+
+- ``root`` defaults to ``C:/INST_hlo``; override with ``HELAO_ROOT``.
 
 Run::
 
@@ -28,80 +49,97 @@ Run::
 
 from __future__ import annotations
 
+import os
 import asyncio
+from typing import Any, Dict, Optional
 
 from helao.core.runners.micro_orch import MicroOrch
+from helao.helpers.premodels import Action
+from helao.core.models.machine import MachineModel
 
 
-# No action servers are contacted; root/servers can be empty.
-WORLD_CFG: dict = {"servers": {}}
+ROOT = os.environ.get("HELAO_ROOT", "C:/INST_hlo")
+WORLD_CFG = {
+    "root": ROOT,
+    "servers": {
+        "ORCH": {"host": "127.0.0.1", "port": 8001},  # hosts wait/global/stop
+    },
+}
+
+WAIT_TIME = 0.2
+CYCLES = 2
+SAMPLES = (1, 2)
+
+# Script-level global store: the MicroOrch-script stand-in for Orch.global_params.
+GLOBALS: Dict[str, Any] = {}
 
 
-async def test_sub_noblocking(
-    orch: MicroOrch, wait_time: float = 3.0, dummy_param: float = 0.0
-) -> asyncio.Task:
-    """Python equivalent of ``TEST_exp.TEST_sub_noblocking``.
-
-    A non-blocking wait (10x ``wait_time``, published to the global
-    ``test_wait``) overlaps a following blocking wait. ``dummy_param`` is the
-    placeholder the sequence wires from the prior cycle's ``test_wait``.
-    """
-    # nonblocking wait -> fire-and-forget; publish its waittime to globals
-    nb_wait = wait_time * 10
-    nb_task = asyncio.create_task(asyncio.sleep(nb_wait))
-    orch.global_params["test_wait"] = nb_wait  # to_global_params
-
-    # blocking wait
-    await asyncio.sleep(wait_time)
-    return nb_task  # caller may await outstanding non-blocking waits
+def _act(server: str, name: str, params: Optional[dict] = None) -> Action:
+    """Build a one-off action targeting ``server``."""
+    return Action(
+        action_name=name,
+        action_server=MachineModel(server_name=server),
+        action_params=params or {},
+    )
 
 
-async def test_consecutive_noblocking(
-    orch: MicroOrch,
-    wait_time: float = 0.2,
-    cycles: int = 2,
-    plate_sample_no_list=(1, 2, 3),
-) -> None:
-    """Python equivalent of ``TEST_seq.TEST_consecutive_noblocking``.
-
-    One ``test_sub_noblocking`` per (sample_no, cycle). After the first cycle of
-    each sample the ``dummy_param`` is taken from the prior cycle's ``test_wait``
-    global, mirroring ``from_global_exp_params={"test_wait": "dummy_param"}``.
-    """
-    pending = []
-    for smp in plate_sample_no_list:
-        for i in range(cycles):
-            if i == 0:
-                dummy = 0.0
-            else:
-                dummy = orch.global_params.get("test_wait", 0.0)  # from_global
-            print(f"sample {smp} cycle {i}: dummy_param={dummy}")
-            pending.append(
-                await test_sub_noblocking(orch, wait_time=wait_time, dummy_param=dummy)
-            )
-    # drain any outstanding non-blocking waits before returning
-    await asyncio.gather(*pending)
+def _inject(params: dict, mapping: Dict[str, str]) -> dict:
+    """from_global: copy ``GLOBALS[gkey]`` into ``params[param_name]``."""
+    for gkey, pname in mapping.items():
+        params[pname] = GLOBALS[gkey]
+    return params
 
 
-async def test_sub_conditional_stop(orch: MicroOrch) -> bool:
-    """Python equivalent of ``TEST_exp.TEST_sub_conditional_stop``.
+async def consecutive_noblocking(orch: MicroOrch) -> None:
+    """Reproduce TEST_consecutive_noblocking via explicit ORCH dispatch."""
+    for smp in SAMPLES:
+        for cycle in range(CYCLES):
+            # from_global: after the first cycle, dummy_param comes from the
+            # prior cycle's test_wait (placeholder consumer, as in the library).
+            dummy_param = GLOBALS["test_wait"] if cycle > 0 else 0.0
+            print(f"sample {smp} cycle {cycle}: dummy_param={dummy_param}")
 
-    Sets ``global_test`` then evaluates the conditional stop. Returns ``True``
-    when the sequence should halt (so the trailing waits are skipped).
-    """
-    orch.global_params["global_test"] = True  # add_global_param
-    # conditional_stop: stop when global_test == True (read from globals)
-    should_stop = orch.global_params.get("global_test") is True
-    if should_stop:
-        print("conditional_stop met -> halting before trailing waits")
-        return True
+            # non-blocking wait: fire-and-forget so it overlaps the blocking one
+            nb = _act("ORCH", "wait", {"waittime": WAIT_TIME * 10})
+            nb.nonblocking = True
+            reply = await orch.dispatch_action(nb)
+            # to_global: waittime -> test_wait (read the returned action_params)
+            GLOBALS["test_wait"] = reply["action_params"]["waittime"]
+
+            # blocking wait
+            await orch.run_action(_act("ORCH", "wait", {"waittime": WAIT_TIME}))
+
+
+async def conditional_stop(orch: MicroOrch) -> None:
+    """Reproduce TEST_sub_conditional_stop via explicit ORCH dispatch."""
+    # add_global_param, then to_global: global_test -> GLOBALS
+    res = await orch.run_action(
+        _act("ORCH", "add_global_param", {"param_name": "global_test", "param_value": True})
+    )
+    GLOBALS["global_test"] = res.action_params["global_test"]
+
+    # conditional_stop with from_global: GLOBALS[global_test] -> action param
+    await orch.run_action(
+        _act(
+            "ORCH",
+            "conditional_stop",
+            _inject(
+                {"stop_parameter": "global_test", "stop_value": True},
+                {"global_test": "global_test"},
+            ),
+        )
+    )
+
+    # script-level flow control: skip the trailing waits when the stop holds
+    if GLOBALS.get("global_test") is True:
+        print("conditional_stop met -> skipping trailing waits")
+        return
     for _ in range(5):
-        await asyncio.sleep(1)  # trailing ORCH/wait actions (skipped when stopped)
-    return False
+        await orch.run_action(_act("ORCH", "wait", {"waittime": 1}))
 
 
 async def main() -> None:
-    """Run both TEST equivalents against a server-less MicroOrch global store."""
+    """Run both TEST equivalents, dispatching every action to the ORCH server."""
     async with MicroOrch(
         server_key="micro_test",
         host="127.0.0.1",
@@ -109,14 +147,15 @@ async def main() -> None:
         world_cfg=WORLD_CFG,
     ) as orch:
         print("=== TEST_consecutive_noblocking equivalent ===")
-        await test_consecutive_noblocking(
-            orch, wait_time=0.2, cycles=2, plate_sample_no_list=(1, 2)
-        )
-        print(f"final globals: {dict(orch.global_params)}")
+        await consecutive_noblocking(orch)
+        print(f"globals after loop: {dict(GLOBALS)}")
 
         print("\n=== TEST_sub_conditional_stop equivalent ===")
-        stopped = await test_sub_conditional_stop(orch)
-        print(f"sequence stopped early: {stopped}")
+        await conditional_stop(orch)
+
+        zip_path = os.path.join(ROOT, "test_microorch_runs.zip")
+        orch.zip_runs(zip_path)
+        print(f"\ntracked {len(orch.runs)} artifacts; archived -> {zip_path}")
 
 
 if __name__ == "__main__":
