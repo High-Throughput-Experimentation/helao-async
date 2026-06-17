@@ -34,6 +34,7 @@ from helao.core.tests._test_utils import TestReporter
 import os
 import tempfile
 import shutil
+import zipfile
 from datetime import datetime as _dt
 from helao.helpers.premodels import Experiment, Sequence
 from helao.helpers.yml_tools import yml_dumps as _yml_dumps
@@ -296,6 +297,51 @@ async def _drive_run_sequence(reporter: TestReporter) -> None:
                     {c["action_output_dir"].split(os.sep)[2] for c in fake.action_calls}
                 )
                 == 1,
+            )
+    finally:
+        await fake.dispatcher.close()
+        shutil.rmtree(root, ignore_errors=True)
+
+
+async def _drive_zip_runs(reporter: TestReporter) -> None:
+    root = tempfile.mkdtemp(prefix="micro_zip_")
+    fake_port = _free_port()
+    fake = _FakeDataActionServer("FAKE", "ping", root)
+    await fake.dispatcher.serve("127.0.0.1", derive_rpc_port(fake_port))
+    experiment_lib = {"demo_exp": _demo_exp_func}
+    try:
+        async with _make_orch(
+            root, {"FAKE": {"host": "127.0.0.1", "port": fake_port}}
+        ) as orch:
+            await orch.run_sequence(_demo_seq_func, experiment_lib, cycles=1)
+            zip_path = os.path.join(root, "artifacts.zip")
+            out = orch.zip_runs(zip_path)
+            reporter.check("zip_runs returns the zip path", lambda: out == zip_path)
+            reporter.check("zip file exists", lambda: os.path.isfile(zip_path))
+            with zipfile.ZipFile(zip_path) as zf:
+                names = zf.namelist()
+            reporter.check(
+                "zip contains a seq yml entry",
+                lambda: any(n.endswith("-seq.yml") for n in names),
+            )
+            reporter.check(
+                "zip contains an exp yml entry",
+                lambda: any(n.endswith("-exp.yml") for n in names),
+            )
+            reporter.check(
+                "zip contains an act yml entry",
+                lambda: any(n.endswith("-act.yml") for n in names),
+            )
+            reporter.check(
+                "zip entries are relative (no RUNS_* prefix, no leading sep)",
+                lambda: all(
+                    not n.startswith("RUNS_") and not n.startswith(os.sep)
+                    for n in names
+                ),
+            )
+            reporter.check(
+                "no duplicate entries",
+                lambda: len(names) == len(set(names)),
             )
     finally:
         await fake.dispatcher.close()
@@ -592,6 +638,9 @@ def micro_orch_unit_test() -> bool:
 
         reporter.section("MicroOrch run_sequence end-to-end")
         asyncio.run(_drive_run_sequence(reporter))
+
+        reporter.section("MicroOrch zip_runs")
+        asyncio.run(_drive_zip_runs(reporter))
 
         return reporter.success()
 
