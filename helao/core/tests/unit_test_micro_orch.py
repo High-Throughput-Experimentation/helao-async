@@ -31,6 +31,37 @@ from helao.core.runners.micro_orch import MicroOrch, _is_terminal
 from helao.helpers.premodels import Action
 from helao.core.tests._test_utils import TestReporter
 
+import os
+import tempfile
+import shutil
+from helao.helpers.premodels import Experiment, Sequence
+from helao.core.runners.micro_orch import MicroOrch as _MO  # alias to reach new methods
+
+
+def _make_orch(root: str, world_servers: dict = None) -> MicroOrch:
+    """Build a MicroOrch with a filesystem root but without starting it."""
+    return MicroOrch(
+        server_key="micro",
+        host="127.0.0.1",
+        port=_free_port(),
+        world_cfg={"root": root, "servers": world_servers or {}},
+        default_timeout=3.0,
+        finished_timeout=5.0,
+        poll_interval=0.05,
+    )
+
+
+def _build_experiment(name: str = "exp_demo") -> Experiment:
+    """A minimal Experiment with a manual sequence context, fully stamped."""
+    exp = Experiment(experiment_name=name)
+    exp.manual_action = True
+    exp.access = "manual"
+    exp.sequence_name = f"seq--{name}"
+    exp.sequence_label = "manual"
+    exp.init_seq(time_offset=0)
+    exp.init_exp(time_offset=0)
+    return exp
+
 
 def _free_port() -> int:
     """Return an ephemeral free TCP port chosen by the OS."""
@@ -166,6 +197,52 @@ async def _drive_micro_orch(reporter: TestReporter) -> None:
         await fake_server.dispatcher.close()
 
 
+async def _drive_yml_writers(reporter: TestReporter) -> None:
+    """_write_exp / _write_seq land yml under RUNS_DIAG for a manual experiment."""
+    root = tempfile.mkdtemp(prefix="micro_yml_")
+    try:
+        orch = _make_orch(root)
+        exp = _build_experiment("yml_exp")
+
+        exp_file = await orch._write_exp(exp)
+        reporter.check(
+            "_write_exp returns an existing .yml path",
+            lambda: isinstance(exp_file, str) and os.path.isfile(exp_file),
+        )
+        reporter.check(
+            "exp yml is under RUNS_DIAG (manual_action)",
+            lambda: os.sep + "RUNS_DIAG" + os.sep in exp_file,
+        )
+        from helao.helpers.yml_tools import yml_load
+        with open(exp_file) as f:
+            exp_meta = yml_load(f.read())
+        reporter.check(
+            "exp yml has file_type=experiment and matching uuid",
+            lambda: (
+                exp_meta["file_type"] == "experiment"
+                and str(exp_meta["experiment_uuid"]) == str(exp.experiment_uuid)
+            ),
+        )
+
+        seq = Sequence(sequence_name="yml_seq", sequence_label="manual")
+        seq.manual_action = True
+        seq.init_seq(time_offset=0)
+        seq_file = await orch._write_seq(seq)
+        reporter.check(
+            "_write_seq returns an existing .yml path under RUNS_DIAG",
+            lambda: os.path.isfile(seq_file)
+            and os.sep + "RUNS_DIAG" + os.sep in seq_file,
+        )
+        with open(seq_file) as f:
+            seq_meta = yml_load(f.read())
+        reporter.check(
+            "seq yml has file_type=sequence",
+            lambda: seq_meta["file_type"] == "sequence",
+        )
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def micro_orch_unit_test() -> bool:
     """Run all MicroOrch assertions and report pass/fail."""
     reporter = TestReporter("micro_orch")
@@ -199,6 +276,9 @@ def micro_orch_unit_test() -> bool:
 
         reporter.section("MicroOrch end-to-end run_action")
         asyncio.run(_drive_micro_orch(reporter))
+
+        reporter.section("MicroOrch yml writers")
+        asyncio.run(_drive_yml_writers(reporter))
 
         return reporter.success()
 

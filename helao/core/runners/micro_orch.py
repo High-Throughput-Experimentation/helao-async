@@ -27,9 +27,11 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from uuid import UUID
+from uuid import UUID, uuid1
 
+import aiofiles
 import zmq
 
 from helao.core.models.action_start_condition import ActionStartCondition
@@ -38,7 +40,8 @@ from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
 from helao.helpers import helao_logging as logging
 from helao.helpers.time_utils import gen_uuid
-from helao.helpers.premodels import Action, Experiment
+from helao.helpers.premodels import Action, Experiment, Sequence
+from helao.helpers.yml_tools import yml_dumps
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -90,6 +93,9 @@ class MicroOrch:
         port: int,
         world_cfg: Optional[dict] = None,
         default_timeout: float = 5.0,
+        finished_timeout: float = 60.0,
+        poll_interval: float = 0.5,
+        loader_factory: Optional[Callable[[str], Any]] = None,
     ) -> None:
         """Initialize the micro-orchestrator and register the status handler.
 
@@ -129,6 +135,18 @@ class MicroOrch:
         # ``to_global_params`` on their actions.
         self.global_params: Dict[str, Any] = {}
         self.last_action_uuid: Optional[UUID] = None
+
+        # Artifact read-back configuration.
+        self.finished_timeout = finished_timeout
+        self.poll_interval = poll_interval
+        # Default to the local-filesystem loader; importing lazily avoids a
+        # hard pandas import at module load for callers that never read back.
+        if loader_factory is None:
+            from helao.core.drivers.data.loaders.localfs import LocalLoader
+            loader_factory = LocalLoader
+        self.loader_factory = loader_factory
+        # Run tracking (Task 4 populates this).
+        self.runs: List[dict] = []
 
     # ------------------------------------------------------------------
     # lifecycle
@@ -649,6 +667,64 @@ class MicroOrch:
                     self.global_params[k2] = action_params[k1]
                 elif k1 in action_output:
                     self.global_params[k2] = action_output[k1]
+
+    # ------------------------------------------------------------------
+    # artifact persistence (mirrors Base.write_exp / write_seq)
+    # ------------------------------------------------------------------
+
+    def _finished_root(self, manual: bool = False) -> str:
+        """Return ``<root>/RUNS_FINISHED`` (or ``RUNS_DIAG`` for manual runs).
+
+        Raises:
+            RuntimeError: If ``world_cfg`` has no ``root`` key.
+        """
+        root = self.world_cfg.get("root")
+        if not root:
+            raise RuntimeError(
+                "world_cfg['root'] is required to persist or read back artifacts"
+            )
+        return os.path.join(root, "RUNS_DIAG" if manual else "RUNS_FINISHED")
+
+    async def _write_meta_atomic(self, output_file: str, output_str: str) -> None:
+        """Atomically write ``output_str`` to ``output_file`` (temp + os.replace)."""
+        if not output_str.endswith("\n"):
+            output_str += "\n"
+        output_path = os.path.dirname(output_file)
+        os.makedirs(output_path, exist_ok=True)
+        tmp_file = os.path.join(
+            output_path, f".{os.path.basename(output_file)}.{uuid1().hex}.tmp"
+        )
+        async with aiofiles.open(tmp_file, mode="w") as f:
+            await f.write(output_str)
+        os.replace(tmp_file, output_file)
+
+    async def _write_exp(self, experiment: Experiment) -> str:
+        """Write ``<finished_root>/<exp_dir>/<ts>-exp.yml`` and return its path."""
+        exp_dict = experiment.get_exp().clean_dict()
+        root = self._finished_root(manual=bool(experiment.manual_action))
+        output_path = os.path.join(root, experiment.get_experiment_dir())
+        output_file = os.path.join(
+            output_path,
+            f"{experiment.experiment_timestamp.strftime('%y%m%d.%H%M%S%f')}-exp.yml",
+        )
+        output_dict = {"file_type": "experiment"}
+        output_dict.update(exp_dict)
+        await self._write_meta_atomic(output_file, yml_dumps(output_dict))
+        return output_file
+
+    async def _write_seq(self, sequence: Sequence) -> str:
+        """Write ``<finished_root>/<seq_dir>/<ts>-seq.yml`` and return its path."""
+        seq_dict = sequence.get_seq().clean_dict()
+        root = self._finished_root(manual=bool(sequence.manual_action))
+        output_path = os.path.join(root, sequence.get_sequence_dir())
+        output_file = os.path.join(
+            output_path,
+            f"{sequence.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.yml",
+        )
+        output_dict = {"file_type": "sequence"}
+        output_dict.update(seq_dict)
+        await self._write_meta_atomic(output_file, yml_dumps(output_dict))
+        return output_file
 
     # ------------------------------------------------------------------
     # introspection
