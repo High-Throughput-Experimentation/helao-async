@@ -48,31 +48,54 @@ def read_hlo(
         A ``(meta, data)`` tuple where ``meta`` is the parsed YAML header
         and ``data`` is a dict of column lists assembled from the body.
     """
+    path_to_hlo = Path(path)
+    with open(str(path_to_hlo), "rb") as f:
+        return read_hlo_stream(f, keep_keys=keep_keys, omit_keys=omit_keys)
+
+
+def read_hlo_stream(
+    stream, keep_keys: list = [], omit_keys: list = []
+) -> Tuple[dict, dict]:
+    """Parse an HLO ``(meta, data)`` pair from an open binary stream.
+
+    Shares the parsing core of :func:`read_hlo` so callers holding an
+    already-open binary file-like (e.g. a ``ZipFile`` member) can parse
+    without a filesystem path.
+
+    Args:
+        stream: An iterable of raw (``bytes``) lines, such as an open binary
+            file or ``ZipFile.open(member)`` handle.
+        keep_keys: When non-empty, only these keys are kept from the body.
+        omit_keys: Keys to omit from the body (ignored when ``keep_keys`` is
+            populated, which takes precedence).
+
+    Returns:
+        A ``(meta, data)`` tuple where ``meta`` is the parsed YAML header
+        and ``data`` is a dict of column lists assembled from the body.
+    """
     if keep_keys and omit_keys:
         print(
             "Both keep_keys and omit_keys are provided. keep_keys will take precedence."
         )
 
-    path_to_hlo = Path(path)
     header_lines = []
     header_end = False
     data = defaultdict(list)
 
-    with open(str(path_to_hlo), "rb") as f:
-        for line in f:
-            if header_end:
-                line_dict = orjson.loads(line)
-                for k in line_dict:
-                    if k in keep_keys or k not in omit_keys:
-                        v = line_dict[k]
-                        if isinstance(v, list):
-                            data[k] += v
-                        else:
-                            data[k].append(v)
-            elif line.decode("utf8").startswith("%%"):
-                header_end = True
-            elif not header_end:
-                header_lines.append(line)
+    for line in stream:
+        if header_end:
+            line_dict = orjson.loads(line)
+            for k in line_dict:
+                if k in keep_keys or k not in omit_keys:
+                    v = line_dict[k]
+                    if isinstance(v, list):
+                        data[k] += v
+                    else:
+                        data[k].append(v)
+        elif line.decode("utf8").startswith("%%"):
+            header_end = True
+        elif not header_end:
+            header_lines.append(line)
     if header_lines:
         meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
     else:
