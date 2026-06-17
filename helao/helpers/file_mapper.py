@@ -97,21 +97,41 @@ class FileMapper:
         """
         if "PROCESSES" in p:
             return p
-        for state in self.states:
-            testp = Path(os.path.join(self.prestr, f"RUNS_{state}", p))
-            if testp.exists():
-                return testp
-        return self._locate_in_zip(p)
+        # ``.hlo`` data files are recorded in metadata under their canonical
+        # ``.hlo.json`` (S3/JSON) name, but the local/zip artifact is the raw
+        # ``.hlo``. Try the name as given, then fall back to the physical name.
+        candidates = [p]
+        if p.endswith(".hlo.json"):
+            candidates.append(p[: -len(".json")])
+        for cand in candidates:
+            for state in self.states:
+                testp = Path(os.path.join(self.prestr, f"RUNS_{state}", cand))
+                if testp.exists():
+                    return testp
+            zip_hit = self._locate_in_zip(cand)
+            if zip_hit is not None:
+                return zip_hit
+        return None
 
     def _locate_in_zip(self, p: str):
         """Locate ``p`` inside the synced sequence zip under ``RUNS_SYNCED``.
 
         A fully-synced sequence directory (``.../YY.WW/MMDD/<seq_dir>``) is
-        archived to ``RUNS_SYNCED/YY.WW/MMDD/<seq_dir>.zip`` with members
-        stored relative to the sequence dir. ``p`` is run-state-root-relative,
-        so some prefix of it names the sequence dir (hence the zip) and the
-        remainder names the member. Each prefix is tried (shortest first)
-        until a synced zip that contains the member is found.
+        archived to ``RUNS_SYNCED/YY.WW/MMDD/<seq_dir>.zip``. ``p`` is
+        run-state-root-relative, so some prefix of it names the sequence dir
+        (hence the zip) and the remainder names the member. Each prefix is
+        tried (shortest first) until a synced zip that contains the member is
+        found.
+
+        Two archive conventions are handled, differing in how member names
+        are stored:
+
+        * ``sync_driver`` zips store members **relative to the sequence dir**
+          (``<exp>/<act>/<file>``).
+        * MicroOrch ``zip_runs`` zips store each member as its path **relative
+          to the run-state root** — either ``<seq_dir>/<exp>/<act>/<file>`` or
+          the full ``YY.WW/MMDD/<seq_dir>/...`` depending on how the run was
+          rooted.
 
         Args:
             p: Path relative to the ``RUNS_<state>`` root.
@@ -126,9 +146,19 @@ class FileMapper:
             zip_path = Path(os.path.join(synced_root, *parts[:i]) + ".zip")
             if not zip_path.is_file():
                 continue
-            member = "/".join(parts[i:])
+            # candidate member names, by archive convention:
+            #   parts[i:]    - stored relative to the sequence dir (sync_driver)
+            #   parts[i-1:]  - includes the sequence dir (MicroOrch, seq-rooted)
+            #   parts[:]     - full run-relative path (MicroOrch, run-rooted)
+            candidates = [
+                "/".join(parts[i:]),
+                "/".join(parts[i - 1 :]),
+                "/".join(parts),
+            ]
             with ZipFile(zip_path, "r") as zf:
-                if member in zf.namelist():
+                names = set(zf.namelist())
+            for member in candidates:
+                if member and member in names:
                     return (zip_path, member)
         return None
 
