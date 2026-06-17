@@ -6,7 +6,7 @@ from typing import Union
 from zipfile import ZipFile
 
 from .yml_tools import yml_load
-from .hlo_data import read_hlo, read_hlo_stream
+from .hlo_data import read_hlo_bytes
 
 
 class FileMapper:
@@ -163,42 +163,31 @@ class FileMapper:
         return None
 
     def read_hlo(self, p: str, retries: int = 3):
-        """Read an HLO file via :func:`read_hlo`, retrying on partial writes.
+        """Resolve and read an HLO file as ``(meta, data)``, retrying partial writes.
 
-        :class:`ValueError` raised by :func:`read_hlo` (typically because
-        the underlying file is still being flushed) is caught and the
-        read is retried up to ``retries`` times.
+        The file is located via :meth:`locate` (run-state dirs and synced
+        sequence zips) and its bytes pulled with :meth:`read_bytes`, so loose
+        files and zip members are handled uniformly; the bytes are then parsed
+        by :func:`read_hlo_bytes`. :class:`ValueError` from the parser
+        (typically a not-yet-flushed file) triggers up to ``retries`` re-reads.
 
         Args:
             p: Path relative to the ``RUNS_<state>`` root.
             retries: Maximum number of retries on :class:`ValueError`.
 
         Returns:
-            The ``(meta, data)`` tuple from :func:`read_hlo`, or ``None``
-            if all retries exhaust without raising.
+            The ``(meta, data)`` tuple, or ``None`` if every attempt raises
+            :class:`ValueError`.
 
         Raises:
             FileNotFoundError: ``p`` could not be located in any run state.
         """
-        lp = self.locate(p)
-        if lp is None:
-            raise FileNotFoundError
-        elif isinstance(lp, tuple):
-            zip_path, member = lp
-            with ZipFile(zip_path, "r") as zf:
-                with zf.open(member) as f:
-                    return read_hlo_stream(f)
-        else:
-            retry_counter = 0
-            read_success = False
-            while (not read_success) or (retry_counter <= retries):
-                try:
-                    hlo_tup = read_hlo(lp.__str__())
-                    read_success = True
-                    return hlo_tup
-                except ValueError:  # retry read_hlo in case file not fully written
-                    retry_counter += 1
-            return None
+        for _ in range(retries + 1):
+            try:
+                return read_hlo_bytes(self.read_bytes(p))
+            except ValueError:  # retry in case file not fully written
+                continue
+        return None
 
     def read_yml(self, p: str) -> dict:
         """Resolve and parse a YAML file from the run tree.

@@ -10,7 +10,6 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from typing import Tuple
-from collections import defaultdict
 
 import os
 import builtins
@@ -24,6 +23,7 @@ import re
 import orjson
 import pandas as pd
 from .yml_tools import yml_load
+from .hlo_data import read_hlo_bytes
 from .file_mapper import FileMapper
 
 
@@ -286,30 +286,10 @@ class HelaoData:
             and ``data`` is a dict of column lists.
         """
         if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
-            header_lines = []
-            header_end = False
-            data = defaultdict(list)
-
-            with zipfile.ZipFile(self.target, "r") as zf:
-                for line in zf.open(hlotarget):
-                    if header_end:
-                        line_dict = orjson.loads(line)
-                        for k in line_dict:
-                            if k in keep_keys or k not in omit_keys:
-                                v = line_dict[k]
-                                if isinstance(v, list):
-                                    data[k] += v
-                                else:
-                                    data[k].append(v)
-                    elif line.decode("utf8").startswith("%%"):
-                        header_end = True
-                    elif not header_end:
-                        header_lines.append(line)
-            if header_lines:
-                meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
-            else:
-                meta = {}
-            return meta, data
+            member = self._resolve_zip_member(hlotarget)
+            return read_hlo_bytes(
+                self.read_file(member), keep_keys=keep_keys, omit_keys=omit_keys
+            )
         else:
             fm = FileMapper(hlotarget)
             return fm.read_hlo(self._runs_relpath(hlotarget))
@@ -363,6 +343,29 @@ class HelaoData:
 
         return {}, json_dict
 
+    def _resolve_zip_member(self, hlotarget: str) -> str:
+        """Map a logical data-file name to its physical zip member.
+
+        ``.hlo`` files are recorded under their canonical ``.hlo.json`` name
+        but archived as raw ``.hlo``. When ``hlotarget`` is not itself a
+        member but its ``.hlo`` counterpart is, the latter is returned.
+
+        Args:
+            hlotarget: Member name as recorded in metadata.
+
+        Returns:
+            The actual member name present in the archive (unchanged when no
+            mapping applies).
+        """
+        if hlotarget in self.zflist:
+            return hlotarget
+        if (
+            hlotarget.endswith(".hlo.json")
+            and hlotarget[: -len(".json")] in self.zflist
+        ):
+            return hlotarget[: -len(".json")]
+        return hlotarget
+
     def read_file(self, hlotarget) -> bytes:
         """Read a single zip member as raw bytes.
 
@@ -385,14 +388,17 @@ class HelaoData:
             A ``(meta, data)`` tuple, or ``({}, {})`` if the extension is not
             supported.
         """
-        if target_data_file.endswith(".hlo"):
+        # ``.hlo`` data files are recorded under their canonical ``.hlo.json``
+        # name but stored as raw ``.hlo``, so both route to the HLO reader;
+        # only genuine (non-HLO) ``.json`` files go to the JSON reader.
+        if target_data_file.endswith(".hlo") or target_data_file.endswith(".hlo.json"):
             return self.read_hlo(target_data_file)
         elif target_data_file.endswith(".json"):
             return self.read_json(target_data_file)
         elif target_data_file.endswith(".parquet"):
             return self.read_parquet(target_data_file)
         else:
-            LOGGER.warn("File not found or type unsupported.")
+            LOGGER.warning("File not found or type unsupported.")
             return {}, {}
 
     def read_data_index(self, idx: int = 0):
