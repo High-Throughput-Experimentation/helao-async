@@ -131,6 +131,40 @@ def test_runs_finished_index():
     print("test_runs_finished_index PASS")
 
 
+def _make_synced_zip(root):
+    """Create root/RUNS_SYNCED/26.25/0618/<seq>.zip with act.yml + .hlo members."""
+    day = os.path.join(root, "RUNS_SYNCED", "26.25", "0618")
+    os.makedirs(day)
+    with tempfile.TemporaryDirectory() as tmp:
+        hlo = os.path.join(tmp, "cv_data.hlo")
+        _write_hlo(hlo)
+        actyml = os.path.join(tmp, "act.yml")
+        with open(actyml, "w") as f:
+            yaml.safe_dump({"technique_name": "CV",
+                            "samples_out": [{"global_label": "solid__lab1_1"}]}, f)
+        zpath = os.path.join(day, "141523__SDC_seq__lab1.zip")
+        with zipfile.ZipFile(zpath, "w") as zf:
+            zf.write(actyml, "260618.141524__SDC_exp_CV/1__0__sim__cv/260618.141525-act.yml")
+            zf.write(hlo, "260618.141524__SDC_exp_CV/1__0__sim__cv/cv_data.hlo")
+
+
+def test_runs_synced_index():
+    with tempfile.TemporaryDirectory() as d:
+        _make_synced_zip(d)
+        df = sources.RunsSourceIndex(d, "SYNCED").index()
+        assert len(df) == 1, df
+        r = df.iloc[0]
+        assert r["source"] == "RUNS_SYNCED"
+        assert r["sequence"] == "SDC_seq"
+        assert r["technique"] == "CV"
+        assert r["sample"] == "solid__lab1_1"
+        assert r["file_name"] == "cv_data.hlo"
+        assert r["locator"].startswith("zip::")
+        _, data = readers.read_dataset(r["locator"], r["file_type"])
+        assert data["Ewe_V"] == [0.1, 0.2]
+    print("test_runs_synced_index PASS")
+
+
 if __name__ == "__main__":
     test_read_hlo_file()
     test_read_json_columnar()
@@ -139,3 +173,4 @@ if __name__ == "__main__":
     test_read_hlo_from_zip()
     test_dir_walk_and_range()
     test_runs_finished_index()
+    test_runs_synced_index()
