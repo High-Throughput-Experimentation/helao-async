@@ -292,3 +292,24 @@ class DerivedSourceIndex(SourceIndex):
                         available=True, locator=str(p),
                     ))
         return rows
+
+
+SOURCES = ["RUNS_FINISHED", "RUNS_SYNCED", "PROCESSES", "ANALYSES"]
+GROUPS = {"RUNS": ["RUNS_FINISHED", "RUNS_SYNCED"],
+          "DERIVED": ["PROCESSES", "ANALYSES"]}
+
+
+def build_source_index(root, source):
+    """Return the SourceIndex for a source name."""
+    if source == "RUNS_FINISHED":
+        return RunsSourceIndex(root, "FINISHED")
+    if source == "RUNS_SYNCED":
+        return RunsSourceIndex(root, "SYNCED")
+    if source in ("PROCESSES", "ANALYSES"):
+        return DerivedSourceIndex(root, source)
+    raise ValueError(f"unknown source: {source!r}")
+
+
+def get_index(root, source, date_start=None, date_end=None):
+    """Build and return the candidate-dataset index DataFrame for a source."""
+    return build_source_index(root, source).index(date_start, date_end)

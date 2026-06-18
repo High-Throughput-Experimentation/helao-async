@@ -251,6 +251,17 @@ def test_analyses_index_s3_only_unavailable():
     print("test_analyses_index PASS")
 
 
+def test_get_index_dispatch():
+    with tempfile.TemporaryDirectory() as d:
+        _make_finished_tree(d)
+        df = sources.get_index(d, "RUNS_FINISHED", None, None)
+        assert df.iloc[0]["source"] == "RUNS_FINISHED"
+        empty = sources.get_index(d, "ANALYSES", None, None)
+        assert list(empty.columns) == sources.INDEX_COLUMNS
+        assert len(empty) == 0
+    print("test_get_index_dispatch PASS")
+
+
 if __name__ == "__main__":
     test_read_hlo_file()
     test_read_json_columnar()
@@ -264,3 +275,4 @@ if __name__ == "__main__":
     test_processes_index_missing_file_unavailable()
     test_analyses_index_local()
     test_analyses_index_s3_only_unavailable()
+    test_get_index_dispatch()
