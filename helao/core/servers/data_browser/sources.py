@@ -75,3 +75,67 @@ def _safe_yaml_bytes(content):
 def _row(**kw):
     """Build one index row dict with all INDEX_COLUMNS present."""
     return {c: kw.get(c, "") for c in INDEX_COLUMNS}
+
+
+class SourceIndex:
+    """Base class for a date-scoped candidate-dataset indexer."""
+
+    def list_dates(self):
+        raise NotImplementedError
+
+    def index(self, date_start=None, date_end=None):
+        raise NotImplementedError
+
+
+class RunsSourceIndex(SourceIndex):
+    """Index RUNS_FINISHED (unzipped trees) or RUNS_SYNCED (sequence zips)."""
+
+    def __init__(self, root, state):
+        # state is "FINISHED" or "SYNCED"
+        self.root = Path(root)
+        self.state = state
+        self.source = f"RUNS_{state}"
+        self.base = self.root / self.source
+
+    def list_dates(self):
+        return [d for d, _ in _list_day_dirs(self.base)]
+
+    def index(self, date_start=None, date_end=None):
+        rows = []
+        for date_str, day in _list_day_dirs(self.base):
+            if not _in_range(date_str, date_start, date_end):
+                continue
+            if self.state == "SYNCED":
+                rows.extend(self._index_zips(date_str, day))
+            else:
+                rows.extend(self._index_tree(date_str, day))
+        df = pd.DataFrame(rows, columns=INDEX_COLUMNS)
+        if "available" in df.columns and len(df):
+            df["available"] = pd.Series(
+                pd.array([bool(v) for v in df["available"]], dtype=object),
+                dtype=object,
+                index=df.index,
+            )
+        return df
+
+    def _index_tree(self, date_str, day):
+        rows = []
+        for seq_dir in sorted(p for p in day.iterdir() if p.is_dir()):
+            seq_name = _seq_name(seq_dir.name)
+            for act_yml in sorted(seq_dir.glob("*/*/*-act.yml")):
+                act_dir = act_yml.parent
+                exp_name = act_dir.parent.name
+                meta = _safe_yaml(act_yml)
+                technique = meta.get("technique_name") or meta.get("action_name", "")
+                sample = _first_sample(meta)
+                run_type = meta.get("run_type", "")
+                for f in sorted(act_dir.iterdir()):
+                    if f.is_file() and f.suffix.lower() in DATA_EXTS:
+                        rows.append(_row(
+                            source=self.source, sequence=seq_name,
+                            experiment=exp_name, node=act_dir.name,
+                            technique=technique, sample=sample, run_type=run_type,
+                            file_name=f.name, file_type=f.suffix.lower().lstrip("."),
+                            date=date_str, available=True, locator=str(f),
+                        ))
+        return rows
