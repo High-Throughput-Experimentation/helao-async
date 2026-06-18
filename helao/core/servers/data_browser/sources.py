@@ -194,12 +194,16 @@ def _resolve_run_file(root, date_str, seq_dirname, exp_dirname, file_name):
     Returns (locator, available).
     """
     root = Path(root)
-    fin_seq = root / "RUNS_FINISHED" / date_str / seq_dirname
-    if fin_seq.is_dir():
-        for cand in fin_seq.glob(f"{exp_dirname}/*/{file_name}"):
-            return str(cand), True
-        for cand in fin_seq.rglob(file_name):
+    exp_path = root / "RUNS_FINISHED" / date_str / seq_dirname / exp_dirname
+    if exp_path.is_dir():
+        # direct action-dir children first (the normal layout)
+        for act_dir in sorted(p for p in exp_path.iterdir() if p.is_dir()):
+            cand = act_dir / file_name
             if cand.is_file():
+                return str(cand), True
+        # fallback: any depth within THIS experiment, exact basename match
+        for cand in exp_path.rglob("*"):
+            if cand.is_file() and cand.name == file_name:
                 return str(cand), True
     zip_path = root / "RUNS_SYNCED" / date_str / f"{seq_dirname}.zip"
     if zip_path.is_file():
@@ -220,6 +224,8 @@ class DerivedSourceIndex(SourceIndex):
         # source is "PROCESSES" or "ANALYSES"
         self.root = Path(root)
         self.source = source
+        if source not in ("PROCESSES", "ANALYSES"):
+            raise ValueError(f"unsupported source: {source!r}")
         self.base = self.root / source
 
     def list_dates(self):
@@ -242,9 +248,7 @@ class DerivedSourceIndex(SourceIndex):
             exp_dir = prc_yml.parent
             seq_dir = exp_dir.parent
             meta = _safe_yaml(prc_yml)
-            technique = meta.get("technique_name", "")
-            sample = _first_sample(meta)
-            run_type = meta.get("run_type", "")
+            technique, sample, run_type = _meta_fields(meta)
             for fi in meta.get("files") or []:
                 fn = (fi or {}).get("file_name", "")
                 if not fn or posixpath.splitext(fn)[1].lower() not in DATA_EXTS:
@@ -264,6 +268,7 @@ class DerivedSourceIndex(SourceIndex):
         rows = []
         for ana_dir in sorted(p for p in day.iterdir() if p.is_dir()):
             ymls = sorted(ana_dir.glob("*.yml"))
+            # first yml is the AnalysisModel; missing or extra ymls fall through to local-json indexing
             meta = _safe_yaml(ymls[0]) if ymls else {}
             ana_name = meta.get("analysis_name", _seq_name(ana_dir.name))
             sample = meta.get("global_sample_label") or ""
