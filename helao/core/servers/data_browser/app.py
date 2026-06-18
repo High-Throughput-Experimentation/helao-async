@@ -12,7 +12,7 @@ from bokeh.plotting import figure
 from helao.core.servers.data_browser import sources, state as dbstate
 
 INDEX_TABLE_COLS = ["source", "sequence", "experiment", "node", "technique",
-                    "sample", "run_type", "file_name", "file_type", "available"]
+                    "sample", "run_type", "file_name", "file_type", "date", "available"]
 FILTER_COLS = ["source", "sequence", "experiment", "node", "technique",
                "sample", "run_type", "file_name", "date"]
 PALETTE = Category10[10]
@@ -76,7 +76,6 @@ class _UI:
         self.clear_btn.on_click(self._on_clear)
         left = column(self.filter_in, self.index_table, self.add_btn, self.clear_btn)
 
-        # --- right region (filled by Tasks 12-13) ---
         self.right = self._build_right()
 
         self.layout = column(header, control, row(left, self.right))
