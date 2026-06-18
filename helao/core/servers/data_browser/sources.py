@@ -74,7 +74,31 @@ def _safe_yaml_bytes(content):
 
 def _row(**kw):
     """Build one index row dict with all INDEX_COLUMNS present."""
-    return {c: kw.get(c, "") for c in INDEX_COLUMNS}
+    defaults = {c: "" for c in INDEX_COLUMNS}
+    defaults["available"] = False
+    defaults.update(kw)
+    return defaults
+
+
+def _meta_fields(meta):
+    """Return (technique, sample, run_type) from an action yml dict."""
+    return (
+        meta.get("technique_name") or meta.get("action_name", ""),
+        _first_sample(meta),
+        meta.get("run_type", ""),
+    )
+
+
+def _rows_to_index_df(rows):
+    df = pd.DataFrame(rows, columns=INDEX_COLUMNS)
+    if len(df):
+        # Keep Python bool identity (pandas would upcast to numpy.bool_).
+        df["available"] = pd.Series(
+            pd.array([bool(v) for v in df["available"]], dtype=object),
+            dtype=object,
+            index=df.index,
+        )
+    return df
 
 
 class SourceIndex:
@@ -109,14 +133,7 @@ class RunsSourceIndex(SourceIndex):
                 rows.extend(self._index_zips(date_str, day))
             else:
                 rows.extend(self._index_tree(date_str, day))
-        df = pd.DataFrame(rows, columns=INDEX_COLUMNS)
-        if "available" in df.columns and len(df):
-            df["available"] = pd.Series(
-                pd.array([bool(v) for v in df["available"]], dtype=object),
-                dtype=object,
-                index=df.index,
-            )
-        return df
+        return _rows_to_index_df(rows)
 
     def _index_tree(self, date_str, day):
         rows = []
@@ -126,9 +143,7 @@ class RunsSourceIndex(SourceIndex):
                 act_dir = act_yml.parent
                 exp_name = act_dir.parent.name
                 meta = _safe_yaml(act_yml)
-                technique = meta.get("technique_name") or meta.get("action_name", "")
-                sample = _first_sample(meta)
-                run_type = meta.get("run_type", "")
+                technique, sample, run_type = _meta_fields(meta)
                 for f in sorted(act_dir.iterdir()):
                     if f.is_file() and f.suffix.lower() in DATA_EXTS:
                         rows.append(_row(
@@ -160,12 +175,12 @@ class RunsSourceIndex(SourceIndex):
                         continue
                     actdir = posixpath.dirname(n)
                     meta = act_meta.get(actdir, {})
+                    technique, sample, run_type = _meta_fields(meta)
                     rows.append(_row(
                         source=self.source, sequence=seq_name,
                         experiment=posixpath.basename(posixpath.dirname(actdir)),
                         node=posixpath.basename(actdir),
-                        technique=meta.get("technique_name") or meta.get("action_name", ""),
-                        sample=_first_sample(meta), run_type=meta.get("run_type", ""),
+                        technique=technique, sample=sample, run_type=run_type,
                         file_name=posixpath.basename(n), file_type=ext.lstrip("."),
                         date=date_str, available=True,
                         locator=make_zip_locator(str(zip_path), n),
