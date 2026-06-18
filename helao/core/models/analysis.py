@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from .run_use import RunUse
+from .file import FileInfo
 from helao.core.version import get_hlo_version
 from helao.core.helaodict import HelaoDict
 from .s3locator import S3Locator
@@ -40,18 +41,20 @@ class ShortAnalysisModel(BaseModel, HelaoDict):
             self.analysis_timestamp = datetime.now()
 
 
-class AnalysisDataModel(BaseModel, HelaoDict):
+class AnalysisDataModel(FileInfo):
     """Reference to an action's raw-data payload used as analysis input.
 
+    Extends :class:`~helao.core.models.file.FileInfo`, inheriting
+    ``action_uuid``, ``run_use``, ``sample``, ``file_name``, ``file_type``,
+    ``data_keys``, and ``nosync``; ``action_uuid`` is required and ``run_use``
+    defaults to :attr:`RunUse.data` for analysis inputs.
+
     Attributes:
-        action_uuid (UUID): UUID of the source action.
+        action_uuid (UUID): UUID of the source action (required here).
         run_use (RunUse): How the source data is being used.
         raw_data_path (str): Storage path to the raw data file.
         global_sample_label (Optional[str]): Global label of the sample, if known.
         composition (Optional[dict]): Optional composition metadata for the sample.
-        file_name (Optional[str]): Name of the source file.
-        file_type (Optional[str]): Type tag of the source file.
-        data_keys (List[str]): Keys within the file consumed by the analysis.
     """
 
     action_uuid: UUID
@@ -59,9 +62,6 @@ class AnalysisDataModel(BaseModel, HelaoDict):
     raw_data_path: str
     global_sample_label: Optional[str] = None
     composition: Optional[dict] = None
-    file_name: Optional[str] = None
-    file_type: Optional[str] = None
-    data_keys: List[str] = Field(default=[])
 
 
 class AnalysisOutputModel(BaseModel, HelaoDict):
