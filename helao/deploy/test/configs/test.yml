@@ -39,3 +39,12 @@ servers:
     bokeh: live_visualizer
     params:
       doc_name: Websocket Live Visualizer
+  DATABROWSE:
+    host: 127.0.0.1
+    port: 5003
+    group: visualizer
+    bokeh: data_browser
+    params:
+      doc_name: Data Browser
+      max_points: 50000
+      launch_browser: true
