@@ -12,9 +12,29 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
+from bokeh.document import Document
+
 from helao.core.servers.data_browser import readers
 from helao.core.servers.data_browser import sources
 from helao.core.servers.data_browser import state as dbstate
+
+
+class _FakeDirs:
+    def __init__(self, root):
+        from pathlib import Path
+        self.root = Path(root)
+        self.log_root = None
+
+
+class _FakeVis:
+    def __init__(self, root, doc):
+        self.world_cfg = {}
+        self.helaodirs = _FakeDirs(root)
+        self.doc = doc
+        self.server_cfg = {"params": {"max_points": 50000}}
+
+    def print_message(self, *a, **k):
+        pass
 
 
 def _write_hlo(path):
@@ -313,6 +333,57 @@ def test_summary_row():
     print("test_state PASS")
 
 
+def test_build_document_smoke():
+    from helao.core.servers.data_browser.app import build_document
+    with tempfile.TemporaryDirectory() as d:
+        _make_finished_tree(d)
+        doc = Document()
+        vis = _FakeVis(d, doc)
+        build_document(vis)
+        assert len(doc.roots) >= 1, "build_document added no roots"
+    print("test_build_document_smoke PASS")
+
+
+def test_plot_tab_builds_traces():
+    from helao.core.servers.data_browser.app import _UI
+    with tempfile.TemporaryDirectory() as d:
+        _make_finished_tree(d)
+        doc = Document()
+        vis = _FakeVis(d, doc)
+        ui = _UI(vis, d, 50000)
+        ui.index_df = sources.get_index(d, "RUNS_FINISHED", None, None)
+        ui._refresh_index_table()
+        ui.index_source.selected.indices = [0]
+        ui._on_add()
+        assert len(ui.selected) == 1
+        assert set(ui.x_sel.options) == {"t_s", "Ewe_V"}
+        ui.x_sel.value, ui.y_sel.value = "t_s", "Ewe_V"
+        ui._rebuild_plot()
+        assert len(ui.plot.renderers) == 1, ui.plot.renderers
+    print("test_plot_tab_builds_traces PASS")
+
+
+def test_table_tab_summary_and_rows():
+    from helao.core.servers.data_browser.app import _UI
+    with tempfile.TemporaryDirectory() as d:
+        _make_finished_tree(d)
+        doc = Document()
+        vis = _FakeVis(d, doc)
+        ui = _UI(vis, d, 50000)
+        ui.index_df = sources.get_index(d, "RUNS_FINISHED", None, None)
+        ui._refresh_index_table()
+        ui.index_source.selected.indices = [0]
+        ui._on_add()
+        ui.x_sel.value, ui.y_sel.value = "t_s", "Ewe_V"
+        ui._rebuild_tables()
+        assert ui.summary_source.data["n_points"] == [2], ui.summary_source.data
+        ui.summary_source.selected.indices = [0]
+        ui._on_summary_select("indices", [], [0])
+        assert ui.rows_source.data["t_s"] == [0.0, 1.0], ui.rows_source.data
+        assert ui.rows_source.data["Ewe_V"] == [0.1, 0.2]
+    print("test_table_tab_summary_and_rows PASS")
+
+
 if __name__ == "__main__":
     test_read_hlo_file()
     test_read_json_columnar()
@@ -331,3 +402,6 @@ if __name__ == "__main__":
     test_available_columns_union_sorted()
     test_build_trace_and_downsample()
     test_summary_row()
+    test_build_document_smoke()
+    test_plot_tab_builds_traces()
+    test_table_tab_summary_and_rows()
