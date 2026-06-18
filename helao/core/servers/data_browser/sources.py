@@ -261,4 +261,34 @@ class DerivedSourceIndex(SourceIndex):
         return rows
 
     def _index_analyses(self, date_str, day):
-        raise NotImplementedError
+        rows = []
+        for ana_dir in sorted(p for p in day.iterdir() if p.is_dir()):
+            ymls = sorted(ana_dir.glob("*.yml"))
+            meta = _safe_yaml(ymls[0]) if ymls else {}
+            ana_name = meta.get("analysis_name", _seq_name(ana_dir.name))
+            sample = meta.get("global_sample_label") or ""
+            local_jsons = {p.name: p for p in ana_dir.glob("*.json")}
+            outputs = meta.get("outputs") or []
+            if outputs:
+                for out in outputs:
+                    key = ((out or {}).get("analysis_output_path") or {}).get("key", "")
+                    fn = posixpath.basename(key) if key else ""
+                    name = (out or {}).get("output_name") or fn
+                    local = local_jsons.get(fn)
+                    rows.append(_row(
+                        source="ANALYSES", sequence=ana_name, experiment="",
+                        node=name, technique=(out or {}).get("output_type", ""),
+                        sample=sample, run_type="", file_name=fn or name,
+                        file_type="json", date=date_str,
+                        available=local is not None,
+                        locator=str(local) if local is not None else "",
+                    ))
+            else:
+                for fn, p in local_jsons.items():
+                    rows.append(_row(
+                        source="ANALYSES", sequence=ana_name, experiment="",
+                        node=fn, technique="", sample=sample, run_type="",
+                        file_name=fn, file_type="json", date=date_str,
+                        available=True, locator=str(p),
+                    ))
+        return rows
