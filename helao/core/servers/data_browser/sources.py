@@ -139,3 +139,35 @@ class RunsSourceIndex(SourceIndex):
                             date=date_str, available=True, locator=str(f),
                         ))
         return rows
+
+    def _index_zips(self, date_str, day):
+        rows = []
+        for zip_path in sorted(day.glob("*.zip")):
+            seq_name = _seq_name(zip_path.stem)
+            try:
+                zf = zipfile.ZipFile(zip_path)
+            except zipfile.BadZipFile:
+                continue
+            with zf:
+                names = zf.namelist()
+                act_meta = {}
+                for n in names:
+                    if n.endswith("-act.yml"):
+                        act_meta[posixpath.dirname(n)] = _safe_yaml_bytes(zf.read(n))
+                for n in names:
+                    ext = posixpath.splitext(n)[1].lower()
+                    if ext not in DATA_EXTS:
+                        continue
+                    actdir = posixpath.dirname(n)
+                    meta = act_meta.get(actdir, {})
+                    rows.append(_row(
+                        source=self.source, sequence=seq_name,
+                        experiment=posixpath.basename(posixpath.dirname(actdir)),
+                        node=posixpath.basename(actdir),
+                        technique=meta.get("technique_name") or meta.get("action_name", ""),
+                        sample=_first_sample(meta), run_type=meta.get("run_type", ""),
+                        file_name=posixpath.basename(n), file_type=ext.lstrip("."),
+                        date=date_str, available=True,
+                        locator=make_zip_locator(str(zip_path), n),
+                    ))
+        return rows
