@@ -3,13 +3,11 @@
     PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async conda run -n helao \
         python -m helao.deploy.test.tests.test_data_browser
 """
-import io
 import json
 import os
 import tempfile
 import zipfile
 
-import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 

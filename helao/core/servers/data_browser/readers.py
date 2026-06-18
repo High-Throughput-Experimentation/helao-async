@@ -10,12 +10,15 @@ of header/metadata and ``data`` is ``{column_name: list}``. ``fmt`` (one of
 ``"hlo"``, ``"json"``, ``"parquet"``) overrides extension-based dispatch; pass it
 for files whose extension does not match their format (e.g. analysis JSON outputs
 named after an S3 key).
+
+A zip member locator uses ``::`` as the separator, so zip file paths containing
+``::`` are not supported (a non-issue on normal filesystems).
 """
 import io
 import json
 import os
 import zipfile
-from typing import Tuple
+from typing import Optional, Tuple
 
 import pyarrow.parquet as pq
 
@@ -29,7 +32,7 @@ def make_zip_locator(zip_path: str, member: str) -> str:
     return f"{ZIP_PREFIX}{zip_path}{ZIP_SEP}{member}"
 
 
-def parse_locator(locator: str):
+def parse_locator(locator: str) -> tuple:
     """Return ('file', path) or ('zip', zip_path, member)."""
     if locator.startswith(ZIP_PREFIX):
         zip_path, member = locator[len(ZIP_PREFIX):].split(ZIP_SEP, 1)
@@ -48,7 +51,7 @@ def _read_bytes(locator: str) -> Tuple[str, bytes]:
         return os.path.basename(parsed[1]), f.read()
 
 
-def read_dataset(locator: str, fmt: str = None) -> Tuple[dict, dict]:
+def read_dataset(locator: str, fmt: Optional[str] = None) -> Tuple[dict, dict]:
     """Read any supported column-bearing file into (meta, {column: list})."""
     file_name, content = _read_bytes(locator)
     if fmt is None:
