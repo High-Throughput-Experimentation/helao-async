@@ -207,6 +207,50 @@ def test_processes_index_missing_file_unavailable():
     print("test_processes_index PASS")
 
 
+def _make_analysis(root, with_local_output=True):
+    ana_dir = os.path.join(root, "ANALYSES", "26.25", "0618", "150305__icpms__plate1")
+    os.makedirs(ana_dir)
+    with open(os.path.join(ana_dir, "uuid1234.yml"), "w") as f:
+        yaml.safe_dump({
+            "analysis_name": "icpms",
+            "global_sample_label": "solid__lab1_1",
+            "outputs": [{
+                "analysis_output_path": {"bucket": "b", "key": "analysis/uuid1234/conc.json", "region": "r"},
+                "content_type": "application/json",
+                "output_type": "concentration",
+                "output_name": "conc",
+            }],
+        }, f)
+    if with_local_output:
+        with open(os.path.join(ana_dir, "conc.json"), "w") as f:
+            json.dump({"element": ["Ni", "Fe"], "ppm": [12.0, 3.4]}, f)
+
+
+def test_analyses_index_local():
+    with tempfile.TemporaryDirectory() as d:
+        _make_analysis(d, with_local_output=True)
+        df = sources.DerivedSourceIndex(d, "ANALYSES").index()
+        assert len(df) == 1, df
+        r = df.iloc[0]
+        assert r["source"] == "ANALYSES"
+        assert r["sequence"] == "icpms"
+        assert r["sample"] == "solid__lab1_1"
+        assert r["file_type"] == "json"
+        assert r["available"] is True
+        _, data = readers.read_dataset(r["locator"], r["file_type"])
+        assert data["ppm"] == [12.0, 3.4]
+
+
+def test_analyses_index_s3_only_unavailable():
+    with tempfile.TemporaryDirectory() as d:
+        _make_analysis(d, with_local_output=False)
+        df = sources.DerivedSourceIndex(d, "ANALYSES").index()
+        assert len(df) == 1
+        assert df.iloc[0]["available"] is False
+        assert df.iloc[0]["locator"] == ""
+    print("test_analyses_index PASS")
+
+
 if __name__ == "__main__":
     test_read_hlo_file()
     test_read_json_columnar()
@@ -218,3 +262,5 @@ if __name__ == "__main__":
     test_runs_synced_index()
     test_processes_index_resolves_to_runs()
     test_processes_index_missing_file_unavailable()
+    test_analyses_index_local()
+    test_analyses_index_s3_only_unavailable()
