@@ -406,7 +406,19 @@ def test_plot_replot_and_clear_safe():
     print("test_plot_replot_and_clear_safe PASS")
 
 
-if __name__ == "__main__":
+def test_shims_expose_makebokehapp():
+    import importlib
+    for mod in ("helao.deploy.hte.servers.visualizer.data_browser",
+                "helao.deploy.test.servers.visualizer.data_browser"):
+        m = importlib.import_module(mod)
+        assert hasattr(m, "makeBokehApp"), mod
+        import inspect
+        params = list(inspect.signature(m.makeBokehApp).parameters)
+        assert params == ["doc", "confPrefix", "server_key", "helao_repo_root"], (mod, params)
+    print("test_shims_expose_makebokehapp PASS")
+
+
+def run_all():
     test_read_hlo_file()
     test_read_json_columnar()
     test_read_json_records()
@@ -428,3 +440,9 @@ if __name__ == "__main__":
     test_plot_tab_builds_traces()
     test_table_tab_summary_and_rows()
     test_plot_replot_and_clear_safe()
+    test_shims_expose_makebokehapp()
+    print("ALL DATA_BROWSER TESTS PASS")
+
+
+if __name__ == "__main__":
+    run_all()
