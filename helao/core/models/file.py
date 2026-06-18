@@ -129,10 +129,10 @@ class FileInfo(BaseModel, HelaoDict):
         nosync (bool): True to exclude the file from data sync.
     """
 
-    file_type: Optional[str] = None
-    file_name: Optional[str] = None
-    data_keys: List[str] = Field(default=[])
-    sample: List[str] = Field(default=[])
     action_uuid: Optional[UUID] = None
     run_use: Optional[RunUse] = None
+    sample: List[str] = Field(default=[])
+    file_name: Optional[str] = None
+    file_type: Optional[str] = None
+    data_keys: List[str] = Field(default=[])
     nosync: bool = False
