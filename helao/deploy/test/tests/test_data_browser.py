@@ -165,6 +165,48 @@ def test_runs_synced_index():
     print("test_runs_synced_index PASS")
 
 
+def _make_process(root):
+    """Create a -prc.yml referencing the .hlo created by _make_finished_tree."""
+    prc_dir = os.path.join(
+        root, "PROCESSES", "26.25", "0618",
+        "141523__SDC_seq__lab1", "260618.141524__SDC_exp_CV",
+    )
+    os.makedirs(prc_dir)
+    with open(os.path.join(prc_dir, "0__abc__CV-prc.yml"), "w") as f:
+        yaml.safe_dump({
+            "technique_name": "CV",
+            "run_type": "data",
+            "samples_out": [{"global_label": "solid__lab1_1"}],
+            "files": [{"file_name": "cv_data.hlo", "file_type": "helao__file"}],
+        }, f)
+
+
+def test_processes_index_resolves_to_runs():
+    with tempfile.TemporaryDirectory() as d:
+        _make_finished_tree(d)   # the actual cv_data.hlo
+        _make_process(d)         # the -prc.yml that references it
+        df = sources.DerivedSourceIndex(d, "PROCESSES").index()
+        assert len(df) == 1, df
+        r = df.iloc[0]
+        assert r["source"] == "PROCESSES"
+        assert r["technique"] == "CV"
+        assert r["sample"] == "solid__lab1_1"
+        assert r["file_name"] == "cv_data.hlo"
+        assert r["available"] is True
+        _, data = readers.read_dataset(r["locator"], r["file_type"])
+        assert data["t_s"] == [0.0, 1.0]
+
+
+def test_processes_index_missing_file_unavailable():
+    with tempfile.TemporaryDirectory() as d:
+        _make_process(d)  # prc.yml but NO RUNS_FINISHED data
+        df = sources.DerivedSourceIndex(d, "PROCESSES").index()
+        assert len(df) == 1
+        assert df.iloc[0]["available"] is False
+        assert df.iloc[0]["locator"] == ""
+    print("test_processes_index PASS")
+
+
 if __name__ == "__main__":
     test_read_hlo_file()
     test_read_json_columnar()
@@ -174,3 +216,5 @@ if __name__ == "__main__":
     test_dir_walk_and_range()
     test_runs_finished_index()
     test_runs_synced_index()
+    test_processes_index_resolves_to_runs()
+    test_processes_index_missing_file_unavailable()

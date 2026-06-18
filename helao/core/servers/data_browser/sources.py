@@ -186,3 +186,79 @@ class RunsSourceIndex(SourceIndex):
                         locator=make_zip_locator(str(zip_path), n),
                     ))
         return rows
+
+
+def _resolve_run_file(root, date_str, seq_dirname, exp_dirname, file_name):
+    """Locate a data file by basename under RUNS_FINISHED tree or RUNS_SYNCED zip.
+
+    Returns (locator, available).
+    """
+    root = Path(root)
+    fin_seq = root / "RUNS_FINISHED" / date_str / seq_dirname
+    if fin_seq.is_dir():
+        for cand in fin_seq.glob(f"{exp_dirname}/*/{file_name}"):
+            return str(cand), True
+        for cand in fin_seq.rglob(file_name):
+            if cand.is_file():
+                return str(cand), True
+    zip_path = root / "RUNS_SYNCED" / date_str / f"{seq_dirname}.zip"
+    if zip_path.is_file():
+        try:
+            with zipfile.ZipFile(zip_path) as zf:
+                for n in zf.namelist():
+                    if posixpath.basename(n) == file_name:
+                        return make_zip_locator(str(zip_path), n), True
+        except zipfile.BadZipFile:
+            pass
+    return "", False
+
+
+class DerivedSourceIndex(SourceIndex):
+    """Index PROCESSES (-prc.yml referencing run files) or ANALYSES (local outputs)."""
+
+    def __init__(self, root, source):
+        # source is "PROCESSES" or "ANALYSES"
+        self.root = Path(root)
+        self.source = source
+        self.base = self.root / source
+
+    def list_dates(self):
+        return [d for d, _ in _list_day_dirs(self.base)]
+
+    def index(self, date_start=None, date_end=None):
+        rows = []
+        for date_str, day in _list_day_dirs(self.base):
+            if not _in_range(date_str, date_start, date_end):
+                continue
+            if self.source == "PROCESSES":
+                rows.extend(self._index_processes(date_str, day))
+            else:
+                rows.extend(self._index_analyses(date_str, day))
+        return _rows_to_index_df(rows)
+
+    def _index_processes(self, date_str, day):
+        rows = []
+        for prc_yml in sorted(day.glob("*/*/*-prc.yml")):
+            exp_dir = prc_yml.parent
+            seq_dir = exp_dir.parent
+            meta = _safe_yaml(prc_yml)
+            technique = meta.get("technique_name", "")
+            sample = _first_sample(meta)
+            run_type = meta.get("run_type", "")
+            for fi in meta.get("files") or []:
+                fn = (fi or {}).get("file_name", "")
+                if not fn or posixpath.splitext(fn)[1].lower() not in DATA_EXTS:
+                    continue
+                locator, available = _resolve_run_file(
+                    self.root, date_str, seq_dir.name, exp_dir.name, fn)
+                rows.append(_row(
+                    source="PROCESSES", sequence=_seq_name(seq_dir.name),
+                    experiment=exp_dir.name, node=prc_yml.stem,
+                    technique=technique, sample=sample, run_type=run_type,
+                    file_name=fn, file_type=posixpath.splitext(fn)[1].lower().lstrip("."),
+                    date=date_str, available=available, locator=locator,
+                ))
+        return rows
+
+    def _index_analyses(self, date_str, day):
+        raise NotImplementedError
