@@ -37,5 +37,53 @@ def test_read_hlo_file():
     print("test_read_hlo_file PASS")
 
 
+def test_read_json_columnar():
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "out.json")
+        with open(p, "w") as f:
+            json.dump({"wl_nm": [400, 500], "abs": [0.1, 0.2], "note": "x"}, f)
+        meta, data = readers.read_dataset(p, fmt="json")
+        assert data == {"wl_nm": [400, 500], "abs": [0.1, 0.2]}, data
+        assert meta == {"note": "x"}, meta
+    print("test_read_json_columnar PASS")
+
+
+def test_read_json_records():
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "recs.json")
+        with open(p, "w") as f:
+            json.dump([{"a": 1, "b": 2}, {"a": 3, "b": 4}], f)
+        _, data = readers.read_dataset(p, fmt="json")
+        assert data == {"a": [1, 3], "b": [2, 4]}, data
+    print("test_read_json_records PASS")
+
+
+def test_read_parquet():
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "pat.parquet")
+        table = pa.table({"q": [1.0, 2.0], "I": [10.0, 20.0]})
+        pq.write_table(table, p)
+        _, data = readers.read_dataset(p)
+        assert data == {"q": [1.0, 2.0], "I": [10.0, 20.0]}, data
+    print("test_read_parquet PASS")
+
+
+def test_read_hlo_from_zip():
+    with tempfile.TemporaryDirectory() as d:
+        hlo = os.path.join(d, "cv_data.hlo")
+        _write_hlo(hlo)
+        zip_path = os.path.join(d, "seq.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.write(hlo, "exp/act/cv_data.hlo")
+        loc = readers.make_zip_locator(zip_path, "exp/act/cv_data.hlo")
+        _, data = readers.read_dataset(loc, fmt="hlo")
+        assert data["t_s"] == [0.0, 1.0], data
+    print("test_read_hlo_from_zip PASS")
+
+
 if __name__ == "__main__":
     test_read_hlo_file()
+    test_read_json_columnar()
+    test_read_json_records()
+    test_read_parquet()
+    test_read_hlo_from_zip()
