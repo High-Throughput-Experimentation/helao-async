@@ -263,6 +263,24 @@ def test_get_index_dispatch():
     print("test_get_index_dispatch PASS")
 
 
+def test_load_selected_end_to_end():
+    with tempfile.TemporaryDirectory() as d:
+        _make_finished_tree(d)
+        _make_process(d)  # adds an unavailable-resolves-to-available process row too
+        df = sources.get_index(d, "RUNS_FINISHED", None, None)
+        datasets, skipped = dbstate.load_selected(df, [0])
+        assert len(datasets) == 1 and not skipped, (datasets, skipped)
+        ds = datasets[0]
+        assert ds.data["t_s"] == [0.0, 1.0]
+        assert dbstate.available_columns(datasets) == ["Ewe_V", "t_s"]
+
+        # an unavailable row is skipped, not loaded
+        ana = sources.get_index(d, "ANALYSES", None, None)  # empty
+        ds2, sk2 = dbstate.load_selected(ana, [])
+        assert ds2 == [] and sk2 == []
+    print("test_load_selected_end_to_end PASS")
+
+
 def _ds(label, data, **kw):
     base = dict(locator="L", source="RUNS_FINISHED", sequence="s", experiment="e",
                 node="n", technique="CV", sample="smp", file_name="f.hlo", meta={})
@@ -309,6 +327,7 @@ if __name__ == "__main__":
     test_analyses_index_local()
     test_analyses_index_s3_only_unavailable()
     test_get_index_dispatch()
+    test_load_selected_end_to_end()
     test_available_columns_union_sorted()
     test_build_trace_and_downsample()
     test_summary_row()
