@@ -10,8 +10,10 @@ import zipfile
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import yaml
 
 from helao.core.servers.data_browser import readers
+from helao.core.servers.data_browser import sources
 
 
 def _write_hlo(path):
@@ -79,9 +81,23 @@ def test_read_hlo_from_zip():
     print("test_read_hlo_from_zip PASS")
 
 
+def test_dir_walk_and_range():
+    with tempfile.TemporaryDirectory() as d:
+        base = os.path.join(d, "RUNS_FINISHED")
+        for ww, mmdd in [("26.20", "0515"), ("26.25", "0618")]:
+            os.makedirs(os.path.join(base, ww, mmdd))
+        dates = [ds for ds, _ in sources._list_day_dirs(base)]
+        assert dates == ["26.20/0515", "26.25/0618"], dates
+        assert sources._in_range("26.25/0618", "26.22", "26.30") is True
+        assert sources._in_range("26.20/0515", "26.22", "26.30") is False
+        assert sources._in_range("26.25/0618", None, None) is True
+    print("test_dir_walk_and_range PASS")
+
+
 if __name__ == "__main__":
     test_read_hlo_file()
     test_read_json_columnar()
     test_read_json_records()
     test_read_parquet()
     test_read_hlo_from_zip()
+    test_dir_walk_and_range()
