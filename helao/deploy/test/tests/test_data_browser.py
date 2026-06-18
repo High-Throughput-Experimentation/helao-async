@@ -94,6 +94,43 @@ def test_dir_walk_and_range():
     print("test_dir_walk_and_range PASS")
 
 
+def _make_finished_tree(root):
+    """Create root/RUNS_FINISHED/26.25/0618/<seq>/<exp>/<act>/ with an .hlo + act.yml."""
+    act_dir = os.path.join(
+        root, "RUNS_FINISHED", "26.25", "0618",
+        "141523__SDC_seq__lab1", "260618.141524__SDC_exp_CV",
+        "1__0__sim__cv",
+    )
+    os.makedirs(act_dir)
+    _write_hlo(os.path.join(act_dir, "cv_data.hlo"))
+    with open(os.path.join(act_dir, "260618.141525-act.yml"), "w") as f:
+        yaml.safe_dump({
+            "technique_name": "CV",
+            "run_type": "data",
+            "samples_out": [{"global_label": "solid__lab1_1"}],
+        }, f)
+
+
+def test_runs_finished_index():
+    with tempfile.TemporaryDirectory() as d:
+        _make_finished_tree(d)
+        idx = sources.RunsSourceIndex(d, "FINISHED")
+        df = idx.index()
+        assert list(df.columns) == sources.INDEX_COLUMNS, list(df.columns)
+        assert len(df) == 1, df
+        r = df.iloc[0]
+        assert r["source"] == "RUNS_FINISHED"
+        assert r["sequence"] == "SDC_seq"
+        assert r["technique"] == "CV"
+        assert r["sample"] == "solid__lab1_1"
+        assert r["file_name"] == "cv_data.hlo"
+        assert r["file_type"] == "hlo"
+        assert r["available"] is True
+        _, data = readers.read_dataset(r["locator"], r["file_type"])
+        assert data["t_s"] == [0.0, 1.0]
+    print("test_runs_finished_index PASS")
+
+
 if __name__ == "__main__":
     test_read_hlo_file()
     test_read_json_columnar()
@@ -101,3 +138,4 @@ if __name__ == "__main__":
     test_read_parquet()
     test_read_hlo_from_zip()
     test_dir_walk_and_range()
+    test_runs_finished_index()
