@@ -384,6 +384,28 @@ def test_table_tab_summary_and_rows():
     print("test_table_tab_summary_and_rows PASS")
 
 
+def test_plot_replot_and_clear_safe():
+    from helao.core.servers.data_browser.app import _UI
+    with tempfile.TemporaryDirectory() as d:
+        _make_finished_tree(d)
+        doc = Document()
+        ui = _UI(_FakeVis(d, doc), d, 50000)
+        ui.index_df = sources.get_index(d, "RUNS_FINISHED", None, None)
+        ui._refresh_index_table()
+        ui.index_source.selected.indices = [0]
+        ui._on_add()
+        ui.x_sel.value, ui.y_sel.value = "t_s", "Ewe_V"
+        ui._rebuild_plot()
+        ui._rebuild_plot()  # replot: exercises legend-clear path twice
+        assert len(ui.plot.renderers) == 1
+        # select a summary row, then clear -> stale summary index must not raise
+        ui.summary_source.selected.indices = [0]
+        ui._on_clear()
+        ui._on_summary_select("indices", [], [0])
+        assert ui.selected == []
+    print("test_plot_replot_and_clear_safe PASS")
+
+
 if __name__ == "__main__":
     test_read_hlo_file()
     test_read_json_columnar()
@@ -405,3 +427,4 @@ if __name__ == "__main__":
     test_build_document_smoke()
     test_plot_tab_builds_traces()
     test_table_tab_summary_and_rows()
+    test_plot_replot_and_clear_safe()

@@ -1,10 +1,9 @@
 """Bokeh document builder for the data browser visualizer."""
-from functools import partial
 from socket import gethostname
 
 from bokeh.layouts import column, row
 from bokeh.models import (
-    Button, ColumnDataSource, DataTable, Div, MultiSelect, RadioButtonGroup,
+    Button, ColumnDataSource, DataTable, Div, RadioButtonGroup,
     Select, Spacer, TableColumn, Tabs, TabPanel, TextInput,
 )
 from bokeh.palettes import Category10
@@ -14,6 +13,8 @@ from helao.core.servers.data_browser import sources, state as dbstate
 
 INDEX_TABLE_COLS = ["source", "sequence", "experiment", "node", "technique",
                     "sample", "run_type", "file_name", "file_type", "available"]
+FILTER_COLS = ["source", "sequence", "experiment", "node", "technique",
+               "sample", "run_type", "file_name", "date"]
 PALETTE = Category10[10]
 
 
@@ -87,7 +88,7 @@ class _UI:
         self.type_sel = Select(title="Type", options=["line", "scatter"],
                                value="line", width=120)
         for w in (self.x_sel, self.y_sel, self.type_sel):
-            w.on_change("value", lambda a, o, n: self._rebuild_plot())
+            w.on_change("value", self._on_axis_change)
         self.plot = figure(height=380, width=560, tools="pan,box_zoom,wheel_zoom,reset,save")
         plot_panel = TabPanel(child=column(row(self.x_sel, self.y_sel, self.type_sel),
                                             self.plot), title="Plot")
@@ -118,6 +119,9 @@ class _UI:
                 self.x_sel.value = cols[0]
             if self.y_sel.value not in cols:
                 self.y_sel.value = cols[1] if len(cols) > 1 else cols[0]
+
+    def _on_axis_change(self, attr, old, new):
+        self._rebuild_plot()
 
     def _rebuild_plot(self):
         self.plot.renderers = []
@@ -151,7 +155,7 @@ class _UI:
         self.rows_table.columns = []
 
     def _on_summary_select(self, attr, old, new):
-        if not new:
+        if not new or new[0] >= len(self.selected):
             return
         ds = self.selected[new[0]]
         self.rows_source.data = {k: list(v) for k, v in ds.data.items()}
@@ -186,8 +190,7 @@ class _UI:
         q = self.filter_in.value.strip().lower()
         if not q:
             return self.index_df
-        cols = ["source", "sequence", "experiment", "node", "technique",
-                "sample", "run_type", "file_name", "date"]
+        cols = FILTER_COLS
         mask = self.index_df[cols].astype(str).apply(
             lambda r: q in " ".join(r.values).lower(), axis=1)
         return self.index_df[mask]
