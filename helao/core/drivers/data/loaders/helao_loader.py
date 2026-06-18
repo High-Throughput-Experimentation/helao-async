@@ -17,6 +17,7 @@ import sshtunnel
 import pandas as pd
 from sqlmodel import Session, text, create_engine
 from helao.core.models.credentials import HelaoCredentials
+from helao.core.drivers.data.loaders.model_base import HelaoDataModelMixin
 
 
 class HelaoSolid:
@@ -103,58 +104,8 @@ class HelaoModel:
         return LOADER.get_sql(self.helao_type, self.uuid)
 
 
-class HelaoDataModel(HelaoModel):
+class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
     """``HelaoModel`` mixed with HLO-data accessors for action and process records."""
-
-    @property
-    def data_files(self) -> list:
-        """Entries in ``files`` that are HLO or JSON data payloads."""
-        meta = self.json
-        file_list = meta.get("files", [])
-        hlo_files = [
-            x
-            for x in file_list
-            if x["file_name"].endswith(".hlo")
-            or x["file_name"].endswith(".json")
-            or x["file_type"] in ["helao__json_file", "json__file"]
-        ]
-        return hlo_files
-
-    @property
-    def other_files(self) -> list:
-        """Entries in ``files`` that are not classified as data files."""
-        meta = self.json
-        file_list = meta.get("files", [])
-        other_files = [x for x in file_list if x not in self.data_files]
-        return other_files
-
-    def hlo_file_tup_type(self, contains: str = "") -> list:
-        """Return ``[file_name, file_type, data_keys]`` for the primary ``.hlo`` file.
-
-        Args:
-            contains: Optional substring filter applied to ``file_type``.
-
-        Returns:
-            A three-element list, or three empty values if no match.
-        """
-        hlo_files = [x for x in self.data_files if x["file_name"].endswith(".hlo")]
-        if contains:
-            hlo_files = [x for x in hlo_files if contains in x["file_type"]]
-        if not hlo_files:
-            return "", "", []
-        first_hlo = hlo_files[0]
-        retkeys = ["file_name", "file_type", "data_keys"]
-        return [first_hlo.get(k, "") for k in retkeys]
-
-    @property
-    def hlo_file_tup(self) -> list:
-        """``hlo_file_tup_type()`` with no ``contains`` filter."""
-        return self.hlo_file_tup_type()
-
-    @property
-    def hlo_file(self) -> dict:
-        """First entry from ``data_files`` (the primary HLO/JSON file)."""
-        return self.data_files[0]
 
     @property
     def hlo(self) -> dict:

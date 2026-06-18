@@ -7,19 +7,19 @@ content via :class:`helao.helpers.file_mapper.FileMapper`.
 """
 
 import os
-import json
 from io import BytesIO
 from glob import glob
 from uuid import UUID
 from datetime import datetime
 from zipfile import ZipFile
-from collections import defaultdict
 from typing import Optional
 
 import pandas as pd
 
 from helao.helpers.yml_tools import yml_load
 from helao.helpers.file_mapper import FileMapper
+from helao.helpers.hlo_data import read_hlo_bytes
+from helao.core.drivers.data.loaders.model_base import HelaoDataModelMixin
 
 
 def parse_seq_path(ymlp, target) -> tuple:
@@ -452,22 +452,8 @@ class LocalLoader:
         if self.target.endswith(".zip"):
             hlotarget = "/".join([os.path.dirname(yml_path), hlo_fn])
             with ZipFile(self.target, "r") as zf:
-                lines = zf.open(hlotarget).readlines()
-
-            lines = [x.decode("UTF-8").replace("\r\n", "\n") for x in lines]
-            sep_index = lines.index("%%\n")
-            meta = yml_load("".join(lines[:sep_index]))
-
-            data = defaultdict(list)
-            for line in lines[sep_index + 1 :]:
-                line_dict = json.loads(line)
-                # print(line_dict)
-                for k, v in line_dict.items():
-                    if isinstance(v, list):
-                        data[k] += v
-                    else:
-                        data[k].append(v)
-            return meta, data
+                content = zf.open(hlotarget).read()
+            return read_hlo_bytes(content)
         else:
             # return read_hlo(os.path.join(os.path.dirname(yml_path), hlo_fn))
             FM = FileMapper(yml_path)
@@ -571,58 +557,8 @@ class HelaoModel:
         return self.meta_dict
 
 
-class HelaoDataModel(HelaoModel):
+class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
     """``HelaoModel`` mixed with HLO-data accessors for action and process records."""
-
-    @property
-    def data_files(self) -> list:
-        """Entries in ``files`` that are HLO or JSON data payloads."""
-        meta = self.json
-        file_list = meta.get("files", [])
-        hlo_files = [
-            x
-            for x in file_list
-            if x["file_name"].endswith(".hlo")
-            or x["file_name"].endswith(".json")
-            or x["file_type"] in ["helao__json_file", "json__file"]
-        ]
-        return hlo_files
-
-    @property
-    def other_files(self) -> list:
-        """Entries in ``files`` that are not classified as data files."""
-        meta = self.json
-        file_list = meta.get("files", [])
-        other_files = [x for x in file_list if x not in self.data_files]
-        return other_files
-
-    def hlo_file_tup_type(self, contains: str = "") -> list:
-        """Return ``[file_name, file_type, data_keys]`` for the primary ``.hlo`` file.
-
-        Args:
-            contains: Optional substring filter applied to ``file_type``.
-
-        Returns:
-            A three-element list, or three empty values if no match.
-        """
-        hlo_files = [x for x in self.data_files if x["file_name"].endswith(".hlo")]
-        if contains:
-            hlo_files = [x for x in hlo_files if contains in x["file_type"]]
-        if not hlo_files:
-            return "", "", []
-        first_hlo = hlo_files[0]
-        retkeys = ["file_name", "file_type", "data_keys"]
-        return [first_hlo.get(k, "") for k in retkeys]
-
-    @property
-    def hlo_file_tup(self) -> list:
-        """``hlo_file_tup_type()`` with no ``contains`` filter."""
-        return self.hlo_file_tup_type()
-
-    @property
-    def hlo_file(self) -> dict:
-        """First entry from ``data_files`` (the primary HLO/JSON file)."""
-        return self.data_files[0]
 
     @property
     def hlo(self) -> tuple:
@@ -801,150 +737,3 @@ class HelaoProcess(HelaoModel):
         fm = FileMapper(self.yml_path)
         return fm.read_bytes(relative_path)
 
-
-class EcheUvisLoader(LocalLoader):
-    """``LocalLoader`` specialization for ECHEUVIS process data retrieval."""
-
-    def __init__(self, data_path: str):
-        """Initialize the underlying ``LocalLoader`` with ``data_path``."""
-        super().__init__(data_path)
-
-    def get_recent(
-        self,
-        query: str,
-        min_date: str = "2023-04-26",
-        plate_id: Optional[int] = None,
-        sample_no: Optional[int] = None,
-    ) -> pd.DataFrame:
-        """Run an ECHEUVIS query filtered by date and optionally plate/sample.
-
-        Annotates the result with ``plate_id`` / ``sample_no`` extracted from
-        each row's ``global_label``, backfilling solids from the parent
-        sequence params when needed. Cached results may be re-sliced from a
-        broader earlier query rather than re-issued.
-
-        Args:
-            query: Base SQL query (conditions are appended).
-            min_date: ``YYYY-MM-DD`` lower bound on ``process_timestamp``.
-            plate_id: Optional plate-id filter.
-            sample_no: Optional sample-no filter.
-
-        Returns:
-            Filtered frame sorted by ``process_timestamp`` with reset index.
-        """
-        conditions = []
-        conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
-        recent_md = sorted(
-            [md for md, pi, sn in self.recent_cache if pi is None and sn is None]
-        )
-        recent_mdpi = sorted(
-            [md for md, pi, sn in self.recent_cache if pi == plate_id and sn is None]
-        )
-        recent_mdsn = sorted(
-            [md for md, pi, sn in self.recent_cache if pi is None and sn == sample_no]
-        )
-        query_parts = ""
-        if plate_id is not None:
-            query_parts += f" & plate_id=={plate_id}"
-        if sample_no is not None:
-            query_parts += f" & sample_no=={sample_no}"
-
-        if (
-            min_date,
-            plate_id,
-            sample_no,
-        ) not in self.recent_cache or not self.cache_sql:
-            data = self.run_raw_query(query + "\n".join(conditions))
-            pdf = pd.DataFrame(data)
-            # print("!!! dataframe shape:", pdf.shape)
-            # print("!!! dataframe cols:", pdf.columns)
-            pdf["plate_id"] = pdf.global_label.apply(
-                lambda x: (
-                    int(x.split("_")[-2]) if "solid" in x and "None" not in x else None
-                )
-            )
-            pdf["sample_no"] = pdf.global_label.apply(
-                lambda x: (
-                    int(x.split("_")[-1]) if "solid" in x and "None" not in x else None
-                )
-            )
-            # assign solid samples from sequence params
-            for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
-                subdf = pdf.query("sequence_uuid==@suuid")
-                spars = subdf.iloc[0]["sequence_params"]
-                pid = spars["plate_id"]
-                solid_samples = spars["plate_sample_no_list"]
-                assemblies = sorted(
-                    set(
-                        subdf.query(
-                            "global_label.str.contains('assembly')"
-                        ).global_label
-                    )
-                )
-                for slab, alab in zip(solid_samples, assemblies):
-                    pdf.loc[
-                        pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
-                        "plate_id",
-                    ] = pid
-                    pdf.loc[
-                        pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
-                        "sample_no",
-                    ] = slab
-            # self.recent_cache[
-            #     (
-            #         min_date,
-            #         plate_id,
-            #         sample_no,
-            #     )
-            # ] = pdf.sort_values("process_timestamp")
-
-        elif recent_md and min_date >= recent_md[0]:
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = self.recent_cache[
-                (
-                    recent_md[0],
-                    None,
-                    None,
-                )
-            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-        elif recent_mdpi and min_date >= recent_mdpi[0]:
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = self.recent_cache[
-                (
-                    recent_mdpi[0],
-                    plate_id,
-                    None,
-                )
-            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-        elif recent_mdsn and min_date >= recent_mdsn[0]:
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = self.recent_cache[
-                (
-                    recent_mdsn[0],
-                    None,
-                    sample_no,
-                )
-            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-
-        return self.recent_cache[
-            (
-                min_date,
-                plate_id,
-                sample_no,
-            )
-        ].reset_index(drop=True)

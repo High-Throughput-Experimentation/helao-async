@@ -10,6 +10,42 @@ from helao.core.drivers.data.loaders.helao_loader import HelaoLoader
 LOADER: HelaoLoader = None
 
 
+def _annotate_plate_sample(pdf: pd.DataFrame) -> pd.DataFrame:
+    """Add ``plate_id``/``sample_no`` columns derived from each row's global label.
+
+    The two values are parsed from the trailing fields of a ``solid`` global
+    label; rows whose sample number can't be parsed are backfilled from the
+    owning sequence's ``plate_id`` / ``plate_sample_no_list`` params. Mutates
+    and returns ``pdf``.
+
+    Args:
+        pdf: Query-result frame with ``global_label``, ``sequence_uuid`` and
+            ``sequence_params`` columns.
+
+    Returns:
+        The same frame with ``plate_id`` and ``sample_no`` columns populated.
+    """
+    pdf["plate_id"] = pdf.global_label.apply(
+        lambda x: int(x.split("_")[-2]) if "solid" in x and "None" not in x else None
+    )
+    pdf["sample_no"] = pdf.global_label.apply(
+        lambda x: int(x.split("_")[-1]) if "solid" in x and "None" not in x else None
+    )
+    for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
+        subdf = pdf.query("sequence_uuid==@suuid")
+        spars = subdf.iloc[0]["sequence_params"]
+        pid = spars["plate_id"]
+        solid_samples = spars["plate_sample_no_list"]
+        assemblies = sorted(
+            set(subdf.query("global_label.str.contains('assembly')").global_label)
+        )
+        for slab, alab in zip(solid_samples, assemblies):
+            idx = pdf.query("sequence_uuid==@suuid & global_label==@alab").index
+            pdf.loc[idx, "plate_id"] = pid
+            pdf.loc[idx, "sample_no"] = slab
+    return pdf
+
+
 class EcheUvisLoader(HelaoLoader):
     """``HelaoLoader`` extended with ECHEUVIS-specific queries.
 
@@ -77,36 +113,8 @@ class EcheUvisLoader(HelaoLoader):
         pdf = pd.DataFrame(data)
         print("!!! dataframe shape:", pdf.shape)
         print("!!! dataframe cols:", pdf.columns)
-        pdf["plate_id"] = pdf.global_label.apply(
-            lambda x: (
-                int(x.split("_")[-2]) if "solid" in x and "None" not in x else None
-            )
-        )
-        pdf["sample_no"] = pdf.global_label.apply(
-            lambda x: (
-                int(x.split("_")[-1]) if "solid" in x and "None" not in x else None
-            )
-        )
-        # assign solid samples from sequence params
-        for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
-            subdf = pdf.query("sequence_uuid==@suuid")
-            spars = subdf.iloc[0]["sequence_params"]
-            pid = spars["plate_id"]
-            solid_samples = spars["plate_sample_no_list"]
-            assemblies = sorted(
-                set(subdf.query("global_label.str.contains('assembly')").global_label)
-            )
-            for slab, alab in zip(solid_samples, assemblies):
-                pdf.loc[
-                    pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
-                    "plate_id",
-                ] = pid
-                pdf.loc[
-                    pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
-                    "sample_no",
-                ] = slab
-
-            return pdf.sort_values("process_timestamp").reset_index(drop=True)
+        pdf = _annotate_plate_sample(pdf)
+        return pdf.sort_values("process_timestamp").reset_index(drop=True)
 
     def get_recent(
         self,
@@ -134,26 +142,12 @@ class EcheUvisLoader(HelaoLoader):
         """
         conditions = []
         conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
-        # recent_md = sorted(
-        #     [md for md, pi, sn in self.recent_cache if pi is None and sn is None]
-        # )
-        # recent_mdpi = sorted(
-        #     [md for md, pi, sn in self.recent_cache if pi == plate_id and sn is None]
-        # )
-        # recent_mdsn = sorted(
-        #     [md for md, pi, sn in self.recent_cache if pi is None and sn == sample_no]
-        # )
         query_parts = ""
         if plate_id is not None:
             query_parts += f" & plate_id=={plate_id}"
         if sample_no is not None:
             query_parts += f" & sample_no=={sample_no}"
 
-        # if (
-        #     min_date,
-        #     plate_id,
-        #     sample_no,
-        # ) not in self.recent_cache or not self.cache_sql:
         tries = 0
         data = None
         while tries < sql_query_retries:
@@ -170,96 +164,9 @@ class EcheUvisLoader(HelaoLoader):
         pdf = pd.DataFrame(data)
         print("!!! dataframe shape:", pdf.shape)
         print("!!! dataframe cols:", pdf.columns)
-        pdf["plate_id"] = pdf.global_label.apply(
-            lambda x: (
-                int(x.split("_")[-2]) if "solid" in x and "None" not in x else None
-            )
+        pdf = _annotate_plate_sample(pdf)
+        return (
+            pdf.query(f"process_timestamp >= '{min_date}'" + query_parts)
+            .sort_values("process_timestamp")
+            .reset_index(drop=True)
         )
-        pdf["sample_no"] = pdf.global_label.apply(
-            lambda x: (
-                int(x.split("_")[-1]) if "solid" in x and "None" not in x else None
-            )
-        )
-        # assign solid samples from sequence params
-        for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
-            subdf = pdf.query("sequence_uuid==@suuid")
-            spars = subdf.iloc[0]["sequence_params"]
-            pid = spars["plate_id"]
-            solid_samples = spars["plate_sample_no_list"]
-            assemblies = sorted(
-                set(subdf.query("global_label.str.contains('assembly')").global_label)
-            )
-            for slab, alab in zip(solid_samples, assemblies):
-                pdf.loc[
-                    pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
-                    "plate_id",
-                ] = pid
-                pdf.loc[
-                    pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
-                    "sample_no",
-                ] = slab
-
-            # self.recent_cache[
-            #     (
-            #         min_date,
-            #         plate_id,
-            #         sample_no,
-            #     )
-            # ] = pdf.sort_values("process_timestamp")
-
-            return (
-                pdf.query(f"process_timestamp >= '{min_date}'" + query_parts)
-                .sort_values("process_timestamp")
-                .reset_index(drop=True)
-            )
-
-        # elif recent_md and min_date >= recent_md[0]:
-        #     self.recent_cache[
-        #         (
-        #             min_date,
-        #             plate_id,
-        #             sample_no,
-        #         )
-        #     ] = self.recent_cache[
-        #         (
-        #             recent_md[0],
-        #             None,
-        #             None,
-        #         )
-        #     ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-        # elif recent_mdpi and min_date >= recent_mdpi[0]:
-        #     self.recent_cache[
-        #         (
-        #             min_date,
-        #             plate_id,
-        #             sample_no,
-        #         )
-        #     ] = self.recent_cache[
-        #         (
-        #             recent_mdpi[0],
-        #             plate_id,
-        #             None,
-        #         )
-        #     ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-        # elif recent_mdsn and min_date >= recent_mdsn[0]:
-        #     self.recent_cache[
-        #         (
-        #             min_date,
-        #             plate_id,
-        #             sample_no,
-        #         )
-        #     ] = self.recent_cache[
-        #         (
-        #             recent_mdsn[0],
-        #             None,
-        #             sample_no,
-        #         )
-        #     ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-
-        # return self.recent_cache[
-        #     (
-        #         min_date,
-        #         plate_id,
-        #         sample_no,
-        #     )
-        # ].reset_index(drop=True)
