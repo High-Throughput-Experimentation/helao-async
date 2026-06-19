@@ -302,6 +302,77 @@ def test_shim_exposes_makebokehapp():
     print("test_shim_exposes_makebokehapp PASS")
 
 
+def test_orch_run_id_sharing():
+    from helao.core.servers.orch import Orch
+    from helao.helpers.premodels import Sequence
+    from helao.helpers.zdeque import zdeque
+
+    orch = Orch.__new__(Orch)
+    orch.sequence_dq = zdeque([])
+    orch.active_run_id = None
+    orch.sequence_codehash_lib = {}
+    orch.sequence_codepath_lib = {}
+    orch.sequence_lib = {}
+
+    s1 = Sequence(sequence_name="seq0")
+    asyncio.run(orch.add_sequence(s1))
+    assert s1.run_id is not None
+    r1 = s1.run_id
+
+    s2 = Sequence(sequence_name="seq0")
+    asyncio.run(orch.add_sequence(s2))
+    assert s2.run_id == r1, "non-empty queue should reuse in-flight run_id"
+
+    # simulate clear_sequences emptying the dq -> next add gets a fresh run_id
+    orch.sequence_dq = zdeque([])
+    s3 = Sequence(sequence_name="seq0")
+    asyncio.run(orch.add_sequence(s3))
+    assert s3.run_id != r1, "cleared/empty queue should start a new run_id"
+    print("test_orch_run_id_sharing PASS")
+
+
+def test_orch_resolve_active_run_id():
+    from helao.core.servers.orch import Orch
+    from helao.helpers.premodels import Sequence
+    from helao.helpers.time_utils import gen_uuid
+
+    orch = Orch.__new__(Orch)
+    orch.active_run_id = None
+
+    rid = gen_uuid()
+    s = Sequence(sequence_name="x")
+    s.run_id = rid
+    orch._resolve_active_run_id(s)
+    assert orch.active_run_id == rid, "active_run_id should follow the sequence"
+
+    s2 = Sequence(sequence_name="y")
+    orch._resolve_active_run_id(s2)
+    assert s2.run_id == rid, "sequence without run_id inherits active_run_id"
+    print("test_orch_resolve_active_run_id PASS")
+
+
+def test_orch_split_run_id():
+    from helao.core.servers.orch import Orch
+    from helao.helpers.premodels import Sequence
+    from helao.helpers.zdeque import zdeque
+
+    orch = Orch.__new__(Orch)
+    orch.sequence_dq = zdeque([])
+    orch.active_run_id = None
+    orch.sequence_codehash_lib = {}
+    orch.sequence_codepath_lib = {}
+    orch.sequence_lib = {}
+    orch.server_params = {"split_by_seq_params": ["plate_sample_no"]}
+
+    seq = Sequence(sequence_name="seq0")
+    seq.sequence_params = {"plate_sample_no": [1, 2, 3]}
+    uuids = asyncio.run(orch.add_split_sequences(seq))
+    assert len(uuids) == 3, uuids
+    run_ids = {s.run_id for s in orch.sequence_dq}
+    assert len(run_ids) == 1 and None not in run_ids, run_ids
+    print("test_orch_split_run_id PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -310,6 +381,9 @@ def run_all():
     test_operator_tables_from_backend()
     test_plate_api_disabled_by_default()
     test_shim_exposes_makebokehapp()
+    test_orch_run_id_sharing()
+    test_orch_resolve_active_run_id()
+    test_orch_split_run_id()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
 
