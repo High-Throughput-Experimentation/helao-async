@@ -727,6 +727,34 @@ def test_uuid_truncation_in_queue_tables():
     print("test_uuid_truncation_in_queue_tables PASS")
 
 
+def test_param_key_uses_name_not_title():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    op.sequence_dropdown.value = "seq0"  # already selected in __init__; param is "x"
+    inp = op.seq_param_input[0]
+    assert inp.title == ""
+    assert inp.name == "x"
+    op.populate_sequence(prepend=False)
+    assert "x" in op.plan[0].sequence_params  # keyed by .name, not .title
+    op.cleanup_session(None)
+    print("test_param_key_uses_name_not_title PASS")
+
+
+def test_find_input_matches_name():
+    from bokeh.document import Document
+    from bokeh.models.widgets.inputs import TextInput
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    probe = TextInput(value="", title="", name="solid_sample_no")
+    assert op.find_input([probe], "solid_sample_no") is probe
+    assert op.find_input([probe], "missing") is None
+    op.cleanup_session(None)
+    print("test_find_input_matches_name PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -735,6 +763,8 @@ def run_all():
     test_operator_tables_from_backend()
     test_uuid_truncation_in_queue_tables()
     test_plate_api_disabled_by_default()
+    test_param_key_uses_name_not_title()
+    test_find_input_matches_name()
     test_shim_exposes_makebokehapp()
     test_orch_run_id_sharing()
     test_orch_resolve_active_run_id()
