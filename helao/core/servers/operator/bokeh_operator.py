@@ -37,7 +37,7 @@ from helao.core.servers.vis import Vis
 from helao.core.models.orchstatus import LoopStatus
 from helao.helpers.premodels import Sequence, Experiment
 
-from bokeh.layouts import column
+from bokeh.layouts import column, row
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 from bokeh.models import DataTable, TableColumn
@@ -789,7 +789,16 @@ class BokehOperator:
                                 height=15,
                             ),
                         ],
-                        [self.planhistory_tabs],
+                        [
+                            row(
+                                column(self.planhistory_tabs,
+                                       sizing_mode="stretch_width"),
+                                column(self.planhistory_tree_header,
+                                       self.planhistory_tree_div,
+                                       sizing_mode="stretch_width"),
+                                sizing_mode="stretch_width",
+                            ),
+                        ],
                         [
                             self.button_plan_move_up,
                             Spacer(width=5),
@@ -804,7 +813,16 @@ class BokehOperator:
                                 height=15,
                             ),
                         ],
-                        [self.queue_tabs],
+                        [
+                            row(
+                                column(self.queue_tabs,
+                                       sizing_mode="stretch_width"),
+                                column(self.queue_tree_header,
+                                       self.queue_tree_div,
+                                       sizing_mode="stretch_width"),
+                                sizing_mode="stretch_width",
+                            ),
+                        ],
                         [
                             self.button_seq_move_up,
                             Spacer(width=5),
@@ -843,7 +861,7 @@ class BokehOperator:
                         Spacer(height=10),
                     ],
                     background="#AED6F1",
-                    width=self.max_width,
+                    sizing_mode="stretch_width",
                     height_policy="min",
                 ),
             ],
@@ -882,6 +900,7 @@ class BokehOperator:
             self.select_tabs,
             layout(height_policy="min"),
             self.layout4,  # placeholder  # placeholder
+            sizing_mode="stretch_width",
         )
         self.vis.doc.add_root(self.dynamic_col)
 
@@ -942,7 +961,7 @@ class BokehOperator:
         table = DataTable(
             source=source,
             columns=columns,
-            width=self.max_width - 20,
+            sizing_mode="stretch_width",
             height=200,
             autosize_mode="force_fit" if "fit_columns" not in extra_kwargs else "none",
             **extra_kwargs,

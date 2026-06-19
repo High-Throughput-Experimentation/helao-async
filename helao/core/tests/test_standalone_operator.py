@@ -1103,6 +1103,17 @@ def test_queue_tree_render_lazy_sequence():
     print("test_queue_tree_render_lazy_sequence PASS")
 
 
+def test_layout_is_stretch_width():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    assert op.dynamic_col.sizing_mode == "stretch_width"
+    assert op.sequence_table.sizing_mode == "stretch_width"
+    op.cleanup_session(None)
+    print("test_layout_is_stretch_width PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -1147,6 +1158,7 @@ def run_all():
     test_planhistory_tree_render_plan()
     test_queue_tree_render_action_server()
     test_queue_tree_render_lazy_sequence()
+    test_layout_is_stretch_width()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
 
