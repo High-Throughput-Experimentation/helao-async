@@ -171,8 +171,17 @@ def test_remote_backend_dispatch_and_serialize():
     print("test_remote_backend_dispatch_and_serialize PASS")
 
 
+def test_operator_accepts_backend():
+    import inspect
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    params = list(inspect.signature(BokehOperator.__init__).parameters)
+    assert params == ["self", "vis_serv", "backend"], params
+    print("test_operator_accepts_backend PASS")
+
+
 if __name__ == "__main__":
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
     test_remote_backend_dispatch_and_serialize()
+    test_operator_accepts_backend()
     print("ok")
