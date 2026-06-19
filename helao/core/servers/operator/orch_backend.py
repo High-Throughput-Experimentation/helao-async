@@ -53,6 +53,9 @@ class OrchBackend(ABC):
     async def list_actions(self) -> list: ...
 
     @abstractmethod
+    async def get_queue_object(self, kind: str, idx: int) -> dict: ...
+
+    @abstractmethod
     async def get_histories(self) -> dict: ...
 
     @abstractmethod
@@ -169,6 +172,19 @@ class LocalBackend(OrchBackend):
                 "action_uuid": d.get("action_uuid"),
             })
         return out
+
+    async def get_queue_object(self, kind, idx):
+        dq = {
+            "sequence": self.orch.sequence_dq,
+            "experiment": self.orch.experiment_dq,
+            "action": self.orch.action_dq,
+        }.get(kind)
+        if dq is None:
+            return {}
+        try:
+            return dq[idx].as_dict()
+        except (IndexError, KeyError, AttributeError):
+            return {}
 
     async def get_histories(self):
         return {
@@ -330,6 +346,12 @@ class RemoteBackend(OrchBackend):
                 "action_uuid": row.get("action_uuid"),
             })
         return out
+
+    async def get_queue_object(self, kind, idx):
+        resp = await self._call(
+            "get_queue_object", params_dict={"kind": kind, "idx": idx}
+        )
+        return resp or {}
 
     async def get_histories(self):
         resp = await self._call("get_histories")
