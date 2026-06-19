@@ -23,6 +23,15 @@ servers:
       - append_params
     seq_postprocess_libs:
       - append_params
+  STANDALONE_OP:
+    group: operator
+    bokeh: standalone_operator
+    host: 127.0.0.1
+    port: 5004
+    params:
+      orch_key: ORCH
+      doc_name: "Standalone Operator (test)"
+      poll_interval: 5
   SIM:
     host: 127.0.0.1
     port: 8002
