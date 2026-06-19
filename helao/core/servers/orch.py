@@ -306,7 +306,8 @@ class Orch(Base):
         )
 
         # _ = HelaoOperator(app.vis)
-        doc.operator = BokehOperator(app.vis, orch)
+        from helao.core.servers.operator.orch_backend import LocalBackend
+        doc.operator = BokehOperator(app.vis, LocalBackend(orch))
         # get the event loop
         # operatorloop = asyncio.get_event_loop()
 

@@ -94,15 +94,16 @@ class BokehOperator:
 
     sequence: Sequence
 
-    def __init__(self, vis_serv: Vis, orch):
-        """Build the Bokeh layout and bind the operator UI to ``orch``.
+    def __init__(self, vis_serv: Vis, backend):
+        """Build the Bokeh layout and bind the operator UI to ``backend``.
 
         Args:
             vis_serv: ``Vis`` helper providing access to the Bokeh document and config.
-            orch: Orchestrator the UI is controlling.
+            backend: An ``OrchBackend`` (Local or Remote) the UI drives.
         """
         self.vis = vis_serv
-        self.orch = orch
+        self.backend = backend
+        self.orch = backend  # TEMP shim, removed in Task 5
         self.dataAPI = HTEPlateAPI()
 
         self.config_dict = self.vis.server_cfg.get("params", {})
