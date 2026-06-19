@@ -1262,7 +1262,7 @@ class BokehOperator:
         specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
         input_params = {
-            paraminput.title: parse_bokeh_input(paraminput.value)
+            paraminput.name: parse_bokeh_input(paraminput.value)
             for paraminput in self.seqspec_param_input
         }
         seq = self.seqspec_parser.parser(
@@ -1292,7 +1292,7 @@ class BokehOperator:
         specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
         seqspec_input_params = {
-            paraminput.title: parse_bokeh_input(paraminput.value)
+            paraminput.name: parse_bokeh_input(paraminput.value)
             for paraminput in self.seqspec_param_input
         }
         seq = self.seqspec_parser.parser(
@@ -1306,8 +1306,8 @@ class BokehOperator:
         self.sequence_dropdown.value = seqname
         # replace defaults with loaded params
         for i, x in enumerate(self.seq_param_input):
-            if x.title in loaded_params:
-                self.seq_param_input[i].value = str(loaded_params[x.title])
+            if x.name in loaded_params:
+                self.seq_param_input[i].value = str(loaded_params[x.name])
 
     def callback_clicked_pmplot(self, event, sender):
         """On a double-tap on the plate map, snap the marker to the nearest sample."""
@@ -1549,7 +1549,7 @@ class BokehOperator:
         LOGGER.info(f"selected sequence from list: {selected_sequence}")
 
         sequence_params = {
-            paraminput.title: (
+            paraminput.name: (
                 input_type(parse_bokeh_input(paraminput.value))
                 if input_type in BUILTIN_TYPES
                 else parse_bokeh_input(paraminput.value)
@@ -1581,7 +1581,7 @@ class BokehOperator:
         selected_experiment = self.experiment_dropdown.value
         LOGGER.info(f"selected experiment from list: {selected_experiment}")
         experiment_params = {
-            paraminput.title: (
+            paraminput.name: (
                 input_type(parse_bokeh_input(paraminput.value))
                 if input_type in BUILTIN_TYPES
                 else parse_bokeh_input(paraminput.value)
@@ -1716,7 +1716,8 @@ class BokehOperator:
             initial_stylesheet = [".bk-input { color: black; }"]
             text_input = TextInput(
                 value=def_val,
-                title=args[idx],
+                title="",
+                name=args[idx],
                 disabled=True if args[idx].endswith("_version") else False,
                 width=400,
                 height=40,
@@ -1741,15 +1742,13 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 layout(
                     [
                         [
-                            param_input[item],
                             Div(
-                                text=str(argtypes[idx])
-                                .split()[-1]
-                                .strip("'<>]")
-                                .split(".")[-1]
-                                .replace("[", " of "),
+                                text=f"{args[idx]} <i>[{str(argtypes[idx]).split()[-1].strip(chr(39) + '<>]').split('.')[-1].replace('[', ' of ')}]</i>",
+                                width=self.max_width - 40,
+                                height=18,
                             ),
                         ],
+                        [param_input[item]],
                         Spacer(height=10),
                     ],
                     background=self.color_sq_param_inputs,
@@ -1797,18 +1796,21 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 
                 private_input.append(
                     TextInput(
-                        value="", title="elements", disabled=True, width=120, height=40
+                        value="", title="elements", name="elements",
+                        disabled=True, width=120, height=40
                     )
                 )
                 private_input.append(
                     TextInput(
-                        value="", title="code", disabled=True, width=60, height=40
+                        value="", title="code", name="code",
+                        disabled=True, width=60, height=40
                     )
                 )
                 private_input.append(
                     TextInput(
                         value="",
                         title="composition",
+                        name="composition",
                         disabled=True,
                         width=220,
                         height=40,
@@ -1839,7 +1841,8 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 
             elif args[idx] == "solid_custom_position":
                 param_input[-1] = Select(
-                    title=args[idx], value=None, options=self.dev_customitems
+                    title=args[idx], value=None, options=self.dev_customitems,
+                    name=args[idx],
                 )
                 if self.dev_customitems:
                     if def_val in self.dev_customitems:
@@ -1857,7 +1860,8 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 
             elif args[idx] == "liquid_custom_position":
                 param_input[-1] = Select(
-                    title=args[idx], value=None, options=self.dev_customitems
+                    title=args[idx], value=None, options=self.dev_customitems,
+                    name=args[idx],
                 )
                 if self.dev_customitems:
                     if def_val in self.dev_customitems:
@@ -1918,9 +1922,9 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             return False
 
         for paraminput in param_input:
-            if paraminput.title == "x_mm":
+            if paraminput.name == "x_mm":
                 paraminput.value = xval
-            if paraminput.title == "y_mm":
+            if paraminput.name == "y_mm":
                 paraminput.value = yval
 
     def update_pm_plot(self, plot_mpmap, pmdata):
@@ -2015,10 +2019,10 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         return None
 
     def find_input(self, inputs, name):
-        """Return the ``TextInput`` in ``inputs`` whose title equals ``name``, or ``None``."""
+        """Return the ``TextInput`` in ``inputs`` whose ``name`` equals ``name``, or ``None``."""
         for inp in inputs:
             if isinstance(inp, TextInput):
-                if inp.title == name:
+                if inp.name == name:
                     return inp
         return None
 
