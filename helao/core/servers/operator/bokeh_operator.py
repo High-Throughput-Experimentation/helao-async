@@ -568,20 +568,18 @@ class BokehOperator:
         # label/campaign/comment fields and the append/prepend button rows are
         # moved into a footer block rendered *below* the dynamic parameter
         # layout (see ``_build_param_footer`` / ``_update_param_layout``).
+        # The selector tabs hold ONLY the dropdown so every tab panel has the
+        # same (minimal) height. Bokeh's ``Tabs`` sizes its content area to the
+        # tallest panel and stacks all panels, so any per-selection height
+        # variation inside a panel (e.g. the item description) would leave a
+        # variable whitespace gap above the dynamic parameter block below. The
+        # item description is therefore rendered inside the dynamic parameter
+        # block instead (see ``_update_param_layout``).
         self.layout1 = layout(
             [
                 layout(
                     [
                         [self.sequence_dropdown],
-                        [
-                            Div(
-                                text="<b>sequence description:</b>",
-                                width=200 + 50,
-                                height=15,
-                            ),
-                        ],
-                        [self.sequence_descr_txt],
-                        Spacer(height=10),
                     ],
                     background="#D6DBDF",
                     width=self.max_width,
@@ -596,15 +594,6 @@ class BokehOperator:
                 layout(
                     [
                         [self.experiment_dropdown],
-                        [
-                            Div(
-                                text="<b>experiment description:</b>",
-                                width=200 + 50,
-                                height=15,
-                            ),
-                        ],
-                        [self.experiment_descr_txt],
-                        Spacer(height=10),
                     ],
                     background="#D6DBDF",
                     width=self.max_width,
@@ -619,15 +608,6 @@ class BokehOperator:
                 layout(
                     [
                         [self.seqspec_dropdown],
-                        [
-                            Div(
-                                text="<b>sequence spec description:</b>",
-                                width=200 + 50,
-                                height=15,
-                            ),
-                        ],
-                        [self.seqspec_descr_txt],
-                        Spacer(height=10),
                     ],
                     background="#D6DBDF",
                     width=self.max_width,
@@ -757,7 +737,7 @@ class BokehOperator:
                     self.sequence_select_tab,
                     self.experiment_select_tab,
                     self.seqspec_select_tab,
-                ]
+                ],
             )
         else:
             self.select_tabs = Tabs(
@@ -996,6 +976,8 @@ class BokehOperator:
                 "private_attr": "seq_private_input",
                 "layout_attr": "seq_param_layout",
                 "header": "<b>Optional sequence parameters:</b>",
+                "descr_attr": "sequence_descr_txt",
+                "descr_label": "<b>sequence description:</b>",
                 "refresh": True,
             },
             "exp": {
@@ -1005,6 +987,8 @@ class BokehOperator:
                 "private_attr": "exp_private_input",
                 "layout_attr": "exp_param_layout",
                 "header": "<b>Optional experiment parameters:</b>",
+                "descr_attr": "experiment_descr_txt",
+                "descr_label": "<b>experiment description:</b>",
                 "refresh": True,
             },
             "seqspec": {
@@ -1014,6 +998,8 @@ class BokehOperator:
                 "private_attr": "seqspec_private_input",
                 "layout_attr": "seqspec_param_layout",
                 "header": "<b>Required sequence parameters:</b>",
+                "descr_attr": "seqspec_descr_txt",
+                "descr_label": "<b>sequence spec description:</b>",
                 "refresh": False,
             },
         }
@@ -1033,7 +1019,26 @@ class BokehOperator:
         setattr(self, cfg["input_attr"], [])
         setattr(self, cfg["types_attr"], [])
         setattr(self, cfg["private_attr"], [])
+        # The item description is rendered here (rather than inside the selector
+        # tab panel) so the tab panels stay a uniform, minimal height and no
+        # variable whitespace appears above this block. See ``layout1``/``2``/``3``.
         param_layout = [
+            layout(
+                [
+                    [
+                        Div(
+                            text=cfg["descr_label"],
+                            width=200 + 50,
+                            height=15,
+                        ),
+                    ],
+                    [getattr(self, cfg["descr_attr"])],
+                    Spacer(height=10),
+                ],
+                background="#D6DBDF",
+                width=self.max_width,
+                height_policy="min",
+            ),
             Spacer(height=10),
             layout(
                 [
