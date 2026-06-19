@@ -153,7 +153,7 @@ class BokehOperator:
 
         self.plan = []
         self.experiment_plan_lists = {
-            k: [] for k in ["sequence_name", "sequence_label", "experiment_name"]
+            k: [] for k in ["sequence_name", "sequence_label", "num_experiments"]
         }
 
         self.sequence_lists = {
@@ -358,6 +358,24 @@ class BokehOperator:
         )
         self.button_prepend_plan = self._make_button(
             "Prepend plan", "default", 100, self.callback_prepend_plan
+        )
+        self.button_plan_move_up = self._make_button(
+            "Plan ↑", "default", 70, self.callback_plan_move_up
+        )
+        self.button_plan_move_down = self._make_button(
+            "Plan ↓", "default", 70, self.callback_plan_move_down
+        )
+        self.button_plan_remove = self._make_button(
+            "Plan ✕", "default", 70, self.callback_plan_remove
+        )
+        self.button_seq_move_up = self._make_button(
+            "Queue ↑", "default", 70, self.callback_seq_move_up
+        )
+        self.button_seq_move_down = self._make_button(
+            "Queue ↓", "default", 70, self.callback_seq_move_down
+        )
+        self.button_seq_remove = self._make_button(
+            "Queue ✕", "default", 70, self.callback_seq_remove
         )
         self.button_stop_orch = self._make_button(
             "Stop Orch", "default", 70, self.callback_stop_orch
@@ -693,6 +711,13 @@ class BokehOperator:
                         ],
                         [self.planhistory_tabs],
                         [
+                            self.button_plan_move_up,
+                            Spacer(width=5),
+                            self.button_plan_move_down,
+                            Spacer(width=5),
+                            self.button_plan_remove,
+                        ],
+                        [
                             Div(
                                 text="<b>Queues:</b>",
                                 width=200 + 50,
@@ -700,6 +725,13 @@ class BokehOperator:
                             ),
                         ],
                         [self.queue_tabs],
+                        [
+                            self.button_seq_move_up,
+                            Spacer(width=5),
+                            self.button_seq_move_down,
+                            Spacer(width=5),
+                            self.button_seq_remove,
+                        ],
                         [
                             self.button_add_expplan,
                             Spacer(width=10),
@@ -1444,6 +1476,63 @@ class BokehOperator:
         )
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
+    def _selected_plan_idx(self):
+        """Return the first selected plan-table row index, or ``None``."""
+        idxs = list(self.experiment_plan_source.selected.indices)
+        return idxs[0] if idxs else None
+
+    def callback_plan_move_up(self, event):
+        """Move the selected buffered sequence one row up."""
+        i = self._selected_plan_idx()
+        if i is not None and i > 0:
+            self.plan[i - 1], self.plan[i] = self.plan[i], self.plan[i - 1]
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_plan_move_down(self, event):
+        """Move the selected buffered sequence one row down."""
+        i = self._selected_plan_idx()
+        if i is not None and i < len(self.plan) - 1:
+            self.plan[i + 1], self.plan[i] = self.plan[i], self.plan[i + 1]
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_plan_remove(self, event):
+        """Remove the selected buffered sequence from the plan."""
+        i = self._selected_plan_idx()
+        if i is not None and 0 <= i < len(self.plan):
+            del self.plan[i]
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_seq_move_up(self, event):
+        """Move the selected queued sequence one position toward the front."""
+        idxs = list(self.sequence_source.selected.indices)
+        if idxs and idxs[0] > 0:
+            i = idxs[0]
+            self.vis.doc.add_next_tick_callback(
+                partial(self.backend.move_sequence, i, i - 1)
+            )
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_seq_move_down(self, event):
+        """Move the selected queued sequence one position toward the back."""
+        idxs = list(self.sequence_source.selected.indices)
+        n = len(self.sequence_source.data.get("sequence_name", []))
+        if idxs and idxs[0] < n - 1:
+            i = idxs[0]
+            self.vis.doc.add_next_tick_callback(
+                partial(self.backend.move_sequence, i, i + 1)
+            )
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_seq_remove(self, event):
+        """Remove the selected queued sequence from the orch queue."""
+        idxs = list(self.sequence_source.selected.indices)
+        if idxs:
+            i = idxs[0]
+            self.vis.doc.add_next_tick_callback(
+                partial(self.backend.remove_sequence, i)
+            )
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
     def callback_toggle_stepact(self, event):
         """Flip the step-through-actions toggle."""
         self.vis.doc.add_next_tick_callback(
@@ -2177,13 +2266,12 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         self.update_queuecount_labels()
         for key in self.experiment_plan_lists:
             self.experiment_plan_lists[key] = []
-        seq_count = 0
         for seq in self.plan:
-            seq_count += 1
-            for D in seq.planned_experiments:
-                self.experiment_plan_lists["sequence_name"].append(seq.sequence_name)
-                self.experiment_plan_lists["sequence_label"].append(seq.sequence_label)
-                self.experiment_plan_lists["experiment_name"].append(D.experiment_name)
+            self.experiment_plan_lists["sequence_name"].append(seq.sequence_name)
+            self.experiment_plan_lists["sequence_label"].append(seq.sequence_label)
+            self.experiment_plan_lists["num_experiments"].append(
+                len(seq.planned_experiments)
+            )
         self.experiment_plan_source.data = self.experiment_plan_lists
 
         state = await self.backend.get_orch_state()
@@ -2211,7 +2299,11 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             self.orch_status_button.label = f"{loop_state}"
             self.orch_status_button.button_type = "danger"
         self.button_prepend_plan.disabled = loop_state != LoopStatus.stopped.value
-        self.button_add_expplan.label = f"Add plan [{seq_count}]"
+        queue_disabled = loop_state != LoopStatus.stopped.value
+        self.button_seq_move_up.disabled = queue_disabled
+        self.button_seq_move_down.disabled = queue_disabled
+        self.button_seq_remove.disabled = queue_disabled
+        self.button_add_expplan.label = f"Add plan [{len(self.plan)}]"
         end_time = time.time()
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
 
