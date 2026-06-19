@@ -239,13 +239,15 @@ class _MockBackend:
 
     async def list_sequences(self):
         return [{"sequence_name": "seq0", "sequence_label": "l",
-                 "sequence_uuid": "su", "campaign_name": "c", "campaign_uuid": "cu"}]
+                 "sequence_uuid": "0123456789abcdef", "campaign_name": "c",
+                 "campaign_uuid": "fedcba9876543210"}]
 
     async def list_experiments(self):
-        return [{"experiment_name": "exp0", "experiment_uuid": "eu"}]
+        return [{"experiment_name": "exp0", "experiment_uuid": "1111222233334444"}]
 
     async def list_actions(self):
-        return [{"action_name": "noop", "action_server": "motor", "action_uuid": "au"}]
+        return [{"action_name": "noop", "action_server": "motor",
+                 "action_uuid": "aaaabbbbccccdddd"}]
 
     async def get_histories(self):
         return {"action": [], "experiment": [], "sequence": []}
@@ -708,12 +710,30 @@ def test_remote_backend_move_remove():
     print("test_remote_backend_move_remove PASS")
 
 
+def test_uuid_truncation_in_queue_tables():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    asyncio.run(op.get_sequences())
+    asyncio.run(op.get_experiments())
+    asyncio.run(op.get_actions())
+    assert op.sequence_source.data["sequence_uuid"] == ["89abcdef"]
+    assert op.sequence_source.data["campaign_uuid"] == ["76543210"]
+    assert op.sequence_source.data["sequence_name"] == ["seq0"]  # non-uuid untouched
+    assert op.experiment_source.data["experiment_uuid"] == ["33334444"]
+    assert op.action_source.data["action_uuid"] == ["ccccdddd"]
+    op.cleanup_session(None)
+    print("test_uuid_truncation_in_queue_tables PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
     test_remote_backend_dispatch_and_serialize()
     test_operator_accepts_backend()
     test_operator_tables_from_backend()
+    test_uuid_truncation_in_queue_tables()
     test_plate_api_disabled_by_default()
     test_shim_exposes_makebokehapp()
     test_orch_run_id_sharing()
