@@ -779,6 +779,57 @@ def test_operator_label_sanitize_callback():
     print("test_operator_label_sanitize_callback PASS")
 
 
+def _drain_callbacks(doc, iterations=20):
+    """Run all queued Bokeh next-tick callbacks until the queue is empty or the
+    iteration limit is reached.  Each iteration drains exactly one generation of
+    callbacks; newly-scheduled ones are picked up in the next pass."""
+    for _ in range(iterations):
+        scheduled = list(doc.session_callbacks)
+        if not scheduled:
+            break
+        for cb in scheduled:
+            try:
+                cb.callback()  # Bokeh self-removes on invocation
+            except Exception:
+                pass
+
+
+def test_save_restore_label_campaign():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    # drain __init__ next-tick callbacks (async get_sequences/history etc.)
+    _drain_callbacks(op.vis.doc)
+
+    op.save_last_seq_pars.active = [0]  # save enabled
+    op.input_sequence_label.value = "runA"
+    op.input_campaign_name.value = "camp1"
+    op.input_campaign_uuid.value = "uuid-1"
+    # drain the mirror callbacks triggered by the direct .value assignments above
+    _drain_callbacks(op.vis.doc)
+
+    op.write_params("seq", "seq0", {"x": 1})
+
+    # clear the live fields, then drain the mirror callbacks before restoring
+    op.input_sequence_label.value = "x"
+    op.input_campaign_name.value = ""
+    op.input_campaign_uuid.value = ""
+    _drain_callbacks(op.vis.doc)
+
+    op.sequence_dropdown.value = "seq0"
+    op.get_last_seq_pars()
+    # run queued next-tick callbacks (restore schedules update_input_value for
+    # both primary and mirror widgets; loop until queue drains)
+    _drain_callbacks(op.vis.doc)
+
+    assert op.input_sequence_label.value == "runA", op.input_sequence_label.value
+    assert op.input_campaign_name.value == "camp1", op.input_campaign_name.value
+    assert op.input_campaign_uuid.value == "uuid-1", op.input_campaign_uuid.value
+    op.cleanup_session(None)
+    print("test_save_restore_label_campaign PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -790,6 +841,7 @@ def run_all():
     test_param_key_uses_name_not_title()
     test_find_input_matches_name()
     test_operator_label_sanitize_callback()
+    test_save_restore_label_campaign()
     test_shim_exposes_makebokehapp()
     test_orch_run_id_sharing()
     test_orch_resolve_active_run_id()
