@@ -424,6 +424,54 @@ def test_prepend_sequences_helper():
     print("test_prepend_sequences_helper PASS")
 
 
+def test_local_backend_prepend():
+    from helao.core.servers.operator.orch_backend import LocalBackend
+
+    class _O(_FakeOrch):
+        sequence_lib = {}
+        experiment_lib = {}
+        async def prepend_sequences(self, sequences):
+            self.prepended = sequences
+            return ["u1"]
+
+    orch = _O()
+    be = LocalBackend(orch)
+    out = asyncio.run(be.prepend_sequences(["s1", "s2"]))
+    assert out == ["u1"]
+    assert orch.prepended == ["s1", "s2"]
+    print("test_local_backend_prepend PASS")
+
+
+def test_remote_backend_prepend():
+    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.core.error import ErrorCodes
+
+    calls = []
+
+    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+        calls.append((endpoint, params_dict, json_dict))
+        return {"sequence_uuids": ["u1", "u2"]}, ErrorCodes.none
+
+    class _Seq:
+        def __init__(self, name):
+            self.name = name
+        def model_dump(self):
+            return {"sequence_name": self.name}
+
+    be = RemoteBackend.__new__(RemoteBackend)
+    be.orch_key = "ORCH"
+    be.host = "127.0.0.1"
+    be.port = 8001
+    be._dispatch = fake_dispatch
+
+    out = asyncio.run(be.prepend_sequences([_Seq("A"), _Seq("B")]))
+    assert out == {"sequence_uuids": ["u1", "u2"]}
+    ep, _, body = calls[0]
+    assert ep == "prepend_sequences"
+    assert body == {"sequences": [{"sequence_name": "A"}, {"sequence_name": "B"}]}
+    print("test_remote_backend_prepend PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -437,6 +485,8 @@ def run_all():
     test_orch_split_run_id()
     test_orch_prepend_order_and_run_id()
     test_prepend_sequences_helper()
+    test_local_backend_prepend()
+    test_remote_backend_prepend()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
 
