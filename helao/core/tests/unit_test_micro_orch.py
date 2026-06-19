@@ -17,6 +17,7 @@ RPC client cache:
 __all__ = ["micro_orch_unit_test"]
 
 import asyncio
+import random
 import socket
 import sys
 import traceback
@@ -66,21 +67,47 @@ def _build_experiment(name: str = "exp_demo") -> Experiment:
     return exp
 
 
-def _free_port() -> int:
-    """Return a free TCP port low enough that ``derive_rpc_port`` stays in range.
+#: Low TCP window to draw test ports from. Kept well below ``65535 -
+#: RPC_PORT_OFFSET`` so the derived RPC port never overflows, and below the
+#: Windows dynamic range (49152-65535) so it does not fight OS ephemeral ports.
+_PORT_WINDOW = (20000, 40000)
 
-    The RPC dispatcher binds ``port + RPC_PORT_OFFSET`` (10000), so an OS
-    ephemeral port above 55535 would push the derived port past 65535 and the
-    bind would fail with a flaky ``Permission denied``. Retry until the chosen
-    port leaves room for the offset.
+
+def _port_pair_free(port: int) -> bool:
+    """True if both ``port`` and its derived RPC port bind cleanly right now."""
+    rpc_port = derive_rpc_port(port)
+    if rpc_port > 65535:
+        return False
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as http_s, \
+                socket.socket(socket.AF_INET, socket.SOCK_STREAM) as rpc_s:
+            http_s.bind(("127.0.0.1", port))
+            rpc_s.bind(("127.0.0.1", rpc_port))
+        return True
+    except OSError:
+        return False
+
+
+def _free_port() -> int:
+    """Return a free TCP port whose derived RPC port is also free.
+
+    Binding an OS ephemeral port (``bind(..., 0)``) is unreliable here: the RPC
+    dispatcher binds ``port + RPC_PORT_OFFSET`` (10000), and on Windows the
+    dynamic port range is 49152-65535, so the kernel routinely hands back ports
+    above 55535 whose offset overflows past 65535 — every retry fails. Instead
+    scan a fixed low window and return the first port where BOTH the HTTP port
+    and its RPC port bind, so coexisting fake servers never collide on the
+    offset port. A randomized start spreads back-to-back calls to dodge
+    ``TIME_WAIT`` reuse races.
     """
-    for _ in range(50):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("127.0.0.1", 0))
-            port = s.getsockname()[1]
-        if port <= 55000:
+    lo, hi = _PORT_WINDOW
+    start = random.randint(lo, hi - 1)
+    span = hi - lo
+    for i in range(span):
+        port = lo + (start - lo + i) % span
+        if _port_pair_free(port):
             return port
-    raise RuntimeError("could not obtain a free port <= 55000 for RPC offset")
+    raise RuntimeError("could not obtain a free HTTP/RPC port pair for the test")
 
 
 class _FakeActionServer:
