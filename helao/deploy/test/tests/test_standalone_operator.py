@@ -304,7 +304,7 @@ def test_shim_exposes_makebokehapp():
     print("test_shim_exposes_makebokehapp PASS")
 
 
-if __name__ == "__main__":
+def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
     test_remote_backend_dispatch_and_serialize()
@@ -312,4 +312,8 @@ if __name__ == "__main__":
     test_operator_tables_from_backend()
     test_plate_api_disabled_by_default()
     test_shim_exposes_makebokehapp()
-    print("ok")
+    print("ALL STANDALONE_OPERATOR TESTS PASS")
+
+
+if __name__ == "__main__":
+    run_all()
