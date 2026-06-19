@@ -882,6 +882,23 @@ def test_save_restore_label_campaign():
     print("test_save_restore_label_campaign PASS")
 
 
+def test_param_label_enumeration():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    op.sequence_dropdown.value = "seq0"  # selected in __init__; single param "x"
+    # seq_param_layout has 3 fixed prefix entries (description block, Spacer,
+    # header block), then param rows appended by add_dynamic_inputs from index 3.
+    # Each param row is layout([[Div],[TextInput],Spacer]) -> children[0].children[0]
+    label_div = op.seq_param_layout[3].children[0].children[0]
+    assert label_div.text.startswith("0) x"), label_div.text
+    # widget key unchanged (decoupled from display)
+    assert op.seq_param_input[0].name == "x"
+    op.cleanup_session(None)
+    print("test_param_label_enumeration PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -892,6 +909,7 @@ def run_all():
     test_plate_api_disabled_by_default()
     test_param_key_uses_name_not_title()
     test_find_input_matches_name()
+    test_param_label_enumeration()
     test_operator_label_sanitize_callback()
     test_save_restore_label_campaign()
     test_shim_exposes_makebokehapp()
