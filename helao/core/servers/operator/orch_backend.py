@@ -11,7 +11,7 @@ branch on object-vs-JSON. See the method docstrings for the contract.
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, Optional
 
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers.import_autolibs import import_autolibs
@@ -231,7 +231,7 @@ class RemoteBackend(OrchBackend):
     ws_status WebSocket plus a slow poll safety net.
     """
 
-    def __init__(self, vis, orch_key: str = None, poll_interval: float = 5.0):
+    def __init__(self, vis, orch_key: Optional[str] = None, poll_interval: float = 5.0):
         self.vis = vis
         self.world_cfg = vis.world_cfg
         self.orch_key = orch_key or self._detect_orch_key(vis.world_cfg)
@@ -253,6 +253,7 @@ class RemoteBackend(OrchBackend):
         self._wss = None
         self._ws_task = None
         self._poll_task = None
+        self._prime_task = None
 
     @staticmethod
     def _detect_orch_key(world_cfg) -> str:
@@ -353,7 +354,7 @@ class RemoteBackend(OrchBackend):
         self._wss = Wss(self.host, self.port, "ws_status")
         self._ws_task = asyncio.create_task(self._ws_loop(on_change))
         self._poll_task = asyncio.create_task(self._poll_loop(on_change))
-        asyncio.create_task(_prime())
+        self._prime_task = asyncio.create_task(_prime())
 
     async def _ws_loop(self, on_change):
         while True:
@@ -372,6 +373,6 @@ class RemoteBackend(OrchBackend):
             on_change()
 
     def close(self):
-        for t in (self._ws_task, self._poll_task):
+        for t in (self._ws_task, self._poll_task, self._prime_task):
             if t is not None:
                 t.cancel()
