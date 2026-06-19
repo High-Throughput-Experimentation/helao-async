@@ -755,6 +755,30 @@ def test_find_input_matches_name():
     print("test_find_input_matches_name PASS")
 
 
+def test_operator_label_sanitize_callback():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    # pure sanitizer used by the on_change callback
+    assert op._clean_label("a b__c d") == "a_b_c_d"
+    assert op._clean_label("a_b") == "a_b"
+    assert op._clean_label("") == ""
+    assert op._clean_label(None) is None
+    # wiring: the on_change callback schedules a correction that rewrites the field
+    op._sanitize_label_callback(op.input_sequence_label, "value", "nolabel", "x y")
+    scheduled = list(op.vis.doc.session_callbacks)
+    assert scheduled, "dirty input should schedule a correction callback"
+    for cb in scheduled:
+        try:
+            cb.callback()  # do NOT remove_next_tick_callback — Bokeh self-removes on run
+        except Exception:
+            pass
+    assert op.input_sequence_label.value == "x_y", op.input_sequence_label.value
+    op.cleanup_session(None)
+    print("test_operator_label_sanitize_callback PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -765,6 +789,7 @@ def run_all():
     test_plate_api_disabled_by_default()
     test_param_key_uses_name_not_title()
     test_find_input_matches_name()
+    test_operator_label_sanitize_callback()
     test_shim_exposes_makebokehapp()
     test_orch_run_id_sharing()
     test_orch_resolve_active_run_id()

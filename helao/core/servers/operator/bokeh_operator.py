@@ -25,6 +25,7 @@ from pydantic import BaseModel
 import numpy as np
 from functools import partial
 import builtins
+import re
 
 from helao.helpers import helao_logging as logging
 
@@ -512,6 +513,14 @@ class BokehOperator:
             "value",
             self._make_copy_callback("input_sequence_label2", "input_sequence_label"),
         )
+        self.input_sequence_label.on_change(
+            "value",
+            partial(self._sanitize_label_callback, self.input_sequence_label),
+        )
+        self.input_sequence_label2.on_change(
+            "value",
+            partial(self._sanitize_label_callback, self.input_sequence_label2),
+        )
         self.input_campaign_name.on_change(
             "value",
             self._make_copy_callback("input_campaign_name", "input_campaign_name2"),
@@ -835,6 +844,20 @@ class BokehOperator:
             )
 
         return _cb
+
+    def _clean_label(self, value):
+        """Collapse whitespace/underscore runs to single underscores (None-safe)."""
+        if not value:
+            return value
+        return re.sub(r"[\s_]+", "_", value)
+
+    def _sanitize_label_callback(self, sender, attr, old, new):
+        """Rewrite a label input's value to its sanitized form when they differ."""
+        cleaned = self._clean_label(new)
+        if cleaned != new:
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_input_value, sender, cleaned)
+            )
 
     def _build_lib(
         self, lib: dict, filter_type, config_key: str, model_class, name_field: str
