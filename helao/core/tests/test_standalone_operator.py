@@ -899,6 +899,38 @@ def test_param_label_enumeration():
     print("test_param_label_enumeration PASS")
 
 
+def test_object_to_html():
+    from helao.core.servers.operator.bokeh_operator import _object_to_html
+
+    obj = {
+        "sequence_name": "CA_led",
+        "sequence_uuid": "0123456789abcdef",
+        "sequence_params": {"plate_id": 4083, "led": 385},
+        "experiment_list": [{"experiment_name": "e0"}, {"experiment_name": "e1"}],
+    }
+    html = _object_to_html(obj, open_keys=["sequence_params"])
+    assert "<details open><summary>sequence_params</summary>" in html
+    assert "<details><summary>sequence_uuid</summary>" in html or \
+           "sequence_uuid: 0123456789abcdef" in html
+    assert "plate_id: 4083" in html
+    assert "experiment_list [2]" in html
+    assert "empty" in _object_to_html({})
+    assert "scalar" in _object_to_html("scalar")
+    print("test_object_to_html PASS")
+
+
+def test_tree_header_text():
+    from helao.core.servers.operator.bokeh_operator import (
+        _tree_header_text, _server_header_text,
+    )
+    obj = {"sequence_name": "seq0", "sequence_uuid": "0123456789abcdef"}
+    assert _tree_header_text("sequence", obj) == "seq0 · 89abcdef"
+    assert _tree_header_text("action", {"action_name": "noop"}) == "noop"
+    cfg = {"host": "127.0.0.1", "port": 8001}
+    assert _server_header_text("MOTOR", cfg) == "MOTOR · 127.0.0.1:8001"
+    print("test_tree_header_text PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -910,6 +942,8 @@ def run_all():
     test_param_key_uses_name_not_title()
     test_find_input_matches_name()
     test_param_label_enumeration()
+    test_object_to_html()
+    test_tree_header_text()
     test_operator_label_sanitize_callback()
     test_save_restore_label_campaign()
     test_shim_exposes_makebokehapp()

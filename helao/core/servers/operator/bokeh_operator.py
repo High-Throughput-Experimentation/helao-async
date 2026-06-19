@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import importlib
+import html as _html
 from enum import Enum
 from typing import List, Optional
 from pybase64 import b64decode
@@ -58,6 +59,55 @@ BUILTIN_TYPES = [
     for d in dir(builtins)
     if isinstance(getattr(builtins, d), type)
 ]
+
+
+def _render_node(key, val, top=False, open_keys=()):
+    """Render one object node as collapsible HTML. Top-level nodes whose key is
+    in ``open_keys`` start expanded; everything else starts collapsed."""
+    open_attr = " open" if (top and key in open_keys) else ""
+    label = _html.escape(str(key))
+    if isinstance(val, dict):
+        inner = "".join(
+            _render_node(k, v, top=False, open_keys=open_keys) for k, v in val.items()
+        )
+        return f"<details{open_attr}><summary>{label}</summary>{inner}</details>"
+    if isinstance(val, (list, tuple)):
+        inner = "".join(
+            _render_node(f"[{i}]", v, top=False, open_keys=open_keys)
+            for i, v in enumerate(val)
+        )
+        return f"<details{open_attr}><summary>{label} [{len(val)}]</summary>{inner}</details>"
+    return (
+        f"<div style='margin-left:1em'>{label}: {_html.escape(str(val))}</div>"
+    )
+
+
+def _object_to_html(obj, open_keys=()):
+    """Render a dict (or scalar) as a nested ``<details>`` tree string."""
+    if not isinstance(obj, dict):
+        return f"<div>{_html.escape(str(obj))}</div>"
+    if not obj:
+        return "<div><i>empty</i></div>"
+    return "".join(
+        _render_node(k, v, top=True, open_keys=open_keys) for k, v in obj.items()
+    )
+
+
+def _truncate_uuid(value):
+    return str(value)[-8:] if value else ""
+
+
+def _tree_header_text(kind, obj):
+    """Header line for a sequence/experiment/action object: 'name · uuid8'."""
+    name = obj.get(f"{kind}_name", "") if isinstance(obj, dict) else ""
+    uuid8 = _truncate_uuid(obj.get(f"{kind}_uuid")) if isinstance(obj, dict) else ""
+    return f"{name} · {uuid8}" if uuid8 else f"{name}"
+
+
+def _server_header_text(server_name, cfg):
+    """Header line for an action-server row: 'NAME · host:port'."""
+    cfg = cfg or {}
+    return f"{server_name} · {cfg.get('host', '')}:{cfg.get('port', '')}"
 
 
 class return_sequence_lib(BaseModel):
