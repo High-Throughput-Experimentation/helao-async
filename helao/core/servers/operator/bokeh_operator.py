@@ -216,6 +216,7 @@ class BokehOperator:
         self.seqspec_private_input = []
 
         self.plan = []
+        self._hist_objs = {"action": [], "experiment": [], "sequence": []}
         self.experiment_plan_lists = {
             k: [] for k in ["sequence_name", "sequence_label", "num_experiments"]
         }
@@ -518,6 +519,21 @@ class BokehOperator:
         )
         self.seqspec_descr_txt = Div(
             text="""select a sequence specification""", width=600, height_policy="min"
+        )
+
+        self.planhistory_tree_header = Div(
+            text="<b>select a row</b>", height=20, sizing_mode="stretch_width"
+        )
+        self.planhistory_tree_div = Div(
+            text="", sizing_mode="stretch_width",
+            styles={"overflow": "auto", "max-height": "200px"},
+        )
+        self.queue_tree_header = Div(
+            text="<b>select a row</b>", height=20, sizing_mode="stretch_width"
+        )
+        self.queue_tree_div = Div(
+            text="", sizing_mode="stretch_width",
+            styles={"overflow": "auto", "max-height": "200px"},
         )
 
         self.error_txt = Div(
@@ -1283,9 +1299,11 @@ class BokehOperator:
     async def get_history(self):
         """Refresh the action/experiment/sequence history tables from the backend."""
         hist = await self.backend.get_histories()
+        self._hist_objs = {"action": [], "experiment": [], "sequence": []}
         for key in self.action_history_lists:
             self.action_history_lists[key] = []
         for actuuid, actdict in sorted(hist["action"], key=lambda x: x[0])[::-1]:
+            self._hist_objs["action"].append(actdict)
             self.action_history_lists["action_uuid"].append(str(actuuid)[-8:])
             self.action_history_lists["action_endpoint"].append(
                 f"{actdict['action_server']}/{actdict['action_name']}"
@@ -1300,6 +1318,7 @@ class BokehOperator:
         for key in self.experiment_history_lists:
             self.experiment_history_lists[key] = []
         for expuuid, expdict in sorted(hist["experiment"], key=lambda x: x[0])[::-1]:
+            self._hist_objs["experiment"].append(expdict)
             self.experiment_history_lists["experiment_uuid"].append(str(expuuid)[-8:])
             self.experiment_history_lists["experiment_name"].append(expdict["experiment_name"])
             self.experiment_history_lists["start"].append(expdict.get("experiment_timestamp", None))
@@ -1312,6 +1331,7 @@ class BokehOperator:
         for key in self.sequence_history_lists:
             self.sequence_history_lists[key] = []
         for sequuid, seqdict in sorted(hist["sequence"], key=lambda x: x[0])[::-1]:
+            self._hist_objs["sequence"].append(seqdict)
             self.sequence_history_lists["sequence_uuid"].append(str(sequuid)[-8:])
             self.sequence_history_lists["sequence_name"].append(seqdict["sequence_name"])
             self.sequence_history_lists["start"].append(seqdict.get("sequence_timestamp", None))
