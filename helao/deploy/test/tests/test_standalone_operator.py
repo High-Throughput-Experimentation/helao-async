@@ -70,6 +70,55 @@ def test_endpoint_helpers_shapes():
     print("test_endpoint_helpers_shapes PASS")
 
 
+def test_local_backend_normalized_shapes():
+    from helao.core.servers.operator.orch_backend import LocalBackend
+
+    class _Seq:
+        def as_dict(self):
+            return {
+                "sequence_name": "seq0", "sequence_label": "lbl",
+                "sequence_uuid": "su", "campaign_name": "camp",
+                "campaign_uuid": "cu", "extra": "ignored",
+            }
+
+    class _Srv:
+        def disp_name(self):
+            return "motor@host"
+
+    class _Act:
+        action_server = _Srv()
+        def as_dict(self):
+            return {"action_name": "noop", "action_uuid": "au"}
+
+    class _Orch2(_FakeOrch):
+        def list_sequences(self, limit=10):
+            return [_Seq()]
+        def list_experiments(self, limit=10):
+            return [type("E", (), {"as_dict": lambda s: {"experiment_name": "exp0", "experiment_uuid": "eu"}})()]
+        def list_actions(self, limit=10):
+            return [_Act()]
+        sequence_lib = {"seq0": lambda x=1: [x]}
+        experiment_lib = {}
+        def unpack_sequence(self, sequence_name, sequence_params):
+            return self.sequence_lib[sequence_name](**sequence_params)
+
+    orch = _Orch2()
+    be = LocalBackend(orch)
+    seqs = asyncio.run(be.list_sequences())
+    assert seqs == [{
+        "sequence_name": "seq0", "sequence_label": "lbl", "sequence_uuid": "su",
+        "campaign_name": "camp", "campaign_uuid": "cu",
+    }]
+    acts = asyncio.run(be.list_actions())
+    assert acts == [{"action_name": "noop", "action_server": "motor@host", "action_uuid": "au"}]
+    assert be.get_step_flags() == {"actions": False, "experiments": False, "sequences": False}
+    assert be.unpack_sequence("seq0", {"x": 5}) == [5]
+    asyncio.run(be.clear_sequences())
+    assert "sequences" in orch.cleared
+    print("test_local_backend_normalized_shapes PASS")
+
+
 if __name__ == "__main__":
     test_endpoint_helpers_shapes()
+    test_local_backend_normalized_shapes()
     print("ok")
