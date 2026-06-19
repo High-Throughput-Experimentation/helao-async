@@ -15,9 +15,14 @@ class zdeque(deque):
     storing. Useful for queues holding large, repetitive payloads.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Forward all arguments to :class:`collections.deque`."""
-        super().__init__(*args, **kwargs)
+    def __init__(self, iterable=(), maxlen=None):
+        """Initialise like :class:`collections.deque`, compressing each item."""
+        if maxlen is not None:
+            super().__init__([], maxlen=maxlen)
+        else:
+            super().__init__()
+        for x in iterable:
+            self.append(x)
 
     def __getitem__(self, i) -> Any:
         """Return the decompressed and unpickled element at index ``i``."""

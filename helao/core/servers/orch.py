@@ -1879,6 +1879,28 @@ class Orch(Base):
             uuids.append(sequence.sequence_uuid)
         return uuids
 
+    def _rebuild_sequence_dq(self, seqs) -> None:
+        """Replace the sequence deque contents with ``seqs`` (re-compresses each)."""
+        self.sequence_dq.clear()
+        for s in seqs:
+            self.sequence_dq.append(s)
+
+    async def move_sequence(self, from_idx: int, to_idx: int) -> None:
+        """Move the queued sequence at ``from_idx`` to ``to_idx`` (no-op if out of range)."""
+        seqs = list(self.sequence_dq)
+        n = len(seqs)
+        if 0 <= from_idx < n and 0 <= to_idx < n:
+            seq = seqs.pop(from_idx)
+            seqs.insert(to_idx, seq)
+            self._rebuild_sequence_dq(seqs)
+
+    async def remove_sequence(self, idx: int) -> None:
+        """Remove the queued sequence at ``idx`` (no-op if out of range)."""
+        seqs = list(self.sequence_dq)
+        if 0 <= idx < len(seqs):
+            seqs.pop(idx)
+            self._rebuild_sequence_dq(seqs)
+
     async def add_experiment(
         self,
         seq: Sequence,
