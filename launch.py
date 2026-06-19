@@ -453,8 +453,12 @@ def launcher(confArg, confDict, helao_repo_root, extraopt=""):
     # get the BaseModel which contains all the dirs for helao
     helaodirs = helao_dirs(confDict, "launcher")
 
-    # API server launch priority (matches folders in root helao-dev/)
-    LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
+    # API server launch priority (matches folders in root helao-dev/).
+    # The "operator" group is launched the same way as visualizers (a bokeh
+    # subprocess via bokeh_launcher.py, resolved from servers/operator/), but is
+    # ordered immediately after the orchestrator group so a standalone operator
+    # can connect to a live orchestrator as soon as it starts.
+    LAUNCH_ORDER = ["action", "orchestrator", "operator", "visualizer"]
 
     pidd = Pidd(
         pidFile=f"pids_{confPrefix}_{extraopt}.pck", pidPath=helaodirs.states_root
