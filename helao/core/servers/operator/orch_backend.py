@@ -298,7 +298,14 @@ class RemoteBackend(OrchBackend):
         out = []
         for row in resp:
             srv = row.get("action_server")
-            srv_name = srv.get("server_name") if isinstance(srv, dict) else srv
+            if isinstance(srv, dict):
+                # Reconstruct MachineModel.disp_name() ("server@machine") so the
+                # actions table matches LocalBackend's a.action_server.disp_name().
+                server_name = srv.get("server_name")
+                machine_name = srv.get("machine_name")
+                srv_name = f"{server_name}@{machine_name}" if machine_name else server_name
+            else:
+                srv_name = srv
             out.append({
                 "action_name": row.get("action_name"),
                 "action_server": srv_name,
@@ -376,3 +383,7 @@ class RemoteBackend(OrchBackend):
         for t in (self._ws_task, self._poll_task, self._prime_task):
             if t is not None:
                 t.cancel()
+        # WsSubscriber spawns its own connect loop with no close method; cancel it
+        # directly so each Bokeh session teardown doesn't leak a WebSocket task.
+        if self._wss is not None and self._wss.subscriber_task is not None:
+            self._wss.subscriber_task.cancel()

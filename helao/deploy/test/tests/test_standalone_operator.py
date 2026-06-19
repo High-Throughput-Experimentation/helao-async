@@ -188,7 +188,7 @@ def test_remote_backend_dispatch_and_serialize():
         "campaign_name": "camp", "campaign_uuid": "cu",
     }]
     acts = asyncio.run(be.list_actions())
-    assert acts[0]["action_server"] == "motor"
+    assert acts[0]["action_server"] == "motor@host"
     asyncio.run(be.add_sequence(_Seq()))
     ep, _, body = [c for c in calls if c[0] == "append_sequence"][0]
     assert body == {"sequence": {"sequence_name": "seq0"}}
