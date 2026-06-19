@@ -885,6 +885,28 @@ class BokehOperator:
         )
         self.vis.doc.add_root(self.dynamic_col)
 
+        # Tree views react to row-selection in the active tab + tab switches.
+        for _src in (
+            self.experiment_plan_source, self.action_history_source,
+            self.experiment_history_source, self.sequence_history_source,
+        ):
+            _src.selected.on_change(
+                "indices", lambda a, o, n: self._render_planhistory_tree()
+            )
+        self.planhistory_tabs.on_change(
+            "active", lambda a, o, n: self._render_planhistory_tree()
+        )
+        for _src in (
+            self.sequence_source, self.experiment_source,
+            self.action_source, self.action_server_source,
+        ):
+            _src.selected.on_change(
+                "indices", lambda a, o, n: self._render_queue_tree()
+            )
+        self.queue_tabs.on_change(
+            "active", lambda a, o, n: self._render_queue_tree()
+        )
+
         # select the first item to force an update of the layout
         if self.experiment_select_list and self.select_tabs.active == 1:
             self.experiment_dropdown.value = self.experiment_select_list[0]
@@ -2390,6 +2412,96 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         self.button_add_expplan.label = f"Add plan [{len(self.plan)}]"
         end_time = time.time()
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
+
+    # ------------------------------------------------------------------
+    # Tree-view helpers — render an object as a <details> tree beside the
+    # active planhistory or queue tab when the user selects a row.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _open_keys(obj):
+        """Top-level keys to expand by default: any '*_params' key."""
+        if not isinstance(obj, dict):
+            return []
+        return [k for k in obj if k.endswith("_params")]
+
+    def _set_tree(self, header_div, tree_div, header_text, obj, open_keys):
+        header_div.text = f"<b>{header_text}</b>" if header_text.strip() else "<b>—</b>"
+        tree_div.text = _object_to_html(obj, open_keys=open_keys)
+
+    def _clear_tree(self, header_div, tree_div):
+        header_div.text = "<b>select a row</b>"
+        tree_div.text = ""
+
+    def _render_planhistory_tree(self):
+        """Render the tree beside the non-queued (plan/history) tabs."""
+        active = self.planhistory_tabs.active
+        if active == 0:  # Plan
+            src, kind, getter = self.experiment_plan_source, "sequence", \
+                lambda i: self.plan[i].as_dict()
+        elif active == 1:  # Action History
+            src, kind, getter = self.action_history_source, "action", \
+                lambda i: self._hist_objs["action"][i]
+        elif active == 2:  # Experiment History
+            src, kind, getter = self.experiment_history_source, "experiment", \
+                lambda i: self._hist_objs["experiment"][i]
+        else:  # Sequence History
+            src, kind, getter = self.sequence_history_source, "sequence", \
+                lambda i: self._hist_objs["sequence"][i]
+        idxs = src.selected.indices
+        if not idxs:
+            self._clear_tree(self.planhistory_tree_header, self.planhistory_tree_div)
+            return
+        try:
+            obj = getter(idxs[0])
+        except (IndexError, KeyError, AttributeError):
+            self._clear_tree(self.planhistory_tree_header, self.planhistory_tree_div)
+            return
+        self._set_tree(
+            self.planhistory_tree_header, self.planhistory_tree_div,
+            _tree_header_text(kind, obj), obj, self._open_keys(obj),
+        )
+
+    def _render_queue_tree(self):
+        """Render the tree beside the queue tabs."""
+        active = self.queue_tabs.active
+        if active == 3:  # Action Servers -> config dict (local)
+            idxs = self.action_server_source.selected.indices
+            if not idxs:
+                self._clear_tree(self.queue_tree_header, self.queue_tree_div)
+                return
+            names = self.action_server_source.data.get("action_server", [])
+            try:
+                name = names[idxs[0]]
+            except IndexError:
+                self._clear_tree(self.queue_tree_header, self.queue_tree_div)
+                return
+            cfg = self.vis.world_cfg["servers"].get(name, {})
+            self._set_tree(
+                self.queue_tree_header, self.queue_tree_div,
+                _server_header_text(name, cfg), cfg, ["params"],
+            )
+            return
+        kind = {0: "sequence", 1: "experiment", 2: "action"}[active]
+        src = {0: self.sequence_source, 1: self.experiment_source,
+               2: self.action_source}[active]
+        idxs = src.selected.indices
+        if not idxs:
+            self._clear_tree(self.queue_tree_header, self.queue_tree_div)
+            return
+        self.vis.doc.add_next_tick_callback(
+            partial(self._async_render_queue_obj, kind, idxs[0])
+        )
+
+    async def _async_render_queue_obj(self, kind, idx):
+        obj = await self.backend.get_queue_object(kind, idx)
+        if not obj:
+            self._clear_tree(self.queue_tree_header, self.queue_tree_div)
+            return
+        self._set_tree(
+            self.queue_tree_header, self.queue_tree_div,
+            _tree_header_text(kind, obj), obj, self._open_keys(obj),
+        )
 
     def _restore_last_meta(self):
         """Schedule label/campaign fields to be filled from the saved global meta block.
