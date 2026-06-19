@@ -859,14 +859,21 @@ def test_operator_label_sanitize_callback():
 def _drain_callbacks(doc, iterations=20):
     """Run all queued Bokeh next-tick callbacks until the queue is empty or the
     iteration limit is reached.  Each iteration drains exactly one generation of
-    callbacks; newly-scheduled ones are picked up in the next pass."""
+    callbacks; newly-scheduled ones are picked up in the next pass.
+
+    Async callbacks (coroutine functions) are run via asyncio.run so that their
+    awaitable body actually executes rather than just creating a coroutine object.
+    """
+    import inspect
     for _ in range(iterations):
         scheduled = list(doc.session_callbacks)
         if not scheduled:
             break
         for cb in scheduled:
             try:
-                cb.callback()  # Bokeh self-removes on invocation
+                result = cb.callback()  # Bokeh self-removes on invocation
+                if inspect.iscoroutine(result):
+                    asyncio.run(result)
             except Exception:
                 pass
 
@@ -1029,6 +1036,73 @@ def test_history_objects_retained():
     print("test_history_objects_retained PASS")
 
 
+def test_planhistory_tree_render_plan():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.helpers.premodels import Sequence
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    s = Sequence(sequence_name="seqX")
+    s.sequence_params = {"plate_id": 7}
+    op.plan = [s]
+    op.planhistory_tabs.active = 0  # Plan tab
+    op.experiment_plan_source.selected.indices = [0]
+    op._render_planhistory_tree()
+    assert "seqX" in op.planhistory_tree_header.text
+    assert "<details open><summary>sequence_params</summary>" in op.planhistory_tree_div.text
+    assert "plate_id: 7" in op.planhistory_tree_div.text
+    op.cleanup_session(None)
+    print("test_planhistory_tree_render_plan PASS")
+
+
+def test_queue_tree_render_action_server():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    vis = _FakeVisOp(Document())
+    vis.world_cfg["servers"]["MOTOR"] = {
+        "group": "action", "host": "10.0.0.1", "port": 8005,
+        "params": {"axis": "x"},
+    }
+    op = BokehOperator(vis, _MockBackend())
+    asyncio.run(op.get_orch_status_summary())
+    op.action_server_source.data = {
+        "action_server": ["MOTOR"], "server_status": ["idle"], "driver_status": ["ok"],
+    }
+    op.queue_tabs.active = 3  # Action Servers tab
+    op.action_server_source.selected.indices = [0]
+    op._render_queue_tree()
+    assert "MOTOR · 10.0.0.1:8005" in op.queue_tree_header.text
+    assert "<details open><summary>params</summary>" in op.queue_tree_div.text
+    assert "axis: x" in op.queue_tree_div.text
+    op.cleanup_session(None)
+    print("test_queue_tree_render_action_server PASS")
+
+
+def test_queue_tree_render_lazy_sequence():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    fetched = {}
+
+    class _BE(_MockBackend):
+        async def get_queue_object(self, kind, idx):
+            fetched["args"] = (kind, idx)
+            return {"sequence_name": "Q", "sequence_uuid": "ffff0000ffff1111",
+                    "sequence_params": {"k": 9}}
+
+    op = BokehOperator(_FakeVisOp(Document()), _BE())
+    op.queue_tabs.active = 0  # Sequences tab
+    op.sequence_source.selected.indices = [2]
+    op._render_queue_tree()
+    _drain_callbacks(op.vis.doc)
+    assert fetched["args"] == ("sequence", 2)
+    assert "Q · ffff1111" in op.queue_tree_header.text
+    assert "<details open><summary>sequence_params</summary>" in op.queue_tree_div.text
+    op.cleanup_session(None)
+    print("test_queue_tree_render_lazy_sequence PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -1070,6 +1144,9 @@ def run_all():
     test_prepend_plan_callback_clears_and_dispatches()
     test_prepend_button_enable_gate()
     test_history_objects_retained()
+    test_planhistory_tree_render_plan()
+    test_queue_tree_render_action_server()
+    test_queue_tree_render_lazy_sequence()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
 
