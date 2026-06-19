@@ -393,6 +393,18 @@ class OrchAPI(HelaoFastAPI):
             uuids = await _prepend_sequences(self.orch, sequences)
             return {"sequence_uuids": uuids}
 
+        @self.post("/move_sequence", tags=["private"])
+        async def move_sequence(from_idx: int, to_idx: int):
+            """Move a queued sequence from one index to another."""
+            await self.orch.move_sequence(from_idx, to_idx)
+            return {"n_sequences": len(self.orch.sequence_dq)}
+
+        @self.post("/remove_sequence", tags=["private"])
+        async def remove_sequence(idx: int):
+            """Remove a queued sequence by index."""
+            await self.orch.remove_sequence(idx)
+            return {"n_sequences": len(self.orch.sequence_dq)}
+
         @self.post("/append_experiment", tags=["private"])
         async def append_experiment(experiment: Experiment = Body({}, embed=True)):
             """Append an experiment to the active sequence and return its UUID."""
