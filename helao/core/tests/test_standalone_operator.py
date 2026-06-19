@@ -639,6 +639,30 @@ def test_orch_add_sequence_sanitizes_label():
     print("test_orch_add_sequence_sanitizes_label PASS")
 
 
+def test_orch_move_and_remove_sequence():
+    from helao.core.servers.orch import Orch
+    from helao.helpers.premodels import Sequence
+    from helao.helpers.zdeque import zdeque
+
+    orch = Orch.__new__(Orch)
+    orch.sequence_dq = zdeque(
+        [Sequence(sequence_name=n) for n in ("A", "B", "C")]
+    )
+
+    asyncio.run(orch.move_sequence(2, 0))
+    assert [s.sequence_name for s in orch.sequence_dq] == ["C", "A", "B"]
+
+    asyncio.run(orch.remove_sequence(0))
+    assert [s.sequence_name for s in orch.sequence_dq] == ["A", "B"]
+    assert len(orch.sequence_dq) == 2
+
+    # out-of-range is a no-op
+    asyncio.run(orch.move_sequence(5, 0))
+    asyncio.run(orch.remove_sequence(9))
+    assert [s.sequence_name for s in orch.sequence_dq] == ["A", "B"]
+    print("test_orch_move_and_remove_sequence PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -653,6 +677,7 @@ def run_all():
     test_orch_prepend_order_and_run_id()
     test_sanitize_sequence_label()
     test_orch_add_sequence_sanitizes_label()
+    test_orch_move_and_remove_sequence()
     test_prepend_sequences_helper()
     test_local_backend_prepend()
     test_remote_backend_prepend()
