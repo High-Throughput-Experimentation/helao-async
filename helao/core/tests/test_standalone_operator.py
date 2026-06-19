@@ -663,6 +663,51 @@ def test_orch_move_and_remove_sequence():
     print("test_orch_move_and_remove_sequence PASS")
 
 
+def test_local_backend_move_remove():
+    from helao.core.servers.operator.orch_backend import LocalBackend
+
+    class _O(_FakeOrch):
+        sequence_lib = {}
+        experiment_lib = {}
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+        async def move_sequence(self, from_idx, to_idx):
+            self.calls.append(("move", from_idx, to_idx))
+        async def remove_sequence(self, idx):
+            self.calls.append(("remove", idx))
+
+    orch = _O()
+    be = LocalBackend(orch)
+    asyncio.run(be.move_sequence(2, 0))
+    asyncio.run(be.remove_sequence(1))
+    assert orch.calls == [("move", 2, 0), ("remove", 1)]
+    print("test_local_backend_move_remove PASS")
+
+
+def test_remote_backend_move_remove():
+    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.core.error import ErrorCodes
+
+    calls = []
+
+    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+        calls.append((endpoint, params_dict))
+        return {"n_sequences": 0}, ErrorCodes.none
+
+    be = RemoteBackend.__new__(RemoteBackend)
+    be.orch_key = "ORCH"
+    be.host = "127.0.0.1"
+    be.port = 8001
+    be._dispatch = fake_dispatch
+
+    asyncio.run(be.move_sequence(2, 0))
+    asyncio.run(be.remove_sequence(1))
+    assert calls[0] == ("move_sequence", {"from_idx": 2, "to_idx": 0})
+    assert calls[1] == ("remove_sequence", {"idx": 1})
+    print("test_remote_backend_move_remove PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -681,6 +726,8 @@ def run_all():
     test_prepend_sequences_helper()
     test_local_backend_prepend()
     test_remote_backend_prepend()
+    test_local_backend_move_remove()
+    test_remote_backend_move_remove()
     test_plan_buffer_append_and_wrap()
     test_plan_buffer_order()
     test_plan_metadata_capture_at_insert()
