@@ -71,6 +71,12 @@ class OrchBackend(ABC):
     async def prepend_sequences(self, sequences: list) -> object: ...
 
     @abstractmethod
+    async def move_sequence(self, from_idx: int, to_idx: int) -> None: ...
+
+    @abstractmethod
+    async def remove_sequence(self, idx: int) -> None: ...
+
+    @abstractmethod
     async def start(self) -> None: ...
 
     @abstractmethod
@@ -196,6 +202,12 @@ class LocalBackend(OrchBackend):
 
     async def prepend_sequences(self, sequences):
         return await self.orch.prepend_sequences(sequences=sequences)
+
+    async def move_sequence(self, from_idx, to_idx):
+        await self.orch.move_sequence(from_idx, to_idx)
+
+    async def remove_sequence(self, idx):
+        await self.orch.remove_sequence(idx)
 
     async def start(self):
         await self.orch.start()
@@ -342,6 +354,14 @@ class RemoteBackend(OrchBackend):
             "prepend_sequences",
             json_dict={"sequences": [s.model_dump() for s in sequences]},
         )
+
+    async def move_sequence(self, from_idx, to_idx):
+        await self._call(
+            "move_sequence", params_dict={"from_idx": from_idx, "to_idx": to_idx}
+        )
+
+    async def remove_sequence(self, idx):
+        await self._call("remove_sequence", params_dict={"idx": idx})
 
     async def start(self):
         await self._call("start")
