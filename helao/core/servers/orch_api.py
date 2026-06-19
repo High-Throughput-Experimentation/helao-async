@@ -78,6 +78,12 @@ def _queue_counts(orch) -> dict:
     }
 
 
+async def _prepend_sequences(orch, sequences) -> list:
+    """Coerce ``sequences`` to ``Sequence`` instances and prepend them on the orch."""
+    seqs = [s if isinstance(s, Sequence) else Sequence(**s) for s in sequences]
+    return await orch.prepend_sequences(sequences=seqs)
+
+
 class OrchAPI(HelaoFastAPI):
     """FastAPI application class for the HELAO orchestrator server.
 
@@ -380,6 +386,12 @@ class OrchAPI(HelaoFastAPI):
                 sequence = Sequence(**sequence)
             seq_uuid = await self.orch.add_sequence(sequence=sequence)
             return {"sequence_uuid": seq_uuid}
+
+        @self.post("/prepend_sequences", tags=["private"])
+        async def prepend_sequences(sequences: List[Sequence] = Body([], embed=True)):
+            """Prepend a list of sequences to the front of the orch queue."""
+            uuids = await _prepend_sequences(self.orch, sequences)
+            return {"sequence_uuids": uuids}
 
         @self.post("/append_experiment", tags=["private"])
         async def append_experiment(experiment: Experiment = Body({}, embed=True)):
