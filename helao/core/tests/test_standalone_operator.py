@@ -961,6 +961,50 @@ def test_tree_header_text():
     print("test_tree_header_text PASS")
 
 
+def test_local_backend_get_queue_object():
+    from helao.core.servers.operator.orch_backend import LocalBackend
+
+    class _Item:
+        def as_dict(self):
+            return {"action_name": "noop", "action_params": {"v": 2}}
+
+    class _O(_FakeOrch):
+        sequence_lib = {}
+        experiment_lib = {}
+        def __init__(self):
+            super().__init__()
+            self.action_dq = [_Item()]
+
+    be = LocalBackend(_O())
+    assert asyncio.run(be.get_queue_object("action", 0)) == {
+        "action_name": "noop", "action_params": {"v": 2},
+    }
+    assert asyncio.run(be.get_queue_object("action", 5)) == {}
+    print("test_local_backend_get_queue_object PASS")
+
+
+def test_remote_backend_get_queue_object():
+    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.core.error import ErrorCodes
+
+    calls = []
+
+    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+        calls.append((endpoint, params_dict))
+        return {"sequence_name": "B", "sequence_params": {"x": 1}}, ErrorCodes.none
+
+    be = RemoteBackend.__new__(RemoteBackend)
+    be.orch_key = "ORCH"
+    be.host = "127.0.0.1"
+    be.port = 8001
+    be._dispatch = fake_dispatch
+
+    out = asyncio.run(be.get_queue_object("sequence", 1))
+    assert out == {"sequence_name": "B", "sequence_params": {"x": 1}}
+    assert calls[0] == ("get_queue_object", {"kind": "sequence", "idx": 1})
+    print("test_remote_backend_get_queue_object PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -990,6 +1034,8 @@ def run_all():
     test_remote_backend_prepend()
     test_local_backend_move_remove()
     test_remote_backend_move_remove()
+    test_local_backend_get_queue_object()
+    test_remote_backend_get_queue_object()
     test_plan_buffer_append_and_wrap()
     test_plan_buffer_order()
     test_plan_metadata_capture_at_insert()
