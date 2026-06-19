@@ -1103,6 +1103,28 @@ def test_queue_tree_render_lazy_sequence():
     print("test_queue_tree_render_lazy_sequence PASS")
 
 
+def test_queue_tree_lazy_empty_clears():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    class _BE(_MockBackend):
+        async def get_queue_object(self, kind, idx):
+            return {}  # snapshot miss: queue mutated since poll
+
+    op = BokehOperator(_FakeVisOp(Document()), _BE())
+    # seed a non-placeholder tree so we can observe it being cleared
+    op.queue_tree_header.text = "<b>stale</b>"
+    op.queue_tree_div.text = "<div>stale</div>"
+    op.queue_tabs.active = 2  # Actions tab
+    op.action_source.selected.indices = [0]
+    op._render_queue_tree()
+    _drain_callbacks(op.vis.doc)
+    assert op.queue_tree_header.text == "<b>select a row</b>"
+    assert op.queue_tree_div.text == ""
+    op.cleanup_session(None)
+    print("test_queue_tree_lazy_empty_clears PASS")
+
+
 def test_layout_is_stretch_width():
     from bokeh.document import Document
     from helao.core.servers.operator.bokeh_operator import BokehOperator
@@ -1158,6 +1180,7 @@ def run_all():
     test_planhistory_tree_render_plan()
     test_queue_tree_render_action_server()
     test_queue_tree_render_lazy_sequence()
+    test_queue_tree_lazy_empty_clears()
     test_layout_is_stretch_width()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
