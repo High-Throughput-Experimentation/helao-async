@@ -44,6 +44,32 @@ class _FakeOrch:
         return ["uuid-1", "uuid-2"]
 
 
+class _FakeDirsOp:
+    def __init__(self):
+        import tempfile
+        from pathlib import Path
+        self.root = Path(tempfile.mkdtemp())
+        self.log_root = None
+        self.user_exp = None
+        self.user_seq = None
+
+
+class _FakeVisOp:
+    """Vis stand-in with the minimum surface BokehOperator reads."""
+    def __init__(self, doc):
+        self.doc = doc
+        self.helaodirs = _FakeDirsOp()
+        self.world_cfg = {
+            "servers": {"ORCH": {"group": "orchestrator", "host": "h", "port": 1}},
+            "root": str(self.helaodirs.root),
+            "loaded_config_path": "test.yml",
+        }
+        self.server_cfg = {"params": {}}
+
+    def print_message(self, *a, **k):
+        pass
+
+
 def test_endpoint_helpers_shapes():
     # Endpoint handler bodies are extracted as module-level helpers for testability.
     from helao.core.servers import orch_api
@@ -179,9 +205,89 @@ def test_operator_accepts_backend():
     print("test_operator_accepts_backend PASS")
 
 
+class _MockBackend:
+    def __init__(self):
+        self.sequence_lib = {"seq0": lambda x=1: [x]}
+        self.experiment_lib = {}
+        self._flags = {"actions": False, "experiments": False, "sequences": False}
+        self.started = False
+        self.on_change = None
+
+    def unpack_sequence(self, sequence_name, sequence_params):
+        return self.sequence_lib[sequence_name](**sequence_params)
+
+    def get_step_flags(self):
+        return dict(self._flags)
+
+    async def set_step_flag(self, kind, value):
+        self._flags[kind] = value
+
+    async def list_sequences(self):
+        return [{"sequence_name": "seq0", "sequence_label": "l",
+                 "sequence_uuid": "su", "campaign_name": "c", "campaign_uuid": "cu"}]
+
+    async def list_experiments(self):
+        return [{"experiment_name": "exp0", "experiment_uuid": "eu"}]
+
+    async def list_actions(self):
+        return [{"action_name": "noop", "action_server": "motor", "action_uuid": "au"}]
+
+    async def get_histories(self):
+        return {"action": [], "experiment": [], "sequence": []}
+
+    async def get_status_summary(self):
+        return {"motor": ["idle", "ok"]}
+
+    async def get_orch_state(self):
+        return {"loop_state": "stopped", "active_sequence": {}, "active_experiment": {},
+                "n_sequences": 1, "n_experiments": 1, "n_actions": 1,
+                "current_stop_message": ""}
+
+    async def add_sequence(self, sequence):
+        return "su"
+
+    async def add_split_sequences(self, sequence):
+        return ["su"]
+
+    async def start(self):
+        self.started = True
+
+    async def stop(self): ...
+    async def skip(self): ...
+    async def estop(self): ...
+    async def clear_sequences(self): ...
+    async def clear_experiments(self): ...
+    async def clear_actions(self): ...
+
+    def subscribe(self, on_change):
+        self.on_change = on_change
+
+    def close(self):
+        self.on_change = None
+
+
+def test_operator_tables_from_backend():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    doc = Document()
+    vis = _FakeVisOp(doc)
+    be = _MockBackend()
+    op = BokehOperator(vis, be)
+    assert be.on_change is not None
+    asyncio.run(op.update_tables())
+    assert op.sequence_source.data["sequence_name"] == ["seq0"]
+    assert op.action_source.data["action_server"] == ["motor"]
+    assert op.action_server_source.data["server_status"] == ["idle"]
+    assert "stop" in op.orch_status_button.label.lower()
+    op.cleanup_session(None)
+    print("test_operator_tables_from_backend PASS")
+
+
 if __name__ == "__main__":
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
     test_remote_backend_dispatch_and_serialize()
     test_operator_accepts_backend()
+    test_operator_tables_from_backend()
     print("ok")
