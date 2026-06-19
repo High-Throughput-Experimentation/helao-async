@@ -355,6 +355,9 @@ class BokehOperator:
         self.button_add_smpseqs = self._make_button(
             "Split plan", "default", 100, self.callback_add_split_sequences
         )
+        self.button_prepend_plan = self._make_button(
+            "Prepend plan", "default", 100, self.callback_prepend_plan
+        )
         self.button_stop_orch = self._make_button(
             "Stop Orch", "default", 70, self.callback_stop_orch
         )
@@ -636,6 +639,8 @@ class BokehOperator:
                             Spacer(width=10),
                             self.button_add_smpseqs,
                             Spacer(width=10),
+                            self.button_prepend_plan,
+                            Spacer(width=10),
                             self.button_start_orch,
                             Spacer(width=10),
                             self.button_stop_orch,
@@ -690,6 +695,8 @@ class BokehOperator:
                             self.button_add_expplan,
                             Spacer(width=10),
                             self.button_add_smpseqs,
+                            Spacer(width=10),
+                            self.button_prepend_plan,
                             Spacer(width=10),
                             self.button_start_orch,
                             Spacer(width=10),
@@ -1393,6 +1400,15 @@ class BokehOperator:
         self.plan = []
         self.vis.doc.add_next_tick_callback(
             partial(self._flush_plan, plan, self.backend.add_split_sequences)
+        )
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_prepend_plan(self, event):
+        """Prepend the whole plan buffer to the front of the orch sequence queue."""
+        plan = self.plan
+        self.plan = []
+        self.vis.doc.add_next_tick_callback(
+            partial(self.backend.prepend_sequences, plan)
         )
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -2142,6 +2158,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         else:
             self.orch_status_button.label = f"{loop_state}"
             self.orch_status_button.button_type = "danger"
+        self.button_prepend_plan.disabled = loop_state != LoopStatus.stopped.value
         self.button_add_expplan.label = f"Add plan [{seq_count}]"
         end_time = time.time()
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")

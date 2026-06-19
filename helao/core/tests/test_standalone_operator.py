@@ -576,6 +576,41 @@ def test_plan_table_rows():
     print("test_plan_table_rows PASS")
 
 
+def test_prepend_plan_callback_clears_and_dispatches():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.helpers.premodels import Sequence
+
+    be = _MockBackend()
+    op = BokehOperator(_FakeVisOp(Document()), be)
+    plan = [Sequence(sequence_name="A"), Sequence(sequence_name="B")]
+    op.plan = plan
+    op.callback_prepend_plan(None)
+    assert op.plan == [], "buffer should clear synchronously"
+    asyncio.run(be.prepend_sequences(plan))
+    assert [s.sequence_name for s in be.prepended] == ["A", "B"]
+    op.cleanup_session(None)
+    print("test_prepend_plan_callback_clears_and_dispatches PASS")
+
+
+def test_prepend_button_enable_gate():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    be = _MockBackend()
+    op = BokehOperator(_FakeVisOp(Document()), be)
+
+    be.loop_state = "started"
+    asyncio.run(op.update_tables())
+    assert op.button_prepend_plan.disabled is True, "disabled while running"
+
+    be.loop_state = "stopped"
+    asyncio.run(op.update_tables())
+    assert op.button_prepend_plan.disabled is False, "enabled while stopped/paused"
+    op.cleanup_session(None)
+    print("test_prepend_button_enable_gate PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -596,6 +631,8 @@ def run_all():
     test_plan_metadata_capture_at_insert()
     test_flush_add_dispatches_per_sequence()
     test_plan_table_rows()
+    test_prepend_plan_callback_clears_and_dispatches()
+    test_prepend_button_enable_gate()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
 
