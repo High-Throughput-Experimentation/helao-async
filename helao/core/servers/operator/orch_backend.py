@@ -68,6 +68,9 @@ class OrchBackend(ABC):
     async def add_split_sequences(self, sequence) -> object: ...
 
     @abstractmethod
+    async def prepend_sequences(self, sequences: list) -> object: ...
+
+    @abstractmethod
     async def start(self) -> None: ...
 
     @abstractmethod
@@ -190,6 +193,9 @@ class LocalBackend(OrchBackend):
 
     async def add_split_sequences(self, sequence):
         return await self.orch.add_split_sequences(sequence=sequence)
+
+    async def prepend_sequences(self, sequences):
+        return await self.orch.prepend_sequences(sequences=sequences)
 
     async def start(self):
         await self.orch.start()
@@ -330,6 +336,12 @@ class RemoteBackend(OrchBackend):
 
     async def add_split_sequences(self, sequence):
         return await self._call("append_split_sequences", json_dict={"sequence": sequence.model_dump()})
+
+    async def prepend_sequences(self, sequences):
+        return await self._call(
+            "prepend_sequences",
+            json_dict={"sequences": [s.model_dump() for s in sequences]},
+        )
 
     async def start(self):
         await self._call("start")
