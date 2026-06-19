@@ -11,8 +11,6 @@ sequence and experiment libraries.
 """
 
 import time
-import traceback
-import asyncio
 import io
 import json
 import os
@@ -846,10 +844,7 @@ class BokehOperator:
             self.seqspec_dropdown.value = self.seqspec_select_list[0]
 
         self._queue_counts = {"n_sequences": 0, "n_experiments": 0, "n_actions": 0}
-        self._loop_state = LoopStatus.stopped
         self._current_stop_message = ""
-        self._active_sequence_name = None
-        self._active_experiment_name = None
         self.backend.subscribe(self._on_backend_change)
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
