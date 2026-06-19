@@ -2455,6 +2455,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         try:
             obj = getter(idxs[0])
         except (IndexError, KeyError, AttributeError):
+            LOGGER.exception("planhistory tree render failed")
             self._clear_tree(self.planhistory_tree_header, self.planhistory_tree_div)
             return
         self._set_tree(
@@ -2489,6 +2490,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         if not idxs:
             self._clear_tree(self.queue_tree_header, self.queue_tree_div)
             return
+        # Rapid row clicks race; last fetch to complete wins. Acceptable for a single-operator UI.
         self.vis.doc.add_next_tick_callback(
             partial(self._async_render_queue_obj, kind, idxs[0])
         )
@@ -2496,6 +2498,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
     async def _async_render_queue_obj(self, kind, idx):
         obj = await self.backend.get_queue_object(kind, idx)
         if not obj:
+            LOGGER.debug("queue object %s[%s] empty; clearing tree", kind, idx)
             self._clear_tree(self.queue_tree_header, self.queue_tree_div)
             return
         self._set_tree(
