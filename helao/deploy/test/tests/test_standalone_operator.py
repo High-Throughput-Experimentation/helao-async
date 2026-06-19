@@ -284,10 +284,20 @@ def test_operator_tables_from_backend():
     print("test_operator_tables_from_backend PASS")
 
 
+def test_plate_api_disabled_by_default():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    assert op.dataAPI is None  # no plate_api param -> disabled
+    op.cleanup_session(None)
+    print("test_plate_api_disabled_by_default PASS")
+
+
 if __name__ == "__main__":
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
     test_remote_backend_dispatch_and_serialize()
     test_operator_accepts_backend()
     test_operator_tables_from_backend()
+    test_plate_api_disabled_by_default()
     print("ok")
