@@ -763,9 +763,8 @@ class Orch(Base):
                         f"global parameter {k} not found in global_params, skipping"
                     )
 
-            # attach run_id
-            if self.active_run_id is not None:
-                self.active_sequence.run_id = self.active_run_id
+            # attach run_id (derive active_run_id from the dequeued sequence)
+            self._resolve_active_run_id(self.active_sequence)
 
             # if planned_experiments is empty, unpack sequence,
             # otherwise operator already populated planned_experiments
@@ -1740,30 +1739,43 @@ class Orch(Base):
         LOGGER.info("clearing action queue")
         self.action_dq.clear()
 
-    async def add_sequence(self, sequence: Sequence) -> UUID:
-        """Append ``sequence`` to the sequence deque, populating its UUID/code metadata.
-
-        Returns:
-            The UUID of the added sequence.
-        """
-        # init uuid now for tracking later
+    def _prep_sequence_meta(self, sequence: Sequence) -> None:
+        """Populate uuid/codehash/codepath/funcname metadata on ``sequence`` in place."""
         if sequence.sequence_uuid is None:
             sequence.sequence_uuid = gen_uuid()
         if (
             sequence.sequence_codehash is None
             and sequence.sequence_name in self.sequence_codehash_lib
         ):
-            sequence.sequence_codehash = self.sequence_codehash_lib[
-                sequence.sequence_name
-            ]
-            sequence.sequence_codepath = self.sequence_codepath_lib[
-                sequence.sequence_name
-            ]
-            sequence.sequence_funcname = self.sequence_lib[
-                sequence.sequence_name
-            ].__name__
+            sequence.sequence_codehash = self.sequence_codehash_lib[sequence.sequence_name]
+            sequence.sequence_codepath = self.sequence_codepath_lib[sequence.sequence_name]
+            sequence.sequence_funcname = self.sequence_lib[sequence.sequence_name].__name__
+
+    def _ensure_run_id(self) -> UUID:
+        """Return the run_id to stamp on a sequence entering the queue.
+
+        Empty/just-cleared queue -> fresh run_id; non-empty -> reuse the
+        in-flight ``active_run_id`` (back-to-back sharing).
+        """
         if len(self.sequence_dq) == 0:
             self.active_run_id = gen_uuid()
+        return self.active_run_id
+
+    def _resolve_active_run_id(self, sequence: Sequence) -> None:
+        """At dequeue, sync ``active_run_id`` with the active sequence's run_id."""
+        if sequence.run_id is not None:
+            self.active_run_id = sequence.run_id
+        elif self.active_run_id is not None:
+            sequence.run_id = self.active_run_id
+
+    async def add_sequence(self, sequence: Sequence) -> UUID:
+        """Append ``sequence`` to the sequence deque, populating its metadata and run_id.
+
+        Returns:
+            The UUID of the added sequence.
+        """
+        self._prep_sequence_meta(sequence)
+        sequence.run_id = self._ensure_run_id()
         self.sequence_dq.append(sequence)
         return sequence.sequence_uuid
 
@@ -1789,6 +1801,7 @@ class Orch(Base):
         ]
 
         if possible_splits:
+            run_id = self._ensure_run_id()
             split_key = possible_splits[0]
             split_list = sequence.sequence_params[split_key]
             sub_sequence_uuids = []
@@ -1825,8 +1838,7 @@ class Orch(Base):
                             sub_sequence.sequence_name
                         ].__name__
                     sub_sequence.run_sequence_parameter_variable = [run_seq_param]
-                    if len(self.sequence_dq) == 0:
-                        self.active_run_id = gen_uuid()
+                    sub_sequence.run_id = run_id
                     self.sequence_dq.append(sub_sequence)
                     sub_sequence_uuids.append(sub_sequence.sequence_uuid)
                     sub_sequence_items = []
