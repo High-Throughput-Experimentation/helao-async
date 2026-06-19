@@ -1846,6 +1846,27 @@ class Orch(Base):
         else:
             return await self.add_sequence(sequence)
 
+    async def prepend_sequences(self, sequences: List[Sequence]) -> List[UUID]:
+        """Insert ``sequences`` at the front of the queue, preserving their order.
+
+        Stamps uuid/codehash/run_id like :meth:`add_sequence`. Reuses the
+        in-flight run_id when the queue is non-empty, else mints a fresh one.
+        An empty list is a no-op (returns ``[]`` without touching run_id).
+
+        Returns:
+            The UUIDs of the prepended sequences, in buffer order.
+        """
+        if not sequences:
+            return []
+        run_id = self._ensure_run_id()
+        uuids = []
+        for i, sequence in enumerate(sequences):
+            self._prep_sequence_meta(sequence)
+            sequence.run_id = run_id
+            self.sequence_dq.insert(i, sequence)
+            uuids.append(sequence.sequence_uuid)
+        return uuids
+
     async def add_experiment(
         self,
         seq: Sequence,

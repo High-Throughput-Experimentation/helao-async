@@ -373,6 +373,39 @@ def test_orch_split_run_id():
     print("test_orch_split_run_id PASS")
 
 
+def test_orch_prepend_order_and_run_id():
+    from helao.core.servers.orch import Orch
+    from helao.helpers.premodels import Sequence
+    from helao.helpers.zdeque import zdeque
+
+    orch = Orch.__new__(Orch)
+    orch.sequence_dq = zdeque([])
+    orch.active_run_id = None
+    orch.sequence_codehash_lib = {}
+    orch.sequence_codepath_lib = {}
+    orch.sequence_lib = {}
+
+    existing = Sequence(sequence_name="existing")
+    asyncio.run(orch.add_sequence(existing))
+    inflight = existing.run_id
+
+    a = Sequence(sequence_name="A")
+    b = Sequence(sequence_name="B")
+    c = Sequence(sequence_name="C")
+    uuids = asyncio.run(orch.prepend_sequences([a, b, c]))
+    assert len(uuids) == 3
+
+    names = [s.sequence_name for s in orch.sequence_dq]
+    assert names == ["A", "B", "C", "existing"], names
+    assert a.run_id == b.run_id == c.run_id == inflight, "prepend reuses in-flight run_id"
+
+    # empty prepend is a no-op and must not mint a stray run_id
+    before = orch.active_run_id
+    assert asyncio.run(orch.prepend_sequences([])) == []
+    assert orch.active_run_id == before
+    print("test_orch_prepend_order_and_run_id PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -384,6 +417,7 @@ def run_all():
     test_orch_run_id_sharing()
     test_orch_resolve_active_run_id()
     test_orch_split_run_id()
+    test_orch_prepend_order_and_run_id()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
 
