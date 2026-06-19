@@ -406,6 +406,24 @@ def test_orch_prepend_order_and_run_id():
     print("test_orch_prepend_order_and_run_id PASS")
 
 
+def test_prepend_sequences_helper():
+    from helao.core.servers import orch_api
+
+    class _O(_FakeOrch):
+        async def prepend_sequences(self, sequences):
+            self.prepended = sequences
+            return ["u1", "u2"]
+
+    orch = _O()
+    uuids = asyncio.run(orch_api._prepend_sequences(orch, [{}, {}]))
+    assert uuids == ["u1", "u2"]
+    assert len(orch.prepended) == 2
+    # dict inputs are coerced to Sequence instances
+    from helao.helpers.premodels import Sequence
+    assert all(isinstance(s, Sequence) for s in orch.prepended)
+    print("test_prepend_sequences_helper PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -418,6 +436,7 @@ def run_all():
     test_orch_resolve_active_run_id()
     test_orch_split_run_id()
     test_orch_prepend_order_and_run_id()
+    test_prepend_sequences_helper()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
 
