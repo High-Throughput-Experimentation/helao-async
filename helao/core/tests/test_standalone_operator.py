@@ -566,16 +566,68 @@ def test_plan_table_rows():
     from helao.helpers.premodels import Sequence, Experiment
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
-    seq = Sequence(sequence_name="s")
-    seq.sequence_label = "L"
-    seq.planned_experiments = [Experiment(experiment_name="exp0")]
-    op.plan = [seq]
+    manual = Sequence(sequence_name="m")
+    manual.sequence_label = "L1"
+    manual.planned_experiments = [Experiment(experiment_name="exp0")]
+    multi = Sequence(sequence_name="big")
+    multi.sequence_label = "L2"
+    multi.planned_experiments = [
+        Experiment(experiment_name="exp0"),
+        Experiment(experiment_name="exp0"),
+    ]
+    op.plan = [manual, multi]
     asyncio.run(op.update_tables())
-    assert op.experiment_plan_source.data["experiment_name"] == ["exp0"]
-    assert op.experiment_plan_source.data["sequence_name"] == ["s"]
-    assert op.button_add_expplan.label == "Add plan [1]"
+    data = op.experiment_plan_source.data
+    assert data["sequence_name"] == ["m", "big"]
+    assert data["sequence_label"] == ["L1", "L2"]
+    assert data["num_experiments"] == [1, 2]
+    assert op.button_add_expplan.label == "Add plan [2]"
     op.cleanup_session(None)
     print("test_plan_table_rows PASS")
+
+
+def test_plan_reorder_and_remove():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.helpers.premodels import Sequence
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    op.plan = [Sequence(sequence_name=n) for n in ("A", "B", "C")]
+    op.experiment_plan_source.selected.indices = [2]
+    op.callback_plan_move_up(None)
+    assert [s.sequence_name for s in op.plan] == ["A", "C", "B"]
+
+    op.experiment_plan_source.selected.indices = [0]
+    op.callback_plan_move_down(None)
+    assert [s.sequence_name for s in op.plan] == ["C", "A", "B"]
+
+    op.experiment_plan_source.selected.indices = [1]
+    op.callback_plan_remove(None)
+    assert [s.sequence_name for s in op.plan] == ["C", "B"]
+    op.cleanup_session(None)
+    print("test_plan_reorder_and_remove PASS")
+
+
+def test_queue_controls_enable_gate():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    be = _MockBackend()
+    op = BokehOperator(_FakeVisOp(Document()), be)
+
+    be.loop_state = "started"
+    asyncio.run(op.update_tables())
+    assert op.button_seq_move_up.disabled is True
+    assert op.button_seq_move_down.disabled is True
+    assert op.button_seq_remove.disabled is True
+
+    be.loop_state = "stopped"
+    asyncio.run(op.update_tables())
+    assert op.button_seq_move_up.disabled is False
+    assert op.button_seq_move_down.disabled is False
+    assert op.button_seq_remove.disabled is False
+    op.cleanup_session(None)
+    print("test_queue_controls_enable_gate PASS")
 
 
 def test_prepend_plan_callback_clears_and_dispatches():
@@ -860,6 +912,8 @@ def run_all():
     test_plan_metadata_capture_at_insert()
     test_flush_add_dispatches_per_sequence()
     test_plan_table_rows()
+    test_plan_reorder_and_remove()
+    test_queue_controls_enable_gate()
     test_prepend_plan_callback_clears_and_dispatches()
     test_prepend_button_enable_gate()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
