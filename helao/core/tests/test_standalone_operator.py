@@ -910,12 +910,13 @@ def test_object_to_html():
     }
     html = _object_to_html(obj, open_keys=["sequence_params"])
     assert "<details open><summary>sequence_params</summary>" in html
-    assert "<details><summary>sequence_uuid</summary>" in html or \
-           "sequence_uuid: 0123456789abcdef" in html
+    assert "sequence_uuid: 0123456789abcdef" in html
     assert "plate_id: 4083" in html
     assert "experiment_list [2]" in html
     assert "empty" in _object_to_html({})
     assert "scalar" in _object_to_html("scalar")
+    # values with HTML special chars are escaped (no raw injection)
+    assert "&lt;b&gt;" in _object_to_html({"k": "<b>x</b>"})
     print("test_object_to_html PASS")
 
 
@@ -928,6 +929,10 @@ def test_tree_header_text():
     assert _tree_header_text("action", {"action_name": "noop"}) == "noop"
     cfg = {"host": "127.0.0.1", "port": 8001}
     assert _server_header_text("MOTOR", cfg) == "MOTOR · 127.0.0.1:8001"
+    # data fields are HTML-escaped (no raw injection)
+    assert "&lt;" in _tree_header_text(
+        "sequence", {"sequence_name": "<x>", "sequence_uuid": "abcd1234"}
+    )
     print("test_tree_header_text PASS")
 
 

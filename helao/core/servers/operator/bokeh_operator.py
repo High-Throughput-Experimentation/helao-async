@@ -98,16 +98,30 @@ def _truncate_uuid(value):
 
 
 def _tree_header_text(kind, obj):
-    """Header line for a sequence/experiment/action object: 'name · uuid8'."""
+    """Header line for a sequence/experiment/action object: 'name · uuid8'.
+
+    Data fields are HTML-escaped so the result is safe to interpolate directly
+    into markup (e.g. ``<b>{header_text}</b>``); the literal middle dot is not
+    data and is left unescaped.
+    """
     name = obj.get(f"{kind}_name", "") if isinstance(obj, dict) else ""
     uuid8 = _truncate_uuid(obj.get(f"{kind}_uuid")) if isinstance(obj, dict) else ""
+    name = _html.escape(str(name))
+    uuid8 = _html.escape(str(uuid8))
     return f"{name} · {uuid8}" if uuid8 else f"{name}"
 
 
 def _server_header_text(server_name, cfg):
-    """Header line for an action-server row: 'NAME · host:port'."""
+    """Header line for an action-server row: 'NAME · host:port'.
+
+    Data fields are HTML-escaped so the result is safe to interpolate directly
+    into markup; the literal middle dot is not data and is left unescaped.
+    """
     cfg = cfg or {}
-    return f"{server_name} · {cfg.get('host', '')}:{cfg.get('port', '')}"
+    name = _html.escape(str(server_name))
+    host = _html.escape(str(cfg.get("host", "")))
+    port = _html.escape(str(cfg.get("port", "")))
+    return f"{name} · {host}:{port}"
 
 
 class return_sequence_lib(BaseModel):
