@@ -1,7 +1,7 @@
 """Standalone tests for the standalone Bokeh operator. No pytest; run with:
 
     PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async conda run -n helao \
-        python -m helao.deploy.test.tests.test_standalone_operator
+        python -m helao.core.tests.test_standalone_operator
 """
 import asyncio
 import inspect
@@ -295,12 +295,10 @@ def test_plate_api_disabled_by_default():
 
 def test_shim_exposes_makebokehapp():
     import importlib, inspect
-    for mod in ("helao.deploy.test.servers.operator.standalone_operator",
-                "helao.deploy.hte.servers.operator.standalone_operator"):
-        m = importlib.import_module(mod)
-        assert hasattr(m, "makeBokehApp"), mod
-        params = list(inspect.signature(m.makeBokehApp).parameters)
-        assert params == ["doc", "confPrefix", "server_key", "helao_repo_root"], (mod, params)
+    m = importlib.import_module("helao.deploy.hte.servers.operator.standalone_operator")
+    assert hasattr(m, "makeBokehApp")
+    params = list(inspect.signature(m.makeBokehApp).parameters)
+    assert params == ["doc", "confPrefix", "server_key", "helao_repo_root"], params
     print("test_shim_exposes_makebokehapp PASS")
 
 
