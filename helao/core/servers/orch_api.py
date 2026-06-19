@@ -35,6 +35,49 @@ from helao.core.servers.base_api import (
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
+def _histories_payload(orch) -> dict:
+    """Return action/experiment/sequence history as JSON-safe (uuid, dict) item lists."""
+    return {
+        "action": list(orch.action_history.items()),
+        "experiment": list(orch.experiment_history.items()),
+        "sequence": list(orch.sequence_history.items()),
+    }
+
+
+def _status_summary_payload(orch) -> dict:
+    """Return {server: [server_status, driver_status]} from orch.status_summary."""
+    return {k: list(v) for k, v in orch.status_summary.items()}
+
+
+def _step_flags_payload(orch) -> dict:
+    """Return the orchestrator's three step-through flags."""
+    return {
+        "actions": orch.step_thru_actions,
+        "experiments": orch.step_thru_experiments,
+        "sequences": orch.step_thru_sequences,
+    }
+
+
+def _set_step_flag(orch, kind: str, value: bool) -> dict:
+    """Set one step-through flag by kind ('actions'|'experiments'|'sequences')."""
+    attr = {
+        "actions": "step_thru_actions",
+        "experiments": "step_thru_experiments",
+        "sequences": "step_thru_sequences",
+    }[kind]
+    setattr(orch, attr, bool(value))
+    return {kind: getattr(orch, attr)}
+
+
+def _queue_counts(orch) -> dict:
+    """Return true queue lengths for the three deques."""
+    return {
+        "n_sequences": len(orch.sequence_dq),
+        "n_experiments": len(orch.experiment_dq),
+        "n_actions": len(orch.action_dq),
+    }
+
+
 class OrchAPI(HelaoFastAPI):
     """FastAPI application class for the HELAO orchestrator server.
 
@@ -440,7 +483,44 @@ class OrchAPI(HelaoFastAPI):
             resp["active_experiment"] = active_exp.clean_dict() if active_exp else {}
             resp["last_experiment"] = last_exp.clean_dict() if last_exp else {}
 
+            resp.update(_queue_counts(self.orch))
+            resp["current_stop_message"] = self.orch.current_stop_message
+
             return resp
+
+        @self.post("/get_histories", tags=["private"])
+        def get_histories():
+            """Return action/experiment/sequence history item lists."""
+            return _histories_payload(self.orch)
+
+        @self.post("/get_status_summary", tags=["private"])
+        def get_status_summary():
+            """Return the per-server (server_status, driver_status) summary."""
+            return _status_summary_payload(self.orch)
+
+        @self.post("/get_step_flags", tags=["private"])
+        def get_step_flags():
+            """Return the orchestrator's step-through flags."""
+            return _step_flags_payload(self.orch)
+
+        @self.post("/set_step_flag", tags=["private"])
+        def set_step_flag(kind: str, value: bool):
+            """Set a single step-through flag and return its new value."""
+            return _set_step_flag(self.orch, kind, value)
+
+        @self.post("/clear_sequences", tags=["private"])
+        async def clear_sequences():
+            """Empty the orchestrator's sequence queue."""
+            await self.orch.clear_sequences()
+            return {}
+
+        @self.post("/append_split_sequences", tags=["private"])
+        async def append_split_sequences(sequence: Sequence = Body({}, embed=True)):
+            """Split a sequence by sample and append the sub-sequences; return their UUIDs."""
+            if not isinstance(sequence, Sequence):
+                sequence = Sequence(**sequence)
+            result = await self.orch.add_split_sequences(sequence=sequence)
+            return {"sequence_uuids": result}
 
         @self.post("/latest_sequence_uuids", tags=["private"])
         def latest_sequence_uuids():
