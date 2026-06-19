@@ -1871,7 +1871,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                     [
                         [
                             Div(
-                                text=f"{args[idx]} <i>[{str(argtypes[idx]).split()[-1].strip(chr(39) + '<>]').split('.')[-1].replace('[', ' of ')}]</i>",
+                                text=f"{idx}) {args[idx]} <i>[{str(argtypes[idx]).split()[-1].strip(chr(39) + '<>]').split('.')[-1].replace('[', ' of ')}]</i>",
                                 width=self.max_width - 40,
                                 height=18,
                             ),
