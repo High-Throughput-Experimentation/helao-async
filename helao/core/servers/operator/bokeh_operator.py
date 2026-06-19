@@ -1542,7 +1542,7 @@ class BokehOperator:
         )
         if not os.path.exists(param_file_path):
             os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
-            pdict = {"seq": {}, "exp": {}}
+            pdict = {"seq": {}, "exp": {}, "last_meta": {}}
         else:
             with open(param_file_path, "r", encoding="utf8") as f:
                 pdict = json.load(f)
@@ -1550,6 +1550,11 @@ class BokehOperator:
             ptype == "exp" and self.save_last_exp_pars.active == [0]
         ):
             pdict[ptype].update({name: pars})
+            pdict["last_meta"] = {
+                "sequence_label": self.input_sequence_label.value,
+                "campaign_name": self.input_campaign_name.value,
+                "campaign_uuid": self.input_campaign_uuid.value,
+            }
             with open(param_file_path, "w", encoding="utf8") as f:
                 json.dump(pdict, f)
 
@@ -1560,11 +1565,22 @@ class BokehOperator:
         )
         if not os.path.exists(param_file_path):
             os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
-            pdict = {"seq": {}, "exp": {}}
+            pdict = {"seq": {}, "exp": {}, "last_meta": {}}
         else:
             with open(param_file_path, "r", encoding="utf8") as f:
                 pdict = json.load(f)
         return pdict.get(ptype, {}).get(name, {})
+
+    def read_last_meta(self) -> dict:
+        """Return the saved global label/campaign block, or ``{}`` if none/older file."""
+        param_file_path = os.path.join(
+            self.vis.world_cfg["root"], "STATES", "previous_params.json"
+        )
+        if not os.path.exists(param_file_path):
+            return {}
+        with open(param_file_path, "r", encoding="utf8") as f:
+            pdict = json.load(f)
+        return pdict.get("last_meta", {})
 
     def populate_sequence(self, prepend: bool = False):
         """Unpack the selected sequence with current params and add it to the plan buffer."""
@@ -2199,20 +2215,46 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         end_time = time.time()
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
 
+    def _restore_last_meta(self):
+        """Schedule label/campaign fields to be filled from the saved global meta block.
+
+        Both the primary and mirror widgets are updated together so the mirror
+        callbacks do not race and overwrite the restored values.
+        """
+        meta = self.read_last_meta()
+        # Each entry is (primary_widget, mirror_widget) so both sides are set
+        # atomically (via next-tick) before their mutual mirror callbacks fire.
+        field_pairs = [
+            ("sequence_label", self.input_sequence_label, self.input_sequence_label2),
+            ("campaign_name", self.input_campaign_name, self.input_campaign_name2),
+            ("campaign_uuid", self.input_campaign_uuid, self.input_campaign_uuid2),
+        ]
+        for key, primary, mirror in field_pairs:
+            if key in meta and meta[key] is not None:
+                val = str(meta[key])
+                self.vis.doc.add_next_tick_callback(
+                    partial(self.update_input_value, primary, val)
+                )
+                self.vis.doc.add_next_tick_callback(
+                    partial(self.update_input_value, mirror, val)
+                )
+
     def get_last_seq_pars(self):
-        """Pre-fill the sequence parameter inputs from the saved ``previous_params.json`` entry."""
+        """Pre-fill the sequence parameter inputs and label/campaign from saved values."""
         loaded_pars = self.read_params("seq", self.sequence_dropdown.value)
         for k, v in loaded_pars.items():
             seq_input = self.find_input(self.seq_param_input, k)
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_input_value, seq_input, str(v))
             )
+        self._restore_last_meta()
 
     def get_last_exp_pars(self):
-        """Pre-fill the experiment parameter inputs from the saved ``previous_params.json`` entry."""
+        """Pre-fill the experiment parameter inputs and label/campaign from saved values."""
         loaded_pars = self.read_params("exp", self.experiment_dropdown.value)
         for k, v in loaded_pars.items():
             exp_input = self.find_input(self.exp_param_input, k)
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_input_value, exp_input, str(v))
             )
+        self._restore_last_meta()
