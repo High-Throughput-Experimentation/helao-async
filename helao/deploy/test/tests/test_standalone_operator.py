@@ -293,6 +293,17 @@ def test_plate_api_disabled_by_default():
     print("test_plate_api_disabled_by_default PASS")
 
 
+def test_shim_exposes_makebokehapp():
+    import importlib, inspect
+    for mod in ("helao.deploy.test.servers.operator.standalone_operator",
+                "helao.deploy.hte.servers.operator.standalone_operator"):
+        m = importlib.import_module(mod)
+        assert hasattr(m, "makeBokehApp"), mod
+        params = list(inspect.signature(m.makeBokehApp).parameters)
+        assert params == ["doc", "confPrefix", "server_key", "helao_repo_root"], (mod, params)
+    print("test_shim_exposes_makebokehapp PASS")
+
+
 if __name__ == "__main__":
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -300,4 +311,5 @@ if __name__ == "__main__":
     test_operator_accepts_backend()
     test_operator_tables_from_backend()
     test_plate_api_disabled_by_default()
+    test_shim_exposes_makebokehapp()
     print("ok")
