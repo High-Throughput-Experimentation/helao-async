@@ -429,6 +429,31 @@ def test_orch_prepend_order_and_run_id():
     print("test_orch_prepend_order_and_run_id PASS")
 
 
+def test_queue_object_payload():
+    from helao.core.servers import orch_api
+
+    class _Item:
+        def __init__(self, name):
+            self._name = name
+        def as_dict(self):
+            return {"sequence_name": self._name, "sequence_params": {"x": 1}}
+
+    class _O(_FakeOrch):
+        def __init__(self):
+            super().__init__()
+            self.sequence_dq = [_Item("A"), _Item("B")]
+            self.experiment_dq = []
+            self.action_dq = []
+
+    orch = _O()
+    assert orch_api._queue_object_payload(orch, "sequence", 1) == {
+        "sequence_name": "B", "sequence_params": {"x": 1},
+    }
+    assert orch_api._queue_object_payload(orch, "sequence", 9) == {}
+    assert orch_api._queue_object_payload(orch, "bogus", 0) == {}
+    print("test_queue_object_payload PASS")
+
+
 def test_prepend_sequences_helper():
     from helao.core.servers import orch_api
 
@@ -960,6 +985,7 @@ def run_all():
     test_orch_add_sequence_sanitizes_label()
     test_orch_move_and_remove_sequence()
     test_prepend_sequences_helper()
+    test_queue_object_payload()
     test_local_backend_prepend()
     test_remote_backend_prepend()
     test_local_backend_move_remove()
