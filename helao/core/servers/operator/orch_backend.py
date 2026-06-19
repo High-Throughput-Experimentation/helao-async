@@ -174,6 +174,7 @@ class LocalBackend(OrchBackend):
         return out
 
     async def get_queue_object(self, kind, idx):
+        # Mirrors orch_api._queue_object_payload (no HTTP hop here); keep in sync.
         dq = {
             "sequence": self.orch.sequence_dq,
             "experiment": self.orch.experiment_dq,
