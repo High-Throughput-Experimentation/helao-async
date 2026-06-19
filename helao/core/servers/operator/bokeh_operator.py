@@ -564,20 +564,15 @@ class BokehOperator:
             ],
             height_policy="min",
         )
+        # Selector tabs hold only the dropdown + description. The sequence
+        # label/campaign/comment fields and the append/prepend button rows are
+        # moved into a footer block rendered *below* the dynamic parameter
+        # layout (see ``_build_param_footer`` / ``_update_param_layout``).
         self.layout1 = layout(
             [
                 layout(
                     [
-                        [
-                            self.sequence_dropdown,
-                            Spacer(width=20),
-                            self.input_sequence_label,
-                            Spacer(width=20),
-                            self.input_campaign_name,
-                            Spacer(width=20),
-                            self.input_campaign_uuid,
-                        ],
-                        [self.input_sequence_comment],
+                        [self.sequence_dropdown],
                         [
                             Div(
                                 text="<b>sequence description:</b>",
@@ -592,19 +587,6 @@ class BokehOperator:
                     width=self.max_width,
                     height_policy="min",
                 ),
-                layout(
-                    [
-                        [
-                            self.button_append_seq,
-                            self.button_prepend_seq,
-                            self.button_last_seq_pars,
-                            self.save_last_seq_pars,
-                        ]
-                    ],
-                    background="#D6DBDF",
-                    width=self.max_width,
-                    height_policy="min",
-                ),
             ],
             height_policy="min",
         )
@@ -613,16 +595,7 @@ class BokehOperator:
             [
                 layout(
                     [
-                        [
-                            self.experiment_dropdown,
-                            Spacer(width=20),
-                            self.input_sequence_label2,
-                            Spacer(width=20),
-                            self.input_campaign_name2,
-                            Spacer(width=20),
-                            self.input_campaign_uuid2,
-                        ],
-                        [self.input_sequence_comment2],
+                        [self.experiment_dropdown],
                         [
                             Div(
                                 text="<b>experiment description:</b>",
@@ -637,19 +610,6 @@ class BokehOperator:
                     width=self.max_width,
                     height_policy="min",
                 ),
-                layout(
-                    [
-                        [
-                            self.button_append_exp,
-                            self.button_prepend_exp,
-                            self.button_last_exp_pars,
-                            self.save_last_exp_pars,
-                        ],
-                    ],
-                    background="#D6DBDF",
-                    width=self.max_width,
-                    height_policy="min",
-                ),
             ],
             height_policy="min",
         )
@@ -658,12 +618,7 @@ class BokehOperator:
             [
                 layout(
                     [
-                        [
-                            self.seqspec_dropdown,
-                            Spacer(width=20),
-                            self.input_sequence_label2,
-                        ],
-                        [self.input_sequence_comment2],
+                        [self.seqspec_dropdown],
                         [
                             Div(
                                 text="<b>sequence spec description:</b>",
@@ -673,20 +628,6 @@ class BokehOperator:
                         ],
                         [self.seqspec_descr_txt],
                         Spacer(height=10),
-                    ],
-                    background="#D6DBDF",
-                    width=self.max_width,
-                    height_policy="min",
-                ),
-                layout(
-                    [
-                        [
-                            self.button_enqueue_seqspec,
-                            Spacer(width=10),
-                            self.button_reload_seqspec,
-                            Spacer(width=10),
-                            self.button_to_seqtab,
-                        ],
                     ],
                     background="#D6DBDF",
                     width=self.max_width,
@@ -985,6 +926,64 @@ class BokehOperator:
         self.sequence = None
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
+    def _build_param_footer(self, mode: str):
+        """Footer rendered below the dynamic parameter layout: the label/
+        campaign/comment fields and the append/prepend button row for ``mode``."""
+        if mode == "seq":
+            field_row = [
+                self.input_sequence_label,
+                Spacer(width=20),
+                self.input_campaign_name,
+                Spacer(width=20),
+                self.input_campaign_uuid,
+            ]
+            comment = self.input_sequence_comment
+            button_row = [
+                self.button_append_seq,
+                self.button_prepend_seq,
+                self.button_last_seq_pars,
+                self.save_last_seq_pars,
+            ]
+        elif mode == "exp":
+            field_row = [
+                self.input_sequence_label2,
+                Spacer(width=20),
+                self.input_campaign_name2,
+                Spacer(width=20),
+                self.input_campaign_uuid2,
+            ]
+            comment = self.input_sequence_comment2
+            button_row = [
+                self.button_append_exp,
+                self.button_prepend_exp,
+                self.button_last_exp_pars,
+                self.save_last_exp_pars,
+            ]
+        else:  # seqspec
+            field_row = [self.input_sequence_label2]
+            comment = self.input_sequence_comment2
+            button_row = [
+                self.button_enqueue_seqspec,
+                Spacer(width=10),
+                self.button_reload_seqspec,
+                Spacer(width=10),
+                self.button_to_seqtab,
+            ]
+        return [
+            layout(
+                [field_row, [comment]],
+                background="#D6DBDF",
+                width=self.max_width,
+                height_policy="min",
+            ),
+            layout(
+                [button_row],
+                background="#D6DBDF",
+                width=self.max_width,
+                height_policy="min",
+            ),
+        ]
+
     def _update_param_layout(
         self, mode: str, idx: int, args=None, defaults=None, argtypes=None
     ):
@@ -1086,6 +1085,8 @@ class BokehOperator:
                     width=self.max_width,
                 ),
             )
+
+        param_layout.extend(self._build_param_footer(mode))
 
         self.dynamic_col.children.insert(3, layout(param_layout, height_policy="min"))
 
