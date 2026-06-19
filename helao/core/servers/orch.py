@@ -20,6 +20,7 @@ from copy import deepcopy
 from typing import List
 from uuid import UUID
 import json
+import re
 import traceback
 import inspect
 from typing import Optional
@@ -64,6 +65,13 @@ from helao.helpers.dequedict import DequeDict
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 CONFIG = config_loader.CONFIG
+
+
+def sanitize_sequence_label(label):
+    """Collapse whitespace/underscore runs to single underscores (None-safe)."""
+    if not label:
+        return label
+    return re.sub(r"[\s_]+", "_", label)
 
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
@@ -1750,6 +1758,7 @@ class Orch(Base):
             sequence.sequence_codehash = self.sequence_codehash_lib[sequence.sequence_name]
             sequence.sequence_codepath = self.sequence_codepath_lib[sequence.sequence_name]
             sequence.sequence_funcname = self.sequence_lib[sequence.sequence_name].__name__
+        sequence.sequence_label = sanitize_sequence_label(sequence.sequence_label)
 
     def _ensure_run_id(self) -> UUID:
         """Return the run_id to stamp on a sequence entering the queue.
@@ -1818,6 +1827,9 @@ class Orch(Base):
                 if item in group_list or i == len(split_list) - 1:
                     # create a copy of the sequence
                     sub_sequence = deepcopy(sequence)
+                    sub_sequence.sequence_label = sanitize_sequence_label(
+                        sub_sequence.sequence_label
+                    )
                     # set the plate_sample_no in the params
                     sub_sequence.sequence_params[split_key] = sub_sequence_items
                     # generate new sub_sequence uuid

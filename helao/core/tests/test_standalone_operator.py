@@ -611,6 +611,34 @@ def test_prepend_button_enable_gate():
     print("test_prepend_button_enable_gate PASS")
 
 
+def test_sanitize_sequence_label():
+    from helao.core.servers.orch import sanitize_sequence_label
+    assert sanitize_sequence_label("a b__c d") == "a_b_c_d"
+    assert sanitize_sequence_label("a_b") == "a_b"        # single underscore preserved
+    assert sanitize_sequence_label("") == ""
+    assert sanitize_sequence_label(None) is None
+    print("test_sanitize_sequence_label PASS")
+
+
+def test_orch_add_sequence_sanitizes_label():
+    from helao.core.servers.orch import Orch
+    from helao.helpers.premodels import Sequence
+    from helao.helpers.zdeque import zdeque
+
+    orch = Orch.__new__(Orch)
+    orch.sequence_dq = zdeque([])
+    orch.active_run_id = None
+    orch.sequence_codehash_lib = {}
+    orch.sequence_codepath_lib = {}
+    orch.sequence_lib = {}
+
+    seq = Sequence(sequence_name="seq0")
+    seq.sequence_label = "x y__z"
+    asyncio.run(orch.add_sequence(seq))
+    assert list(orch.sequence_dq)[0].sequence_label == "x_y_z"
+    print("test_orch_add_sequence_sanitizes_label PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -623,6 +651,8 @@ def run_all():
     test_orch_resolve_active_run_id()
     test_orch_split_run_id()
     test_orch_prepend_order_and_run_id()
+    test_sanitize_sequence_label()
+    test_orch_add_sequence_sanitizes_label()
     test_prepend_sequences_helper()
     test_local_backend_prepend()
     test_remote_backend_prepend()
