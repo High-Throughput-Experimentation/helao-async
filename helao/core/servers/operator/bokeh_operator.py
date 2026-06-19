@@ -89,7 +89,7 @@ class BokehOperator:
     orchestrator's APIs via the bound :class:`Vis` instance.
     """
 
-    sequence: Sequence
+    plan: List[Sequence]
 
     def __init__(self, vis_serv: Vis, backend):
         """Build the Bokeh layout and bind the operator UI to ``backend``.
@@ -150,7 +150,7 @@ class BokehOperator:
         self.seqspec_param_input_types = []
         self.seqspec_private_input = []
 
-        self.sequence = None
+        self.plan = []
         self.experiment_plan_lists = {
             k: [] for k in ["sequence_name", "sequence_label", "experiment_name"]
         }
@@ -888,23 +888,18 @@ class BokehOperator:
             select_list.append(name)
         return items, select_list
 
-    def _apply_sequence_to_orch(self, backend_method):
-        """Annotate the staged sequence with UI fields and dispatch it through ``backend_method``."""
-        if self.sequence is None:
-            return
-        self.sequence.sequence_label = self.input_sequence_label.value
+    def _capture_metadata(self, seq: Sequence) -> None:
+        """Stamp label / campaign / comment from the current inputs onto ``seq``."""
+        seq.sequence_label = self.input_sequence_label.value
         if self.input_sequence_comment.value != "":
-            self.sequence.sequence_comment = self.input_sequence_comment.value
+            seq.sequence_comment = self.input_sequence_comment.value
         campaign_name = self.input_campaign_name.value
         if campaign_name != "":
-            self.sequence.campaign_name = campaign_name
+            seq.campaign_name = campaign_name
             if self.input_campaign_uuid.value.strip() == "":
-                self.sequence.campaign_uuid = md5_string(campaign_name)
+                seq.campaign_uuid = md5_string(campaign_name)
             else:
-                self.sequence.campaign_uuid = self.input_campaign_uuid.value.strip()
-        self.vis.doc.add_next_tick_callback(partial(backend_method, self.sequence))
-        self.sequence = None
-        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+                seq.campaign_uuid = self.input_campaign_uuid.value.strip()
 
     def _build_param_footer(self, mode: str):
         """Footer rendered below the dynamic parameter layout: the label/
@@ -1378,13 +1373,28 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.backend.start))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
+    async def _flush_plan(self, plan, method):
+        """Dispatch each buffered sequence through ``method`` (add_sequence / add_split_sequences)."""
+        for seq in plan:
+            await method(seq)
+
     def callback_add_expplan(self, event):
-        """Send the current experiment plan to the orchestrator as a new sequence."""
-        self._apply_sequence_to_orch(self.backend.add_sequence)
+        """Enqueue every buffered sequence on the orchestrator (append)."""
+        plan = self.plan
+        self.plan = []
+        self.vis.doc.add_next_tick_callback(
+            partial(self._flush_plan, plan, self.backend.add_sequence)
+        )
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_add_split_sequences(self, event):
-        """Send the current plan to the orchestrator using the split-by-sample helper."""
-        self._apply_sequence_to_orch(self.backend.add_split_sequences)
+        """Enqueue every buffered sequence via the split-by-sample helper."""
+        plan = self.plan
+        self.plan = []
+        self.vis.doc.add_next_tick_callback(
+            partial(self._flush_plan, plan, self.backend.add_split_sequences)
+        )
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_toggle_stepact(self, event):
         """Flip the step-through-actions toggle."""
@@ -1415,9 +1425,9 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_expplan(self, event):
-        """Discard the staged experiment plan and refresh the tables."""
-        LOGGER.info("clearing exp plan table")
-        self.sequence = None
+        """Discard the staged plan buffer and refresh the tables."""
+        LOGGER.info("clearing plan buffer")
+        self.plan = []
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_sequences(self, event):
@@ -1460,14 +1470,22 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def append_experiment(self):
-        """Build the experiment model from the current inputs and append it to the staged plan."""
+        """Wrap the current experiment selection as a manual sequence appended to the buffer."""
         experimentmodel = self.populate_experimentmodel()
-        self.sequence.planned_experiments.append(experimentmodel)
+        seq = Sequence(
+            sequence_name="manual_orch_seq", planned_experiments=[experimentmodel]
+        )
+        self._capture_metadata(seq)
+        self.plan.append(seq)
 
     def prepend_experiment(self):
-        """Build the experiment model from the current inputs and prepend it to the staged plan."""
+        """Wrap the current experiment selection as a manual sequence prepended to the buffer."""
         experimentmodel = self.populate_experimentmodel()
-        self.sequence.planned_experiments.insert(0, experimentmodel)
+        seq = Sequence(
+            sequence_name="manual_orch_seq", planned_experiments=[experimentmodel]
+        )
+        self._capture_metadata(seq)
+        self.plan.insert(0, seq)
 
     def write_params(self, ptype: str, name: str, pars: dict):
         """Persist the most recent sequence/experiment parameters to ``previous_params.json``."""
@@ -1501,7 +1519,7 @@ class BokehOperator:
         return pdict.get(ptype, {}).get(name, {})
 
     def populate_sequence(self, prepend: bool = False):
-        """Unpack the selected sequence with current parameters and merge it into the staged plan."""
+        """Unpack the selected sequence with current params and add it to the plan buffer."""
         selected_sequence = self.sequence_dropdown.value
         LOGGER.info(f"selected sequence from list: {selected_sequence}")
 
@@ -1516,35 +1534,22 @@ class BokehOperator:
             )
         }
         for k, v in sequence_params.items():
-            LOGGER.info(
-                f"added sequence param '{k}' with value {v} and type {type(v)} "
-            )
+            LOGGER.info(f"added sequence param '{k}' with value {v} and type {type(v)} ")
 
         self.write_params("seq", selected_sequence, sequence_params)
-        start_time = time.time()
         expplan_list = self.backend.unpack_sequence(
             sequence_name=selected_sequence, sequence_params=sequence_params
         )
-        end_time = time.time()
-        LOGGER.debug(f"Unpacking sequence took {end_time - start_time} seconds")
-
-        if self.sequence is None:
-            self.sequence = Sequence()
-            self.sequence.planned_experiments = []
-        self.sequence.sequence_name = selected_sequence
-        self.sequence.sequence_label = self.input_sequence_label.value
-        self.sequence.sequence_params = sequence_params
-        start_time = time.time()
-        if prepend:
-            self.sequence.planned_experiments = (
-                expplan_list + self.sequence.planned_experiments
-            )
-        else:
-            self.sequence.planned_experiments += expplan_list
-        end_time = time.time()
-        LOGGER.debug(
-            f"Adding experiments to sequence took {end_time - start_time} seconds"
+        seq = Sequence(
+            sequence_name=selected_sequence,
+            sequence_params=sequence_params,
+            planned_experiments=expplan_list,
         )
+        self._capture_metadata(seq)
+        if prepend:
+            self.plan.insert(0, seq)
+        else:
+            self.plan.append(seq)
 
     def populate_experimentmodel(self) -> Experiment:
         """Build an ``Experiment`` from the experiment dropdown and current parameter inputs."""
@@ -1565,14 +1570,9 @@ class BokehOperator:
                 f"added experiment param '{k}' with value {v} and type {type(v)} "
             )
         self.write_params("exp", selected_experiment, experiment_params)
-        experimentmodel = Experiment(
+        return Experiment(
             experiment_name=selected_experiment, experiment_params=experiment_params
         )
-        if self.sequence is None:
-            self.sequence = Sequence()
-        self.sequence.sequence_name = "manual_orch_seq"
-        self.sequence.sequence_label = self.input_sequence_label.value
-        return experimentmodel
 
     def refresh_inputs(self, param_input, private_input):
         """Re-fire ``solid_plate_id`` / ``solid_sample_no`` callbacks to refresh dependent widgets."""
@@ -2109,20 +2109,13 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         self.update_queuecount_labels()
         for key in self.experiment_plan_lists:
             self.experiment_plan_lists[key] = []
-
-        plan_count = 0
-        if self.sequence is not None:
-            for D in self.sequence.planned_experiments:
-                self.experiment_plan_lists["sequence_name"].append(
-                    self.sequence.sequence_name
-                )
-                self.experiment_plan_lists["sequence_label"].append(
-                    self.sequence.sequence_label
-                )
+        seq_count = 0
+        for seq in self.plan:
+            seq_count += 1
+            for D in seq.planned_experiments:
+                self.experiment_plan_lists["sequence_name"].append(seq.sequence_name)
+                self.experiment_plan_lists["sequence_label"].append(seq.sequence_label)
                 self.experiment_plan_lists["experiment_name"].append(D.experiment_name)
-                plan_count += 1
-
-        # self.experiment_plan_source.stream(self.experiment_plan_lists, rollover=plan_count)
         self.experiment_plan_source.data = self.experiment_plan_lists
 
         state = await self.backend.get_orch_state()
@@ -2149,7 +2142,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         else:
             self.orch_status_button.label = f"{loop_state}"
             self.orch_status_button.button_type = "danger"
-        self.button_add_expplan.label = f"Add plan [{plan_count}]"
+        self.button_add_expplan.label = f"Add plan [{seq_count}]"
         end_time = time.time()
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
 

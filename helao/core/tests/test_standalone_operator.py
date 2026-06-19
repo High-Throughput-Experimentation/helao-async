@@ -6,6 +6,13 @@
 import asyncio
 import inspect
 
+from helao.helpers.premodels import Experiment as _ExpModel
+
+
+def _exp0(experiment: _ExpModel, val: int = 1):
+    """Mock experiment library function (Experiment arg is filtered out)."""
+    return []
+
 
 class _FakeGlobalStatus:
     def __init__(self):
@@ -207,11 +214,19 @@ def test_operator_accepts_backend():
 
 class _MockBackend:
     def __init__(self):
-        self.sequence_lib = {"seq0": lambda x=1: [x]}
-        self.experiment_lib = {}
+        # seq0 unpacks to a single planned experiment so populate_sequence can
+        # construct a valid Sequence (planned_experiments must be experiments).
+        self.sequence_lib = {
+            "seq0": lambda x=1: [_ExpModel(experiment_name="exp0")]
+        }
+        self.experiment_lib = {"exp0": _exp0}
         self._flags = {"actions": False, "experiments": False, "sequences": False}
         self.started = False
         self.on_change = None
+        self.loop_state = "stopped"
+        self.added = []
+        self.split_added = []
+        self.prepended = None
 
     def unpack_sequence(self, sequence_name, sequence_params):
         return self.sequence_lib[sequence_name](**sequence_params)
@@ -239,14 +254,20 @@ class _MockBackend:
         return {"motor": ["idle", "ok"]}
 
     async def get_orch_state(self):
-        return {"loop_state": "stopped", "active_sequence": {}, "active_experiment": {},
+        return {"loop_state": self.loop_state, "active_sequence": {}, "active_experiment": {},
                 "n_sequences": 1, "n_experiments": 1, "n_actions": 1,
                 "current_stop_message": ""}
 
     async def add_sequence(self, sequence):
+        self.added.append(sequence)
         return "su"
 
     async def add_split_sequences(self, sequence):
+        self.split_added.append(sequence)
+        return ["su"]
+
+    async def prepend_sequences(self, sequences):
+        self.prepended = list(sequences)
         return ["su"]
 
     async def start(self):
@@ -472,6 +493,89 @@ def test_remote_backend_prepend():
     print("test_remote_backend_prepend PASS")
 
 
+def test_plan_buffer_append_and_wrap():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    op.sequence_dropdown.value = "seq0"
+    op.populate_sequence(prepend=False)
+    assert len(op.plan) == 1
+    assert op.plan[0].sequence_name == "seq0"
+
+    op.update_selector_layout("active", 0, 1)  # build the experiment panel + dropdown
+    op.append_experiment()
+    assert len(op.plan) == 2
+    assert op.plan[1].sequence_name == "manual_orch_seq"
+    assert len(op.plan[1].planned_experiments) == 1
+    op.cleanup_session(None)
+    print("test_plan_buffer_append_and_wrap PASS")
+
+
+def test_plan_buffer_order():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.helpers.premodels import Sequence
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    op.plan = [Sequence(sequence_name="A")]
+    op.sequence_dropdown.value = "seq0"
+    op.populate_sequence(prepend=True)   # inserts seq0 at front
+    op.plan.append(Sequence(sequence_name="C"))
+    names = [s.sequence_name for s in op.plan]
+    assert names == ["seq0", "A", "C"], names
+    op.cleanup_session(None)
+    print("test_plan_buffer_order PASS")
+
+
+def test_plan_metadata_capture_at_insert():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    op.sequence_dropdown.value = "seq0"
+    op.input_sequence_label.value = "first"
+    op.populate_sequence(prepend=False)
+    op.input_sequence_label.value = "second"
+    op.populate_sequence(prepend=False)
+    assert op.plan[0].sequence_label == "first"
+    assert op.plan[1].sequence_label == "second"
+    op.cleanup_session(None)
+    print("test_plan_metadata_capture_at_insert PASS")
+
+
+def test_flush_add_dispatches_per_sequence():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.helpers.premodels import Sequence
+
+    be = _MockBackend()
+    op = BokehOperator(_FakeVisOp(Document()), be)
+    op.plan = [Sequence(sequence_name="A"), Sequence(sequence_name="B")]
+    asyncio.run(op._flush_plan(op.plan, be.add_sequence))
+    assert [s.sequence_name for s in be.added] == ["A", "B"]
+    op.cleanup_session(None)
+    print("test_flush_add_dispatches_per_sequence PASS")
+
+
+def test_plan_table_rows():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.helpers.premodels import Sequence, Experiment
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    seq = Sequence(sequence_name="s")
+    seq.sequence_label = "L"
+    seq.planned_experiments = [Experiment(experiment_name="exp0")]
+    op.plan = [seq]
+    asyncio.run(op.update_tables())
+    assert op.experiment_plan_source.data["experiment_name"] == ["exp0"]
+    assert op.experiment_plan_source.data["sequence_name"] == ["s"]
+    assert op.button_add_expplan.label == "Add plan [1]"
+    op.cleanup_session(None)
+    print("test_plan_table_rows PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -487,6 +591,11 @@ def run_all():
     test_prepend_sequences_helper()
     test_local_backend_prepend()
     test_remote_backend_prepend()
+    test_plan_buffer_append_and_wrap()
+    test_plan_buffer_order()
+    test_plan_metadata_capture_at_insert()
+    test_flush_add_dispatches_per_sequence()
+    test_plan_table_rows()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
 
