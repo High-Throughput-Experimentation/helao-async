@@ -31,7 +31,6 @@ from helao.helpers import helao_logging as logging
 from helao.helpers.to_json import parse_bokeh_input
 from helao.helpers.time_utils import md5_string
 from helao.core.servers.vis import Vis
-from helao.helpers.plate_api import HTEPlateAPI
 
 from helao.core.models.orchstatus import LoopStatus
 from helao.helpers.premodels import Sequence, Experiment
@@ -101,9 +100,13 @@ class BokehOperator:
         """
         self.vis = vis_serv
         self.backend = backend
-        self.dataAPI = HTEPlateAPI()
 
         self.config_dict = self.vis.server_cfg.get("params", {})
+        self.dataAPI = None
+        plate_api_name = self.config_dict.get("plate_api")
+        if plate_api_name == "HTEPlateAPI":
+            from helao.helpers.plate_api import HTEPlateAPI
+            self.dataAPI = HTEPlateAPI()
         self.loaded_config_path = self.vis.world_cfg.get("loaded_config_path", "")
         self.pal_name = None
         self.num_actserv = len(
@@ -1725,7 +1728,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             item = item + 1
 
             # special key params
-            if args[idx] == "solid_plate_id":
+            if self.dataAPI is not None and args[idx] == "solid_plate_id":
                 param_input[-1].on_change(
                     "value",
                     partial(self.callback_changed_plateid, sender=param_input[-1]),
@@ -1791,16 +1794,16 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                     )
                 )
 
-            elif args[idx] == "solid_sample_no":
+            elif self.dataAPI is not None and args[idx] == "solid_sample_no":
                 param_input[-1].on_change(
                     "value",
                     partial(self.callback_changed_sampleno, sender=param_input[-1]),
                 )
 
-            elif args[idx] == "x_mm":
+            elif self.dataAPI is not None and args[idx] == "x_mm":
                 param_input[-1].disabled = True
 
-            elif args[idx] == "y_mm":
+            elif self.dataAPI is not None and args[idx] == "y_mm":
                 param_input[-1].disabled = True
 
             elif args[idx] == "solid_custom_position":
@@ -1839,7 +1842,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                     width=self.max_width,
                 )
 
-            elif args[idx] == "plate_sample_no_list":
+            elif self.dataAPI is not None and args[idx] == "plate_sample_no_list":
                 private_input.append(FileInput(width=200, accept=".txt"))
                 param_layout.append(
                     layout(
