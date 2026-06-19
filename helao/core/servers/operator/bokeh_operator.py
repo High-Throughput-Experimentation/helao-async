@@ -1135,21 +1135,30 @@ class BokehOperator:
         """Refresh the queued-sequences table from the backend."""
         rows = await self.backend.list_sequences()
         for key in self.sequence_lists:
-            self.sequence_lists[key] = [r.get(key) for r in rows]
+            vals = [r.get(key) for r in rows]
+            if key.endswith("_uuid"):
+                vals = [str(v)[-8:] if v else v for v in vals]
+            self.sequence_lists[key] = vals
         self.sequence_source.data = self.sequence_lists
 
     async def get_experiments(self):
         """Refresh the queued-experiments table from the backend."""
         rows = await self.backend.list_experiments()
         for key in self.experiment_lists:
-            self.experiment_lists[key] = [r.get(key) for r in rows]
+            vals = [r.get(key) for r in rows]
+            if key.endswith("_uuid"):
+                vals = [str(v)[-8:] if v else v for v in vals]
+            self.experiment_lists[key] = vals
         self.experiment_source.data = self.experiment_lists
 
     async def get_actions(self):
         """Refresh the queued-actions table from the backend."""
         rows = await self.backend.list_actions()
         for key in self.action_lists:
-            self.action_lists[key] = [r.get(key) for r in rows]
+            vals = [r.get(key) for r in rows]
+            if key.endswith("_uuid"):
+                vals = [str(v)[-8:] if v else v for v in vals]
+            self.action_lists[key] = vals
         self.action_source.data = self.action_lists
 
     async def get_history(self):
