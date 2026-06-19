@@ -103,13 +103,11 @@ class BokehOperator:
         """
         self.vis = vis_serv
         self.backend = backend
-        self.orch = backend  # TEMP shim, removed in Task 5
         self.dataAPI = HTEPlateAPI()
 
         self.config_dict = self.vis.server_cfg.get("params", {})
         self.loaded_config_path = self.vis.world_cfg.get("loaded_config_path", "")
         self.pal_name = None
-        self.update_q = asyncio.Queue()
         self.num_actserv = len(
             [
                 k
@@ -216,11 +214,11 @@ class BokehOperator:
 
         self.sequence_select_list = []
         self.sequences = []
-        self.sequence_lib = self.orch.sequence_lib
+        self.sequence_lib = self.backend.sequence_lib
 
         self.experiment_select_list = []
         self.experiments = []
-        self.experiment_lib = self.orch.experiment_lib
+        self.experiment_lib = self.backend.experiment_lib
 
         self.seqspec_select_list = []
         self.seqspecs = []
@@ -373,14 +371,13 @@ class BokehOperator:
         )  # success: green, danger: red
 
         self.orch_stepact_button = self._make_stepwise_button(
-            "step_thru_actions", "actions", self.callback_toggle_stepact
+            "actions", self.callback_toggle_stepact
         )
         self.orch_stepexp_button = self._make_stepwise_button(
-            "step_thru_experiments", "experiments", self.callback_toggle_stepexp
+            "experiments", self.callback_toggle_stepexp
         )
-        # note: intentionally uses step_thru_experiments to match original behaviour
         self.orch_stepseq_button = self._make_stepwise_button(
-            "step_thru_experiments", "sequences", self.callback_toggle_stepseq
+            "sequences", self.callback_toggle_stepseq
         )
 
         self.button_clear_seqs = self._make_button(
@@ -848,16 +845,22 @@ class BokehOperator:
         if self.seqspec_select_list and self.select_tabs.active == 2:
             self.seqspec_dropdown.value = self.seqspec_select_list[0]
 
-        self.IOloop_run = False
-        self.IOtask = asyncio.create_task(self.IOloop())
+        self._queue_counts = {"n_sequences": 0, "n_experiments": 0, "n_actions": 0}
+        self._loop_state = LoopStatus.stopped
+        self._current_stop_message = ""
+        self._active_sequence_name = None
+        self._active_experiment_name = None
+        self.backend.subscribe(self._on_backend_change)
         self.vis.doc.on_session_destroyed(self.cleanup_session)
-        self.orch.orch_op = self
+
+    def _on_backend_change(self):
+        """Backend notified a state change: schedule a table refresh on the doc thread."""
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def cleanup_session(self, session_context):
-        """Stop the IO loop and cancel the background task when the Bokeh session ends."""
+        """Tear down the backend subscription when the Bokeh session ends."""
         LOGGER.info("BokehOperator session closed")
-        self.IOloop_run = False
-        self.IOtask.cancel()
+        self.backend.close()
 
     # ------------------------------------------------------------------
     # Private helpers — used to reduce repetition in __init__ and below
@@ -885,13 +888,11 @@ class BokehOperator:
         btn.on_event(ButtonClick, callback)
         return btn
 
-    def _make_stepwise_button(self, flag_attr: str, kind: str, callback) -> Button:
-        """Build a STEP/RUN toggle button reflecting the orchestrator flag named ``flag_attr``."""
-        is_step = getattr(self.orch, flag_attr)
+    def _make_stepwise_button(self, kind: str, callback) -> Button:
+        """Build a STEP/RUN toggle button reflecting the backend step flag for ``kind``."""
+        is_step = self.backend.get_step_flags()[kind]
         label = f"{'STEP' if is_step else 'RUN'}-THRU {kind}"
-        btn = Button(
-            label=label, button_type="danger" if is_step else "success", width=170
-        )
+        btn = Button(label=label, button_type="danger" if is_step else "success", width=170)
         btn.on_event(ButtonClick, callback)
         return btn
 
@@ -945,7 +946,7 @@ class BokehOperator:
                         tmpargs.pop(idx - j)
                         tmptypes.pop(idx - j)
 
-            cfg_defs = self.orch.world_cfg.get(config_key, {})
+            cfg_defs = self.vis.world_cfg.get(config_key, {})
             tmpdefs = [cfg_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
             for t in tmpdefs:
                 try:
@@ -968,8 +969,8 @@ class BokehOperator:
             select_list.append(name)
         return items, select_list
 
-    def _apply_sequence_to_orch(self, orch_method):
-        """Annotate the staged sequence with UI fields and dispatch it through ``orch_method``."""
+    def _apply_sequence_to_orch(self, backend_method):
+        """Annotate the staged sequence with UI fields and dispatch it through ``backend_method``."""
         if self.sequence is None:
             return
         self.sequence.sequence_label = self.input_sequence_label.value
@@ -982,7 +983,7 @@ class BokehOperator:
                 self.sequence.campaign_uuid = md5_string(campaign_name)
             else:
                 self.sequence.campaign_uuid = self.input_campaign_uuid.value.strip()
-        self.vis.doc.add_next_tick_callback(partial(orch_method, self.sequence))
+        self.vis.doc.add_next_tick_callback(partial(backend_method, self.sequence))
         self.sequence = None
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -1125,168 +1126,81 @@ class BokehOperator:
         self.seqspec_dropdown.options = self.seqspec_select_list
 
     async def get_sequences(self):
-        """Refresh the queued-sequences table from the orchestrator."""
-        sequences = self.orch.list_sequences()
+        """Refresh the queued-sequences table from the backend."""
+        rows = await self.backend.list_sequences()
         for key in self.sequence_lists:
-            self.sequence_lists[key] = []
-
-        sequence_count = 0
-        for seq in sequences:
-            seqdict = seq.as_dict()
-            self.sequence_lists["sequence_name"].append(
-                seqdict.get("sequence_name", None)
-            )
-            self.sequence_lists["sequence_label"].append(
-                seqdict.get("sequence_label", None)
-            )
-            self.sequence_lists["sequence_uuid"].append(
-                seqdict.get("sequence_uuid", None)
-            )
-            self.sequence_lists["campaign_name"].append(
-                seqdict.get("campaign_name", None)
-            )
-            self.sequence_lists["campaign_uuid"].append(
-                seqdict.get("campaign_uuid", None)
-            )
-            sequence_count += 1
-
-        # self.sequence_source.stream(self.sequence_lists, rollover=sequence_count)
+            self.sequence_lists[key] = [r.get(key) for r in rows]
         self.sequence_source.data = self.sequence_lists
-        # self.vis.print_message(
-        #     f"current queued sequences: ({len(self.orch.sequence_dq)})"
-        # )
 
     async def get_experiments(self):
-        """Refresh the queued-experiments table from the orchestrator."""
-        experiments = self.orch.list_experiments()
+        """Refresh the queued-experiments table from the backend."""
+        rows = await self.backend.list_experiments()
         for key in self.experiment_lists:
-            self.experiment_lists[key] = []
-
-        experiment_count = 0
-        for exp in experiments:
-            expdict = exp.as_dict()
-            self.experiment_lists["experiment_name"].append(
-                expdict.get("experiment_name", None)
-            )
-            self.experiment_lists["experiment_uuid"].append(
-                expdict.get("experiment_uuid", None)
-            )
-            experiment_count += 1
-
-        # self.experiment_source.stream(self.experiment_lists, rollover=experiment_count)
+            self.experiment_lists[key] = [r.get(key) for r in rows]
         self.experiment_source.data = self.experiment_lists
-        # self.vis.print_message(
-        #     f"current queued experiments: ({len(self.orch.experiment_dq)})"
-        # )
 
     async def get_actions(self):
-        """Refresh the queued-actions table from the orchestrator."""
-        actions = self.orch.list_actions()
+        """Refresh the queued-actions table from the backend."""
+        rows = await self.backend.list_actions()
         for key in self.action_lists:
-            self.action_lists[key] = []
-
-        action_count = 0
-        for act in actions:
-            actdict = act.as_dict()
-            self.action_lists["action_name"].append(actdict.get("action_name", None))
-            self.action_lists["action_server"].append(act.action_server.disp_name())
-            self.action_lists["action_uuid"].append(actdict.get("action_uuid", None))
-            action_count += 1
-
-        # self.action_source.stream(self.action_lists, rollover=action_count)
+            self.action_lists[key] = [r.get(key) for r in rows]
         self.action_source.data = self.action_lists
-        # LOGGER.info(f"current queued actions: ({len(self.orch.action_dq)})")
 
     async def get_history(self):
-        """Refresh the action/experiment/sequence history tables from the orchestrator."""
+        """Refresh the action/experiment/sequence history tables from the backend."""
+        hist = await self.backend.get_histories()
         for key in self.action_history_lists:
             self.action_history_lists[key] = []
-        action_tups = sorted(self.orch.action_history.items(), key=lambda x: x[0])[::-1]
-        for actuuid, actdict in action_tups:
+        for actuuid, actdict in sorted(hist["action"], key=lambda x: x[0])[::-1]:
             self.action_history_lists["action_uuid"].append(str(actuuid)[-8:])
             self.action_history_lists["action_endpoint"].append(
                 f"{actdict['action_server']}/{actdict['action_name']}"
             )
-            self.action_history_lists["start"].append(
-                actdict.get("action_timestamp", None)
-            )
-            self.action_history_lists["finish"].append(
-                actdict.get("action_finished_timestamp", None)
-            )
+            self.action_history_lists["start"].append(actdict.get("action_timestamp", None))
+            self.action_history_lists["finish"].append(actdict.get("action_finished_timestamp", None))
             for k in ["action_status", "experiment_name", "sequence_label"]:
                 if k in actdict:
                     self.action_history_lists[k].append(
                         actdict[k][-1] if isinstance(actdict[k], list) else actdict[k]
                     )
-
         for key in self.experiment_history_lists:
             self.experiment_history_lists[key] = []
-        exp_tups = sorted(self.orch.experiment_history.items(), key=lambda x: x[0])[
-            ::-1
-        ]
-        LOGGER.debug(f"Experiment tuples: {exp_tups}")
-        for expuuid, expdict in exp_tups:
+        for expuuid, expdict in sorted(hist["experiment"], key=lambda x: x[0])[::-1]:
             self.experiment_history_lists["experiment_uuid"].append(str(expuuid)[-8:])
-            self.experiment_history_lists["experiment_name"].append(
-                expdict["experiment_name"]
-            )
-            self.experiment_history_lists["start"].append(
-                expdict.get("experiment_timestamp", None)
-            )
-            self.experiment_history_lists["finish"].append(
-                expdict.get("experiment_finished_timestamp", None)
-            )
-            for k in [
-                "experiment_status",
-                "sequence_label",
-                "campaign_name",
-            ]:
+            self.experiment_history_lists["experiment_name"].append(expdict["experiment_name"])
+            self.experiment_history_lists["start"].append(expdict.get("experiment_timestamp", None))
+            self.experiment_history_lists["finish"].append(expdict.get("experiment_finished_timestamp", None))
+            for k in ["experiment_status", "sequence_label", "campaign_name"]:
                 if k in expdict:
                     self.experiment_history_lists[k].append(
                         expdict[k][-1] if isinstance(expdict[k], list) else expdict[k]
                     )
-
         for key in self.sequence_history_lists:
             self.sequence_history_lists[key] = []
-        seq_tups = sorted(self.orch.sequence_history.items(), key=lambda x: x[0])[::-1]
-        LOGGER.debug(f"Sequence tuples: {seq_tups}")
-        for sequuid, seqdict in seq_tups:
+        for sequuid, seqdict in sorted(hist["sequence"], key=lambda x: x[0])[::-1]:
             self.sequence_history_lists["sequence_uuid"].append(str(sequuid)[-8:])
-            self.sequence_history_lists["sequence_name"].append(
-                seqdict["sequence_name"]
-            )
-            self.sequence_history_lists["start"].append(
-                seqdict.get("sequence_timestamp", None)
-            )
-            self.sequence_history_lists["finish"].append(
-                seqdict.get("sequence_finished_timestamp", None)
-            )
-            for k in [
-                "sequence_status",
-                "sequence_label",
-                "campaign_name",
-            ]:
+            self.sequence_history_lists["sequence_name"].append(seqdict["sequence_name"])
+            self.sequence_history_lists["start"].append(seqdict.get("sequence_timestamp", None))
+            self.sequence_history_lists["finish"].append(seqdict.get("sequence_finished_timestamp", None))
+            for k in ["sequence_status", "sequence_label", "campaign_name"]:
                 if k in seqdict:
                     self.sequence_history_lists[k].append(
                         seqdict[k][-1] if isinstance(seqdict[k], list) else seqdict[k]
                     )
-
         self.action_history_source.data = self.action_history_lists
         self.experiment_history_source.data = self.experiment_history_lists
         self.sequence_history_source.data = self.sequence_history_lists
 
     async def get_orch_status_summary(self):
-        """Refresh the action-server status table from the orchestrator's heartbeat data."""
+        """Refresh the action-server status table from the backend's status summary."""
+        summary = await self.backend.get_status_summary()
         for key in self.action_server_lists:
             self.action_server_lists[key] = []
-
-        for server_name, (status_str, driver_str) in self.orch.status_summary.items():
+        for server_name, (status_str, driver_str) in summary.items():
             self.action_server_lists["action_server"].append(server_name)
             self.action_server_lists["server_status"].append(status_str)
             self.action_server_lists["driver_status"].append(driver_str)
-            self.action_server_source.stream(
-                self.action_server_lists, rollover=self.num_actserv
-            )
+            self.action_server_source.stream(self.action_server_lists, rollover=self.num_actserv)
 
     def update_selector_layout(self, attr, old, new):
         """Switch the parameter panel to match the currently active selector tab."""
@@ -1337,7 +1251,7 @@ class BokehOperator:
             for paraminput in self.seqspec_param_input
         }
         seq = self.seqspec_parser.parser(
-            specfile, self.orch, params=input_params, **parser_kwargs
+            specfile, self.backend, params=input_params, **parser_kwargs
         )
         seq.sequence_label = self.input_sequence_label.value
         if self.input_sequence_comment.value != "":
@@ -1349,7 +1263,7 @@ class BokehOperator:
                 seq.campaign_uuid = md5_string(campaign_name)
             else:
                 seq.campaign_uuid = self.input_campaign_uuid.value.strip()
-        self.vis.doc.add_next_tick_callback(partial(self.orch.add_sequence, seq))
+        self.vis.doc.add_next_tick_callback(partial(self.backend.add_sequence, seq))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_reload_seqspec(self, event):
@@ -1367,7 +1281,7 @@ class BokehOperator:
             for paraminput in self.seqspec_param_input
         }
         seq = self.seqspec_parser.parser(
-            specfile, self.orch, params=seqspec_input_params, **parser_kwargs
+            specfile, self.backend, params=seqspec_input_params, **parser_kwargs
         )
         seqname = seq.sequence_name
         loaded_params = seq.sequence_params
@@ -1452,28 +1366,21 @@ class BokehOperator:
             )
 
     def callback_estop_orch(self, event):
-        """Schedule an emergency stop of the orchestrator from the ESTOP button."""
         LOGGER.info("estop orch")
-        self.vis.doc.add_next_tick_callback(partial(self.orch.estop_loop))
+        self.vis.doc.add_next_tick_callback(partial(self.backend.estop))
 
     def callback_start_orch(self, event):
-        """Start the orchestrator from the Start button when it is in the stopped state."""
-        if self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
-            LOGGER.info("starting orch")
-            self.vis.doc.add_next_tick_callback(partial(self.orch.start))
-            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
-        elif self.orch.globalstatusmodel.loop_state == LoopStatus.estopped:
-            LOGGER.error("orch is in estop")
-        else:
-            LOGGER.info("Cannot start orch when not in a stopped state.")
+        LOGGER.info("starting orch")
+        self.vis.doc.add_next_tick_callback(partial(self.backend.start))
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_add_expplan(self, event):
         """Send the current experiment plan to the orchestrator as a new sequence."""
-        self._apply_sequence_to_orch(self.orch.add_sequence)
+        self._apply_sequence_to_orch(self.backend.add_sequence)
 
     def callback_add_split_sequences(self, event):
         """Send the current plan to the orchestrator using the split-by-sample helper."""
-        self._apply_sequence_to_orch(self.orch.add_split_sequences)
+        self._apply_sequence_to_orch(self.backend.add_split_sequences)
 
     def callback_toggle_stepact(self, event):
         """Flip the step-through-actions toggle."""
@@ -1494,15 +1401,13 @@ class BokehOperator:
         )
 
     def callback_stop_orch(self, event):
-        """Stop the orchestrator from the Stop button and refresh the tables."""
         LOGGER.info("stopping operator orch")
-        self.vis.doc.add_next_tick_callback(partial(self.orch.stop))
+        self.vis.doc.add_next_tick_callback(partial(self.backend.stop))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_skip_exp(self, event):
-        """Skip the current experiment via the orchestrator."""
         LOGGER.info("skipping experiment")
-        self.vis.doc.add_next_tick_callback(partial(self.orch.skip))
+        self.vis.doc.add_next_tick_callback(partial(self.backend.skip))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_expplan(self, event):
@@ -1512,21 +1417,18 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_sequences(self, event):
-        """Clear the orchestrator's sequence queue."""
-        LOGGER.info("clearing experiments")
-        self.vis.doc.add_next_tick_callback(partial(self.orch.clear_sequences))
+        LOGGER.info("clearing sequences")
+        self.vis.doc.add_next_tick_callback(partial(self.backend.clear_sequences))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_experiments(self, event):
-        """Clear the orchestrator's experiment queue."""
         LOGGER.info("clearing experiments")
-        self.vis.doc.add_next_tick_callback(partial(self.orch.clear_experiments))
+        self.vis.doc.add_next_tick_callback(partial(self.backend.clear_experiments))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_clear_actions(self, event):
-        """Clear the orchestrator's action queue."""
         LOGGER.info("clearing actions")
-        self.vis.doc.add_next_tick_callback(partial(self.orch.clear_actions))
+        self.vis.doc.add_next_tick_callback(partial(self.backend.clear_actions))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_prepend_seq(self, event):
@@ -1566,7 +1468,7 @@ class BokehOperator:
     def write_params(self, ptype: str, name: str, pars: dict):
         """Persist the most recent sequence/experiment parameters to ``previous_params.json``."""
         param_file_path = os.path.join(
-            self.orch.world_cfg["root"], "STATES", "previous_params.json"
+            self.vis.world_cfg["root"], "STATES", "previous_params.json"
         )
         if not os.path.exists(param_file_path):
             os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
@@ -1584,7 +1486,7 @@ class BokehOperator:
     def read_params(self, ptype: str, name: str) -> dict:
         """Return the most recently saved parameters for ``name`` of type ``ptype`` (``seq``/``exp``)."""
         param_file_path = os.path.join(
-            self.orch.world_cfg["root"], "STATES", "previous_params.json"
+            self.vis.world_cfg["root"], "STATES", "previous_params.json"
         )
         if not os.path.exists(param_file_path):
             os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
@@ -1616,7 +1518,7 @@ class BokehOperator:
 
         self.write_params("seq", selected_sequence, sequence_params)
         start_time = time.time()
-        expplan_list = self.orch.unpack_sequence(
+        expplan_list = self.backend.unpack_sequence(
             sequence_name=selected_sequence, sequence_params=sequence_params
         )
         end_time = time.time()
@@ -1701,39 +1603,34 @@ class BokehOperator:
             LOGGER.warning("tried to update value of nonexistant sender")
 
     def flip_stepwise_flag(self, sender_type):
-        """Toggle the orchestrator's step-through flag for actions/experiments/sequences."""
-        if sender_type == "actions":
-            self.orch.step_thru_actions = not self.orch.step_thru_actions
-        elif sender_type == "experiments":
-            self.orch.step_thru_experiments = not self.orch.step_thru_experiments
-        elif sender_type == "sequences":
-            self.orch.step_thru_sequences = not self.orch.step_thru_sequences
+        """Toggle the backend's step-through flag for actions/experiments/sequences."""
+        new_val = not self.backend.get_step_flags()[sender_type]
+        self.vis.doc.add_next_tick_callback(
+            partial(self.backend.set_step_flag, sender_type, new_val)
+        )
 
     def update_stepwise_toggle(self, sender):
         """Update a step-through button's label and colour after its flag flips."""
         sender_type = sender.label.split("[")[0].strip().split()[-1].strip()
-        sender_map = {
-            "actions": (self.orch_stepact_button, len(self.orch.action_dq)),
-            "experiments": (self.orch_stepexp_button, len(self.orch.experiment_dq)),
-            "sequences": (self.orch_stepseq_button, len(self.orch.sequence_dq)),
-        }
-        sbutton, numq = sender_map[sender_type]
+        count_key = {"actions": "n_actions", "experiments": "n_experiments",
+                     "sequences": "n_sequences"}[sender_type]
+        numq = self._queue_counts.get(count_key, 0)
         self.flip_stepwise_flag(sender_type)
-        if sbutton.button_type == "danger":
-            sbutton.label = f"RUN-THRU {sender_type} [{numq}]"
-            sbutton.button_type = "success"
+        if sender.button_type == "danger":
+            sender.label = f"RUN-THRU {sender_type} [{numq}]"
+            sender.button_type = "success"
         else:
-            sbutton.label = f"STEP-THRU {sender_type} [{numq}]"
-            sbutton.button_type = "danger"
+            sender.label = f"STEP-THRU {sender_type} [{numq}]"
+            sender.button_type = "danger"
 
     def update_queuecount_labels(self):
         """Refresh the queue-size counters shown on the step-through buttons."""
-        stepwisebuttons = [
-            (self.orch_stepseq_button, len(self.orch.sequence_dq)),
-            (self.orch_stepexp_button, len(self.orch.experiment_dq)),
-            (self.orch_stepact_button, len(self.orch.action_dq)),
-        ]
-        for sbutton, numq in stepwisebuttons:
+        for sbutton, count_key in [
+            (self.orch_stepseq_button, "n_sequences"),
+            (self.orch_stepexp_button, "n_experiments"),
+            (self.orch_stepact_button, "n_actions"),
+        ]:
+            numq = self._queue_counts.get(count_key, 0)
             sbutton.label = sbutton.label.split("[")[0].strip() + f" [{numq}]"
 
     def update_seq_param_layout(self, idx):
@@ -1751,7 +1648,7 @@ class BokehOperator:
         defaults = []
         seqspec_path = self.seqspecs[idx]
         try:
-            seqfunc_params = self.seqspec_parser.list_params(seqspec_path, self.orch)
+            seqfunc_params = self.seqspec_parser.list_params(seqspec_path, self.backend)
         except Exception:
             LOGGER.error(f"error parsing specfile {seqspec_path}", exc_info=True)
             seqfunc_params = {}
@@ -2224,45 +2121,33 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         # self.experiment_plan_source.stream(self.experiment_plan_lists, rollover=plan_count)
         self.experiment_plan_source.data = self.experiment_plan_lists
 
-        if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
-            if (
-                self.orch.active_sequence is not None
-                and self.orch.active_experiment is not None
-            ):
-                self.orch_status_button.label = f"running {str(self.orch.active_sequence.sequence_name)} / {str(self.orch.active_experiment.experiment_name)}"
+        state = await self.backend.get_orch_state()
+        self._queue_counts = {
+            "n_sequences": state.get("n_sequences", 0),
+            "n_experiments": state.get("n_experiments", 0),
+            "n_actions": state.get("n_actions", 0),
+        }
+        loop_state = state.get("loop_state")
+        loop_state = getattr(loop_state, "value", loop_state)  # normalize enum->str
+        self._current_stop_message = state.get("current_stop_message", "") or ""
+        aseq = (state.get("active_sequence") or {}).get("sequence_name")
+        aexp = (state.get("active_experiment") or {}).get("experiment_name")
+        if loop_state == LoopStatus.started.value:
+            if aseq is not None and aexp is not None:
+                self.orch_status_button.label = f"running {aseq} / {aexp}"
             else:
                 self.orch_status_button.label = "running"
             self.orch_status_button.button_type = "success"
-        elif self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
-            stop_msg = (
-                ": " + self.orch.current_stop_message
-                if self.orch.current_stop_message != ""
-                else ""
-            )
+        elif loop_state == LoopStatus.stopped.value:
+            stop_msg = f": {self._current_stop_message}" if self._current_stop_message else ""
             self.orch_status_button.label = f"stopped{stop_msg}"
-            if stop_msg:
-                self.orch_status_button.button_type = "warning"
-            else:
-                self.orch_status_button.button_type = "primary"
+            self.orch_status_button.button_type = "warning" if stop_msg else "primary"
         else:
-            self.orch_status_button.label = (
-                f"{self.orch.globalstatusmodel.loop_state.value}"
-            )
+            self.orch_status_button.label = f"{loop_state}"
             self.orch_status_button.button_type = "danger"
         self.button_add_expplan.label = f"Add plan [{plan_count}]"
         end_time = time.time()
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
-
-    async def IOloop(self):
-        """Wait on ``update_q`` and refresh the UI tables whenever the orchestrator posts a message."""
-        self.IOloop_run = True
-        while self.IOloop_run:
-            try:
-                _ = await self.update_q.get()
-                self.vis.doc.add_next_tick_callback(partial(self.update_tables))
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"BokehOperator IOloop error: {repr(e), tb,}")
 
     def get_last_seq_pars(self):
         """Pre-fill the sequence parameter inputs from the saved ``previous_params.json`` entry."""
