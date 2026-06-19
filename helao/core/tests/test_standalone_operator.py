@@ -1005,6 +1005,30 @@ def test_remote_backend_get_queue_object():
     print("test_remote_backend_get_queue_object PASS")
 
 
+def test_history_objects_retained():
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    class _BE(_MockBackend):
+        async def get_histories(self):
+            return {
+                "action": [("au1", {"action_name": "noop", "action_uuid": "au1",
+                                    "action_server": "test_server"})],
+                "experiment": [],
+                "sequence": [],
+            }
+
+    op = BokehOperator(_FakeVisOp(Document()), _BE())
+    asyncio.run(op.get_history())
+    assert op._hist_objs["action"][0]["action_name"] == "noop"
+    assert op.planhistory_tree_div is not None
+    assert op.queue_tree_div is not None
+    assert op.planhistory_tree_header is not None
+    assert op.queue_tree_header is not None
+    op.cleanup_session(None)
+    print("test_history_objects_retained PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
@@ -1045,6 +1069,7 @@ def run_all():
     test_queue_controls_enable_gate()
     test_prepend_plan_callback_clears_and_dispatches()
     test_prepend_button_enable_gate()
+    test_history_objects_retained()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
 
