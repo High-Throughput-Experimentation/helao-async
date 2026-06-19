@@ -84,6 +84,24 @@ async def _prepend_sequences(orch, sequences) -> list:
     return await orch.prepend_sequences(sequences=seqs)
 
 
+def _queue_object_payload(orch, kind: str, idx: int) -> dict:
+    """Return the full dict for the queued item of ``kind`` at ``idx``.
+
+    Out-of-range indices or unknown kinds return ``{}`` (the queue may have
+    mutated since the table was last polled — snapshot semantics)."""
+    dq = {
+        "sequence": getattr(orch, "sequence_dq", None),
+        "experiment": getattr(orch, "experiment_dq", None),
+        "action": getattr(orch, "action_dq", None),
+    }.get(kind)
+    if dq is None:
+        return {}
+    try:
+        return dq[idx].as_dict()
+    except (IndexError, KeyError, AttributeError):
+        return {}
+
+
 class OrchAPI(HelaoFastAPI):
     """FastAPI application class for the HELAO orchestrator server.
 
@@ -404,6 +422,11 @@ class OrchAPI(HelaoFastAPI):
             """Remove a queued sequence by index."""
             await self.orch.remove_sequence(idx)
             return {"n_sequences": len(self.orch.sequence_dq)}
+
+        @self.post("/get_queue_object", tags=["private"])
+        def get_queue_object(kind: str, idx: int):
+            """Return the full dict for a queued sequence/experiment/action."""
+            return _queue_object_payload(self.orch, kind, idx)
 
         @self.post("/append_experiment", tags=["private"])
         async def append_experiment(experiment: Experiment = Body({}, embed=True)):
