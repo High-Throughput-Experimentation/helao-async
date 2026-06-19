@@ -118,7 +118,61 @@ def test_local_backend_normalized_shapes():
     print("test_local_backend_normalized_shapes PASS")
 
 
+def test_remote_backend_dispatch_and_serialize():
+    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.core.error import ErrorCodes
+
+    calls = []
+
+    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+        calls.append((endpoint, params_dict, json_dict))
+        canned = {
+            "list_sequences": [{
+                "sequence_name": "seq0", "sequence_label": "lbl", "sequence_uuid": "su",
+                "campaign_name": "camp", "campaign_uuid": "cu", "junk": 1,
+            }],
+            "list_actions": [{
+                "action_name": "noop", "action_uuid": "au",
+                "action_server": {"server_name": "motor", "machine_name": "host"},
+            }],
+            "get_orch_state": {"loop_state": "stopped", "n_sequences": 2,
+                               "n_experiments": 0, "n_actions": 0,
+                               "current_stop_message": ""},
+            "get_step_flags": {"actions": True, "experiments": False, "sequences": False},
+            "append_sequence": {"sequence_uuid": "newseq"},
+        }
+        return canned.get(endpoint, {}), ErrorCodes.none
+
+    class _Seq:
+        def __init__(self):
+            self.sequence_name = "seq0"
+        def model_dump(self):
+            return {"sequence_name": self.sequence_name}
+
+    be = RemoteBackend.__new__(RemoteBackend)  # bypass lib loading for unit test
+    be.orch_key = "ORCH"
+    be.host = "127.0.0.1"
+    be.port = 8001
+    be._dispatch = fake_dispatch
+    be._step_flags = {"actions": False, "experiments": False, "sequences": False}
+
+    seqs = asyncio.run(be.list_sequences())
+    assert seqs == [{
+        "sequence_name": "seq0", "sequence_label": "lbl", "sequence_uuid": "su",
+        "campaign_name": "camp", "campaign_uuid": "cu",
+    }]
+    acts = asyncio.run(be.list_actions())
+    assert acts[0]["action_server"] == "motor"
+    asyncio.run(be.add_sequence(_Seq()))
+    ep, _, body = [c for c in calls if c[0] == "append_sequence"][0]
+    assert body == {"sequence": {"sequence_name": "seq0"}}
+    asyncio.run(be.set_step_flag("actions", True))
+    assert be.get_step_flags()["actions"] is True
+    print("test_remote_backend_dispatch_and_serialize PASS")
+
+
 if __name__ == "__main__":
     test_endpoint_helpers_shapes()
     test_local_backend_normalized_shapes()
+    test_remote_backend_dispatch_and_serialize()
     print("ok")
