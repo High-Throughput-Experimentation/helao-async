@@ -922,9 +922,15 @@ def test_param_label_enumeration():
     op.sequence_dropdown.value = "seq0"  # selected in __init__; single param "x"
     # seq_param_layout has 3 fixed prefix entries (description block, Spacer,
     # header block), then param rows appended by add_dynamic_inputs from index 3.
-    # Each param row is layout([[Div],[TextInput],Spacer]) -> children[0].children[0]
-    label_div = op.seq_param_layout[3].children[0].children[0]
-    assert label_div.text.startswith("0) x"), label_div.text
+    # Each param row is layout([[Spacer, name_div, type_div],
+    #                           [index_div, TextInput], Spacer]).
+    header_row = op.seq_param_layout[3].children[0]
+    name_div = header_row.children[1]
+    type_div = header_row.children[2]
+    index_div = op.seq_param_layout[3].children[1].children[0]
+    assert index_div.text == "0)", index_div.text
+    assert name_div.text == "x", name_div.text
+    assert type_div.text.startswith("<i>["), type_div.text
     # widget key unchanged (decoupled from display)
     assert op.seq_param_input[0].name == "x"
     op.cleanup_session(None)

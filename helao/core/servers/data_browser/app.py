@@ -61,24 +61,26 @@ class _UI:
         control = row(self.group_sel, self.source_sel, self.date_start,
                       self.date_end, column(Spacer(height=18), self.scan_btn))
 
-        # --- left index ---
+        # --- index (full width) ---
         self.filter_in = TextInput(title="Filter index", width=300)
         self.filter_in.on_change("value", lambda a, o, n: self._refresh_index_table())
         self.index_source = ColumnDataSource(data={c: [] for c in INDEX_TABLE_COLS})
         self.index_table = DataTable(
             source=self.index_source,
             columns=[TableColumn(field=c, title=c) for c in INDEX_TABLE_COLS],
-            width=460, height=380, selectable="checkbox")
+            height=380, selectable="checkbox", sizing_mode="stretch_width")
         self.add_btn = Button(label="+ Add selected to plot",
                               button_type="success", width=300)
         self.clear_btn = Button(label="Clear plot", width=300)
         self.add_btn.on_click(self._on_add)
         self.clear_btn.on_click(self._on_clear)
-        left = column(self.filter_in, self.index_table, self.add_btn, self.clear_btn)
+        buttons = row(self.add_btn, self.clear_btn)
 
         self.right = self._build_right()
 
-        self.layout = column(header, control, row(left, self.right))
+        self.layout = column(
+            header, control, self.filter_in, self.index_table, buttons, self.right,
+            sizing_mode="stretch_width")
 
     def _build_right(self):
         # axis controls
@@ -88,25 +90,29 @@ class _UI:
                                value="line", width=120)
         for w in (self.x_sel, self.y_sel, self.type_sel):
             w.on_change("value", self._on_axis_change)
-        self.plot = figure(height=380, width=560, tools="pan,box_zoom,wheel_zoom,reset,save")
-        plot_panel = TabPanel(child=column(row(self.x_sel, self.y_sel, self.type_sel),
-                                            self.plot), title="Plot")
+        self.plot = figure(height=380, tools="pan,box_zoom,wheel_zoom,reset,save",
+                           sizing_mode="stretch_width")
+        plot_panel = TabPanel(
+            child=column(row(self.x_sel, self.y_sel, self.type_sel), self.plot,
+                         sizing_mode="stretch_width"),
+            title="Plot")
         # table panel (Task 13)
         self.summary_source = ColumnDataSource(data={c: [] for c in dbstate.SUMMARY_COLS})
         self.summary_table = DataTable(
             source=self.summary_source,
             columns=[TableColumn(field=c, title=c) for c in dbstate.SUMMARY_COLS],
-            width=560, height=180, selectable=True)
+            height=180, selectable=True, sizing_mode="stretch_width")
         self.summary_source.selected.on_change("indices", self._on_summary_select)
         self.rows_source = ColumnDataSource(data={})
         self.rows_table = DataTable(source=self.rows_source, columns=[],
-                                    width=560, height=200)
+                                    height=200, sizing_mode="stretch_width")
         table_panel = TabPanel(
             child=column(Div(text="<b>Trace summary</b> (select a row to view data)"),
                          self.summary_table,
-                         Div(text="<b>Data rows</b>"), self.rows_table),
+                         Div(text="<b>Data rows</b>"), self.rows_table,
+                         sizing_mode="stretch_width"),
             title="Table")
-        self.tabs = Tabs(tabs=[plot_panel, table_panel])
+        self.tabs = Tabs(tabs=[plot_panel, table_panel], sizing_mode="stretch_width")
         return self.tabs
 
     def _refresh_axes(self):
