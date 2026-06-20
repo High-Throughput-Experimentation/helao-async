@@ -103,54 +103,6 @@ def test_endpoint_helpers_shapes():
     print("test_endpoint_helpers_shapes PASS")
 
 
-def test_local_backend_normalized_shapes():
-    from helao.core.servers.operator.orch_backend import LocalBackend
-
-    class _Seq:
-        def as_dict(self):
-            return {
-                "sequence_name": "seq0", "sequence_label": "lbl",
-                "sequence_uuid": "su", "campaign_name": "camp",
-                "campaign_uuid": "cu", "extra": "ignored",
-            }
-
-    class _Srv:
-        def disp_name(self):
-            return "motor@host"
-
-    class _Act:
-        action_server = _Srv()
-        def as_dict(self):
-            return {"action_name": "noop", "action_uuid": "au"}
-
-    class _Orch2(_FakeOrch):
-        def list_sequences(self, limit=10):
-            return [_Seq()]
-        def list_experiments(self, limit=10):
-            return [type("E", (), {"as_dict": lambda s: {"experiment_name": "exp0", "experiment_uuid": "eu"}})()]
-        def list_actions(self, limit=10):
-            return [_Act()]
-        sequence_lib = {"seq0": lambda x=1: [x]}
-        experiment_lib = {}
-        def unpack_sequence(self, sequence_name, sequence_params):
-            return self.sequence_lib[sequence_name](**sequence_params)
-
-    orch = _Orch2()
-    be = LocalBackend(orch)
-    seqs = asyncio.run(be.list_sequences())
-    assert seqs == [{
-        "sequence_name": "seq0", "sequence_label": "lbl", "sequence_uuid": "su",
-        "campaign_name": "camp", "campaign_uuid": "cu",
-    }]
-    acts = asyncio.run(be.list_actions())
-    assert acts == [{"action_name": "noop", "action_server": "motor@host", "action_uuid": "au"}]
-    assert be.get_step_flags() == {"actions": False, "experiments": False, "sequences": False}
-    assert be.unpack_sequence("seq0", {"x": 5}) == [5]
-    asyncio.run(be.clear_sequences())
-    assert "sequences" in orch.cleared
-    print("test_local_backend_normalized_shapes PASS")
-
-
 def test_remote_backend_dispatch_and_serialize():
     from helao.core.servers.operator.orch_backend import RemoteBackend
     from helao.core.error import ErrorCodes
@@ -472,24 +424,6 @@ def test_prepend_sequences_helper():
     print("test_prepend_sequences_helper PASS")
 
 
-def test_local_backend_prepend():
-    from helao.core.servers.operator.orch_backend import LocalBackend
-
-    class _O(_FakeOrch):
-        sequence_lib = {}
-        experiment_lib = {}
-        async def prepend_sequences(self, sequences):
-            self.prepended = sequences
-            return ["u1"]
-
-    orch = _O()
-    be = LocalBackend(orch)
-    out = asyncio.run(be.prepend_sequences(["s1", "s2"]))
-    assert out == ["u1"]
-    assert orch.prepended == ["s1", "s2"]
-    print("test_local_backend_prepend PASS")
-
-
 def test_remote_backend_prepend():
     from helao.core.servers.operator.orch_backend import RemoteBackend
     from helao.core.error import ErrorCodes
@@ -742,28 +676,6 @@ def test_orch_move_and_remove_sequence():
     print("test_orch_move_and_remove_sequence PASS")
 
 
-def test_local_backend_move_remove():
-    from helao.core.servers.operator.orch_backend import LocalBackend
-
-    class _O(_FakeOrch):
-        sequence_lib = {}
-        experiment_lib = {}
-        def __init__(self):
-            super().__init__()
-            self.calls = []
-        async def move_sequence(self, from_idx, to_idx):
-            self.calls.append(("move", from_idx, to_idx))
-        async def remove_sequence(self, idx):
-            self.calls.append(("remove", idx))
-
-    orch = _O()
-    be = LocalBackend(orch)
-    asyncio.run(be.move_sequence(2, 0))
-    asyncio.run(be.remove_sequence(1))
-    assert orch.calls == [("move", 2, 0), ("remove", 1)]
-    print("test_local_backend_move_remove PASS")
-
-
 def test_remote_backend_move_remove():
     from helao.core.servers.operator.orch_backend import RemoteBackend
     from helao.core.error import ErrorCodes
@@ -974,28 +886,6 @@ def test_tree_header_text():
     print("test_tree_header_text PASS")
 
 
-def test_local_backend_get_queue_object():
-    from helao.core.servers.operator.orch_backend import LocalBackend
-
-    class _Item:
-        def as_dict(self):
-            return {"action_name": "noop", "action_params": {"v": 2}}
-
-    class _O(_FakeOrch):
-        sequence_lib = {}
-        experiment_lib = {}
-        def __init__(self):
-            super().__init__()
-            self.action_dq = [_Item()]
-
-    be = LocalBackend(_O())
-    assert asyncio.run(be.get_queue_object("action", 0)) == {
-        "action_name": "noop", "action_params": {"v": 2},
-    }
-    assert asyncio.run(be.get_queue_object("action", 5)) == {}
-    print("test_local_backend_get_queue_object PASS")
-
-
 def test_remote_backend_get_queue_object():
     from helao.core.servers.operator.orch_backend import RemoteBackend
     from helao.core.error import ErrorCodes
@@ -1144,7 +1034,6 @@ def test_layout_is_stretch_width():
 
 def run_all():
     test_endpoint_helpers_shapes()
-    test_local_backend_normalized_shapes()
     test_remote_backend_dispatch_and_serialize()
     test_operator_accepts_backend()
     test_operator_tables_from_backend()
@@ -1167,11 +1056,8 @@ def run_all():
     test_orch_move_and_remove_sequence()
     test_prepend_sequences_helper()
     test_queue_object_payload()
-    test_local_backend_prepend()
     test_remote_backend_prepend()
-    test_local_backend_move_remove()
     test_remote_backend_move_remove()
-    test_local_backend_get_queue_object()
     test_remote_backend_get_queue_object()
     test_plan_buffer_append_and_wrap()
     test_plan_buffer_order()

@@ -90,7 +90,7 @@ def _queue_object_payload(orch, kind: str, idx: int) -> dict:
     Out-of-range indices or unknown kinds return ``{}`` (the queue may have
     mutated since the table was last polled — snapshot semantics).
 
-    Mirrors ``LocalBackend.get_queue_object``; keep the two in sync."""
+    Mirrors ``RemoteBackend.get_queue_object``; keep the two in sync."""
     dq = {
         "sequence": getattr(orch, "sequence_dq", None),
         "experiment": getattr(orch, "experiment_dq", None),
