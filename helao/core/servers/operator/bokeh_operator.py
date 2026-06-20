@@ -416,7 +416,17 @@ class BokehOperator:
             "Start Orch", "default", 70, self.callback_start_orch
         )
         self.button_estop_orch = self._make_button(
-            "ESTOP", "danger", 400, self.callback_estop_orch, height=100
+            "ESTOP", "danger", int(self.max_width * 0.25), self.callback_estop_orch,
+            height=100,
+            stylesheets=[
+                InlineStyleSheet(
+                    css=(
+                        ".bk-btn.bk-btn-danger { background-color: #7B0000; "
+                        "border-color: #5A0000; } "
+                        ".bk-btn.bk-btn-danger:hover { background-color: #5A0000; }"
+                    )
+                )
+            ],
         )
         self.button_add_expplan = self._make_button(
             "Add plan", "default", 100, self.callback_add_expplan
@@ -2003,17 +2013,34 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 text_input.js_on_change("value_input", color_callback_js)
             param_input.append(text_input)
             argtype_list.append(argtypes[idx])
+            idx_col_w = 35
+            input_w = 400
+            type_hint = (
+                str(argtypes[idx]).split()[-1].strip(chr(39) + "<>]")
+                .split(".")[-1].replace("[", " of ")
+            )
+            name_div = Div(
+                text=f"{args[idx]}",
+                width=input_w // 2,
+                height=16,
+            )
+            type_div = Div(
+                text=f"<i>[{type_hint}]</i>",
+                width=input_w - input_w // 2,
+                height=16,
+                styles={"text-align": "right"},
+            )
+            index_div = Div(
+                text=f"{idx})",
+                width=idx_col_w,
+                height=text_input.height,
+                styles={"text-align": "right", "line-height": f"{text_input.height}px"},
+            )
             param_layout.append(
                 layout(
                     [
-                        [
-                            Div(
-                                text=f"{idx}) {args[idx]} <i>[{str(argtypes[idx]).split()[-1].strip(chr(39) + '<>]').split('.')[-1].replace('[', ' of ')}]</i>",
-                                width=self.max_width - 40,
-                                height=18,
-                            ),
-                        ],
-                        [param_input[item]],
+                        [Spacer(width=idx_col_w), name_div, type_div],
+                        [index_div, param_input[item]],
                         Spacer(height=10),
                     ],
                     background=self.color_sq_param_inputs,
