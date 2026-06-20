@@ -620,7 +620,6 @@ class OrchAPI(HelaoFastAPI):
             self.orch.current_stop_message = active.action.action_params["reason"]
             LOGGER.warning(active.action.action_params["reason"])
             await self.orch.stop()
-            await self.orch.update_operator(True)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -747,7 +746,6 @@ class OrchAPI(HelaoFastAPI):
                 self.orch.current_stop_message = active.action.action_params["reason"]
                 LOGGER.warning(active.action.action_params["reason"])
                 LOGGER.alert(f"ORCH STOPPED ~ {active.action.action_params['reason']}")
-                await self.orch.update_operator(True)
 
             finished_action = await active.finish()
             return finished_action.as_dict()
@@ -787,7 +785,6 @@ class OrchAPI(HelaoFastAPI):
                     await self.orch.clear_actions()
                 if active.action.action_params["skip_queued_experiments"]:
                     await self.orch.clear_experiments()
-                await self.orch.update_operator(True)
 
             finished_action = await active.finish()
             return finished_action.as_dict()
@@ -845,9 +842,7 @@ class OrchAPI(HelaoFastAPI):
 
         @self.on_event("shutdown")
         async def shutdown_event():
-            """Stop the Bokeh operator UI and the orchestrator on application shutdown."""
-            LOGGER.info("Stopping operator")
-            self.orch.bokehapp.stop()
+            """Stop the orchestrator on application shutdown."""
             LOGGER.info("orch shutdown")
             await self.orch.shutdown()
             time.sleep(0.75)
