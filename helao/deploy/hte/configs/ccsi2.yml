@@ -20,11 +20,17 @@ servers:
     group: orchestrator
     fast: async_orch2
     params:
-      enable_op: true
-      bokeh_port: 5002
       seqspec_parser_path: helao\specifications\last2weeks.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
     verbose: false
+  OPERATOR:
+    group: operator
+    bokeh: standalone_operator
+    host: hte-ccsi-02.htejcap.caltech.edu
+    port: 5002
+    params:
+      orch_key: ORCH
+      poll_interval: 5
   # IO:
   #   host: hte-ccsi-02.htejcap.caltech.edu
   #   port: 8005

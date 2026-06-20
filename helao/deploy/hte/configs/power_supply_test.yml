@@ -40,13 +40,19 @@ servers:
     group: orchestrator
     fast: async_orch2
     params:
-      enable_op: true
-      bokeh_port: 5002
       # seqspec_parser_path: helao\specifications\last3months.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
       ignore_heartbeats:
         - ANDOR/acquire
     verbose: true
+  OPERATOR:
+    group: operator
+    bokeh: standalone_operator
+    host: 127.0.0.1
+    port: 5002
+    params:
+      orch_key: ORCH
+      poll_interval: 5
 
 
   POWER_SUPPLY:
