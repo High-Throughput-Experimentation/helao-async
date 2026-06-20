@@ -223,7 +223,7 @@ class Experiment(Sequence, ExperimentModel):
             self.dispatched_actions = []
 
         for actm in self.dispatched_actions:
-            LOGGER.info(
+            LOGGER.debug(
                 f"updating exp with act {actm.action_name} on {actm.action_server.disp_name()}, uuid:{actm.action_uuid}"
             )
 
