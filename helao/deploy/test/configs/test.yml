@@ -15,22 +15,19 @@ servers:
     port: 8001
     group: orchestrator
     fast: async_orch2
-    params:
-      enable_op: true
-      bokeh_port: 5001
-      launch_browser: true
+    params: {}
     exp_postprocess_libs:
       - append_params
     seq_postprocess_libs:
       - append_params
-  STANDALONE_OP:
+  OPERATOR:
     group: operator
     bokeh: standalone_operator
     host: 127.0.0.1
-    port: 5004
+    port: 5001
     params:
       orch_key: ORCH
-      doc_name: "Standalone Operator (test)"
+      doc_name: "Operator (test)"
       poll_interval: 5
   SIM:
     host: 127.0.0.1
