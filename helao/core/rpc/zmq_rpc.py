@@ -106,6 +106,10 @@ def _msgpack_enc_hook(obj: Any) -> Any:
         return list(obj)
     if isinstance(obj, bytes):
         return bytes(obj)
+    # Pydantic models (Action/Experiment/SequenceModel/etc.) returned by a
+    # handler -- dump to a JSON-safe dict; the encoder recurses through it.
+    if isinstance(obj, BaseModel):
+        return obj.model_dump(mode="json")
     raise NotImplementedError(
         f"Objects of type {type(obj).__name__} are not msgpack-serializable"
     )
