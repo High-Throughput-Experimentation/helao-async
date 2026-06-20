@@ -46,6 +46,7 @@ from bokeh.models import Button
 from bokeh.models import CheckboxGroup
 from bokeh.models import TabPanel, Tabs
 from bokeh.models import CustomJS
+from bokeh.models import InlineStyleSheet
 from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.plotting import figure
@@ -425,22 +426,22 @@ class BokehOperator:
             "Prepend plan", "default", 100, self.callback_prepend_plan
         )
         self.button_plan_move_up = self._make_button(
-            "Plan ↑", "default", 70, self.callback_plan_move_up
+            "Plan ↑", "default", 70, self.callback_plan_move_up, width_policy="min"
         )
         self.button_plan_move_down = self._make_button(
-            "Plan ↓", "default", 70, self.callback_plan_move_down
+            "Plan ↓", "default", 70, self.callback_plan_move_down, width_policy="min"
         )
         self.button_plan_remove = self._make_button(
-            "Plan ✕", "default", 70, self.callback_plan_remove
+            "Plan ✕", "default", 70, self.callback_plan_remove, width_policy="min"
         )
         self.button_seq_move_up = self._make_button(
-            "Queue ↑", "default", 70, self.callback_seq_move_up
+            "Queue ↑", "default", 70, self.callback_seq_move_up, width_policy="min"
         )
         self.button_seq_move_down = self._make_button(
-            "Queue ↓", "default", 70, self.callback_seq_move_down
+            "Queue ↓", "default", 70, self.callback_seq_move_down, width_policy="min"
         )
         self.button_seq_remove = self._make_button(
-            "Queue ✕", "default", 70, self.callback_seq_remove
+            "Queue ✕", "default", 70, self.callback_seq_remove, width_policy="min"
         )
         self.button_stop_orch = self._make_button(
             "Stop Orch", "default", 70, self.callback_stop_orch
@@ -455,8 +456,9 @@ class BokehOperator:
             "Clear expplan", "default", 100, self.callback_clear_expplan
         )
         self.orch_status_button = Button(
-            label="Disabled", disabled=False, button_type="danger", width=470
-        )  # success: green, danger: red
+            label="Disabled", disabled=False, button_type="danger",
+            sizing_mode="stretch_width",
+        )  # success: green, danger: red; fills width left by the other buttons
 
         self.orch_stepact_button = self._make_stepwise_button(
             "actions", self.callback_toggle_stepact
@@ -526,14 +528,16 @@ class BokehOperator:
         )
         self.planhistory_tree_div = Div(
             text="", sizing_mode="stretch_width",
-            styles={"overflow": "auto", "max-height": "200px"},
+            styles={"overflow": "auto", "max-height": "200px",
+                    "background-color": "white"},
         )
         self.queue_tree_header = Div(
             text="<b>select a row</b>", height=20, sizing_mode="stretch_width"
         )
         self.queue_tree_div = Div(
             text="", sizing_mode="stretch_width",
-            styles={"overflow": "auto", "max-height": "200px"},
+            styles={"overflow": "auto", "max-height": "200px",
+                    "background-color": "white"},
         )
 
         self.error_txt = Div(
@@ -741,29 +745,24 @@ class BokehOperator:
                 ),
                 layout(
                     [
-                        [
+                        row(
                             self.button_add_expplan,
-                            Spacer(width=10),
                             self.button_add_smpseqs,
-                            Spacer(width=10),
                             self.button_prepend_plan,
-                            Spacer(width=10),
                             self.button_start_orch,
-                            Spacer(width=10),
                             self.button_stop_orch,
-                            Spacer(width=10),
                             self.button_clear_expplan,
-                            Spacer(width=10),
                             self.orch_status_button,
-                        ],
+                            spacing=4,
+                            sizing_mode="stretch_width",
+                        ),
                         Spacer(height=4),
-                        [
+                        row(
                             self.orch_stepact_button,
-                            Spacer(width=10),
                             self.orch_stepexp_button,
-                            Spacer(width=10),
                             self.orch_stepseq_button,
-                        ],
+                            spacing=4,
+                        ),
                         Spacer(height=10),
                         [
                             Div(
@@ -777,7 +776,7 @@ class BokehOperator:
                         Spacer(height=10),
                     ],
                     background="#D6DBDF",
-                    width=self.max_width,
+                    sizing_mode="stretch_width",
                     height_policy="min",
                 ),
                 layout(
@@ -792,20 +791,23 @@ class BokehOperator:
                         [
                             row(
                                 column(self.planhistory_tabs,
-                                       sizing_mode="stretch_width"),
+                                       sizing_mode="stretch_width",
+                                       stylesheets=[InlineStyleSheet(
+                                           css=":host { flex: 7 1 0% !important; }")]),
                                 column(self.planhistory_tree_header,
                                        self.planhistory_tree_div,
-                                       sizing_mode="stretch_width"),
+                                       sizing_mode="stretch_width",
+                                       stylesheets=[InlineStyleSheet(
+                                           css=":host { flex: 3 1 0% !important; }")]),
                                 sizing_mode="stretch_width",
                             ),
                         ],
-                        [
+                        row(
                             self.button_plan_move_up,
-                            Spacer(width=5),
                             self.button_plan_move_down,
-                            Spacer(width=5),
                             self.button_plan_remove,
-                        ],
+                            spacing=4,
+                        ),
                         [
                             Div(
                                 text="<b>Queues:</b>",
@@ -816,46 +818,43 @@ class BokehOperator:
                         [
                             row(
                                 column(self.queue_tabs,
-                                       sizing_mode="stretch_width"),
+                                       sizing_mode="stretch_width",
+                                       stylesheets=[InlineStyleSheet(
+                                           css=":host { flex: 7 1 0% !important; }")]),
                                 column(self.queue_tree_header,
                                        self.queue_tree_div,
-                                       sizing_mode="stretch_width"),
+                                       sizing_mode="stretch_width",
+                                       stylesheets=[InlineStyleSheet(
+                                           css=":host { flex: 3 1 0% !important; }")]),
                                 sizing_mode="stretch_width",
                             ),
                         ],
-                        [
+                        row(
                             self.button_seq_move_up,
-                            Spacer(width=5),
                             self.button_seq_move_down,
-                            Spacer(width=5),
                             self.button_seq_remove,
-                        ],
-                        [
+                            spacing=4,
+                        ),
+                        row(
                             self.button_add_expplan,
-                            Spacer(width=10),
                             self.button_add_smpseqs,
-                            Spacer(width=10),
                             self.button_prepend_plan,
-                            Spacer(width=10),
                             self.button_start_orch,
-                            Spacer(width=10),
                             self.button_stop_orch,
-                            Spacer(width=10),
                             self.button_clear_expplan,
-                            Spacer(width=10),
                             self.orch_status_button,
-                        ],
+                            spacing=4,
+                            sizing_mode="stretch_width",
+                        ),
                         Spacer(height=10),
-                        [
+                        row(
                             self.button_skip_exp,
-                            Spacer(width=5),
                             self.button_clear_seqs,
-                            Spacer(width=5),
                             self.button_clear_exps,
-                            Spacer(width=5),
                             self.button_clear_action,
                             self.button_update,
-                        ],
+                            spacing=4,
+                        ),
                         Spacer(height=10),
                         self.button_estop_orch,
                         Spacer(height=10),
@@ -1391,11 +1390,15 @@ class BokehOperator:
         summary = await self.backend.get_status_summary()
         for key in self.action_server_lists:
             self.action_server_lists[key] = []
-        for server_name, (status_str, driver_str) in summary.items():
+        # Sort by server name so the table keeps a fixed row order regardless of
+        # the (unordered) dict order the backend status summary arrives in.
+        for server_name, (status_str, driver_str) in sorted(summary.items()):
             self.action_server_lists["action_server"].append(server_name)
             self.action_server_lists["server_status"].append(status_str)
             self.action_server_lists["driver_status"].append(driver_str)
-            self.action_server_source.stream(self.action_server_lists, rollover=self.num_actserv)
+        # Replace the data wholesale (like the history tables) instead of
+        # streaming per row, so rows render exactly once in the sorted order.
+        self.action_server_source.data = self.action_server_lists
 
     def update_selector_layout(self, attr, old, new):
         """Switch the parameter panel to match the currently active selector tab."""
