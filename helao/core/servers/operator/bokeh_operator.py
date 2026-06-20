@@ -350,6 +350,7 @@ class BokehOperator:
                 self.action_server_tab,
             ],
             height_policy="min",
+            sizing_mode="stretch_width",
         )
 
         self.action_history_source, self.action_history_table = self._make_table(
@@ -386,6 +387,7 @@ class BokehOperator:
                 self.sequence_history_tab,
             ],
             height_policy="min",
+            sizing_mode="stretch_width",
         )
 
         self.sequence_dropdown = Select(
