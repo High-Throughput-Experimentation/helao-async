@@ -20,9 +20,15 @@ servers:
     port: 8001
     group: orchestrator
     fast: async_orch2
+    params: {}
+  OPERATOR:
+    group: operator
+    bokeh: standalone_operator
+    host: 127.0.0.1
+    port: 5002
     params:
-      enable_op: true
-      bokeh_port: 5002
+      orch_key: ORCH
+      poll_interval: 5
   SPEC_T:
     host: 127.0.0.1
     port: 8004
