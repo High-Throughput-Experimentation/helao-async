@@ -26,13 +26,11 @@ import inspect
 from typing import Optional
 
 import time
-from functools import partial
 from collections import defaultdict
 
 import aiohttp
 import colorama
 from fastapi import WebSocket
-from bokeh.server.server import Server
 
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
@@ -41,8 +39,6 @@ from helao.core.models.server import ActionServerModel, GlobalStatusModel
 from helao.core.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
 from helao.core.error import ErrorCodes
 
-from helao.core.servers.operator.bokeh_operator import BokehOperator
-from helao.core.servers.vis import HelaoVis
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.time_utils import set_time
 from helao.helpers.import_autolibs import import_autolibs
@@ -92,7 +88,6 @@ class Orch(Base):
     present in the world config.
     """
 
-    bokehapp: Server
     loop_task: asyncio.Task
     status_subscriber: asyncio.Task
     globstat_broadcaster: asyncio.Task
@@ -150,9 +145,6 @@ class Orch(Base):
         self.active_seq_exp_counter = 0
         self.last_sequence: Sequence = None
         self.active_run_id: Optional[UUID] = None
-        self.bokehapp = None
-        self.orch_op = None
-        self.op_enabled = self.server_params.get("enable_op", False)
         self.heartbeat_interval = self.server_params.get("heartbeat_interval", 10)
         self.ignore_heartbeats = self.server_params.get("ignore_heartbeats", [])
         self.verify_plates = self.server_params.get("verify_plates", True)
@@ -226,8 +218,6 @@ class Orch(Base):
                 self.regular_status_task(regular_delay)
             )
 
-        if self.op_enabled:
-            self.start_operator()
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
         self.heartbeat_monitor = asyncio.create_task(self.active_action_monitor())
@@ -274,55 +264,6 @@ class Orch(Base):
     def track_action_uuid(self, action_uuid):
         """Remember ``action_uuid`` as the most recently dispatched action."""
         self.last_dispatched_action_uuid = action_uuid
-
-    def start_operator(self):
-        """Start the Bokeh server hosting the operator UI and optionally open a browser."""
-        servHost = self.server_cfg["host"]
-        servPort = self.server_params.get("bokeh_port", self.server_cfg["port"] + 1000)
-        servPy = "BokehOperator"
-
-        # Allow both 127.0.0.1 and localhost so the operator works from either URL
-        origins = [f"{servHost}:{servPort}"]
-        if servHost == "127.0.0.1":
-            origins.append(f"localhost:{servPort}")
-        # Bokeh session token: default 300s; use 7 days so /BokehOperator/ws does not expire during use
-        session_token_expiration = self.server_params.get("bokeh_session_token_expiration", 604800)
-
-        self.bokehapp = Server(
-            {f"/{servPy}": partial(self.makeBokehApp, orch=self)},
-            port=servPort,
-            address=servHost,
-            allow_websocket_origin=origins,
-            session_token_expiration=session_token_expiration,
-        )
-        LOGGER.info(f"started bokeh server {self.bokehapp}")
-        self.bokehapp.start()
-        if self.server_params.get("launch_browser", False):
-            self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
-        # bokehapp.io_loop.start()
-
-    def makeBokehApp(self, doc, orch):
-        """Attach a :class:`BokehOperator` to ``doc`` and return the populated Bokeh document.
-
-        Args:
-            doc: The Bokeh ``Document`` being served.
-            orch: Orchestrator instance the operator should drive.
-        """
-        app = HelaoVis(
-            server_key=self.server.server_name,
-            doc=doc,
-        )
-
-        # _ = HelaoOperator(app.vis)
-        from helao.core.servers.operator.orch_backend import LocalBackend
-        doc.operator = BokehOperator(app.vis, LocalBackend(orch))
-        # get the event loop
-        # operatorloop = asyncio.get_event_loop()
-
-        # this periodically updates the GUI (action and experiment tables)
-        # operator.vis.doc.add_periodic_callback(operator.IOloop,2000) # time in ms
-
-        return doc
 
     async def wait_for_interrupt(self, pending_action: Optional[Action] = None) -> bool:
         """Block until an interrupt message arrives and forward queued ``GlobalStatusModel``s.
@@ -619,7 +560,6 @@ class Orch(Base):
 
             # now push it to the interrupt_q
             await self.interrupt_q.put(self.globalstatusmodel)
-            await self.update_operator(True)
             # await self.globstat_q.put(self.globalstatusmodel.as_json())
 
             return True
@@ -1235,7 +1175,6 @@ class Orch(Base):
                         await self.stop()
                         LOGGER.info(f"Re-queuing {A.action_name}")
                         self.action_dq.insert(0, A)
-                        await self.update_operator(True)
                         return ErrorCodes.none
 
                 # except asyncio.exceptions.TimeoutError:
@@ -1495,7 +1434,6 @@ class Orch(Base):
                 if error_code is not ErrorCodes.none:
                     LOGGER.error(f"stopping orch with error code: {error_code}")
                     await self.intend_stop()
-                await self.update_operator(True)
 
             # finish the last exp
             # this wait for all actions in active experiment
@@ -1516,7 +1454,6 @@ class Orch(Base):
             if self.globalstatusmodel.loop_state != OrchStatus.estopped:
                 self.globalstatusmodel.loop_state = LoopStatus.stopped
             await self.intend_none()
-            await self.update_operator(True)
 
             if any(
                 [
@@ -1574,7 +1511,6 @@ class Orch(Base):
         else:
             LOGGER.info("already running")
         self.current_stop_message = ""
-        await self.update_operator(True)
 
     async def start_loop(self) -> LoopStatus:
         """Start :meth:`dispatch_loop_task` if the loop is stopped, refusing to start under E-STOP.
@@ -1613,7 +1549,6 @@ class Orch(Base):
         self.current_stop_message = "E-STOP" + reason_suffix
         LOGGER.warning("E-STOP" + reason_suffix)
         LOGGER.alert("ORCH E-STOP")
-        await self.update_operator(True)
 
     async def stop_loop(self):
         """Signal the dispatch loop to stop after the current iteration via :meth:`intend_stop`."""
@@ -2293,11 +2228,6 @@ class Orch(Base):
                 f"Orch queues are not empty, exported queues to {export_path}"
             )
 
-    async def update_operator(self, msg):
-        """Forward ``msg`` to the Bokeh operator's update queue, if the operator is enabled."""
-        if self.op_enabled and self.orch_op:
-            await self.orch_op.update_q.put(msg)
-
     def start_wait(self, active: Active):
         """Schedule :meth:`dispatch_wait_task` for ``active`` as a background task."""
         self.wait_task = asyncio.create_task(self.dispatch_wait_task(active))
@@ -2354,7 +2284,6 @@ class Orch(Base):
                         )
                         await self.stop()
                         LOGGER.alert(f"ORCH STOPPED ~ {self.current_stop_message}")
-                        await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
 
     async def ping_action_servers(self) -> dict:
@@ -2411,7 +2340,6 @@ class Orch(Base):
         """Heartbeat loop that refreshes ``status_summary`` via :meth:`ping_action_servers`."""
         while True:
             self.status_summary = await self.ping_action_servers()
-            await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
 
     def export_queues(self, timestamp_pck: bool = False) -> str:
@@ -2495,7 +2423,6 @@ class Orch(Base):
                 self.action_history = DequeDict(queue_dict.get("action_history", []), maxlen=1000)
                 self.experiment_history = DequeDict(queue_dict.get("experiment_history", []), maxlen=1000)
                 self.sequence_history = DequeDict(queue_dict.get("sequence_history", []), maxlen=1000)
-                self.update_operator(True)
             except Exception:
                 LOGGER.warning("Error restoring queues from pck. Check if pck is compatible.", exc_info=True)
         return save_path
