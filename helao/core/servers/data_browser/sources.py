@@ -112,10 +112,10 @@ class SourceIndex:
 
 
 class RunsSourceIndex(SourceIndex):
-    """Index RUNS_FINISHED (unzipped trees) or RUNS_SYNCED (sequence zips)."""
+    """Index RUNS_FINISHED/RUNS_DIAG (unzipped trees) or RUNS_SYNCED (sequence zips)."""
 
     def __init__(self, root, state):
-        # state is "FINISHED" or "SYNCED"
+        # state is "FINISHED", "DIAG", or "SYNCED"
         self.root = Path(root)
         self.state = state
         self.source = f"RUNS_{state}"
@@ -299,8 +299,8 @@ class DerivedSourceIndex(SourceIndex):
         return rows
 
 
-SOURCES = ["RUNS_FINISHED", "RUNS_SYNCED", "PROCESSES", "ANALYSES"]
-GROUPS = {"RUNS": ["RUNS_FINISHED", "RUNS_SYNCED"],
+SOURCES = ["RUNS_FINISHED", "RUNS_DIAG", "RUNS_SYNCED", "PROCESSES", "ANALYSES"]
+GROUPS = {"RUNS": ["RUNS_FINISHED", "RUNS_DIAG", "RUNS_SYNCED"],
           "DERIVED": ["PROCESSES", "ANALYSES"]}
 
 
@@ -308,6 +308,8 @@ def build_source_index(root, source):
     """Return the SourceIndex for a source name."""
     if source == "RUNS_FINISHED":
         return RunsSourceIndex(root, "FINISHED")
+    if source == "RUNS_DIAG":
+        return RunsSourceIndex(root, "DIAG")
     if source == "RUNS_SYNCED":
         return RunsSourceIndex(root, "SYNCED")
     if source in ("PROCESSES", "ANALYSES"):
