@@ -810,6 +810,13 @@ class BokehOperator:
                             self.button_plan_remove,
                             spacing=4,
                         ),
+                    ],
+                    background="#AED6F1",
+                    sizing_mode="stretch_width",
+                    height_policy="min",
+                ),
+                layout(
+                    [
                         [
                             Div(
                                 text="<b>Queues:</b>",
@@ -861,7 +868,7 @@ class BokehOperator:
                         self.button_estop_orch,
                         Spacer(height=10),
                     ],
-                    background="#AED6F1",
+                    background="#D6DBDF",
                     sizing_mode="stretch_width",
                     height_policy="min",
                 ),
