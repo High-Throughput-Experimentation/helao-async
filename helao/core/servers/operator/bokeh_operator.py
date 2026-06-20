@@ -418,6 +418,7 @@ class BokehOperator:
         self.button_estop_orch = self._make_button(
             "ESTOP", "danger", int(self.max_width * 0.25), self.callback_estop_orch,
             height=100,
+            sizing_mode="fixed",
             stylesheets=[
                 InlineStyleSheet(
                     css=(
@@ -2031,7 +2032,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 styles={"text-align": "right"},
             )
             index_div = Div(
-                text=f"{idx})",
+                text=f"[{idx}]",
                 width=idx_col_w,
                 height=text_input.height,
                 styles={"text-align": "right", "line-height": f"{text_input.height}px"},

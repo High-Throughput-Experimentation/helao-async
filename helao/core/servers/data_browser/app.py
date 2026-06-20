@@ -3,7 +3,7 @@ from socket import gethostname
 
 from bokeh.layouts import column, row
 from bokeh.models import (
-    Button, ColumnDataSource, DataTable, Div, RadioButtonGroup,
+    Button, ColumnDataSource, DataTable, Div, InlineStyleSheet, RadioButtonGroup,
     Select, Spacer, TableColumn, Tabs, TabPanel, TextInput,
 )
 from bokeh.palettes import Category10
@@ -68,7 +68,11 @@ class _UI:
         self.index_table = DataTable(
             source=self.index_source,
             columns=[TableColumn(field=c, title=c) for c in INDEX_TABLE_COLS],
-            height=380, selectable="checkbox", sizing_mode="stretch_width")
+            selectable="checkbox", sizing_mode="stretch_both")
+        # source table holds the top 30% of the app height
+        index_box = column(
+            self.index_table, sizing_mode="stretch_width",
+            stylesheets=[InlineStyleSheet(css=":host { height: 30vh; }")])
         self.add_btn = Button(label="+ Add selected to plot",
                               button_type="success", width=300)
         self.clear_btn = Button(label="Clear plot", width=300)
@@ -77,9 +81,13 @@ class _UI:
         buttons = row(self.add_btn, self.clear_btn)
 
         self.right = self._build_right()
+        # plot + data tables fill the lower 70% of the app height
+        right_box = column(
+            self.right, sizing_mode="stretch_width",
+            stylesheets=[InlineStyleSheet(css=":host { height: 70vh; }")])
 
         self.layout = column(
-            header, control, self.filter_in, self.index_table, buttons, self.right,
+            header, control, self.filter_in, index_box, buttons, right_box,
             sizing_mode="stretch_width")
 
     def _build_right(self):
@@ -90,11 +98,11 @@ class _UI:
                                value="line", width=120)
         for w in (self.x_sel, self.y_sel, self.type_sel):
             w.on_change("value", self._on_axis_change)
-        self.plot = figure(height=380, tools="pan,box_zoom,wheel_zoom,reset,save",
-                           sizing_mode="stretch_width")
+        self.plot = figure(tools="pan,box_zoom,wheel_zoom,reset,save",
+                           sizing_mode="stretch_both")
         plot_panel = TabPanel(
             child=column(row(self.x_sel, self.y_sel, self.type_sel), self.plot,
-                         sizing_mode="stretch_width"),
+                         sizing_mode="stretch_both"),
             title="Plot")
         # table panel (Task 13)
         self.summary_source = ColumnDataSource(data={c: [] for c in dbstate.SUMMARY_COLS})
@@ -110,9 +118,9 @@ class _UI:
             child=column(Div(text="<b>Trace summary</b> (select a row to view data)"),
                          self.summary_table,
                          Div(text="<b>Data rows</b>"), self.rows_table,
-                         sizing_mode="stretch_width"),
+                         sizing_mode="stretch_both"),
             title="Table")
-        self.tabs = Tabs(tabs=[plot_panel, table_panel], sizing_mode="stretch_width")
+        self.tabs = Tabs(tabs=[plot_panel, table_panel], sizing_mode="stretch_both")
         return self.tabs
 
     def _refresh_axes(self):
@@ -177,6 +185,13 @@ class _UI:
         self.source_sel.value = opts[0]
 
     def _on_scan(self):
+        # flip the button to a "scanning" color, then run the scan on the next
+        # tick so the color change is flushed to the browser before the work
+        self.scan_btn.button_type = "warning"
+        self.scan_btn.disabled = True
+        self.vis.doc.add_next_tick_callback(self._do_scan)
+
+    def _do_scan(self):
         ds = self.date_start.value.strip() or None
         de = self.date_end.value.strip() or None
         try:
@@ -186,6 +201,9 @@ class _UI:
             self.status.text = f"<span style='color:#c0392b'>scan failed: {exc}</span>"
             self.vis.print_message(f"data_browser scan failed: {exc}", error=True)
             return
+        finally:
+            self.scan_btn.button_type = "primary"
+            self.scan_btn.disabled = False
         self.status.text = f"indexed {len(self.index_df)} datasets from {self._current_source()}"
         self._refresh_index_table()
 
