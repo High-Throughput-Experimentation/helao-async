@@ -928,7 +928,7 @@ def test_param_label_enumeration():
     name_div = header_row.children[1]
     type_div = header_row.children[2]
     index_div = op.seq_param_layout[3].children[1].children[0]
-    assert index_div.text == "0)", index_div.text
+    assert index_div.text == "[0]", index_div.text
     assert name_div.text == "x", name_div.text
     assert type_div.text.startswith("<i>["), type_div.text
     # widget key unchanged (decoupled from display)
