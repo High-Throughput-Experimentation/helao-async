@@ -151,14 +151,15 @@ class OrchServerParams(BaseModel):
     """Per-orchestrator ``params:`` block from a config YAML.
 
     Attributes:
-        enable_op: Whether the orchestrator should host its Bokeh operator UI.
+        enable_op: DEPRECATED and ignored. The operator now runs as a separate
+            ``group: operator`` server; the orchestrator no longer hosts it.
         heartbeat_interval: Seconds between status pings sent to action servers.
         ignore_heartbeats: Server keys whose missed heartbeats should not
             trigger error handling.
         verify_plates: Whether plate barcode verification is required.
     """
 
-    enable_op: Optional[bool] = True
+    enable_op: Optional[bool] = None  # deprecated, ignored
     heartbeat_interval: Optional[float] = 10.0
     ignore_heartbeats: Optional[List[str]] = None
     verify_plates: Optional[bool] = True
