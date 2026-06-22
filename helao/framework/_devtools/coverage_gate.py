@@ -1,14 +1,18 @@
 """Coverage-threshold math for the framework merge gate.
 
 Parses coverage.py JSON (`coverage json`) and enforces a minimum percentage
-on the gated layers only (domain + models). Empty gated layers pass.
+on the gated layers (domain + models + support). Empty gated layers pass.
+A per-module bar for support/ is additionally enforced by
+``tests/test_support_coverage_bar.py`` (the aggregate gate here cannot catch
+a single under-covered module).
 """
 from typing import Iterable, Mapping
 
-# Path prefixes the coverage threshold applies to.
+# Path prefixes the aggregate coverage threshold applies to.
 GATED_PREFIXES: tuple[str, ...] = (
     "helao/framework/domain/",
     "helao/framework/models/",
+    "helao/framework/support/",
 )
 
 

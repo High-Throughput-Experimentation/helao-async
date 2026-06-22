@@ -141,3 +141,40 @@ def test_load_global_config_set_global(tmp_path):
         assert config_loader.CONFIG.run_type == "simulation"
     finally:
         config_loader.CONFIG = None
+
+
+def test_read_config_prefix_resolves_single_yml(tmp_path, monkeypatch):
+    p = tmp_path / "myprefix.yml"
+    p.write_text(_DEMO_YML)
+    monkeypatch.setattr(config_loader, "glob", lambda pattern: [str(p)])
+    config = read_config("myprefix")
+    assert config["run_type"] == "simulation"
+    assert config["loaded_config_path"] == str(p)
+
+
+def test_read_config_prefix_resolves_single_py(tmp_path, monkeypatch):
+    p = tmp_path / "myprefix.py"
+    p.write_text(_DEMO_PY)
+    monkeypatch.setattr(config_loader, "glob", lambda pattern: [str(p)])
+    config = read_config("myprefix")
+    assert config["run_type"] == "simulation"
+
+
+def test_read_config_prefix_multiple_yml_raises(monkeypatch):
+    monkeypatch.setattr(config_loader, "glob", lambda pattern: ["/a/x.yml", "/b/x.yml"])
+    with pytest.raises(Exception, match="Multiple .yml"):
+        read_config("x")
+
+
+def test_read_config_prefix_multiple_py_raises(monkeypatch):
+    monkeypatch.setattr(config_loader, "glob", lambda pattern: ["/a/x.py", "/b/x.py"])
+    with pytest.raises(Exception, match="Multiple .py"):
+        read_config("x")
+
+
+def test_read_config_sets_alert_config_path(tmp_path, monkeypatch):
+    p = tmp_path / "demo0.yml"
+    p.write_text(_DEMO_YML)
+    monkeypatch.setenv("ALERT_CONFIG_PATH", "/tmp/alert.yml")
+    config = read_config(str(p))
+    assert config["alert_config_path"] == "/tmp/alert.yml"

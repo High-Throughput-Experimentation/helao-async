@@ -1,7 +1,9 @@
 """Framework merge gate.
 
 Runs the helao/framework pytest suite under coverage, then enforces a
-minimum coverage percentage on the gated layers (domain + models).
+minimum coverage percentage on the gated layers (domain + models + support).
+A per-module >=90% bar for support/ is additionally enforced by
+tests/test_support_coverage_bar.py.
 
 Run with the helao conda env, e.g.:
     conda run -n helao python run_framework_tests.py
@@ -40,13 +42,13 @@ def main() -> int:
     cov_json = json.loads(COV_JSON.read_text(encoding="utf-8"))
     covered, total = summarize(cov_json, GATED_PREFIXES)
     if total == 0:
-        print("[gate] gated layers (domain+models) have no statements yet — PASS")
+        print("[gate] gated layers (domain+models+support) have no statements yet — PASS")
         return 0
 
     pct = (covered / total) * 100.0
     ok = gate_passes(cov_json, THRESHOLD, GATED_PREFIXES)
     status = "PASS" if ok else "FAIL"
-    print(f"[gate] domain+models coverage: {covered}/{total} = {pct:.1f}% (>= {THRESHOLD}%? {status})")
+    print(f"[gate] domain+models+support coverage: {covered}/{total} = {pct:.1f}% (>= {THRESHOLD}%? {status})")
     return 0 if ok else 1
 
 

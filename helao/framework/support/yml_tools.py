@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import aiofiles
+import aiofiles.os
 import aiohttp
 import aioshutil
 import ruamel.yaml
