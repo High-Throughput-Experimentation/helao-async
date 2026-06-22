@@ -23,10 +23,10 @@ DOMAIN_FORBIDDEN: set[str] = {
 
 
 def _matches(module: str, forbidden: Iterable[str]) -> str | None:
-    """Return the forbidden prefix that `module` violates, or None.
+    """Return `module` if it violates any forbidden prefix, else None.
 
-    Matching is on dotted-path boundaries: 'os' matches 'os' and 'os.path'
-    but not 'osmosis'.
+    Matching is on dotted-path boundaries: prefix 'os' matches 'os' and
+    'os.path' but not 'osmosis'.
     """
     for prefix in forbidden:
         if module == prefix or module.startswith(prefix + "."):
