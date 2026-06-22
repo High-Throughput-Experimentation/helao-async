@@ -52,6 +52,7 @@ dependencies:
   - pyaml
   - pytest
   - pytest-cov
+  - pytest-asyncio
   - coverage
   - pyarrow
   - pybase64
