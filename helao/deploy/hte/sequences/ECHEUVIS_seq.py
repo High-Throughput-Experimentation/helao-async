@@ -81,52 +81,52 @@ def ECHEUVIS_CV_led(
     Loads the sample, performs reference measurements, then runs CV with synchronized LED illumination and spectrometer triggering.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_vs_nhe: Parameter passed through to the sub-experiments.
-        CV_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV_cycles: Parameter passed through to the sub-experiments.
-        preCV_duration: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_names: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CV: Parameter passed through to the sub-experiments.
-        toggleCV_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCV_illum_period: Parameter passed through to the sub-experiments.
-        toggleCV_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCV_illum_time: Parameter passed through to the sub-experiments.
-        toggleSpec_duty: Parameter passed through to the sub-experiments.
-        toggleSpec_period: Parameter passed through to the sub-experiments.
-        toggleSpec_init_delay: Parameter passed through to the sub-experiments.
-        toggleSpec_time: Parameter passed through to the sub-experiments.
-        spec_ref_duration: Parameter passed through to the sub-experiments.
-        spec_int_time_ms: Parameter passed through to the sub-experiments.
-        spec_n_avg: Parameter passed through to the sub-experiments.
-        spec_technique: Parameter passed through to the sub-experiments.
-        calc_ev_parts: Parameter passed through to the sub-experiments.
-        calc_bin_width: Parameter passed through to the sub-experiments.
-        calc_window_length: Parameter passed through to the sub-experiments.
-        calc_poly_order: Parameter passed through to the sub-experiments.
-        calc_lower_wl: Parameter passed through to the sub-experiments.
-        calc_upper_wl: Parameter passed through to the sub-experiments.
-        use_z_motor: Parameter passed through to the sub-experiments.
-        cell_engaged_z: Parameter passed through to the sub-experiments.
-        cell_disengaged_z: Parameter passed through to the sub-experiments.
-        cell_vent_wait: Parameter passed through to the sub-experiments.
-        cell_fill_wait: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_vs_nhe: Reference-electrode potential vs NHE (V).
+        CV_Vinit_vsRHE: Cyclic-voltammetry initial potential vs RHE.
+        CV_Vapex1_vsRHE: Cyclic-voltammetry apex-1 potential vs RHE.
+        CV_Vapex2_vsRHE: Cyclic-voltammetry apex-2 potential vs RHE.
+        CV_Vfinal_vsRHE: Cyclic-voltammetry final potential vs RHE.
+        CV_scanrate_voltsec: Cyclic-voltammetry scan rate (V/s).
+        CV_samplerate_mV: Cyclic-voltammetry sample rate (mV).
+        CV_cycles: Cyclic-voltammetry cycle count.
+        preCV_duration: Pre cyclic-voltammetry duration.
+        gamry_i_range: Gamry potentiostat current range setting.
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_names: Identifiers of the LEDs to use.
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_intensities_mw: LED intensities (mW).
+        led_name_CV: LED name cyclic-voltammetry.
+        toggleCV_illum_duty: Toggled cyclic-voltammetry illumination duty cycle.
+        toggleCV_illum_period: Toggled cyclic-voltammetry illumination period.
+        toggleCV_dark_time_init: Toggled cyclic-voltammetry dark time initial.
+        toggleCV_illum_time: Toggled cyclic-voltammetry illumination time.
+        toggleSpec_duty: Toggled spectrometer duty cycle.
+        toggleSpec_period: Toggled spectrometer period.
+        toggleSpec_init_delay: Toggled spectrometer initial delay.
+        toggleSpec_time: Toggled spectrometer time.
+        spec_ref_duration: Spectrometer reference acquisition duration (s).
+        spec_int_time_ms: Spectrometer integration time (ms).
+        spec_n_avg: Number of spectra to average.
+        spec_technique: Spectrometer acquisition technique to run.
+        calc_ev_parts: Number of eV partitions for analysis.
+        calc_bin_width: Spectral bin width for analysis.
+        calc_window_length: Savitzky-Golay smoothing window length for analysis.
+        calc_poly_order: Polynomial order for the analysis fit.
+        calc_lower_wl: Lower wavelength bound for analysis (nm).
+        calc_upper_wl: Upper wavelength bound for analysis (nm).
+        use_z_motor: Whether to use the z-axis motor to engage the cell.
+        cell_engaged_z: Cell engaged z-position.
+        cell_disengaged_z: Cell disengaged z-position.
+        cell_vent_wait: Cell vent wait time.
+        cell_fill_wait: Cell fill wait time.
 
     Returns:
         List of planned experiments to dispatch.
@@ -483,48 +483,48 @@ def ECHEUVIS_CA_led(
     Loads the sample, performs reference measurements, then runs CA with synchronized LED illumination and spectrometer triggering.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_vs_nhe: Parameter passed through to the sub-experiments.
-        CA_potential_vsRHE: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        CA_samplerate_sec: Parameter passed through to the sub-experiments.
-        OCV_duration: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_names: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CA: Parameter passed through to the sub-experiments.
-        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCA_illum_period: Parameter passed through to the sub-experiments.
-        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCA_illum_time: Parameter passed through to the sub-experiments.
-        toggleSpec_duty: Parameter passed through to the sub-experiments.
-        toggleSpec_period: Parameter passed through to the sub-experiments.
-        toggleSpec_init_delay: Parameter passed through to the sub-experiments.
-        toggleSpec_time: Parameter passed through to the sub-experiments.
-        spec_ref_duration: Parameter passed through to the sub-experiments.
-        spec_int_time_ms: Parameter passed through to the sub-experiments.
-        spec_n_avg: Parameter passed through to the sub-experiments.
-        spec_technique: Parameter passed through to the sub-experiments.
-        calc_ev_parts: Parameter passed through to the sub-experiments.
-        calc_bin_width: Parameter passed through to the sub-experiments.
-        calc_window_length: Parameter passed through to the sub-experiments.
-        calc_poly_order: Parameter passed through to the sub-experiments.
-        calc_lower_wl: Parameter passed through to the sub-experiments.
-        calc_upper_wl: Parameter passed through to the sub-experiments.
-        use_z_motor: Parameter passed through to the sub-experiments.
-        cell_engaged_z: Parameter passed through to the sub-experiments.
-        cell_disengaged_z: Parameter passed through to the sub-experiments.
-        cell_vent_wait: Parameter passed through to the sub-experiments.
-        cell_fill_wait: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_vs_nhe: Reference-electrode potential vs NHE (V).
+        CA_potential_vsRHE: Chronoamperometry potential vs RHE.
+        CA_duration_sec: Chronoamperometry duration (s).
+        CA_samplerate_sec: Chronoamperometry sample rate (s).
+        OCV_duration: Open-circuit-voltage duration.
+        gamry_i_range: Gamry potentiostat current range setting.
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_names: Identifiers of the LEDs to use.
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_intensities_mw: LED intensities (mW).
+        led_name_CA: LED name chronoamperometry.
+        toggleCA_illum_duty: Toggled chronoamperometry illumination duty cycle.
+        toggleCA_illum_period: Toggled chronoamperometry illumination period.
+        toggleCA_dark_time_init: Toggled chronoamperometry dark time initial.
+        toggleCA_illum_time: Toggled chronoamperometry illumination time.
+        toggleSpec_duty: Toggled spectrometer duty cycle.
+        toggleSpec_period: Toggled spectrometer period.
+        toggleSpec_init_delay: Toggled spectrometer initial delay.
+        toggleSpec_time: Toggled spectrometer time.
+        spec_ref_duration: Spectrometer reference acquisition duration (s).
+        spec_int_time_ms: Spectrometer integration time (ms).
+        spec_n_avg: Number of spectra to average.
+        spec_technique: Spectrometer acquisition technique to run.
+        calc_ev_parts: Number of eV partitions for analysis.
+        calc_bin_width: Spectral bin width for analysis.
+        calc_window_length: Savitzky-Golay smoothing window length for analysis.
+        calc_poly_order: Polynomial order for the analysis fit.
+        calc_lower_wl: Lower wavelength bound for analysis (nm).
+        calc_upper_wl: Upper wavelength bound for analysis (nm).
+        use_z_motor: Whether to use the z-axis motor to engage the cell.
+        cell_engaged_z: Cell engaged z-position.
+        cell_disengaged_z: Cell disengaged z-position.
+        cell_vent_wait: Cell vent wait time.
+        cell_fill_wait: Cell fill wait time.
 
     Returns:
         List of planned experiments to dispatch.
@@ -874,47 +874,47 @@ def ECHEUVIS_CP_led(
     Loads the sample, performs reference measurements, then runs CP with synchronized LED illumination and spectrometer triggering.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_vs_nhe: Parameter passed through to the sub-experiments.
-        CP_current: Parameter passed through to the sub-experiments.
-        CP_duration_sec: Parameter passed through to the sub-experiments.
-        CP_samplerate_sec: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_names: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CP: Parameter passed through to the sub-experiments.
-        toggleCP_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCP_illum_period: Parameter passed through to the sub-experiments.
-        toggleCP_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCP_illum_time: Parameter passed through to the sub-experiments.
-        toggleSpec_duty: Parameter passed through to the sub-experiments.
-        toggleSpec_period: Parameter passed through to the sub-experiments.
-        toggleSpec_init_delay: Parameter passed through to the sub-experiments.
-        toggleSpec_time: Parameter passed through to the sub-experiments.
-        spec_ref_duration: Parameter passed through to the sub-experiments.
-        spec_int_time_ms: Parameter passed through to the sub-experiments.
-        spec_n_avg: Parameter passed through to the sub-experiments.
-        spec_technique: Parameter passed through to the sub-experiments.
-        calc_ev_parts: Parameter passed through to the sub-experiments.
-        calc_bin_width: Parameter passed through to the sub-experiments.
-        calc_window_length: Parameter passed through to the sub-experiments.
-        calc_poly_order: Parameter passed through to the sub-experiments.
-        calc_lower_wl: Parameter passed through to the sub-experiments.
-        calc_upper_wl: Parameter passed through to the sub-experiments.
-        use_z_motor: Parameter passed through to the sub-experiments.
-        cell_engaged_z: Parameter passed through to the sub-experiments.
-        cell_disengaged_z: Parameter passed through to the sub-experiments.
-        cell_vent_wait: Parameter passed through to the sub-experiments.
-        cell_fill_wait: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_vs_nhe: Reference-electrode potential vs NHE (V).
+        CP_current: Chronopotentiometry current.
+        CP_duration_sec: Chronopotentiometry duration (s).
+        CP_samplerate_sec: Chronopotentiometry sample rate (s).
+        gamry_i_range: Gamry potentiostat current range setting.
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_names: Identifiers of the LEDs to use.
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_intensities_mw: LED intensities (mW).
+        led_name_CP: LED name chronopotentiometry.
+        toggleCP_illum_duty: Toggled chronopotentiometry illumination duty cycle.
+        toggleCP_illum_period: Toggled chronopotentiometry illumination period.
+        toggleCP_dark_time_init: Toggled chronopotentiometry dark time initial.
+        toggleCP_illum_time: Toggled chronopotentiometry illumination time.
+        toggleSpec_duty: Toggled spectrometer duty cycle.
+        toggleSpec_period: Toggled spectrometer period.
+        toggleSpec_init_delay: Toggled spectrometer initial delay.
+        toggleSpec_time: Toggled spectrometer time.
+        spec_ref_duration: Spectrometer reference acquisition duration (s).
+        spec_int_time_ms: Spectrometer integration time (ms).
+        spec_n_avg: Number of spectra to average.
+        spec_technique: Spectrometer acquisition technique to run.
+        calc_ev_parts: Number of eV partitions for analysis.
+        calc_bin_width: Spectral bin width for analysis.
+        calc_window_length: Savitzky-Golay smoothing window length for analysis.
+        calc_poly_order: Polynomial order for the analysis fit.
+        calc_lower_wl: Lower wavelength bound for analysis (nm).
+        calc_upper_wl: Upper wavelength bound for analysis (nm).
+        use_z_motor: Whether to use the z-axis motor to engage the cell.
+        cell_engaged_z: Cell engaged z-position.
+        cell_disengaged_z: Cell disengaged z-position.
+        cell_vent_wait: Cell vent wait time.
+        cell_fill_wait: Cell fill wait time.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1242,33 +1242,33 @@ def ECHEUVIS_diagnostic_CV(
     Loads a reference sample and runs a standard CV scan with the configured spectrometer reference.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_vs_nhe: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_names: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CA: Parameter passed through to the sub-experiments.
-        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCA_illum_period: Parameter passed through to the sub-experiments.
-        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCA_illum_time: Parameter passed through to the sub-experiments.
-        toggleSpec_duty: Parameter passed through to the sub-experiments.
-        toggleSpec_period: Parameter passed through to the sub-experiments.
-        toggleSpec_init_delay: Parameter passed through to the sub-experiments.
-        toggleSpec_time: Parameter passed through to the sub-experiments.
-        spec_n_avg: Parameter passed through to the sub-experiments.
-        cell_engaged_z: Parameter passed through to the sub-experiments.
-        cell_disengaged_z: Parameter passed through to the sub-experiments.
-        cell_vent_wait: Parameter passed through to the sub-experiments.
-        cell_fill_wait: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_vs_nhe: Reference-electrode potential vs NHE (V).
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_names: Identifiers of the LEDs to use.
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_intensities_mw: LED intensities (mW).
+        led_name_CA: LED name chronoamperometry.
+        toggleCA_illum_duty: Toggled chronoamperometry illumination duty cycle.
+        toggleCA_illum_period: Toggled chronoamperometry illumination period.
+        toggleCA_dark_time_init: Toggled chronoamperometry dark time initial.
+        toggleCA_illum_time: Toggled chronoamperometry illumination time.
+        toggleSpec_duty: Toggled spectrometer duty cycle.
+        toggleSpec_period: Toggled spectrometer period.
+        toggleSpec_init_delay: Toggled spectrometer initial delay.
+        toggleSpec_time: Toggled spectrometer time.
+        spec_n_avg: Number of spectra to average.
+        cell_engaged_z: Cell engaged z-position.
+        cell_disengaged_z: Cell disengaged z-position.
+        cell_vent_wait: Cell vent wait time.
+        cell_fill_wait: Cell fill wait time.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1436,43 +1436,43 @@ def ECHEUVIS_multiCA_led(
     Iterates through the supplied CA potential list running photo-CA and UV-Vis acquisition at each value.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_vs_nhe: Parameter passed through to the sub-experiments.
-        CA_potential_vsRHE: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        CA_samplerate_sec: Parameter passed through to the sub-experiments.
-        OCV_duration_sec: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_names: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CA: Parameter passed through to the sub-experiments.
-        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCA_illum_period: Parameter passed through to the sub-experiments.
-        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCA_illum_time: Parameter passed through to the sub-experiments.
-        toggleSpec_duty: Parameter passed through to the sub-experiments.
-        toggleSpec_period: Parameter passed through to the sub-experiments.
-        toggleSpec_init_delay: Parameter passed through to the sub-experiments.
-        toggleSpec_time: Parameter passed through to the sub-experiments.
-        spec_ref_duration: Parameter passed through to the sub-experiments.
-        spec_int_time_ms: Parameter passed through to the sub-experiments.
-        spec_n_avg: Parameter passed through to the sub-experiments.
-        spec_technique: Parameter passed through to the sub-experiments.
-        random_start_potential: Parameter passed through to the sub-experiments.
-        use_z_motor: Parameter passed through to the sub-experiments.
-        cell_engaged_z: Parameter passed through to the sub-experiments.
-        cell_disengaged_z: Parameter passed through to the sub-experiments.
-        cell_vent_wait: Parameter passed through to the sub-experiments.
-        cell_fill_wait: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_vs_nhe: Reference-electrode potential vs NHE (V).
+        CA_potential_vsRHE: Chronoamperometry potential vs RHE.
+        CA_duration_sec: Chronoamperometry duration (s).
+        CA_samplerate_sec: Chronoamperometry sample rate (s).
+        OCV_duration_sec: Open-circuit-voltage duration (s).
+        gamry_i_range: Gamry potentiostat current range setting.
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_names: Identifiers of the LEDs to use.
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_intensities_mw: LED intensities (mW).
+        led_name_CA: LED name chronoamperometry.
+        toggleCA_illum_duty: Toggled chronoamperometry illumination duty cycle.
+        toggleCA_illum_period: Toggled chronoamperometry illumination period.
+        toggleCA_dark_time_init: Toggled chronoamperometry dark time initial.
+        toggleCA_illum_time: Toggled chronoamperometry illumination time.
+        toggleSpec_duty: Toggled spectrometer duty cycle.
+        toggleSpec_period: Toggled spectrometer period.
+        toggleSpec_init_delay: Toggled spectrometer initial delay.
+        toggleSpec_time: Toggled spectrometer time.
+        spec_ref_duration: Spectrometer reference acquisition duration (s).
+        spec_int_time_ms: Spectrometer integration time (ms).
+        spec_n_avg: Number of spectra to average.
+        spec_technique: Spectrometer acquisition technique to run.
+        random_start_potential: Whether to randomize the starting potential.
+        use_z_motor: Whether to use the z-axis motor to engage the cell.
+        cell_engaged_z: Cell engaged z-position.
+        cell_disengaged_z: Cell disengaged z-position.
+        cell_vent_wait: Cell vent wait time.
+        cell_fill_wait: Cell fill wait time.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1826,9 +1826,9 @@ def ECHEUVIS_postseq(
     Forwards the sequence UUID and parameters to the ECHEUVIS analyzer.
 
     Args:
-        analysis_seq_uuid: Parameter passed through to the sub-experiments.
-        plate_id: Parameter passed through to the sub-experiments.
-        recent: Parameter passed through to the sub-experiments.
+        analysis_seq_uuid: UUID of the sequence to analyze.
+        plate_id: Plate ID of the solid sample library.
+        recent: Whether to reuse the most recent calibration/state.
 
     Returns:
         List of planned experiments to dispatch.

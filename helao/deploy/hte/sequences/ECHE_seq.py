@@ -41,8 +41,8 @@ def ECHE_movetosample(
     Issues one ``ECHE_sub_movetosample`` followed by an ``ECHE_sub_shutdown``.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no: Solid-sample number on the plate to measure.
 
     Returns:
         List of planned experiments to dispatch.
@@ -74,8 +74,8 @@ def ECHE_move(
     Calls ``ECHE_sub_rel_move`` then ``ECHE_sub_shutdown``.
 
     Args:
-        move_x_mm: Parameter passed through to the sub-experiments.
-        move_y_mm: Parameter passed through to the sub-experiments.
+        move_x_mm: Target x position to move to (mm).
+        move_y_mm: Target y position to move to (mm).
 
     Returns:
         List of planned experiments to dispatch.
@@ -154,55 +154,55 @@ def ECHE_4CA_led_1CV_led(
     For each sample: startup, OCV, four CA-LED steps with OCVs between them, then a CV-LED scan and shutdown.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_vs_nhe: Parameter passed through to the sub-experiments.
-        CA1_potential: Parameter passed through to the sub-experiments.
-        CA1_duration_sec: Parameter passed through to the sub-experiments.
-        CA2_potential: Parameter passed through to the sub-experiments.
-        CA2_duration_sec: Parameter passed through to the sub-experiments.
-        CA3_potential: Parameter passed through to the sub-experiments.
-        CA3_duration_sec: Parameter passed through to the sub-experiments.
-        CA4_potential: Parameter passed through to the sub-experiments.
-        CA4_duration_sec: Parameter passed through to the sub-experiments.
-        CA_samplerate_sec: Parameter passed through to the sub-experiments.
-        CV_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV_cycles: Parameter passed through to the sub-experiments.
-        preCV_duration: Parameter passed through to the sub-experiments.
-        OCV_duration: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
-        gamrychannelwait: Parameter passed through to the sub-experiments.
-        gamrychannelsend: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_names: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CA1: Parameter passed through to the sub-experiments.
-        led_name_CA2: Parameter passed through to the sub-experiments.
-        led_name_CA3: Parameter passed through to the sub-experiments.
-        led_name_CA4: Parameter passed through to the sub-experiments.
-        led_name_CV: Parameter passed through to the sub-experiments.
-        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCA_illum_period: Parameter passed through to the sub-experiments.
-        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCA_illum_time: Parameter passed through to the sub-experiments.
-        toggleCV_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCV_illum_period: Parameter passed through to the sub-experiments.
-        toggleCV_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCV_illum_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        ref_type: Reference-electrode type.
+        ref_offset__V: Reference-electrode potential offset (V).
+        measurement_area: Electrode measurement area (cm^2).
+        ref_vs_nhe: Reference-electrode potential vs NHE (V).
+        CA1_potential: Chronoamperometry 1 potential.
+        CA1_duration_sec: Chronoamperometry 1 duration (s).
+        CA2_potential: Chronoamperometry 2 potential.
+        CA2_duration_sec: Chronoamperometry 2 duration (s).
+        CA3_potential: Chronoamperometry 3 potential.
+        CA3_duration_sec: Chronoamperometry 3 duration (s).
+        CA4_potential: Chronoamperometry 4 potential.
+        CA4_duration_sec: Chronoamperometry 4 duration (s).
+        CA_samplerate_sec: Chronoamperometry sample rate (s).
+        CV_Vinit_vsRHE: Cyclic-voltammetry initial potential vs RHE.
+        CV_Vapex1_vsRHE: Cyclic-voltammetry apex-1 potential vs RHE.
+        CV_Vapex2_vsRHE: Cyclic-voltammetry apex-2 potential vs RHE.
+        CV_Vfinal_vsRHE: Cyclic-voltammetry final potential vs RHE.
+        CV_scanrate_voltsec: Cyclic-voltammetry scan rate (V/s).
+        CV_samplerate_mV: Cyclic-voltammetry sample rate (mV).
+        CV_cycles: Cyclic-voltammetry cycle count.
+        preCV_duration: Pre cyclic-voltammetry duration.
+        OCV_duration: Open-circuit-voltage duration.
+        gamry_i_range: Gamry potentiostat current range setting.
+        gamrychannelwait: Gamry channel index to wait on before dispatching.
+        gamrychannelsend: Gamry channel index to dispatch the action to.
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_names: Identifiers of the LEDs to use.
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_intensities_mw: LED intensities (mW).
+        led_name_CA1: LED name chronoamperometry 1.
+        led_name_CA2: LED name chronoamperometry 2.
+        led_name_CA3: LED name chronoamperometry 3.
+        led_name_CA4: LED name chronoamperometry 4.
+        led_name_CV: LED name cyclic-voltammetry.
+        toggleCA_illum_duty: Toggled chronoamperometry illumination duty cycle.
+        toggleCA_illum_period: Toggled chronoamperometry illumination period.
+        toggleCA_dark_time_init: Toggled chronoamperometry dark time initial.
+        toggleCA_illum_time: Toggled chronoamperometry illumination time.
+        toggleCV_illum_duty: Toggled cyclic-voltammetry illumination duty cycle.
+        toggleCV_illum_period: Toggled cyclic-voltammetry illumination period.
+        toggleCV_dark_time_init: Toggled cyclic-voltammetry dark time initial.
+        toggleCV_illum_time: Toggled cyclic-voltammetry illumination time.
 
     Returns:
         List of planned experiments to dispatch.
@@ -467,36 +467,36 @@ def ECHE_CV_CA_CV(
     Loads sample, runs preCV, CA, then CV with LED toggling and shutdown.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        liquid_volume_ml: Parameter passed through to the sub-experiments.
-        CV1_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV1_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV1_cycles: Parameter passed through to the sub-experiments.
-        preCV_duration: Parameter passed through to the sub-experiments.
-        OCV_duration: Parameter passed through to the sub-experiments.
-        CA2_potential: Parameter passed through to the sub-experiments.
-        CA2_duration_sec: Parameter passed through to the sub-experiments.
-        CA_samplerate_sec: Parameter passed through to the sub-experiments.
-        CV3_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV3_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV3_cycles: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        ref_type: Reference-electrode type.
+        ref_offset__V: Reference-electrode potential offset (V).
+        measurement_area: Electrode measurement area (cm^2).
+        liquid_volume_ml: Liquid volume to dispense (mL).
+        CV1_Vinit_vsRHE: Cyclic-voltammetry 1 initial potential vs RHE.
+        CV1_Vapex1_vsRHE: Cyclic-voltammetry 1 apex-1 potential vs RHE.
+        CV1_Vapex2_vsRHE: Cyclic-voltammetry 1 apex-2 potential vs RHE.
+        CV1_Vfinal_vsRHE: Cyclic-voltammetry 1 final potential vs RHE.
+        CV1_scanrate_voltsec: Cyclic-voltammetry 1 scan rate (V/s).
+        CV1_samplerate_mV: Cyclic-voltammetry 1 sample rate (mV).
+        CV1_cycles: Cyclic-voltammetry 1 cycle count.
+        preCV_duration: Pre cyclic-voltammetry duration.
+        OCV_duration: Open-circuit-voltage duration.
+        CA2_potential: Chronoamperometry 2 potential.
+        CA2_duration_sec: Chronoamperometry 2 duration (s).
+        CA_samplerate_sec: Chronoamperometry sample rate (s).
+        CV3_Vinit_vsRHE: Cyclic-voltammetry 3 initial potential vs RHE.
+        CV3_Vapex1_vsRHE: Cyclic-voltammetry 3 apex-1 potential vs RHE.
+        CV3_Vapex2_vsRHE: Cyclic-voltammetry 3 apex-2 potential vs RHE.
+        CV3_Vfinal_vsRHE: Cyclic-voltammetry 3 final potential vs RHE.
+        CV3_scanrate_voltsec: Cyclic-voltammetry 3 scan rate (V/s).
+        CV3_samplerate_mV: Cyclic-voltammetry 3 sample rate (mV).
+        CV3_cycles: Cyclic-voltammetry 3 cycle count.
+        gamry_i_range: Gamry potentiostat current range setting.
 
     Returns:
         List of planned experiments to dispatch.
@@ -646,24 +646,24 @@ def ECHE_CV(
     Loads the sample, runs OCV, performs a CV scan, and shuts down.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        CV1_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV1_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV1_cycles: Parameter passed through to the sub-experiments.
-        preCV_duration: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_type: Reference-electrode type.
+        ref_offset__V: Reference-electrode potential offset (V).
+        CV1_Vinit_vsRHE: Cyclic-voltammetry 1 initial potential vs RHE.
+        CV1_Vapex1_vsRHE: Cyclic-voltammetry 1 apex-1 potential vs RHE.
+        CV1_Vapex2_vsRHE: Cyclic-voltammetry 1 apex-2 potential vs RHE.
+        CV1_Vfinal_vsRHE: Cyclic-voltammetry 1 final potential vs RHE.
+        CV1_scanrate_voltsec: Cyclic-voltammetry 1 scan rate (V/s).
+        CV1_samplerate_mV: Cyclic-voltammetry 1 sample rate (mV).
+        CV1_cycles: Cyclic-voltammetry 1 cycle count.
+        preCV_duration: Pre cyclic-voltammetry duration.
+        gamry_i_range: Gamry potentiostat current range setting.
 
     Returns:
         List of planned experiments to dispatch.
@@ -749,20 +749,20 @@ def ECHE_CA(
     Loads the sample, runs OCV, performs a CA hold, and shuts down.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        CA_potential: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        CA_samplerate_sec: Parameter passed through to the sub-experiments.
-        OCV_duration: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_type: Reference-electrode type.
+        ref_offset__V: Reference-electrode potential offset (V).
+        CA_potential: Chronoamperometry potential.
+        CA_duration_sec: Chronoamperometry duration (s).
+        CA_samplerate_sec: Chronoamperometry sample rate (s).
+        OCV_duration: Open-circuit-voltage duration.
+        gamry_i_range: Gamry potentiostat current range setting.
 
     Returns:
         List of planned experiments to dispatch.
@@ -853,32 +853,32 @@ def ECHE_CA_led(
     Loads the sample, runs OCV, performs a CA-LED hold, and shuts down.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        CA_potential: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        CA_samplerate_sec: Parameter passed through to the sub-experiments.
-        OCV_duration: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
-        gamrychannelwait: Parameter passed through to the sub-experiments.
-        gamrychannelsend: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_names: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CA: Parameter passed through to the sub-experiments.
-        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCA_illum_period: Parameter passed through to the sub-experiments.
-        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCA_illum_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_type: Reference-electrode type.
+        ref_offset__V: Reference-electrode potential offset (V).
+        CA_potential: Chronoamperometry potential.
+        CA_duration_sec: Chronoamperometry duration (s).
+        CA_samplerate_sec: Chronoamperometry sample rate (s).
+        OCV_duration: Open-circuit-voltage duration.
+        gamry_i_range: Gamry potentiostat current range setting.
+        gamrychannelwait: Gamry channel index to wait on before dispatching.
+        gamrychannelsend: Gamry channel index to dispatch the action to.
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_names: Identifiers of the LEDs to use.
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_intensities_mw: LED intensities (mW).
+        led_name_CA: LED name chronoamperometry.
+        toggleCA_illum_duty: Toggled chronoamperometry illumination duty cycle.
+        toggleCA_illum_period: Toggled chronoamperometry illumination period.
+        toggleCA_dark_time_init: Toggled chronoamperometry dark time initial.
+        toggleCA_illum_time: Toggled chronoamperometry illumination time.
 
     Returns:
         List of planned experiments to dispatch.
@@ -987,36 +987,36 @@ def ECHE_CV_led(
     Loads the sample, runs OCV, performs a CV-LED sweep, and shuts down.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        CV_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV_cycles: Parameter passed through to the sub-experiments.
-        preCV_duration: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
-        gamrychannelwait: Parameter passed through to the sub-experiments.
-        gamrychannelsend: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_names: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CV: Parameter passed through to the sub-experiments.
-        toggleCV_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCV_illum_period: Parameter passed through to the sub-experiments.
-        toggleCV_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCV_illum_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_type: Reference-electrode type.
+        ref_offset__V: Reference-electrode potential offset (V).
+        CV_Vinit_vsRHE: Cyclic-voltammetry initial potential vs RHE.
+        CV_Vapex1_vsRHE: Cyclic-voltammetry apex-1 potential vs RHE.
+        CV_Vapex2_vsRHE: Cyclic-voltammetry apex-2 potential vs RHE.
+        CV_Vfinal_vsRHE: Cyclic-voltammetry final potential vs RHE.
+        CV_scanrate_voltsec: Cyclic-voltammetry scan rate (V/s).
+        CV_samplerate_mV: Cyclic-voltammetry sample rate (mV).
+        CV_cycles: Cyclic-voltammetry cycle count.
+        preCV_duration: Pre cyclic-voltammetry duration.
+        gamry_i_range: Gamry potentiostat current range setting.
+        gamrychannelwait: Gamry channel index to wait on before dispatching.
+        gamrychannelsend: Gamry channel index to dispatch the action to.
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_names: Identifiers of the LEDs to use.
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_intensities_mw: LED intensities (mW).
+        led_name_CV: LED name cyclic-voltammetry.
+        toggleCV_illum_duty: Toggled cyclic-voltammetry illumination duty cycle.
+        toggleCV_illum_period: Toggled cyclic-voltammetry illumination period.
+        toggleCV_dark_time_init: Toggled cyclic-voltammetry dark time initial.
+        toggleCV_illum_time: Toggled cyclic-voltammetry illumination time.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1116,19 +1116,19 @@ def ECHE_CP(
     Loads the sample, runs OCV, performs a CP hold, and shuts down.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        CP_current: Parameter passed through to the sub-experiments.
-        CP_duration_sec: Parameter passed through to the sub-experiments.
-        CP_samplerate_sec: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_type: Reference-electrode type.
+        ref_offset__V: Reference-electrode potential offset (V).
+        CP_current: Chronopotentiometry current.
+        CP_duration_sec: Chronopotentiometry duration (s).
+        CP_samplerate_sec: Chronopotentiometry sample rate (s).
+        gamry_i_range: Gamry potentiostat current range setting.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1211,31 +1211,31 @@ def ECHE_CP_led(
     Loads the sample, runs OCV, performs a CP-LED hold, and shuts down.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        CP_current: Parameter passed through to the sub-experiments.
-        CP_duration_sec: Parameter passed through to the sub-experiments.
-        CP_samplerate_sec: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
-        gamrychannelwait: Parameter passed through to the sub-experiments.
-        gamrychannelsend: Parameter passed through to the sub-experiments.
-        led_name_CP: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_names: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        toggleCP_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCP_illum_period: Parameter passed through to the sub-experiments.
-        toggleCP_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCP_illum_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        measurement_area: Electrode measurement area (cm^2).
+        ref_type: Reference-electrode type.
+        ref_offset__V: Reference-electrode potential offset (V).
+        CP_current: Chronopotentiometry current.
+        CP_duration_sec: Chronopotentiometry duration (s).
+        CP_samplerate_sec: Chronopotentiometry sample rate (s).
+        gamry_i_range: Gamry potentiostat current range setting.
+        gamrychannelwait: Gamry channel index to wait on before dispatching.
+        gamrychannelsend: Gamry channel index to dispatch the action to.
+        led_name_CP: LED name chronopotentiometry.
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_names: Identifiers of the LEDs to use.
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_intensities_mw: LED intensities (mW).
+        toggleCP_illum_duty: Toggled chronopotentiometry illumination duty cycle.
+        toggleCP_illum_period: Toggled chronopotentiometry illumination period.
+        toggleCP_dark_time_init: Toggled chronopotentiometry dark time initial.
+        toggleCP_illum_time: Toggled chronopotentiometry illumination time.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1345,45 +1345,45 @@ def ECHE_CVs_CAs(
     Iterates over CV cycle/potential lists then CA potential/duration lists.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        liquid_volume_ml: Parameter passed through to the sub-experiments.
-        CV1_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV1_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV1_cycles: Parameter passed through to the sub-experiments.
-        CV2_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV2_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV2_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV2_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV2_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV2_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV2_cycles: Parameter passed through to the sub-experiments.
-        CV3_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV3_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV3_cycles: Parameter passed through to the sub-experiments.
-        preCV_duration: Parameter passed through to the sub-experiments.
-        OCV_duration: Parameter passed through to the sub-experiments.
-        CA1_potential: Parameter passed through to the sub-experiments.
-        CA1_duration_sec: Parameter passed through to the sub-experiments.
-        CA2_potential: Parameter passed through to the sub-experiments.
-        CA2_duration_sec: Parameter passed through to the sub-experiments.
-        CA_samplerate_sec: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        ref_type: Reference-electrode type.
+        ref_offset__V: Reference-electrode potential offset (V).
+        measurement_area: Electrode measurement area (cm^2).
+        liquid_volume_ml: Liquid volume to dispense (mL).
+        CV1_Vinit_vsRHE: Cyclic-voltammetry 1 initial potential vs RHE.
+        CV1_Vapex1_vsRHE: Cyclic-voltammetry 1 apex-1 potential vs RHE.
+        CV1_Vapex2_vsRHE: Cyclic-voltammetry 1 apex-2 potential vs RHE.
+        CV1_Vfinal_vsRHE: Cyclic-voltammetry 1 final potential vs RHE.
+        CV1_scanrate_voltsec: Cyclic-voltammetry 1 scan rate (V/s).
+        CV1_samplerate_mV: Cyclic-voltammetry 1 sample rate (mV).
+        CV1_cycles: Cyclic-voltammetry 1 cycle count.
+        CV2_Vinit_vsRHE: Cyclic-voltammetry 2 initial potential vs RHE.
+        CV2_Vapex1_vsRHE: Cyclic-voltammetry 2 apex-1 potential vs RHE.
+        CV2_Vapex2_vsRHE: Cyclic-voltammetry 2 apex-2 potential vs RHE.
+        CV2_Vfinal_vsRHE: Cyclic-voltammetry 2 final potential vs RHE.
+        CV2_scanrate_voltsec: Cyclic-voltammetry 2 scan rate (V/s).
+        CV2_samplerate_mV: Cyclic-voltammetry 2 sample rate (mV).
+        CV2_cycles: Cyclic-voltammetry 2 cycle count.
+        CV3_Vinit_vsRHE: Cyclic-voltammetry 3 initial potential vs RHE.
+        CV3_Vapex1_vsRHE: Cyclic-voltammetry 3 apex-1 potential vs RHE.
+        CV3_Vapex2_vsRHE: Cyclic-voltammetry 3 apex-2 potential vs RHE.
+        CV3_Vfinal_vsRHE: Cyclic-voltammetry 3 final potential vs RHE.
+        CV3_scanrate_voltsec: Cyclic-voltammetry 3 scan rate (V/s).
+        CV3_samplerate_mV: Cyclic-voltammetry 3 sample rate (mV).
+        CV3_cycles: Cyclic-voltammetry 3 cycle count.
+        preCV_duration: Pre cyclic-voltammetry duration.
+        OCV_duration: Open-circuit-voltage duration.
+        CA1_potential: Chronoamperometry 1 potential.
+        CA1_duration_sec: Chronoamperometry 1 duration (s).
+        CA2_potential: Chronoamperometry 2 potential.
+        CA2_duration_sec: Chronoamperometry 2 duration (s).
+        CA_samplerate_sec: Chronoamperometry sample rate (s).
+        gamry_i_range: Gamry potentiostat current range setting.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1596,52 +1596,52 @@ def ECHE_cleanCVs_regCVs_CAs(
     Loads each sample, runs N cleaning CV cycles, then the main CV list, then the CA list.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        plate_sample_no_list: Parameter passed through to the sub-experiments.
-        reservoir_electrolyte: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        solution_bubble_gas: Parameter passed through to the sub-experiments.
-        solution_ph: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        measurement_area: Parameter passed through to the sub-experiments.
-        liquid_volume_ml: Parameter passed through to the sub-experiments.
-        CVcln_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CVcln_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CVcln_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CVcln_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CVcln_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CVcln_samplerate_mV: Parameter passed through to the sub-experiments.
-        CVcln_cycles: Parameter passed through to the sub-experiments.
-        CV1_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV1_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV1_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV1_cycles: Parameter passed through to the sub-experiments.
-        CV2_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV2_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV2_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV2_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV2_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV2_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV2_cycles: Parameter passed through to the sub-experiments.
-        CV3_Vinit_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_Vapex1_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_Vapex2_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_Vfinal_vsRHE: Parameter passed through to the sub-experiments.
-        CV3_scanrate_voltsec: Parameter passed through to the sub-experiments.
-        CV3_samplerate_mV: Parameter passed through to the sub-experiments.
-        CV3_cycles: Parameter passed through to the sub-experiments.
-        preCV_duration: Parameter passed through to the sub-experiments.
-        OCV_duration: Parameter passed through to the sub-experiments.
-        CA1_potential: Parameter passed through to the sub-experiments.
-        CA1_duration_sec: Parameter passed through to the sub-experiments.
-        CA2_potential: Parameter passed through to the sub-experiments.
-        CA2_duration_sec: Parameter passed through to the sub-experiments.
-        CA_samplerate_sec: Parameter passed through to the sub-experiments.
-        gamry_i_range: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        plate_sample_no_list: List of solid-sample numbers on the plate to measure.
+        reservoir_electrolyte: Name of the electrolyte in the reservoir.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        solution_bubble_gas: Gas used to bubble/sparge the solution.
+        solution_ph: pH of the solution.
+        ref_type: Reference-electrode type.
+        ref_offset__V: Reference-electrode potential offset (V).
+        measurement_area: Electrode measurement area (cm^2).
+        liquid_volume_ml: Liquid volume to dispense (mL).
+        CVcln_Vinit_vsRHE: Cyclic-voltammetry cleaning initial potential vs RHE.
+        CVcln_Vapex1_vsRHE: Cyclic-voltammetry cleaning apex-1 potential vs RHE.
+        CVcln_Vapex2_vsRHE: Cyclic-voltammetry cleaning apex-2 potential vs RHE.
+        CVcln_Vfinal_vsRHE: Cyclic-voltammetry cleaning final potential vs RHE.
+        CVcln_scanrate_voltsec: Cyclic-voltammetry cleaning scan rate (V/s).
+        CVcln_samplerate_mV: Cyclic-voltammetry cleaning sample rate (mV).
+        CVcln_cycles: Cyclic-voltammetry cleaning cycle count.
+        CV1_Vinit_vsRHE: Cyclic-voltammetry 1 initial potential vs RHE.
+        CV1_Vapex1_vsRHE: Cyclic-voltammetry 1 apex-1 potential vs RHE.
+        CV1_Vapex2_vsRHE: Cyclic-voltammetry 1 apex-2 potential vs RHE.
+        CV1_Vfinal_vsRHE: Cyclic-voltammetry 1 final potential vs RHE.
+        CV1_scanrate_voltsec: Cyclic-voltammetry 1 scan rate (V/s).
+        CV1_samplerate_mV: Cyclic-voltammetry 1 sample rate (mV).
+        CV1_cycles: Cyclic-voltammetry 1 cycle count.
+        CV2_Vinit_vsRHE: Cyclic-voltammetry 2 initial potential vs RHE.
+        CV2_Vapex1_vsRHE: Cyclic-voltammetry 2 apex-1 potential vs RHE.
+        CV2_Vapex2_vsRHE: Cyclic-voltammetry 2 apex-2 potential vs RHE.
+        CV2_Vfinal_vsRHE: Cyclic-voltammetry 2 final potential vs RHE.
+        CV2_scanrate_voltsec: Cyclic-voltammetry 2 scan rate (V/s).
+        CV2_samplerate_mV: Cyclic-voltammetry 2 sample rate (mV).
+        CV2_cycles: Cyclic-voltammetry 2 cycle count.
+        CV3_Vinit_vsRHE: Cyclic-voltammetry 3 initial potential vs RHE.
+        CV3_Vapex1_vsRHE: Cyclic-voltammetry 3 apex-1 potential vs RHE.
+        CV3_Vapex2_vsRHE: Cyclic-voltammetry 3 apex-2 potential vs RHE.
+        CV3_Vfinal_vsRHE: Cyclic-voltammetry 3 final potential vs RHE.
+        CV3_scanrate_voltsec: Cyclic-voltammetry 3 scan rate (V/s).
+        CV3_samplerate_mV: Cyclic-voltammetry 3 sample rate (mV).
+        CV3_cycles: Cyclic-voltammetry 3 cycle count.
+        preCV_duration: Pre cyclic-voltammetry duration.
+        OCV_duration: Open-circuit-voltage duration.
+        CA1_potential: Chronoamperometry 1 potential.
+        CA1_duration_sec: Chronoamperometry 1 duration (s).
+        CA2_potential: Chronoamperometry 2 potential.
+        CA2_duration_sec: Chronoamperometry 2 duration (s).
+        CA_samplerate_sec: Chronoamperometry sample rate (s).
+        gamry_i_range: Gamry potentiostat current range setting.
 
     Returns:
         List of planned experiments to dispatch.

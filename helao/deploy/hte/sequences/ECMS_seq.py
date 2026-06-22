@@ -54,18 +54,18 @@ def ECMS_initiation(
     Performs the standard pre-run housekeeping followed by two CO2 baseline acquisitions at fast and slow flow rates.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        vacuum_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        vacuum_time: Vacuum hold duration (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        liquid_drain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -140,20 +140,20 @@ def ECMS_initiation_recirculation(
     Same shape as :func:`ECMS_initiation` but fills a recirculation reservoir before the cell and drains via the recirculation loop.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        liquid_fill_time: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        vacuum_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        tube_clear_time: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        liquid_fill_time: Duration of the liquid fill (s).
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        vacuum_time: Vacuum hold duration (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        tube_clear_time: Duration to clear the tube (s).
+        liquid_drain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -236,21 +236,21 @@ def ECMS_initiation_recirculation_mixedreactant(
     Like :func:`ECMS_initiation_recirculation` but replaces the second CO2 baseline with a ``ECMS_sub_cali`` mixed-reactant calibration.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        liquid_fill_time: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        vacuum_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
-        Califlowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        tube_clear_time: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        liquid_fill_time: Duration of the liquid fill (s).
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        vacuum_time: Vacuum hold duration (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: Calibration flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        tube_clear_time: Duration to clear the tube (s).
+        liquid_drain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -347,32 +347,32 @@ def ECMS_repeat_CV(
     For ``num_repeats`` iterations: fill, run two CO2 baselines, then run CV at ``ScanRate_V_s_1`` and CV at ``ScanRate_V_s_2``, return to normal state and drain.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        num_repeats: Parameter passed through to the sub-experiments.
-        WE_potential_init__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
-        WE_potential_final__V: Parameter passed through to the sub-experiments.
-        ScanRate_V_s_1: Parameter passed through to the sub-experiments.
-        ScanRate_V_s_2: Parameter passed through to the sub-experiments.
-        Cycles: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset: Parameter passed through to the sub-experiments.
-        MS_equilibrium_time: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        num_repeats: Number of repeats.
+        WE_potential_init__V: Working-electrode potential initial (V).
+        WE_potential_apex1__V: Working-electrode potential apex 1 (V).
+        WE_potential_apex2__V: Working-electrode potential apex 2 (V).
+        WE_potential_final__V: Working-electrode potential final (V).
+        ScanRate_V_s_1: Cyclic-voltammetry scan rate, segment 1 (V/s).
+        ScanRate_V_s_2: Cyclic-voltammetry scan rate, segment 2 (V/s).
+        Cycles: Number of cycles to repeat.
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset: Reference-electrode potential offset (V).
+        MS_equilibrium_time: Mass-spec equilibration time (s).
+        liquid_drain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -517,36 +517,36 @@ def ECMS_repeat_CV_recirculation(
     Adds ``cleaning_times`` clean cycles between CVs and uses the recirculation drain.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        num_repeats: Parameter passed through to the sub-experiments.
-        WE_potential_init__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
-        WE_potential_final__V: Parameter passed through to the sub-experiments.
-        ScanRate_V_s_1: Parameter passed through to the sub-experiments.
-        ScanRate_V_s_2: Parameter passed through to the sub-experiments.
-        Cycles: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset: Parameter passed through to the sub-experiments.
-        MS_equilibrium_time: Parameter passed through to the sub-experiments.
-        cleaning_times: Parameter passed through to the sub-experiments.
-        liquid_fill_time: Parameter passed through to the sub-experiments.
-        tube_clear_time: Parameter passed through to the sub-experiments.
-        tube_clear_delaytime: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        num_repeats: Number of repeats.
+        WE_potential_init__V: Working-electrode potential initial (V).
+        WE_potential_apex1__V: Working-electrode potential apex 1 (V).
+        WE_potential_apex2__V: Working-electrode potential apex 2 (V).
+        WE_potential_final__V: Working-electrode potential final (V).
+        ScanRate_V_s_1: Cyclic-voltammetry scan rate, segment 1 (V/s).
+        ScanRate_V_s_2: Cyclic-voltammetry scan rate, segment 2 (V/s).
+        Cycles: Number of cycles to repeat.
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset: Reference-electrode potential offset (V).
+        MS_equilibrium_time: Mass-spec equilibration time (s).
+        cleaning_times: Number of cleaning repetitions.
+        liquid_fill_time: Duration of the liquid fill (s).
+        tube_clear_time: Duration to clear the tube (s).
+        tube_clear_delaytime: Delay before clearing the tube (s).
+        liquid_drain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -834,37 +834,37 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
     Adapts :func:`ECMS_repeat_CV_recirculation` to take a calibration baseline at each iteration.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
-        Califlowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        num_repeats: Parameter passed through to the sub-experiments.
-        WE_potential_init__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
-        WE_potential_final__V: Parameter passed through to the sub-experiments.
-        ScanRate_V_s_1: Parameter passed through to the sub-experiments.
-        ScanRate_V_s_2: Parameter passed through to the sub-experiments.
-        Cycles: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset: Parameter passed through to the sub-experiments.
-        MS_equilibrium_time: Parameter passed through to the sub-experiments.
-        cleaning_times: Parameter passed through to the sub-experiments.
-        liquid_fill_time: Parameter passed through to the sub-experiments.
-        tube_clear_time: Parameter passed through to the sub-experiments.
-        tube_clear_delaytime: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: Calibration flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        num_repeats: Number of repeats.
+        WE_potential_init__V: Working-electrode potential initial (V).
+        WE_potential_apex1__V: Working-electrode potential apex 1 (V).
+        WE_potential_apex2__V: Working-electrode potential apex 2 (V).
+        WE_potential_final__V: Working-electrode potential final (V).
+        ScanRate_V_s_1: Cyclic-voltammetry scan rate, segment 1 (V/s).
+        ScanRate_V_s_2: Cyclic-voltammetry scan rate, segment 2 (V/s).
+        Cycles: Number of cycles to repeat.
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset: Reference-electrode potential offset (V).
+        MS_equilibrium_time: Mass-spec equilibration time (s).
+        cleaning_times: Number of cleaning repetitions.
+        liquid_fill_time: Duration of the liquid fill (s).
+        tube_clear_time: Duration to clear the tube (s).
+        tube_clear_delaytime: Delay before clearing the tube (s).
+        liquid_drain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1024,35 +1024,35 @@ def ECMS_CV_recirculation_mixedreactant(
     One-shot variant of the recirculating mixed-reactant CV protocol.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
-        Califlowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        WE_potential_init__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
-        WE_potential_final__V: Parameter passed through to the sub-experiments.
-        ScanRate_V_s_1: Parameter passed through to the sub-experiments.
-        Cycles: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset: Parameter passed through to the sub-experiments.
-        MS_equilibrium_time: Parameter passed through to the sub-experiments.
-        cleaning_times: Parameter passed through to the sub-experiments.
-        liquid_fill_time: Parameter passed through to the sub-experiments.
-        tube_clear_time: Parameter passed through to the sub-experiments.
-        tube_clear_delaytime: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: Calibration flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        WE_potential_init__V: Working-electrode potential initial (V).
+        WE_potential_apex1__V: Working-electrode potential apex 1 (V).
+        WE_potential_apex2__V: Working-electrode potential apex 2 (V).
+        WE_potential_final__V: Working-electrode potential final (V).
+        ScanRate_V_s_1: Cyclic-voltammetry scan rate, segment 1 (V/s).
+        Cycles: Number of cycles to repeat.
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset: Reference-electrode potential offset (V).
+        MS_equilibrium_time: Mass-spec equilibration time (s).
+        cleaning_times: Number of cleaning repetitions.
+        liquid_fill_time: Duration of the liquid fill (s).
+        tube_clear_time: Duration to clear the tube (s).
+        tube_clear_delaytime: Delay before clearing the tube (s).
+        liquid_drain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1186,26 +1186,26 @@ def ECMS_series_CA(
     For each potential: fill, run CO2 baselines, run CA, then drain.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        MS_equilibrium_time: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        MS_equilibrium_time: Mass-spec equilibration time (s).
+        liquid_drain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1415,30 +1415,30 @@ def ECMS_series_CA_recirculation(
     Adds the recirculation reservoir fill and drain and inserts cleaning cycles.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        MS_equilibrium_time: Parameter passed through to the sub-experiments.
-        cleaning_times: Parameter passed through to the sub-experiments.
-        liquid_fill_time: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
-        tube_clear_time: Parameter passed through to the sub-experiments.
-        tube_clear_delaytime: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        MS_equilibrium_time: Mass-spec equilibration time (s).
+        cleaning_times: Number of cleaning repetitions.
+        liquid_fill_time: Duration of the liquid fill (s).
+        liquid_drain_time: Duration of the liquid drain (s).
+        tube_clear_time: Duration to clear the tube (s).
+        tube_clear_delaytime: Delay before clearing the tube (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1575,31 +1575,31 @@ def ECMS_series_CA_recirculation_mixedreactant(
     Same loop as :func:`ECMS_series_CA_recirculation` but with ``ECMS_sub_cali`` baselines.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
-        Califlowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        MS_equilibrium_time: Parameter passed through to the sub-experiments.
-        cleaning_times: Parameter passed through to the sub-experiments.
-        liquid_fill_time: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
-        tube_clear_time: Parameter passed through to the sub-experiments.
-        tube_clear_delaytime: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: Calibration flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        MS_equilibrium_time: Mass-spec equilibration time (s).
+        cleaning_times: Number of cleaning repetitions.
+        liquid_fill_time: Duration of the liquid fill (s).
+        liquid_drain_time: Duration of the liquid drain (s).
+        tube_clear_time: Duration to clear the tube (s).
+        tube_clear_delaytime: Delay before clearing the tube (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1736,30 +1736,30 @@ def ECMS_series_CA_recirculation_mixedthreereactant(
     Three-gas variant of the mixed-reactant CA protocol.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
-        Califlowrate_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        MS_equilibrium_time: Parameter passed through to the sub-experiments.
-        cleaning_times: Parameter passed through to the sub-experiments.
-        liquid_fill_time: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
-        tube_clear_time: Parameter passed through to the sub-experiments.
-        tube_clear_delaytime: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: Calibration flow rate (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        MS_equilibrium_time: Mass-spec equilibration time (s).
+        cleaning_times: Number of cleaning repetitions.
+        liquid_fill_time: Duration of the liquid fill (s).
+        liquid_drain_time: Duration of the liquid drain (s).
+        tube_clear_time: Duration to clear the tube (s).
+        tube_clear_delaytime: Delay before clearing the tube (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1898,31 +1898,31 @@ def ECMS_series_pulseCA(
     Runs sequence of pulsed CA segments separated by recovery holds.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_2: Parameter passed through to the sub-experiments.
-        WE_pulsepotential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        MS_equilibrium_time: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
-        Vinit__V: Parameter passed through to the sub-experiments.
-        Tinit__s: Parameter passed through to the sub-experiments.
-        Tstep__s: Parameter passed through to the sub-experiments.
-        Cycles: Parameter passed through to the sub-experiments.
-        AcqInterval__s: Parameter passed through to the sub-experiments.
-        Tocv__s: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        WE_pulsepotential__V: Working-electrode pulse potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        MS_equilibrium_time: Mass-spec equilibration time (s).
+        liquid_drain_time: Duration of the liquid drain (s).
+        Vinit__V: Initial applied potential (V).
+        Tinit__s: Initial hold duration before the measurement (s).
+        Tstep__s: Step duration (s).
+        Cycles: Number of cycles to repeat.
+        AcqInterval__s: Data acquisition interval (s).
+        Tocv__s: Open-circuit-voltage measurement duration (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -2010,20 +2010,20 @@ def ECMS_MS_calibration_recirculation(
     Cycles through calibration mixtures and records the resulting MS signal levels.
 
     Args:
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        liquid_fill_time: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
-        Califlowrate_sccm: Parameter passed through to the sub-experiments.
-        MSsignal_quilibrium_time_initial: Parameter passed through to the sub-experiments.
-        MSsignal_quilibrium_time: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
-        tube_clear_time: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        liquid_fill_time: Duration of the liquid fill (s).
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: Calibration flow rate (sccm).
+        MSsignal_quilibrium_time_initial: Initial mass-spec signal equilibration time (s).
+        MSsignal_quilibrium_time: Mass-spec signal equilibration time (s).
+        liquid_drain_time: Duration of the liquid drain (s).
+        tube_clear_time: Duration to clear the tube (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -2199,18 +2199,18 @@ def ECMS_MS_calibration(
     Single-pass variant of the MS calibration sequence.
 
     Args:
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        CO2flowrate_sccm: Parameter passed through to the sub-experiments.
-        Califlowrate_sccm: Parameter passed through to the sub-experiments.
-        MSsignal_quilibrium_time_initial: Parameter passed through to the sub-experiments.
-        MSsignal_quilibrium_time: Parameter passed through to the sub-experiments.
-        liquid_drain_time: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: Calibration flow rate (sccm).
+        MSsignal_quilibrium_time_initial: Initial mass-spec signal equilibration time (s).
+        MSsignal_quilibrium_time: Mass-spec signal equilibration time (s).
+        liquid_drain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -2284,16 +2284,16 @@ def ECMS_MS_pulsecalibration(
     Calibrates the MS by toggling between calibration gases.
 
     Args:
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        liquid_backward_time: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        Califlowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        MSsignal_quilibrium_time: Parameter passed through to the sub-experiments.
-        calibration_cycles: Parameter passed through to the sub-experiments.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        Califlowrate_sccm: Calibration flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MSsignal_quilibrium_time: Mass-spec signal equilibration time (s).
+        calibration_cycles: Number of calibration cycles to repeat.
 
     Returns:
         List of planned experiments to dispatch.
@@ -2385,26 +2385,26 @@ def ECMS_series_CA_change_gasflow(
     Allows the operator to study the flow-rate dependence of the products with one sequence.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        CO2equilibrium_duration: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flow_ramp_sccm: Parameter passed through to the sub-experiments.
-        MS_baseline_duration_1: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        postCA_MS_equilibrium_time: Parameter passed through to the sub-experiments.
-        CA_flow_change_duration_sec: Parameter passed through to the sub-experiments.
-        CA_CO2_flow_rate_sccm: Parameter passed through to the sub-experiments.
-        PreExp_CO2flowrate_sccm: Parameter passed through to the sub-experiments.
-        PreExp_Califlowrate2_sccm: Parameter passed through to the sub-experiments.
-        PreExp_MSsignal_quilibrium_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        postCA_MS_equilibrium_time: Post-chronoamperometry mass-spec equilibration time (s).
+        CA_flow_change_duration_sec: Chronoamperometry flow change duration (s).
+        CA_CO2_flow_rate_sccm: Chronoamperometry CO2 flow rate (sccm).
+        PreExp_CO2flowrate_sccm: Pre-experiment CO2 flow rate (sccm).
+        PreExp_Califlowrate2_sccm: Pre-experiment secondary calibration flow rate (sccm).
+        PreExp_MSsignal_quilibrium_time: Pre-experiment mass-spec signal equilibration time (s).
 
     Returns:
         List of planned experiments to dispatch.

@@ -513,39 +513,39 @@ def ANEC_photo_CA(
     Iterates over ``WE_potential__V`` running ``ANEC_sub_photo_CA`` at each potential with the matching duration and LED toggle settings, taking a GC+archive aliquot between cycles.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        gamrychannelwait: Parameter passed through to the sub-experiments.
-        gamrychannelsend: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CA: Parameter passed through to the sub-experiments.
-        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCA_illum_period: Parameter passed through to the sub-experiments.
-        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCA_illum_time: Parameter passed through to the sub-experiments.
-        toolGC: Parameter passed through to the sub-experiments.
-        toolarchive: Parameter passed through to the sub-experiments.
-        volume_ul_GC: Parameter passed through to the sub-experiments.
-        volume_ul_archive: Parameter passed through to the sub-experiments.
-        wash1: Parameter passed through to the sub-experiments.
-        wash2: Parameter passed through to the sub-experiments.
-        wash3: Parameter passed through to the sub-experiments.
-        wash4: Parameter passed through to the sub-experiments.
-        liquid_flush_time: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        gamrychannelwait: Gamry channel index to wait on before dispatching.
+        gamrychannelsend: Gamry channel index to dispatch the action to.
+        ref_offset__V: Reference-electrode potential offset (V).
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_intensities_mw: LED intensities (mW).
+        led_name_CA: LED name chronoamperometry.
+        toggleCA_illum_duty: Toggled chronoamperometry illumination duty cycle.
+        toggleCA_illum_period: Toggled chronoamperometry illumination period.
+        toggleCA_dark_time_init: Toggled chronoamperometry dark time initial.
+        toggleCA_illum_time: Toggled chronoamperometry illumination time.
+        toolGC: PAL tool used for gas-chromatograph sampling.
+        toolarchive: PAL tool used for archive sampling.
+        volume_ul_GC: Volume sampled for gas chromatography (µL).
+        volume_ul_archive: Volume sampled to the archive (µL).
+        wash1: Whether to run wash step 1.
+        wash2: Whether to run wash step 2.
+        wash3: Whether to run wash step 3.
+        wash4: Whether to run wash step 4.
+        liquid_flush_time: Duration of the liquid flush (s).
+        liquidDrain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -662,33 +662,33 @@ def ANEC_photo_CAgasonly(
     Same flow as :func:`ANEC_photo_CA` but the aliquot step uses ``ANEC_sub_GCLiquid_archive`` for a GC-only sample.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        gamrychannelwait: Parameter passed through to the sub-experiments.
-        gamrychannelsend: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CA: Parameter passed through to the sub-experiments.
-        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCA_illum_period: Parameter passed through to the sub-experiments.
-        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCA_illum_time: Parameter passed through to the sub-experiments.
-        toolGC: Parameter passed through to the sub-experiments.
-        volume_ul_GC: Parameter passed through to the sub-experiments.
-        liquid_flush_time: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        gamrychannelwait: Gamry channel index to wait on before dispatching.
+        gamrychannelsend: Gamry channel index to dispatch the action to.
+        ref_offset__V: Reference-electrode potential offset (V).
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_intensities_mw: LED intensities (mW).
+        led_name_CA: LED name chronoamperometry.
+        toggleCA_illum_duty: Toggled chronoamperometry illumination duty cycle.
+        toggleCA_illum_period: Toggled chronoamperometry illumination period.
+        toggleCA_dark_time_init: Toggled chronoamperometry dark time initial.
+        toggleCA_illum_time: Toggled chronoamperometry illumination time.
+        toolGC: PAL tool used for gas-chromatograph sampling.
+        volume_ul_GC: Volume sampled for gas chromatography (µL).
+        liquid_flush_time: Duration of the liquid flush (s).
+        liquidDrain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -802,36 +802,36 @@ def ANEC_photo_CV(
     Loads the sample, fills the cell, then runs ``ANEC_sub_photo_CV`` with the configured vertices and LED parameters before draining.
 
     Args:
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        num_repeats: Parameter passed through to the sub-experiments.
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential_init__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
-        WE_potential_final__V: Parameter passed through to the sub-experiments.
-        ScanRate_V_s: Parameter passed through to the sub-experiments.
-        Cycles: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        gamrychannelwait: Parameter passed through to the sub-experiments.
-        gamrychannelsend: Parameter passed through to the sub-experiments.
-        ref_offset: Parameter passed through to the sub-experiments.
-        led_wavelengths_nm: Parameter passed through to the sub-experiments.
-        led_type: Parameter passed through to the sub-experiments.
-        led_date: Parameter passed through to the sub-experiments.
-        led_intensities_mw: Parameter passed through to the sub-experiments.
-        led_name_CA: Parameter passed through to the sub-experiments.
-        toggleCA_illum_duty: Parameter passed through to the sub-experiments.
-        toggleCA_illum_period: Parameter passed through to the sub-experiments.
-        toggleCA_dark_time_init: Parameter passed through to the sub-experiments.
-        toggleCA_illum_time: Parameter passed through to the sub-experiments.
-        liquid_flush_time: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        num_repeats: Number of repeats.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential_init__V: Working-electrode potential initial (V).
+        WE_potential_apex1__V: Working-electrode potential apex 1 (V).
+        WE_potential_apex2__V: Working-electrode potential apex 2 (V).
+        WE_potential_final__V: Working-electrode potential final (V).
+        ScanRate_V_s: Cyclic-voltammetry scan rate (V/s).
+        Cycles: Number of cycles to repeat.
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        gamrychannelwait: Gamry channel index to wait on before dispatching.
+        gamrychannelsend: Gamry channel index to dispatch the action to.
+        ref_offset: Reference-electrode potential offset (V).
+        led_wavelengths_nm: LED peak wavelengths (nm).
+        led_type: LED type identifier.
+        led_date: LED calibration date.
+        led_intensities_mw: LED intensities (mW).
+        led_name_CA: LED name chronoamperometry.
+        toggleCA_illum_duty: Toggled chronoamperometry illumination duty cycle.
+        toggleCA_illum_period: Toggled chronoamperometry illumination period.
+        toggleCA_dark_time_init: Toggled chronoamperometry dark time initial.
+        toggleCA_illum_time: Toggled chronoamperometry illumination time.
+        liquid_flush_time: Duration of the liquid flush (s).
+        liquidDrain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -940,21 +940,21 @@ def ANEC_CA_pretreat(
     Loads the solid sample, flushes/fills the cell, runs one ``ANEC_sub_CA`` at ``WE_potential__V`` for ``CA_duration_sec`` seconds, and drains.
 
     Args:
-        num_repeats: Parameter passed through to the sub-experiments.
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        liquid_flush_time: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
+        num_repeats: Number of repeats.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        liquid_flush_time: Duration of the liquid flush (s).
+        liquidDrain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1031,25 +1031,25 @@ def ANEC_CA_DOE_demo(
     Single-shot variant used in the DOE demo: load sample, fill cell, run one CA, take optional aliquots, then drain.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        toolGC: Parameter passed through to the sub-experiments.
-        toolarchive: Parameter passed through to the sub-experiments.
-        volume_ul_GC: Parameter passed through to the sub-experiments.
-        volume_ul_archive: Parameter passed through to the sub-experiments.
-        wash1: Parameter passed through to the sub-experiments.
-        wash2: Parameter passed through to the sub-experiments.
-        wash3: Parameter passed through to the sub-experiments.
-        wash4: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        toolGC: PAL tool used for gas-chromatograph sampling.
+        toolarchive: PAL tool used for archive sampling.
+        volume_ul_GC: Volume sampled for gas chromatography (µL).
+        volume_ul_archive: Volume sampled to the archive (µL).
+        wash1: Whether to run wash step 1.
+        wash2: Whether to run wash step 2.
+        wash3: Whether to run wash step 3.
+        wash4: Whether to run wash step 4.
+        liquidDrain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1120,19 +1120,19 @@ def ANEC_CA_DOE_demo_headspace(
     Variant of the DOE demo that uses ``ANEC_sub_GCLiquid_archive`` for a single headspace sample after the CA.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        toolGC: Parameter passed through to the sub-experiments.
-        volume_ul_GC: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        toolGC: PAL tool used for gas-chromatograph sampling.
+        volume_ul_GC: Volume sampled for gas chromatography (µL).
+        liquidDrain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1207,29 +1207,29 @@ def ANEC_repeat_CA(
     Loads the sample once, then repeats fill -> CA -> aliquot -> drain ``num_repeats`` times.
 
     Args:
-        num_repeats: Parameter passed through to the sub-experiments.
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        toolGC: Parameter passed through to the sub-experiments.
-        toolarchive: Parameter passed through to the sub-experiments.
-        volume_ul_GC: Parameter passed through to the sub-experiments.
-        volume_ul_archive: Parameter passed through to the sub-experiments.
-        wash1: Parameter passed through to the sub-experiments.
-        wash2: Parameter passed through to the sub-experiments.
-        wash3: Parameter passed through to the sub-experiments.
-        wash4: Parameter passed through to the sub-experiments.
-        liquid_flush_time: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
+        num_repeats: Number of repeats.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        toolGC: PAL tool used for gas-chromatograph sampling.
+        toolarchive: PAL tool used for archive sampling.
+        volume_ul_GC: Volume sampled for gas chromatography (µL).
+        volume_ul_archive: Volume sampled to the archive (µL).
+        wash1: Whether to run wash step 1.
+        wash2: Whether to run wash step 2.
+        wash3: Whether to run wash step 3.
+        wash4: Whether to run wash step 4.
+        liquid_flush_time: Duration of the liquid flush (s).
+        liquidDrain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1319,24 +1319,24 @@ def ANEC_repeat_TentHeatCAgasonly(
     For ``num_repeats`` iterations: heat the tent, fill, run CA, take a GC-only aliquot, drain.
 
     Args:
-        num_repeats: Parameter passed through to the sub-experiments.
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        toolGC: Parameter passed through to the sub-experiments.
-        volume_ul_GC: Parameter passed through to the sub-experiments.
-        liquid_flush_time: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
-        target_temperature_degc: Parameter passed through to the sub-experiments.
+        num_repeats: Number of repeats.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        toolGC: PAL tool used for gas-chromatograph sampling.
+        volume_ul_GC: Volume sampled for gas chromatography (µL).
+        liquid_flush_time: Duration of the liquid flush (s).
+        liquidDrain_time: Duration of the liquid drain (s).
+        target_temperature_degc: Target temperature (°C).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1416,15 +1416,15 @@ def ANEC_heatOCV(
     For ``num_repeats`` iterations: heat the tent, fill, run OCV, take an archive aliquot, drain.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        Tval__s: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        liquid_flush_time: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
-        target_temperature_degc: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        Tval__s: Hold duration at the set value (s).
+        IErange: Potentiostat current (I/E) range setting.
+        liquid_flush_time: Duration of the liquid flush (s).
+        liquidDrain_time: Duration of the liquid drain (s).
+        target_temperature_degc: Target temperature (°C).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1504,30 +1504,30 @@ def ANEC_repeat_TentHeatCA(
     For ``num_repeats`` iterations: heat the tent, fill, run CA, take GC+archive aliquots, drain.
 
     Args:
-        num_repeats: Parameter passed through to the sub-experiments.
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        toolGC: Parameter passed through to the sub-experiments.
-        toolarchive: Parameter passed through to the sub-experiments.
-        volume_ul_GC: Parameter passed through to the sub-experiments.
-        volume_ul_archive: Parameter passed through to the sub-experiments.
-        wash1: Parameter passed through to the sub-experiments.
-        wash2: Parameter passed through to the sub-experiments.
-        wash3: Parameter passed through to the sub-experiments.
-        wash4: Parameter passed through to the sub-experiments.
-        liquid_flush_time: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
-        target_temperature_degc: Parameter passed through to the sub-experiments.
+        num_repeats: Number of repeats.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        toolGC: PAL tool used for gas-chromatograph sampling.
+        toolarchive: PAL tool used for archive sampling.
+        volume_ul_GC: Volume sampled for gas chromatography (µL).
+        volume_ul_archive: Volume sampled to the archive (µL).
+        wash1: Whether to run wash step 1.
+        wash2: Whether to run wash step 2.
+        wash3: Whether to run wash step 3.
+        wash4: Whether to run wash step 4.
+        liquid_flush_time: Duration of the liquid flush (s).
+        liquidDrain_time: Duration of the liquid drain (s).
+        target_temperature_degc: Target temperature (°C).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1628,30 +1628,30 @@ def ANEC_repeat_HeatCA(
     For ``num_repeats`` iterations: heat the cell, fill, run CA, take aliquots, drain.
 
     Args:
-        num_repeats: Parameter passed through to the sub-experiments.
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        toolGC: Parameter passed through to the sub-experiments.
-        toolarchive: Parameter passed through to the sub-experiments.
-        volume_ul_GC: Parameter passed through to the sub-experiments.
-        volume_ul_archive: Parameter passed through to the sub-experiments.
-        wash1: Parameter passed through to the sub-experiments.
-        wash2: Parameter passed through to the sub-experiments.
-        wash3: Parameter passed through to the sub-experiments.
-        wash4: Parameter passed through to the sub-experiments.
-        liquid_flush_time: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
-        target_temperature_degc: Parameter passed through to the sub-experiments.
+        num_repeats: Number of repeats.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        toolGC: PAL tool used for gas-chromatograph sampling.
+        toolarchive: PAL tool used for archive sampling.
+        volume_ul_GC: Volume sampled for gas chromatography (µL).
+        volume_ul_archive: Volume sampled to the archive (µL).
+        wash1: Whether to run wash step 1.
+        wash2: Whether to run wash step 2.
+        wash3: Whether to run wash step 3.
+        wash4: Whether to run wash step 4.
+        liquid_flush_time: Duration of the liquid flush (s).
+        liquidDrain_time: Duration of the liquid drain (s).
+        target_temperature_degc: Target temperature (°C).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1741,23 +1741,23 @@ def ANEC_gasonly_CA(
     Loads the sample, fills the cell, runs one CA and one GC-only aliquot, then drains.
 
     Args:
-        num_repeats: Parameter passed through to the sub-experiments.
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        toolGC: Parameter passed through to the sub-experiments.
-        volume_ul_GC: Parameter passed through to the sub-experiments.
-        liquid_flush_time: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
+        num_repeats: Number of repeats.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        toolGC: PAL tool used for gas-chromatograph sampling.
+        volume_ul_GC: Volume sampled for gas chromatography (µL).
+        liquid_flush_time: Duration of the liquid flush (s).
+        liquidDrain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1841,24 +1841,24 @@ def ANEC_repeat_CV(
     Loads the sample once and repeats fill -> CV -> drain ``num_repeats`` times.
 
     Args:
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        num_repeats: Parameter passed through to the sub-experiments.
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential_init__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
-        WE_potential_final__V: Parameter passed through to the sub-experiments.
-        ScanRate_V_s: Parameter passed through to the sub-experiments.
-        Cycles: Parameter passed through to the sub-experiments.
-        SampleRate: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        num_repeats: Number of repeats.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential_init__V: Working-electrode potential initial (V).
+        WE_potential_apex1__V: Working-electrode potential apex 1 (V).
+        WE_potential_apex2__V: Working-electrode potential apex 2 (V).
+        WE_potential_final__V: Working-electrode potential final (V).
+        ScanRate_V_s: Cyclic-voltammetry scan rate (V/s).
+        Cycles: Number of cycles to repeat.
+        SampleRate: Data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset: Reference-electrode potential offset (V).
+        liquidDrain_time: Duration of the liquid drain (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1940,27 +1940,27 @@ def ANEC_ferricyanide_simpleprotocol(
     Runs a fixed fill/CA/aliquot/drain protocol used to validate the ANEC potentiostat with a ferricyanide standard.
 
     Args:
-        num_repeats: Parameter passed through to the sub-experiments.
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate_CA: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        WE_potential_init__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
-        WE_potential_final__V: Parameter passed through to the sub-experiments.
-        ScanRate_V_s: Parameter passed through to the sub-experiments.
-        Cycles: Parameter passed through to the sub-experiments.
-        SampleRate_CV: Parameter passed through to the sub-experiments.
-        target_temperature_degc: Parameter passed through to the sub-experiments.
+        num_repeats: Number of repeats.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate_CA: Chronoamperometry data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        WE_potential_init__V: Working-electrode potential initial (V).
+        WE_potential_apex1__V: Working-electrode potential apex 1 (V).
+        WE_potential_apex2__V: Working-electrode potential apex 2 (V).
+        WE_potential_final__V: Working-electrode potential final (V).
+        ScanRate_V_s: Cyclic-voltammetry scan rate (V/s).
+        Cycles: Number of cycles to repeat.
+        SampleRate_CV: Cyclic-voltammetry data acquisition sample rate.
+        target_temperature_degc: Target temperature (°C).
 
     Returns:
         List of planned experiments to dispatch.
@@ -2045,28 +2045,28 @@ def ANEC_ferricyanide_protocol(
     Extended ferricyanide diagnostic: fills the cell, runs CA and CV with archive aliquots, then drains and cleans.
 
     Args:
-        plate_id: Parameter passed through to the sub-experiments.
-        solid_sample_no: Parameter passed through to the sub-experiments.
-        reservoir_liquid_sample_no: Parameter passed through to the sub-experiments.
-        volume_ul_cell_liquid: Parameter passed through to the sub-experiments.
-        WE_potential__V: Parameter passed through to the sub-experiments.
-        WE_versus: Parameter passed through to the sub-experiments.
-        ref_type: Parameter passed through to the sub-experiments.
-        pH: Parameter passed through to the sub-experiments.
-        CA_duration_sec: Parameter passed through to the sub-experiments.
-        SampleRate_CA: Parameter passed through to the sub-experiments.
-        IErange: Parameter passed through to the sub-experiments.
-        ref_offset__V: Parameter passed through to the sub-experiments.
-        WE_potential_init__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex1__V: Parameter passed through to the sub-experiments.
-        WE_potential_apex2__V: Parameter passed through to the sub-experiments.
-        WE_potential_final__V: Parameter passed through to the sub-experiments.
-        ScanRate_V_s: Parameter passed through to the sub-experiments.
-        Cycles: Parameter passed through to the sub-experiments.
-        SampleRate_CV: Parameter passed through to the sub-experiments.
-        liquidDrain_time: Parameter passed through to the sub-experiments.
-        target_temperature_degc: Parameter passed through to the sub-experiments.
-        CV_only: Parameter passed through to the sub-experiments.
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        WE_potential__V: Working-electrode potential (V).
+        WE_versus: Potential reference the working-electrode values are quoted against.
+        ref_type: Reference-electrode type.
+        pH: Electrolyte pH.
+        CA_duration_sec: Chronoamperometry duration (s).
+        SampleRate_CA: Chronoamperometry data acquisition sample rate.
+        IErange: Potentiostat current (I/E) range setting.
+        ref_offset__V: Reference-electrode potential offset (V).
+        WE_potential_init__V: Working-electrode potential initial (V).
+        WE_potential_apex1__V: Working-electrode potential apex 1 (V).
+        WE_potential_apex2__V: Working-electrode potential apex 2 (V).
+        WE_potential_final__V: Working-electrode potential final (V).
+        ScanRate_V_s: Cyclic-voltammetry scan rate (V/s).
+        Cycles: Number of cycles to repeat.
+        SampleRate_CV: Cyclic-voltammetry data acquisition sample rate.
+        liquidDrain_time: Duration of the liquid drain (s).
+        target_temperature_degc: Target temperature (°C).
+        CV_only: Whether to run only the cyclic-voltammetry step.
 
     Returns:
         List of planned experiments to dispatch.
