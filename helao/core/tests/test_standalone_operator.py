@@ -835,13 +835,14 @@ def test_param_label_enumeration():
     # seq_param_layout has 4 fixed prefix entries (load/save header block,
     # description block, Spacer, params header block), then param rows appended
     # by add_dynamic_inputs from index 4.
-    # Each param row is layout([column(row(Spacer, name_div, type_div),
-    #                                  row(index_div, TextInput)), Spacer]).
-    param_col = op.seq_param_layout[4].children[0]
-    label_row = param_col.children[0]
+    # Each param row is layout([row(input_col, desc_col), Spacer]) where
+    # input_col == column(row(Spacer, name_div, type_div), row(index_div, input)).
+    param_row = op.seq_param_layout[4].children[0]
+    input_col = param_row.children[0]
+    label_row = input_col.children[0]
     name_div = label_row.children[1]
     type_div = label_row.children[2]
-    index_div = param_col.children[1].children[0]
+    index_div = input_col.children[1].children[0]
     assert index_div.text == "[0]", index_div.text
     assert name_div.text == "x", name_div.text
     assert type_div.text.startswith("<i>["), type_div.text
@@ -870,6 +871,32 @@ def test_object_to_html():
     # values with HTML special chars are escaped (no raw injection)
     assert "&lt;b&gt;" in _object_to_html({"k": "<b>x</b>"})
     print("test_object_to_html PASS")
+
+
+def test_parse_arg_docs():
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    doc = (
+        "Plan a thing.\n\n"
+        "Args:\n"
+        "    wait_time: Base wait used inside each sub-experiment.\n"
+        "    cycles (int): Number of cycles\n"
+        "        per sample.\n"
+        "    *args: Ignored positional arguments.\n"
+        "\n"
+        "Returns:\n"
+        "    Planned experiments.\n"
+    )
+    descs = BokehOperator._parse_arg_docs(doc)
+    assert descs["wait_time"] == "Base wait used inside each sub-experiment.", descs
+    # type annotation stripped + continuation line folded in
+    assert descs["cycles"] == "Number of cycles per sample.", descs
+    # *args skipped, Returns section not bled in
+    assert "args" not in descs, descs
+    assert "Returns" not in " ".join(descs.values()), descs
+    assert BokehOperator._parse_arg_docs("") == {}
+    assert BokehOperator._parse_arg_docs("No args section here.") == {}
+    print("test_parse_arg_docs PASS")
 
 
 def test_tree_header_text():
@@ -1044,6 +1071,7 @@ def run_all():
     test_param_key_uses_name_not_title()
     test_find_input_matches_name()
     test_param_label_enumeration()
+    test_parse_arg_docs()
     test_object_to_html()
     test_tree_header_text()
     test_operator_label_sanitize_callback()
