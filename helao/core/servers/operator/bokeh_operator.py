@@ -2170,7 +2170,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             desc_div = Div(
                 text=arg_descs.get(args[idx], ""),
                 sizing_mode="stretch_width",
-                styles={"color": "#566573"},
+                styles={"color": "#566573", "margin-left": "12px"},
             )
             # The focus-within rule (below) lives on the row's stylesheet and can
             # only reach the row's *direct* children, so the toggled class goes on
@@ -2346,13 +2346,48 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                     ),
                 )
 
+    @staticmethod
+    def _doc_to_html(doc: str) -> str:
+        """Render a docstring as HTML, with the ``Args:`` block as a collapsed tree.
+
+        Text before/after the ``Args:`` section is kept as-is (newlines -> <br>);
+        the argument list is rendered inside a closed ``<details>`` element so it
+        starts collapsed and expands on click.
+        """
+        if not doc:
+            return ""
+        lines = doc.splitlines()
+        hdr_re = re.compile(r"^\s*(Args|Arguments|Parameters)\s*:\s*$", re.I)
+        sect_re = re.compile(
+            r"^\s*(Returns?|Raises|Yields?|Examples?|Notes?|Attributes)\s*:\s*$",
+            re.I,
+        )
+        hdr = next((i for i, l in enumerate(lines) if hdr_re.match(l)), None)
+        if hdr is None:
+            return _html.escape(doc).replace("\n", "<br>")
+        # end of the Args block: first blank line or next section header
+        end = len(lines)
+        for j in range(hdr + 1, len(lines)):
+            if lines[j].strip() == "" or sect_re.match(lines[j]):
+                end = j
+                break
+        args = BokehOperator._parse_arg_docs(doc)
+        items = "".join(
+            f"<div style='margin-left:1em'>{_html.escape(k)}: {_html.escape(v)}</div>"
+            for k, v in args.items()
+        )
+        tree = f"<details><summary><b>Args:</b></summary>{items}</details>"
+        pre = "<br>".join(_html.escape(l) for l in lines[:hdr])
+        post = "<br>".join(_html.escape(l) for l in lines[end:])
+        return "".join(p for p in (pre, tree, post) if p)
+
     def update_seq_doc(self, value):
         """Render the selected sequence's docstring into the sequence description widget."""
-        self.sequence_descr_txt.text = value.replace("\n", "<br>")
+        self.sequence_descr_txt.text = self._doc_to_html(value)
 
     def update_exp_doc(self, value):
         """Render the selected experiment's docstring into the experiment description widget."""
-        self.experiment_descr_txt.text = value.replace("\n", "<br>")
+        self.experiment_descr_txt.text = self._doc_to_html(value)
 
     def update_seqspec_doc(self, value):
         """Show the parser path and spec file path in the seqspec description widget."""
