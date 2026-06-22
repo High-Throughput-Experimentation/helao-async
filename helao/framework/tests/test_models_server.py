@@ -7,8 +7,6 @@ the ``errored`` finished bucket, `find_hlostatus_in_finished` /
 """
 from uuid import uuid4
 
-import pytest
-
 from helao.framework.models.action import ActionModel
 from helao.framework.models.hlostatus import HloStatus
 from helao.framework.models.machine import MachineModel
@@ -194,19 +192,47 @@ def test_clear_in_finished_direct_bucket():
     assert gsm.nonactive_dict[HloStatus.errored] == {}
 
 
-def test_clear_in_finished_substatus_path_raises_on_nonempty_finished():
-    # KNOWN PRE-EXISTING BUG (faithfully ported from helao/core/models/server.py):
-    # the substatus branch deletes keys while iterating the same dict's .keys(),
-    # which raises RuntimeError whenever the finished bucket is non-empty. This
-    # test pins the *current* behavior; it must NOT be changed silently.
+def test_clear_in_finished_substatus_path_clears_nonempty_finished():
+    # REGRESSION: the substatus branch used to delete keys while iterating the
+    # same dict's .keys(), raising RuntimeError whenever the finished bucket was
+    # non-empty. It now rebinds the bucket to a fresh empty dict, so clearing a
+    # substatus (only present under 'finished') must NOT raise and must empty it.
     a = _action([HloStatus.finished, HloStatus.estopped])
     gsm = GlobalStatusModel(orchestrator=ORCH)
     ep = EndpointModel(endpoint_name="ep", active_dict={a.action_uuid: a})
     asm = ActionServerModel(action_server=SRV, endpoints={"ep": ep})
     gsm.update_global_with_acts(asm)
+    # estopped is not in main_finished_status, so no estopped bucket exists; the
+    # action lives only under the 'finished' bucket -> exercises the elif path.
     assert HloStatus.estopped not in gsm.nonactive_dict
-    with pytest.raises(RuntimeError):
-        gsm.clear_in_finished(HloStatus.estopped)
+    assert gsm.nonactive_dict[HloStatus.finished]  # non-empty before clearing
+    gsm.clear_in_finished(HloStatus.estopped)  # must not raise
+    assert gsm.nonactive_dict[HloStatus.finished] == {}
+
+
+def test_clear_in_finished_substatus_path_clears_multiple_entries():
+    # Regression for the dict-mutation bug with *multiple* entries in the
+    # finished bucket and a substatus (estopped) that has no dedicated bucket.
+    a1 = _action([HloStatus.finished, HloStatus.estopped])
+    a2 = _action([HloStatus.finished, HloStatus.estopped])
+    a3 = _action([HloStatus.finished, HloStatus.estopped])
+    ep = EndpointModel(
+        endpoint_name="ep",
+        active_dict={
+            a1.action_uuid: a1,
+            a2.action_uuid: a2,
+            a3.action_uuid: a3,
+        },
+    )
+    asm = ActionServerModel(action_server=SRV, endpoints={"ep": ep})
+    gsm = GlobalStatusModel(orchestrator=ORCH)
+    gsm.update_global_with_acts(asm)
+    # estopped is not a main_finished_status -> no dedicated bucket; all three
+    # land only under 'finished'.
+    assert HloStatus.estopped not in gsm.nonactive_dict
+    assert len(gsm.nonactive_dict[HloStatus.finished]) == 3
+    gsm.clear_in_finished(HloStatus.estopped)  # must not raise (the old bug)
+    assert gsm.nonactive_dict[HloStatus.finished] == {}
 
 
 def test_clear_in_finished_substatus_path_noop_on_empty_finished():
