@@ -832,14 +832,16 @@ def test_param_label_enumeration():
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     op.sequence_dropdown.value = "seq0"  # selected in __init__; single param "x"
-    # seq_param_layout has 3 fixed prefix entries (description block, Spacer,
-    # header block), then param rows appended by add_dynamic_inputs from index 3.
-    # Each param row is layout([[Spacer, name_div, type_div],
-    #                           [index_div, TextInput], Spacer]).
-    header_row = op.seq_param_layout[3].children[0]
-    name_div = header_row.children[1]
-    type_div = header_row.children[2]
-    index_div = op.seq_param_layout[3].children[1].children[0]
+    # seq_param_layout has 4 fixed prefix entries (load/save header block,
+    # description block, Spacer, params header block), then param rows appended
+    # by add_dynamic_inputs from index 4.
+    # Each param row is layout([column(row(Spacer, name_div, type_div),
+    #                                  row(index_div, TextInput)), Spacer]).
+    param_col = op.seq_param_layout[4].children[0]
+    label_row = param_col.children[0]
+    name_div = label_row.children[1]
+    type_div = label_row.children[2]
+    index_div = param_col.children[1].children[0]
     assert index_div.text == "[0]", index_div.text
     assert name_div.text == "x", name_div.text
     assert type_div.text.startswith("<i>["), type_div.text

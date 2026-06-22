@@ -29,6 +29,9 @@ class OrchBackend(ABC):
     sequence_lib: dict
     #: name -> callable experiment library (local in every backend)
     experiment_lib: dict
+    #: name -> source-file hash for the sequence/experiment libraries
+    sequence_codehash: dict
+    experiment_codehash: dict
 
     @abstractmethod
     def unpack_sequence(self, sequence_name: str, sequence_params: dict) -> list:
@@ -130,11 +133,11 @@ class RemoteBackend(OrchBackend):
         self.poll_interval = poll_interval
         self._dispatch = async_private_dispatcher
 
-        self.experiment_lib, _, _ = import_autolibs(
+        self.experiment_lib, self.experiment_codehash, _ = import_autolibs(
             world_config_dict=vis.world_cfg, lib_dir=None,
             user_lib_dir=vis.helaodirs.user_exp, lib_type="experiment",
         )
-        self.sequence_lib, _, _ = import_autolibs(
+        self.sequence_lib, self.sequence_codehash, _ = import_autolibs(
             world_config_dict=vis.world_cfg, lib_dir=None,
             user_lib_dir=vis.helaodirs.user_seq, lib_type="sequence",
         )
