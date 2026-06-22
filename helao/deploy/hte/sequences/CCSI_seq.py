@@ -1080,15 +1080,7 @@ def CCSI_Solution_co2maintainconcentration(  # assumes initialization performed 
     Loop variant of :func:`CCSI_Solution_testing` that re-injects when the CO2 signal drifts outside the configured bounds.
 
     Args:
-        10 co2check cleans: Parameter passed through to the sub-experiments.
-        11 initialization included 13 measure delay
-    #                   v 14: Parameter passed through to the sub-experiments.
-        list for solution/total sample volumes+ extra clean 15 added rinses/16agitation
-    #                   17 repeat cleans/rinses/flushes
-    #                   18 water injection options
-    #                   19 co2 measurement duration now list for flexibility
-    #                   20 renaming water addition to secondliquid // adding secondliquid prerinse #21 second liquid rinse volume
-    initial_gas_sample_no: Gas-sample number of the initial headspace gas.
+        initial_gas_sample_no: Gas-sample number of the initial headspace gas.
         pureco2_sample_no: Gas-sample number of the pure CO2 source.
         Solution_volume_ul: Solution volume to dispense (µL).
         Solution_reservoir_sample_no: Liquid-sample number of the solution reservoir.
@@ -1122,8 +1114,10 @@ def CCSI_Solution_co2maintainconcentration(  # assumes initialization performed 
         recirculation_duration: Recirculation duration.
         drainclean_volume_ul: Volume drained during cleaning (µL).
         n2flowrate_sccm: N2 flow rate (sccm).
+        prerinse_cleans: Number of pre-rinse cleaning cycles.
         perform_init: Whether to run the initialization steps.
         fixed_flushes: Number of fixed flush cycles.
+        LiquidClean_full_rinses: Number of full rinse cycles during liquid cleaning.
         LiquidClean_rinse_agitation: Liquid cleaning rinse agitation.
         LiquidClean_rinse_agitation_wait: Liquid cleaning rinse agitation wait time.
         LiquidClean_rinse_agitation_duration: Liquid cleaning rinse agitation duration.
