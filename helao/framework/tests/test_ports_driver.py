@@ -168,13 +168,16 @@ def test_created_at_returns_formatted_string():
 
 
 def test_uptime_inherits_source_timedelta_bug():
-    # Ported near-verbatim from helao.core: ``_uptime`` calls ``.strftime``
-    # on a ``timedelta`` (the result of ``datetime.now() - self.timestamp``),
-    # which raises. We assert the inherited behavior rather than alter the
-    # faithfully-ported source.
+    # The legacy source called ``.strftime`` on a ``timedelta`` (the result of
+    # ``datetime.now() - self.timestamp``), which raises AttributeError. The bug
+    # is fixed in the framework port (SP4, memory note known-bug-clear-in-finished):
+    # ``_uptime`` now formats the elapsed timedelta via ``str()`` and must NOT raise.
     drv = _StubDriver()
-    with pytest.raises(AttributeError):
-        _ = drv._uptime
+    uptime = drv._uptime  # must not raise
+    assert isinstance(uptime, str)
+    assert len(uptime) > 0
+    # str(timedelta) is H:MM:SS[.ffffff]
+    assert ":" in uptime
 
 
 def test_abstract_methods_dispatch_to_concrete_impl():

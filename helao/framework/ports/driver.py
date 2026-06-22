@@ -114,8 +114,14 @@ class HelaoDriver(ABC):
 
     @property
     def _uptime(self) -> str:
-        """Time since instantiation formatted as ``YYYY-MM-DD HH:MM:SS,mmm``."""
-        return (datetime.now() - self.timestamp).strftime("%F %T,%f")[:-3]
+        """Time since instantiation, formatted as a ``timedelta`` string.
+
+        The legacy source called ``.strftime`` on the ``timedelta`` returned by
+        ``datetime.now() - self.timestamp``, which raises ``AttributeError``
+        (timedelta has no ``strftime``). Fixed here to format the elapsed time
+        via ``str(timedelta)`` (``H:MM:SS[.ffffff]``).
+        """
+        return str(datetime.now() - self.timestamp)
 
     @abstractmethod
     def connect(self) -> DriverResponse:
