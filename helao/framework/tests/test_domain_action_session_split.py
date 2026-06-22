@@ -66,8 +66,11 @@ def _make_session(action=None, now_values=None, uuid_values=None):
 
     executor = Executor(active=_Wrap(action))
 
-    nows = iter(now_values) if now_values is not None else None
-    uuids = iter(uuid_values) if uuid_values is not None else None
+    # Constant factories: split() mints one timestamp/uuid for the new action and
+    # finish() stamps a finished timestamp, so the factories are called more than
+    # once. The tests assert on the (single) value these constants return.
+    now_value = now_values[0] if now_values else SPLIT_NOW
+    uuid_value = uuid_values[0] if uuid_values else NEW_UUID
 
     session = ActionSession(
         action,
@@ -76,8 +79,8 @@ def _make_session(action=None, now_values=None, uuid_values=None):
         clock=clock,
         executor=executor,
         transport=transport,
-        now_factory=(lambda: next(nows)) if nows is not None else (lambda: SPLIT_NOW),
-        uuid_factory=(lambda: next(uuids)) if uuids is not None else (lambda: NEW_UUID),
+        now_factory=lambda: now_value,
+        uuid_factory=lambda: uuid_value,
     )
     return session, storage, eventsink, clock, transport
 
