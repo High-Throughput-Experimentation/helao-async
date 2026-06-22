@@ -401,7 +401,7 @@ class BokehOperator:
         )
         self.sequence_dropdown.on_change("value", self.callback_sequence_select)
         self.sequence_version_div = Div(
-            text="", width=300, height=40,
+            text="", width=300, height=40, align="center",
             styles={"line-height": "40px", "color": "#566573"},
         )
 
@@ -410,7 +410,7 @@ class BokehOperator:
         )
         self.experiment_dropdown.on_change("value", self.callback_experiment_select)
         self.experiment_version_div = Div(
-            text="", width=300, height=40,
+            text="", width=300, height=40, align="center",
             styles={"line-height": "40px", "color": "#566573"},
         )
 
@@ -1138,17 +1138,18 @@ class BokehOperator:
                 seq.campaign_uuid = self.input_campaign_uuid.value.strip()
 
     def _build_param_header(self, mode: str):
-        """Header rendered above the dynamic parameter layout: the load-last-
-        params button and save-params checkbox for ``mode`` (seq/exp only)."""
+        """Load-last-params button + save-params checkbox row for ``mode``
+        (seq/exp only). Rendered just below the description block."""
         if mode == "seq":
-            header_row = [self.button_last_seq_pars, self.save_last_seq_pars]
+            button, checkbox = self.button_last_seq_pars, self.save_last_seq_pars
         elif mode == "exp":
-            header_row = [self.button_last_exp_pars, self.save_last_exp_pars]
+            button, checkbox = self.button_last_exp_pars, self.save_last_exp_pars
         else:  # seqspec has no saved-params controls
             return []
+        checkbox.align = "center"
         return [
             layout(
-                [header_row],
+                [row(button, checkbox)],
                 background="#D6DBDF",
                 width=self.max_width,
                 height_policy="min",
@@ -1202,6 +1203,7 @@ class BokehOperator:
             layout(
                 [
                     row(*field_row, sizing_mode="stretch_width"),
+                    Spacer(height=16),
                     row(comment, sizing_mode="stretch_width"),
                 ],
                 background="#D6DBDF",
@@ -1274,9 +1276,9 @@ class BokehOperator:
         # The item description is rendered here (rather than inside the selector
         # tab panel) so the tab panels stay a uniform, minimal height and no
         # variable whitespace appears above this block. See ``layout1``/``2``/``3``.
-        # The load-last-params button + save-params checkbox are pinned to the
-        # very top of the dynamic parameter block (see ``_build_param_header``).
-        param_layout = self._build_param_header(mode) + [
+        # The load-last-params button + save-params checkbox row is rendered just
+        # below the description block (see ``_build_param_header``).
+        param_layout = [
             layout(
                 [
                     [
@@ -1293,6 +1295,7 @@ class BokehOperator:
                 width=self.max_width,
                 height_policy="min",
             ),
+        ] + self._build_param_header(mode) + [
             Spacer(height=10),
             layout(
                 [
@@ -2109,7 +2112,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                             row(Spacer(width=idx_col_w), name_div, type_div,
                                 spacing=0),
                             row(index_div, param_input[item], spacing=0),
-                            spacing=0,
+                            spacing=5,
                         ),
                         Spacer(height=10),
                     ],
