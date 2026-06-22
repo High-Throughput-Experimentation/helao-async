@@ -19,7 +19,11 @@ Purity: imports only from ``helao.framework.models`` / ``ports`` / ``support`` /
 __all__ = ["ActionSession"]
 
 import asyncio
-from typing import Any, List, Mapping, Optional
+import uuid as _uuid
+from copy import deepcopy
+from datetime import datetime
+from typing import Any, Callable, List, Mapping, Optional
+from uuid import UUID
 
 from helao.framework.models.errors import ErrorCodes
 from helao.framework.models.hlostatus import HloStatus
@@ -32,9 +36,10 @@ from helao.framework.models.sample import (
 from helao.framework.ports.clock import Clock
 from helao.framework.ports.eventsink import EventSink
 from helao.framework.ports.storage import Storage
-from helao.framework.ports.transport import Transport
+from helao.framework.ports.transport import Message, Transport
 from helao.framework.domain.run_models import RunAction
 from helao.framework.domain.executor import Executor
+from helao.framework.domain import lifecycle
 
 from helao.framework.support import helao_logging as logging
 
@@ -67,6 +72,8 @@ class ActionSession:
         clock: Clock,
         executor: Executor,
         transport: Optional[Transport] = None,
+        now_factory: Optional[Callable[[], datetime]] = None,
+        uuid_factory: Optional[Callable[[], UUID]] = None,
     ) -> None:
         """Wire the session to its run-action and injected ports.
 
@@ -76,7 +83,13 @@ class ActionSession:
             eventsink: EventSink port for status/data broadcast.
             clock: Clock port for timestamps.
             executor: The executor implementing the action's phases.
-            transport: Optional transport port (used by ``finish`` in Wave 4).
+            transport: Optional transport port (used by ``finish``).
+            now_factory: Callable returning the wall-clock timestamp used by
+                ``split`` / manual promotion / ``finish``. Injected so those
+                transitions are deterministic in tests; defaults to
+                ``datetime.now`` for production use.
+            uuid_factory: Callable minting new UUIDs for ``split`` / manual
+                promotion. Injected for determinism; defaults to ``uuid.uuid4``.
         """
         self.action = run_action
         self.storage = storage
@@ -84,6 +97,8 @@ class ActionSession:
         self.clock = clock
         self.executor = executor
         self.transport = transport
+        self._now: Callable[[], datetime] = now_factory or datetime.now
+        self._uuid: Callable[[], UUID] = uuid_factory or _uuid.uuid4
 
         # newest action is at position 0 (matches legacy Active.action_list)
         self.action_list: List[RunAction] = [self.action]
@@ -94,6 +109,10 @@ class ActionSession:
         # data packages awaiting drain to storage (in lieu of the legacy
         # data_q / log_data_task background task). finish() drains these.
         self._pending_data: List[DataPackageModel] = []
+        # open HLO file-connection handles keyed by file_conn_key (ports the
+        # legacy Active.file_conn_dict open-file bookkeeping). substitute/finish
+        # close these; split closes the prior ones and opens fresh ones.
+        self._open_handles: dict[UUID, Any] = {}
 
         # save defaults mirror Active.__init__: cannot save data without act
         if self.action.save_data is None:
@@ -222,6 +241,146 @@ class ActionSession:
         await self.storage.append_hlo(handle, output_str)
         await self.storage.close_hlo(handle)
         return relpath
+
+    # --- file connections (streaming HLO handles) ----------------------------
+
+    def _conn_relpath(self, file_conn_key: UUID, action: Optional[RunAction] = None) -> str:
+        """Relpath of the streaming HLO file for ``file_conn_key``."""
+        if action is None:
+            action = self.action
+        return f"{action.action_output_dir}/{action.action_name}-{file_conn_key}.hlo"
+
+    async def open_file(
+        self,
+        file_conn_key: UUID,
+        header: str = "",
+        action: Optional[RunAction] = None,
+    ) -> Any:
+        """Open a streaming HLO file connection and remember its handle.
+
+        Ports the open-file half of the legacy ``Active.file_conn_dict``: the
+        storage port writes the header + ``%%`` separator and returns an opaque
+        handle, which is tracked under ``file_conn_key`` so ``split`` /
+        ``substitute`` / ``finish`` can close it later.
+        """
+        handle = await self.storage.open_hlo(
+            self._conn_relpath(file_conn_key, action), header
+        )
+        self._open_handles[file_conn_key] = handle
+        return handle
+
+    async def _close_conns(self, file_conn_keys) -> None:
+        """Close (and forget) every open handle in ``file_conn_keys``."""
+        for key in list(file_conn_keys):
+            handle = self._open_handles.pop(key, None)
+            if handle is not None:
+                await self.storage.close_hlo(handle)
+
+    # --- split / substitute --------------------------------------------------
+
+    async def split(self, uuid_list: Optional[List[UUID]] = None) -> List[UUID]:
+        """Fork the current action into a fresh sibling with new file connections.
+
+        Ports ``Active.split``: the previous action is snapshotted and marked
+        ``HloStatus.split``, ``action_split`` is incremented and the current
+        action's identity re-initialised (injected uuid/clock), parent/child
+        uuids are linked, old file connections are closed and one fresh
+        connection per prior one is opened. Counters reset for the new action.
+
+        Args:
+            uuid_list: Prior-action UUIDs to finish; ``None`` finishes all prior
+                actions (every sibling except the new current one); ``[]`` keeps
+                all prior actions open.
+
+        Returns:
+            The newly opened file-connection keys.
+        """
+        prev_action_list = deepcopy(self.action_list)
+        result = lifecycle.split_action(
+            self.action, now=self._now(), uuid=self._uuid()
+        )
+        prev_action = result.prev_action
+
+        # close the prior action's file connections
+        await self._close_conns(result.close_file_conns)
+
+        # newest action stays at position 0; prior siblings follow
+        prev_action_list[0] = prev_action
+        self.action_list = [self.action] + prev_action_list
+
+        # open fresh connections for the new action's file conn keys
+        for new_key in result.open_file_conns:
+            await self.open_file(new_key, header="")
+
+        # reset counters for the new action
+        self.num_data_queued = 0
+        self.num_data_written = 0
+
+        # broadcast status for the new split action
+        await self.add_status()
+
+        # finish the requested prior actions
+        if uuid_list is None:
+            await self.finish(
+                finish_uuid_list=[a.action_uuid for a in self.action_list[1:]]
+            )
+        else:
+            await self.finish(finish_uuid_list=uuid_list)
+
+        return result.open_file_conns
+
+    async def split_and_keep_active(self) -> List[UUID]:
+        """Split while leaving every prior action open. Ports ``Active.split_and_keep_active``."""
+        return await self.split(uuid_list=[])
+
+    async def split_and_finish_prev_uuids(self) -> List[UUID]:
+        """Split and finish every prior action. Ports ``Active.split_and_finish_prev_uuids``."""
+        return await self.split(uuid_list=None)
+
+    async def substitute(self) -> None:
+        """Close every open HLO handle so another session can take over the files.
+
+        Ports ``Active.substitute``.
+        """
+        await self._close_conns(list(self._open_handles.keys()))
+
+    # --- manual action -------------------------------------------------------
+
+    async def promote_manual(self) -> None:
+        """Promote this action to a manual run, initialising synthetic identity.
+
+        Ports the auto-promotion in ``init_act``: when an action has no parent
+        sequence/experiment timestamps it becomes a manual run with synthetic
+        ``seq--``/``exp--`` identity and ``access="manual"``. Uses the injected
+        clock/uuid so the synthetic identity is deterministic.
+        """
+        lifecycle.init_action(self.action, now=self._now(), uuid=self._uuid())
+
+    async def finish_manual_action(self) -> None:
+        """Write synthetic experiment/sequence meta for a manual run.
+
+        Ports ``Active.finish_manual_action``: when the very first action in the
+        list is manual, emit a finished ``.exp`` and ``.seq`` meta doc derived
+        from it. No-op for non-manual actions.
+        """
+        first = self.action_list[-1]
+        if not first.manual_action:
+            return
+        exp = deepcopy(first)
+        exp.experiment_status = [HloStatus.finished]
+        exp.sequence_status = [HloStatus.finished]
+        exp.samples_in = []
+        exp.samples_out = []
+        exp.files = []
+        for action in self.action_list:
+            exp.dispatched_actions.append(deepcopy(action))
+
+        await self.storage.write_meta(
+            f"{exp.action_output_dir}/{exp.experiment_uuid}.exp", exp.as_dict()
+        )
+        await self.storage.write_meta(
+            f"{exp.action_output_dir}/{exp.sequence_uuid}.seq", exp.as_dict()
+        )
 
     # --- samples -------------------------------------------------------------
 
@@ -354,23 +513,32 @@ class ActionSession:
 
     # --- finish (minimal happy-path drain) -----------------------------------
 
-    async def finish(self) -> RunAction:
+    async def finish(
+        self, finish_uuid_list: Optional[List[UUID]] = None
+    ) -> RunAction:
         """Drain queued data, stamp the final status, and broadcast it.
 
-        Minimal Wave-3 form: drains the pending-data queue (so
-        ``num_data_written == num_data_queued``), appends ``HloStatus.finished``
-        to the action status, rewrites the action meta, and emits the final
-        status. The full drain (global params via transport, post-processors,
-        aux-file relocation) is Wave 4.
+        Minimal happy-path form: finishes the selected actions (or all),
+        appending ``HloStatus.finished``, draining the pending-data queue, and
+        emitting the final status. The full drain (global params via transport,
+        post-processors, aux-file relocation) is filled in by :meth:`_finish`.
         """
+        if finish_uuid_list is None:
+            finish_uuid_list = [a.action_uuid for a in self.action_list]
+
+        for action in self.action_list:
+            if action.action_uuid not in finish_uuid_list:
+                continue
+            if HloStatus.finished in action.action_status:
+                continue
+            if HloStatus.finished not in action.action_status:
+                action.action_status.append(HloStatus.finished)
+            action.data_stream_status = HloStatus.finished
+
         # drain pending data to storage
         while self._pending_data:
             self._pending_data.pop(0)
             self.num_data_written += 1
-
-        if HloStatus.finished not in self.action.action_status:
-            self.action.action_status.append(HloStatus.finished)
-        self.action.data_stream_status = HloStatus.finished
 
         await self.update_act_file()
         await self.add_status()
