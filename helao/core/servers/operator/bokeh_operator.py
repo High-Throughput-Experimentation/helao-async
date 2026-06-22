@@ -1113,6 +1113,46 @@ class BokehOperator:
         return items, select_list
 
     @staticmethod
+    def _parse_arg_docs(doc: str) -> dict:
+        """Parse a Google-style ``Args:`` section into ``{arg_name: description}``.
+
+        Recognises ``name: text`` and ``name (type): text`` entries, folds
+        indented continuation lines into the preceding entry, and stops at the
+        next section header or a blank line. ``*args``/``**kwargs`` are skipped.
+        """
+        if not doc:
+            return {}
+        header_re = re.compile(r"^\s*(Args|Arguments|Parameters)\s*:\s*$", re.I)
+        section_re = re.compile(
+            r"^\s*(Returns?|Raises|Yields?|Examples?|Notes?|Attributes|"
+            r"Args|Arguments|Parameters)\s*:\s*$",
+            re.I,
+        )
+        arg_re = re.compile(r"^\s*([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*:\s*(.*)$")
+        descs = {}
+        in_args = False
+        cur = None
+        for line in doc.splitlines():
+            if not in_args:
+                if header_re.match(line):
+                    in_args = True
+                continue
+            if line.strip() == "":
+                break
+            if section_re.match(line):
+                break
+            if re.match(r"^\s*\*", line):  # *args / **kwargs: skip, end current
+                cur = None
+                continue
+            m = arg_re.match(line)
+            if m:
+                cur = m.group(1)
+                descs[cur] = m.group(2).strip()
+            elif cur is not None:
+                descs[cur] = f"{descs[cur]} {line.strip()}".strip()
+        return descs
+
+    @staticmethod
     def _version_hint(item: dict) -> str:
         """Format the 'version · codehash' hint shown beside a selector dropdown."""
         parts = []
@@ -1259,11 +1299,14 @@ class BokehOperator:
         }
         cfg = _cfg[mode]
 
-        if args is None and cfg["items_attr"] is not None:
+        arg_descs = {}
+        if cfg["items_attr"] is not None:
             item = getattr(self, cfg["items_attr"])[idx]
-            args = list(item["args"])
-            defaults = list(item["defaults"])
-            argtypes = list(item["argtypes"])
+            arg_descs = self._parse_arg_docs(item.get("doc", ""))
+            if args is None:
+                args = list(item["args"])
+                defaults = list(item["defaults"])
+                argtypes = list(item["argtypes"])
 
         self.dynamic_col.children.pop(3)
 
@@ -1327,6 +1370,7 @@ class BokehOperator:
             defaults,
             argtypes,
             argtype_list,
+            arg_descs,
         )
 
         if not param_input:
@@ -2038,13 +2082,20 @@ class BokehOperator:
         defaults,
         argtypes,
         argtype_list,
+        arg_descs=None,
     ):
         """Generate Bokeh widgets for the given parameter ``args`` and append them to ``param_layout``.
+
+        Each param row is split into two columns: the input field on the left
+        (fixed width) and, on the right, the parsed ``Args:`` description for
+        that field (from ``arg_descs``), revealed only while the field is the
+        active/focused widget via a ``:focus-within`` stylesheet.
 
         Special-cases plate-related parameters (``solid_plate_id``,
         ``solid_sample_no``, ``x_mm``/``y_mm``, custom positions, file
         upload) by attaching the appropriate callbacks and extra inputs.
         """
+        arg_descs = arg_descs or {}
         item = 0
 
         for idx in range(len(args)):
@@ -2105,14 +2156,46 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 margin=(0, 5, 0, 5),
                 styles={"text-align": "right", "line-height": f"{text_input.height}px"},
             )
+            input_col = column(
+                row(Spacer(width=idx_col_w), name_div, type_div, spacing=0),
+                row(index_div, param_input[item], spacing=0),
+                spacing=5,
+                width=idx_col_w + input_w,
+            )
+            # Right column: the parsed Args: description, hidden until this row's
+            # input has focus. ``:focus-within`` on the row host crosses the
+            # widget's shadow boundary, so focusing the input reveals only this
+            # field's description. ``visibility`` (not ``display``) keeps the
+            # column's width reserved so the input field width never shifts.
+            desc_div = Div(
+                text=arg_descs.get(args[idx], ""),
+                sizing_mode="stretch_width",
+                styles={"color": "#566573"},
+            )
+            # The focus-within rule (below) lives on the row's stylesheet and can
+            # only reach the row's *direct* children, so the toggled class goes on
+            # desc_col, not the nested desc_div.
+            desc_col = column(
+                Spacer(height=name_div.height + 5),
+                desc_div,
+                sizing_mode="stretch_width",
+                css_classes=["param-desc"],
+            )
+            focus_sheet = InlineStyleSheet(
+                css=(
+                    ".param-desc { visibility: hidden; }"
+                    ":host(:focus-within) .param-desc { visibility: visible; }"
+                )
+            )
             param_layout.append(
                 layout(
                     [
-                        column(
-                            row(Spacer(width=idx_col_w), name_div, type_div,
-                                spacing=0),
-                            row(index_div, param_input[item], spacing=0),
-                            spacing=5,
+                        row(
+                            input_col,
+                            desc_col,
+                            spacing=10,
+                            sizing_mode="stretch_width",
+                            stylesheets=[focus_sheet],
                         ),
                         Spacer(height=10),
                     ],
