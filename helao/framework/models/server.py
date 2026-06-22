@@ -324,13 +324,19 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         return uuid_dict
 
     def clear_in_finished(self, hlostatus: HloStatus):
-        """Clear the bucket of finished actions associated with `hlostatus`."""
+        """Clear the bucket of finished actions associated with `hlostatus`.
+
+        If `hlostatus` has its own bucket it is emptied directly; otherwise the
+        action can only live under the ``finished`` bucket (as a substatus), so
+        that bucket is emptied. The substatus branch rebinds the bucket to a
+        fresh empty dict rather than deleting keys while iterating it (which
+        would raise ``RuntimeError: dictionary changed size during iteration``).
+        """
         if hlostatus in self.nonactive_dict:
             self.nonactive_dict[hlostatus] = {}
         elif HloStatus.finished in self.nonactive_dict:
-            # can only be in finsihed, but need to look for substatus
-            for key in self.nonactive_dict[HloStatus.finished].keys():
-                del self.nonactive_dict[HloStatus.finished][key]
+            # can only be in finished, but need to look for substatus
+            self.nonactive_dict[HloStatus.finished] = {}
 
     def new_experiment(self, exp_uuid: UUID):
         """Initialize the dispatched-action counter for a new experiment."""
