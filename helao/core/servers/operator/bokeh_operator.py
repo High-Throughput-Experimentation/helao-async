@@ -134,6 +134,8 @@ class return_sequence_lib(BaseModel):
     args: list
     defaults: list
     argtypes: list
+    version: Optional[int] = None
+    codehash: Optional[str] = None
 
 
 class return_experiment_lib(BaseModel):
@@ -145,6 +147,8 @@ class return_experiment_lib(BaseModel):
     args: list
     defaults: list
     argtypes: list
+    version: Optional[int] = None
+    codehash: Optional[str] = None
 
 
 class BokehOperator:
@@ -396,11 +400,19 @@ class BokehOperator:
             options=self.sequence_select_list,
         )
         self.sequence_dropdown.on_change("value", self.callback_sequence_select)
+        self.sequence_version_div = Div(
+            text="", width=300, height=40,
+            styles={"line-height": "40px", "color": "#566573"},
+        )
 
         self.experiment_dropdown = Select(
             title="Select experiment:", value=None, options=self.experiment_select_list
         )
         self.experiment_dropdown.on_change("value", self.callback_experiment_select)
+        self.experiment_version_div = Div(
+            text="", width=300, height=40,
+            styles={"line-height": "40px", "color": "#566573"},
+        )
 
         # specification file loader
         self.seqspec_dropdown = Select(
@@ -555,8 +567,8 @@ class BokehOperator:
 
         self.error_txt = Div(
             text="""no error""",
-            width=600,
-            height=30,
+            sizing_mode="stretch_width",
+            height=60,
             styles={"font-size": "100%", "color": "black"},
         )
 
@@ -564,49 +576,49 @@ class BokehOperator:
             value="nolabel",
             title="sequence label",
             disabled=False,
-            width=150,
-            height=40,
+            sizing_mode="stretch_width",
+            height=31,
         )
         self.input_sequence_label2 = TextInput(
             value="nolabel",
             title="sequence label",
             disabled=False,
-            width=150,
-            height=40,
+            sizing_mode="stretch_width",
+            height=31,
         )
         self.input_campaign_name = TextInput(
             value="",
             title="campaign name",
             disabled=False,
-            width=150,
-            height=40,
+            sizing_mode="stretch_width",
+            height=31,
         )
         self.input_campaign_name2 = TextInput(
             value="",
             title="campaign name",
             disabled=False,
-            width=150,
-            height=40,
+            sizing_mode="stretch_width",
+            height=31,
         )
         self.input_campaign_uuid = TextInput(
             value="",
             title="campaign uuid",
             disabled=False,
-            width=150,
-            height=40,
+            sizing_mode="stretch_width",
+            height=31,
         )
         self.input_campaign_uuid2 = TextInput(
             value="",
             title="campaign uuid",
             disabled=False,
-            width=150,
-            height=40,
+            sizing_mode="stretch_width",
+            height=31,
         )
         self.input_sequence_comment = TextAreaInput(
             value="",
             title="sequence comment",
             disabled=False,
-            width=470,
+            sizing_mode="stretch_width",
             height=90,
             rows=3,
         )
@@ -614,7 +626,7 @@ class BokehOperator:
             value="",
             title="sequence comment",
             disabled=False,
-            width=470,
+            sizing_mode="stretch_width",
             height=90,
             rows=3,
         )
@@ -706,7 +718,7 @@ class BokehOperator:
             [
                 layout(
                     [
-                        [self.sequence_dropdown],
+                        [self.sequence_dropdown, self.sequence_version_div],
                     ],
                     background="#D6DBDF",
                     width=self.max_width,
@@ -720,7 +732,7 @@ class BokehOperator:
             [
                 layout(
                     [
-                        [self.experiment_dropdown],
+                        [self.experiment_dropdown, self.experiment_version_div],
                     ],
                     background="#D6DBDF",
                     width=self.max_width,
@@ -776,16 +788,6 @@ class BokehOperator:
                             self.orch_stepseq_button,
                             spacing=4,
                         ),
-                        Spacer(height=10),
-                        [
-                            Div(
-                                text="<b>Error message:</b>",
-                                width=200 + 50,
-                                height=15,
-                                styles={"font-size": "100%", "color": "black"},
-                            ),
-                        ],
-                        [Spacer(width=10), self.error_txt],
                         Spacer(height=10),
                     ],
                     background="#D6DBDF",
@@ -876,7 +878,21 @@ class BokehOperator:
                             spacing=4,
                         ),
                         Spacer(height=10),
-                        self.button_estop_orch,
+                        row(
+                            column(self.button_estop_orch),
+                            column(
+                                Div(
+                                    text="<b>Error message:</b>",
+                                    height=15,
+                                    sizing_mode="stretch_width",
+                                    styles={"font-size": "100%", "color": "black"},
+                                ),
+                                self.error_txt,
+                                sizing_mode="stretch_width",
+                            ),
+                            spacing=10,
+                            sizing_mode="stretch_width",
+                        ),
                         Spacer(height=10),
                     ],
                     background="#D6DBDF",
@@ -1032,7 +1048,8 @@ class BokehOperator:
             )
 
     def _build_lib(
-        self, lib: dict, filter_type, config_key: str, model_class, name_field: str
+        self, lib: dict, filter_type, config_key: str, model_class, name_field: str,
+        codehash_map: dict = None,
     ) -> tuple:
         """Inspect ``lib`` and return ``(items, select_list)`` for sequence/experiment dropdowns.
 
@@ -1042,6 +1059,8 @@ class BokehOperator:
         """
         items = []
         select_list = []
+        codehash_map = codehash_map or {}
+        version_attr = name_field.replace("_name", "_version")
         LOGGER.info(f"found {name_field.replace('_name', '')}s: {list(lib)}")
         for i, name in enumerate(lib):
             func = lib[name]
@@ -1077,6 +1096,7 @@ class BokehOperator:
                         t = json.dumps(t)
                 except Exception:
                     t = ""
+            codehash = codehash_map.get(name)
             items.append(
                 model_class(
                     index=i,
@@ -1085,10 +1105,24 @@ class BokehOperator:
                     args=tuple(tmpargs),
                     defaults=tuple(tmpdefs),
                     argtypes=tuple(tmptypes),
+                    version=getattr(func, version_attr, None),
+                    codehash=str(codehash)[:8] if codehash else None,
                 ).model_dump()
             )
             select_list.append(name)
         return items, select_list
+
+    @staticmethod
+    def _version_hint(item: dict) -> str:
+        """Format the 'version · codehash' hint shown beside a selector dropdown."""
+        parts = []
+        version = item.get("version")
+        if version is not None:
+            parts.append(f"v{version}")
+        codehash = item.get("codehash")
+        if codehash:
+            parts.append(_html.escape(str(codehash)))
+        return f"<i>{' · '.join(parts)}</i>" if parts else ""
 
     def _capture_metadata(self, seq: Sequence) -> None:
         """Stamp label / campaign / comment from the current inputs onto ``seq``."""
@@ -1102,6 +1136,24 @@ class BokehOperator:
                 seq.campaign_uuid = md5_string(campaign_name)
             else:
                 seq.campaign_uuid = self.input_campaign_uuid.value.strip()
+
+    def _build_param_header(self, mode: str):
+        """Header rendered above the dynamic parameter layout: the load-last-
+        params button and save-params checkbox for ``mode`` (seq/exp only)."""
+        if mode == "seq":
+            header_row = [self.button_last_seq_pars, self.save_last_seq_pars]
+        elif mode == "exp":
+            header_row = [self.button_last_exp_pars, self.save_last_exp_pars]
+        else:  # seqspec has no saved-params controls
+            return []
+        return [
+            layout(
+                [header_row],
+                background="#D6DBDF",
+                width=self.max_width,
+                height_policy="min",
+            ),
+        ]
 
     def _build_param_footer(self, mode: str):
         """Footer rendered below the dynamic parameter layout: the label/
@@ -1118,8 +1170,6 @@ class BokehOperator:
             button_row = [
                 self.button_append_seq,
                 self.button_prepend_seq,
-                self.button_last_seq_pars,
-                self.save_last_seq_pars,
             ]
         elif mode == "exp":
             field_row = [
@@ -1133,8 +1183,6 @@ class BokehOperator:
             button_row = [
                 self.button_append_exp,
                 self.button_prepend_exp,
-                self.button_last_exp_pars,
-                self.save_last_exp_pars,
             ]
         else:  # seqspec
             field_row = [self.input_sequence_label2]
@@ -1146,11 +1194,18 @@ class BokehOperator:
                 Spacer(width=10),
                 self.button_to_seqtab,
             ]
+        # Explicit stretch_width rows so the (stretch_width) label/campaign/uuid
+        # and comment widgets actually fill the app width — a plain ``layout([...])``
+        # auto-row stays fixed-width and the children never expand.
+        comment.sizing_mode = "stretch_width"
         return [
             layout(
-                [field_row, [comment]],
+                [
+                    row(*field_row, sizing_mode="stretch_width"),
+                    row(comment, sizing_mode="stretch_width"),
+                ],
                 background="#D6DBDF",
-                width=self.max_width,
+                sizing_mode="stretch_width",
                 height_policy="min",
             ),
             layout(
@@ -1219,7 +1274,9 @@ class BokehOperator:
         # The item description is rendered here (rather than inside the selector
         # tab panel) so the tab panels stay a uniform, minimal height and no
         # variable whitespace appears above this block. See ``layout1``/``2``/``3``.
-        param_layout = [
+        # The load-last-params button + save-params checkbox are pinned to the
+        # very top of the dynamic parameter block (see ``_build_param_header``).
+        param_layout = self._build_param_header(mode) + [
             layout(
                 [
                     [
@@ -1303,6 +1360,7 @@ class BokehOperator:
             "sequence_params",
             return_sequence_lib,
             "sequence_name",
+            codehash_map=getattr(self.backend, "sequence_codehash", {}),
         )
 
     def get_experiment_lib(self):
@@ -1313,6 +1371,7 @@ class BokehOperator:
             "experiment_params",
             return_experiment_lib,
             "experiment_name",
+            codehash_map=getattr(self.backend, "experiment_codehash", {}),
         )
 
     def get_seqspec_lib(self):
@@ -1438,6 +1497,7 @@ class BokehOperator:
     def callback_sequence_select(self, attr, old, new):
         """Rebuild the sequence parameter panel and docstring for the newly selected sequence."""
         idx = self.sequence_select_list.index(new)
+        self.sequence_version_div.text = self._version_hint(self.sequences[idx])
         self.update_seq_param_layout(idx)
         self.vis.doc.add_next_tick_callback(
             partial(self.update_seq_doc, self.sequences[idx]["doc"])
@@ -1446,6 +1506,7 @@ class BokehOperator:
     def callback_experiment_select(self, attr, old, new):
         """Rebuild the experiment parameter panel and docstring for the newly selected experiment."""
         idx = self.experiment_select_list.index(new)
+        self.experiment_version_div.text = self._version_hint(self.experiments[idx])
         self.update_exp_param_layout(idx)
         self.vis.doc.add_next_tick_callback(
             partial(self.update_exp_doc, self.experiments[idx]["doc"])
@@ -1996,7 +2057,8 @@ class BokehOperator:
                 name=args[idx],
                 disabled=True if args[idx].endswith("_version") else False,
                 width=400,
-                height=40,
+                height=31,
+                margin=(0, 5, 0, 5),
                 stylesheets=initial_stylesheet,
             )
             if args[idx] not in self.skip_default_highlights:
@@ -2023,25 +2085,32 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             name_div = Div(
                 text=f"{args[idx]}",
                 width=input_w // 2,
-                height=16,
+                height=14,
+                margin=(0, 5, 0, 5),
             )
             type_div = Div(
                 text=f"<i>[{type_hint}]</i>",
                 width=input_w - input_w // 2,
-                height=16,
+                height=14,
+                margin=(0, 5, 0, 5),
                 styles={"text-align": "right"},
             )
             index_div = Div(
                 text=f"[{idx}]",
                 width=idx_col_w,
                 height=text_input.height,
+                margin=(0, 5, 0, 5),
                 styles={"text-align": "right", "line-height": f"{text_input.height}px"},
             )
             param_layout.append(
                 layout(
                     [
-                        [Spacer(width=idx_col_w), name_div, type_div],
-                        [index_div, param_input[item]],
+                        column(
+                            row(Spacer(width=idx_col_w), name_div, type_div,
+                                spacing=0),
+                            row(index_div, param_input[item], spacing=0),
+                            spacing=0,
+                        ),
                         Spacer(height=10),
                     ],
                     background=self.color_sq_param_inputs,
