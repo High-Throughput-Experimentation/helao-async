@@ -1,0 +1,1275 @@
+{
+  "nodes": [
+    {
+      "id": "file:append.py",
+      "type": "file",
+      "name": "append.py",
+      "filePath": "append.py",
+      "summary": "CLI utility that starts additional HELAO servers from an append-config prefix and merges them into an already-running orchestration group.",
+      "tags": [
+        "entry-point",
+        "cli",
+        "launcher",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:append.py:appender",
+      "type": "function",
+      "name": "appender",
+      "filePath": "append.py",
+      "lineRange": [
+        20,
+        31
+      ],
+      "summary": "Reads the running and append configs, launches the extra servers, and merges them into the live group.",
+      "tags": [
+        "launcher",
+        "cli",
+        "orchestration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:cli.py",
+      "type": "file",
+      "name": "cli.py",
+      "filePath": "cli.py",
+      "summary": "Interactive REPL that introspects each FastAPI server's endpoints from a config prefix and lets the user invoke them by hand.",
+      "tags": [
+        "entry-point",
+        "cli",
+        "repl",
+        "tooling"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:cli.py:load_config",
+      "type": "function",
+      "name": "load_config",
+      "filePath": "cli.py",
+      "lineRange": [
+        43,
+        78
+      ],
+      "summary": "Resolves a config prefix to its server map and builds dispatcher targets for the REPL.",
+      "tags": [
+        "cli",
+        "config",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:cli.py:parse_input",
+      "type": "function",
+      "name": "parse_input",
+      "filePath": "cli.py",
+      "lineRange": [
+        81,
+        190
+      ],
+      "summary": "Parses REPL command lines into server/endpoint/parameter selections and dispatches the corresponding HTTP calls.",
+      "tags": [
+        "cli",
+        "repl",
+        "dispatch",
+        "parsing"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:helao/core/drivers/data/analyses/base_analysis.py",
+      "type": "file",
+      "name": "base_analysis.py",
+      "filePath": "helao/core/drivers/data/analyses/base_analysis.py",
+      "summary": "Defines the BaseAnalysis abstract base providing common scaffolding (inputs, outputs, S3 locators, timestamps) shared by all data-analysis implementations.",
+      "tags": [
+        "data-model",
+        "analysis",
+        "base-class",
+        "abstraction"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/drivers/data/analyses/base_analysis.py:BaseAnalysis",
+      "type": "class",
+      "name": "BaseAnalysis",
+      "filePath": "helao/core/drivers/data/analyses/base_analysis.py",
+      "lineRange": [
+        16,
+        193
+      ],
+      "summary": "Common base for analysis modules; holds input/output models, S3 locators, and analysis metadata and defines the shared calculation contract.",
+      "tags": [
+        "analysis",
+        "base-class",
+        "data-model"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:helao/core/drivers/data/analysis_driver.py",
+      "type": "file",
+      "name": "analysis_driver.py",
+      "filePath": "helao/core/drivers/data/analysis_driver.py",
+      "summary": "Consolidated analysis driver that dynamically loads analysis classes, runs them via an executor, and syncs resulting Analysis models to S3; provides make_analysis_app for the analysis action server.",
+      "tags": [
+        "service",
+        "analysis",
+        "factory",
+        "data-pipeline"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/core/drivers/data/analysis_driver.py:_resolve_analysis_class",
+      "type": "function",
+      "name": "_resolve_analysis_class",
+      "filePath": "helao/core/drivers/data/analysis_driver.py",
+      "lineRange": [
+        56,
+        91
+      ],
+      "summary": "Resolves an analysis module/class name to its concrete BaseAnalysis subclass.",
+      "tags": [
+        "analysis",
+        "reflection",
+        "factory"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:helao/core/drivers/data/analysis_driver.py:load_analysis_classes",
+      "type": "function",
+      "name": "load_analysis_classes",
+      "filePath": "helao/core/drivers/data/analysis_driver.py",
+      "lineRange": [
+        94,
+        136
+      ],
+      "summary": "Imports and registers the configured analysis classes for dispatch by the analysis server.",
+      "tags": [
+        "analysis",
+        "dynamic-import",
+        "factory"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/core/drivers/data/analysis_driver.py:make_analysis_app",
+      "type": "function",
+      "name": "make_analysis_app",
+      "filePath": "helao/core/drivers/data/analysis_driver.py",
+      "lineRange": [
+        487,
+        555
+      ],
+      "summary": "Builds the analysis FastAPI app, registering an analyze_<module> endpoint for each configured analysis.",
+      "tags": [
+        "factory",
+        "api-handler",
+        "analysis"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/drivers/data/analysis_driver.py:AnalysisSyncer",
+      "type": "class",
+      "name": "AnalysisSyncer",
+      "filePath": "helao/core/drivers/data/analysis_driver.py",
+      "lineRange": [
+        139,
+        438
+      ],
+      "summary": "Asynchronous queue manager that runs analyses and uploads their outputs and Analysis models to S3/Postgres.",
+      "tags": [
+        "service",
+        "analysis",
+        "sync",
+        "data-pipeline"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:helao/core/drivers/data/analysis_driver.py:AnalysisExecutor",
+      "type": "class",
+      "name": "AnalysisExecutor",
+      "filePath": "helao/core/drivers/data/analysis_driver.py",
+      "lineRange": [
+        441,
+        484
+      ],
+      "summary": "Executor that runs a single analysis action within the action-server lifecycle.",
+      "tags": [
+        "executor",
+        "analysis",
+        "action-handler"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:helao/core/drivers/data/enum.py",
+      "type": "file",
+      "name": "enum.py",
+      "filePath": "helao/core/drivers/data/enum.py",
+      "summary": "Shared enum defining the top-level kinds of HELAO YAML records (action, experiment, sequence) used across data-driver modules.",
+      "tags": [
+        "type-definition",
+        "enum",
+        "data-model"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/core/drivers/data/loaders/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/core/drivers/data/loaders/__init__.py",
+      "summary": "Package marker for the data-loaders package; no exported symbols.",
+      "tags": [
+        "barrel",
+        "package-init"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/core/drivers/data/loaders/helao_loader.py",
+      "type": "file",
+      "name": "helao_loader.py",
+      "filePath": "helao/core/drivers/data/loaders/helao_loader.py",
+      "summary": "Remote (Postgres/S3) loader hierarchy that wraps HELAO action/experiment/sequence/process records and fetches their metadata and HLO payloads from the database and object store.",
+      "tags": [
+        "data-model",
+        "loader",
+        "database",
+        "serialization"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:helao/core/drivers/data/loaders/helao_loader.py:HelaoModel",
+      "type": "class",
+      "name": "HelaoModel",
+      "filePath": "helao/core/drivers/data/loaders/helao_loader.py",
+      "lineRange": [
+        38,
+        104
+      ],
+      "summary": "Base remote record wrapper exposing metadata accessors shared by action/experiment/sequence/process models.",
+      "tags": [
+        "data-model",
+        "loader",
+        "base-class"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/drivers/data/loaders/helao_loader.py:HelaoLoader",
+      "type": "class",
+      "name": "HelaoLoader",
+      "filePath": "helao/core/drivers/data/loaders/helao_loader.py",
+      "lineRange": [
+        206,
+        408
+      ],
+      "summary": "Backend client that queries Postgres and S3 to retrieve HELAO records and HLO data for the remote loader hierarchy.",
+      "tags": [
+        "loader",
+        "database",
+        "s3",
+        "service"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:helao/core/drivers/data/loaders/model_base.py",
+      "type": "file",
+      "name": "model_base.py",
+      "filePath": "helao/core/drivers/data/loaders/model_base.py",
+      "summary": "Mixin providing the HLO/data-file accessors shared by both the local and remote HelaoDataModel hierarchies.",
+      "tags": [
+        "data-model",
+        "mixin",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:helao/core/drivers/data/loaders/model_base.py:HelaoDataModelMixin",
+      "type": "class",
+      "name": "HelaoDataModelMixin",
+      "filePath": "helao/core/drivers/data/loaders/model_base.py",
+      "lineRange": [
+        13,
+        66
+      ],
+      "summary": "Shared HLO/data-file accessor mixin; subclasses supply their own json metadata and hlo payload accessors.",
+      "tags": [
+        "mixin",
+        "data-model",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:helao/core/drivers/data/loaders/pgs3.py",
+      "type": "file",
+      "name": "pgs3.py",
+      "filePath": "helao/core/drivers/data/loaders/pgs3.py",
+      "summary": "Postgres+S3 specialization (EcheUvisLoader) of the remote loader, with helpers to annotate spectroscopy plate samples for the EcheUvis analyses.",
+      "tags": [
+        "loader",
+        "database",
+        "s3",
+        "analysis"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/drivers/data/loaders/pgs3.py:EcheUvisLoader",
+      "type": "class",
+      "name": "EcheUvisLoader",
+      "filePath": "helao/core/drivers/data/loaders/pgs3.py",
+      "lineRange": [
+        49,
+        172
+      ],
+      "summary": "Loader that fetches and annotates EcheUvis spectroscopy records from Postgres and S3 for the stability/background analyses.",
+      "tags": [
+        "loader",
+        "database",
+        "analysis",
+        "s3"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:helao/core/drivers/data/sync_driver.py",
+      "type": "file",
+      "name": "sync_driver.py",
+      "filePath": "helao/core/drivers/data/sync_driver.py",
+      "summary": "The HelaoSyncer data-sync engine: walks finished run YAMLs, tracks per-record progress, uploads files to S3 and metadata to Postgres, and moves runs into the synced tree.",
+      "tags": [
+        "service",
+        "data-pipeline",
+        "sync",
+        "s3"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Uses an AsyncRWLock and async queues to coordinate concurrent uploads of action/experiment/sequence records."
+    },
+    {
+      "id": "function:helao/core/drivers/data/sync_driver.py:move_to_synced",
+      "type": "function",
+      "name": "move_to_synced",
+      "filePath": "helao/core/drivers/data/sync_driver.py",
+      "lineRange": [
+        97,
+        126
+      ],
+      "summary": "Moves a finished run directory into the canonical synced output tree.",
+      "tags": [
+        "sync",
+        "filesystem",
+        "data-pipeline"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:helao/core/drivers/data/sync_driver.py:revert_to_finished",
+      "type": "function",
+      "name": "revert_to_finished",
+      "filePath": "helao/core/drivers/data/sync_driver.py",
+      "lineRange": [
+        129,
+        151
+      ],
+      "summary": "Reverts a synced run directory back to the finished state for re-processing.",
+      "tags": [
+        "sync",
+        "filesystem",
+        "data-pipeline"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:helao/core/drivers/data/sync_driver.py:AsyncRWLock",
+      "type": "class",
+      "name": "AsyncRWLock",
+      "filePath": "helao/core/drivers/data/sync_driver.py",
+      "lineRange": [
+        154,
+        196
+      ],
+      "summary": "Async reader/writer lock used to coordinate concurrent access to sync progress state.",
+      "tags": [
+        "concurrency",
+        "lock",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/drivers/data/sync_driver.py:HelaoYml",
+      "type": "class",
+      "name": "HelaoYml",
+      "filePath": "helao/core/drivers/data/sync_driver.py",
+      "lineRange": [
+        199,
+        506
+      ],
+      "summary": "Wrapper over a run's YAML record exposing parsed metadata, paths, and state transitions used by the syncer.",
+      "tags": [
+        "data-model",
+        "yaml",
+        "serialization"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:helao/core/drivers/data/sync_driver.py:Progress",
+      "type": "class",
+      "name": "Progress",
+      "filePath": "helao/core/drivers/data/sync_driver.py",
+      "lineRange": [
+        509,
+        650
+      ],
+      "summary": "Tracks and persists per-record upload progress so interrupted syncs can resume.",
+      "tags": [
+        "data-model",
+        "sync",
+        "state"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:helao/core/drivers/data/sync_driver.py:SyncDriver",
+      "type": "class",
+      "name": "SyncDriver",
+      "filePath": "helao/core/drivers/data/sync_driver.py",
+      "lineRange": [
+        653,
+        1896
+      ],
+      "summary": "Core sync engine that discovers finished runs and uploads their files and metadata to S3 and Postgres before moving them to the synced tree.",
+      "tags": [
+        "service",
+        "data-pipeline",
+        "sync",
+        "s3"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:helao/core/drivers/data/sync_driver.py:HelaoSyncer",
+      "type": "class",
+      "name": "HelaoSyncer",
+      "filePath": "helao/core/drivers/data/sync_driver.py",
+      "lineRange": [
+        1899,
+        1933
+      ],
+      "summary": "Public syncer facade wrapping SyncDriver for use by servers.",
+      "tags": [
+        "service",
+        "facade",
+        "sync"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/core/models/analysis.py",
+      "type": "file",
+      "name": "analysis.py",
+      "filePath": "helao/core/models/analysis.py",
+      "summary": "Pydantic models describing analyses, their inputs/outputs, and S3 data locators produced by the analysis driver.",
+      "tags": [
+        "data-model",
+        "analysis",
+        "type-definition",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/models/analysis.py:AnalysisModel",
+      "type": "class",
+      "name": "AnalysisModel",
+      "filePath": "helao/core/models/analysis.py",
+      "lineRange": [
+        89,
+        131
+      ],
+      "summary": "Full analysis record model capturing metadata, inputs, outputs, and provenance.",
+      "tags": [
+        "data-model",
+        "analysis",
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:helao/core/models/credentials.py",
+      "type": "file",
+      "name": "credentials.py",
+      "filePath": "helao/core/models/credentials.py",
+      "summary": "Pydantic settings model that gathers Postgres/S3 connection credentials for the data loaders and syncer from environment configuration.",
+      "tags": [
+        "config",
+        "credentials",
+        "data-model",
+        "security"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/models/credentials.py:HelaoCredentials",
+      "type": "class",
+      "name": "HelaoCredentials",
+      "filePath": "helao/core/models/credentials.py",
+      "lineRange": [
+        10,
+        131
+      ],
+      "summary": "Credentials container exposing database and object-store connection settings.",
+      "tags": [
+        "credentials",
+        "config",
+        "data-model",
+        "security"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:helao/core/models/helaodirs.py",
+      "type": "file",
+      "name": "helaodirs.py",
+      "filePath": "helao/core/models/helaodirs.py",
+      "summary": "Pydantic model enumerating the standard HELAO runtime directories (logs, states, run trees) derived from a config root.",
+      "tags": [
+        "data-model",
+        "config",
+        "type-definition"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:helao/core/models/helaodirs.py:HelaoDirs",
+      "type": "class",
+      "name": "HelaoDirs",
+      "filePath": "helao/core/models/helaodirs.py",
+      "lineRange": [
+        12,
+        35
+      ],
+      "summary": "Holds resolved paths for the standard HELAO directory layout.",
+      "tags": [
+        "data-model",
+        "config",
+        "filesystem"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/core/models/process.py",
+      "type": "file",
+      "name": "process.py",
+      "filePath": "helao/core/models/process.py",
+      "summary": "Pydantic models for HELAO process records (a grouping of actions producing a dataset), including a short summary variant.",
+      "tags": [
+        "data-model",
+        "type-definition",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/models/process.py:ProcessModel",
+      "type": "class",
+      "name": "ProcessModel",
+      "filePath": "helao/core/models/process.py",
+      "lineRange": [
+        34,
+        86
+      ],
+      "summary": "Full process record model capturing constituent actions, samples, and metadata.",
+      "tags": [
+        "data-model",
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:append.py",
+      "target": "file:helao/helpers/config_loader.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:append.py",
+      "target": "file:launch.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:append.py",
+      "target": "function:append.py:appender",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:append.py",
+      "target": "function:append.py:appender",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:cli.py",
+      "target": "file:launch.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:cli.py",
+      "target": "function:cli.py:load_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:cli.py",
+      "target": "function:cli.py:parse_input",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:cli.py",
+      "target": "function:cli.py:load_config",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:cli.py",
+      "target": "function:cli.py:parse_input",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/analyses/base_analysis.py",
+      "target": "file:helao/core/models/analysis.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analyses/base_analysis.py",
+      "target": "file:helao/core/models/run_use.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analyses/base_analysis.py",
+      "target": "file:helao/core/models/s3locator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analyses/base_analysis.py",
+      "target": "file:helao/helpers/time_utils.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analyses/base_analysis.py",
+      "target": "class:helao/core/drivers/data/analyses/base_analysis.py:BaseAnalysis",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/analyses/base_analysis.py",
+      "target": "class:helao/core/drivers/data/analyses/base_analysis.py:BaseAnalysis",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/core/drivers/data/analyses/base_analysis.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/core/drivers/data/loaders/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/core/drivers/data/loaders/localfs.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/core/drivers/data/loaders/pgs3.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/core/drivers/data/sync_driver.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/core/error.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/core/servers/base_api.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/core/servers/base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/helpers/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/helpers/config_loader.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/helpers/executor.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/helpers/time_utils.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "file:helao/helpers/yml_tools.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "function:helao/core/drivers/data/analysis_driver.py:_resolve_analysis_class",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "function:helao/core/drivers/data/analysis_driver.py:load_analysis_classes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "function:helao/core/drivers/data/analysis_driver.py:make_analysis_app",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "class:helao/core/drivers/data/analysis_driver.py:AnalysisSyncer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "class:helao/core/drivers/data/analysis_driver.py:AnalysisExecutor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "function:helao/core/drivers/data/analysis_driver.py:make_analysis_app",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "class:helao/core/drivers/data/analysis_driver.py:AnalysisSyncer",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "class:helao/core/drivers/data/analysis_driver.py:AnalysisExecutor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/analysis_driver.py",
+      "target": "class:helao/core/drivers/data/sync_driver.py:SyncDriver",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:helao/core/drivers/data/enum.py",
+      "target": "class:helao/core/drivers/data/enum.py:YmlType",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/enum.py",
+      "target": "class:helao/core/drivers/data/enum.py:YmlType",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/helao_loader.py",
+      "target": "file:helao/core/drivers/data/loaders/model_base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/helao_loader.py",
+      "target": "file:helao/core/models/credentials.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/helao_loader.py",
+      "target": "class:helao/core/drivers/data/loaders/helao_loader.py:HelaoModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/helao_loader.py",
+      "target": "class:helao/core/drivers/data/loaders/helao_loader.py:HelaoLoader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/helao_loader.py",
+      "target": "class:helao/core/drivers/data/loaders/helao_loader.py:HelaoModel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/helao_loader.py",
+      "target": "class:helao/core/drivers/data/loaders/helao_loader.py:HelaoLoader",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/pgs3.py",
+      "target": "file:helao/core/drivers/data/loaders/helao_loader.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/pgs3.py",
+      "target": "class:helao/core/drivers/data/loaders/pgs3.py:EcheUvisLoader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/pgs3.py",
+      "target": "class:helao/core/drivers/data/loaders/pgs3.py:EcheUvisLoader",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:helao/core/drivers/data/loaders/pgs3.py:EcheUvisLoader",
+      "target": "class:helao/core/drivers/data/loaders/helao_loader.py:HelaoLoader",
+      "type": "inherits",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/core/models/action.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/core/models/file.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/core/models/helaodirs.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/core/models/machine.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/core/models/process.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/core/servers/base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/helpers/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/helpers/dispatcher.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/helpers/file_utils.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/helpers/hlo_data.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/helpers/premodels.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/helpers/time_utils.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/helpers/yml_tools.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "function:helao/core/drivers/data/sync_driver.py:move_to_synced",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "function:helao/core/drivers/data/sync_driver.py:revert_to_finished",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "class:helao/core/drivers/data/sync_driver.py:AsyncRWLock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "class:helao/core/drivers/data/sync_driver.py:HelaoYml",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "class:helao/core/drivers/data/sync_driver.py:Progress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "class:helao/core/drivers/data/sync_driver.py:SyncDriver",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "class:helao/core/drivers/data/sync_driver.py:HelaoSyncer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "class:helao/core/drivers/data/sync_driver.py:SyncDriver",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "class:helao/core/drivers/data/sync_driver.py:HelaoSyncer",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/sync_driver.py",
+      "target": "file:helao/core/tests/unit_test_sync_to_thread.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:helao/core/models/analysis.py",
+      "target": "file:helao/core/helaodict.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/analysis.py",
+      "target": "file:helao/core/models/file.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/analysis.py",
+      "target": "file:helao/core/models/run_use.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/analysis.py",
+      "target": "file:helao/core/models/s3locator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/analysis.py",
+      "target": "file:helao/core/version.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/analysis.py",
+      "target": "class:helao/core/models/analysis.py:AnalysisModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/models/analysis.py",
+      "target": "class:helao/core/models/analysis.py:AnalysisModel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/models/credentials.py",
+      "target": "class:helao/core/models/credentials.py:HelaoCredentials",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/models/credentials.py",
+      "target": "class:helao/core/models/credentials.py:HelaoCredentials",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/models/helaodirs.py",
+      "target": "file:helao/core/helaodict.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/helaodirs.py",
+      "target": "class:helao/core/models/helaodirs.py:HelaoDirs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/models/helaodirs.py",
+      "target": "class:helao/core/models/helaodirs.py:HelaoDirs",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/models/process.py",
+      "target": "file:helao/core/helaodict.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/process.py",
+      "target": "file:helao/core/models/action.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/process.py",
+      "target": "file:helao/core/models/file.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/process.py",
+      "target": "file:helao/core/models/machine.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/process.py",
+      "target": "file:helao/core/models/run_use.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/process.py",
+      "target": "file:helao/core/models/sample.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/process.py",
+      "target": "file:helao/core/version.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/models/process.py",
+      "target": "class:helao/core/models/process.py:ProcessModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:helao/core/models/process.py",
+      "target": "class:helao/core/models/process.py:ProcessModel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/models/analysis.py",
+      "target": "file:helao/core/tests/unit_test_extra_models.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:helao/core/models/process.py",
+      "target": "file:helao/core/tests/unit_test_extra_models.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

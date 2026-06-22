@@ -1,0 +1,1358 @@
+{
+  "nodes": [
+    {
+      "id": "file:helao/core/drivers/data/loaders/localfs.py",
+      "type": "file",
+      "name": "localfs.py",
+      "filePath": "helao/core/drivers/data/loaders/localfs.py",
+      "summary": "Local-filesystem data loader that indexes RUNS_* sequence/experiment/action/process YAML trees (and zip archives) into pandas DataFrames and exposes HELAO model wrappers for reading hlo and parquet payloads.",
+      "tags": [
+        "data-loader",
+        "serialization",
+        "data-model",
+        "filesystem"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Parses HELAO run directory naming conventions into structured metadata; supports both unpacked trees and zipped sequence archives."
+    },
+    {
+      "id": "function:helao/core/drivers/data/loaders/localfs.py:parse_seq_path",
+      "type": "function",
+      "name": "parse_seq_path",
+      "filePath": "helao/core/drivers/data/loaders/localfs.py",
+      "lineRange": [
+        25,
+        81
+      ],
+      "summary": "Parses a sequence YAML path into structured fields (name, label, serial number, timestamp) from HELAO run-directory naming conventions.",
+      "tags": [
+        "parsing",
+        "utility",
+        "filesystem"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/core/drivers/data/loaders/localfs.py:parse_exp_path",
+      "type": "function",
+      "name": "parse_exp_path",
+      "filePath": "helao/core/drivers/data/loaders/localfs.py",
+      "lineRange": [
+        84,
+        103
+      ],
+      "summary": "Parses an experiment YAML path into name and timestamp metadata.",
+      "tags": [
+        "parsing",
+        "utility",
+        "filesystem"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:helao/core/drivers/data/loaders/localfs.py:parse_act_path",
+      "type": "function",
+      "name": "parse_act_path",
+      "filePath": "helao/core/drivers/data/loaders/localfs.py",
+      "lineRange": [
+        106,
+        134
+      ],
+      "summary": "Parses an action YAML path into name and timestamp metadata, raising on malformed directory structures.",
+      "tags": [
+        "parsing",
+        "utility",
+        "filesystem"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/core/drivers/data/loaders/localfs.py:parse_prc_path",
+      "type": "function",
+      "name": "parse_prc_path",
+      "filePath": "helao/core/drivers/data/loaders/localfs.py",
+      "lineRange": [
+        137,
+        156
+      ],
+      "summary": "Parses a process YAML path into process UUID, index, and timestamp metadata.",
+      "tags": [
+        "parsing",
+        "utility",
+        "filesystem"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/drivers/data/loaders/localfs.py:LocalLoader",
+      "type": "class",
+      "name": "LocalLoader",
+      "filePath": "helao/core/drivers/data/loaders/localfs.py",
+      "lineRange": [
+        159,
+        501
+      ],
+      "summary": "Indexes a local RUNS_* data tree or zip archive into action/experiment/sequence/process DataFrames and provides cached accessors for YAML metadata, hlo data, raw bytes, and parquet frames.",
+      "tags": [
+        "data-loader",
+        "factory",
+        "filesystem",
+        "cache"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:helao/core/drivers/data/loaders/localfs.py:HelaoModel",
+      "type": "class",
+      "name": "HelaoModel",
+      "filePath": "helao/core/drivers/data/loaders/localfs.py",
+      "lineRange": [
+        507,
+        557
+      ],
+      "summary": "Base wrapper exposing common HELAO record fields (name, uuid, type, timestamp, params) loaded from a YAML path via a LocalLoader.",
+      "tags": [
+        "data-model",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/drivers/data/loaders/localfs.py:HelaoProcess",
+      "type": "class",
+      "name": "HelaoProcess",
+      "filePath": "helao/core/drivers/data/loaders/localfs.py",
+      "lineRange": [
+        666,
+        738
+      ],
+      "summary": "HELAO process record wrapper providing access to the owning experiment, its file list, and helpers to read referenced action data files.",
+      "tags": [
+        "data-model",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:helao/core/servers/data_browser/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/core/servers/data_browser/__init__.py",
+      "summary": "Package entry point for the data_browser Bokeh app, re-exporting the build_document factory from app.py.",
+      "tags": [
+        "entry-point",
+        "barrel",
+        "package"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/core/servers/data_browser/app.py",
+      "type": "file",
+      "name": "app.py",
+      "filePath": "helao/core/servers/data_browser/app.py",
+      "summary": "Bokeh UI for the data browser: builds the document, lets users scan run/derived sources by date, filter and select datasets, and plot/tabulate the loaded data.",
+      "tags": [
+        "component",
+        "visualization",
+        "ui",
+        "bokeh"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/core/servers/data_browser/app.py:build_document",
+      "type": "function",
+      "name": "build_document",
+      "filePath": "helao/core/servers/data_browser/app.py",
+      "lineRange": [
+        21,
+        30
+      ],
+      "summary": "Bokeh document factory that reads the data root from the Vis server config and attaches the _UI layout.",
+      "tags": [
+        "factory",
+        "bokeh",
+        "ui"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:helao/core/servers/data_browser/app.py:_UI",
+      "type": "class",
+      "name": "_UI",
+      "filePath": "helao/core/servers/data_browser/app.py",
+      "lineRange": [
+        33,
+        248
+      ],
+      "summary": "Builds and wires the data browser Bokeh layout, handling source/group selection, date-range scans, dataset selection, axis pickers, plot rebuilds, and summary/data tables.",
+      "tags": [
+        "component",
+        "ui",
+        "event-handler",
+        "bokeh"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:helao/core/servers/data_browser/readers.py",
+      "type": "file",
+      "name": "readers.py",
+      "filePath": "helao/core/servers/data_browser/readers.py",
+      "summary": "Locator-based dataset readers that resolve a file (plain or zip-member) and parse hlo, JSON, or parquet bytes into column dictionaries for the data browser.",
+      "tags": [
+        "serialization",
+        "utility",
+        "data-loader"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/core/servers/data_browser/readers.py:read_dataset",
+      "type": "function",
+      "name": "read_dataset",
+      "filePath": "helao/core/servers/data_browser/readers.py",
+      "lineRange": [
+        54,
+        65
+      ],
+      "summary": "Reads a dataset by locator, dispatching to hlo, JSON, or parquet parsers based on file extension or explicit format.",
+      "tags": [
+        "serialization",
+        "utility",
+        "dispatch"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:helao/core/servers/data_browser/readers.py:_read_json",
+      "type": "function",
+      "name": "_read_json",
+      "filePath": "helao/core/servers/data_browser/readers.py",
+      "lineRange": [
+        68,
+        82
+      ],
+      "summary": "Parses JSON content into a columnar dictionary, normalizing both record-list and column-dict shapes.",
+      "tags": [
+        "serialization",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:helao/core/servers/data_browser/readers.py:_read_parquet",
+      "type": "function",
+      "name": "_read_parquet",
+      "filePath": "helao/core/servers/data_browser/readers.py",
+      "lineRange": [
+        85,
+        95
+      ],
+      "summary": "Reads parquet bytes into a column dictionary and extracts embedded HELAO metadata from the schema.",
+      "tags": [
+        "serialization",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/core/servers/data_browser/sources.py",
+      "type": "file",
+      "name": "sources.py",
+      "filePath": "helao/core/servers/data_browser/sources.py",
+      "summary": "Source-index builders that scan RUNS_* trees/zips and PROCESSES/ANALYSES directories within a date range, producing pandas index DataFrames of selectable data files for the browser.",
+      "tags": [
+        "data-loader",
+        "filesystem",
+        "factory"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:helao/core/servers/data_browser/sources.py:RunsSourceIndex",
+      "type": "class",
+      "name": "RunsSourceIndex",
+      "filePath": "helao/core/servers/data_browser/sources.py",
+      "lineRange": [
+        114,
+        188
+      ],
+      "summary": "Indexes a RUNS_* root by date, walking both unpacked sequence trees and zipped sequence archives to enumerate available data files with their metadata.",
+      "tags": [
+        "data-loader",
+        "filesystem"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:helao/core/servers/data_browser/sources.py:DerivedSourceIndex",
+      "type": "class",
+      "name": "DerivedSourceIndex",
+      "filePath": "helao/core/servers/data_browser/sources.py",
+      "lineRange": [
+        220,
+        299
+      ],
+      "summary": "Indexes derived PROCESSES and ANALYSES directories by date, resolving process/analysis output files back to their run locations.",
+      "tags": [
+        "data-loader",
+        "filesystem"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/core/servers/data_browser/sources.py:_resolve_run_file",
+      "type": "function",
+      "name": "_resolve_run_file",
+      "filePath": "helao/core/servers/data_browser/sources.py",
+      "lineRange": [
+        191,
+        217
+      ],
+      "summary": "Resolves a named run file within an experiment directory, falling back to recursive globbing and zip-member lookup.",
+      "tags": [
+        "filesystem",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/core/servers/data_browser/sources.py:build_source_index",
+      "type": "function",
+      "name": "build_source_index",
+      "filePath": "helao/core/servers/data_browser/sources.py",
+      "lineRange": [
+        307,
+        317
+      ],
+      "summary": "Factory selecting the appropriate SourceIndex implementation for a named source (RUNS variants or derived processes/analyses).",
+      "tags": [
+        "factory",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/core/servers/data_browser/state.py",
+      "type": "file",
+      "name": "state.py",
+      "filePath": "helao/core/servers/data_browser/state.py",
+      "summary": "Pure state/transform helpers for the data browser: a SelectedDataset record plus functions to compute available columns, build/downsample traces, summarize ranges, and load selected datasets.",
+      "tags": [
+        "data-model",
+        "utility",
+        "state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/core/servers/data_browser/state.py:SelectedDataset",
+      "type": "class",
+      "name": "SelectedDataset",
+      "filePath": "helao/core/servers/data_browser/state.py",
+      "lineRange": [
+        13,
+        28
+      ],
+      "summary": "Dataclass holding a loaded dataset's locator, provenance metadata, and column data for the browser.",
+      "tags": [
+        "data-model",
+        "type-definition"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:helao/core/servers/data_browser/state.py:load_selected",
+      "type": "function",
+      "name": "load_selected",
+      "filePath": "helao/core/servers/data_browser/state.py",
+      "lineRange": [
+        77,
+        101
+      ],
+      "summary": "Reads each selected index-row's dataset into a SelectedDataset, skipping rows that fail to load.",
+      "tags": [
+        "data-loader",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/core/servers/data_browser/state.py:summary_row",
+      "type": "function",
+      "name": "summary_row",
+      "filePath": "helao/core/servers/data_browser/state.py",
+      "lineRange": [
+        58,
+        74
+      ],
+      "summary": "Computes a summary row (point count, x/y ranges) for a selected dataset's chosen axes.",
+      "tags": [
+        "utility",
+        "aggregation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:helao/deploy/hte/processors/append_params.py",
+      "type": "file",
+      "name": "append_params.py",
+      "filePath": "helao/deploy/hte/processors/append_params.py",
+      "summary": "Post-processor that merges extra parameters into an experiment's and sequence's params metadata.",
+      "tags": [
+        "processor",
+        "data-pipeline",
+        "metadata"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:helao/deploy/hte/processors/append_params.py:PostProcess",
+      "type": "class",
+      "name": "PostProcess",
+      "filePath": "helao/deploy/hte/processors/append_params.py",
+      "lineRange": [
+        14,
+        22
+      ],
+      "summary": "Post-processor updating experiment and sequence params dictionaries with supplied values.",
+      "tags": [
+        "processor",
+        "metadata"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/processors/hispec_process_all.py",
+      "type": "file",
+      "name": "hispec_process_all.py",
+      "filePath": "helao/deploy/hte/processors/hispec_process_all.py",
+      "summary": "HiSpec post-processor that converts CV hlo to parquet, calibrates and downsamples spectra, melts wavelength columns, and writes a partitioned parquet dataset back into the run tree.",
+      "tags": [
+        "processor",
+        "data-pipeline",
+        "calibration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/deploy/hte/processors/hispec_process_all.py:PostProcess",
+      "type": "class",
+      "name": "PostProcess",
+      "filePath": "helao/deploy/hte/processors/hispec_process_all.py",
+      "lineRange": [
+        32,
+        114
+      ],
+      "summary": "Reads CV and spectrum data, runs full calibration/downsampling, melts to long form, and writes a processed parquet dataset, registering output files.",
+      "tags": [
+        "processor",
+        "data-pipeline",
+        "calibration"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:helao/deploy/hte/processors/hlo_to_csv.py",
+      "type": "file",
+      "name": "hlo_to_csv.py",
+      "filePath": "helao/deploy/hte/processors/hlo_to_csv.py",
+      "summary": "Post-processor that reads action hlo data files and writes them out as CSV, registering the produced files.",
+      "tags": [
+        "processor",
+        "data-pipeline",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:helao/deploy/hte/processors/hlo_to_csv.py:PostProcess",
+      "type": "class",
+      "name": "PostProcess",
+      "filePath": "helao/deploy/hte/processors/hlo_to_csv.py",
+      "lineRange": [
+        24,
+        63
+      ],
+      "summary": "Converts each hlo action file to a CSV file and appends it to the processed file list.",
+      "tags": [
+        "processor",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "type": "file",
+      "name": "hispec_calibrate_downsample_parquet.py",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "summary": "Library of spectral-electrochemistry calibration routines: reads CV/spectra from hlo or parquet, fits sawtooth potential and current splines, assigns cycles/scan directions, and downsamples calibrated spectra to mV precision.",
+      "tags": [
+        "data-pipeline",
+        "calibration",
+        "scientific-computing",
+        "utility"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Uses scipy curve_fit/UnivariateSpline and pandas groupby pipelines for time-to-potential interpolation and per-cycle scan-direction correction."
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:fully_read_and_calibrate_parquet",
+      "type": "function",
+      "name": "fully_read_and_calibrate_parquet",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        741,
+        868
+      ],
+      "summary": "End-to-end pipeline reading CV and spectra, interpolating potential/current, assigning cycles and scan directions, and downsampling into a calibrated parquet dataset.",
+      "tags": [
+        "data-pipeline",
+        "calibration",
+        "orchestration"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:read_CV_hlo",
+      "type": "function",
+      "name": "read_CV_hlo",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        51,
+        112
+      ],
+      "summary": "Reads a CV hlo file (with fallback paths) into a DataFrame with configurable potential/time/cycle/current headers.",
+      "tags": [
+        "data-loader",
+        "calibration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:generate_interpolation_function",
+      "type": "function",
+      "name": "generate_interpolation_function",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        196,
+        290
+      ],
+      "summary": "Fits a sawtooth potential-vs-time model to CV data via curve_fit and returns the interpolation parameters, optionally plotting and persisting them.",
+      "tags": [
+        "calibration",
+        "scientific-computing",
+        "curve-fitting"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:generate_min_max_list_for_cycles",
+      "type": "function",
+      "name": "generate_min_max_list_for_cycles",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        351,
+        386
+      ],
+      "summary": "Builds a per-cycle min/max time dictionary by grouping CV data on the cycle column.",
+      "tags": [
+        "calibration",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:return_cycle_for_time",
+      "type": "function",
+      "name": "return_cycle_for_time",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        389,
+        426
+      ],
+      "summary": "Maps a spectrum timestamp to its CV cycle index using the precomputed per-cycle time bounds.",
+      "tags": [
+        "calibration",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:calcualte_scan_direction_for_spec_times",
+      "type": "function",
+      "name": "calcualte_scan_direction_for_spec_times",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        457,
+        489
+      ],
+      "summary": "Computes anodic/cathodic scan direction for each spectrum time from the sawtooth potential derivative.",
+      "tags": [
+        "calibration",
+        "scientific-computing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:error_correct_scan",
+      "type": "function",
+      "name": "error_correct_scan",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        492,
+        533
+      ],
+      "summary": "Corrects inconsistent scan-direction labels within a cycle segment.",
+      "tags": [
+        "calibration",
+        "validation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:downsample_to_1mV_precision",
+      "type": "function",
+      "name": "downsample_to_1mV_precision",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        601,
+        658
+      ],
+      "summary": "Averages calibrated spectra to 1 mV potential bins per cycle and scan direction, reducing dataset size.",
+      "tags": [
+        "calibration",
+        "scientific-computing",
+        "downsampling"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:fit_current_time_to_univariate_spline",
+      "type": "function",
+      "name": "fit_current_time_to_univariate_spline",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        661,
+        703
+      ],
+      "summary": "Fits a smoothing UnivariateSpline of current vs time for later interpolation to spectrum timestamps.",
+      "tags": [
+        "calibration",
+        "scientific-computing",
+        "curve-fitting"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:interpolate_spectral_time_to_current",
+      "type": "function",
+      "name": "interpolate_spectral_time_to_current",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        706,
+        738
+      ],
+      "summary": "Interpolates current values onto spectrum timestamps using the fitted current-time spline.",
+      "tags": [
+        "calibration",
+        "scientific-computing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:get_cycles_for_spec_times",
+      "type": "function",
+      "name": "get_cycles_for_spec_times",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "lineRange": [
+        429,
+        454
+      ],
+      "summary": "Annotates the calibration DataFrame with the CV cycle for each spectrum timestamp.",
+      "tags": [
+        "calibration",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:helao/deploy/hte/processors/spec_melt_wls.py",
+      "type": "file",
+      "name": "spec_melt_wls.py",
+      "filePath": "helao/deploy/hte/processors/spec_melt_wls.py",
+      "summary": "Post-processor that reads spectrum hlo data, renames wavelength columns, melts them to long form, and writes a sorted parquet file, removing the source hlo.",
+      "tags": [
+        "processor",
+        "data-pipeline",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/deploy/hte/processors/spec_melt_wls.py:PostProcess",
+      "type": "class",
+      "name": "PostProcess",
+      "filePath": "helao/deploy/hte/processors/spec_melt_wls.py",
+      "lineRange": [
+        25,
+        98
+      ],
+      "summary": "Melts wide-format spectrum data into wavelength/intensity long form and writes the result as parquet.",
+      "tags": [
+        "processor",
+        "data-pipeline",
+        "serialization"
+      ],
+      "complexity": "complex"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "function:helao/core/drivers/data/loaders/localfs.py:parse_seq_path",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "function:helao/core/drivers/data/loaders/localfs.py:parse_exp_path",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "function:helao/core/drivers/data/loaders/localfs.py:parse_act_path",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "function:helao/core/drivers/data/loaders/localfs.py:parse_prc_path",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "class:helao/core/drivers/data/loaders/localfs.py:LocalLoader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "class:helao/core/drivers/data/loaders/localfs.py:HelaoModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "class:helao/core/drivers/data/loaders/localfs.py:HelaoProcess",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "function:helao/core/drivers/data/loaders/localfs.py:parse_seq_path",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "function:helao/core/drivers/data/loaders/localfs.py:parse_exp_path",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "function:helao/core/drivers/data/loaders/localfs.py:parse_act_path",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "function:helao/core/drivers/data/loaders/localfs.py:parse_prc_path",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "class:helao/core/drivers/data/loaders/localfs.py:LocalLoader",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "class:helao/core/drivers/data/loaders/localfs.py:HelaoModel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "class:helao/core/drivers/data/loaders/localfs.py:HelaoProcess",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "file:helao/core/drivers/data/loaders/model_base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "file:helao/helpers/file_mapper.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "file:helao/helpers/hlo_data.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/drivers/data/loaders/localfs.py",
+      "target": "file:helao/helpers/yml_tools.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "class:helao/core/drivers/data/loaders/localfs.py:LocalLoader",
+      "target": "class:helao/helpers/file_mapper.py:FileMapper",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/__init__.py",
+      "target": "file:helao/core/servers/data_browser/app.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/app.py",
+      "target": "function:helao/core/servers/data_browser/app.py:build_document",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/app.py",
+      "target": "class:helao/core/servers/data_browser/app.py:_UI",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/app.py",
+      "target": "function:helao/core/servers/data_browser/app.py:build_document",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/app.py",
+      "target": "file:helao/core/servers/data_browser/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/app.py",
+      "target": "file:helao/core/servers/data_browser/sources.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "class:helao/core/servers/data_browser/app.py:_UI",
+      "target": "class:helao/core/servers/data_browser/sources.py:RunsSourceIndex",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/readers.py",
+      "target": "function:helao/core/servers/data_browser/readers.py:read_dataset",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/readers.py",
+      "target": "function:helao/core/servers/data_browser/readers.py:_read_json",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/readers.py",
+      "target": "function:helao/core/servers/data_browser/readers.py:_read_parquet",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/readers.py",
+      "target": "function:helao/core/servers/data_browser/readers.py:read_dataset",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/readers.py",
+      "target": "file:helao/helpers/hlo_data.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/sources.py",
+      "target": "class:helao/core/servers/data_browser/sources.py:RunsSourceIndex",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/sources.py",
+      "target": "class:helao/core/servers/data_browser/sources.py:DerivedSourceIndex",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/sources.py",
+      "target": "function:helao/core/servers/data_browser/sources.py:_resolve_run_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/sources.py",
+      "target": "function:helao/core/servers/data_browser/sources.py:build_source_index",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/sources.py",
+      "target": "class:helao/core/servers/data_browser/sources.py:RunsSourceIndex",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/sources.py",
+      "target": "class:helao/core/servers/data_browser/sources.py:DerivedSourceIndex",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/sources.py",
+      "target": "function:helao/core/servers/data_browser/sources.py:build_source_index",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/sources.py",
+      "target": "file:helao/core/servers/data_browser/readers.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/state.py",
+      "target": "class:helao/core/servers/data_browser/state.py:SelectedDataset",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/state.py",
+      "target": "function:helao/core/servers/data_browser/state.py:load_selected",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/state.py",
+      "target": "function:helao/core/servers/data_browser/state.py:summary_row",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/state.py",
+      "target": "class:helao/core/servers/data_browser/state.py:SelectedDataset",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/state.py",
+      "target": "function:helao/core/servers/data_browser/state.py:load_selected",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/state.py",
+      "target": "function:helao/core/servers/data_browser/state.py:summary_row",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/core/servers/data_browser/state.py",
+      "target": "file:helao/core/servers/data_browser/readers.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "function:helao/core/servers/data_browser/state.py:load_selected",
+      "target": "function:helao/core/servers/data_browser/readers.py:read_dataset",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/append_params.py",
+      "target": "class:helao/deploy/hte/processors/append_params.py:PostProcess",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/append_params.py",
+      "target": "class:helao/deploy/hte/processors/append_params.py:PostProcess",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/append_params.py",
+      "target": "file:helao/helpers/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/append_params.py",
+      "target": "file:helao/helpers/processors.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hispec_process_all.py",
+      "target": "class:helao/deploy/hte/processors/hispec_process_all.py:PostProcess",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hispec_process_all.py",
+      "target": "class:helao/deploy/hte/processors/hispec_process_all.py:PostProcess",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hispec_process_all.py",
+      "target": "file:helao/core/models/file.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hispec_process_all.py",
+      "target": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hispec_process_all.py",
+      "target": "file:helao/helpers/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hispec_process_all.py",
+      "target": "file:helao/helpers/helao_data.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hispec_process_all.py",
+      "target": "file:helao/helpers/hlo_data.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hispec_process_all.py",
+      "target": "file:helao/helpers/processors.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "class:helao/deploy/hte/processors/hispec_process_all.py:PostProcess",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:fully_read_and_calibrate_parquet",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:helao/deploy/hte/processors/hispec_process_all.py:PostProcess",
+      "target": "function:helao/helpers/hlo_data.py:hlo_to_parquet",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:helao/deploy/hte/processors/hispec_process_all.py:PostProcess",
+      "target": "class:helao/helpers/helao_data.py:HelaoData",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hlo_to_csv.py",
+      "target": "class:helao/deploy/hte/processors/hlo_to_csv.py:PostProcess",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hlo_to_csv.py",
+      "target": "class:helao/deploy/hte/processors/hlo_to_csv.py:PostProcess",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hlo_to_csv.py",
+      "target": "file:helao/core/models/file.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hlo_to_csv.py",
+      "target": "file:helao/helpers/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hlo_to_csv.py",
+      "target": "file:helao/helpers/hlo_data.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/hlo_to_csv.py",
+      "target": "file:helao/helpers/processors.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "class:helao/deploy/hte/processors/hlo_to_csv.py:PostProcess",
+      "target": "function:helao/helpers/hlo_data.py:read_hlo_stream",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:fully_read_and_calibrate_parquet",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:read_CV_hlo",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:generate_interpolation_function",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:generate_min_max_list_for_cycles",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:return_cycle_for_time",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:calcualte_scan_direction_for_spec_times",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:error_correct_scan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:downsample_to_1mV_precision",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:fit_current_time_to_univariate_spline",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:interpolate_spectral_time_to_current",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:get_cycles_for_spec_times",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:fully_read_and_calibrate_parquet",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py",
+      "target": "file:helao/helpers/hlo_data.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:fully_read_and_calibrate_parquet",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:read_CV_hlo",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:fully_read_and_calibrate_parquet",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:generate_interpolation_function",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:fully_read_and_calibrate_parquet",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py:downsample_to_1mV_precision",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/spec_melt_wls.py",
+      "target": "class:helao/deploy/hte/processors/spec_melt_wls.py:PostProcess",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/spec_melt_wls.py",
+      "target": "class:helao/deploy/hte/processors/spec_melt_wls.py:PostProcess",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/spec_melt_wls.py",
+      "target": "file:helao/core/models/file.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/spec_melt_wls.py",
+      "target": "file:helao/helpers/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/spec_melt_wls.py",
+      "target": "file:helao/helpers/hlo_data.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/spec_melt_wls.py",
+      "target": "file:helao/helpers/processors.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "class:helao/deploy/hte/processors/spec_melt_wls.py:PostProcess",
+      "target": "function:helao/helpers/hlo_data.py:read_hlo_stream",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

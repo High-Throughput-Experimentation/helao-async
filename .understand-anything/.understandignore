@@ -1,0 +1,29 @@
+# .understandignore — Framework + hte scope
+# Syntax: same as .gitignore
+
+# --- caches / binaries ---
+__pycache__/
+*.pyc
+*.pck
+*.parquet
+*.zip
+ntpLastSync.txt
+
+# --- editor / tooling ---
+.claude/
+.superpowers/
+.vscode/
+.vs/
+.qodo/
+.ropeproject/
+pyrightconfig.json
+docs/superpowers/
+
+# --- deployments out of scope (separate nested git repos) ---
+helao/deploy/lila/
+helao/deploy/lila_gl/
+helao/deploy/mea/
+helao/deploy/priv/
+helao/deploy/test/
+
+# in-scope: helao/core, helao/helpers, helao/deploy/hte, root scripts

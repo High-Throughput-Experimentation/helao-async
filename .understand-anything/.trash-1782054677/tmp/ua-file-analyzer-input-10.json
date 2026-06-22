@@ -1,0 +1,27 @@
+{
+  "projectRoot": "/mnt/STORAGE/repos/helao/helao-async",
+  "batchFiles": [
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/commands/__init__.py", "language": "python", "sizeLines": 12, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/commands/commands.py", "language": "python", "sizeLines": 99, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/database/__init__.py", "language": "python", "sizeLines": 7, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/database/database.py", "language": "python", "sizeLines": 171, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/logger/__init__.py", "language": "python", "sizeLines": 7, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/logger/logger.py", "language": "python", "sizeLines": 78, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/script/__init__.py", "language": "python", "sizeLines": 7, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/script/script.py", "language": "python", "sizeLines": 42, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/station/__init__.py", "language": "python", "sizeLines": 7, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/station/station.py", "language": "python", "sizeLines": 261, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "helao/deploy/hte/drivers/test_station/leancat/commands/__init__.py": ["helao/deploy/hte/drivers/test_station/leancat/commands/commands.py"],
+    "helao/deploy/hte/drivers/test_station/leancat/commands/commands.py": ["helao/deploy/hte/drivers/test_station/leancat/database/__init__.py","helao/deploy/hte/drivers/test_station/leancat/logger/__init__.py"],
+    "helao/deploy/hte/drivers/test_station/leancat/database/__init__.py": ["helao/deploy/hte/drivers/test_station/leancat/database/database.py"],
+    "helao/deploy/hte/drivers/test_station/leancat/database/database.py": ["helao/deploy/hte/drivers/test_station/leancat/logger/__init__.py"],
+    "helao/deploy/hte/drivers/test_station/leancat/logger/__init__.py": ["helao/deploy/hte/drivers/test_station/leancat/logger/logger.py"],
+    "helao/deploy/hte/drivers/test_station/leancat/logger/logger.py": [],
+    "helao/deploy/hte/drivers/test_station/leancat/script/__init__.py": ["helao/deploy/hte/drivers/test_station/leancat/script/script.py"],
+    "helao/deploy/hte/drivers/test_station/leancat/script/script.py": ["helao/deploy/hte/drivers/test_station/leancat/logger/__init__.py"],
+    "helao/deploy/hte/drivers/test_station/leancat/station/__init__.py": ["helao/deploy/hte/drivers/test_station/leancat/station/station.py"],
+    "helao/deploy/hte/drivers/test_station/leancat/station/station.py": ["helao/deploy/hte/drivers/test_station/leancat/database/__init__.py","helao/deploy/hte/drivers/test_station/leancat/logger/__init__.py"]
+  }
+}

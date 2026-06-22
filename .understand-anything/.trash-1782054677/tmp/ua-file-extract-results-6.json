@@ -1,0 +1,7048 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 25,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "helao/deploy/hte/servers/action/calc_server.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 253,
+      "nonEmptyLines": 222,
+      "functions": [
+        {
+          "name": "makeApp",
+          "startLine": 26,
+          "endLine": 253,
+          "params": [
+            "server_key"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "makeApp",
+          "line": 26,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "makeApp",
+          "callee": "BaseAPI",
+          "lineNumber": 40
+        },
+        {
+          "caller": "makeApp",
+          "callee": "app.post",
+          "lineNumber": 48
+        },
+        {
+          "caller": "makeApp",
+          "callee": "action_version",
+          "lineNumber": 49
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "app.base.setup_and_contain_action",
+          "lineNumber": 69
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "app.driver.calc_uvis_abs",
+          "lineNumber": 70
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "active.enqueue_data_dflt",
+          "lineNumber": 71
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "arraydict.items",
+          "lineNumber": 72
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "list",
+          "lineNumber": 74
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "zip",
+          "lineNumber": 74
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "range",
+          "lineNumber": 79
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "len",
+          "lineNumber": 79
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "zip",
+          "lineNumber": 81
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "json.dumps",
+          "lineNumber": 82
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "HloHeaderModel",
+          "lineNumber": 83
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "app.base.get_realtime_nowait",
+          "lineNumber": 87
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "time_ns",
+          "lineNumber": 87
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "active.write_file",
+          "lineNumber": 95
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "header.clean_dict",
+          "lineNumber": 100
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "active.finish",
+          "lineNumber": 105
+        },
+        {
+          "caller": "calc_uvis_abs",
+          "callee": "finished_action.as_dict",
+          "lineNumber": 106
+        },
+        {
+          "caller": "makeApp",
+          "callee": "app.post",
+          "lineNumber": 108
+        },
+        {
+          "caller": "makeApp",
+          "callee": "action_version",
+          "lineNumber": 109
+        },
+        {
+          "caller": "check_co2_purge",
+          "callee": "app.base.setup_and_contain_action",
+          "lineNumber": 123
+        },
+        {
+          "caller": "check_co2_purge",
+          "callee": "app.driver.check_co2_purge_level",
+          "lineNumber": 124
+        },
+        {
+          "caller": "check_co2_purge",
+          "callee": "LOGGER.info",
+          "lineNumber": 125
+        },
+        {
+          "caller": "check_co2_purge",
+          "callee": "active.enqueue_data_dflt",
+          "lineNumber": 126
+        },
+        {
+          "caller": "check_co2_purge",
+          "callee": "active.finish",
+          "lineNumber": 127
+        },
+        {
+          "caller": "check_co2_purge",
+          "callee": "finished_action.as_dict",
+          "lineNumber": 128
+        },
+        {
+          "caller": "makeApp",
+          "callee": "app.post",
+          "lineNumber": 130
+        },
+        {
+          "caller": "fill_syringe_volume_check",
+          "callee": "app.base.setup_and_contain_action",
+          "lineNumber": 144
+        },
+        {
+          "caller": "fill_syringe_volume_check",
+          "callee": "app.driver.fill_syringe_volume_check",
+          "lineNumber": 147
+        },
+        {
+          "caller": "fill_syringe_volume_check",
+          "callee": "LOGGER.info",
+          "lineNumber": 148
+        },
+        {
+          "caller": "fill_syringe_volume_check",
+          "callee": "active.enqueue_data_dflt",
+          "lineNumber": 149
+        },
+        {
+          "caller": "fill_syringe_volume_check",
+          "callee": "active.finish",
+          "lineNumber": 150
+        },
+        {
+          "caller": "fill_syringe_volume_check",
+          "callee": "finished_action.as_dict",
+          "lineNumber": 151
+        },
+        {
+          "caller": "makeApp",
+          "callee": "app.post",
+          "lineNumber": 153
+        },
+        {
+          "caller": "makeApp",
+          "callee": "action_version",
+          "lineNumber": 154
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "app.base.setup_and_contain_action",
+          "lineNumber": 172
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "isinstance",
+          "lineNumber": 174
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "LOGGER.warning",
+          "lineNumber": 176
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "isinstance",
+          "lineNumber": 182
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "LOGGER.warning",
+          "lineNumber": 184
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "LOGGER.error",
+          "lineNumber": 189
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "print",
+          "lineNumber": 190
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "min",
+          "lineNumber": 193
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "LOGGER.warning",
+          "lineNumber": 196
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "LOGGER.warning",
+          "lineNumber": 199
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "LOGGER.info",
+          "lineNumber": 202
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "active.enqueue_data_dflt",
+          "lineNumber": 203
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "active.finish",
+          "lineNumber": 205
+        },
+        {
+          "caller": "keep_min_ocv",
+          "callee": "finished_action.as_dict",
+          "lineNumber": 206
+        },
+        {
+          "caller": "makeApp",
+          "callee": "app.post",
+          "lineNumber": 209
+        },
+        {
+          "caller": "makeApp",
+          "callee": "action_version",
+          "lineNumber": 210
+        },
+        {
+          "caller": "check_CP_Ewe_bounds",
+          "callee": "app.base.setup_and_contain_action",
+          "lineNumber": 224
+        },
+        {
+          "caller": "check_CP_Ewe_bounds",
+          "callee": "isinstance",
+          "lineNumber": 228
+        },
+        {
+          "caller": "check_CP_Ewe_bounds",
+          "callee": "LOGGER.warning",
+          "lineNumber": 229
+        },
+        {
+          "caller": "check_CP_Ewe_bounds",
+          "callee": "LOGGER.error",
+          "lineNumber": 235
+        },
+        {
+          "caller": "check_CP_Ewe_bounds",
+          "callee": "print",
+          "lineNumber": 236
+        },
+        {
+          "caller": "check_CP_Ewe_bounds",
+          "callee": "LOGGER.info",
+          "lineNumber": 241
+        },
+        {
+          "caller": "check_CP_Ewe_bounds",
+          "callee": "LOGGER.info",
+          "lineNumber": 244
+        },
+        {
+          "caller": "check_CP_Ewe_bounds",
+          "callee": "active.enqueue_data_dflt",
+          "lineNumber": 247
+        },
+        {
+          "caller": "check_CP_Ewe_bounds",
+          "callee": "active.finish",
+          "lineNumber": 249
+        },
+        {
+          "caller": "check_CP_Ewe_bounds",
+          "callee": "finished_action.as_dict",
+          "lineNumber": 250
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/action/pdu_server.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 96,
+      "nonEmptyLines": 78,
+      "functions": [
+        {
+          "name": "makeApp",
+          "startLine": 22,
+          "endLine": 96,
+          "params": [
+            "server_key"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "makeApp",
+          "line": 22,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "makeApp",
+          "callee": "BaseAPI",
+          "lineNumber": 35
+        },
+        {
+          "caller": "makeApp",
+          "callee": "app.post",
+          "lineNumber": 43
+        },
+        {
+          "caller": "switch_outlet",
+          "callee": "app.base.setup_and_contain_action",
+          "lineNumber": 60
+        },
+        {
+          "caller": "switch_outlet",
+          "callee": "app.driver.switch_outlet",
+          "lineNumber": 61
+        },
+        {
+          "caller": "switch_outlet",
+          "callee": "active.action.action_status.append",
+          "lineNumber": 66
+        },
+        {
+          "caller": "switch_outlet",
+          "callee": "active.finish",
+          "lineNumber": 68
+        },
+        {
+          "caller": "switch_outlet",
+          "callee": "finished_action.as_dict",
+          "lineNumber": 69
+        },
+        {
+          "caller": "makeApp",
+          "callee": "app.post",
+          "lineNumber": 71
+        },
+        {
+          "caller": "switch_all",
+          "callee": "app.base.setup_and_contain_action",
+          "lineNumber": 86
+        },
+        {
+          "caller": "switch_all",
+          "callee": "app.driver.switch_all",
+          "lineNumber": 87
+        },
+        {
+          "caller": "switch_all",
+          "callee": "active.action.action_status.append",
+          "lineNumber": 91
+        },
+        {
+          "caller": "switch_all",
+          "callee": "active.finish",
+          "lineNumber": 93
+        },
+        {
+          "caller": "switch_all",
+          "callee": "finished_action.as_dict",
+          "lineNumber": 94
+        }
+      ],
+      "metrics": {
+        "importCount": 7,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/operator/standalone_operator.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 35,
+      "nonEmptyLines": 28,
+      "functions": [
+        {
+          "name": "makeBokehApp",
+          "startLine": 11,
+          "endLine": 35,
+          "params": [
+            "doc",
+            "confPrefix",
+            "server_key",
+            "helao_repo_root"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "makeBokehApp",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "makeBokehApp",
+          "callee": "HelaoVis",
+          "lineNumber": 27
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "app.vis.server_cfg.get",
+          "lineNumber": 28
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "RemoteBackend",
+          "lineNumber": 29
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "params.get",
+          "lineNumber": 31
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "params.get",
+          "lineNumber": 32
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "BokehOperator",
+          "lineNumber": 34
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/action_visualizer.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 64,
+      "nonEmptyLines": 51,
+      "functions": [
+        {
+          "name": "makeBokehApp",
+          "startLine": 16,
+          "endLine": 64,
+          "params": [
+            "doc",
+            "confPrefix",
+            "server_key",
+            "helao_repo_root"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "makeBokehApp",
+          "line": 16,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "makeBokehApp",
+          "callee": "HelaoVis",
+          "lineNumber": 37
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "os.path.basename",
+          "lineNumber": 42
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "app.vis.doc.add_root",
+          "lineNumber": 44
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "layout",
+          "lineNumber": 45
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "Spacer",
+          "lineNumber": 47
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "Div",
+          "lineNumber": 48
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "gethostname().lower",
+          "lineNumber": 49
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "gethostname",
+          "lineNumber": 49
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "app.vis.doc.add_root",
+          "lineNumber": 59
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "Spacer",
+          "lineNumber": 59
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "mount_visualizers",
+          "lineNumber": 62
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/biologic_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 390,
+      "nonEmptyLines": 346,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 42,
+          "endLine": 390,
+          "methods": [
+            "__init__",
+            "callback_selector_change",
+            "add_points",
+            "_add_plots",
+            "reset_plot",
+            "callback_stop_measure"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 42,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 80
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 80
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.config_dict.get",
+          "lineNumber": 83
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 90
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 91
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 94
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 95
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 97
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 98
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 103
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_points.on_change",
+          "lineNumber": 110
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 112
+        },
+        {
+          "caller": "__init__",
+          "callee": "RadioButtonGroup",
+          "lineNumber": 115
+        },
+        {
+          "caller": "__init__",
+          "callee": "RadioButtonGroup",
+          "lineNumber": 118
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.xaxis_selector_group.on_change",
+          "lineNumber": 121
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 122
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.yaxis_selector_group.on_change",
+          "lineNumber": 124
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 125
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 129
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 130
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 134
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 135
+        },
+        {
+          "caller": "__init__",
+          "callee": "Button",
+          "lineNumber": 139
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 144
+        },
+        {
+          "caller": "__init__",
+          "callee": "enumerate",
+          "lineNumber": 147
+        },
+        {
+          "caller": "__init__",
+          "callee": "x.on_event",
+          "lineNumber": 148
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 148
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 155
+        },
+        {
+          "caller": "__init__",
+          "callee": "zip",
+          "lineNumber": 156
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 163
+        },
+        {
+          "caller": "__init__",
+          "callee": "zip",
+          "lineNumber": 167
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 170
+        },
+        {
+          "caller": "__init__",
+          "callee": "len",
+          "lineNumber": 170
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 181
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 183
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 183
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 186
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 187
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 190
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 201
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.channel_action_uuid.items",
+          "lineNumber": 202
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.reset_plot",
+          "lineNumber": 203
+        },
+        {
+          "caller": "callback_selector_change",
+          "callee": "self.reset_plot",
+          "lineNumber": 214
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_package.datamodel.data.items",
+          "lineNumber": 233
+        },
+        {
+          "caller": "add_points",
+          "callee": "uuid_dict.get",
+          "lineNumber": 235
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.reset_plot",
+          "lineNumber": 239
+        },
+        {
+          "caller": "add_points",
+          "callee": "uuid_dict.items",
+          "lineNumber": 243
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 245
+        },
+        {
+          "caller": "add_points",
+          "callee": "pd.isna",
+          "lineNumber": 247
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[data_label].append",
+          "lineNumber": 251
+        },
+        {
+          "caller": "add_points",
+          "callee": "pd.isna",
+          "lineNumber": 252
+        },
+        {
+          "caller": "add_points",
+          "callee": "max",
+          "lineNumber": 256
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 256
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.values",
+          "lineNumber": 256
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.items",
+          "lineNumber": 257
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 258
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 259
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.channel_datasources[pstat_channel].stream",
+          "lineNumber": 262
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "LOGGER.info",
+          "lineNumber": 295
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.channel_plots[channel].line",
+          "lineNumber": 297
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.channel_plots_prev[channel].line",
+          "lineNumber": 305
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "str",
+          "lineNumber": 335
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "LOGGER.info",
+          "lineNumber": 338
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "ColumnDataSource",
+          "lineNumber": 343
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "deepcopy",
+          "lineNumber": 344
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.xaxis_selector_group.update",
+          "lineNumber": 352
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.data_dict_keys.index",
+          "lineNumber": 353
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.yaxis_selector_group.update",
+          "lineNumber": 355
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.data_dict_keys.index",
+          "lineNumber": 356
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 360
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 366
+        },
+        {
+          "caller": "callback_stop_measure",
+          "callee": "LOGGER.info",
+          "lineNumber": 379
+        },
+        {
+          "caller": "callback_stop_measure",
+          "callee": "self.vis.doc.add_next_tick_callback",
+          "lineNumber": 380
+        },
+        {
+          "caller": "callback_stop_measure",
+          "callee": "partial",
+          "lineNumber": 381
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/co2_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 204,
+      "nonEmptyLines": 176,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 25,
+          "endLine": 204,
+          "methods": [
+            "__init__",
+            "add_points",
+            "_add_plots",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 25,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 55
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 55
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 62
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 63
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 70
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_points.on_change",
+          "lineNumber": 77
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 79
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 82
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_update_rate.on_change",
+          "lineNumber": 89
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 91
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 94
+        },
+        {
+          "caller": "__init__",
+          "callee": "DatetimeTickFormatter",
+          "lineNumber": 95
+        },
+        {
+          "caller": "__init__",
+          "callee": "DataTable",
+          "lineNumber": 102
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 105
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 106
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 115
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 117
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 119
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 120
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 121
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 127
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._add_plots",
+          "lineNumber": 128
+        },
+        {
+          "caller": "add_points",
+          "callee": "datapackage.items",
+          "lineNumber": 144
+        },
+        {
+          "caller": "add_points",
+          "callee": "dataval.items",
+          "lineNumber": 146
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[k].append",
+          "lineNumber": 147
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 148
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[datalab].append",
+          "lineNumber": 151
+        },
+        {
+          "caller": "add_points",
+          "callee": "max",
+          "lineNumber": 152
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[\"datetime\"].append",
+          "lineNumber": 153
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp",
+          "lineNumber": 153
+        },
+        {
+          "caller": "add_points",
+          "callee": "np.concatenate",
+          "lineNumber": 156
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 157
+        },
+        {
+          "caller": "add_points",
+          "callee": "list",
+          "lineNumber": 158
+        },
+        {
+          "caller": "add_points",
+          "callee": "ndi.uniform_filter1d",
+          "lineNumber": 159
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 160
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.stream",
+          "lineNumber": 166
+        },
+        {
+          "caller": "add_points",
+          "callee": "list",
+          "lineNumber": 167
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.keys",
+          "lineNumber": 167
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource_table.stream",
+          "lineNumber": 170
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 170
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 181
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 188
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 204
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/gamry_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 394,
+      "nonEmptyLines": 345,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 44,
+          "endLine": 394,
+          "methods": [
+            "__init__",
+            "callback_stop_measure",
+            "callback_selector_change",
+            "callback_input_max_prev",
+            "add_points",
+            "_add_plots",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 44,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 85
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 85
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 91
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 104
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_points.on_change",
+          "lineNumber": 111
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 113
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 116
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_prev.on_change",
+          "lineNumber": 123
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 125
+        },
+        {
+          "caller": "__init__",
+          "callee": "Button",
+          "lineNumber": 128
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.button_stop_measure.on_event",
+          "lineNumber": 133
+        },
+        {
+          "caller": "__init__",
+          "callee": "RadioButtonGroup",
+          "lineNumber": 135
+        },
+        {
+          "caller": "__init__",
+          "callee": "RadioButtonGroup",
+          "lineNumber": 138
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.xaxis_selector_group.on_change",
+          "lineNumber": 141
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 142
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.yaxis_selector_group.on_change",
+          "lineNumber": 144
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 145
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 148
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 149
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 157
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 159
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 159
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 162
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 164
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 168
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 169
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 172
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 173
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 174
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 184
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.reset_plot",
+          "lineNumber": 185
+        },
+        {
+          "caller": "callback_stop_measure",
+          "callee": "LOGGER.info",
+          "lineNumber": 196
+        },
+        {
+          "caller": "callback_stop_measure",
+          "callee": "self.vis.doc.add_next_tick_callback",
+          "lineNumber": 197
+        },
+        {
+          "caller": "callback_stop_measure",
+          "callee": "partial",
+          "lineNumber": 198
+        },
+        {
+          "caller": "callback_selector_change",
+          "callee": "self.reset_plot",
+          "lineNumber": 219
+        },
+        {
+          "caller": "to_int",
+          "callee": "int",
+          "lineNumber": 236
+        },
+        {
+          "caller": "callback_input_max_prev",
+          "callee": "to_int",
+          "lineNumber": 240
+        },
+        {
+          "caller": "callback_input_max_prev",
+          "callee": "to_int",
+          "lineNumber": 241
+        },
+        {
+          "caller": "callback_input_max_prev",
+          "callee": "self.vis.doc.add_next_tick_callback",
+          "lineNumber": 251
+        },
+        {
+          "caller": "callback_input_max_prev",
+          "callee": "partial",
+          "lineNumber": 252
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.reset_plot",
+          "lineNumber": 274
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_package.datamodel.data.items",
+          "lineNumber": 275
+        },
+        {
+          "caller": "add_points",
+          "callee": "uuid_dict.items",
+          "lineNumber": 276
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 278
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[data_label].append",
+          "lineNumber": 285
+        },
+        {
+          "caller": "add_points",
+          "callee": "max",
+          "lineNumber": 288
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 288
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.values",
+          "lineNumber": 288
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.items",
+          "lineNumber": 289
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 290
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 291
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.stream",
+          "lineNumber": 293
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "len",
+          "lineNumber": 314
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "LOGGER.info",
+          "lineNumber": 317
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 319
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "enumerate",
+          "lineNumber": 327
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot_prev.line",
+          "lineNumber": 328
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "len",
+          "lineNumber": 331
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "str",
+          "lineNumber": 357
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "LOGGER.info",
+          "lineNumber": 360
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.prev_action_uuids.append",
+          "lineNumber": 363
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "LOGGER.info",
+          "lineNumber": 364
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "ColumnDataSource",
+          "lineNumber": 366
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "deepcopy",
+          "lineNumber": 367
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "len",
+          "lineNumber": 371
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.prev_action_uuids.pop",
+          "lineNumber": 372
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.prev_datasources.pop",
+          "lineNumber": 374
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.xaxis_selector_group.update",
+          "lineNumber": 378
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.data_dict_keys.index",
+          "lineNumber": 379
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.yaxis_selector_group.update",
+          "lineNumber": 381
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.data_dict_keys.index",
+          "lineNumber": 382
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 388
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 394
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/live_visualizer.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 61,
+      "nonEmptyLines": 48,
+      "functions": [
+        {
+          "name": "makeBokehApp",
+          "startLine": 15,
+          "endLine": 61,
+          "params": [
+            "doc",
+            "confPrefix",
+            "server_key",
+            "helao_repo_root"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "makeBokehApp",
+          "line": 15,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "makeBokehApp",
+          "callee": "HelaoVis",
+          "lineNumber": 36
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "app.vis.doc.add_root",
+          "lineNumber": 41
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "layout",
+          "lineNumber": 42
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "Spacer",
+          "lineNumber": 44
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "Div",
+          "lineNumber": 45
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "gethostname().lower",
+          "lineNumber": 46
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "gethostname",
+          "lineNumber": 46
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "app.vis.doc.add_root",
+          "lineNumber": 56
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "Spacer",
+          "lineNumber": 56
+        },
+        {
+          "caller": "makeBokehApp",
+          "callee": "mount_visualizers",
+          "lineNumber": 59
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/mfc_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 284,
+      "nonEmptyLines": 253,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 25,
+          "endLine": 284,
+          "methods": [
+            "__init__",
+            "add_points",
+            "_add_plots",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 25,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 64
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 64
+        },
+        {
+          "caller": "__init__",
+          "callee": "sorted",
+          "lineNumber": 90
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.actsrv_cfg[\"devices\"].keys",
+          "lineNumber": 90
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.data_dict_keys.append",
+          "lineNumber": 93
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 94
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 95
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 102
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_points.on_change",
+          "lineNumber": 109
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 111
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 114
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_update_rate.on_change",
+          "lineNumber": 121
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 123
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 126
+        },
+        {
+          "caller": "__init__",
+          "callee": "DatetimeTickFormatter",
+          "lineNumber": 127
+        },
+        {
+          "caller": "__init__",
+          "callee": "DataTable",
+          "lineNumber": 134
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 137
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 138
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 147
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 149
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 151
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 152
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 153
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 161
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._add_plots",
+          "lineNumber": 162
+        },
+        {
+          "caller": "add_points",
+          "callee": "datapackage.items",
+          "lineNumber": 178
+        },
+        {
+          "caller": "add_points",
+          "callee": "dataval.items",
+          "lineNumber": 180
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[k].append",
+          "lineNumber": 181
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 182
+        },
+        {
+          "caller": "add_points",
+          "callee": "dataval.items",
+          "lineNumber": 183
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[f\"{datalab}__{k}\"].append",
+          "lineNumber": 184
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 185
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[datalab].append",
+          "lineNumber": 188
+        },
+        {
+          "caller": "add_points",
+          "callee": "max",
+          "lineNumber": 189
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[\"datetime\"].append",
+          "lineNumber": 190
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp",
+          "lineNumber": 190
+        },
+        {
+          "caller": "add_points",
+          "callee": "mvar.endswith",
+          "lineNumber": 192
+        },
+        {
+          "caller": "add_points",
+          "callee": "mvar.endswith",
+          "lineNumber": 192
+        },
+        {
+          "caller": "add_points",
+          "callee": "np.concatenate",
+          "lineNumber": 194
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 195
+        },
+        {
+          "caller": "add_points",
+          "callee": "list",
+          "lineNumber": 196
+        },
+        {
+          "caller": "add_points",
+          "callee": "ndi.uniform_filter1d",
+          "lineNumber": 197
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 198
+        },
+        {
+          "caller": "add_points",
+          "callee": "LOGGER.error",
+          "lineNumber": 204
+        },
+        {
+          "caller": "add_points",
+          "callee": "LOGGER.info",
+          "lineNumber": 205
+        },
+        {
+          "caller": "add_points",
+          "callee": "LOGGER.info",
+          "lineNumber": 206
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[f\"{dev_name}__control_point\"][-1].strip",
+          "lineNumber": 212
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.stream",
+          "lineNumber": 222
+        },
+        {
+          "caller": "add_points",
+          "callee": "list",
+          "lineNumber": 223
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.keys",
+          "lineNumber": 223
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource_table.stream",
+          "lineNumber": 226
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 226
+        },
+        {
+          "caller": "add_points",
+          "callee": "LOGGER.info",
+          "lineNumber": 228
+        },
+        {
+          "caller": "add_points",
+          "callee": "self._add_plots",
+          "lineNumber": 230
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "zip",
+          "lineNumber": 247
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "len",
+          "lineNumber": 247
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 248
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 256
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 264
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 284
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/nidaqmx_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 278,
+      "nonEmptyLines": 239,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 30,
+          "endLine": 278,
+          "methods": [
+            "__init__",
+            "add_points",
+            "_add_plots",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 30,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 68
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 68
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 74
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 98
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 101
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 111
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_points.on_change",
+          "lineNumber": 118
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 120
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 123
+        },
+        {
+          "caller": "__init__",
+          "callee": "CheckboxButtonGroup",
+          "lineNumber": 124
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 125
+        },
+        {
+          "caller": "__init__",
+          "callee": "list",
+          "lineNumber": 125
+        },
+        {
+          "caller": "__init__",
+          "callee": "range",
+          "lineNumber": 125
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 130
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 131
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 133
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 134
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.reset_plot",
+          "lineNumber": 138
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 144
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 146
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 146
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 150
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 152
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 154
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 160
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.reset_plot",
+          "lineNumber": 175
+        },
+        {
+          "caller": "add_points",
+          "callee": "str",
+          "lineNumber": 175
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_package.datamodel.data.items",
+          "lineNumber": 180
+        },
+        {
+          "caller": "add_points",
+          "callee": "uuid_dict.items",
+          "lineNumber": 181
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 183
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[data_label].append",
+          "lineNumber": 186
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.stream",
+          "lineNumber": 187
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot_VOLT.line",
+          "lineNumber": 222
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot_CURRENT.line",
+          "lineNumber": 230
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot_VOLT_prev.line",
+          "lineNumber": 238
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot_CURRENT_prev.line",
+          "lineNumber": 246
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "LOGGER.info",
+          "lineNumber": 270
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "dict",
+          "lineNumber": 272
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "deepcopy(self.datasource.data).items",
+          "lineNumber": 272
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "deepcopy",
+          "lineNumber": 272
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 275
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 278
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/pal_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 330,
+      "nonEmptyLines": 289,
+      "functions": [
+        {
+          "name": "async_partial",
+          "startLine": 33,
+          "endLine": 54,
+          "params": [
+            "f",
+            "*args"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 57,
+          "endLine": 330,
+          "methods": [
+            "__init__",
+            "callback_input_max_smps",
+            "update_inheritance_selector",
+            "callback_inheritance",
+            "add_points",
+            "IOloop_data",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "async_partial",
+          "line": 33,
+          "isDefault": false
+        },
+        {
+          "name": "C_vis",
+          "line": 57,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "f2",
+          "callee": "f",
+          "lineNumber": 49
+        },
+        {
+          "caller": "f2",
+          "callee": "asyncio.iscoroutinefunction",
+          "lineNumber": 50
+        },
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 93
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 93
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 114
+        },
+        {
+          "caller": "__init__",
+          "callee": "DataTable",
+          "lineNumber": 119
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 121
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 133
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_smps.on_change",
+          "lineNumber": 141
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 143
+        },
+        {
+          "caller": "__init__",
+          "callee": "CheckboxButtonGroup",
+          "lineNumber": 147
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.inheritance_selector_group.on_change",
+          "lineNumber": 153
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 155
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 160
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 163
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 164
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 172
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 174
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 179
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 180
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 186
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 187
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 195
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 196
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 200
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 201
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 204
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.reset_plot",
+          "lineNumber": 210
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 212
+        },
+        {
+          "caller": "to_int",
+          "callee": "int",
+          "lineNumber": 230
+        },
+        {
+          "caller": "callback_input_max_smps",
+          "callee": "to_int",
+          "lineNumber": 234
+        },
+        {
+          "caller": "callback_input_max_smps",
+          "callee": "self.vis.doc.add_next_tick_callback",
+          "lineNumber": 236
+        },
+        {
+          "caller": "callback_input_max_smps",
+          "callee": "partial",
+          "lineNumber": 237
+        },
+        {
+          "caller": "callback_input_max_smps",
+          "callee": "self.reset_plot",
+          "lineNumber": 239
+        },
+        {
+          "caller": "callback_inheritance",
+          "callee": "self.vis.doc.add_next_tick_callback",
+          "lineNumber": 254
+        },
+        {
+          "caller": "callback_inheritance",
+          "callee": "partial",
+          "lineNumber": 254
+        },
+        {
+          "caller": "callback_inheritance",
+          "callee": "self.reset_plot",
+          "lineNumber": 255
+        },
+        {
+          "caller": "add_points",
+          "callee": "async_private_dispatcher",
+          "lineNumber": 267
+        },
+        {
+          "caller": "add_points",
+          "callee": "d.get",
+          "lineNumber": 281
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp(v / 1e9).strftime",
+          "lineNumber": 283
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp",
+          "lineNumber": 283
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "LOGGER.info",
+          "lineNumber": 297
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "range",
+          "lineNumber": 299
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "websockets.connect",
+          "lineNumber": 301
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "DataPackageModel",
+          "lineNumber": 305
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "json.loads",
+          "lineNumber": 306
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "ws.recv",
+          "lineNumber": 306
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "self.vis.doc.add_next_tick_callback",
+          "lineNumber": 310
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "async_partial",
+          "lineNumber": 311
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "ws.close",
+          "lineNumber": 315
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "LOGGER.error",
+          "lineNumber": 318
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "asyncio.sleep",
+          "lineNumber": 322
+        },
+        {
+          "caller": "IOloop_data",
+          "callee": "LOGGER.info",
+          "lineNumber": 324
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self.vis.doc.add_next_tick_callback",
+          "lineNumber": 330
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "partial",
+          "lineNumber": 330
+        }
+      ],
+      "metrics": {
+        "importCount": 7,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/power_supply_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 202,
+      "nonEmptyLines": 174,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 24,
+          "endLine": 202,
+          "methods": [
+            "__init__",
+            "add_points",
+            "_add_plots",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 24,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 55
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 55
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 68
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 69
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 76
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_points.on_change",
+          "lineNumber": 83
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 85
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 88
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_update_rate.on_change",
+          "lineNumber": 95
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 97
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 100
+        },
+        {
+          "caller": "__init__",
+          "callee": "DatetimeTickFormatter",
+          "lineNumber": 101
+        },
+        {
+          "caller": "__init__",
+          "callee": "DataTable",
+          "lineNumber": 110
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 113
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 114
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 123
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 125
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 127
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 128
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 129
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 135
+        },
+        {
+          "caller": "add_points",
+          "callee": "datapackage.items",
+          "lineNumber": 151
+        },
+        {
+          "caller": "add_points",
+          "callee": "dataval.items",
+          "lineNumber": 153
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[k].append",
+          "lineNumber": 154
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 155
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[datalab].append",
+          "lineNumber": 159
+        },
+        {
+          "caller": "add_points",
+          "callee": "max",
+          "lineNumber": 160
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[\"datetime\"].append",
+          "lineNumber": 161
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp",
+          "lineNumber": 161
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.stream",
+          "lineNumber": 163
+        },
+        {
+          "caller": "add_points",
+          "callee": "list",
+          "lineNumber": 164
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.keys",
+          "lineNumber": 164
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 165
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource_table.stream",
+          "lineNumber": 167
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 167
+        },
+        {
+          "caller": "add_points",
+          "callee": "self._add_plots",
+          "lineNumber": 168
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 180
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 187
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 202
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/pressure_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 217,
+      "nonEmptyLines": 189,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 25,
+          "endLine": 217,
+          "methods": [
+            "__init__",
+            "add_points",
+            "_add_plots",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 25,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 59
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 59
+        },
+        {
+          "caller": "__init__",
+          "callee": "sorted",
+          "lineNumber": 66
+        },
+        {
+          "caller": "__init__",
+          "callee": "psrv_config.get(\"params\", {}).get(\"dev_ai\", {}).keys",
+          "lineNumber": 66
+        },
+        {
+          "caller": "__init__",
+          "callee": "psrv_config.get(\"params\", {}).get",
+          "lineNumber": 66
+        },
+        {
+          "caller": "__init__",
+          "callee": "psrv_config.get",
+          "lineNumber": 66
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 69
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 70
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 77
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_points.on_change",
+          "lineNumber": 84
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 86
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 89
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_update_rate.on_change",
+          "lineNumber": 96
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 98
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 101
+        },
+        {
+          "caller": "__init__",
+          "callee": "DatetimeTickFormatter",
+          "lineNumber": 102
+        },
+        {
+          "caller": "__init__",
+          "callee": "DataTable",
+          "lineNumber": 109
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 112
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 113
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 122
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 124
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 126
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 127
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 128
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 134
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._add_plots",
+          "lineNumber": 135
+        },
+        {
+          "caller": "add_points",
+          "callee": "datapackage.items",
+          "lineNumber": 150
+        },
+        {
+          "caller": "add_points",
+          "callee": "dataval.items",
+          "lineNumber": 152
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[k].append",
+          "lineNumber": 153
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 154
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[datalab].append",
+          "lineNumber": 157
+        },
+        {
+          "caller": "add_points",
+          "callee": "max",
+          "lineNumber": 158
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[\"datetime\"].append",
+          "lineNumber": 159
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp",
+          "lineNumber": 159
+        },
+        {
+          "caller": "add_points",
+          "callee": "np.concatenate",
+          "lineNumber": 161
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 162
+        },
+        {
+          "caller": "add_points",
+          "callee": "list",
+          "lineNumber": 163
+        },
+        {
+          "caller": "add_points",
+          "callee": "ndi.uniform_filter1d",
+          "lineNumber": 164
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 165
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.stream",
+          "lineNumber": 171
+        },
+        {
+          "caller": "add_points",
+          "callee": "list",
+          "lineNumber": 172
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.keys",
+          "lineNumber": 172
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource_table.stream",
+          "lineNumber": 175
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 175
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "zip",
+          "lineNumber": 190
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 191
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 199
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 217
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/spec_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 346,
+      "nonEmptyLines": 292,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 40,
+          "endLine": 346,
+          "methods": [
+            "__init__",
+            "callback_input_max_spectra",
+            "callback_input_downsample",
+            "add_points",
+            "_add_plots",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 40,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 80
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 80
+        },
+        {
+          "caller": "__init__",
+          "callee": "cm.get_cmap",
+          "lineNumber": 86
+        },
+        {
+          "caller": "__init__",
+          "callee": "private_dispatcher",
+          "lineNumber": 89
+        },
+        {
+          "caller": "__init__",
+          "callee": "LOGGER.info",
+          "lineNumber": 97
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 101
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 104
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 114
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_spectra.on_change",
+          "lineNumber": 121
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 123
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 126
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_downsample.on_change",
+          "lineNumber": 133
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 135
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 144
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 148
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 155
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 157
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 157
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 158
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 159
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 160
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 161
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 172
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.reset_plot",
+          "lineNumber": 173
+        },
+        {
+          "caller": "to_int",
+          "callee": "int",
+          "lineNumber": 192
+        },
+        {
+          "caller": "callback_input_max_spectra",
+          "callee": "to_int",
+          "lineNumber": 196
+        },
+        {
+          "caller": "callback_input_max_spectra",
+          "callee": "to_int",
+          "lineNumber": 197
+        },
+        {
+          "caller": "callback_input_max_spectra",
+          "callee": "cm.get_cmap",
+          "lineNumber": 211
+        },
+        {
+          "caller": "callback_input_max_spectra",
+          "callee": "self.vis.doc.add_next_tick_callback",
+          "lineNumber": 213
+        },
+        {
+          "caller": "callback_input_max_spectra",
+          "callee": "partial",
+          "lineNumber": 214
+        },
+        {
+          "caller": "to_int",
+          "callee": "int",
+          "lineNumber": 232
+        },
+        {
+          "caller": "callback_input_downsample",
+          "callee": "to_int",
+          "lineNumber": 236
+        },
+        {
+          "caller": "callback_input_downsample",
+          "callee": "to_int",
+          "lineNumber": 237
+        },
+        {
+          "caller": "callback_input_downsample",
+          "callee": "self.vis.doc.add_next_tick_callback",
+          "lineNumber": 245
+        },
+        {
+          "caller": "callback_input_downsample",
+          "callee": "partial",
+          "lineNumber": 246
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.reset_plot",
+          "lineNumber": 262
+        },
+        {
+          "caller": "add_points",
+          "callee": "str",
+          "lineNumber": 262
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_package.datamodel.data.items",
+          "lineNumber": 267
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp(epoch).strftime",
+          "lineNumber": 270
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp",
+          "lineNumber": 270
+        },
+        {
+          "caller": "add_points",
+          "callee": "sorted",
+          "lineNumber": 273
+        },
+        {
+          "caller": "add_points",
+          "callee": "uuid_dict.keys",
+          "lineNumber": 274
+        },
+        {
+          "caller": "add_points",
+          "callee": "k.startswith",
+          "lineNumber": 274
+        },
+        {
+          "caller": "add_points",
+          "callee": "int",
+          "lineNumber": 275
+        },
+        {
+          "caller": "add_points",
+          "callee": "x.split",
+          "lineNumber": 275
+        },
+        {
+          "caller": "add_points",
+          "callee": "mcolors.rgb2hex",
+          "lineNumber": 281
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.cmap",
+          "lineNumber": 281
+        },
+        {
+          "caller": "add_points",
+          "callee": "mcolors.rgb2hex",
+          "lineNumber": 287
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.cmap",
+          "lineNumber": 287
+        },
+        {
+          "caller": "add_points",
+          "callee": "enumerate",
+          "lineNumber": 288
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.patch",
+          "lineNumber": 290
+        },
+        {
+          "caller": "add_points",
+          "callee": "slice",
+          "lineNumber": 291
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 291
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.stream",
+          "lineNumber": 293
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.multi_line",
+          "lineNumber": 311
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot_prev.multi_line",
+          "lineNumber": 319
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "LOGGER.info",
+          "lineNumber": 341
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "dict",
+          "lineNumber": 343
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "deepcopy(self.datasource.data).items",
+          "lineNumber": 343
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "deepcopy",
+          "lineNumber": 343
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 346
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/syringe_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 183,
+      "nonEmptyLines": 154,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 25,
+          "endLine": 183,
+          "methods": [
+            "__init__",
+            "add_points",
+            "_add_plots",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 25,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 55
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 55
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 63
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 64
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 71
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_points.on_change",
+          "lineNumber": 78
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 80
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 83
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_update_rate.on_change",
+          "lineNumber": 90
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 92
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 95
+        },
+        {
+          "caller": "__init__",
+          "callee": "DatetimeTickFormatter",
+          "lineNumber": 96
+        },
+        {
+          "caller": "__init__",
+          "callee": "DataTable",
+          "lineNumber": 103
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 106
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 107
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 116
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 118
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 120
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 121
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 122
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 128
+        },
+        {
+          "caller": "add_points",
+          "callee": "datapackage.items",
+          "lineNumber": 142
+        },
+        {
+          "caller": "add_points",
+          "callee": "dataval.items",
+          "lineNumber": 144
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[k].append",
+          "lineNumber": 145
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 146
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[datalab].append",
+          "lineNumber": 149
+        },
+        {
+          "caller": "add_points",
+          "callee": "max",
+          "lineNumber": 150
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[\"datetime\"].append",
+          "lineNumber": 151
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp",
+          "lineNumber": 151
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.stream",
+          "lineNumber": 153
+        },
+        {
+          "caller": "add_points",
+          "callee": "list",
+          "lineNumber": 154
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.keys",
+          "lineNumber": 154
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource_table.stream",
+          "lineNumber": 157
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 157
+        },
+        {
+          "caller": "add_points",
+          "callee": "self._add_plots",
+          "lineNumber": 158
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 169
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 183
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/tec_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 211,
+      "nonEmptyLines": 184,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 22,
+          "endLine": 211,
+          "methods": [
+            "__init__",
+            "add_points",
+            "_add_plots",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 22,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 55
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 55
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 62
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 63
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 70
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_points.on_change",
+          "lineNumber": 77
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 79
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 82
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_update_rate.on_change",
+          "lineNumber": 89
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 91
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 94
+        },
+        {
+          "caller": "__init__",
+          "callee": "DatetimeTickFormatter",
+          "lineNumber": 95
+        },
+        {
+          "caller": "__init__",
+          "callee": "Range1d",
+          "lineNumber": 101
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.plot.add_layout",
+          "lineNumber": 102
+        },
+        {
+          "caller": "__init__",
+          "callee": "LinearAxis",
+          "lineNumber": 103
+        },
+        {
+          "caller": "__init__",
+          "callee": "DataTable",
+          "lineNumber": 106
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 109
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 110
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 119
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 121
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 123
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 124
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 125
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 131
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._add_plots",
+          "lineNumber": 132
+        },
+        {
+          "caller": "add_points",
+          "callee": "datapackage.items",
+          "lineNumber": 147
+        },
+        {
+          "caller": "add_points",
+          "callee": "dataval.items",
+          "lineNumber": 149
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[k].append",
+          "lineNumber": 150
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 151
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[datalab].append",
+          "lineNumber": 154
+        },
+        {
+          "caller": "add_points",
+          "callee": "max",
+          "lineNumber": 155
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[\"datetime\"].append",
+          "lineNumber": 156
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp",
+          "lineNumber": 156
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.stream",
+          "lineNumber": 158
+        },
+        {
+          "caller": "add_points",
+          "callee": "list",
+          "lineNumber": 159
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.keys",
+          "lineNumber": 159
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource_table.stream",
+          "lineNumber": 162
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 162
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 178
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 185
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 193
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 211
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/deploy/hte/servers/visualizer/temp_vis.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 190,
+      "nonEmptyLines": 164,
+      "classes": [
+        {
+          "name": "C_vis",
+          "startLine": 21,
+          "endLine": 190,
+          "methods": [
+            "__init__",
+            "add_points",
+            "_add_plots",
+            "reset_plot"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "C_vis",
+          "line": 21,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 51
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 51
+        },
+        {
+          "caller": "__init__",
+          "callee": "sorted",
+          "lineNumber": 58
+        },
+        {
+          "caller": "__init__",
+          "callee": "tserv_config.get(\"params\", {}).get(\"dev_monitor\", {}).keys",
+          "lineNumber": 59
+        },
+        {
+          "caller": "__init__",
+          "callee": "tserv_config.get(\"params\", {}).get",
+          "lineNumber": 59
+        },
+        {
+          "caller": "__init__",
+          "callee": "tserv_config.get",
+          "lineNumber": 59
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 61
+        },
+        {
+          "caller": "__init__",
+          "callee": "ColumnDataSource",
+          "lineNumber": 62
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 69
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_max_points.on_change",
+          "lineNumber": 76
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 78
+        },
+        {
+          "caller": "__init__",
+          "callee": "TextInput",
+          "lineNumber": 81
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.input_update_rate.on_change",
+          "lineNumber": 88
+        },
+        {
+          "caller": "__init__",
+          "callee": "partial",
+          "lineNumber": 90
+        },
+        {
+          "caller": "__init__",
+          "callee": "figure",
+          "lineNumber": 93
+        },
+        {
+          "caller": "__init__",
+          "callee": "DatetimeTickFormatter",
+          "lineNumber": 94
+        },
+        {
+          "caller": "__init__",
+          "callee": "DataTable",
+          "lineNumber": 101
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 104
+        },
+        {
+          "caller": "__init__",
+          "callee": "TableColumn",
+          "lineNumber": 105
+        },
+        {
+          "caller": "__init__",
+          "callee": "layout",
+          "lineNumber": 114
+        },
+        {
+          "caller": "__init__",
+          "callee": "Div",
+          "lineNumber": 116
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 118
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 119
+        },
+        {
+          "caller": "__init__",
+          "callee": "Spacer",
+          "lineNumber": 120
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._mount",
+          "lineNumber": 126
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._add_plots",
+          "lineNumber": 127
+        },
+        {
+          "caller": "add_points",
+          "callee": "datapackage.items",
+          "lineNumber": 142
+        },
+        {
+          "caller": "add_points",
+          "callee": "dataval.items",
+          "lineNumber": 144
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[k].append",
+          "lineNumber": 145
+        },
+        {
+          "caller": "add_points",
+          "callee": "isinstance",
+          "lineNumber": 146
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[datalab].append",
+          "lineNumber": 149
+        },
+        {
+          "caller": "add_points",
+          "callee": "max",
+          "lineNumber": 150
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict[\"datetime\"].append",
+          "lineNumber": 151
+        },
+        {
+          "caller": "add_points",
+          "callee": "datetime.fromtimestamp",
+          "lineNumber": 151
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource.stream",
+          "lineNumber": 153
+        },
+        {
+          "caller": "add_points",
+          "callee": "list",
+          "lineNumber": 154
+        },
+        {
+          "caller": "add_points",
+          "callee": "data_dict.keys",
+          "lineNumber": 154
+        },
+        {
+          "caller": "add_points",
+          "callee": "self.datasource_table.stream",
+          "lineNumber": 157
+        },
+        {
+          "caller": "add_points",
+          "callee": "len",
+          "lineNumber": 157
+        },
+        {
+          "caller": "add_points",
+          "callee": "self._add_plots",
+          "lineNumber": 159
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "zip",
+          "lineNumber": 172
+        },
+        {
+          "caller": "_add_plots",
+          "callee": "self.plot.line",
+          "lineNumber": 173
+        },
+        {
+          "caller": "reset_plot",
+          "callee": "self._add_plots",
+          "lineNumber": 190
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/helpers/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 9,
+      "nonEmptyLines": 7,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/helpers/bubble_detection.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 141,
+      "nonEmptyLines": 116,
+      "functions": [
+        {
+          "name": "bubble_detection",
+          "startLine": 13,
+          "endLine": 141,
+          "params": [
+            "data",
+            "RSD_threshold",
+            "simple_threshold",
+            "signal_change_threshold",
+            "amplitude_threshold"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "bubble_detection",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "bubble_detection",
+          "callee": "required_cols.difference",
+          "lineNumber": 42
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "set",
+          "lineNumber": 42
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "LOGGER.warning",
+          "lineNumber": 44
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "sorted",
+          "lineNumber": 45
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "len",
+          "lineNumber": 49
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "LOGGER.warning",
+          "lineNumber": 50
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "statistics.stdev",
+          "lineNumber": 55
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "list",
+          "lineNumber": 55
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "statistics.mean",
+          "lineNumber": 56
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "list",
+          "lineNumber": 56
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "LOGGER.warning",
+          "lineNumber": 59
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "data.iterrows",
+          "lineNumber": 73
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "idx.append",
+          "lineNumber": 75
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "range",
+          "lineNumber": 80
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "len",
+          "lineNumber": 80
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "E_changes.append",
+          "lineNumber": 81
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "abs",
+          "lineNumber": 81
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "any",
+          "lineNumber": 82
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "find_peaks",
+          "lineNumber": 86
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "data[\"Ewe_V\"].iloc[peaks].mean",
+          "lineNumber": 87
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "find_peaks",
+          "lineNumber": 89
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "data[\"Ewe_V\"].iloc[troughs].mean",
+          "lineNumber": 90
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "abs",
+          "lineNumber": 92
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "LOGGER.debug",
+          "lineNumber": 136
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "bool",
+          "lineNumber": 138
+        },
+        {
+          "caller": "bubble_detection",
+          "callee": "LOGGER.error",
+          "lineNumber": 140
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/helpers/dispatcher.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 480,
+      "nonEmptyLines": 423,
+      "functions": [
+        {
+          "name": "_get_rpc_client",
+          "startLine": 60,
+          "endLine": 83,
+          "params": [
+            "host",
+            "port"
+          ]
+        },
+        {
+          "name": "aclose_all_rpc_clients",
+          "startLine": 86,
+          "endLine": 94,
+          "params": []
+        },
+        {
+          "name": "async_action_dispatcher",
+          "startLine": 97,
+          "endLine": 202,
+          "params": [
+            "world_config_dict",
+            "A",
+            "params",
+            "timeout",
+            "retries"
+          ]
+        },
+        {
+          "name": "async_private_dispatcher",
+          "startLine": 205,
+          "endLine": 308,
+          "params": [
+            "server_key",
+            "host",
+            "port",
+            "private_action",
+            "params_dict",
+            "json_dict",
+            "timeout",
+            "retries"
+          ]
+        },
+        {
+          "name": "_get_sync_rpc_client",
+          "startLine": 311,
+          "endLine": 330,
+          "params": [
+            "host",
+            "port"
+          ]
+        },
+        {
+          "name": "close_all_sync_rpc_clients",
+          "startLine": 333,
+          "endLine": 341,
+          "params": []
+        },
+        {
+          "name": "private_dispatcher",
+          "startLine": 344,
+          "endLine": 415,
+          "params": [
+            "server_key",
+            "server_host",
+            "server_port",
+            "private_action",
+            "params_dict",
+            "json_dict",
+            "timeout"
+          ]
+        },
+        {
+          "name": "check_endpoint",
+          "startLine": 418,
+          "endLine": 429,
+          "params": [
+            "url"
+          ]
+        },
+        {
+          "name": "endpoints_available",
+          "startLine": 432,
+          "endLine": 480,
+          "params": [
+            "req_list"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "_get_rpc_client",
+          "line": 60,
+          "isDefault": false
+        },
+        {
+          "name": "aclose_all_rpc_clients",
+          "line": 86,
+          "isDefault": false
+        },
+        {
+          "name": "async_action_dispatcher",
+          "line": 97,
+          "isDefault": false
+        },
+        {
+          "name": "async_private_dispatcher",
+          "line": 205,
+          "isDefault": false
+        },
+        {
+          "name": "_get_sync_rpc_client",
+          "line": 311,
+          "isDefault": false
+        },
+        {
+          "name": "close_all_sync_rpc_clients",
+          "line": 333,
+          "isDefault": false
+        },
+        {
+          "name": "private_dispatcher",
+          "line": 344,
+          "isDefault": false
+        },
+        {
+          "name": "check_endpoint",
+          "line": 418,
+          "isDefault": false
+        },
+        {
+          "name": "endpoints_available",
+          "line": 432,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "_get_rpc_client",
+          "callee": "_RPC_CLIENTS.get",
+          "lineNumber": 72
+        },
+        {
+          "caller": "_get_rpc_client",
+          "callee": "_RPC_CLIENTS.get",
+          "lineNumber": 76
+        },
+        {
+          "caller": "_get_rpc_client",
+          "callee": "RPCClient",
+          "lineNumber": 78
+        },
+        {
+          "caller": "_get_rpc_client",
+          "callee": "derive_rpc_port",
+          "lineNumber": 79
+        },
+        {
+          "caller": "aclose_all_rpc_clients",
+          "callee": "list",
+          "lineNumber": 88
+        },
+        {
+          "caller": "aclose_all_rpc_clients",
+          "callee": "_RPC_CLIENTS.values",
+          "lineNumber": 88
+        },
+        {
+          "caller": "aclose_all_rpc_clients",
+          "callee": "_RPC_CLIENTS.clear",
+          "lineNumber": 89
+        },
+        {
+          "caller": "aclose_all_rpc_clients",
+          "callee": "client.close",
+          "lineNumber": 92
+        },
+        {
+          "caller": "aclose_all_rpc_clients",
+          "callee": "LOGGER.exception",
+          "lineNumber": 94
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "rpc_args.update",
+          "lineNumber": 136
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "A.as_dict",
+          "lineNumber": 137
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "_get_rpc_client",
+          "lineNumber": 139
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "client.call",
+          "lineNumber": 140
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "min",
+          "lineNumber": 142
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "LOGGER.debug",
+          "lineNumber": 147
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "type",
+          "lineNumber": 149
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "aiohttp.ClientTimeout",
+          "lineNumber": 157
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "aiohttp.TCPConnector",
+          "lineNumber": 162
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "aiohttp.ClientSession",
+          "lineNumber": 166
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "session.post",
+          "lineNumber": 169
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "A.as_dict",
+          "lineNumber": 172
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "resp.json",
+          "lineNumber": 174
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "LOGGER.error",
+          "lineNumber": 178
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "LOGGER.warning",
+          "lineNumber": 187
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "asyncio.sleep",
+          "lineNumber": 191
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "conn.close",
+          "lineNumber": 194
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "LOGGER.error",
+          "lineNumber": 196
+        },
+        {
+          "caller": "async_action_dispatcher",
+          "callee": "asyncio.sleep",
+          "lineNumber": 201
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "rpc_args.update",
+          "lineNumber": 243
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "rpc_args.update",
+          "lineNumber": 244
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "_get_rpc_client",
+          "lineNumber": 246
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "client.call",
+          "lineNumber": 247
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "min",
+          "lineNumber": 249
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "LOGGER.debug",
+          "lineNumber": 254
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "type",
+          "lineNumber": 256
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "aiohttp.ClientTimeout",
+          "lineNumber": 264
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "aiohttp.TCPConnector",
+          "lineNumber": 269
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "aiohttp.ClientSession",
+          "lineNumber": 273
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "session.post",
+          "lineNumber": 276
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "resp.json",
+          "lineNumber": 281
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "LOGGER.error",
+          "lineNumber": 285
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "LOGGER.warning",
+          "lineNumber": 294
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "asyncio.sleep",
+          "lineNumber": 298
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "conn.close",
+          "lineNumber": 301
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "LOGGER.error",
+          "lineNumber": 303
+        },
+        {
+          "caller": "async_private_dispatcher",
+          "callee": "asyncio.sleep",
+          "lineNumber": 307
+        },
+        {
+          "caller": "_get_sync_rpc_client",
+          "callee": "_SYNC_RPC_CLIENTS.get",
+          "lineNumber": 323
+        },
+        {
+          "caller": "_get_sync_rpc_client",
+          "callee": "RPCSyncClient",
+          "lineNumber": 325
+        },
+        {
+          "caller": "_get_sync_rpc_client",
+          "callee": "derive_rpc_port",
+          "lineNumber": 326
+        },
+        {
+          "caller": "close_all_sync_rpc_clients",
+          "callee": "list",
+          "lineNumber": 335
+        },
+        {
+          "caller": "close_all_sync_rpc_clients",
+          "callee": "_SYNC_RPC_CLIENTS.values",
+          "lineNumber": 335
+        },
+        {
+          "caller": "close_all_sync_rpc_clients",
+          "callee": "_SYNC_RPC_CLIENTS.clear",
+          "lineNumber": 336
+        },
+        {
+          "caller": "close_all_sync_rpc_clients",
+          "callee": "client.close",
+          "lineNumber": 339
+        },
+        {
+          "caller": "close_all_sync_rpc_clients",
+          "callee": "LOGGER.exception",
+          "lineNumber": 341
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "rpc_args.update",
+          "lineNumber": 374
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "rpc_args.update",
+          "lineNumber": 375
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "_get_sync_rpc_client",
+          "lineNumber": 377
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "client.call",
+          "lineNumber": 378
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "min",
+          "lineNumber": 380
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "LOGGER.debug",
+          "lineNumber": 385
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "type",
+          "lineNumber": 387
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "requests.Session",
+          "lineNumber": 393
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "session.post",
+          "lineNumber": 394
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "resp.json",
+          "lineNumber": 402
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "LOGGER.error",
+          "lineNumber": 406
+        },
+        {
+          "caller": "private_dispatcher",
+          "callee": "LOGGER.error",
+          "lineNumber": 410
+        },
+        {
+          "caller": "check_endpoint",
+          "callee": "aiohttp.ClientSession",
+          "lineNumber": 427
+        },
+        {
+          "caller": "check_endpoint",
+          "callee": "session.head",
+          "lineNumber": 428
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "check_endpoint",
+          "lineNumber": 454
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "states.append",
+          "lineNumber": 458
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "states.append",
+          "lineNumber": 460
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "states.append",
+          "lineNumber": 462
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "states.append",
+          "lineNumber": 464
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "states.append",
+          "lineNumber": 466
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "states.append",
+          "lineNumber": 468
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "states.append",
+          "lineNumber": 470
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "responses.append",
+          "lineNumber": 471
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "all",
+          "lineNumber": 472
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "enumerate",
+          "lineNumber": 473
+        },
+        {
+          "caller": "endpoints_available",
+          "callee": "LOGGER.info",
+          "lineNumber": 475
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 9,
+        "functionCount": 9,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/helpers/import_autolibs.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 140,
+      "nonEmptyLines": 124,
+      "functions": [
+        {
+          "name": "import_autolibs",
+          "startLine": 26,
+          "endLine": 140,
+          "params": [
+            "world_config_dict",
+            "lib_dir",
+            "user_lib_dir",
+            "lib_type"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "import_autolibs",
+          "line": 26,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "get_libs",
+          "callee": "lib_file.endswith",
+          "lineNumber": 62
+        },
+        {
+          "caller": "get_libs",
+          "callee": "os.path.isfile",
+          "lineNumber": 62
+        },
+        {
+          "caller": "get_libs",
+          "callee": "lib_file.split",
+          "lineNumber": 64
+        },
+        {
+          "caller": "get_libs",
+          "callee": "lib_file.split",
+          "lineNumber": 66
+        },
+        {
+          "caller": "get_libs",
+          "callee": "LOGGER.info",
+          "lineNumber": 67
+        },
+        {
+          "caller": "get_libs",
+          "callee": "os.path.join",
+          "lineNumber": 70
+        },
+        {
+          "caller": "get_libs",
+          "callee": "os.path.isfile",
+          "lineNumber": 71
+        },
+        {
+          "caller": "get_libs",
+          "callee": "LOGGER.warning",
+          "lineNumber": 72
+        },
+        {
+          "caller": "get_libs",
+          "callee": "os.path.join",
+          "lineNumber": 75
+        },
+        {
+          "caller": "get_libs",
+          "callee": "os.path.isfile",
+          "lineNumber": 78
+        },
+        {
+          "caller": "get_libs",
+          "callee": "glob",
+          "lineNumber": 79
+        },
+        {
+          "caller": "get_libs",
+          "callee": "os.path.join",
+          "lineNumber": 80
+        },
+        {
+          "caller": "get_libs",
+          "callee": "LOGGER.warning",
+          "lineNumber": 86
+        },
+        {
+          "caller": "get_libs",
+          "callee": "FileNotFoundError",
+          "lineNumber": 90
+        },
+        {
+          "caller": "get_libs",
+          "callee": "get_filehash",
+          "lineNumber": 93
+        },
+        {
+          "caller": "get_libs",
+          "callee": "SourceFileLoader(lib_file, lib_path).load_module",
+          "lineNumber": 94
+        },
+        {
+          "caller": "get_libs",
+          "callee": "SourceFileLoader",
+          "lineNumber": 94
+        },
+        {
+          "caller": "get_libs",
+          "callee": "tempd.get",
+          "lineNumber": 95
+        },
+        {
+          "caller": "get_libs",
+          "callee": "lib_type.upper",
+          "lineNumber": 95
+        },
+        {
+          "caller": "get_libs",
+          "callee": "lib.update",
+          "lineNumber": 97
+        },
+        {
+          "caller": "get_libs",
+          "callee": "codehash_lib.update",
+          "lineNumber": 98
+        },
+        {
+          "caller": "get_libs",
+          "callee": "codepath_lib.update",
+          "lineNumber": 99
+        },
+        {
+          "caller": "get_libs",
+          "callee": "\"/\".join",
+          "lineNumber": 99
+        },
+        {
+          "caller": "get_libs",
+          "callee": "lib_path.split",
+          "lineNumber": 99
+        },
+        {
+          "caller": "get_libs",
+          "callee": "LOGGER.info",
+          "lineNumber": 100
+        },
+        {
+          "caller": "get_libs",
+          "callee": "LOGGER.error",
+          "lineNumber": 102
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "os.path.basename",
+          "lineNumber": 107
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "os.path.dirname",
+          "lineNumber": 108
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "os.path.dirname",
+          "lineNumber": 108
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "world_config_dict.get",
+          "lineNumber": 110
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "os.path.join",
+          "lineNumber": 112
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "os.path.isdir",
+          "lineNumber": 114
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "LOGGER.error",
+          "lineNumber": 115
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "world_config_dict.get",
+          "lineNumber": 120
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "get_libs",
+          "lineNumber": 122
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "os.path.splitext",
+          "lineNumber": 127
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "os.listdir",
+          "lineNumber": 128
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "userfile.endswith",
+          "lineNumber": 129
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "get_libs",
+          "lineNumber": 132
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "LOGGER.info",
+          "lineNumber": 133
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "os.path.join",
+          "lineNumber": 134
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "LOGGER.info",
+          "lineNumber": 137
+        },
+        {
+          "caller": "import_autolibs",
+          "callee": "len",
+          "lineNumber": 138
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/helpers/legacy_api.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 728,
+      "nonEmptyLines": 641,
+      "classes": [
+        {
+          "name": "HTELegacyAPI",
+          "startLine": 24,
+          "endLine": 728,
+          "methods": [
+            "__init__",
+            "has_access",
+            "get_rcp_plateid",
+            "get_info_plateid",
+            "check_plateid",
+            "check_printrecord_plateid",
+            "check_annealrecord_plateid",
+            "get_platemap_plateid",
+            "get_elements_plateid",
+            "getnumspaces",
+            "rcp_to_dict",
+            "getplatemappath_plateid",
+            "importinfo",
+            "tryprependpath",
+            "getinfopath_plateid",
+            "filedict_lines",
+            "createnestparamtup",
+            "createdict_tup",
+            "get_multielementink_concentrationinfo",
+            "partitionlineitem",
+            "myeval",
+            "readsingleplatemaptxt"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "HTELegacyAPI",
+          "line": 24,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "has_access",
+          "callee": "any",
+          "lineNumber": 50
+        },
+        {
+          "caller": "has_access",
+          "callee": "os.path.exists",
+          "lineNumber": 50
+        },
+        {
+          "caller": "has_access",
+          "callee": "any",
+          "lineNumber": 50
+        },
+        {
+          "caller": "has_access",
+          "callee": "os.path.exists",
+          "lineNumber": 51
+        },
+        {
+          "caller": "get_rcp_plateid",
+          "callee": "LOGGER.info",
+          "lineNumber": 56
+        },
+        {
+          "caller": "get_info_plateid",
+          "callee": "self.importinfo",
+          "lineNumber": 69
+        },
+        {
+          "caller": "get_info_plateid",
+          "callee": "self.get_elements_plateid",
+          "lineNumber": 74
+        },
+        {
+          "caller": "get_info_plateid",
+          "callee": "LOGGER.info",
+          "lineNumber": 75
+        },
+        {
+          "caller": "get_info_plateid",
+          "callee": "LOGGER.warning",
+          "lineNumber": 79
+        },
+        {
+          "caller": "get_info_plateid",
+          "callee": "self.get_platemap_plateid",
+          "lineNumber": 84
+        },
+        {
+          "caller": "check_plateid",
+          "callee": "self.importinfo",
+          "lineNumber": 91
+        },
+        {
+          "caller": "check_printrecord_plateid",
+          "callee": "self.importinfo",
+          "lineNumber": 100
+        },
+        {
+          "caller": "check_annealrecord_plateid",
+          "callee": "self.importinfo",
+          "lineNumber": 109
+        },
+        {
+          "caller": "get_platemap_plateid",
+          "callee": "self.map_cache.keys",
+          "lineNumber": 126
+        },
+        {
+          "caller": "get_platemap_plateid",
+          "callee": "self.getplatemappath_plateid",
+          "lineNumber": 129
+        },
+        {
+          "caller": "get_platemap_plateid",
+          "callee": "self.readsingleplatemaptxt",
+          "lineNumber": 132
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "isinstance",
+          "lineNumber": 166
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "self.importinfo",
+          "lineNumber": 169
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "self.els_cache.keys",
+          "lineNumber": 172
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "requiredkeysthere",
+          "lineNumber": 180
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "infofiled[\"lineage\"].split(\",\")[-2].strip",
+          "lineNumber": 184
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "infofiled[\"lineage\"].split",
+          "lineNumber": 184
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "self.importinfo",
+          "lineNumber": 185
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "infofiled[\"prints\"].values",
+          "lineNumber": 189
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "len",
+          "lineNumber": 192
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "printd[\"elements\"].split",
+          "lineNumber": 200
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "self.get_multielementink_concentrationinfo",
+          "lineNumber": 206
+        },
+        {
+          "caller": "getnumspaces",
+          "callee": "len",
+          "lineNumber": 219
+        },
+        {
+          "caller": "getnumspaces",
+          "callee": "len",
+          "lineNumber": 219
+        },
+        {
+          "caller": "getnumspaces",
+          "callee": "a.lstrip",
+          "lineNumber": 219
+        },
+        {
+          "caller": "_tab_level",
+          "callee": "len",
+          "lineNumber": 237
+        },
+        {
+          "caller": "_tab_level",
+          "callee": "len",
+          "lineNumber": 237
+        },
+        {
+          "caller": "_tab_level",
+          "callee": "astr.lstrip",
+          "lineNumber": 237
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "rcppath.endswith",
+          "lineNumber": 239
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "os.path.dirname",
+          "lineNumber": 240
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "os.path.dirname",
+          "lineNumber": 242
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "os.path.basename(rcppath).split",
+          "lineNumber": 246
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "os.path.basename",
+          "lineNumber": 246
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "zipfile.ZipFile",
+          "lineNumber": 247
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "archive.open",
+          "lineNumber": 248
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "l.decode(\"ascii\").split",
+          "lineNumber": 250
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "l.decode",
+          "lineNumber": 250
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "_tab_level",
+          "lineNumber": 251
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "l.decode",
+          "lineNumber": 251
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "dlist.append",
+          "lineNumber": 252
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "k.strip",
+          "lineNumber": 252
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "v.strip",
+          "lineNumber": 252
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "open",
+          "lineNumber": 254
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "l.split",
+          "lineNumber": 256
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "_tab_level",
+          "lineNumber": 257
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "dlist.append",
+          "lineNumber": 258
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "k.strip",
+          "lineNumber": 258
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "v.strip",
+          "lineNumber": 258
+        },
+        {
+          "caller": "ttree_to_json",
+          "callee": "range",
+          "lineNumber": 262
+        },
+        {
+          "caller": "ttree_to_json",
+          "callee": "len",
+          "lineNumber": 262
+        },
+        {
+          "caller": "ttree_to_json",
+          "callee": "dict_insert_or_append",
+          "lineNumber": 276
+        },
+        {
+          "caller": "ttree_to_json",
+          "callee": "ttree_to_json",
+          "lineNumber": 278
+        },
+        {
+          "caller": "ttree_to_json",
+          "callee": "dict_insert_or_append",
+          "lineNumber": 279
+        },
+        {
+          "caller": "ttree_to_json",
+          "callee": "dict_insert_or_append",
+          "lineNumber": 281
+        },
+        {
+          "caller": "dict_insert_or_append",
+          "callee": "type",
+          "lineNumber": 290
+        },
+        {
+          "caller": "dict_insert_or_append",
+          "callee": "adict[key].append",
+          "lineNumber": 292
+        },
+        {
+          "caller": "rcp_to_dict",
+          "callee": "ttree_to_json",
+          "lineNumber": 296
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "self.pmpath_pid_cache.keys",
+          "lineNumber": 324
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "self.tryprependpath",
+          "lineNumber": 327
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "LOGGER.info",
+          "lineNumber": 328
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "self.getinfopath_plateid",
+          "lineNumber": 332
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "LOGGER.info",
+          "lineNumber": 334
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "erroruifcn",
+          "lineNumber": 336
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "self.tryprependpath",
+          "lineNumber": 337
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "LOGGER.info",
+          "lineNumber": 340
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "open",
+          "lineNumber": 341
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "f.read",
+          "lineNumber": 342
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "LOGGER.info",
+          "lineNumber": 344
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "erroruifcn",
+          "lineNumber": 346
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "self.tryprependpath",
+          "lineNumber": 347
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "s.partition(infokey)[2].partition(\"\\n\")[0].strip",
+          "lineNumber": 350
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "s.partition(infokey)[2].partition",
+          "lineNumber": 350
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "s.partition",
+          "lineNumber": 350
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "self.rcp_to_dict",
+          "lineNumber": 352
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "infod[\"prints\"].items",
+          "lineNumber": 353
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "printdlist.sort",
+          "lineNumber": 354
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "int",
+          "lineNumber": 354
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "os.listdir",
+          "lineNumber": 359
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "fn.startswith",
+          "lineNumber": 360
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "len",
+          "lineNumber": 360
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "fn.endswith",
+          "lineNumber": 361
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "len",
+          "lineNumber": 363
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "erroruifcn",
+          "lineNumber": 365
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "self.tryprependpath",
+          "lineNumber": 365
+        },
+        {
+          "caller": "getplatemappath_plateid",
+          "callee": "os.path.join",
+          "lineNumber": 366
+        },
+        {
+          "caller": "importinfo",
+          "callee": "self.info_cache.keys",
+          "lineNumber": 379
+        },
+        {
+          "caller": "importinfo",
+          "callee": "str",
+          "lineNumber": 382
+        },
+        {
+          "caller": "importinfo",
+          "callee": "self.tryprependpath",
+          "lineNumber": 383
+        },
+        {
+          "caller": "importinfo",
+          "callee": "os.path.join",
+          "lineNumber": 385
+        },
+        {
+          "caller": "importinfo",
+          "callee": "str",
+          "lineNumber": 385
+        },
+        {
+          "caller": "importinfo",
+          "callee": "os.path.isfile",
+          "lineNumber": 389
+        },
+        {
+          "caller": "importinfo",
+          "callee": "open",
+          "lineNumber": 391
+        },
+        {
+          "caller": "importinfo",
+          "callee": "f.readlines",
+          "lineNumber": 392
+        },
+        {
+          "caller": "importinfo",
+          "callee": "self.filedict_lines",
+          "lineNumber": 393
+        },
+        {
+          "caller": "tryprependpath",
+          "callee": "os.path.isfile",
+          "lineNumber": 409
+        },
+        {
+          "caller": "tryprependpath",
+          "callee": "p.strip(chr(47)).strip",
+          "lineNumber": 411
+        },
+        {
+          "caller": "tryprependpath",
+          "callee": "p.strip",
+          "lineNumber": 411
+        },
+        {
+          "caller": "tryprependpath",
+          "callee": "chr",
+          "lineNumber": 411
+        },
+        {
+          "caller": "tryprependpath",
+          "callee": "chr",
+          "lineNumber": 411
+        },
+        {
+          "caller": "tryprependpath",
+          "callee": "os.path.join",
+          "lineNumber": 413
+        },
+        {
+          "caller": "tryprependpath",
+          "callee": "os.path.isdir",
+          "lineNumber": 414
+        },
+        {
+          "caller": "tryprependpath",
+          "callee": "os.path.isfile",
+          "lineNumber": 414
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "self.infopath_cache.keys",
+          "lineNumber": 429
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "os.path.join",
+          "lineNumber": 433
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "self.tryprependpath",
+          "lineNumber": 433
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "str",
+          "lineNumber": 433
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "os.path.isdir",
+          "lineNumber": 434
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "os.listdir",
+          "lineNumber": 435
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "fn.endswith",
+          "lineNumber": 435
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "os.path.join",
+          "lineNumber": 436
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "os.path.isfile",
+          "lineNumber": 437
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "erroruifcn",
+          "lineNumber": 438
+        },
+        {
+          "caller": "getinfopath_plateid",
+          "callee": "os.path.isfile",
+          "lineNumber": 439
+        },
+        {
+          "caller": "filedict_lines",
+          "callee": "len",
+          "lineNumber": 453
+        },
+        {
+          "caller": "filedict_lines",
+          "callee": "l.strip",
+          "lineNumber": 453
+        },
+        {
+          "caller": "filedict_lines",
+          "callee": "len",
+          "lineNumber": 455
+        },
+        {
+          "caller": "filedict_lines",
+          "callee": "self.createnestparamtup",
+          "lineNumber": 456
+        },
+        {
+          "caller": "filedict_lines",
+          "callee": "dict",
+          "lineNumber": 457
+        },
+        {
+          "caller": "filedict_lines",
+          "callee": "self.createdict_tup",
+          "lineNumber": 457
+        },
+        {
+          "caller": "createnestparamtup",
+          "callee": "str",
+          "lineNumber": 468
+        },
+        {
+          "caller": "createnestparamtup",
+          "callee": "lines.pop(0).rstrip",
+          "lineNumber": 468
+        },
+        {
+          "caller": "createnestparamtup",
+          "callee": "lines.pop",
+          "lineNumber": 468
+        },
+        {
+          "caller": "createnestparamtup",
+          "callee": "self.getnumspaces",
+          "lineNumber": 469
+        },
+        {
+          "caller": "createnestparamtup",
+          "callee": "len",
+          "lineNumber": 471
+        },
+        {
+          "caller": "createnestparamtup",
+          "callee": "self.getnumspaces",
+          "lineNumber": 471
+        },
+        {
+          "caller": "createnestparamtup",
+          "callee": "self.createnestparamtup",
+          "lineNumber": 472
+        },
+        {
+          "caller": "createnestparamtup",
+          "callee": "ln.lstrip",
+          "lineNumber": 475
+        },
+        {
+          "caller": "createdict_tup",
+          "callee": "self.partitionlineitem",
+          "lineNumber": 487
+        },
+        {
+          "caller": "createdict_tup",
+          "callee": "len",
+          "lineNumber": 488
+        },
+        {
+          "caller": "createdict_tup",
+          "callee": "dict",
+          "lineNumber": 490
+        },
+        {
+          "caller": "createdict_tup",
+          "callee": "self.createdict_tup",
+          "lineNumber": 490
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 518
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "regexcompile(\"[A-Z][a-z]*\").findall",
+          "lineNumber": 518
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "regexcompile",
+          "lineNumber": 518
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "max",
+          "lineNumber": 520
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "set",
+          "lineNumber": 525
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 526
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 526
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "numpy.zeros",
+          "lineNumber": 529
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 530
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 530
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "enumerate",
+          "lineNumber": 533
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "cels_set_ordered.index",
+          "lineNumber": 536
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "numpy.identity",
+          "lineNumber": 540
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 540
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "float",
+          "lineNumber": 546
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "concstr.split",
+          "lineNumber": 546
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "cel.strip",
+          "lineNumber": 548
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "cels.split",
+          "lineNumber": 548
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "set",
+          "lineNumber": 549
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 550
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 550
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "regexcompile(\"[A-Z][a-z]*\").findall",
+          "lineNumber": 553
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "regexcompile",
+          "lineNumber": 553
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "enumerate",
+          "lineNumber": 556
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "enumerate",
+          "lineNumber": 557
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 561
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "els_tuplist.pop",
+          "lineNumber": 562
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 566
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 566
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "numpy.zeros",
+          "lineNumber": 576
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 577
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "zip",
+          "lineNumber": 579
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "cels_set_ordered.index",
+          "lineNumber": 580
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "numpy.identity",
+          "lineNumber": 586
+        },
+        {
+          "caller": "get_multielementink_concentrationinfo",
+          "callee": "len",
+          "lineNumber": 586
+        },
+        {
+          "caller": "partitionlineitem",
+          "callee": "ln.strip().partition",
+          "lineNumber": 591
+        },
+        {
+          "caller": "partitionlineitem",
+          "callee": "ln.strip",
+          "lineNumber": 591
+        },
+        {
+          "caller": "partitionlineitem",
+          "callee": "a.strip",
+          "lineNumber": 592
+        },
+        {
+          "caller": "partitionlineitem",
+          "callee": "c.strip",
+          "lineNumber": 592
+        },
+        {
+          "caller": "myeval",
+          "callee": "c.lstrip",
+          "lineNumber": 605
+        },
+        {
+          "caller": "myeval",
+          "callee": "eval",
+          "lineNumber": 609
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "open",
+          "lineNumber": 638
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "erroruifcn",
+          "lineNumber": 642
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "len",
+          "lineNumber": 643
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "open",
+          "lineNumber": 645
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "f.readlines",
+          "lineNumber": 647
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "f.close",
+          "lineNumber": 648
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "ls[0].partition(\"=\")[2].partition(\"mm\")[0].strip",
+          "lineNumber": 653
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "ls[0].partition(\"=\")[2].partition",
+          "lineNumber": 653
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "ls[0].partition",
+          "lineNumber": 653
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.find",
+          "lineNumber": 655
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.find",
+          "lineNumber": 655
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "LOGGER.warning",
+          "lineNumber": 657
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "LOGGER.info",
+          "lineNumber": 660
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace(\n                        \"(   \",\n                        \"(  \",\n                    )\n                    .replace(\n                        \"(  \",\n                        \"( \",\n                    )\n                    .replace(\n                        \"( \",\n                        \"(\",\n                    )\n                    .replace(\n                        \"   )\",\n                        \"  )\",\n                    )\n                    .replace(\n                        \",  \",\n                        \",\",\n                    )\n                    .replace(\n                        \", \",\n                        \",\",\n                    )\n                    .replace(\n                        \"  )\",\n                        \" )\",\n                    )\n                    .replace(\n                        \" )\",\n                        \")\",\n                    )\n                    .replace(\n                        \"   \",\n                        \",\",\n                    )\n                    .replace(\n                        \"  \",\n                        \",\",\n                    )\n                    .replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace(\n                        \"(   \",\n                        \"(  \",\n                    )\n                    .replace(\n                        \"(  \",\n                        \"( \",\n                    )\n                    .replace(\n                        \"( \",\n                        \"(\",\n                    )\n                    .replace(\n                        \"   )\",\n                        \"  )\",\n                    )\n                    .replace(\n                        \",  \",\n                        \",\",\n                    )\n                    .replace(\n                        \", \",\n                        \",\",\n                    )\n                    .replace(\n                        \"  )\",\n                        \" )\",\n                    )\n                    .replace(\n                        \" )\",\n                        \")\",\n                    )\n                    .replace(\n                        \"   \",\n                        \",\",\n                    )\n                    .replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace(\n                        \"(   \",\n                        \"(  \",\n                    )\n                    .replace(\n                        \"(  \",\n                        \"( \",\n                    )\n                    .replace(\n                        \"( \",\n                        \"(\",\n                    )\n                    .replace(\n                        \"   )\",\n                        \"  )\",\n                    )\n                    .replace(\n                        \",  \",\n                        \",\",\n                    )\n                    .replace(\n                        \", \",\n                        \",\",\n                    )\n                    .replace(\n                        \"  )\",\n                        \" )\",\n                    )\n                    .replace(\n                        \" )\",\n                        \")\",\n                    )\n                    .replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace(\n                        \"(   \",\n                        \"(  \",\n                    )\n                    .replace(\n                        \"(  \",\n                        \"( \",\n                    )\n                    .replace(\n                        \"( \",\n                        \"(\",\n                    )\n                    .replace(\n                        \"   )\",\n                        \"  )\",\n                    )\n                    .replace(\n                        \",  \",\n                        \",\",\n                    )\n                    .replace(\n                        \", \",\n                        \",\",\n                    )\n                    .replace(\n                        \"  )\",\n                        \" )\",\n                    )\n                    .replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace(\n                        \"(   \",\n                        \"(  \",\n                    )\n                    .replace(\n                        \"(  \",\n                        \"( \",\n                    )\n                    .replace(\n                        \"( \",\n                        \"(\",\n                    )\n                    .replace(\n                        \"   )\",\n                        \"  )\",\n                    )\n                    .replace(\n                        \",  \",\n                        \",\",\n                    )\n                    .replace(\n                        \", \",\n                        \",\",\n                    )\n                    .replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace(\n                        \"(   \",\n                        \"(  \",\n                    )\n                    .replace(\n                        \"(  \",\n                        \"( \",\n                    )\n                    .replace(\n                        \"( \",\n                        \"(\",\n                    )\n                    .replace(\n                        \"   )\",\n                        \"  )\",\n                    )\n                    .replace(\n                        \",  \",\n                        \",\",\n                    )\n                    .replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace(\n                        \"(   \",\n                        \"(  \",\n                    )\n                    .replace(\n                        \"(  \",\n                        \"( \",\n                    )\n                    .replace(\n                        \"( \",\n                        \"(\",\n                    )\n                    .replace(\n                        \"   )\",\n                        \"  )\",\n                    )\n                    .replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace(\n                        \"(   \",\n                        \"(  \",\n                    )\n                    .replace(\n                        \"(  \",\n                        \"( \",\n                    )\n                    .replace(\n                        \"( \",\n                        \"(\",\n                    )\n                    .replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace(\n                        \"(   \",\n                        \"(  \",\n                    )\n                    .replace(\n                        \"(  \",\n                        \"( \",\n                    )\n                    .replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace(\n                        \"(   \",\n                        \"(  \",\n                    )\n                    .replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.replace",
+          "lineNumber": 662
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "LOGGER.info",
+          "lineNumber": 707
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "eval",
+          "lineNumber": 708
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "enumerate",
+          "lineNumber": 711
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "l.startswith",
+          "lineNumber": 712
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "ls[count - 1][1:].split",
+          "lineNumber": 715
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "(k.partition(\"(\")[0]).strip",
+          "lineNumber": 716
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "k.partition",
+          "lineNumber": 716
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "l.count",
+          "lineNumber": 718
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "len",
+          "lineNumber": 718
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "l.split",
+          "lineNumber": 721
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "dict",
+          "lineNumber": 722
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "self.myeval",
+          "lineNumber": 722
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "s.strip",
+          "lineNumber": 722
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "zip",
+          "lineNumber": 722
+        },
+        {
+          "caller": "readsingleplatemaptxt",
+          "callee": "dict",
+          "lineNumber": 726
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/helpers/plate_api.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 305,
+      "nonEmptyLines": 262,
+      "classes": [
+        {
+          "name": "HTEPlateAPI",
+          "startLine": 24,
+          "endLine": 305,
+          "methods": [
+            "__init__",
+            "has_access",
+            "get_info",
+            "get_print_plateid",
+            "get_platemap",
+            "get_platemapdlist",
+            "get_info_plateid",
+            "get_platemap_plateid",
+            "get_rcp_plateid",
+            "check_plateid",
+            "check_printrecord_plateid",
+            "check_annealrecord_plateid",
+            "get_print",
+            "get_elements_plateid"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "HTEPlateAPI",
+          "line": 24,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "os.path.exists",
+          "lineNumber": 46
+        },
+        {
+          "caller": "__init__",
+          "callee": "HelaoLoader",
+          "lineNumber": 48
+        },
+        {
+          "caller": "__init__",
+          "callee": "LOGGER.warning",
+          "lineNumber": 50
+        },
+        {
+          "caller": "__init__",
+          "callee": "HTELegacyAPI",
+          "lineNumber": 56
+        },
+        {
+          "caller": "has_access",
+          "callee": "self.loader.sess.client",
+          "lineNumber": 64
+        },
+        {
+          "caller": "has_access",
+          "callee": "sts_client.get_caller_identity",
+          "lineNumber": 65
+        },
+        {
+          "caller": "has_access",
+          "callee": "LOGGER.error",
+          "lineNumber": 68
+        },
+        {
+          "caller": "get_info",
+          "callee": "httpx.get",
+          "lineNumber": 82
+        },
+        {
+          "caller": "get_info",
+          "callee": "resp.json",
+          "lineNumber": 87
+        },
+        {
+          "caller": "get_info",
+          "callee": "LOGGER.error",
+          "lineNumber": 89
+        },
+        {
+          "caller": "get_print_plateid",
+          "callee": "httpx.get",
+          "lineNumber": 103
+        },
+        {
+          "caller": "get_print_plateid",
+          "callee": "resp.json",
+          "lineNumber": 108
+        },
+        {
+          "caller": "get_print_plateid",
+          "callee": "sorted",
+          "lineNumber": 109
+        },
+        {
+          "caller": "get_print_plateid",
+          "callee": "LOGGER.error",
+          "lineNumber": 114
+        },
+        {
+          "caller": "get_platemap",
+          "callee": "self.loader.cli.list_objects_v2(\n                Bucket=\"sync.j\", Prefix=f\"hte_jcap_app_proto__unzipped/map/{map_id:04}\"\n            ).get",
+          "lineNumber": 131
+        },
+        {
+          "caller": "get_platemap",
+          "callee": "self.loader.cli.list_objects_v2",
+          "lineNumber": 131
+        },
+        {
+          "caller": "get_platemap",
+          "callee": "f[\"Key\"].endswith",
+          "lineNumber": 134
+        },
+        {
+          "caller": "get_platemap",
+          "callee": "self.loader.get_bytes",
+          "lineNumber": 137
+        },
+        {
+          "caller": "get_platemap",
+          "callee": "pd.read_csv",
+          "lineNumber": 138
+        },
+        {
+          "caller": "get_platemap",
+          "callee": "x.split(\"(\")[0].replace(\"%\", \"\").strip",
+          "lineNumber": 140
+        },
+        {
+          "caller": "get_platemap",
+          "callee": "x.split(\"(\")[0].replace",
+          "lineNumber": 140
+        },
+        {
+          "caller": "get_platemap",
+          "callee": "x.split",
+          "lineNumber": 140
+        },
+        {
+          "caller": "get_platemapdlist",
+          "callee": "self.get_platemap",
+          "lineNumber": 154
+        },
+        {
+          "caller": "get_platemapdlist",
+          "callee": "map_df[col].apply",
+          "lineNumber": 157
+        },
+        {
+          "caller": "get_platemapdlist",
+          "callee": "float",
+          "lineNumber": 157
+        },
+        {
+          "caller": "get_platemapdlist",
+          "callee": "x.strip",
+          "lineNumber": 157
+        },
+        {
+          "caller": "get_platemapdlist",
+          "callee": "map_df.to_dict",
+          "lineNumber": 162
+        },
+        {
+          "caller": "get_info_plateid",
+          "callee": "self.legacy_api.get_info_plateid",
+          "lineNumber": 171
+        },
+        {
+          "caller": "get_info_plateid",
+          "callee": "self.get_info",
+          "lineNumber": 172
+        },
+        {
+          "caller": "get_info_plateid",
+          "callee": "self.get_platemapdlist",
+          "lineNumber": 178
+        },
+        {
+          "caller": "get_platemap_plateid",
+          "callee": "self.legacy_api.get_platemap_plateid",
+          "lineNumber": 183
+        },
+        {
+          "caller": "get_platemap_plateid",
+          "callee": "self.get_info_plateid",
+          "lineNumber": 185
+        },
+        {
+          "caller": "get_rcp_plateid",
+          "callee": "LOGGER.info",
+          "lineNumber": 189
+        },
+        {
+          "caller": "get_rcp_plateid",
+          "callee": "self.legacy_api.get_rcp_plateid",
+          "lineNumber": 190
+        },
+        {
+          "caller": "check_plateid",
+          "callee": "self.legacy_api.check_plateid",
+          "lineNumber": 195
+        },
+        {
+          "caller": "check_plateid",
+          "callee": "self.get_info",
+          "lineNumber": 196
+        },
+        {
+          "caller": "check_printrecord_plateid",
+          "callee": "self.legacy_api.check_printrecord_plateid",
+          "lineNumber": 206
+        },
+        {
+          "caller": "check_printrecord_plateid",
+          "callee": "self.get_info",
+          "lineNumber": 207
+        },
+        {
+          "caller": "check_annealrecord_plateid",
+          "callee": "self.legacy_api.check_annealrecord_plateid",
+          "lineNumber": 217
+        },
+        {
+          "caller": "check_annealrecord_plateid",
+          "callee": "self.get_info",
+          "lineNumber": 218
+        },
+        {
+          "caller": "get_print",
+          "callee": "httpx.get",
+          "lineNumber": 236
+        },
+        {
+          "caller": "get_print",
+          "callee": "resp.json",
+          "lineNumber": 241
+        },
+        {
+          "caller": "get_print",
+          "callee": "LOGGER.error",
+          "lineNumber": 243
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "isinstance",
+          "lineNumber": 266
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "self.legacy_api.get_elements_plateid",
+          "lineNumber": 270
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "self.get_info",
+          "lineNumber": 275
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "infofiled.get",
+          "lineNumber": 278
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "self.get_print",
+          "lineNumber": 282
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "printd.keys",
+          "lineNumber": 283
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "isinstance",
+          "lineNumber": 283
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "LOGGER.warning",
+          "lineNumber": 284
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "self.get_print_plateid",
+          "lineNumber": 285
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "d[\"chemical_id\"].split(\"_\")[0].capitalize",
+          "lineNumber": 290
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "d[\"chemical_id\"].split",
+          "lineNumber": 290
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "mendeleev.element",
+          "lineNumber": 297
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "LOGGER.warning",
+          "lineNumber": 302
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "LOGGER.warning",
+          "lineNumber": 303
+        },
+        {
+          "caller": "get_elements_plateid",
+          "callee": "LOGGER.warning",
+          "lineNumber": 304
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "helao/helpers/to_json.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 61,
+      "nonEmptyLines": 49,
+      "functions": [
+        {
+          "name": "fix_numerics",
+          "startLine": 8,
+          "endLine": 41,
+          "params": [
+            "val"
+          ]
+        },
+        {
+          "name": "parse_bokeh_input",
+          "startLine": 44,
+          "endLine": 61,
+          "params": [
+            "v"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "fix_numerics",
+          "line": 8,
+          "isDefault": false
+        },
+        {
+          "name": "parse_bokeh_input",
+          "line": 44,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "fix_numerics",
+          "callee": "isinstance",
+          "lineNumber": 21
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "val.strip",
+          "lineNumber": 22
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "eval",
+          "lineNumber": 24
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "stripped.lower",
+          "lineNumber": 25
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "stripped.lstrip(\"-\")\n            .replace(\".\", \"\", 1)\n            .replace(\"e-\", \"\", 1)\n            .replace",
+          "lineNumber": 27
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "stripped.lstrip(\"-\")\n            .replace(\".\", \"\", 1)\n            .replace",
+          "lineNumber": 27
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "stripped.lstrip(\"-\")\n            .replace",
+          "lineNumber": 27
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "stripped.lstrip",
+          "lineNumber": 27
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "cleaned.isdigit",
+          "lineNumber": 32
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "float",
+          "lineNumber": 33
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "isinstance",
+          "lineNumber": 35
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "parse_bokeh_input",
+          "lineNumber": 36
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "isinstance",
+          "lineNumber": 38
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "parse_bokeh_input",
+          "lineNumber": 39
+        },
+        {
+          "caller": "fix_numerics",
+          "callee": "val.items",
+          "lineNumber": 39
+        },
+        {
+          "caller": "parse_bokeh_input",
+          "callee": "json.loads",
+          "lineNumber": 58
+        },
+        {
+          "caller": "parse_bokeh_input",
+          "callee": "v.replace",
+          "lineNumber": 58
+        },
+        {
+          "caller": "parse_bokeh_input",
+          "callee": "fix_numerics",
+          "lineNumber": 61
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/helpers/ws_utils.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 136,
+      "nonEmptyLines": 109,
+      "classes": [
+        {
+          "name": "WsPublisher",
+          "startLine": 23,
+          "endLine": 67,
+          "methods": [
+            "__init__",
+            "connect",
+            "disconnect",
+            "broadcast"
+          ],
+          "properties": [
+            "active_connections"
+          ]
+        },
+        {
+          "name": "WsSyncClient",
+          "startLine": 70,
+          "endLine": 96,
+          "methods": [
+            "__init__",
+            "read_messages"
+          ],
+          "properties": []
+        },
+        {
+          "name": "WsSubscriber",
+          "startLine": 99,
+          "endLine": 136,
+          "methods": [
+            "__init__",
+            "subscriber_loop",
+            "read_messages"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "WsPublisher",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "WsSyncClient",
+          "line": 70,
+          "isDefault": false
+        },
+        {
+          "name": "WsSubscriber",
+          "line": 99,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "connect",
+          "callee": "websocket.accept",
+          "lineNumber": 45
+        },
+        {
+          "caller": "connect",
+          "callee": "self.active_connections.append",
+          "lineNumber": 46
+        },
+        {
+          "caller": "disconnect",
+          "callee": "self.active_connections.remove",
+          "lineNumber": 50
+        },
+        {
+          "caller": "broadcast",
+          "callee": "self.source_queue.subscribe",
+          "lineNumber": 58
+        },
+        {
+          "caller": "broadcast",
+          "callee": "self.source_queue.subscribe",
+          "lineNumber": 60
+        },
+        {
+          "caller": "broadcast",
+          "callee": "websocket.send_bytes",
+          "lineNumber": 61
+        },
+        {
+          "caller": "broadcast",
+          "callee": "pyzstd.compress",
+          "lineNumber": 62
+        },
+        {
+          "caller": "broadcast",
+          "callee": "pickle.dumps",
+          "lineNumber": 62
+        },
+        {
+          "caller": "broadcast",
+          "callee": "self.xform_func",
+          "lineNumber": 62
+        },
+        {
+          "caller": "broadcast",
+          "callee": "print",
+          "lineNumber": 65
+        },
+        {
+          "caller": "broadcast",
+          "callee": "self.source_queue.remove",
+          "lineNumber": 67
+        },
+        {
+          "caller": "read_messages",
+          "callee": "range",
+          "lineNumber": 87
+        },
+        {
+          "caller": "read_messages",
+          "callee": "connect",
+          "lineNumber": 89
+        },
+        {
+          "caller": "read_messages",
+          "callee": "conn.recv",
+          "lineNumber": 90
+        },
+        {
+          "caller": "read_messages",
+          "callee": "pickle.loads",
+          "lineNumber": 92
+        },
+        {
+          "caller": "read_messages",
+          "callee": "pyzstd.decompress",
+          "lineNumber": 92
+        },
+        {
+          "caller": "read_messages",
+          "callee": "print",
+          "lineNumber": 94
+        },
+        {
+          "caller": "read_messages",
+          "callee": "time.sleep",
+          "lineNumber": 95
+        },
+        {
+          "caller": "__init__",
+          "callee": "collections.deque",
+          "lineNumber": 109
+        },
+        {
+          "caller": "__init__",
+          "callee": "asyncio.create_task",
+          "lineNumber": 110
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.subscriber_loop",
+          "lineNumber": 110
+        },
+        {
+          "caller": "subscriber_loop",
+          "callee": "range",
+          "lineNumber": 119
+        },
+        {
+          "caller": "subscriber_loop",
+          "callee": "websockets.connect",
+          "lineNumber": 121
+        },
+        {
+          "caller": "subscriber_loop",
+          "callee": "ws.recv",
+          "lineNumber": 123
+        },
+        {
+          "caller": "subscriber_loop",
+          "callee": "pickle.loads",
+          "lineNumber": 124
+        },
+        {
+          "caller": "subscriber_loop",
+          "callee": "pyzstd.decompress",
+          "lineNumber": 124
+        },
+        {
+          "caller": "subscriber_loop",
+          "callee": "self.recv_queue.append",
+          "lineNumber": 125
+        },
+        {
+          "caller": "subscriber_loop",
+          "callee": "print",
+          "lineNumber": 127
+        },
+        {
+          "caller": "subscriber_loop",
+          "callee": "time.sleep",
+          "lineNumber": 128
+        },
+        {
+          "caller": "read_messages",
+          "callee": "messages.append",
+          "lineNumber": 134
+        },
+        {
+          "caller": "read_messages",
+          "callee": "self.recv_queue.popleft",
+          "lineNumber": 134
+        },
+        {
+          "caller": "read_messages",
+          "callee": "asyncio.sleep",
+          "lineNumber": 135
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 0,
+        "classCount": 3
+      }
+    }
+  ]
+}

@@ -1,0 +1,559 @@
+{
+  "nodes": [
+    {
+      "id": "file:helao/deploy/hte/experiments/archive/list_all_params.ipynb",
+      "type": "file",
+      "name": "list_all_params.ipynb",
+      "filePath": "helao/deploy/hte/experiments/archive/list_all_params.ipynb",
+      "summary": "Archived Jupyter notebook used for ad-hoc introspection of experiment parameters across the HTE deployment's experiment library.",
+      "tags": ["notebook", "archive", "experiment", "introspection"],
+      "complexity": "moderate",
+      "languageNotes": "Jupyter notebook; not part of the runtime server group, kept under an archive directory for reference."
+    },
+    {
+      "id": "file:helao/deploy/hte/layouts/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/layouts/__init__.py",
+      "summary": "Package initializer for the HTE deployment's layouts module (well-plate / instrument layout definitions).",
+      "tags": ["entry-point", "package-init", "layouts"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/processors/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/processors/__init__.py",
+      "summary": "Package initializer for the HTE deployment's post-run data processors module.",
+      "tags": ["entry-point", "package-init", "processors"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/processors/libs/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/processors/libs/__init__.py",
+      "summary": "Package initializer for the processor support libraries used by HTE data analysis routines.",
+      "tags": ["entry-point", "package-init", "processors"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "type": "file",
+      "name": "hispec_class_2.py",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "summary": "Spectroelectrochemistry (SpEC) analysis library defining the SpEC data container class plus a suite of functions for computing, normalizing, downsampling, and plotting delta-optical-density (DOD) and cyclic-voltammetry data.",
+      "tags": ["data-analysis", "spectroscopy", "electrochemistry", "plotting", "utility"],
+      "complexity": "complex",
+      "languageNotes": "Heavy use of pandas/numpy/scipy/matplotlib; reads HELAO .hlo and parquet outputs and offers tkinter file-dialog helpers for interactive notebook use."
+    },
+    {
+      "id": "file:helao/deploy/hte/sequences/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/sequences/__init__.py",
+      "summary": "Empty package initializer marking the HTE deployment's sequence library directory as a Python package.",
+      "tags": ["entry-point", "package-init", "sequences"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/servers/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/servers/__init__.py",
+      "summary": "Package initializer for the HTE deployment's servers module, which groups action, orchestrator, visualizer, and operator server packages.",
+      "tags": ["entry-point", "package-init", "servers"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/servers/action/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/servers/action/__init__.py",
+      "summary": "Package initializer for the HTE deployment's action server package.",
+      "tags": ["entry-point", "package-init", "action-server"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/servers/operator/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/servers/operator/__init__.py",
+      "summary": "Empty package initializer marking the HTE operator server directory as a Python package.",
+      "tags": ["entry-point", "package-init", "operator-server"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/servers/orchestrator/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/servers/orchestrator/__init__.py",
+      "summary": "Empty package initializer marking the HTE orchestrator server directory as a Python package.",
+      "tags": ["entry-point", "package-init", "orchestrator-server"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/servers/visualizer/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/servers/visualizer/__init__.py",
+      "summary": "Empty package initializer marking the HTE visualizer server directory as a Python package.",
+      "tags": ["entry-point", "package-init", "visualizer-server"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/servers/visualizer/styles.css",
+      "type": "file",
+      "name": "styles.css",
+      "filePath": "helao/deploy/hte/servers/visualizer/styles.css",
+      "summary": "Stylesheet customizing the appearance of the HTE deployment's Bokeh visualizer web pages.",
+      "tags": ["stylesheet", "css", "visualizer", "ui"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/helpers/gcld_client.py",
+      "type": "file",
+      "name": "gcld_client.py",
+      "filePath": "helao/helpers/gcld_client.py",
+      "summary": "HTTP client wrapper around an external data-requests REST API, providing pydantic request/response models and a DataRequestsClient for creating, reading, updating, acknowledging, and status-tracking gcld data requests.",
+      "tags": ["api-handler", "http-client", "data-model", "service"],
+      "complexity": "moderate",
+      "languageNotes": "Uses httpx.Client behind a context manager and pydantic-settings for BASE_URL/API_KEY configuration."
+    },
+    {
+      "id": "file:helao/helpers/rcp_to_dict.py",
+      "type": "file",
+      "name": "rcp_to_dict.py",
+      "filePath": "helao/helpers/rcp_to_dict.py",
+      "summary": "Utility that parses tab-indented .rcp instrument metadata files (optionally inside zip archives) into a nested Python dictionary.",
+      "tags": ["utility", "parser", "serialization", "metadata"],
+      "complexity": "moderate",
+      "languageNotes": "Recursively converts an indentation-based tree into nested dicts, appending duplicate keys into lists."
+    },
+    {
+      "id": "file:helao/helpers/zeroconf_manager.drawio",
+      "type": "file",
+      "name": "zeroconf_manager.drawio",
+      "filePath": "helao/helpers/zeroconf_manager.drawio",
+      "summary": "Draw.io diagram documenting the design of the Zeroconf/mDNS service-registration manager.",
+      "tags": ["diagram", "documentation", "design", "zeroconf"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/helpers/zeroconf_manager.py",
+      "type": "file",
+      "name": "zeroconf_manager.py",
+      "filePath": "helao/helpers/zeroconf_manager.py",
+      "summary": "Wraps python-zeroconf's AsyncZeroconf to register and unregister HELAO server services over mDNS, exposing simple enable/disable methods that drive the async registration coroutines.",
+      "tags": ["service", "networking", "zeroconf", "service-discovery"],
+      "complexity": "moderate",
+      "languageNotes": "Bridges synchronous enable/disable calls onto an asyncio event loop via run_until_complete."
+    },
+    {
+      "id": "class:helao/deploy/hte/processors/libs/hispec_class_2.py:SpEC",
+      "type": "class",
+      "name": "SpEC",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [29, 245],
+      "summary": "Data container for a spectroelectrochemistry experiment that loads CV (.hlo) and Andor spectral (parquet) data, builds interpolation maps, and splits scans into anodic/cathodic per-cycle DataFrames.",
+      "tags": ["data-model", "spectroscopy", "electrochemistry", "container"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:calculateDOD",
+      "type": "function",
+      "name": "calculateDOD",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [248, 301],
+      "summary": "Computes the delta optical density (DOD) for a given cycle and scan direction relative to a reference potential, with optional Savitzky-Golay smoothing.",
+      "tags": ["data-analysis", "spectroscopy", "computation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:plot_DOD",
+      "type": "function",
+      "name": "plot_DOD",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [304, 377],
+      "summary": "Renders a DOD spectrum DataFrame as a potential-colored line plot with a colorbar and configurable axis limits.",
+      "tags": ["plotting", "visualization", "spectroscopy"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:Co_plot_DOD_and_CV",
+      "type": "function",
+      "name": "Co_plot_DOD_and_CV",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [380, 541],
+      "summary": "Produces a side-by-side figure overlaying DOD spectra with the corresponding cyclic-voltammetry curve, including reference-electrode correction and annotations.",
+      "tags": ["plotting", "visualization", "electrochemistry"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:normalise_DOD",
+      "type": "function",
+      "name": "normalise_DOD",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [544, 562],
+      "summary": "Normalizes a DOD DataFrame either by its maximum value or across its min-max range.",
+      "tags": ["data-analysis", "normalization", "spectroscopy"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:select_spectrum_at_nearest_voltage",
+      "type": "function",
+      "name": "select_spectrum_at_nearest_voltage",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [565, 582],
+      "summary": "Selects the spectrum column whose potential is closest to a requested voltage from a DOD DataFrame.",
+      "tags": ["data-analysis", "selection", "spectroscopy"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:downsample_spectra_for_differential_analysis",
+      "type": "function",
+      "name": "downsample_spectra_for_differential_analysis",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [585, 619],
+      "summary": "Downsamples a DOD DataFrame onto a regular voltage grid by selecting nearest-voltage spectra at a fixed step.",
+      "tags": ["data-analysis", "downsampling", "spectroscopy"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:calculate_differential_spectra",
+      "type": "function",
+      "name": "calculate_differential_spectra",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [622, 662],
+      "summary": "Computes voltage-step differential spectra from a DOD DataFrame with optional smoothing and normalization.",
+      "tags": ["data-analysis", "differential", "spectroscopy"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:fit_current_to_univariate_spline",
+      "type": "function",
+      "name": "fit_current_to_univariate_spline",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [665, 705],
+      "summary": "Fits a smoothing UnivariateSpline to current-versus-potential data and optionally plots the fit.",
+      "tags": ["data-analysis", "curve-fitting", "electrochemistry"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:Downsample_Potential",
+      "type": "function",
+      "name": "Downsample_Potential",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [708, 751],
+      "summary": "Rounds spectral scan potentials to a target resolution and averages spectra sharing the same rounded voltage.",
+      "tags": ["data-analysis", "downsampling", "spectroscopy"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:yml_load",
+      "type": "function",
+      "name": "yml_load",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [785, 808],
+      "summary": "Loads YAML content from a path or string using ruamel.yaml, handling both file-like and raw inputs.",
+      "tags": ["utility", "serialization", "yaml"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:read_hlo",
+      "type": "function",
+      "name": "read_hlo",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [811, 862],
+      "summary": "Parses a HELAO .hlo file, separating the YAML metadata header from the JSON-lines data body into a metadata dict and a column-keyed data dict.",
+      "tags": ["utility", "parser", "serialization", "hlo"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:read_CV_hlo",
+      "type": "function",
+      "name": "read_CV_hlo",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [865, 912],
+      "summary": "Reads a cyclic-voltammetry .hlo file into a pandas DataFrame with configurable column headers and optional metadata return.",
+      "tags": ["utility", "parser", "electrochemistry", "hlo"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:extract_average_spectrum_in_voltage_window",
+      "type": "function",
+      "name": "extract_average_spectrum_in_voltage_window",
+      "filePath": "helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "lineRange": [932, 960],
+      "summary": "Averages spectra whose potentials fall within a given lower/upper voltage window from a DOD DataFrame.",
+      "tags": ["data-analysis", "averaging", "spectroscopy"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:helao/helpers/gcld_client.py:DataRequestsClient",
+      "type": "class",
+      "name": "DataRequestsClient",
+      "filePath": "helao/helpers/gcld_client.py",
+      "lineRange": [110, 253],
+      "summary": "Context-managed HTTP client for the gcld data-requests REST API, exposing create/read/update/delete, acknowledge, set-status, and list operations over an httpx session.",
+      "tags": ["api-handler", "http-client", "service"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:helao/helpers/gcld_client.py:BaseDataRequestModel",
+      "type": "class",
+      "name": "BaseDataRequestModel",
+      "filePath": "helao/helpers/gcld_client.py",
+      "lineRange": [46, 61],
+      "summary": "Pydantic base model describing a data request's status, composition, score, sample label, and analysis fields.",
+      "tags": ["data-model", "validation", "type-definition"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:helao/helpers/zeroconf_manager.py:ZeroconfManager",
+      "type": "class",
+      "name": "ZeroconfManager",
+      "filePath": "helao/helpers/zeroconf_manager.py",
+      "lineRange": [16, 73],
+      "summary": "Registers and unregisters a HELAO server's mDNS service via AsyncZeroconf, exposing synchronous enable/disable wrappers around the async registration coroutines.",
+      "tags": ["service", "networking", "zeroconf", "service-discovery"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/helpers/rcp_to_dict.py:rcp_to_dict",
+      "type": "function",
+      "name": "rcp_to_dict",
+      "filePath": "helao/helpers/rcp_to_dict.py",
+      "lineRange": [9, 109],
+      "summary": "Reads a tab-indented .rcp metadata file (plain or zipped) and recursively converts its indentation tree into a nested dictionary via internal helpers.",
+      "tags": ["utility", "parser", "serialization", "metadata"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "class:helao/deploy/hte/processors/libs/hispec_class_2.py:SpEC",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "class:helao/deploy/hte/processors/libs/hispec_class_2.py:SpEC",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:calculateDOD",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:calculateDOD",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:plot_DOD",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:plot_DOD",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:Co_plot_DOD_and_CV",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:Co_plot_DOD_and_CV",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:normalise_DOD",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:select_spectrum_at_nearest_voltage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:downsample_spectra_for_differential_analysis",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:calculate_differential_spectra",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:fit_current_to_univariate_spline",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:Downsample_Potential",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:yml_load",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:read_hlo",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:read_CV_hlo",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/deploy/hte/processors/libs/hispec_class_2.py",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:extract_average_spectrum_in_voltage_window",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:read_CV_hlo",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:read_hlo",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:read_hlo",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:yml_load",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:calculate_differential_spectra",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:downsample_spectra_for_differential_analysis",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:calculate_differential_spectra",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:normalise_DOD",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:downsample_spectra_for_differential_analysis",
+      "target": "function:helao/deploy/hte/processors/libs/hispec_class_2.py:select_spectrum_at_nearest_voltage",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/helpers/gcld_client.py",
+      "target": "class:helao/helpers/gcld_client.py:DataRequestsClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/helpers/gcld_client.py",
+      "target": "class:helao/helpers/gcld_client.py:DataRequestsClient",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/helpers/gcld_client.py",
+      "target": "class:helao/helpers/gcld_client.py:BaseDataRequestModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/helpers/gcld_client.py",
+      "target": "class:helao/helpers/gcld_client.py:BaseDataRequestModel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/helpers/zeroconf_manager.py",
+      "target": "class:helao/helpers/zeroconf_manager.py:ZeroconfManager",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/helpers/zeroconf_manager.py",
+      "target": "class:helao/helpers/zeroconf_manager.py:ZeroconfManager",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:helao/helpers/zeroconf_manager.drawio",
+      "target": "file:helao/helpers/zeroconf_manager.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:helao/helpers/rcp_to_dict.py",
+      "target": "function:helao/helpers/rcp_to_dict.py:rcp_to_dict",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:helao/helpers/rcp_to_dict.py",
+      "target": "function:helao/helpers/rcp_to_dict.py:rcp_to_dict",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

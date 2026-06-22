@@ -1,0 +1,521 @@
+{
+  "nodes": [
+    {
+      "id": "file:helao/deploy/hte/drivers/io/galil_toggle_main.dmc",
+      "type": "file",
+      "name": "galil_toggle_main.dmc",
+      "filePath": "helao/deploy/hte/drivers/io/galil_toggle_main.dmc",
+      "summary": "Galil DMC controller program implementing the main thread of a digital-output toggle routine triggered by an input edge.",
+      "tags": ["galil", "dmc", "io", "controller-program", "hardware"],
+      "complexity": "simple",
+      "languageNotes": "Galil DMC motion-controller language; programs are downloaded to the controller and started with XQ."
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/io/galil_toggle_sub_req.dmc",
+      "type": "file",
+      "name": "galil_toggle_sub_req.dmc",
+      "filePath": "helao/deploy/hte/drivers/io/galil_toggle_sub_req.dmc",
+      "summary": "Galil DMC subroutine variant that toggles a digital output on request, used by the IO action server's Galil backend.",
+      "tags": ["galil", "dmc", "io", "controller-program", "hardware"],
+      "complexity": "simple",
+      "languageNotes": "Galil DMC subroutine invoked from a main thread on the motion controller."
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/io/galil_toggle_sub.dmc",
+      "type": "file",
+      "name": "galil_toggle_sub.dmc",
+      "filePath": "helao/deploy/hte/drivers/io/galil_toggle_sub.dmc",
+      "summary": "Galil DMC subroutine that drives a single digital-output toggle on the IO controller.",
+      "tags": ["galil", "dmc", "io", "controller-program", "hardware"],
+      "complexity": "simple",
+      "languageNotes": "Galil DMC subroutine for digital output control."
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/io/galil_toggle.dmc",
+      "type": "file",
+      "name": "galil_toggle.dmc",
+      "filePath": "helao/deploy/hte/drivers/io/galil_toggle.dmc",
+      "summary": "Galil DMC program toggling a digital output in response to a trigger input, clearing outputs and waiting on input state.",
+      "tags": ["galil", "dmc", "io", "controller-program", "hardware"],
+      "complexity": "simple",
+      "languageNotes": "Galil DMC program using CB (clear bit) and AI (after input) controller primitives."
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/io/galil_two_toggle.dmc",
+      "type": "file",
+      "name": "galil_two_toggle.dmc",
+      "filePath": "helao/deploy/hte/drivers/io/galil_two_toggle.dmc",
+      "summary": "Galil DMC program coordinating two independent output toggles gated by trigger inputs, used for paired IO actuation on the HTE station.",
+      "tags": ["galil", "dmc", "io", "controller-program", "hardware"],
+      "complexity": "simple",
+      "languageNotes": "Galil DMC program with multiple controller threads/labels driving two outputs."
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/io/synaccess/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/io/synaccess/__init__.py",
+      "summary": "Package marker for the Synaccess networked power-distribution-unit driver under the IO driver group.",
+      "tags": ["barrel", "entry-point", "driver", "synaccess", "io"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/mfc/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/mfc/__init__.py",
+      "summary": "Package marker for the mass-flow-controller (MFC) driver subpackage in the HTE deployment.",
+      "tags": ["barrel", "entry-point", "driver", "mfc"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/motion/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/motion/__init__.py",
+      "summary": "Package marker for the motion-control (Galil) driver subpackage in the HTE deployment.",
+      "tags": ["barrel", "entry-point", "driver", "motion"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/power_supply/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/power_supply/__init__.py",
+      "summary": "Package marker for the power-supply driver subpackage in the HTE deployment.",
+      "tags": ["barrel", "entry-point", "driver", "power-supply"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/pstat/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/pstat/__init__.py",
+      "summary": "Potentiostat driver subpackage barrel hosting vendor-specific implementations (Biologic, Gamry) behind the HelaoDriver contract.",
+      "tags": ["barrel", "entry-point", "driver", "potentiostat"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/pstat/biologic/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/pstat/biologic/__init__.py",
+      "summary": "Package marker for the Biologic potentiostat driver implementation.",
+      "tags": ["barrel", "entry-point", "driver", "biologic", "potentiostat"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/pstat/gamry/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/pstat/gamry/__init__.py",
+      "summary": "Package marker for the Gamry potentiostat driver implementation (Windows-only, comtypes-based).",
+      "tags": ["barrel", "entry-point", "driver", "gamry", "potentiostat"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/pstat/gamry/tests/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/pstat/gamry/tests/__init__.py",
+      "summary": "Package marker for the Gamry potentiostat driver test subpackage.",
+      "tags": ["barrel", "test", "driver", "gamry"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/pump/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/pump/__init__.py",
+      "summary": "Package marker for the pump driver subpackage in the HTE deployment.",
+      "tags": ["barrel", "entry-point", "driver", "pump"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/robot/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/robot/__init__.py",
+      "summary": "Package marker for the robot (sample-handling) driver subpackage in the HTE deployment.",
+      "tags": ["barrel", "entry-point", "driver", "robot"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/sensor/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/sensor/__init__.py",
+      "summary": "Package marker for the sensor driver subpackage in the HTE deployment.",
+      "tags": ["barrel", "entry-point", "driver", "sensor"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/spec/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/spec/__init__.py",
+      "summary": "Spectrometer/spectroscopy driver subpackage barrel hosting vendor implementations such as the Andor camera stack.",
+      "tags": ["barrel", "entry-point", "driver", "spectrometer"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/spec/andor/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/__init__.py",
+      "summary": "Andor camera/spectrograph driver subpackage barrel wrapping the Andor SDK3 and ATSpectrograph libraries plus exploratory test scripts.",
+      "tags": ["barrel", "entry-point", "driver", "andor", "spectrometer"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "type": "file",
+      "name": "test_funcs.py",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "summary": "Standalone exploratory smoke-test script for the Andor SDK3 camera and ATSpectrograph stack: cools the sensor, configures the spectrograph, acquires images, optimises the ND filter, runs timed acquisition bursts, and warms down.",
+      "tags": ["test", "andor", "spectrometer", "acquisition", "script"],
+      "complexity": "complex",
+      "languageNotes": "Module-scope execution: importing the file runs the full acquisition sequence; relies on Windows-only pyAndorSDK3 and ATSpectrograph bindings."
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "type": "file",
+      "name": "test_read_loop.py",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "summary": "Near-duplicate of test_funcs.py adding a continuous read-loop acquisition path (setup_shot, single_shot_vbinned) for exploratory Andor camera timing and SEC acquisition testing.",
+      "tags": ["test", "andor", "spectrometer", "acquisition", "script"],
+      "complexity": "complex",
+      "languageNotes": "Adds vertically-binned single-shot helpers on top of the test_funcs acquisition routines; depends on pyAndorSDK3 and ATSpectrograph."
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/temperature_control/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/temperature_control/__init__.py",
+      "summary": "Package marker for the temperature-control driver subpackage in the HTE deployment.",
+      "tags": ["barrel", "entry-point", "driver", "temperature-control"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/test_station/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/test_station/__init__.py",
+      "summary": "Package marker for the test-station driver subpackage hosting fuel-cell test-station integrations.",
+      "tags": ["barrel", "entry-point", "driver", "test-station"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/drivers/test_station/leancat/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/drivers/test_station/leancat/__init__.py",
+      "summary": "LEANCAT fuel-cell test-station driver subpackage barrel exposing the LeancatDriver HelaoDriver implementation and its command/database/logger/station submodules.",
+      "tags": ["barrel", "entry-point", "driver", "leancat", "test-station"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:helao/deploy/hte/experiments/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "helao/deploy/hte/experiments/__init__.py",
+      "summary": "Experiment library package barrel; its modules are named in the experiment_libraries config list and dynamically imported by the HTE orchestrator at launch.",
+      "tags": ["barrel", "entry-point", "experiment-library", "orchestrator"],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:helao/deploy/hte/experiments/archive/current_params.csv",
+      "type": "table",
+      "name": "current_params.csv",
+      "filePath": "helao/deploy/hte/experiments/archive/current_params.csv",
+      "summary": "Archived reference table mapping experiment parameter names to their action, experiment, source module, and station type across HTE experiment libraries.",
+      "tags": ["data", "parameter-catalog", "experiment-library", "archive", "reference"],
+      "complexity": "complex",
+      "languageNotes": "Flat CSV catalog (parameter_name, action, experiment, exp.py, type) documenting parameter usage across experiments; no personal data."
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:SetupSpectroscope",
+      "type": "function",
+      "name": "SetupSpectroscope",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [161, 266],
+      "summary": "Initialises the ATSpectrograph, selects the grating, sets wavelength/slit/filter and pixel calibration, and returns the spectrograph calibration array.",
+      "tags": ["andor", "spectrograph", "configuration", "calibration"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:adjust_ND",
+      "type": "function",
+      "name": "adjust_ND",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [269, 378],
+      "summary": "Sweeps neutral-density filter positions across wavelengths, images each, and selects the ND setting that best fits the camera's dynamic range.",
+      "tags": ["andor", "spectrograph", "nd-filter", "dynamic-range", "optimization"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:test_aquisition",
+      "type": "function",
+      "name": "test_aquisition",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [415, 518],
+      "summary": "Runs a timed burst of software-triggered camera acquisitions into a queued buffer pool, recording per-step timing for performance profiling.",
+      "tags": ["andor", "acquisition", "timing", "buffer", "profiling"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:SEC_aquisition",
+      "type": "function",
+      "name": "SEC_aquisition",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [521, 603],
+      "summary": "Performs a spectro-electrochemistry acquisition burst, software-triggering frames and collecting them from the buffer queue.",
+      "tags": ["andor", "acquisition", "spectroelectrochemistry", "buffer"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:GetMetaData",
+      "type": "function",
+      "name": "GetMetaData",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [107, 158],
+      "summary": "Acquires a single image and prints camera metadata (settings, temperature, status) for diagnostic inspection.",
+      "tags": ["andor", "metadata", "diagnostics"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:process_timings",
+      "type": "function",
+      "name": "process_timings",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [635, 686],
+      "summary": "Plots and breaks down per-step acquisition timings into a stacked bar chart for performance analysis.",
+      "tags": ["andor", "timing", "visualization", "profiling"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:generate_spectral_array",
+      "type": "function",
+      "name": "generate_spectral_array",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [689, 724],
+      "summary": "Assembles acquired frames and per-frame timestamps into a wavelength-indexed spectral DataFrame.",
+      "tags": ["andor", "serialization", "spectral-data", "dataframe"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:setup_image",
+      "type": "function",
+      "name": "setup_image",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [47, 73],
+      "summary": "Configures the Andor camera for an image acquisition with a given exposure time.",
+      "tags": ["andor", "configuration", "imaging"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:image_and_check_dynamic_range",
+      "type": "function",
+      "name": "image_and_check_dynamic_range",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [76, 104],
+      "summary": "Acquires an image at a wavelength and checks how close the peak signal is to the camera's saturation limit.",
+      "tags": ["andor", "imaging", "dynamic-range", "validation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:WarmAndClose",
+      "type": "function",
+      "name": "WarmAndClose",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [606, 632],
+      "summary": "Warms the camera sensor back to a safe temperature before closing the connection.",
+      "tags": ["andor", "shutdown", "temperature-control"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:setup_SEC_aquisition",
+      "type": "function",
+      "name": "setup_SEC_aquisition",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [381, 412],
+      "summary": "Configures the camera for a spectro-electrochemistry acquisition run at a target exposure and frame rate.",
+      "tags": ["andor", "configuration", "spectroelectrochemistry"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:cool",
+      "type": "function",
+      "name": "cool",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "lineRange": [26, 44],
+      "summary": "Waits for the Andor sensor to reach its cooling setpoint, raising if the target temperature is not stabilised.",
+      "tags": ["andor", "temperature-control", "initialization"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:SetupSpectroscope",
+      "type": "function",
+      "name": "SetupSpectroscope",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [191, 296],
+      "summary": "Initialises the ATSpectrograph, selects grating/wavelength/slit/filter, and returns the pixel calibration array.",
+      "tags": ["andor", "spectrograph", "configuration", "calibration"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:adjust_ND",
+      "type": "function",
+      "name": "adjust_ND",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [299, 405],
+      "summary": "Sweeps neutral-density filter positions across wavelengths and selects the setting that best fits the camera's dynamic range.",
+      "tags": ["andor", "spectrograph", "nd-filter", "dynamic-range", "optimization"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:test_aquisition",
+      "type": "function",
+      "name": "test_aquisition",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [439, 539],
+      "summary": "Runs a timed burst of software-triggered acquisitions into a queued buffer pool, recording per-step timing for profiling.",
+      "tags": ["andor", "acquisition", "timing", "buffer", "profiling"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:SEC_aquisition",
+      "type": "function",
+      "name": "SEC_aquisition",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [542, 624],
+      "summary": "Performs a spectro-electrochemistry acquisition burst, software-triggering frames and collecting them from the buffer queue.",
+      "tags": ["andor", "acquisition", "spectroelectrochemistry", "buffer"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:GetMetaData",
+      "type": "function",
+      "name": "GetMetaData",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [137, 188],
+      "summary": "Acquires a single image and prints camera metadata (settings, temperature, status) for diagnostics.",
+      "tags": ["andor", "metadata", "diagnostics"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:process_timings",
+      "type": "function",
+      "name": "process_timings",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [651, 701],
+      "summary": "Plots and breaks down per-step acquisition timings into a stacked bar chart for performance analysis.",
+      "tags": ["andor", "timing", "visualization", "profiling"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:generate_spectral_array",
+      "type": "function",
+      "name": "generate_spectral_array",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [704, 739],
+      "summary": "Assembles acquired frames and per-frame timestamps into a wavelength-indexed spectral DataFrame.",
+      "tags": ["andor", "serialization", "spectral-data", "dataframe"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:setup_shot",
+      "type": "function",
+      "name": "setup_shot",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [43, 71],
+      "summary": "Configures the camera for a vertically-binned single-shot spectrum acquisition at a given exposure.",
+      "tags": ["andor", "configuration", "single-shot", "binning"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:setup_image",
+      "type": "function",
+      "name": "setup_image",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [74, 100],
+      "summary": "Configures the Andor camera for a full image acquisition at a given exposure time.",
+      "tags": ["andor", "configuration", "imaging"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:image_and_check_dynamic_range",
+      "type": "function",
+      "name": "image_and_check_dynamic_range",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [109, 134],
+      "summary": "Acquires an image at a wavelength and checks how close the peak signal is to the camera's saturation limit.",
+      "tags": ["andor", "imaging", "dynamic-range", "validation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:WarmAndClose",
+      "type": "function",
+      "name": "WarmAndClose",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [627, 648],
+      "summary": "Warms the camera sensor back to a safe temperature before closing the connection.",
+      "tags": ["andor", "shutdown", "temperature-control"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:setup_SEC_aquisition",
+      "type": "function",
+      "name": "setup_SEC_aquisition",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [408, 436],
+      "summary": "Configures the camera for a spectro-electrochemistry acquisition run at a target exposure and frame rate.",
+      "tags": ["andor", "configuration", "spectroelectrochemistry"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:cool",
+      "type": "function",
+      "name": "cool",
+      "filePath": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "lineRange": [24, 40],
+      "summary": "Waits for the Andor sensor to reach its cooling setpoint, raising if the target temperature is not stabilised.",
+      "tags": ["andor", "temperature-control", "initialization"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:SetupSpectroscope", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:adjust_ND", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:test_aquisition", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:SEC_aquisition", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:GetMetaData", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:process_timings", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:generate_spectral_array", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:setup_image", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:image_and_check_dynamic_range", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:WarmAndClose", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:setup_SEC_aquisition", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_funcs.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:cool", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:adjust_ND", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:image_and_check_dynamic_range", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:image_and_check_dynamic_range", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:setup_image", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:GetMetaData", "target": "function:helao/deploy/hte/drivers/spec/andor/test_funcs.py:setup_image", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:SetupSpectroscope", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:adjust_ND", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:test_aquisition", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:SEC_aquisition", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:GetMetaData", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:process_timings", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:generate_spectral_array", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:setup_shot", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:setup_image", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:image_and_check_dynamic_range", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:WarmAndClose", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:setup_SEC_aquisition", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:cool", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:adjust_ND", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:image_and_check_dynamic_range", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:image_and_check_dynamic_range", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:setup_image", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:GetMetaData", "target": "function:helao/deploy/hte/drivers/spec/andor/test_read_loop.py:setup_image", "type": "calls", "direction": "forward", "weight": 0.8}
+  ]
+}
