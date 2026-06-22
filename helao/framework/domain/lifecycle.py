@@ -51,6 +51,10 @@ def sequence_output_dir(action: RunAction) -> str:
     sequence_day = action.sequence_timestamp.strftime("%m%d")
     plate = action.sequence_params.get("plate_id", "")
     smpno = action.sequence_params.get("plate_sample_no_list", [])
+    # Init unconditionally so the (plate set, serial already in label) path
+    # can't NameError as it does in the legacy premodels.get_sequence_dir.
+    # Output is unchanged for every path the legacy code reached without crashing.
+    append_plate = ""
     if plate:
         serial = f"{plate}{str(sum([int(x) for x in str(plate)]) % 10)}"
         if f"-{serial}" not in action.sequence_label:
@@ -58,8 +62,6 @@ def sequence_output_dir(action: RunAction) -> str:
                 append_plate = f"-{serial}-{smpno[0]}"
             else:
                 append_plate = f"-{serial}"
-    else:
-        append_plate = ""
 
     return os.path.join(
         year_week,
