@@ -1,0 +1,417 @@
+"""Canonical logger factory shared by every HELAO server.
+
+Adds a custom ``ALERT`` level above ``CRITICAL`` and provides ``make_logger``,
+which configures a single per-server ``logging.Logger`` with a coloured
+console handler, a daily ``TimedRotatingFileHandler`` that gzips rotated
+files, and optional NTP-offset-aware timestamps. When credentials are
+provided, ``ALERT``-level records are also fanned out to an SMTP handler
+and/or a JSON HTTP POST webhook via queue listeners.
+
+Usage::
+
+    from helao.framework.support import helao_logging as logging
+    if logging.LOGGER is None:
+        logger = logging.make_logger(__file__)
+    logger = logging.LOGGER
+"""
+
+import tempfile
+import os
+import subprocess
+import logging
+import time
+import requests
+from socket import gethostname
+from queue import Queue
+from logging.handlers import (
+    TimedRotatingFileHandler,
+    SMTPHandler,
+    QueueHandler,
+    QueueListener,
+)
+from typing import Optional
+from pathlib import Path
+
+from colorlog import ColoredFormatter
+from datetime import datetime, timezone, timedelta
+from helao.framework.support.time_utils import read_saved_offset
+
+ALERT_LEVEL = 60
+logging.addLevelName(ALERT_LEVEL, "ALERT")
+
+# Default minimum number of seconds between two outgoing alert emails. Alert
+# records that arrive while an email is still "cooling down" are suppressed
+# (counted, then summarised in the next email's subject). ``0`` disables
+# throttling entirely. Overridden per-deployment via the ``email_interval``
+# key in the alert config referenced by ``alert_config_path``.
+DEFAULT_EMAIL_INTERVAL = 600
+
+
+def alert(self, message, *args, **kws):
+    """Log ``message`` at the custom ``ALERT`` level if enabled."""
+    if self.isEnabledFor(ALERT_LEVEL):
+        # Yes, logger takes its '*args' as 'args'.
+        self._log(ALERT_LEVEL, message, args, **kws)
+
+
+# logging.Logger.alert = alert
+setattr(logging.Logger, "alert", alert)
+
+LOGGER: logging.Logger = None
+HOST = gethostname()
+
+
+class GZipRotator:
+    """Rotation callable that renames the rotated log file and gzips it."""
+
+    def __call__(self, source, dest):
+        """Move ``source`` to ``dest`` then spawn ``gzip`` to compress it."""
+        os.rename(source, dest)
+        subprocess.Popen(["gzip", dest])
+
+
+class TitledSMTPHandler(SMTPHandler):
+    """SMTP handler that derives a structured subject line from the record.
+
+    Adds rate limiting so that at most one email is sent per
+    ``min_interval`` seconds. Records that arrive during the cooldown window
+    are dropped rather than mailed, but are counted so the next email that
+    does go out can report how many alerts were suppressed in the meantime.
+    """
+
+    def __init__(self, *args, min_interval: float = 0, **kwargs):
+        """Build the handler.
+
+        Args:
+            *args: Positional arguments forwarded to ``SMTPHandler``.
+            min_interval: Minimum seconds between outgoing emails. ``0`` (the
+                default) disables throttling and restores stock behaviour.
+            **kwargs: Keyword arguments forwarded to ``SMTPHandler``.
+        """
+        super().__init__(*args, **kwargs)
+        self.min_interval = min_interval
+        self._last_emit_monotonic = None
+        self._suppressed_count = 0
+
+    def getSubject(self, record) -> str:
+        """Return ``"<LEVEL> - <title> on <HOST>"`` for ``record``.
+
+        When alerts were suppressed by throttling since the last email, a
+        ``"(+N suppressed)"`` note is appended to the subject.
+        """
+        if "~" in record.message:
+            title = record.message.split("~")[0].strip()
+        else:
+            title = record.message.split()[0].strip()
+        subject = f"{record.levelname} - {title} on {HOST}"
+        if self._suppressed_count:
+            subject += f" (+{self._suppressed_count} suppressed)"
+        return subject
+
+    def emit(self, record):
+        """Send ``record`` by email unless still within the cooldown window."""
+        if self.min_interval and self.min_interval > 0:
+            now = time.monotonic()
+            if (
+                self._last_emit_monotonic is not None
+                and now - self._last_emit_monotonic < self.min_interval
+            ):
+                self._suppressed_count += 1
+                return
+            self._last_emit_monotonic = now
+        super().emit(record)
+        self._suppressed_count = 0
+
+
+class HTTPPostHandler(logging.Handler):
+    """Logging handler that POSTs each record as JSON to a webhook URL."""
+
+    def __init__(self, url, headers=None, **kwargs):
+        """Store the webhook URL, headers and extra payload fields.
+
+        Args:
+            url: Destination URL for the HTTP POST.
+            headers: Request headers (defaults to ``application/json``).
+            **kwargs: Extra key/value pairs merged into every payload.
+        """
+        super().__init__()
+        self.url = url
+        self.headers = (
+            headers if headers is not None else {"Content-type": "application/json"}
+        )
+        self.payload = kwargs
+
+    def emit(self, record):
+        """Format ``record`` and POST it to the webhook with the stored payload."""
+        try:
+            # Format the log record into a desired structure (e.g., a JSON dictionary)
+            log_entry = self.format(record)
+            payload = {k: v for k, v in self.payload.items()}
+            payload["text"] = log_entry
+            # print("Sending log record to webhook with payload:", payload)
+
+            # Send the custom payload using requests
+            requests.post(self.url, json=payload, headers=self.headers, timeout=30)
+        except Exception:
+            self.handleError(record)
+
+
+class NtpOffsetFormatter(logging.Formatter):
+    """Formatter that shifts timestamps by a fixed NTP-derived offset.
+
+    Attributes:
+        offset: Timedelta added to each record's creation time.
+        tz: Timezone used for formatting (UTC or local).
+    """
+
+    def __init__(self, *args, offset_seconds=0, use_utc: bool = False, **kwargs):
+        """Build the formatter.
+
+        Args:
+            *args: Positional arguments forwarded to ``logging.Formatter``.
+            offset_seconds: Seconds to add to each log record timestamp.
+            use_utc: If ``True``, format times in UTC instead of local time.
+            **kwargs: Keyword arguments forwarded to ``logging.Formatter``.
+        """
+        super().__init__(*args, **kwargs)
+        self.offset = timedelta(seconds=offset_seconds)
+        if use_utc:
+            self.tz = timezone.utc
+        else:
+            now = datetime.now()
+            local_now = now.astimezone()
+            local_tz = local_now.tzinfo
+            self.tz = local_tz
+
+    def formatTime(self, record, datefmt=None) -> str:
+        """Return the record's creation time shifted by the configured offset."""
+        # Convert the record's timestamp (seconds since epoch) to a UTC datetime
+        ct = datetime.fromtimestamp(record.created, tz=self.tz)
+        # Apply the desired offset
+        dt = ct + self.offset
+
+        if datefmt:
+            return dt.strftime(datefmt)
+        else:
+            # If no datefmt is specified, use a default ISO8601-like format with offset
+            t = dt.strftime(self.default_time_format)
+            return self.default_msec_format % (t, record.msecs)
+
+
+class ColoredNtpOffsetFormatter(ColoredFormatter):
+    """Colour-aware variant of ``NtpOffsetFormatter`` for stream handlers."""
+
+    def __init__(self, *args, offset_seconds=0, use_utc: bool = False, **kwargs):
+        """Build the formatter.
+
+        Args:
+            *args: Positional arguments forwarded to ``ColoredFormatter``.
+            offset_seconds: Seconds to add to each log record timestamp.
+            use_utc: If ``True``, format times in UTC instead of local time.
+            **kwargs: Keyword arguments forwarded to ``ColoredFormatter``.
+        """
+        super().__init__(*args, **kwargs)
+        self.offset = timedelta(seconds=offset_seconds)
+        if use_utc:
+            self.tz = timezone.utc
+        else:
+            now = datetime.now()
+            local_now = now.astimezone()
+            local_tz = local_now.tzinfo
+            self.tz = local_tz
+
+    def formatTime(self, record, datefmt=None) -> str:
+        """Return the record's creation time shifted by the configured offset."""
+        # Convert the record's timestamp (seconds since epoch) to a UTC datetime
+        ct = datetime.fromtimestamp(record.created, tz=self.tz)
+        # Apply the desired offset
+        dt = ct + self.offset
+
+        if datefmt:
+            return dt.strftime(datefmt)
+        else:
+            # If no datefmt is specified, use a default ISO8601-like format with offset
+            t = dt.strftime(self.default_time_format)
+            return self.default_msec_format % (t, record.msecs)
+
+
+def make_logger(
+    logger_name: Optional[str] = None,
+    log_dir: Optional[str] = None,
+    log_level: int = 20,  # 10 (DEBUG), 20 (INFO), 30 (WARNING), 40 (ERROR), 50 (CRITICAL)
+    email_config: dict = {},
+    show_debug_console: bool = False,
+) -> logging.Logger:
+    """Build and configure the canonical per-server HELAO logger.
+
+    Attaches a daily-rotating gzip file handler and a coloured console
+    handler. When ``email_config`` provides full SMTP credentials or a
+    webhook plus payload, an ``ALERT``-level queue-backed handler is added
+    that forwards records to email and/or HTTP respectively. Timestamps are
+    offset using the cached NTP offset from ``ntpLastSync.txt`` in
+    ``log_dir`` when present.
+
+    Args:
+        logger_name: Logger name; if it ends with ``.py`` the basename
+            without extension is used.
+        log_dir: Directory for log files; defaults to a fresh temp dir.
+        log_level: Threshold for the file and (non-debug) console handlers.
+        email_config: Configuration dict that may contain SMTP credentials
+            (``mailhost``, ``mailport``, ``fromaddr``, ``username``,
+            ``password``, ``recipients``, ``subject``) and/or a ``webhook``
+            URL with associated ``payload``. An optional ``email_interval``
+            key (seconds) throttles outgoing alert emails to at most one per
+            interval, defaulting to :data:`DEFAULT_EMAIL_INTERVAL`.
+        show_debug_console: If ``True``, the console handler is set to
+            ``DEBUG`` level.
+
+    Returns:
+        The configured ``logging.Logger`` instance.
+    """
+    if logger_name is not None and logger_name.endswith(".py"):
+        logger_name = os.path.basename(logger_name).replace(".py", "")
+    temp_dir = tempfile.mkdtemp()
+    log_dir = temp_dir if log_dir is None else log_dir
+    log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
+    format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
+    ntp_path = os.path.join(log_dir, "ntpLastSync.txt")
+    if os.path.exists(ntp_path):
+        _, offset_seconds = read_saved_offset(ntp_path)
+    else:
+        offset_seconds = 0
+    formatter = NtpOffsetFormatter(format_string, offset_seconds=offset_seconds)
+    # for stream output
+    colored_format_string = "%(log_color)s%(asctime)s | %(levelname)-8s | %(name)s %(reset)s%(white)s:: %(funcName)s @ %(filename)s:%(lineno)d - %(reset)s%(light_blue)s%(message)s"
+    colored_formatter = ColoredNtpOffsetFormatter(
+        colored_format_string,
+        offset_seconds=offset_seconds,
+        log_colors={
+            "DEBUG": "cyan",
+            "INFO": "light_green",
+            "WARNING": "yellow",
+            "ERROR": "light_red",
+            "CRITICAL": "red,bg_white",
+            "ALERT": "light_purple",
+        },
+        secondary_log_colors={},
+        style="%",
+    )
+
+    logger_instance = logging.getLogger(logger_name)
+    logger_instance.setLevel(min(10, log_level))
+
+    # create handlers
+    console = logging.StreamHandler()
+    console.setFormatter(colored_formatter)
+    try:
+        timed_rotation = TimedRotatingFileHandler(
+            filename=log_path, when="D", interval=1, backupCount=90
+        )
+        timed_rotation.rotator = GZipRotator()
+    except OSError:
+        temp_log_path = Path(os.path.join(temp_dir, f"{logger_name}.log"))
+        print(f"Can't write to {log_path}. Redirecting to: {temp_log_path}")
+        timed_rotation = TimedRotatingFileHandler(
+            filename=temp_log_path, when="D", interval=1, backupCount=90
+        )
+    timed_rotation.setFormatter(formatter)
+
+    # set log level and attach default handlers
+    handlers = [timed_rotation]
+    for handler in handlers:
+        handler.setLevel(log_level)
+        logger_instance.addHandler(handler)
+
+    debug_handlers = [console]
+    for handler in debug_handlers:
+        handler.setLevel(10 if show_debug_console else 20)
+        logger_instance.addHandler(handler)
+
+    mailhost = email_config.get("mailhost", None)
+    mailport = email_config.get("mailport", None)
+    fromaddr = email_config.get("fromaddr", None)
+    username = email_config.get("username", None)
+    password = email_config.get("password", None)
+    recipients = email_config.get("recipients", None)
+    subject = email_config.get("subject", "Error in Helao")
+    email_interval = email_config.get("email_interval", DEFAULT_EMAIL_INTERVAL)
+    email_conditions = [
+        x is not None
+        for x in [mailhost, mailport, fromaddr, username, password, recipients]
+    ]
+    # print(email_conditions)
+    if all(email_conditions):
+        email_queue = Queue(-1)
+        queue_handler = QueueHandler(email_queue)
+        queue_handler.setLevel(ALERT_LEVEL)
+        # queue_handler.setFormatter(formatter)
+        logger_instance.addHandler(queue_handler)
+        email_handler = TitledSMTPHandler(
+            mailhost=(mailhost, mailport),
+            fromaddr=fromaddr,
+            toaddrs=recipients,
+            subject=subject,
+            credentials=(username, password),
+            secure=(),
+            min_interval=email_interval,
+        )
+        email_handler.setLevel(ALERT_LEVEL)
+        email_handler.setFormatter(formatter)
+        # logger_instance.addHandler(email_handler)
+        queue_listener = QueueListener(email_queue, email_handler)
+        queue_listener.start()
+        logger_instance.info(
+            f"Email alerts enabled at log level: {ALERT_LEVEL} "
+            f"(throttled to 1 email per {email_interval}s)"
+        )
+    else:
+        logger_instance.info(f"Email alerts not enabled using config: {email_config}")
+
+    webhook = email_config.get("webhook", None)
+    payload = email_config.get("payload", None)
+    webhook_conditions = [x is not None for x in [webhook, payload]]
+    if all(webhook_conditions):
+        webhook_queue = Queue(-1)
+        webhook_queue_handler = QueueHandler(webhook_queue)
+        webhook_queue_handler.setLevel(ALERT_LEVEL)
+        logger_instance.addHandler(webhook_queue_handler)
+        webhook_handler = HTTPPostHandler(url=webhook, **payload)
+        webhook_handler.setLevel(ALERT_LEVEL)
+        webhook_handler.setFormatter(formatter)
+        # logger_instance.addHandler(webhook_handler)
+        webhook_queue_listener = QueueListener(webhook_queue, webhook_handler)
+        webhook_queue_listener.start()
+        logger_instance.info(f"Webhook alerts enabled at log level: {ALERT_LEVEL}")
+    else:
+        logger_instance.info(f"Webhook alerts not enabled using config: {email_config}")
+
+    logger_instance.info(f"writing log events to {log_path}")
+    logger_instance.propagate = False
+    return logger_instance
+
+
+def print_message(logger, server_name, *args, **kwargs):
+    """Forward a message to ``logger`` at a level chosen by recognised kwargs.
+
+    The level is picked from ``kwargs``: ``error`` selects ``logger.error``,
+    ``warning`` or ``warn`` selects ``logger.warning``, ``info`` or no
+    recognised key selects ``logger.info``. Positional ``args`` are
+    stringified and joined with spaces.
+
+    Args:
+        logger: Target logger.
+        server_name: Originating server name (currently unused, retained for
+            call-site compatibility).
+        *args: Message fragments concatenated with spaces.
+        **kwargs: Level-selecting flags as described above.
+    """
+    if "error" in kwargs:
+        logger_method = logger.error
+    elif "warning" in kwargs or "warn" in kwargs:
+        logger_method = logger.warning
+    elif "info" in kwargs:
+        logger_method = logger.info
+    else:
+        logger_method = logger.info
+
+    logger_method(" ".join([str(x) for x in args]))
