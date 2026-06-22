@@ -163,14 +163,14 @@ servers:
     params:
       aws_profile: default
       testing: false
-  ANA:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8014
-    group: action
-    fast: analysis_server
-    params:
-      local_only: false
-      analyses: [icpms_local, xrfs_local]
+  # ANA:
+  #   host: hte-eche-10.htejcap.caltech.edu
+  #   port: 8014
+  #   group: action
+  #   fast: analysis_server
+  #   params:
+  #     local_only: false
+  #     analyses: [icpms_local, xrfs_local]
   CAM:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8013
