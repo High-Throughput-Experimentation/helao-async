@@ -59,6 +59,7 @@ dependencies:
   - pyftdi
   - pylablib
   - pymodbus
+  - pyright
   - pyserial
   - python-dotenv
   - python-multipart
