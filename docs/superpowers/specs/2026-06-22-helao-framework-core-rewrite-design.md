@@ -8,7 +8,7 @@
 
 ## 1. Goal & context
 
-HELAO-async is a distributed instrument-control system (~183k LOC, 507 Python files, 9 architectural layers) built from cooperating FastAPI and Bokeh servers. The deployment-agnostic framework lives in `helao/core/` (~25k LOC) and `helao/helpers/` (~9k LOC). It runs live lab hardware across 5 deployments (`hte`, `test`, plus the nested separate repos `lila`, `lila_gl`, `mea`, `priv`).
+HELAO-async is a distributed instrument-control system (~183k LOC, 507 Python files, 9 architectural layers) built from cooperating FastAPI and Bokeh servers. The deployment-agnostic framework lives in `helao/core/` (~25k LOC) and `helao/helpers/` (~9k LOC). It runs live lab hardware across multiple deployments — the in-tree `hte` and `test`, plus several private deployments maintained as separate repositories.
 
 The framework has accumulated three structural problems that this rewrite targets directly:
 
@@ -179,7 +179,7 @@ Sub-projects 0–3 are low-risk and partly parallelizable. 4–6 are the heart. 
 
 - Operator and data_browser Bokeh UIs (`bokeh_operator.py` and friends).
 - Production deployment migration (`hte`).
-- Migration of the nested separate repos (`lila`, `lila_gl`, `mea`, `priv`) — each its own cycle in its own repo.
+- Migration of the private deployments maintained as separate repositories — each its own cycle in its own repo.
 - Deletion of old `helao/core` + `helao/helpers` (only after the last deployment migrates).
 - Per-sub-project implementation detail (each sub-project §8 gets its own spec).
 - Changing the wire protocol / transport technology (an explicit C-later concern, not now).
