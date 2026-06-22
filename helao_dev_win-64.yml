@@ -50,6 +50,9 @@ dependencies:
   - psutil
   - psycopg2
   - pyaml
+  - pytest
+  - pytest-cov
+  - coverage
   - pyarrow
   - pybase64
   - pydantic
