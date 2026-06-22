@@ -401,8 +401,8 @@ class BokehOperator:
         )
         self.sequence_dropdown.on_change("value", self.callback_sequence_select)
         self.sequence_version_div = Div(
-            text="", width=300, height=40, align="center",
-            styles={"line-height": "40px", "color": "#566573"},
+            text="", width=300, height=31, margin=(22, 5, 0, 5),
+            styles={"line-height": "31px", "color": "#566573"},
         )
 
         self.experiment_dropdown = Select(
@@ -410,8 +410,8 @@ class BokehOperator:
         )
         self.experiment_dropdown.on_change("value", self.callback_experiment_select)
         self.experiment_version_div = Div(
-            text="", width=300, height=40, align="center",
-            styles={"line-height": "40px", "color": "#566573"},
+            text="", width=300, height=31, margin=(22, 5, 0, 5),
+            styles={"line-height": "31px", "color": "#566573"},
         )
 
         # specification file loader
