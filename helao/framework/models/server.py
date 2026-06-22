@@ -5,7 +5,7 @@ __all__ = [
     "GlobalStatusModel",
 ]
 
-from typing import Any, Dict, Optional, Tuple, List, TYPE_CHECKING
+from typing import Dict, Optional, Tuple, List
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -14,14 +14,12 @@ from helao.framework.models.machine import MachineModel
 from helao.framework.models.hlostatus import HloStatus
 from helao.framework.models.helao_dict import HelaoDict
 
-if TYPE_CHECKING:
-    # The action value type is the pure data model `ActionModel` (ported in a
-    # later sub-project). It is referenced only for static typing; at runtime
-    # these dicts hold action-model instances supplied by the domain layer.
-    # The fields are typed `Any` so this module stays constructible without a
-    # runtime dependency on the action model, and so the data->runtime circular
-    # import on the legacy premodels runtime Action class is broken.
-    from helao.framework.models.action import ActionModel  # noqa: F401
+# The action value type is the pure data model `ActionModel`. The dicts below
+# hold action-model instances. Importing it at module scope (rather than via
+# the legacy `helao.helpers.premodels.Action` runtime class) keeps the
+# data->runtime circular import broken while still giving the fields a precise,
+# validated type.
+from helao.framework.models.action import ActionModel
 
 
 # additional finished categories which contain one of these
@@ -36,8 +34,8 @@ class EndpointModel(BaseModel, HelaoDict):
 
     Attributes:
         endpoint_name (str): Endpoint (action) name.
-        active_dict (Dict[UUID, Any]): Active actions keyed by UUID.
-        nonactive_dict (Dict[HloStatus, Dict[UUID, Any]]): Finished actions
+        active_dict (Dict[UUID, ActionModel]): Active actions keyed by UUID.
+        nonactive_dict (Dict[HloStatus, Dict[UUID, ActionModel]]): Finished actions
             bucketed by status (``finished`` plus any `main_finished_status`).
         max_uuids (Optional[int]): Optional cap on retained UUIDs; `None` means unbounded.
     """
@@ -45,11 +43,13 @@ class EndpointModel(BaseModel, HelaoDict):
     endpoint_name: str
     # status is a dict (keyed by action uuid)
     # which hold a dict of active actions
-    active_dict: Dict[UUID, Any] = Field(default_factory=dict)
+    active_dict: Dict[UUID, ActionModel] = Field(default_factory=dict)
 
     # holds the finished uuids
     # keyed by either main_finished_status or "finished"
-    nonactive_dict: Dict[HloStatus, Dict[UUID, Any]] = Field(default_factory=dict)
+    nonactive_dict: Dict[HloStatus, Dict[UUID, ActionModel]] = Field(
+        default_factory=dict
+    )
 
     # none is infinite
     max_uuids: Optional[int] = None
@@ -157,8 +157,8 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         orchestrator (MachineModel): Identity of the owning orchestrator.
         server_dict (Dict[Tuple, ActionServerModel]): Action server status keyed by
             `MachineModel.as_key()`.
-        active_dict (Dict[UUID, Any]): All active actions for this orch.
-        nonactive_dict (Dict[HloStatus, Dict[UUID, Any]]): Finished actions
+        active_dict (Dict[UUID, ActionModel]): All active actions for this orch.
+        nonactive_dict (Dict[HloStatus, Dict[UUID, ActionModel]]): Finished actions
             bucketed by status.
         loop_intent (LoopIntent): Requested loop transition.
         loop_state (LoopStatus): Current dispatch-loop state.
@@ -172,10 +172,12 @@ class GlobalStatusModel(BaseModel, HelaoDict):
     server_dict: Dict[Tuple, ActionServerModel] = Field(default_factory=dict)
 
     # a dict of all active actions for this orch
-    active_dict: Dict[UUID, Any] = Field(default_factory=dict)
+    active_dict: Dict[UUID, ActionModel] = Field(default_factory=dict)
     # a dict of all finished actions
     # keyed by either main_finished_status or "finished"
-    nonactive_dict: Dict[HloStatus, Dict[UUID, Any]] = Field(default_factory=dict)
+    nonactive_dict: Dict[HloStatus, Dict[UUID, ActionModel]] = Field(
+        default_factory=dict
+    )
 
     # some control parameters for the orch
 
@@ -305,7 +307,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         recent_nonactive = self._sort_status()
         return recent_nonactive
 
-    def find_hlostatus_in_finished(self, hlostatus: HloStatus) -> Dict[UUID, Any]:
+    def find_hlostatus_in_finished(self, hlostatus: HloStatus) -> Dict[UUID, ActionModel]:
         """Return finished actions whose status set contains `hlostatus`."""
         uuid_dict = {}
 
@@ -334,7 +336,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         """Initialize the dispatched-action counter for a new experiment."""
         self.counter_dispatched_actions[exp_uuid] = 0
 
-    def finish_experiment(self, exp_uuid: UUID) -> List[Any]:
+    def finish_experiment(self, exp_uuid: UUID) -> List[ActionModel]:
         """Return all finished actions for `exp_uuid` and clear the nonactive buckets and counter."""
         # we don't filter by orch as this should have happened already when they
         # were added to the finished_exps
