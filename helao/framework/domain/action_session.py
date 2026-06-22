@@ -19,6 +19,7 @@ Purity: imports only from ``helao.framework.models`` / ``ports`` / ``support`` /
 __all__ = ["ActionSession"]
 
 import asyncio
+import json
 import os
 import uuid as _uuid
 from copy import deepcopy
@@ -210,6 +211,22 @@ class ActionSession:
         if has_data:
             self.num_data_queued += 1
             self._pending_data.append(package)
+            await self._write_live_rows(datamodel)
+
+    async def _write_live_rows(self, datamodel: DataModel) -> None:
+        """Append each keyed row to its open HLO connection. Ports ``write_live_data``.
+
+        For every ``{file_conn_key: row}`` entry whose key has an open file
+        handle, the row is serialised to JSON and appended via the storage port
+        (mirroring the legacy data-logger draining onto ``file_conn_dict``).
+        Rows whose key has no open connection are emitted only (status-stream
+        semantics), exactly as the legacy logger skips unopened connections.
+        """
+        for key, row in datamodel.data.items():
+            handle = self._open_handles.get(key)
+            if handle is None:
+                continue
+            await self.storage.append_hlo(handle, json.dumps(row))
 
     async def _enqueue_phase_data(self, data: dict) -> None:
         """Enqueue executor-phase ``data`` keyed by the action's first file conn."""
