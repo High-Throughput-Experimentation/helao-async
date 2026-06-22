@@ -1,0 +1,17 @@
+[tool.pytest.ini_options]
+testpaths = ["helao/framework/tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["helao/framework"]
+branch = true
+omit = [
+    "helao/framework/tests/*",
+    "helao/framework/_devtools/*",
+    "helao/framework/adapters/fakes/*",
+]
+
+[tool.coverage.report]
+show_missing = true
