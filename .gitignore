@@ -26,3 +26,5 @@ helao/deploy/*
 
 # superpowers brainstorm/companion artifacts
 .superpowers/
+.framework-cov.json
+.coverage
