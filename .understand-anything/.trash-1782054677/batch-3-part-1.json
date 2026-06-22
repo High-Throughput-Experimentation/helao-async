@@ -1,0 +1,692 @@
+{
+ "nodes": [
+  {
+   "id": "file:helao/core/models/action_start_condition.py",
+   "type": "file",
+   "name": "action_start_condition.py",
+   "filePath": "helao/core/models/action_start_condition.py",
+   "summary": "Defines the ActionStartCondition IntEnum controlling whether an action waits on prior actions/servers before starting.",
+   "tags": [
+    "data-model",
+    "type-definition",
+    "enum"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:helao/core/models/action_start_condition.py:ActionStartCondition",
+   "type": "class",
+   "name": "ActionStartCondition",
+   "filePath": "helao/core/models/action_start_condition.py",
+   "lineRange": [
+    8,
+    25
+   ],
+   "summary": "IntEnum enumerating start-gating policies (no wait, wait on endpoint, wait on server, wait on all) for queued actions.",
+   "tags": [
+    "enum",
+    "data-model",
+    "validation"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:helao/core/models/electrolyte.py",
+   "type": "file",
+   "name": "electrolyte.py",
+   "filePath": "helao/core/models/electrolyte.py",
+   "summary": "Defines the Electrolyte enumeration of supported electrolyte chemistries used across electrochemistry experiments.",
+   "tags": [
+    "data-model",
+    "type-definition",
+    "enum"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:helao/core/models/electrolyte.py:Electrolyte",
+   "type": "class",
+   "name": "Electrolyte",
+   "filePath": "helao/core/models/electrolyte.py",
+   "lineRange": [
+    7,
+    29
+   ],
+   "summary": "Enum of electrolyte identifiers referenced by ECHE/HISPEC experiment libraries.",
+   "tags": [
+    "enum",
+    "data-model"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:helao/core/models/machine.py",
+   "type": "file",
+   "name": "machine.py",
+   "filePath": "helao/core/models/machine.py",
+   "summary": "Pydantic MachineModel capturing host machine identity/metadata, serializable via the HelaoDict mixin.",
+   "tags": [
+    "data-model",
+    "serialization"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:helao/core/models/machine.py:MachineModel",
+   "type": "class",
+   "name": "MachineModel",
+   "filePath": "helao/core/models/machine.py",
+   "lineRange": [
+    11,
+    32
+   ],
+   "summary": "HelaoDict-backed model describing the machine (name, hostname) attached to actions/experiments for provenance.",
+   "tags": [
+    "data-model",
+    "serialization"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:helao/core/models/process_contrib.py",
+   "type": "file",
+   "name": "process_contrib.py",
+   "filePath": "helao/core/models/process_contrib.py",
+   "summary": "Defines the ProcessContrib enum naming which action outputs (files, samples, data) contribute to a process record.",
+   "tags": [
+    "data-model",
+    "type-definition",
+    "enum"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:helao/core/models/process_contrib.py:ProcessContrib",
+   "type": "class",
+   "name": "ProcessContrib",
+   "filePath": "helao/core/models/process_contrib.py",
+   "lineRange": [
+    7,
+    24
+   ],
+   "summary": "Enum of process-contribution categories used when finalizing process grouping from actions.",
+   "tags": [
+    "enum",
+    "data-model"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:helao/core/models/sample.py",
+   "type": "file",
+   "name": "sample.py",
+   "filePath": "helao/core/models/sample.py",
+   "summary": "Core sample data models (liquid/solid/gas/assembly) with inheritance, status tracking, volume math and HLO serialization used throughout the platform.",
+   "tags": [
+    "data-model",
+    "serialization",
+    "validation",
+    "sample"
+   ],
+   "complexity": "complex",
+   "languageNotes": "Heavy use of pydantic discriminated sample subclasses sharing the SampleModel base; HelaoDict mixin provides JSON/clean-dict serialization."
+  },
+  {
+   "id": "class:helao/core/models/sample.py:SampleType",
+   "type": "class",
+   "name": "SampleType",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    35,
+    41
+   ],
+   "summary": "Enum of sample physical types (liquid, solid, gas, assembly).",
+   "tags": [
+    "enum",
+    "data-model"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:helao/core/models/sample.py:SampleInheritance",
+   "type": "class",
+   "name": "SampleInheritance",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    44,
+    59
+   ],
+   "summary": "Enum describing how sample identity propagates across actions.",
+   "tags": [
+    "enum",
+    "data-model"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:helao/core/models/sample.py:SampleStatus",
+   "type": "class",
+   "name": "SampleStatus",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    62,
+    91
+   ],
+   "summary": "Enum of sample lifecycle states (created, preserved, destroyed, etc.).",
+   "tags": [
+    "enum",
+    "data-model"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:helao/core/models/sample.py:SampleModel",
+   "type": "class",
+   "name": "SampleModel",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    94,
+    220
+   ],
+   "summary": "Abstract base sample model holding global label, status, inheritance, volume and provenance fields with shared serialization helpers.",
+   "tags": [
+    "data-model",
+    "serialization",
+    "sample",
+    "base-class"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:helao/core/models/sample.py:NoneSample",
+   "type": "class",
+   "name": "NoneSample",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    223,
+    251
+   ],
+   "summary": "Null-object sample representing an absent/placeholder sample slot.",
+   "tags": [
+    "data-model",
+    "sample",
+    "null-object"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:helao/core/models/sample.py:LiquidSample",
+   "type": "class",
+   "name": "LiquidSample",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    254,
+    291
+   ],
+   "summary": "Liquid sample model adding volume and electrolyte/chemistry metadata.",
+   "tags": [
+    "data-model",
+    "sample"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:helao/core/models/sample.py:SolidSample",
+   "type": "class",
+   "name": "SolidSample",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    294,
+    332
+   ],
+   "summary": "Solid sample model keyed by plate/sample index for combinatorial libraries.",
+   "tags": [
+    "data-model",
+    "sample"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:helao/core/models/sample.py:GasSample",
+   "type": "class",
+   "name": "GasSample",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    335,
+    367
+   ],
+   "summary": "Gas sample model with volume and composition metadata.",
+   "tags": [
+    "data-model",
+    "sample"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:helao/core/models/sample.py:AssemblySample",
+   "type": "class",
+   "name": "AssemblySample",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    370,
+    433
+   ],
+   "summary": "Composite sample assembled from multiple liquid/solid/gas parts, tracking constituent references.",
+   "tags": [
+    "data-model",
+    "sample",
+    "composite"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:helao/core/models/sample.py:SampleList",
+   "type": "class",
+   "name": "SampleList",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    438,
+    456
+   ],
+   "summary": "Container model wrapping a heterogeneous list of sample models for bulk transport.",
+   "tags": [
+    "data-model",
+    "sample",
+    "collection"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:helao/core/models/sample.py:object_to_sample",
+   "type": "function",
+   "name": "object_to_sample",
+   "filePath": "helao/core/models/sample.py",
+   "lineRange": [
+    469,
+    490
+   ],
+   "summary": "Factory that reconstructs the correct concrete sample subclass from a serialized dict by inspecting sample_type.",
+   "tags": [
+    "factory",
+    "deserialization",
+    "sample"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:helao/core/tests/test_standalone_operator.py",
+   "type": "file",
+   "name": "test_standalone_operator.py",
+   "filePath": "helao/core/tests/test_standalone_operator.py",
+   "summary": "Extensive standalone unit-test suite for the operator UI/backend: exercises queue tables, plan buffering, run-id sharing, prepend/move/remove and tree rendering against mock orch/backends.",
+   "tags": [
+    "test",
+    "operator",
+    "unit-test"
+   ],
+   "complexity": "complex",
+   "languageNotes": "Pure-python test harness with Fake/Mock orchestrator and backend doubles; no live servers required."
+  },
+  {
+   "id": "class:helao/core/tests/test_standalone_operator.py:_MockBackend",
+   "type": "class",
+   "name": "_MockBackend",
+   "filePath": "helao/core/tests/test_standalone_operator.py",
+   "lineRange": [
+    167,
+    241
+   ],
+   "summary": "Mock operator backend implementing the dispatch/queue API surface for testing without live servers.",
+   "tags": [
+    "test",
+    "mock",
+    "operator"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:helao/core/tests/test_standalone_operator.py:_FakeOrch",
+   "type": "class",
+   "name": "_FakeOrch",
+   "filePath": "helao/core/tests/test_standalone_operator.py",
+   "lineRange": [
+    27,
+    51
+   ],
+   "summary": "Lightweight fake orchestrator providing deque/run-id behavior for operator tests.",
+   "tags": [
+    "test",
+    "mock"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:helao/core/tests/test_standalone_operator.py:run_all",
+   "type": "function",
+   "name": "run_all",
+   "filePath": "helao/core/tests/test_standalone_operator.py",
+   "lineRange": [
+    1035,
+    1077
+   ],
+   "summary": "Test runner that drains Bokeh callbacks and invokes every test_* function, reporting pass/fail.",
+   "tags": [
+    "test",
+    "runner"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/core/tests/test_standalone_operator.py:test_remote_backend_dispatch_and_serialize",
+   "type": "function",
+   "name": "test_remote_backend_dispatch_and_serialize",
+   "filePath": "helao/core/tests/test_standalone_operator.py",
+   "lineRange": [
+    106,
+    156
+   ],
+   "summary": "Verifies the remote backend serializes and dispatches sequences correctly.",
+   "tags": [
+    "test"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/core/tests/test_standalone_operator.py:test_plan_metadata_capture_at_insert",
+   "type": "function",
+   "name": "test_plan_metadata_capture_at_insert",
+   "filePath": "helao/core/tests/test_standalone_operator.py",
+   "lineRange": [
+    492,
+    505
+   ],
+   "summary": "Asserts plan metadata is captured at insertion time rather than flush time.",
+   "tags": [
+    "test"
+   ],
+   "complexity": "simple"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:helao/core/models/action_start_condition.py",
+   "target": "class:helao/core/models/action_start_condition.py:ActionStartCondition",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/action_start_condition.py",
+   "target": "class:helao/core/models/action_start_condition.py:ActionStartCondition",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/electrolyte.py",
+   "target": "class:helao/core/models/electrolyte.py:Electrolyte",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/electrolyte.py",
+   "target": "class:helao/core/models/electrolyte.py:Electrolyte",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/machine.py",
+   "target": "class:helao/core/models/machine.py:MachineModel",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/machine.py",
+   "target": "class:helao/core/models/machine.py:MachineModel",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/machine.py",
+   "target": "file:helao/core/helaodict.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/core/models/process_contrib.py",
+   "target": "class:helao/core/models/process_contrib.py:ProcessContrib",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/process_contrib.py",
+   "target": "class:helao/core/models/process_contrib.py:ProcessContrib",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SampleType",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SampleType",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SampleInheritance",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SampleInheritance",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SampleStatus",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SampleStatus",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SampleModel",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SampleModel",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:NoneSample",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:NoneSample",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:LiquidSample",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:LiquidSample",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SolidSample",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SolidSample",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:GasSample",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:GasSample",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:AssemblySample",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:AssemblySample",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SampleList",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "class:helao/core/models/sample.py:SampleList",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "function:helao/core/models/sample.py:object_to_sample",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "function:helao/core/models/sample.py:object_to_sample",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "file:helao/core/helaodict.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/core/models/sample.py",
+   "target": "file:helao/core/version.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/core/tests/test_standalone_operator.py",
+   "target": "class:helao/core/tests/test_standalone_operator.py:_MockBackend",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/tests/test_standalone_operator.py",
+   "target": "class:helao/core/tests/test_standalone_operator.py:_FakeOrch",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/tests/test_standalone_operator.py",
+   "target": "function:helao/core/tests/test_standalone_operator.py:run_all",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/tests/test_standalone_operator.py",
+   "target": "function:helao/core/tests/test_standalone_operator.py:run_all",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/core/tests/test_standalone_operator.py",
+   "target": "function:helao/core/tests/test_standalone_operator.py:test_remote_backend_dispatch_and_serialize",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/tests/test_standalone_operator.py",
+   "target": "function:helao/core/tests/test_standalone_operator.py:test_plan_metadata_capture_at_insert",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/core/tests/test_standalone_operator.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  }
+ ]
+}

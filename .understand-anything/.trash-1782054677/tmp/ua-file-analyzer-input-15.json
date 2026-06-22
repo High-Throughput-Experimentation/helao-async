@@ -1,0 +1,31 @@
+{
+  "projectRoot": "/mnt/STORAGE/repos/helao/helao-async",
+  "batchFiles": [
+    {"path": "helao/deploy/hte/drivers/io/galil_toggle_main.dmc", "language": "dmc", "sizeLines": 8, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/io/galil_toggle_sub_req.dmc", "language": "dmc", "sizeLines": 20, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/io/galil_toggle_sub.dmc", "language": "dmc", "sizeLines": 16, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/io/galil_toggle.dmc", "language": "dmc", "sizeLines": 39, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/io/galil_two_toggle.dmc", "language": "dmc", "sizeLines": 64, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/io/synaccess/__init__.py", "language": "python", "sizeLines": 1, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/mfc/__init__.py", "language": "python", "sizeLines": 1, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/motion/__init__.py", "language": "python", "sizeLines": 1, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/power_supply/__init__.py", "language": "python", "sizeLines": 1, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/pstat/__init__.py", "language": "python", "sizeLines": 5, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/pstat/biologic/__init__.py", "language": "python", "sizeLines": 5, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/pstat/gamry/__init__.py", "language": "python", "sizeLines": 6, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/pstat/gamry/tests/__init__.py", "language": "python", "sizeLines": 1, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/pump/__init__.py", "language": "python", "sizeLines": 5, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/robot/__init__.py", "language": "python", "sizeLines": 5, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/sensor/__init__.py", "language": "python", "sizeLines": 5, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/spec/__init__.py", "language": "python", "sizeLines": 5, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/spec/andor/__init__.py", "language": "python", "sizeLines": 5, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/spec/andor/test_funcs.py", "language": "python", "sizeLines": 742, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py", "language": "python", "sizeLines": 773, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/temperature_control/__init__.py", "language": "python", "sizeLines": 5, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/__init__.py", "language": "python", "sizeLines": 5, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/drivers/test_station/leancat/__init__.py", "language": "python", "sizeLines": 6, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/experiments/__init__.py", "language": "python", "sizeLines": 6, "fileCategory": "code"},
+    {"path": "helao/deploy/hte/experiments/archive/current_params.csv", "language": "csv", "sizeLines": 832, "fileCategory": "data"}
+  ],
+  "batchImportData": {}
+}

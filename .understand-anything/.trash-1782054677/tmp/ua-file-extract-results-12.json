@@ -1,0 +1,383 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 19,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "CLAUDE.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 73,
+      "nonEmptyLines": 53,
+      "sections": [
+        {
+          "heading": "CLAUDE.md",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Project",
+          "level": 2,
+          "line": 5
+        },
+        {
+          "heading": "Environment & common commands",
+          "level": 2,
+          "line": 11
+        },
+        {
+          "heading": "Architecture",
+          "level": 2,
+          "line": 37
+        },
+        {
+          "heading": "Three-layer layout",
+          "level": 3,
+          "line": 39
+        },
+        {
+          "heading": "Launch flow",
+          "level": 3,
+          "line": 44
+        },
+        {
+          "heading": "Server roles inside a group",
+          "level": 3,
+          "line": 50
+        },
+        {
+          "heading": "Data and state on disk",
+          "level": 3,
+          "line": 58
+        },
+        {
+          "heading": "Two execution models: Orchestrator vs Runners",
+          "level": 3,
+          "line": 64
+        },
+        {
+          "heading": "Conventions worth knowing",
+          "level": 2,
+          "line": 67
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 10
+      }
+    },
+    {
+      "path": "LICENSE.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 30,
+      "nonEmptyLines": 25,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 0
+      }
+    },
+    {
+      "path": "helao.bat",
+      "language": "batch",
+      "fileCategory": "script",
+      "totalLines": 5,
+      "nonEmptyLines": 5,
+      "metrics": {}
+    },
+    {
+      "path": "helao.sh",
+      "language": "shell",
+      "fileCategory": "script",
+      "totalLines": 6,
+      "nonEmptyLines": 6,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao_dev_linux-64.yml",
+      "language": "yaml",
+      "fileCategory": "config",
+      "totalLines": 88,
+      "nonEmptyLines": 88,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "channels",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 4
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "helao_dev_win-64.yml",
+      "language": "yaml",
+      "fileCategory": "config",
+      "totalLines": 88,
+      "nonEmptyLines": 88,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "channels",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 4
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "helao_pinned_linux-64.yml",
+      "language": "yaml",
+      "fileCategory": "config",
+      "totalLines": 465,
+      "nonEmptyLines": 465,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "channels",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 4
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "helao_pinned_win-64.yml",
+      "language": "yaml",
+      "fileCategory": "config",
+      "totalLines": 399,
+      "nonEmptyLines": 399,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "channels",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 4
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "hipy.bat",
+      "language": "batch",
+      "fileCategory": "script",
+      "totalLines": 4,
+      "nonEmptyLines": 4,
+      "metrics": {}
+    },
+    {
+      "path": "launch.bat",
+      "language": "batch",
+      "fileCategory": "script",
+      "totalLines": 4,
+      "nonEmptyLines": 4,
+      "metrics": {}
+    },
+    {
+      "path": "readme.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 50,
+      "nonEmptyLines": 35,
+      "sections": [
+        {
+          "heading": "HELAO-async",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Requirements",
+          "level": 2,
+          "line": 5
+        },
+        {
+          "heading": "Installation",
+          "level": 2,
+          "line": 11
+        },
+        {
+          "heading": "Windows",
+          "level": 4,
+          "line": 14
+        },
+        {
+          "heading": "Linux",
+          "level": 4,
+          "line": 19
+        },
+        {
+          "heading": "Usage",
+          "level": 2,
+          "line": 25
+        },
+        {
+          "heading": "Description of launch scripts and utilities",
+          "level": 2,
+          "line": 36
+        },
+        {
+          "heading": "Development notes",
+          "level": 2,
+          "line": 48
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 8
+      }
+    },
+    {
+      "path": "reset_unstable.bat",
+      "language": "batch",
+      "fileCategory": "script",
+      "totalLines": 18,
+      "nonEmptyLines": 16,
+      "metrics": {}
+    },
+    {
+      "path": "setup_env.bat",
+      "language": "batch",
+      "fileCategory": "script",
+      "totalLines": 16,
+      "nonEmptyLines": 16,
+      "metrics": {}
+    },
+    {
+      "path": "setup_env.sh",
+      "language": "shell",
+      "fileCategory": "script",
+      "totalLines": 19,
+      "nonEmptyLines": 19,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "switch.bat",
+      "language": "batch",
+      "fileCategory": "script",
+      "totalLines": 7,
+      "nonEmptyLines": 6,
+      "metrics": {}
+    },
+    {
+      "path": "update.bat",
+      "language": "batch",
+      "fileCategory": "script",
+      "totalLines": 23,
+      "nonEmptyLines": 22,
+      "metrics": {}
+    },
+    {
+      "path": "update.sh",
+      "language": "shell",
+      "fileCategory": "script",
+      "totalLines": 20,
+      "nonEmptyLines": 18,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "update_env.bat",
+      "language": "batch",
+      "fileCategory": "script",
+      "totalLines": 17,
+      "nonEmptyLines": 17,
+      "metrics": {}
+    },
+    {
+      "path": "update_env.sh",
+      "language": "shell",
+      "fileCategory": "script",
+      "totalLines": 20,
+      "nonEmptyLines": 20,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

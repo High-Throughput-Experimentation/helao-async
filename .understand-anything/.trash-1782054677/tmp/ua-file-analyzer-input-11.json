@@ -1,0 +1,15 @@
+{
+  "projectRoot": "/mnt/STORAGE/repos/helao/helao-async",
+  "batchFiles": [
+    {"path": "helao/core/tests/openapi_client_test.py", "language": "python", "sizeLines": 273, "fileCategory": "code"},
+    {"path": "helao/core/tests/openapi_pagination_test.py", "language": "python", "sizeLines": 168, "fileCategory": "code"},
+    {"path": "helao/helpers/openapi_client.py", "language": "python", "sizeLines": 529, "fileCategory": "code"},
+    {"path": "helao/helpers/openapi_pagination.py", "language": "python", "sizeLines": 246, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "helao/core/tests/openapi_client_test.py": ["helao/helpers/openapi_client.py", "helao/helpers/openapi_pagination.py"],
+    "helao/core/tests/openapi_pagination_test.py": ["helao/helpers/openapi_pagination.py"],
+    "helao/helpers/openapi_client.py": [],
+    "helao/helpers/openapi_pagination.py": []
+  }
+}

@@ -1,0 +1,84 @@
+[
+  {
+    "order": 1,
+    "title": "Project Overview",
+    "description": "Start with the README to understand what HELAO-async is: the Caltech HTE group's distributed instrument-control software, where cooperating FastAPI and Bokeh servers are launched together as a configurable 'orchestration group'. It covers requirements, Windows/Linux installation, and the basic usage flow that the rest of this tour traces through actual code. Read it alongside CLAUDE.md, which gives the architectural map: the three-layer layout (core framework, per-deployment instrument code, shared helpers) and the launch flow we explore next.",
+    "nodeIds": ["document:readme.md", "document:CLAUDE.md"]
+  },
+  {
+    "order": 2,
+    "title": "The Launch Entry Point",
+    "description": "launch.py is where everything begins. It takes a config prefix, validates the YAML's `servers:` block (unique keys, unique host:port, exactly one of fast/bokeh per entry), then iterates LAUNCH_ORDER = [action, orchestrator, visualizer, operator], shelling out to a launcher per server. Because it spawns subprocesses rather than importing them, this single file is the seam that composes an entire distributed system from one config file.",
+    "nodeIds": ["file:launch.py"],
+    "languageLesson": "launch.py uses subprocess spawning plus psutil to track PIDs (pickled to STATES/) rather than in-process imports — a common pattern for supervising a fleet of independent server processes that must restart individually."
+  },
+  {
+    "order": 3,
+    "title": "Resolving the Config",
+    "description": "Before any server starts, the config prefix must be resolved to an actual file. config_loader.py globs `helao/deploy/*/configs/<prefix>.{yml,py}`, loads it, validates the server group, and exposes the global CONFIG that every server reads. This is also where deployment auto-detection happens — the directory the config lives in normally determines which deployment's code gets imported.",
+    "nodeIds": ["file:helao/helpers/config_loader.py", "config:helao/deploy/hte/configs/adss.yml"],
+    "languageLesson": "Configs may be `.yml` or `.py` (the latter must define a top-level `config` dict). A YAML config declares the full server group plus the experiment_libraries/sequence_libraries lists that the orchestrator later imports dynamically."
+  },
+  {
+    "order": 4,
+    "title": "The Per-Server Launchers",
+    "description": "For each server in the group, launch.py delegates to one of two launchers. fast_launcher.py resolves the prefix, dynamically imports `helao.deploy.<deployment>.servers.<group>.fast`, and calls its `makeApp(server_key)` factory under uvicorn; bokeh_launcher.py does the same for Bokeh apps via `makeBokehApp(...)`. This dynamic-import-by-path convention is why module/file names under `servers/<group>/` must match the `fast:`/`bokeh:` value in the config.",
+    "nodeIds": ["file:fast_launcher.py", "file:bokeh_launcher.py"]
+  },
+  {
+    "order": 5,
+    "title": "The Server Foundation: Base & BaseAPI",
+    "description": "Every action server is built on these two core classes. base.py's Base wires in the status/data WebSockets, an NTP-synced clock, endpoint queues, the action lifecycle, and HLO file output — the shared machinery every server needs. base_api.py's BaseAPI builds the FastAPI application on top of Base, dynamically wrapping a driver's action functions into versioned HTTP endpoints. Base is the highest-fan-out node in the framework, so understanding it unlocks most of the codebase.",
+    "nodeIds": ["file:helao/core/servers/base.py", "file:helao/core/servers/base_api.py"]
+  },
+  {
+    "order": 6,
+    "title": "The Domain Models",
+    "description": "HELAO's vocabulary is a hierarchy of Pydantic models: a Sequence contains Experiments, each Experiment contains Actions, and Actions operate on Samples. These models (in helao/core/models/) are the contract passed over HTTP between servers and serialized to disk. premodels.py wraps them into the queue-side runtime schemas (Sequence/Experiment/Action plus the ActionPlanMaker/ExperimentPlanMaker helpers) the orchestrator actually enqueues — it is the single most depended-upon module in the project.",
+    "nodeIds": ["file:helao/helpers/premodels.py", "file:helao/core/models/sequence.py", "file:helao/core/models/experiment.py", "file:helao/core/models/action.py", "file:helao/core/models/sample.py"]
+  },
+  {
+    "order": 7,
+    "title": "The Orchestrator",
+    "description": "The orchestrator is the brain of a running group. orch.py's Orch class (extending Base from Step 5) owns the sequence/experiment/action deques, dispatches actions to action servers over HTTP, and reacts to their status updates. The HTE deployment's async_orch2.py is the thin `makeApp` wrapper that turns Orch into a launchable FastAPI server and dynamically imports the experiment/sequence libraries named in the config.",
+    "nodeIds": ["file:helao/core/servers/orch.py", "file:helao/deploy/hte/servers/orchestrator/async_orch2.py"]
+  },
+  {
+    "order": 8,
+    "title": "Inter-Server Communication",
+    "description": "The orchestrator and action servers are separate processes, so all coordination travels over HTTP. dispatcher.py is the async RPC layer that makes this work: it provides action and private dispatchers with retry logic, letting the orchestrator from Step 7 fire actions at action servers and poll their status. This is the glue that turns a pile of independent FastAPI apps into one cooperating system.",
+    "nodeIds": ["file:helao/helpers/dispatcher.py"],
+    "languageLesson": "The dispatcher is fully async (asyncio + aiohttp): non-blocking HTTP calls let one orchestrator manage many concurrent action servers without threads, which is the core scalability move behind the 'async' in HELAO-async."
+  },
+  {
+    "order": 9,
+    "title": "The Driver Contract & an Action Server",
+    "description": "Action servers wrap hardware. The HelaoDriver ABC (helao_driver.py) defines the contract every backend must satisfy — connect/get_status/stop/reset/disconnect — returning DriverResponse objects, with DriverPoller for streaming data. pal_server.py is a concrete example: a FastAPI action server wrapping the PAL autosampler driver, exposing its sampling/injection operations as the `/<key>/<action>` endpoints that the orchestrator dispatches to. Every instrument in the system follows this same driver-plus-server shape.",
+    "nodeIds": ["file:helao/core/drivers/helao_driver.py", "file:helao/deploy/hte/servers/action/pal_server.py"],
+    "languageLesson": "HelaoDriver is an abstract base class (ABC) enforcing a uniform interface across vendor-specific hardware. This Liskov-style contract lets the BaseAPI factory wrap any driver's methods into HTTP endpoints without knowing the hardware details."
+  },
+  {
+    "order": 10,
+    "title": "Experiment & Sequence Libraries",
+    "description": "Building on the models from Step 6, the actual science lives in importable experiment and sequence libraries under deploy/hte/. ECHE_exp.py is an electrochemistry experiment library whose @experiment sub-functions emit ordered lists of actions; HISPEC_seq.py is a sequence library composing experiments into a full station workflow. The orchestrator dynamically imports exactly the modules named by the config's experiment_libraries/sequence_libraries lists — this is how one codebase serves many physical stations.",
+    "nodeIds": ["file:helao/deploy/hte/experiments/ECHE_exp.py", "file:helao/deploy/hte/sequences/HISPEC_seq.py"]
+  },
+  {
+    "order": 11,
+    "title": "Visualizers & Operators",
+    "description": "Two server roles complete the group. Visualizers are Bokeh apps that subscribe to action servers' status/data WebSockets and render live plots — spec_vis.py streams downsampled spectra, while live_visualizer.py mounts a consolidated multi-server view. Operators are the human-facing UIs and automation clients: bokeh_operator.py renders the sequence/experiment/action queues and plate maps, while helao_operator.py is the headless client that drives the orchestrator programmatically.",
+    "nodeIds": ["file:helao/deploy/hte/servers/visualizer/live_visualizer.py", "file:helao/deploy/hte/servers/visualizer/spec_vis.py", "file:helao/core/servers/operator/bokeh_operator.py", "file:helao/core/servers/operator/helao_operator.py"]
+  },
+  {
+    "order": 12,
+    "title": "Data Sync & The Visualizer Base",
+    "description": "As actions run, each server writes HLO output into per-run RUNS_* trees on disk. sync_driver.py's HelaoSyncer is the engine that walks those finished run YAMLs, tracks per-record progress, and uploads files to S3 and a database — turning local output into canonical, shipped data. vis.py is the Bokeh counterpart to Step 5's Base: the Vis class plus HelaoVis wrapper that every visualizer from Step 11 builds on.",
+    "nodeIds": ["file:helao/core/drivers/data/sync_driver.py", "file:helao/core/servers/vis.py"]
+  },
+  {
+    "order": 13,
+    "title": "Testing & Operational Tooling",
+    "description": "Finally, the operational surface. run_unit_tests.py executes the standalone sample-model unit tests and is run automatically by launch.py before anything boots, aborting on failure. cli.py is an interactive REPL that introspects each running FastAPI server's endpoints and invokes them, and append.py merges additional servers into an already-running group — together they round out the day-to-day workflow of operating a HELAO station.",
+    "nodeIds": ["file:run_unit_tests.py", "file:cli.py", "file:append.py"]
+  }
+]

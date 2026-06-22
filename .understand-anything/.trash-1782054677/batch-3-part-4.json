@@ -1,0 +1,1275 @@
+{
+ "nodes": [
+  {
+   "id": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "type": "file",
+   "name": "ECHE_exp.py",
+   "filePath": "helao/deploy/hte/experiments/ECHE_exp.py",
+   "summary": "ECHE (electrochemistry) experiment library: startup/shutdown, sample loading, and CA/CV/CP measurements with LED-illuminated photo variants plus stage moves.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "eche"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_startup",
+   "type": "function",
+   "name": "ECHE_sub_startup",
+   "filePath": "helao/deploy/hte/experiments/ECHE_exp.py",
+   "lineRange": [
+    169,
+    243
+   ],
+   "summary": "Initializes the ECHE station and engages the cell.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "eche"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CA_led",
+   "type": "function",
+   "name": "ECHE_sub_CA_led",
+   "filePath": "helao/deploy/hte/experiments/ECHE_exp.py",
+   "lineRange": [
+    263,
+    398
+   ],
+   "summary": "Chronoamperometry with LED illumination control.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "eche"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CV_led",
+   "type": "function",
+   "name": "ECHE_sub_CV_led",
+   "filePath": "helao/deploy/hte/experiments/ECHE_exp.py",
+   "lineRange": [
+    603,
+    765
+   ],
+   "summary": "Cyclic voltammetry with LED illumination control.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "eche"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CV",
+   "type": "function",
+   "name": "ECHE_sub_CV",
+   "filePath": "helao/deploy/hte/experiments/ECHE_exp.py",
+   "lineRange": [
+    769,
+    865
+   ],
+   "summary": "Standard cyclic voltammetry measurement.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "eche"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CP_led",
+   "type": "function",
+   "name": "ECHE_sub_CP_led",
+   "filePath": "helao/deploy/hte/experiments/ECHE_exp.py",
+   "lineRange": [
+    947,
+    1067
+   ],
+   "summary": "Chronopotentiometry with LED illumination control.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "eche"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_movetosample",
+   "type": "function",
+   "name": "ECHE_sub_movetosample",
+   "filePath": "helao/deploy/hte/experiments/ECHE_exp.py",
+   "lineRange": [
+    1071,
+    1115
+   ],
+   "summary": "Moves the stage to a target plate sample position.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "eche"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "type": "file",
+   "name": "ECHEUVIS_exp.py",
+   "filePath": "helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "summary": "ECHEUVIS experiment library: combined electrochemistry + UV-Vis spectroscopy measurements (CV/CA/CP/OCV with LED), engage/disengage, and a stability analysis step.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "echeuvis",
+    "spectroscopy"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_CV_led",
+   "type": "function",
+   "name": "ECHEUVIS_sub_CV_led",
+   "filePath": "helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "lineRange": [
+    99,
+    333
+   ],
+   "summary": "Cyclic voltammetry with synchronized LED illumination and UV-Vis acquisition.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "echeuvis",
+    "spectroscopy"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_CA_led",
+   "type": "function",
+   "name": "ECHEUVIS_sub_CA_led",
+   "filePath": "helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "lineRange": [
+    337,
+    551
+   ],
+   "summary": "Chronoamperometry with synchronized LED and spectral capture.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "echeuvis",
+    "spectroscopy"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_CP_led",
+   "type": "function",
+   "name": "ECHEUVIS_sub_CP_led",
+   "filePath": "helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "lineRange": [
+    555,
+    762
+   ],
+   "summary": "Chronopotentiometry with synchronized LED and spectral capture.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "echeuvis",
+    "spectroscopy"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_OCV_led",
+   "type": "function",
+   "name": "ECHEUVIS_sub_OCV_led",
+   "filePath": "helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "lineRange": [
+    783,
+    990
+   ],
+   "summary": "Open-circuit voltage with synchronized LED and spectral capture.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "echeuvis",
+    "spectroscopy"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_engage",
+   "type": "function",
+   "name": "ECHEUVIS_sub_engage",
+   "filePath": "helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "lineRange": [
+    1041,
+    1128
+   ],
+   "summary": "Engages the optical/electrochemical cell against the sample.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "echeuvis",
+    "spectroscopy"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_analysis_stability",
+   "type": "function",
+   "name": "ECHEUVIS_analysis_stability",
+   "filePath": "helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "lineRange": [
+    1132,
+    1160
+   ],
+   "summary": "Post-measurement spectral stability analysis step.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "echeuvis",
+    "spectroscopy"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "type": "file",
+   "name": "ECMS_exp.py",
+   "filePath": "helao/deploy/hte/experiments/ECMS_exp.py",
+   "summary": "ECMS (electrochemistry-mass-spec) experiment library: cell/electrolyte fill and recirculation, vacuum/headspace purge with gas baselines, CA/CV/pulse measurements and calibration routines.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "ecms",
+    "gas-handling"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_normal_state",
+   "type": "function",
+   "name": "ECMS_sub_normal_state",
+   "filePath": "helao/deploy/hte/experiments/ECMS_exp.py",
+   "lineRange": [
+    203,
+    276
+   ],
+   "summary": "Returns ECMS hardware (valves/pumps) to a safe normal state.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "ecms",
+    "gas-handling"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_headspace_purge_and_CO2baseline",
+   "type": "function",
+   "name": "ECMS_sub_headspace_purge_and_CO2baseline",
+   "filePath": "helao/deploy/hte/experiments/ECMS_exp.py",
+   "lineRange": [
+    580,
+    641
+   ],
+   "summary": "Purges headspace and records a CO2 baseline for MS.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "ecms",
+    "gas-handling"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_pulseCA",
+   "type": "function",
+   "name": "ECMS_sub_pulseCA",
+   "filePath": "helao/deploy/hte/experiments/ECMS_exp.py",
+   "lineRange": [
+    804,
+    932
+   ],
+   "summary": "Pulsed chronoamperometry sequence synchronized with MS sampling.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "ecms",
+    "gas-handling"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_CV",
+   "type": "function",
+   "name": "ECMS_sub_CV",
+   "filePath": "helao/deploy/hte/experiments/ECMS_exp.py",
+   "lineRange": [
+    936,
+    1036
+   ],
+   "summary": "Cyclic voltammetry measurement with MS acquisition.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "ecms",
+    "gas-handling"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_threegascali",
+   "type": "function",
+   "name": "ECMS_sub_threegascali",
+   "filePath": "helao/deploy/hte/experiments/ECMS_exp.py",
+   "lineRange": [
+    1307,
+    1385
+   ],
+   "summary": "Three-gas mass-spec calibration routine.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "ecms",
+    "gas-handling"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_CA_CO2flow",
+   "type": "function",
+   "name": "ECMS_sub_CA_CO2flow",
+   "filePath": "helao/deploy/hte/experiments/ECMS_exp.py",
+   "lineRange": [
+    1674,
+    1802
+   ],
+   "summary": "Chronoamperometry under controlled CO2 flow.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "ecms",
+    "gas-handling"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "type": "file",
+   "name": "HISPEC_exp.py",
+   "filePath": "helao/deploy/hte/experiments/HISPEC_exp.py",
+   "summary": "HISPEC experiment library: high-throughput spectro-electrochemistry with engage/disengage, startup, CV/CA/CP/OCV, PEIS impedance, and a SpEC spectro-electrochemistry sequence plus vertex-potential helpers.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "hispec",
+    "spectroscopy",
+    "impedance"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_engage",
+   "type": "function",
+   "name": "HISPEC_sub_engage",
+   "filePath": "helao/deploy/hte/experiments/HISPEC_exp.py",
+   "lineRange": [
+    221,
+    289
+   ],
+   "summary": "Engages the HISPEC optical/electrochemical cell.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "hispec",
+    "spectroscopy"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_startup",
+   "type": "function",
+   "name": "HISPEC_sub_startup",
+   "filePath": "helao/deploy/hte/experiments/HISPEC_exp.py",
+   "lineRange": [
+    361,
+    439
+   ],
+   "summary": "Initializes the HISPEC station to a measurement-ready state.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "hispec",
+    "spectroscopy"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_calculate_lower_vertex_potential",
+   "type": "function",
+   "name": "HISPEC_calculate_lower_vertex_potential",
+   "filePath": "helao/deploy/hte/experiments/HISPEC_exp.py",
+   "lineRange": [
+    475,
+    504
+   ],
+   "summary": "Computes the lower CV vertex potential from measured bounds.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "hispec",
+    "spectroscopy"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_SpEC",
+   "type": "function",
+   "name": "HISPEC_sub_SpEC",
+   "filePath": "helao/deploy/hte/experiments/HISPEC_exp.py",
+   "lineRange": [
+    637,
+    817
+   ],
+   "summary": "Combined spectro-electrochemistry measurement sequence.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "hispec",
+    "spectroscopy"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_CP",
+   "type": "function",
+   "name": "HISPEC_sub_CP",
+   "filePath": "helao/deploy/hte/experiments/HISPEC_exp.py",
+   "lineRange": [
+    821,
+    907
+   ],
+   "summary": "Chronopotentiometry measurement.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "hispec",
+    "spectroscopy"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_PEIS",
+   "type": "function",
+   "name": "HISPEC_sub_PEIS",
+   "filePath": "helao/deploy/hte/experiments/HISPEC_exp.py",
+   "lineRange": [
+    911,
+    989
+   ],
+   "summary": "Potentiostatic electrochemical impedance spectroscopy measurement.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "hispec",
+    "spectroscopy"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:helao/deploy/hte/experiments/ICPMS_exp.py",
+   "type": "file",
+   "name": "ICPMS_exp.py",
+   "filePath": "helao/deploy/hte/experiments/ICPMS_exp.py",
+   "summary": "Small ICP-MS experiment library exposing a single concentration-analysis experiment step.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "icpms",
+    "analysis"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/ICPMS_exp.py:ICPMS_analysis_concentration",
+   "type": "function",
+   "name": "ICPMS_analysis_concentration",
+   "filePath": "helao/deploy/hte/experiments/ICPMS_exp.py",
+   "lineRange": [
+    20,
+    42
+   ],
+   "summary": "Experiment step that submits collected samples for ICP-MS concentration analysis.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "icpms",
+    "analysis"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:helao/deploy/hte/experiments/PSTAT_exp.py",
+   "type": "file",
+   "name": "PSTAT_exp.py",
+   "filePath": "helao/deploy/hte/experiments/PSTAT_exp.py",
+   "summary": "Minimal potentiostat experiment library exposing a single chronopotentiometry experiment.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "pstat"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:helao/deploy/hte/experiments/PSTAT_exp.py:PSTAT_exp_CP",
+   "type": "function",
+   "name": "PSTAT_exp_CP",
+   "filePath": "helao/deploy/hte/experiments/PSTAT_exp.py",
+   "lineRange": [
+    17,
+    94
+   ],
+   "summary": "Chronopotentiometry experiment dispatching a potentiostat CP action.",
+   "tags": [
+    "experiment-library",
+    "electrochemistry",
+    "action-sequence",
+    "pstat"
+   ],
+   "complexity": "moderate"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_startup",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_startup",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CA_led",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CA_led",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CV_led",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CV_led",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CV",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CV",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CP_led",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_CP_led",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_movetosample",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHE_exp.py:ECHE_sub_movetosample",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "file:helao/core/models/action_start_condition.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "file:helao/core/models/electrolyte.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "file:helao/core/models/machine.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "file:helao/core/models/process_contrib.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "file:helao/core/models/sample.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "file:helao/deploy/hte/drivers/io/enum.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "file:helao/deploy/hte/drivers/motion/enum.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "file:helao/helpers/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHE_exp.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_CV_led",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_CV_led",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_CA_led",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_CA_led",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_CP_led",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_CP_led",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_OCV_led",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_OCV_led",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_engage",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_sub_engage",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_analysis_stability",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECHEUVIS_exp.py:ECHEUVIS_analysis_stability",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "file:helao/core/models/action_start_condition.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "file:helao/core/models/electrolyte.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "file:helao/core/models/machine.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "file:helao/core/models/process_contrib.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "file:helao/deploy/hte/drivers/io/enum.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "file:helao/helpers/__init__.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "file:helao/helpers/config_loader.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "file:helao/helpers/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECHEUVIS_exp.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_normal_state",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_normal_state",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_headspace_purge_and_CO2baseline",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_headspace_purge_and_CO2baseline",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_pulseCA",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_pulseCA",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_CV",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_CV",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_threegascali",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_threegascali",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_CA_CO2flow",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ECMS_exp.py:ECMS_sub_CA_CO2flow",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "file:helao/core/models/action_start_condition.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "file:helao/core/models/machine.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "file:helao/core/models/process_contrib.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "file:helao/core/models/sample.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "file:helao/deploy/hte/drivers/io/enum.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "file:helao/deploy/hte/drivers/robot/pal_driver.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "file:helao/helpers/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ECMS_exp.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_engage",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_engage",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_startup",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_startup",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_calculate_lower_vertex_potential",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_calculate_lower_vertex_potential",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_SpEC",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_SpEC",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_CP",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_CP",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_PEIS",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "function:helao/deploy/hte/experiments/HISPEC_exp.py:HISPEC_sub_PEIS",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/core/models/action_start_condition.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/core/models/electrolyte.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/core/models/machine.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/core/models/process_contrib.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/core/models/sample.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/deploy/hte/drivers/io/enum.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/deploy/hte/drivers/motion/enum.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/helpers/__init__.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/helpers/config_loader.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/helpers/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/HISPEC_exp.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ICPMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ICPMS_exp.py:ICPMS_analysis_concentration",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ICPMS_exp.py",
+   "target": "function:helao/deploy/hte/experiments/ICPMS_exp.py:ICPMS_analysis_concentration",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ICPMS_exp.py",
+   "target": "file:helao/core/models/machine.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ICPMS_exp.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/ICPMS_exp.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/PSTAT_exp.py",
+   "target": "function:helao/deploy/hte/experiments/PSTAT_exp.py:PSTAT_exp_CP",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/PSTAT_exp.py",
+   "target": "function:helao/deploy/hte/experiments/PSTAT_exp.py:PSTAT_exp_CP",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/PSTAT_exp.py",
+   "target": "file:helao/core/models/machine.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/PSTAT_exp.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/experiments/PSTAT_exp.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  }
+ ]
+}

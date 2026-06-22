@@ -1,0 +1,186 @@
+{
+  "nodes": [
+    {
+      "id": "config:helao/deploy/hte/configs/adss.yml",
+      "type": "config",
+      "name": "adss.yml",
+      "filePath": "helao/deploy/hte/configs/adss.yml",
+      "summary": "Orchestration group config for the ADSS (acid dosing / scanning-droplet) HTE station, wiring an async orchestrator, standalone operator, Galil motion, and supporting action servers with ADSS_exp/ADSS_seq libraries.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "adss", "deployment"],
+      "complexity": "complex",
+      "languageNotes": "HELAO YAML config: servers block defines each FastAPI/Bokeh server (host/port/group/fast|bokeh/params); experiment_libraries/sequence_libraries name dynamically-imported modules."
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/adss3.yml",
+      "type": "config",
+      "name": "adss3.yml",
+      "filePath": "helao/deploy/hte/configs/adss3.yml",
+      "summary": "Orchestration group config for the ADSS3 variant of the acid dosing / scanning-droplet HTE station, defining its orchestrator, operator, motion, and action servers plus ADSS experiment/sequence libraries.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "adss", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/anec.yml",
+      "type": "config",
+      "name": "anec.yml",
+      "filePath": "helao/deploy/hte/configs/anec.yml",
+      "summary": "Orchestration group config for the ANEC (anion-exchange / CO2 reduction) HTE station, declaring its server set and the experiment/sequence libraries it loads.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "anec", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/ccsi1.yml",
+      "type": "config",
+      "name": "ccsi1.yml",
+      "filePath": "helao/deploy/hte/configs/ccsi1.yml",
+      "summary": "Orchestration group config for the CCSI1 (carbon capture) HTE station, wiring its orchestrator, operator, and action servers with the station's experiment and sequence libraries.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "ccsi", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/ccsi2.yml",
+      "type": "config",
+      "name": "ccsi2.yml",
+      "filePath": "helao/deploy/hte/configs/ccsi2.yml",
+      "summary": "Orchestration group config for the CCSI2 carbon-capture HTE station, defining its full server set and the experiment/sequence libraries dynamically imported at launch.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "ccsi", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/clad.yml",
+      "type": "config",
+      "name": "clad.yml",
+      "filePath": "helao/deploy/hte/configs/clad.yml",
+      "summary": "Orchestration group config for the CLAD HTE station with multiple motor reference positions, an orchestrator, operator, motion, and action servers plus its experiment/sequence libraries.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "clad", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/eche10.yml",
+      "type": "config",
+      "name": "eche10.yml",
+      "filePath": "helao/deploy/hte/configs/eche10.yml",
+      "summary": "Orchestration group config for the ECHE10 electrochemistry HTE station, wiring its orchestrator, operator, Galil motion, potentiostat, and supporting action servers with ECHE experiment/sequence libraries.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "eche", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/eche4.yml",
+      "type": "config",
+      "name": "eche4.yml",
+      "filePath": "helao/deploy/hte/configs/eche4.yml",
+      "summary": "Orchestration group config for the ECHE4 electrochemistry HTE station, defining its server set and the ECHE experiment/sequence libraries it loads at launch.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "eche", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/eche5.yml",
+      "type": "config",
+      "name": "eche5.yml",
+      "filePath": "helao/deploy/hte/configs/eche5.yml",
+      "summary": "Orchestration group config for the ECHE5 electrochemistry HTE station, declaring its orchestrator, operator, and action servers plus the ECHE experiment/sequence libraries.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "eche", "deployment"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/eche6.yml",
+      "type": "config",
+      "name": "eche6.yml",
+      "filePath": "helao/deploy/hte/configs/eche6.yml",
+      "summary": "Orchestration group config for the ECHE6 electrochemistry HTE station, wiring its server set and the experiment/sequence libraries imported at launch.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "eche", "deployment"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/eche7.yml",
+      "type": "config",
+      "name": "eche7.yml",
+      "filePath": "helao/deploy/hte/configs/eche7.yml",
+      "summary": "Orchestration group config for the ECHE7 electrochemistry HTE station, defining its orchestrator, operator, and action servers plus the ECHE experiment/sequence libraries.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "eche", "deployment"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/eche8.yml",
+      "type": "config",
+      "name": "eche8.yml",
+      "filePath": "helao/deploy/hte/configs/eche8.yml",
+      "summary": "Orchestration group config for the ECHE8 electrochemistry HTE station, declaring its server set and the experiment/sequence libraries loaded at launch.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "eche", "deployment"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/ecms1.yml",
+      "type": "config",
+      "name": "ecms1.yml",
+      "filePath": "helao/deploy/hte/configs/ecms1.yml",
+      "summary": "Orchestration group config for the ECMS1 (electrochemistry mass-spectrometry) HTE station, wiring its orchestrator, operator, and action servers with the station's experiment/sequence libraries.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "ecms", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/ecms2.yml",
+      "type": "config",
+      "name": "ecms2.yml",
+      "filePath": "helao/deploy/hte/configs/ecms2.yml",
+      "summary": "Orchestration group config for the ECMS2 electrochemistry mass-spectrometry HTE station, defining its server set and the experiment/sequence libraries it loads.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "ecms", "deployment"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/gamry.yml",
+      "type": "config",
+      "name": "gamry.yml",
+      "filePath": "helao/deploy/hte/configs/gamry.yml",
+      "summary": "Minimal standalone orchestration config that launches only a Gamry potentiostat action server, used for isolated potentiostat testing/bring-up.",
+      "tags": ["configuration", "orchestration-group", "gamry", "potentiostat", "testing"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/hispec.yml",
+      "type": "config",
+      "name": "hispec.yml",
+      "filePath": "helao/deploy/hte/configs/hispec.yml",
+      "summary": "Orchestration group config for the HISPEC (hyperspectral) HTE station, wiring its orchestrator, operator, and action servers with the station's experiment/sequence libraries.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "hispec", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/icpm1.yml",
+      "type": "config",
+      "name": "icpm1.yml",
+      "filePath": "helao/deploy/hte/configs/icpm1.yml",
+      "summary": "Compact orchestration group config for the ICPM1 (ICP-MS) HTE station, declaring its orchestrator/operator and the experiment/sequence libraries it loads.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "icpms", "deployment"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/partialccsi1.yml",
+      "type": "config",
+      "name": "partialccsi1.yml",
+      "filePath": "helao/deploy/hte/configs/partialccsi1.yml",
+      "summary": "Partial/subset orchestration group config for the CCSI1 carbon-capture station, launching a reduced server set for staged bring-up or maintenance.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "ccsi", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/power_supply_test.yml",
+      "type": "config",
+      "name": "power_supply_test.yml",
+      "filePath": "helao/deploy/hte/configs/power_supply_test.yml",
+      "summary": "Orchestration group config for bench testing power-supply hardware, wiring an orchestrator, operator, and the relevant action/visualizer servers with test experiment/sequence libraries.",
+      "tags": ["configuration", "orchestration-group", "power-supply", "testing", "deployment"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:helao/deploy/hte/configs/uvis.yml",
+      "type": "config",
+      "name": "uvis.yml",
+      "filePath": "helao/deploy/hte/configs/uvis.yml",
+      "summary": "Orchestration group config for the UVIS (UV-Vis spectroscopy) HTE station, declaring its server set, motor reference position, and the experiment/sequence libraries it loads.",
+      "tags": ["configuration", "orchestration-group", "hte-station", "uvis", "deployment"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": []
+}

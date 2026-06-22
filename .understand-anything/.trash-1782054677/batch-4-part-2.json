@@ -1,0 +1,820 @@
+{
+ "nodes": [
+  {
+   "id": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "type": "file",
+   "name": "ECMS_seq.py",
+   "filePath": "helao/deploy/hte/sequences/ECMS_seq.py",
+   "summary": "ECMS station sequence library defining electrochemistry-mass-spectrometry recirculation, calibration, and gas-flow workflows.",
+   "tags": [
+    "sequence-library",
+    "electrochemistry",
+    "mass-spec",
+    "ecms"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:helao/deploy/hte/sequences/HISPEC_seq.py",
+   "type": "file",
+   "name": "HISPEC_seq.py",
+   "filePath": "helao/deploy/hte/sequences/HISPEC_seq.py",
+   "summary": "HISPEC station sequence library defining high-speed spectro-electrochemistry CV and EIS measurement workflows.",
+   "tags": [
+    "sequence-library",
+    "electrochemistry",
+    "spectroscopy",
+    "hispec"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:helao/deploy/hte/sequences/ICPMS_seq.py",
+   "type": "file",
+   "name": "ICPMS_seq.py",
+   "filePath": "helao/deploy/hte/sequences/ICPMS_seq.py",
+   "summary": "ICPMS sequence library providing a post-sequence finalization routine for ICP-MS runs.",
+   "tags": [
+    "sequence-library",
+    "icpms",
+    "post-processing"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:helao/deploy/hte/sequences/PSTAT_seq.py",
+   "type": "file",
+   "name": "PSTAT_seq.py",
+   "filePath": "helao/deploy/hte/sequences/PSTAT_seq.py",
+   "summary": "Generic potentiostat sequence library defining a chronopotentiometry loop workflow.",
+   "tags": [
+    "sequence-library",
+    "potentiostat",
+    "pstat",
+    "workflow"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:helao/deploy/hte/sequences/UVIS_DR_seq.py",
+   "type": "file",
+   "name": "UVIS_DR_seq.py",
+   "filePath": "helao/deploy/hte/sequences/UVIS_DR_seq.py",
+   "summary": "UV-Vis diffuse-reflectance sequence library defining a dry-reflectance scan workflow.",
+   "tags": [
+    "sequence-library",
+    "spectroscopy",
+    "uvis",
+    "workflow"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:helao/deploy/hte/sequences/UVIS_R_seq.py",
+   "type": "file",
+   "name": "UVIS_R_seq.py",
+   "filePath": "helao/deploy/hte/sequences/UVIS_R_seq.py",
+   "summary": "UV-Vis reflectance sequence library defining reflectance scans, GAIA preset, shutoff, and post-sequence routines.",
+   "tags": [
+    "sequence-library",
+    "spectroscopy",
+    "uvis",
+    "workflow"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:helao/deploy/hte/sequences/UVIS_TR_seq.py",
+   "type": "file",
+   "name": "UVIS_TR_seq.py",
+   "filePath": "helao/deploy/hte/sequences/UVIS_TR_seq.py",
+   "summary": "UV-Vis transmission-reflectance sequence library defining a combined T/R scan workflow.",
+   "tags": [
+    "sequence-library",
+    "spectroscopy",
+    "uvis",
+    "workflow"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:helao/deploy/hte/sequences/UVIS_T_seq.py",
+   "type": "file",
+   "name": "UVIS_T_seq.py",
+   "filePath": "helao/deploy/hte/sequences/UVIS_T_seq.py",
+   "summary": "UV-Vis transmission sequence library defining a transmission scan and post-sequence finalization workflow.",
+   "tags": [
+    "sequence-library",
+    "spectroscopy",
+    "uvis",
+    "workflow"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:helao/deploy/hte/sequences/XRFS_seq.py",
+   "type": "file",
+   "name": "XRFS_seq.py",
+   "filePath": "helao/deploy/hte/sequences/XRFS_seq.py",
+   "summary": "XRFS sequence library providing a post-sequence finalization routine for X-ray fluorescence runs.",
+   "tags": [
+    "sequence-library",
+    "xrfs",
+    "post-processing"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_initiation",
+   "type": "function",
+   "name": "ECMS_initiation",
+   "filePath": "helao/deploy/hte/sequences/ECMS_seq.py",
+   "lineRange": [
+    37,
+    118
+   ],
+   "summary": "ECMS sequence initiating the EC-MS cell to a measurement-ready state.",
+   "tags": [
+    "sequence",
+    "mass-spec",
+    "ecms"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_initiation_recirculation",
+   "type": "function",
+   "name": "ECMS_initiation_recirculation",
+   "filePath": "helao/deploy/hte/sequences/ECMS_seq.py",
+   "lineRange": [
+    122,
+    213
+   ],
+   "summary": "ECMS sequence initiating the cell with electrolyte recirculation.",
+   "tags": [
+    "sequence",
+    "mass-spec",
+    "ecms"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_repeat_CV",
+   "type": "function",
+   "name": "ECMS_repeat_CV",
+   "filePath": "helao/deploy/hte/sequences/ECMS_seq.py",
+   "lineRange": [
+    313,
+    475
+   ],
+   "summary": "ECMS sequence repeating cyclic voltammetry with MS data capture.",
+   "tags": [
+    "sequence",
+    "mass-spec",
+    "ecms"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_series_CA",
+   "type": "function",
+   "name": "ECMS_series_CA",
+   "filePath": "helao/deploy/hte/sequences/ECMS_seq.py",
+   "lineRange": [
+    1158,
+    1287
+   ],
+   "summary": "ECMS sequence running a series of chronoamperometry steps with MS capture.",
+   "tags": [
+    "sequence",
+    "mass-spec",
+    "ecms"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_MS_calibration",
+   "type": "function",
+   "name": "ECMS_MS_calibration",
+   "filePath": "helao/deploy/hte/sequences/ECMS_seq.py",
+   "lineRange": [
+    2182,
+    2262
+   ],
+   "summary": "ECMS mass-spectrometer calibration sequence.",
+   "tags": [
+    "sequence",
+    "mass-spec",
+    "calibration"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_series_CA_change_gasflow",
+   "type": "function",
+   "name": "ECMS_series_CA_change_gasflow",
+   "filePath": "helao/deploy/hte/sequences/ECMS_seq.py",
+   "lineRange": [
+    2344,
+    2510
+   ],
+   "summary": "ECMS chronoamperometry series sequence with changing gas flow.",
+   "tags": [
+    "sequence",
+    "mass-spec",
+    "ecms"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/HISPEC_seq.py:HISPEC_CV",
+   "type": "function",
+   "name": "HISPEC_CV",
+   "filePath": "helao/deploy/hte/sequences/HISPEC_seq.py",
+   "lineRange": [
+    19,
+    288
+   ],
+   "summary": "HISPEC sequence running high-speed spectro-electrochemistry cyclic voltammetry.",
+   "tags": [
+    "sequence",
+    "electrochemistry",
+    "spectroscopy"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/HISPEC_seq.py:HISPEC_EIS_only",
+   "type": "function",
+   "name": "HISPEC_EIS_only",
+   "filePath": "helao/deploy/hte/sequences/HISPEC_seq.py",
+   "lineRange": [
+    292,
+    482
+   ],
+   "summary": "HISPEC sequence running electrochemical impedance spectroscopy only.",
+   "tags": [
+    "sequence",
+    "electrochemistry",
+    "eis"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/HISPEC_seq.py:ECHEUVIS_postseq",
+   "type": "function",
+   "name": "ECHEUVIS_postseq",
+   "filePath": "helao/deploy/hte/sequences/HISPEC_seq.py",
+   "lineRange": [
+    1353,
+    1378
+   ],
+   "summary": "Post-sequence finalization routine reused for HISPEC runs.",
+   "tags": [
+    "sequence",
+    "post-processing"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/ICPMS_seq.py:ICPMS_postseq",
+   "type": "function",
+   "name": "ICPMS_postseq",
+   "filePath": "helao/deploy/hte/sequences/ICPMS_seq.py",
+   "lineRange": [
+    13,
+    32
+   ],
+   "summary": "ICP-MS post-sequence finalization routine.",
+   "tags": [
+    "sequence",
+    "post-processing",
+    "icpms"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/PSTAT_seq.py:CP_loop",
+   "type": "function",
+   "name": "CP_loop",
+   "filePath": "helao/deploy/hte/sequences/PSTAT_seq.py",
+   "lineRange": [
+    16,
+    85
+   ],
+   "summary": "Generic potentiostat chronopotentiometry loop sequence.",
+   "tags": [
+    "sequence",
+    "potentiostat",
+    "pstat"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/UVIS_DR_seq.py:UVIS_DR",
+   "type": "function",
+   "name": "UVIS_DR",
+   "filePath": "helao/deploy/hte/sequences/UVIS_DR_seq.py",
+   "lineRange": [
+    14,
+    213
+   ],
+   "summary": "UV-Vis diffuse-reflectance dry scan sequence across plate samples.",
+   "tags": [
+    "sequence",
+    "spectroscopy",
+    "uvis"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/UVIS_R_seq.py:UVIS_R",
+   "type": "function",
+   "name": "UVIS_R",
+   "filePath": "helao/deploy/hte/sequences/UVIS_R_seq.py",
+   "lineRange": [
+    14,
+    132
+   ],
+   "summary": "UV-Vis reflectance scan sequence across plate samples.",
+   "tags": [
+    "sequence",
+    "spectroscopy",
+    "uvis"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/UVIS_R_seq.py:UVIS_GAIA_preset",
+   "type": "function",
+   "name": "UVIS_GAIA_preset",
+   "filePath": "helao/deploy/hte/sequences/UVIS_R_seq.py",
+   "lineRange": [
+    188,
+    726
+   ],
+   "summary": "UV-Vis sequence applying a GAIA instrument preset across a reflectance measurement campaign.",
+   "tags": [
+    "sequence",
+    "spectroscopy",
+    "uvis"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/UVIS_TR_seq.py:UVIS_TR",
+   "type": "function",
+   "name": "UVIS_TR",
+   "filePath": "helao/deploy/hte/sequences/UVIS_TR_seq.py",
+   "lineRange": [
+    14,
+    220
+   ],
+   "summary": "UV-Vis combined transmission/reflectance scan sequence across plate samples.",
+   "tags": [
+    "sequence",
+    "spectroscopy",
+    "uvis"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/UVIS_T_seq.py:UVIS_T",
+   "type": "function",
+   "name": "UVIS_T",
+   "filePath": "helao/deploy/hte/sequences/UVIS_T_seq.py",
+   "lineRange": [
+    13,
+    234
+   ],
+   "summary": "UV-Vis transmission scan sequence across plate samples.",
+   "tags": [
+    "sequence",
+    "spectroscopy",
+    "uvis"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/UVIS_T_seq.py:UVIS_T_postseq",
+   "type": "function",
+   "name": "UVIS_T_postseq",
+   "filePath": "helao/deploy/hte/sequences/UVIS_T_seq.py",
+   "lineRange": [
+    238,
+    263
+   ],
+   "summary": "UV-Vis transmission post-sequence finalization routine.",
+   "tags": [
+    "sequence",
+    "post-processing",
+    "uvis"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:helao/deploy/hte/sequences/XRFS_seq.py:XRFS_postseq",
+   "type": "function",
+   "name": "XRFS_postseq",
+   "filePath": "helao/deploy/hte/sequences/XRFS_seq.py",
+   "lineRange": [
+    13,
+    35
+   ],
+   "summary": "XRFS post-sequence finalization routine.",
+   "tags": [
+    "sequence",
+    "post-processing",
+    "xrfs"
+   ],
+   "complexity": "simple"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/HISPEC_seq.py",
+   "target": "file:helao/core/models/electrolyte.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/HISPEC_seq.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/HISPEC_seq.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ICPMS_seq.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ICPMS_seq.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/PSTAT_seq.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/PSTAT_seq.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_DR_seq.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_DR_seq.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_R_seq.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_R_seq.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_TR_seq.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_TR_seq.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_T_seq.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_T_seq.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/XRFS_seq.py",
+   "target": "file:helao/helpers/lib_decorators.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/XRFS_seq.py",
+   "target": "file:helao/helpers/premodels.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_initiation",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_initiation",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_initiation_recirculation",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_initiation_recirculation",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_repeat_CV",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_repeat_CV",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_series_CA",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_series_CA",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_MS_calibration",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_MS_calibration",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_series_CA_change_gasflow",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ECMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ECMS_seq.py:ECMS_series_CA_change_gasflow",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/HISPEC_seq.py",
+   "target": "function:helao/deploy/hte/sequences/HISPEC_seq.py:HISPEC_CV",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/HISPEC_seq.py",
+   "target": "function:helao/deploy/hte/sequences/HISPEC_seq.py:HISPEC_CV",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/HISPEC_seq.py",
+   "target": "function:helao/deploy/hte/sequences/HISPEC_seq.py:HISPEC_EIS_only",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/HISPEC_seq.py",
+   "target": "function:helao/deploy/hte/sequences/HISPEC_seq.py:HISPEC_EIS_only",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/HISPEC_seq.py",
+   "target": "function:helao/deploy/hte/sequences/HISPEC_seq.py:ECHEUVIS_postseq",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/HISPEC_seq.py",
+   "target": "function:helao/deploy/hte/sequences/HISPEC_seq.py:ECHEUVIS_postseq",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ICPMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ICPMS_seq.py:ICPMS_postseq",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/ICPMS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/ICPMS_seq.py:ICPMS_postseq",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/PSTAT_seq.py",
+   "target": "function:helao/deploy/hte/sequences/PSTAT_seq.py:CP_loop",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/PSTAT_seq.py",
+   "target": "function:helao/deploy/hte/sequences/PSTAT_seq.py:CP_loop",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_DR_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_DR_seq.py:UVIS_DR",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_DR_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_DR_seq.py:UVIS_DR",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_R_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_R_seq.py:UVIS_R",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_R_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_R_seq.py:UVIS_R",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_R_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_R_seq.py:UVIS_GAIA_preset",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_R_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_R_seq.py:UVIS_GAIA_preset",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_TR_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_TR_seq.py:UVIS_TR",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_TR_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_TR_seq.py:UVIS_TR",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_T_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_T_seq.py:UVIS_T",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_T_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_T_seq.py:UVIS_T",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_T_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_T_seq.py:UVIS_T_postseq",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/UVIS_T_seq.py",
+   "target": "function:helao/deploy/hte/sequences/UVIS_T_seq.py:UVIS_T_postseq",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/XRFS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/XRFS_seq.py:XRFS_postseq",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:helao/deploy/hte/sequences/XRFS_seq.py",
+   "target": "function:helao/deploy/hte/sequences/XRFS_seq.py:XRFS_postseq",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}

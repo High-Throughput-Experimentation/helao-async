@@ -1,0 +1,3003 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 25,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "helao/deploy/hte/drivers/io/galil_toggle_main.dmc",
+      "language": "dmc",
+      "fileCategory": "code",
+      "totalLines": 8,
+      "nonEmptyLines": 8,
+      "metrics": {}
+    },
+    {
+      "path": "helao/deploy/hte/drivers/io/galil_toggle_sub_req.dmc",
+      "language": "dmc",
+      "fileCategory": "code",
+      "totalLines": 20,
+      "nonEmptyLines": 20,
+      "metrics": {}
+    },
+    {
+      "path": "helao/deploy/hte/drivers/io/galil_toggle_sub.dmc",
+      "language": "dmc",
+      "fileCategory": "code",
+      "totalLines": 16,
+      "nonEmptyLines": 16,
+      "metrics": {}
+    },
+    {
+      "path": "helao/deploy/hte/drivers/io/galil_toggle.dmc",
+      "language": "dmc",
+      "fileCategory": "code",
+      "totalLines": 39,
+      "nonEmptyLines": 37,
+      "metrics": {}
+    },
+    {
+      "path": "helao/deploy/hte/drivers/io/galil_two_toggle.dmc",
+      "language": "dmc",
+      "fileCategory": "code",
+      "totalLines": 65,
+      "nonEmptyLines": 58,
+      "metrics": {}
+    },
+    {
+      "path": "helao/deploy/hte/drivers/io/synaccess/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/mfc/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/motion/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/power_supply/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/pstat/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/pstat/biologic/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/pstat/gamry/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 6,
+      "nonEmptyLines": 5,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/pstat/gamry/tests/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/pump/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/robot/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/sensor/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/spec/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/spec/andor/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/spec/andor/test_funcs.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 742,
+      "nonEmptyLines": 612,
+      "functions": [
+        {
+          "name": "cool",
+          "startLine": 26,
+          "endLine": 44,
+          "params": [
+            "cam"
+          ]
+        },
+        {
+          "name": "setup_image",
+          "startLine": 47,
+          "endLine": 73,
+          "params": [
+            "cam",
+            "exposure_time"
+          ]
+        },
+        {
+          "name": "image_and_check_dynamic_range",
+          "startLine": 76,
+          "endLine": 104,
+          "params": [
+            "cam",
+            "WL",
+            "exposure_time"
+          ]
+        },
+        {
+          "name": "GetMetaData",
+          "startLine": 107,
+          "endLine": 158,
+          "params": [
+            "cam"
+          ]
+        },
+        {
+          "name": "SetupSpectroscope",
+          "startLine": 161,
+          "endLine": 266,
+          "params": [
+            "PixelWidth",
+            "centralWL",
+            "NumHorizPixels",
+            "ND_filer_num",
+            "slit_width_um"
+          ]
+        },
+        {
+          "name": "adjust_ND",
+          "startLine": 269,
+          "endLine": 378,
+          "params": [
+            "cam",
+            "WL_arr"
+          ]
+        },
+        {
+          "name": "setup_SEC_aquisition",
+          "startLine": 381,
+          "endLine": 412,
+          "params": [
+            "cam",
+            "exp_time",
+            "framerate"
+          ]
+        },
+        {
+          "name": "test_aquisition",
+          "startLine": 415,
+          "endLine": 518,
+          "params": [
+            "cam",
+            "frame_count",
+            "timeout",
+            "buffer_count"
+          ]
+        },
+        {
+          "name": "SEC_aquisition",
+          "startLine": 521,
+          "endLine": 603,
+          "params": [
+            "cam",
+            "frame_count",
+            "timeout",
+            "buffer_count"
+          ]
+        },
+        {
+          "name": "WarmAndClose",
+          "startLine": 606,
+          "endLine": 632,
+          "params": [
+            "cam",
+            "WarmupBool"
+          ]
+        },
+        {
+          "name": "process_timings",
+          "startLine": 635,
+          "endLine": 686,
+          "params": [
+            "timez",
+            "measurment_time"
+          ]
+        },
+        {
+          "name": "generate_spectral_array",
+          "startLine": 689,
+          "endLine": 724,
+          "params": [
+            "WL_arr",
+            "acqs",
+            "clockHz"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "cool",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "setup_image",
+          "line": 47,
+          "isDefault": false
+        },
+        {
+          "name": "image_and_check_dynamic_range",
+          "line": 76,
+          "isDefault": false
+        },
+        {
+          "name": "GetMetaData",
+          "line": 107,
+          "isDefault": false
+        },
+        {
+          "name": "SetupSpectroscope",
+          "line": 161,
+          "isDefault": false
+        },
+        {
+          "name": "adjust_ND",
+          "line": 269,
+          "isDefault": false
+        },
+        {
+          "name": "setup_SEC_aquisition",
+          "line": 381,
+          "isDefault": false
+        },
+        {
+          "name": "test_aquisition",
+          "line": 415,
+          "isDefault": false
+        },
+        {
+          "name": "SEC_aquisition",
+          "line": 521,
+          "isDefault": false
+        },
+        {
+          "name": "WarmAndClose",
+          "line": 606,
+          "isDefault": false
+        },
+        {
+          "name": "process_timings",
+          "line": 635,
+          "isDefault": false
+        },
+        {
+          "name": "generate_spectral_array",
+          "line": 689,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "cool",
+          "callee": "time.sleep",
+          "lineNumber": 39
+        },
+        {
+          "caller": "cool",
+          "callee": "print",
+          "lineNumber": 40
+        },
+        {
+          "caller": "cool",
+          "callee": "\"Temperature: {:.5f}C\".format",
+          "lineNumber": 40
+        },
+        {
+          "caller": "cool",
+          "callee": "print",
+          "lineNumber": 41
+        },
+        {
+          "caller": "cool",
+          "callee": "\"Status: '{}'\".format",
+          "lineNumber": 41
+        },
+        {
+          "caller": "cool",
+          "callee": "RuntimeError",
+          "lineNumber": 44
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "setup_image",
+          "lineNumber": 90
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "print",
+          "lineNumber": 91
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "cam.acquire",
+          "lineNumber": 92
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "test.image.max",
+          "lineNumber": 93
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "np.abs",
+          "lineNumber": 94
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "len",
+          "lineNumber": 96
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "plt.imshow",
+          "lineNumber": 97
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "print",
+          "lineNumber": 100
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "plt.figure",
+          "lineNumber": 101
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "plt.imshow",
+          "lineNumber": 102
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "setup_image",
+          "lineNumber": 117
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 124
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "cam.acquire",
+          "lineNumber": 127
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 130
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 131
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 132
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 133
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 134
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 137
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 138
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 139
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 142
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 143
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 144
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 145
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 146
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 147
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 148
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 149
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 150
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "\"Temperature: {:.5f}C\".format",
+          "lineNumber": 150
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 151
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "\"Status: '{}'\".format",
+          "lineNumber": 151
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 179
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 182
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 185
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 188
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "ATSpectrograph",
+          "lineNumber": 191
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.Initialize",
+          "lineNumber": 194
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 196
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function Initialize returned {}\".format",
+          "lineNumber": 197
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 198
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 202
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function Initialize returned {}\".format",
+          "lineNumber": 202
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetGrating",
+          "lineNumber": 208
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 209
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function SetGrating returned {}\".format",
+          "lineNumber": 210
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 211
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetGrating",
+          "lineNumber": 215
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 216
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function GetGrating returned: {} Grat\".format",
+          "lineNumber": 216
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetWavelength",
+          "lineNumber": 218
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 219
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function SetWavelength returned: {}\".format",
+          "lineNumber": 220
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 221
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetWavelength",
+          "lineNumber": 225
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 226
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function GetWavelength returned: {} Wavelength: {}\".format",
+          "lineNumber": 227
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 228
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetWavelengthLimits",
+          "lineNumber": 232
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 233
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function GetWavelengthLimits returned: {} Wavelength Min: {} Wavelength Max: {}\".format",
+          "lineNumber": 234
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 235
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 242
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 243
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 244
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 245
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.IsFilterPresent",
+          "lineNumber": 245
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.IsSlitPresent",
+          "lineNumber": 246
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetSlitWidth",
+          "lineNumber": 247
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 248
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.IsFilterPresent",
+          "lineNumber": 249
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetFilter",
+          "lineNumber": 250
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 251
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 254
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetNumberPixels",
+          "lineNumber": 259
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 260
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetPixelWidth",
+          "lineNumber": 261
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 262
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetNumberPixels",
+          "lineNumber": 262
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 263
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetPixelWidth",
+          "lineNumber": 263
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "np.array",
+          "lineNumber": 264
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetCalibration",
+          "lineNumber": 264
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.Close",
+          "lineNumber": 265
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "ATSpectrograph",
+          "lineNumber": 284
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.Initialize",
+          "lineNumber": 287
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 289
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function Initialize returned {}\".format",
+          "lineNumber": 290
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 291
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 295
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function Initialize returned {}\".format",
+          "lineNumber": 295
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetGrating",
+          "lineNumber": 301
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 302
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function SetGrating returned {}\".format",
+          "lineNumber": 303
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 304
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetGrating",
+          "lineNumber": 308
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 309
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function GetGrating returned: {} Grat\".format",
+          "lineNumber": 309
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetWavelength",
+          "lineNumber": 311
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 312
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function SetWavelength returned: {}\".format",
+          "lineNumber": 313
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 314
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetWavelength",
+          "lineNumber": 318
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 319
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function GetWavelength returned: {} Wavelength: {}\".format",
+          "lineNumber": 320
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 321
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetWavelengthLimits",
+          "lineNumber": 325
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 326
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function GetWavelengthLimits returned: {} Wavelength Min: {} Wavelength Max: {}\".format",
+          "lineNumber": 327
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 328
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetPixelCalibrationCoefficients",
+          "lineNumber": 332
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 337
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 338
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 339
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 340
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.IsFilterPresent",
+          "lineNumber": 340
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.IsSlitPresent",
+          "lineNumber": 341
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetSlitWidth",
+          "lineNumber": 342
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 343
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.IsFilterPresent",
+          "lineNumber": 344
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetFilter",
+          "lineNumber": 345
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 346
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "np.zeros",
+          "lineNumber": 348
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "np.zeros",
+          "lineNumber": 349
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "range",
+          "lineNumber": 351
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetFilter",
+          "lineNumber": 352
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "image_and_check_dynamic_range",
+          "lineNumber": 353
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "np.argmin",
+          "lineNumber": 357
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "range",
+          "lineNumber": 359
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "np.argmin",
+          "lineNumber": 362
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "np.argmin",
+          "lineNumber": 364
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetFilter",
+          "lineNumber": 365
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 367
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 376
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.Close",
+          "lineNumber": 377
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "range",
+          "lineNumber": 445
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "np.empty",
+          "lineNumber": 446
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.queue",
+          "lineNumber": 449
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 456
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "deque",
+          "lineNumber": 459
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "pd.DataFrame",
+          "lineNumber": 463
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "np.full",
+          "lineNumber": 463
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 465
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.AcquisitionStart",
+          "lineNumber": 469
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 476
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.SoftwareTrigger",
+          "lineNumber": 477
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 478
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 480
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.wait_buffer",
+          "lineNumber": 481
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 484
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "acqs.append",
+          "lineNumber": 489
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 492
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.queue",
+          "lineNumber": 493
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 496
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 502
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 507
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 508
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "str",
+          "lineNumber": 508
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.AcquisitionStop",
+          "lineNumber": 509
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.flush",
+          "lineNumber": 510
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.AcquisitionStop",
+          "lineNumber": 512
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.flush",
+          "lineNumber": 513
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 514
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 515
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 516
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "range",
+          "lineNumber": 546
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "np.empty",
+          "lineNumber": 547
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.queue",
+          "lineNumber": 550
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "print",
+          "lineNumber": 557
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "deque",
+          "lineNumber": 560
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.AcquisitionStart",
+          "lineNumber": 564
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.SoftwareTrigger",
+          "lineNumber": 571
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.wait_buffer",
+          "lineNumber": 573
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "acqs.append",
+          "lineNumber": 580
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.queue",
+          "lineNumber": 583
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "print",
+          "lineNumber": 590
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "print",
+          "lineNumber": 595
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "print",
+          "lineNumber": 596
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "str",
+          "lineNumber": 596
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.AcquisitionStop",
+          "lineNumber": 597
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.flush",
+          "lineNumber": 598
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.AcquisitionStop",
+          "lineNumber": 600
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.flush",
+          "lineNumber": 601
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "time.sleep",
+          "lineNumber": 624
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "print",
+          "lineNumber": 625
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "\"Temperature: {:.5f}C\".format",
+          "lineNumber": 625
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "print",
+          "lineNumber": 626
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "\"Status: '{}'\".format",
+          "lineNumber": 626
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "RuntimeError",
+          "lineNumber": 629
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "cam.close",
+          "lineNumber": 630
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "print",
+          "lineNumber": 632
+        },
+        {
+          "caller": "process_timings",
+          "callee": "plt.subplots",
+          "lineNumber": 644
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].scatter",
+          "lineNumber": 646
+        },
+        {
+          "caller": "process_timings",
+          "callee": "range",
+          "lineNumber": 646
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].scatter",
+          "lineNumber": 647
+        },
+        {
+          "caller": "process_timings",
+          "callee": "range",
+          "lineNumber": 647
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].scatter",
+          "lineNumber": 648
+        },
+        {
+          "caller": "process_timings",
+          "callee": "range",
+          "lineNumber": 648
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].legend",
+          "lineNumber": 650
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].set_ylim",
+          "lineNumber": 658
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].set_xlabel",
+          "lineNumber": 660
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].set_ylabel",
+          "lineNumber": 662
+        },
+        {
+          "caller": "process_timings",
+          "callee": "pd.DataFrame",
+          "lineNumber": 664
+        },
+        {
+          "caller": "process_timings",
+          "callee": "timez.sum",
+          "lineNumber": 664
+        },
+        {
+          "caller": "process_timings",
+          "callee": "sum_times.copy",
+          "lineNumber": 668
+        },
+        {
+          "caller": "process_timings",
+          "callee": "sum_times.iloc[0:3].sum",
+          "lineNumber": 671
+        },
+        {
+          "caller": "process_timings",
+          "callee": "times_breakdown.drop",
+          "lineNumber": 674
+        },
+        {
+          "caller": "process_timings",
+          "callee": "times_breakdown.T.plot.barh",
+          "lineNumber": 678
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[1].set_xlabel",
+          "lineNumber": 679
+        },
+        {
+          "caller": "process_timings",
+          "callee": "plt.legend",
+          "lineNumber": 681
+        },
+        {
+          "caller": "process_timings",
+          "callee": "plt.legend",
+          "lineNumber": 683
+        },
+        {
+          "caller": "process_timings",
+          "callee": "plt.xlabel",
+          "lineNumber": 685
+        },
+        {
+          "caller": "process_timings",
+          "callee": "plt.tight_layout",
+          "lineNumber": 686
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "list",
+          "lineNumber": 701
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "print",
+          "lineNumber": 703
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "np.zeros",
+          "lineNumber": 705
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "len",
+          "lineNumber": 705
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "len",
+          "lineNumber": 705
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "np.zeros",
+          "lineNumber": 706
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "len",
+          "lineNumber": 706
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "np.array",
+          "lineNumber": 709
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "np.array",
+          "lineNumber": 711
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "pd.DataFrame",
+          "lineNumber": 713
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 12,
+        "functionCount": 12,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/spec/andor/test_read_loop.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 773,
+      "nonEmptyLines": 643,
+      "functions": [
+        {
+          "name": "cool",
+          "startLine": 24,
+          "endLine": 40,
+          "params": [
+            "cam"
+          ]
+        },
+        {
+          "name": "setup_shot",
+          "startLine": 43,
+          "endLine": 71,
+          "params": [
+            "cam",
+            "exposure_time"
+          ]
+        },
+        {
+          "name": "setup_image",
+          "startLine": 74,
+          "endLine": 100,
+          "params": [
+            "cam",
+            "exposure_time"
+          ]
+        },
+        {
+          "name": "single_shot_vbinned",
+          "startLine": 103,
+          "endLine": 106,
+          "params": [
+            "cam"
+          ]
+        },
+        {
+          "name": "image_and_check_dynamic_range",
+          "startLine": 109,
+          "endLine": 134,
+          "params": [
+            "cam",
+            "WL",
+            "exposure_time"
+          ]
+        },
+        {
+          "name": "GetMetaData",
+          "startLine": 137,
+          "endLine": 188,
+          "params": [
+            "cam"
+          ]
+        },
+        {
+          "name": "SetupSpectroscope",
+          "startLine": 191,
+          "endLine": 296,
+          "params": [
+            "PixelWidth",
+            "centralWL",
+            "NumHorizPixels",
+            "ND_filer_num",
+            "slit_width_um"
+          ]
+        },
+        {
+          "name": "adjust_ND",
+          "startLine": 299,
+          "endLine": 405,
+          "params": [
+            "cam",
+            "WL_arr"
+          ]
+        },
+        {
+          "name": "setup_SEC_aquisition",
+          "startLine": 408,
+          "endLine": 436,
+          "params": [
+            "cam",
+            "exp_time",
+            "framerate"
+          ]
+        },
+        {
+          "name": "test_aquisition",
+          "startLine": 439,
+          "endLine": 539,
+          "params": [
+            "cam",
+            "frame_count",
+            "timeout",
+            "buffer_count"
+          ]
+        },
+        {
+          "name": "SEC_aquisition",
+          "startLine": 542,
+          "endLine": 624,
+          "params": [
+            "cam",
+            "frame_count",
+            "timeout",
+            "buffer_count"
+          ]
+        },
+        {
+          "name": "WarmAndClose",
+          "startLine": 627,
+          "endLine": 648,
+          "params": [
+            "cam",
+            "WarmupBool"
+          ]
+        },
+        {
+          "name": "process_timings",
+          "startLine": 651,
+          "endLine": 701,
+          "params": [
+            "timez",
+            "measurment_time"
+          ]
+        },
+        {
+          "name": "generate_spectral_array",
+          "startLine": 704,
+          "endLine": 739,
+          "params": [
+            "WL_arr",
+            "acqs",
+            "clockHz"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "cool",
+          "line": 24,
+          "isDefault": false
+        },
+        {
+          "name": "setup_shot",
+          "line": 43,
+          "isDefault": false
+        },
+        {
+          "name": "setup_image",
+          "line": 74,
+          "isDefault": false
+        },
+        {
+          "name": "single_shot_vbinned",
+          "line": 103,
+          "isDefault": false
+        },
+        {
+          "name": "image_and_check_dynamic_range",
+          "line": 109,
+          "isDefault": false
+        },
+        {
+          "name": "GetMetaData",
+          "line": 137,
+          "isDefault": false
+        },
+        {
+          "name": "SetupSpectroscope",
+          "line": 191,
+          "isDefault": false
+        },
+        {
+          "name": "adjust_ND",
+          "line": 299,
+          "isDefault": false
+        },
+        {
+          "name": "setup_SEC_aquisition",
+          "line": 408,
+          "isDefault": false
+        },
+        {
+          "name": "test_aquisition",
+          "line": 439,
+          "isDefault": false
+        },
+        {
+          "name": "SEC_aquisition",
+          "line": 542,
+          "isDefault": false
+        },
+        {
+          "name": "WarmAndClose",
+          "line": 627,
+          "isDefault": false
+        },
+        {
+          "name": "process_timings",
+          "line": 651,
+          "isDefault": false
+        },
+        {
+          "name": "generate_spectral_array",
+          "line": 704,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "cool",
+          "callee": "time.sleep",
+          "lineNumber": 35
+        },
+        {
+          "caller": "cool",
+          "callee": "print",
+          "lineNumber": 36
+        },
+        {
+          "caller": "cool",
+          "callee": "\"Temperature: {:.5f}C\".format",
+          "lineNumber": 36
+        },
+        {
+          "caller": "cool",
+          "callee": "print",
+          "lineNumber": 37
+        },
+        {
+          "caller": "cool",
+          "callee": "\"Status: '{}'\".format",
+          "lineNumber": 37
+        },
+        {
+          "caller": "cool",
+          "callee": "RuntimeError",
+          "lineNumber": 40
+        },
+        {
+          "caller": "single_shot_vbinned",
+          "callee": "setup_shot",
+          "lineNumber": 105
+        },
+        {
+          "caller": "single_shot_vbinned",
+          "callee": "cam.acquire",
+          "lineNumber": 106
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "setup_image",
+          "lineNumber": 120
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "print",
+          "lineNumber": 121
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "cam.acquire",
+          "lineNumber": 122
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "test.image.max",
+          "lineNumber": 123
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "np.abs",
+          "lineNumber": 124
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "len",
+          "lineNumber": 126
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "plt.imshow",
+          "lineNumber": 127
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "print",
+          "lineNumber": 130
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "plt.figure",
+          "lineNumber": 131
+        },
+        {
+          "caller": "image_and_check_dynamic_range",
+          "callee": "plt.imshow",
+          "lineNumber": 132
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "setup_image",
+          "lineNumber": 147
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 154
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "cam.acquire",
+          "lineNumber": 157
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 160
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 161
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 162
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 163
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 164
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 167
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 168
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 169
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 172
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 173
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 174
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 175
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 176
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 177
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 178
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 179
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 180
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "\"Temperature: {:.5f}C\".format",
+          "lineNumber": 180
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "print",
+          "lineNumber": 181
+        },
+        {
+          "caller": "GetMetaData",
+          "callee": "\"Status: '{}'\".format",
+          "lineNumber": 181
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 209
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 212
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 215
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 218
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "ATSpectrograph",
+          "lineNumber": 221
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.Initialize",
+          "lineNumber": 224
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 226
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function Initialize returned {}\".format",
+          "lineNumber": 227
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 228
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 232
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function Initialize returned {}\".format",
+          "lineNumber": 232
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetGrating",
+          "lineNumber": 238
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 239
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function SetGrating returned {}\".format",
+          "lineNumber": 240
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 241
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetGrating",
+          "lineNumber": 245
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 246
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function GetGrating returned: {} Grat\".format",
+          "lineNumber": 246
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetWavelength",
+          "lineNumber": 248
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 249
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function SetWavelength returned: {}\".format",
+          "lineNumber": 250
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 251
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetWavelength",
+          "lineNumber": 255
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 256
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function GetWavelength returned: {} Wavelength: {}\".format",
+          "lineNumber": 257
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 258
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetWavelengthLimits",
+          "lineNumber": 262
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 263
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "\"Function GetWavelengthLimits returned: {} Wavelength Min: {} Wavelength Max: {}\".format",
+          "lineNumber": 264
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 265
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 272
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 273
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 274
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 275
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.IsFilterPresent",
+          "lineNumber": 275
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.IsSlitPresent",
+          "lineNumber": 276
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetSlitWidth",
+          "lineNumber": 277
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 278
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.IsFilterPresent",
+          "lineNumber": 279
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetFilter",
+          "lineNumber": 280
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 281
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 284
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetNumberPixels",
+          "lineNumber": 289
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 290
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.SetPixelWidth",
+          "lineNumber": 291
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 292
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetNumberPixels",
+          "lineNumber": 292
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "print",
+          "lineNumber": 293
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetPixelWidth",
+          "lineNumber": 293
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "np.array",
+          "lineNumber": 294
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.GetCalibration",
+          "lineNumber": 294
+        },
+        {
+          "caller": "SetupSpectroscope",
+          "callee": "spc.Close",
+          "lineNumber": 295
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "ATSpectrograph",
+          "lineNumber": 311
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.Initialize",
+          "lineNumber": 314
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 316
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function Initialize returned {}\".format",
+          "lineNumber": 317
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 318
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 322
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function Initialize returned {}\".format",
+          "lineNumber": 322
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetGrating",
+          "lineNumber": 328
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 329
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function SetGrating returned {}\".format",
+          "lineNumber": 330
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 331
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetGrating",
+          "lineNumber": 335
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 336
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function GetGrating returned: {} Grat\".format",
+          "lineNumber": 336
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetWavelength",
+          "lineNumber": 338
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 339
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function SetWavelength returned: {}\".format",
+          "lineNumber": 340
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 341
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetWavelength",
+          "lineNumber": 345
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 346
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function GetWavelength returned: {} Wavelength: {}\".format",
+          "lineNumber": 347
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 348
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetWavelengthLimits",
+          "lineNumber": 352
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 353
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "\"Function GetWavelengthLimits returned: {} Wavelength Min: {} Wavelength Max: {}\".format",
+          "lineNumber": 354
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetFunctionReturnDescription",
+          "lineNumber": 355
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.GetPixelCalibrationCoefficients",
+          "lineNumber": 359
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 364
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 365
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 366
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 367
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.IsFilterPresent",
+          "lineNumber": 367
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.IsSlitPresent",
+          "lineNumber": 368
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetSlitWidth",
+          "lineNumber": 369
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 370
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.IsFilterPresent",
+          "lineNumber": 371
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetFilter",
+          "lineNumber": 372
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 373
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "np.zeros",
+          "lineNumber": 375
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "np.zeros",
+          "lineNumber": 376
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "range",
+          "lineNumber": 378
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetFilter",
+          "lineNumber": 379
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "image_and_check_dynamic_range",
+          "lineNumber": 380
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "np.argmin",
+          "lineNumber": 384
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "range",
+          "lineNumber": 386
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "np.argmin",
+          "lineNumber": 389
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "np.argmin",
+          "lineNumber": 391
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.SetFilter",
+          "lineNumber": 392
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 394
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "print",
+          "lineNumber": 403
+        },
+        {
+          "caller": "adjust_ND",
+          "callee": "spc.Close",
+          "lineNumber": 404
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "range",
+          "lineNumber": 466
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "np.empty",
+          "lineNumber": 467
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.queue",
+          "lineNumber": 470
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 477
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "deque",
+          "lineNumber": 480
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "pd.DataFrame",
+          "lineNumber": 484
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "np.full",
+          "lineNumber": 484
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 486
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.AcquisitionStart",
+          "lineNumber": 490
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 497
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.SoftwareTrigger",
+          "lineNumber": 498
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 499
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 501
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.wait_buffer",
+          "lineNumber": 502
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 505
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "acqs.append",
+          "lineNumber": 510
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 513
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.queue",
+          "lineNumber": 514
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 517
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 523
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 528
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 529
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "str",
+          "lineNumber": 529
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.AcquisitionStop",
+          "lineNumber": 530
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.flush",
+          "lineNumber": 531
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.AcquisitionStop",
+          "lineNumber": 533
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "cam.flush",
+          "lineNumber": 534
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "time.time",
+          "lineNumber": 535
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 536
+        },
+        {
+          "caller": "test_aquisition",
+          "callee": "print",
+          "lineNumber": 537
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "range",
+          "lineNumber": 567
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "np.empty",
+          "lineNumber": 568
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.queue",
+          "lineNumber": 571
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "print",
+          "lineNumber": 578
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "deque",
+          "lineNumber": 581
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.AcquisitionStart",
+          "lineNumber": 585
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.SoftwareTrigger",
+          "lineNumber": 592
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.wait_buffer",
+          "lineNumber": 594
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "acqs.append",
+          "lineNumber": 601
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.queue",
+          "lineNumber": 604
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "print",
+          "lineNumber": 611
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "print",
+          "lineNumber": 616
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "print",
+          "lineNumber": 617
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "str",
+          "lineNumber": 617
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.AcquisitionStop",
+          "lineNumber": 618
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.flush",
+          "lineNumber": 619
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.AcquisitionStop",
+          "lineNumber": 621
+        },
+        {
+          "caller": "SEC_aquisition",
+          "callee": "cam.flush",
+          "lineNumber": 622
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "time.sleep",
+          "lineNumber": 640
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "print",
+          "lineNumber": 641
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "\"Temperature: {:.5f}C\".format",
+          "lineNumber": 641
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "print",
+          "lineNumber": 642
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "\"Status: '{}'\".format",
+          "lineNumber": 642
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "RuntimeError",
+          "lineNumber": 645
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "cam.close",
+          "lineNumber": 646
+        },
+        {
+          "caller": "WarmAndClose",
+          "callee": "print",
+          "lineNumber": 648
+        },
+        {
+          "caller": "process_timings",
+          "callee": "plt.subplots",
+          "lineNumber": 659
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].scatter",
+          "lineNumber": 661
+        },
+        {
+          "caller": "process_timings",
+          "callee": "range",
+          "lineNumber": 661
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].scatter",
+          "lineNumber": 662
+        },
+        {
+          "caller": "process_timings",
+          "callee": "range",
+          "lineNumber": 662
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].scatter",
+          "lineNumber": 663
+        },
+        {
+          "caller": "process_timings",
+          "callee": "range",
+          "lineNumber": 663
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].legend",
+          "lineNumber": 665
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].set_ylim",
+          "lineNumber": 673
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].set_xlabel",
+          "lineNumber": 675
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[0].set_ylabel",
+          "lineNumber": 677
+        },
+        {
+          "caller": "process_timings",
+          "callee": "pd.DataFrame",
+          "lineNumber": 679
+        },
+        {
+          "caller": "process_timings",
+          "callee": "timez.sum",
+          "lineNumber": 679
+        },
+        {
+          "caller": "process_timings",
+          "callee": "sum_times.copy",
+          "lineNumber": 683
+        },
+        {
+          "caller": "process_timings",
+          "callee": "sum_times.iloc[0:3].sum",
+          "lineNumber": 686
+        },
+        {
+          "caller": "process_timings",
+          "callee": "times_breakdown.drop",
+          "lineNumber": 689
+        },
+        {
+          "caller": "process_timings",
+          "callee": "times_breakdown.T.plot.barh",
+          "lineNumber": 693
+        },
+        {
+          "caller": "process_timings",
+          "callee": "axs[1].set_xlabel",
+          "lineNumber": 694
+        },
+        {
+          "caller": "process_timings",
+          "callee": "plt.legend",
+          "lineNumber": 696
+        },
+        {
+          "caller": "process_timings",
+          "callee": "plt.legend",
+          "lineNumber": 698
+        },
+        {
+          "caller": "process_timings",
+          "callee": "plt.xlabel",
+          "lineNumber": 700
+        },
+        {
+          "caller": "process_timings",
+          "callee": "plt.tight_layout",
+          "lineNumber": 701
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "list",
+          "lineNumber": 716
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "print",
+          "lineNumber": 718
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "np.zeros",
+          "lineNumber": 720
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "len",
+          "lineNumber": 720
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "len",
+          "lineNumber": 720
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "np.zeros",
+          "lineNumber": 721
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "len",
+          "lineNumber": 721
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "np.array",
+          "lineNumber": 724
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "np.array",
+          "lineNumber": 726
+        },
+        {
+          "caller": "generate_spectral_array",
+          "callee": "pd.DataFrame",
+          "lineNumber": 728
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 14,
+        "functionCount": 14,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/temperature_control/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/test_station/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/drivers/test_station/leancat/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 6,
+      "nonEmptyLines": 5,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/experiments/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 6,
+      "nonEmptyLines": 5,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "helao/deploy/hte/experiments/archive/current_params.csv",
+      "language": "csv",
+      "fileCategory": "data",
+      "totalLines": 832,
+      "nonEmptyLines": 832,
+      "metrics": {}
+    }
+  ]
+}
