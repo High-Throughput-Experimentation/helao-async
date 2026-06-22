@@ -62,24 +62,24 @@ def CCSI_initialization(
 
     Args:
         added clean inject/made cleaninjects optional
-    headspace_purge_cycles: Parameter passed through to the sub-experiments.
-        HSpurge1_duration: Parameter passed through to the sub-experiments.
-        Manpurge1_duration: Parameter passed through to the sub-experiments.
-        Alphapurge1_duration: Parameter passed through to the sub-experiments.
-        Probepurge1_duration: Parameter passed through to the sub-experiments.
-        Sensorpurge1_duration: Parameter passed through to the sub-experiments.
-        DeltaDilute1_duration: Parameter passed through to the sub-experiments.
-        HSpurge_duration: Parameter passed through to the sub-experiments.
-        CO2measure_duration: Parameter passed through to the sub-experiments.
-        CO2measure_acqrate: Parameter passed through to the sub-experiments.
-        CO2threshold: Parameter passed through to the sub-experiments.
-        Syringe_rate_ulsec: Parameter passed through to the sub-experiments.
-        LiquidCleanWait_s: Parameter passed through to the sub-experiments.
-        use_co2_check: Parameter passed through to the sub-experiments.
-        need_fill: Parameter passed through to the sub-experiments.
-        clean_injects: Parameter passed through to the sub-experiments.
-        drainrecirc: Parameter passed through to the sub-experiments.
-        recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
+    headspace_purge_cycles: Number of headspace purge cycles.
+        HSpurge1_duration: Headspace-purge 1 duration.
+        Manpurge1_duration: Manual purge 1 duration.
+        Alphapurge1_duration: Alpha purge 1 duration.
+        Probepurge1_duration: Probe purge 1 duration.
+        Sensorpurge1_duration: Sensor purge 1 duration.
+        DeltaDilute1_duration: Delta Dilute 1 duration.
+        HSpurge_duration: Headspace-purge duration.
+        CO2measure_duration: CO2 measurement duration.
+        CO2measure_acqrate: CO2 measurement acquisition rate.
+        CO2threshold: CO2 concentration threshold (ppm).
+        Syringe_rate_ulsec: Syringe rate (µL/s).
+        LiquidCleanWait_s: Liquid cleaning wait time (s).
+        use_co2_check: Whether to verify the CO2 level before measuring.
+        need_fill: Whether the cell needs to be filled first.
+        clean_injects: Number of cleaning injections.
+        drainrecirc: Whether to recirculate while draining.
+        recirculation_rate_uL_min: Recirculation rate (µL/min).
 
     Returns:
         List of planned experiments to dispatch.
@@ -714,29 +714,29 @@ def CCSI_Solution_testing(  # assumes initialization performed previously
     Cleans the cell, fills the syringe, then iterates over ``Solution_volume_ul`` running fills, CO2 measurements, headspace purges, and clean injects.
 
     Args:
-        Solution_volume_ul: Parameter passed through to the sub-experiments.
-        Solution_reservoir_sample_no: Parameter passed through to the sub-experiments.
-        Solution_name: Parameter passed through to the sub-experiments.
-        total_sample_volume_ul: Parameter passed through to the sub-experiments.
-        Clean_reservoir_sample_no: Parameter passed through to the sub-experiments.
-        syringe_rate_ulsec: Parameter passed through to the sub-experiments.
-        LiquidFillWait_s: Parameter passed through to the sub-experiments.
-        co2measure_duration: Parameter passed through to the sub-experiments.
-        co2measure_acqrate: Parameter passed through to the sub-experiments.
-        drainclean_volume_ul: Parameter passed through to the sub-experiments.
-        headspace_purge_cycles: Parameter passed through to the sub-experiments.
-        headspace_co2measure_duration: Parameter passed through to the sub-experiments.
-        clean_co2measure_duration: Parameter passed through to the sub-experiments.
-        SamplePurge_duration: Parameter passed through to the sub-experiments.
-        LiquidCleanPurge_duration: Parameter passed through to the sub-experiments.
-        clean_co2_ppm_thresh: Parameter passed through to the sub-experiments.
-        max_repeats: Parameter passed through to the sub-experiments.
-        purge_if: Parameter passed through to the sub-experiments.
-        HSpurge_duration: Parameter passed through to the sub-experiments.
-        DeltaDilute1_duration: Parameter passed through to the sub-experiments.
-        drainrecirc: Parameter passed through to the sub-experiments.
-        recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
-        need_fill: Parameter passed through to the sub-experiments.
+        Solution_volume_ul: Solution volume to dispense (µL).
+        Solution_reservoir_sample_no: Liquid-sample number of the solution reservoir.
+        Solution_name: Name of the solution.
+        total_sample_volume_ul: Total sample volume (µL).
+        Clean_reservoir_sample_no: Liquid-sample number of the cleaning reservoir.
+        syringe_rate_ulsec: Syringe rate (µL/s).
+        LiquidFillWait_s: Liquid fill wait time (s).
+        co2measure_duration: CO2 measurement duration.
+        co2measure_acqrate: CO2 measurement acquisition rate.
+        drainclean_volume_ul: Volume drained during cleaning (µL).
+        headspace_purge_cycles: Number of headspace purge cycles.
+        headspace_co2measure_duration: Headspace CO2 measurement duration.
+        clean_co2measure_duration: Cleaning CO2 measurement duration.
+        SamplePurge_duration: Sample purge duration.
+        LiquidCleanPurge_duration: Liquid cleaning purge duration.
+        clean_co2_ppm_thresh: CO2 concentration threshold for cleaning (ppm).
+        max_repeats: Maximum number of repeats.
+        purge_if: Whether to purge the cell before measuring.
+        HSpurge_duration: Headspace-purge duration.
+        DeltaDilute1_duration: Delta Dilute 1 duration.
+        drainrecirc: Whether to recirculate while draining.
+        recirculation_rate_uL_min: Recirculation rate (µL/min).
+        need_fill: Whether the cell needs to be filled first.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1088,72 +1088,72 @@ def CCSI_Solution_co2maintainconcentration(  # assumes initialization performed 
     #                   18 water injection options
     #                   19 co2 measurement duration now list for flexibility
     #                   20 renaming water addition to secondliquid // adding secondliquid prerinse #21 second liquid rinse volume
-    initial_gas_sample_no: Parameter passed through to the sub-experiments.
-        pureco2_sample_no: Parameter passed through to the sub-experiments.
-        Solution_volume_ul: Parameter passed through to the sub-experiments.
-        Solution_reservoir_sample_no: Parameter passed through to the sub-experiments.
-        Solution_name: Parameter passed through to the sub-experiments.
-        total_sample_volume_ul: Parameter passed through to the sub-experiments.
-        total_cell_volume_ul: Parameter passed through to the sub-experiments.
-        secondliquid_injection: Parameter passed through to the sub-experiments.
-        secondliquid_injection_before_IL: Parameter passed through to the sub-experiments.
-        secondliquid_injection_reservoir_sample_no: Parameter passed through to the sub-experiments.
-        secondliquid_injection_syringe_rate_ulsec: Parameter passed through to the sub-experiments.
-        secondliquid_injection_volume_ul: Parameter passed through to the sub-experiments.
-        secondliquid_injection_FillWait: Parameter passed through to the sub-experiments.
-        Clean_reservoir_sample_no: Parameter passed through to the sub-experiments.
-        Clean_syringe_rate_ulsec: Parameter passed through to the sub-experiments.
-        Clean_FillWait_s: Parameter passed through to the sub-experiments.
-        syringe_rate_ulsec: Parameter passed through to the sub-experiments.
-        LiquidFillWait_s: Parameter passed through to the sub-experiments.
-        SyringePushWait_s: Parameter passed through to the sub-experiments.
-        n2_push: Parameter passed through to the sub-experiments.
-        co2_filltime_s: Parameter passed through to the sub-experiments.
-        co2measure_duration: Parameter passed through to the sub-experiments.
-        co2measure_acqrate: Parameter passed through to the sub-experiments.
-        flowrate_sccm: Parameter passed through to the sub-experiments.
-        flowramp_sccm: Parameter passed through to the sub-experiments.
-        target_co2_ppm: Parameter passed through to the sub-experiments.
-        maintain_fill_freq_s: Parameter passed through to the sub-experiments.
-        recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
-        clean_recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
-        drainrecirc: Parameter passed through to the sub-experiments.
-        SamplePurge_duration: Parameter passed through to the sub-experiments.
-        recirculation_duration: Parameter passed through to the sub-experiments.
-        drainclean_volume_ul: Parameter passed through to the sub-experiments.
-        n2flowrate_sccm: Parameter passed through to the sub-experiments.
-        perform_init: Parameter passed through to the sub-experiments.
-        fixed_flushes: Parameter passed through to the sub-experiments.
-        LiquidClean_rinse_agitation: Parameter passed through to the sub-experiments.
-        LiquidClean_rinse_agitation_wait: Parameter passed through to the sub-experiments.
-        LiquidClean_rinse_agitation_duration: Parameter passed through to the sub-experiments.
-        LiquidClean_rinse_agitation_rate: Parameter passed through to the sub-experiments.
-        rinsePurge_duration: Parameter passed through to the sub-experiments.
-        secondary_prerinse_cycles: Parameter passed through to the sub-experiments.
-        secondary_prerinse_volume: Parameter passed through to the sub-experiments.
-        rinse_recirc: Parameter passed through to the sub-experiments.
-        rinsePurge_recirc_duration: Parameter passed through to the sub-experiments.
-        LiquidCleanPurge_duration: Parameter passed through to the sub-experiments.
-        LiquidCleanPurge_recirc_duration: Parameter passed through to the sub-experiments.
-        FlushPurge_duration: Parameter passed through to the sub-experiments.
-        flush_Manpurge1_duration: Parameter passed through to the sub-experiments.
-        flush_Alphapurge1_duration: Parameter passed through to the sub-experiments.
-        flush_Probepurge1_duration: Parameter passed through to the sub-experiments.
-        flush_Sensorpurge1_duration: Parameter passed through to the sub-experiments.
-        init_HSpurge1_duration: Parameter passed through to the sub-experiments.
-        init_Manpurge1_duration: Parameter passed through to the sub-experiments.
-        init_Alphapurge1_duration: Parameter passed through to the sub-experiments.
-        init_Probepurge1_duration: Parameter passed through to the sub-experiments.
-        init_Sensorpurge1_duration: Parameter passed through to the sub-experiments.
-        init_DeltaDilute1_duration: Parameter passed through to the sub-experiments.
-        init_HSpurge_duration: Parameter passed through to the sub-experiments.
-        use_co2_check: Parameter passed through to the sub-experiments.
-        check_co2measure_duration: Parameter passed through to the sub-experiments.
-        clean_co2_ppm_thresh: Parameter passed through to the sub-experiments.
-        clean_co2measure_delay: Parameter passed through to the sub-experiments.
-        max_repeats: Parameter passed through to the sub-experiments.
-        purge_if: Parameter passed through to the sub-experiments.
-        temp_monitor_time: Parameter passed through to the sub-experiments.
+    initial_gas_sample_no: Gas-sample number of the initial headspace gas.
+        pureco2_sample_no: Gas-sample number of the pure CO2 source.
+        Solution_volume_ul: Solution volume to dispense (µL).
+        Solution_reservoir_sample_no: Liquid-sample number of the solution reservoir.
+        Solution_name: Name of the solution.
+        total_sample_volume_ul: Total sample volume (µL).
+        total_cell_volume_ul: Total cell volume (µL).
+        secondliquid_injection: Whether to inject a second liquid.
+        secondliquid_injection_before_IL: Whether to inject the second liquid before the ionic liquid.
+        secondliquid_injection_reservoir_sample_no: Liquid-sample number of the second-liquid injection reservoir.
+        secondliquid_injection_syringe_rate_ulsec: Second-liquid injection syringe rate (µL/s).
+        secondliquid_injection_volume_ul: Second-liquid injection volume (µL).
+        secondliquid_injection_FillWait: Wait time after the second-liquid injection fill (s).
+        Clean_reservoir_sample_no: Liquid-sample number of the cleaning reservoir.
+        Clean_syringe_rate_ulsec: Cleaning syringe rate (µL/s).
+        Clean_FillWait_s: Cleaning fill wait time (s).
+        syringe_rate_ulsec: Syringe rate (µL/s).
+        LiquidFillWait_s: Liquid fill wait time (s).
+        SyringePushWait_s: Syringe push wait time (s).
+        n2_push: Whether to push liquid with N2.
+        co2_filltime_s: CO2 fill time (s).
+        co2measure_duration: CO2 measurement duration.
+        co2measure_acqrate: CO2 measurement acquisition rate.
+        flowrate_sccm: Flow rate (sccm).
+        flowramp_sccm: Flow ramp (sccm).
+        target_co2_ppm: Target CO2 concentration (ppm).
+        maintain_fill_freq_s: Interval between top-off fills (s).
+        recirculation_rate_uL_min: Recirculation rate (µL/min).
+        clean_recirculation_rate_uL_min: Cleaning recirculation rate (µL/min).
+        drainrecirc: Whether to recirculate while draining.
+        SamplePurge_duration: Sample purge duration.
+        recirculation_duration: Recirculation duration.
+        drainclean_volume_ul: Volume drained during cleaning (µL).
+        n2flowrate_sccm: N2 flow rate (sccm).
+        perform_init: Whether to run the initialization steps.
+        fixed_flushes: Number of fixed flush cycles.
+        LiquidClean_rinse_agitation: Liquid cleaning rinse agitation.
+        LiquidClean_rinse_agitation_wait: Liquid cleaning rinse agitation wait time.
+        LiquidClean_rinse_agitation_duration: Liquid cleaning rinse agitation duration.
+        LiquidClean_rinse_agitation_rate: Liquid cleaning rinse agitation rate.
+        rinsePurge_duration: Rinse purge duration.
+        secondary_prerinse_cycles: Number of secondary pre-rinse cycles.
+        secondary_prerinse_volume: Secondary pre-rinse volume (µL).
+        rinse_recirc: Whether to recirculate during the rinse.
+        rinsePurge_recirc_duration: Rinse purge recirculation duration.
+        LiquidCleanPurge_duration: Liquid cleaning purge duration.
+        LiquidCleanPurge_recirc_duration: Liquid cleaning purge recirculation duration.
+        FlushPurge_duration: Flush purge duration.
+        flush_Manpurge1_duration: Flush manual purge 1 duration.
+        flush_Alphapurge1_duration: Flush alpha purge 1 duration.
+        flush_Probepurge1_duration: Flush probe purge 1 duration.
+        flush_Sensorpurge1_duration: Flush sensor purge 1 duration.
+        init_HSpurge1_duration: Initial headspace-purge 1 duration.
+        init_Manpurge1_duration: Initial manual purge 1 duration.
+        init_Alphapurge1_duration: Initial alpha purge 1 duration.
+        init_Probepurge1_duration: Initial probe purge 1 duration.
+        init_Sensorpurge1_duration: Initial sensor purge 1 duration.
+        init_DeltaDilute1_duration: Initial Delta Dilute 1 duration.
+        init_HSpurge_duration: Initial headspace-purge duration.
+        use_co2_check: Whether to verify the CO2 level before measuring.
+        check_co2measure_duration: Check CO2 measurement duration.
+        clean_co2_ppm_thresh: CO2 concentration threshold for cleaning (ppm).
+        clean_co2measure_delay: Cleaning CO2 measurement delay.
+        max_repeats: Maximum number of repeats.
+        purge_if: Whether to purge the cell before measuring.
+        temp_monitor_time: Temperature monitoring duration (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1427,49 +1427,49 @@ def CCSI_cleancycles(
     Useful as a standalone cell-cleaning routine between long campaigns.
 
     Args:
-        drain_first: Parameter passed through to the sub-experiments.
-        prerinse_cleans: Parameter passed through to the sub-experiments.
-        LiquidClean_full_rinses: Parameter passed through to the sub-experiments.
-        perform_init: Parameter passed through to the sub-experiments.
-        fixed_flushes: Parameter passed through to the sub-experiments.
-        Clean_syringe_rate_ulsec: Parameter passed through to the sub-experiments.
-        Clean_FillWait_s: Parameter passed through to the sub-experiments.
-        co2measure_acqrate: Parameter passed through to the sub-experiments.
-        recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
-        clean_recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
-        drainrecirc: Parameter passed through to the sub-experiments.
-        SamplePurge_duration: Parameter passed through to the sub-experiments.
-        recirculation_duration: Parameter passed through to the sub-experiments.
-        drainclean_volume_ul: Parameter passed through to the sub-experiments.
-        n2flowrate_sccm: Parameter passed through to the sub-experiments.
-        LiquidClean_rinse_agitation: Parameter passed through to the sub-experiments.
-        LiquidClean_rinse_agitation_wait: Parameter passed through to the sub-experiments.
-        LiquidClean_rinse_agitation_duration: Parameter passed through to the sub-experiments.
-        LiquidClean_rinse_agitation_rate: Parameter passed through to the sub-experiments.
-        rinsePurge_duration: Parameter passed through to the sub-experiments.
-        rinse_recirc: Parameter passed through to the sub-experiments.
-        rinsePurge_recirc_duration: Parameter passed through to the sub-experiments.
-        LiquidCleanPurge_duration: Parameter passed through to the sub-experiments.
-        LiquidCleanPurge_recirc_duration: Parameter passed through to the sub-experiments.
-        FlushPurge_duration: Parameter passed through to the sub-experiments.
-        flush_Manpurge1_duration: Parameter passed through to the sub-experiments.
-        flush_Alphapurge1_duration: Parameter passed through to the sub-experiments.
-        flush_Probepurge1_duration: Parameter passed through to the sub-experiments.
-        flush_Sensorpurge1_duration: Parameter passed through to the sub-experiments.
-        init_HSpurge1_duration: Parameter passed through to the sub-experiments.
-        init_Manpurge1_duration: Parameter passed through to the sub-experiments.
-        init_Alphapurge1_duration: Parameter passed through to the sub-experiments.
-        init_Probepurge1_duration: Parameter passed through to the sub-experiments.
-        init_Sensorpurge1_duration: Parameter passed through to the sub-experiments.
-        init_DeltaDilute1_duration: Parameter passed through to the sub-experiments.
-        init_HSpurge_duration: Parameter passed through to the sub-experiments.
-        use_co2_check: Parameter passed through to the sub-experiments.
-        check_co2measure_duration: Parameter passed through to the sub-experiments.
-        clean_co2_ppm_thresh: Parameter passed through to the sub-experiments.
-        clean_co2measure_delay: Parameter passed through to the sub-experiments.
-        max_repeats: Parameter passed through to the sub-experiments.
-        purge_if: Parameter passed through to the sub-experiments.
-        temp_monitor_time: Parameter passed through to the sub-experiments.
+        drain_first: Whether to drain the cell before starting.
+        prerinse_cleans: Number of pre-rinse cleaning cycles.
+        LiquidClean_full_rinses: Liquid cleaning full rinses.
+        perform_init: Whether to run the initialization steps.
+        fixed_flushes: Number of fixed flush cycles.
+        Clean_syringe_rate_ulsec: Cleaning syringe rate (µL/s).
+        Clean_FillWait_s: Cleaning fill wait time (s).
+        co2measure_acqrate: CO2 measurement acquisition rate.
+        recirculation_rate_uL_min: Recirculation rate (µL/min).
+        clean_recirculation_rate_uL_min: Cleaning recirculation rate (µL/min).
+        drainrecirc: Whether to recirculate while draining.
+        SamplePurge_duration: Sample purge duration.
+        recirculation_duration: Recirculation duration.
+        drainclean_volume_ul: Volume drained during cleaning (µL).
+        n2flowrate_sccm: N2 flow rate (sccm).
+        LiquidClean_rinse_agitation: Liquid cleaning rinse agitation.
+        LiquidClean_rinse_agitation_wait: Liquid cleaning rinse agitation wait time.
+        LiquidClean_rinse_agitation_duration: Liquid cleaning rinse agitation duration.
+        LiquidClean_rinse_agitation_rate: Liquid cleaning rinse agitation rate.
+        rinsePurge_duration: Rinse purge duration.
+        rinse_recirc: Whether to recirculate during the rinse.
+        rinsePurge_recirc_duration: Rinse purge recirculation duration.
+        LiquidCleanPurge_duration: Liquid cleaning purge duration.
+        LiquidCleanPurge_recirc_duration: Liquid cleaning purge recirculation duration.
+        FlushPurge_duration: Flush purge duration.
+        flush_Manpurge1_duration: Flush manual purge 1 duration.
+        flush_Alphapurge1_duration: Flush alpha purge 1 duration.
+        flush_Probepurge1_duration: Flush probe purge 1 duration.
+        flush_Sensorpurge1_duration: Flush sensor purge 1 duration.
+        init_HSpurge1_duration: Initial headspace-purge 1 duration.
+        init_Manpurge1_duration: Initial manual purge 1 duration.
+        init_Alphapurge1_duration: Initial alpha purge 1 duration.
+        init_Probepurge1_duration: Initial probe purge 1 duration.
+        init_Sensorpurge1_duration: Initial sensor purge 1 duration.
+        init_DeltaDilute1_duration: Initial Delta Dilute 1 duration.
+        init_HSpurge_duration: Initial headspace-purge duration.
+        use_co2_check: Whether to verify the CO2 level before measuring.
+        check_co2measure_duration: Check CO2 measurement duration.
+        clean_co2_ppm_thresh: CO2 concentration threshold for cleaning (ppm).
+        clean_co2measure_delay: Cleaning CO2 measurement delay.
+        max_repeats: Maximum number of repeats.
+        purge_if: Whether to purge the cell before measuring.
+        temp_monitor_time: Temperature monitoring duration (s).
 
     Returns:
         List of planned experiments to dispatch.
@@ -1635,25 +1635,25 @@ def CCSI_Solution_testing_fixed_cleans(  # assumes initialization performed prev
     Same general flow as :func:`CCSI_Solution_testing` but uses a fixed clean-cycle count instead of CO2-threshold based decisions.
 
     Args:
-        Solution_volume_ul: Parameter passed through to the sub-experiments.
-        Solution_reservoir_sample_no: Parameter passed through to the sub-experiments.
-        Solution_name: Parameter passed through to the sub-experiments.
-        total_sample_volume_ul: Parameter passed through to the sub-experiments.
-        Clean_reservoir_sample_no: Parameter passed through to the sub-experiments.
-        syringe_rate_ulsec: Parameter passed through to the sub-experiments.
-        LiquidFillWait_s: Parameter passed through to the sub-experiments.
-        co2measure_duration: Parameter passed through to the sub-experiments.
-        co2measure_acqrate: Parameter passed through to the sub-experiments.
-        drainclean_volume_ul: Parameter passed through to the sub-experiments.
-        headspace_purge_cycles: Parameter passed through to the sub-experiments.
-        headspace_co2measure_duration: Parameter passed through to the sub-experiments.
-        clean_co2measure_duration: Parameter passed through to the sub-experiments.
-        LiquidCleanPurge_duration: Parameter passed through to the sub-experiments.
-        HSpurge_duration: Parameter passed through to the sub-experiments.
-        DeltaDilute1_duration: Parameter passed through to the sub-experiments.
-        cleanloops: Parameter passed through to the sub-experiments.
-        initcleans: Parameter passed through to the sub-experiments.
-        drainrecirc: Parameter passed through to the sub-experiments.
+        Solution_volume_ul: Solution volume to dispense (µL).
+        Solution_reservoir_sample_no: Liquid-sample number of the solution reservoir.
+        Solution_name: Name of the solution.
+        total_sample_volume_ul: Total sample volume (µL).
+        Clean_reservoir_sample_no: Liquid-sample number of the cleaning reservoir.
+        syringe_rate_ulsec: Syringe rate (µL/s).
+        LiquidFillWait_s: Liquid fill wait time (s).
+        co2measure_duration: CO2 measurement duration.
+        co2measure_acqrate: CO2 measurement acquisition rate.
+        drainclean_volume_ul: Volume drained during cleaning (µL).
+        headspace_purge_cycles: Number of headspace purge cycles.
+        headspace_co2measure_duration: Headspace CO2 measurement duration.
+        clean_co2measure_duration: Cleaning CO2 measurement duration.
+        LiquidCleanPurge_duration: Liquid cleaning purge duration.
+        HSpurge_duration: Headspace-purge duration.
+        DeltaDilute1_duration: Delta Dilute 1 duration.
+        cleanloops: Number of cleaning loops.
+        initcleans: Number of initial cleaning cycles.
+        drainrecirc: Whether to recirculate while draining.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1804,28 +1804,28 @@ def CCSI_priming(  # assumes initialization performed previously
     Fills syringes and runs forward/reverse recirculation steps to remove air and seat the seals before measurements begin.
 
     Args:
-        Solution_volume_ul: Parameter passed through to the sub-experiments.
-        Solution_reservoir_sample_no: Parameter passed through to the sub-experiments.
-        Solution_name: Parameter passed through to the sub-experiments.
-        total_sample_volume_ul: Parameter passed through to the sub-experiments.
-        Clean_reservoir_sample_no: Parameter passed through to the sub-experiments.
-        syringe_rate_ulsec: Parameter passed through to the sub-experiments.
-        LiquidFillWait_s: Parameter passed through to the sub-experiments.
-        co2measure_duration: Parameter passed through to the sub-experiments.
-        co2measure_acqrate: Parameter passed through to the sub-experiments.
-        drainclean_volume_ul: Parameter passed through to the sub-experiments.
-        headspace_purge_cycles: Parameter passed through to the sub-experiments.
-        headspace_co2measure_duration: Parameter passed through to the sub-experiments.
-        clean_co2measure_duration: Parameter passed through to the sub-experiments.
-        LiquidCleanPurge_duration: Parameter passed through to the sub-experiments.
-        clean_co2_ppm_thresh: Parameter passed through to the sub-experiments.
-        max_repeats: Parameter passed through to the sub-experiments.
-        purge_if: Parameter passed through to the sub-experiments.
-        HSpurge_duration: Parameter passed through to the sub-experiments.
-        DeltaDilute1_duration: Parameter passed through to the sub-experiments.
-        drainrecirc: Parameter passed through to the sub-experiments.
-        recirculation_rate_uL_min: Parameter passed through to the sub-experiments.
-        need_fill: Parameter passed through to the sub-experiments.
+        Solution_volume_ul: Solution volume to dispense (µL).
+        Solution_reservoir_sample_no: Liquid-sample number of the solution reservoir.
+        Solution_name: Name of the solution.
+        total_sample_volume_ul: Total sample volume (µL).
+        Clean_reservoir_sample_no: Liquid-sample number of the cleaning reservoir.
+        syringe_rate_ulsec: Syringe rate (µL/s).
+        LiquidFillWait_s: Liquid fill wait time (s).
+        co2measure_duration: CO2 measurement duration.
+        co2measure_acqrate: CO2 measurement acquisition rate.
+        drainclean_volume_ul: Volume drained during cleaning (µL).
+        headspace_purge_cycles: Number of headspace purge cycles.
+        headspace_co2measure_duration: Headspace CO2 measurement duration.
+        clean_co2measure_duration: Cleaning CO2 measurement duration.
+        LiquidCleanPurge_duration: Liquid cleaning purge duration.
+        clean_co2_ppm_thresh: CO2 concentration threshold for cleaning (ppm).
+        max_repeats: Maximum number of repeats.
+        purge_if: Whether to purge the cell before measuring.
+        HSpurge_duration: Headspace-purge duration.
+        DeltaDilute1_duration: Delta Dilute 1 duration.
+        drainrecirc: Whether to recirculate while draining.
+        recirculation_rate_uL_min: Recirculation rate (µL/min).
+        need_fill: Whether the cell needs to be filled first.
 
     Returns:
         List of planned experiments to dispatch.
