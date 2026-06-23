@@ -125,9 +125,8 @@ def unzpickle(fpath):
     Returns:
         The deserialised Python object.
     """
-    data = pyzstd.ZstdFile(fpath, "rb")
-    data = cPickle.load(data)
-    return data
+    with pyzstd.ZstdFile(fpath, "rb") as f:
+        return cPickle.load(f)
 
 
 def zpickle(fpath, data) -> bool:
