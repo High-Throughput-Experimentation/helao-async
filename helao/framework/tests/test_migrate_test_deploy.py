@@ -219,7 +219,7 @@ def test_wssim_import_and_makeapp_attempt(tmp_path):
     except AttributeError as exc:
         pytest.xfail(f"{KNOWN_GAPS} | raised: {exc}")
     except Exception as exc:
-        pytest.xfail(f"Unexpected error during makeApp construction — {type(exc).__name__}: {exc}")
+        pytest.fail(f"Unexpected error during makeApp construction — {type(exc).__name__}: {exc}")
 
     # makeApp succeeded — override storage so files land in tmp_path
     app.base.storage = FsStorage(save_root=str(tmp_path))
@@ -237,6 +237,5 @@ def test_wssim_import_and_makeapp_attempt(tmp_path):
     resp = asyncio.run(_drive())
     assert resp.status_code == 200, f"acquire_data returned {resp.status_code}"
     body = resp.json()
-    assert "action_uuid" in body or "action_name" in body, (
-        f"response missing action fields: {list(body.keys())}"
-    )
+    assert "action_uuid" in body, f"response missing action_uuid: {list(body.keys())}"
+    assert "action_name" in body, f"response missing action_name: {list(body.keys())}"
