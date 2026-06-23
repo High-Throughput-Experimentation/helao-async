@@ -7,7 +7,7 @@ from typing import List, Optional
 from uuid import UUID
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .hlostatus import HloStatus
 from .experiment import (
@@ -45,6 +45,16 @@ class ShortSequenceModel(BaseModel, HelaoDict):
         default=[]
     )  # populated by operator using sequence library funcs
     run_type: Optional[str] = None
+
+    @field_validator("planned_experiments", mode="before")
+    @classmethod
+    def _coerce_planned_experiments(cls, v):
+        if isinstance(v, list):
+            return [
+                item.model_dump() if isinstance(item, BaseModel) else item
+                for item in v
+            ]
+        return v
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
     run_id: Optional[UUID] = None
@@ -101,6 +111,16 @@ class SequenceModel(ShortSequenceModel):
     dispatched_experiments_abbr: List[ShortExperimentModel] = Field(
         default=[]
     )  # list of completed experiments (abbreviated) from dispatched_experiments (premodels.py)
+
+    @field_validator("dispatched_experiments_abbr", mode="before")
+    @classmethod
+    def _coerce_dispatched_experiments(cls, v):
+        if isinstance(v, list):
+            return [
+                item.model_dump() if isinstance(item, BaseModel) else item
+                for item in v
+            ]
+        return v
     sync_data: bool = True
     manual_action: bool = False
     initial_global_params: dict = Field(default={})
