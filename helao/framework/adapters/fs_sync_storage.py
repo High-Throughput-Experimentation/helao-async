@@ -35,7 +35,6 @@ class FsSyncStorage:
     # ── YAML I/O ──────────────────────────────────────────────────────────
 
     def read_yml(self, path: Path) -> dict:
-        from io import StringIO
         with open(path, encoding="utf-8") as f:
             return dict(_yaml.load(f) or {})
 
