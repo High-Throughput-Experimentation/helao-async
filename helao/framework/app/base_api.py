@@ -13,6 +13,8 @@ method names are preserved so deployment authors keep the same surface.
 """
 from __future__ import annotations
 
+import time
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -24,7 +26,11 @@ from helao.framework.ports.eventsink import EventSink
 from helao.framework.ports.storage import Storage
 from helao.framework.ports.transport import Transport
 
-__all__ = ["ActionContext", "FrameworkBase"]
+from helao.framework.support import helao_logging as logging
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+__all__ = ["ActionContext", "ACTION_CTX", "FrameworkBase"]
 
 
 @dataclass
@@ -42,6 +48,14 @@ class ActionContext:
 
     action: RunAction
     endpoint_name: Optional[str] = None
+
+
+#: Per-request action context published by the action-endpoint wrapper in
+#: ``server_api.wrap_action_endpoint`` and read by
+#: ``FrameworkBase.setup_and_contain_action`` when no ctx is passed explicitly.
+ACTION_CTX: "ContextVar[Optional[ActionContext]]" = ContextVar(
+    "helao_framework_action_ctx", default=None
+)
 
 
 class FrameworkBase:
@@ -90,6 +104,31 @@ class FrameworkBase:
         self.history: Dict[UUID, RunAction] = {}
         self.world_cfg: Dict = world_cfg or {}
         self.server_cfg: Dict = self.world_cfg.get("servers", {}).get(server_key, {})
+        # running executors keyed by exec_id; maps to the ActionSession driving
+        # it (ports Base.executors). Deployment cancel-endpoints iterate this.
+        self.executors: Dict[str, ActionSession] = {}
+        # live data buffer: key -> (value, epoch_seconds). Ports Base.live_buffer.
+        self.live_buffer: Dict[str, Any] = {}
+
+    # --- live buffer (ports Base.put_lbuf / get_lbuf) ------------------------
+
+    @staticmethod
+    def _stamp_lbuf_dict(live_dict: dict) -> dict:
+        """Wrap each value in a ``(value, epoch_s)`` tuple for the live buffer."""
+        now = time.time()
+        return {k: (v, now) for k, v in live_dict.items()}
+
+    async def put_lbuf(self, live_dict: dict) -> None:
+        """Timestamp ``live_dict`` and fold it into the live buffer."""
+        self.live_buffer.update(self._stamp_lbuf_dict(live_dict))
+
+    def put_lbuf_nowait(self, live_dict: dict) -> None:
+        """Timestamp ``live_dict`` and fold it into the live buffer (sync)."""
+        self.live_buffer.update(self._stamp_lbuf_dict(live_dict))
+
+    def get_lbuf(self, live_key):
+        """Return the most recent ``(value, timestamp)`` tuple stored under ``live_key``."""
+        return self.live_buffer[live_key]
 
     # --- request -> action ---------------------------------------------------
 
@@ -116,23 +155,46 @@ class FrameworkBase:
 
     async def setup_and_contain_action(
         self,
-        ctx: ActionContext,
+        ctx: Optional[ActionContext] = None,
         *,
+        action_abbr: Optional[str] = None,
+        json_data_keys: Optional[List[str]] = None,
+        file_type: Optional[str] = None,
+        hloheader: Optional[Any] = None,
         header: str = "",
     ) -> ActionSession:
         """Build the request's action and wrap it in an :class:`ActionSession`.
 
-        Ports ``Base.setup_and_contain_action``: finalize the action, default its
-        file-connection header, and hand it to :meth:`contain_action`.
+        Ports ``Base.setup_and_contain_action``. When ``ctx`` is omitted the
+        per-request :data:`ACTION_CTX` (published by the action-endpoint wrapper
+        in ``server_api``) supplies the action, so deployment endpoints can call
+        ``await app.base.setup_and_contain_action()`` with no arguments exactly
+        as they did against the legacy ``Base``.
 
         Args:
-            ctx: The per-request action context.
-            header: Default HLO header for this action's file connections.
+            ctx: Optional per-request action context. Falls back to ``ACTION_CTX``.
+            action_abbr: Optional short abbreviation stored on the action.
+            json_data_keys: Column names for the default HLO file connection
+                (accepted for legacy parity; file-connection wiring is an
+                app/adapter concern handled at finish time).
+            file_type: Optional HLO file type (legacy parity).
+            hloheader: Optional HLO header (legacy parity).
+            header: Default HLO header string for this action's file connections.
 
         Returns:
             The :class:`ActionSession` now tracking this action.
         """
+        if ctx is None:
+            ctx = ACTION_CTX.get(None)
+        if ctx is None:
+            LOGGER.error(
+                "setup_and_contain_action called outside an action endpoint "
+                "context and with no ctx; using a blank RunAction."
+            )
+            ctx = ActionContext(action=RunAction())
         action = self._get_action(ctx)
+        if action_abbr is not None:
+            action.action_abbr = action_abbr
         self._default_header = header
         return await self.contain_action(action)
 
@@ -160,6 +222,7 @@ class FrameworkBase:
             transport=self.transport,
             now_factory=self._clock_now,
             postprocessors=self.postprocessors,
+            base=self,
         )
         self.actives[action.action_uuid] = session
         await session.myinit()

@@ -78,6 +78,7 @@ class ActionSession:
         now_factory: Optional[Callable[[], datetime]] = None,
         uuid_factory: Optional[Callable[[], UUID]] = None,
         postprocessors: Optional[List[str]] = None,
+        base: Any = None,
     ) -> None:
         """Wire the session to its run-action and injected ports.
 
@@ -113,6 +114,11 @@ class ActionSession:
         self.num_data_written = 0
         self.manual_stop = False
         self.action_loop_running = False
+        # opaque back-reference to the hosting action server (FrameworkBase).
+        # Untyped to keep the domain layer import-clean (no app-layer import);
+        # used by deployment drivers as ``active.base`` and by the executor
+        # registry. None in pure-domain tests.
+        self.base = base
         # data packages awaiting drain to storage (in lieu of the legacy
         # data_q / log_data_task background task). finish() drains these.
         self._pending_data: List[DataPackageModel] = []
@@ -515,6 +521,12 @@ class ActionSession:
             self.action.error_code = setup_error
             return await self.finish()
 
+        # register this executor on the hosting server (ports Base.executors).
+        # Deployment cancel-endpoints iterate base.executors to stop a run.
+        if self.base is not None:
+            LOGGER.info(f"Registering exec_id: '{executor.exec_id}' with server")
+            self.base.executors[executor.exec_id] = self
+
         # one-shot execution
         LOGGER.info("Running executor._exec() method")
         try:
@@ -562,7 +574,22 @@ class ActionSession:
         if cleanup_state.get("error", ErrorCodes.none) != ErrorCodes.none:
             LOGGER.info("Error encountered during executor cleanup.")
 
+        # deregister the executor (ports Base.executors.pop in action_loop_task)
+        if self.base is not None:
+            self.base.executors.pop(executor.exec_id, None)
+
         return await self.finish()
+
+    def stop_action_task(self) -> None:
+        """Signal the polling loop to exit and request a manual stop.
+
+        Ports ``Active.stop_action_task``: deployment cancel-endpoints call this
+        on the :class:`ActionSession` registered in ``base.executors`` to halt a
+        running ``_poll`` loop on its next iteration.
+        """
+        LOGGER.info("Stop action request received. Stopping poll.")
+        self.manual_stop = True
+        self.action_loop_running = False
 
     def start_executor(self, executor: "Executor") -> dict:
         """Schedule the executor loop as a background task; return action dict.
