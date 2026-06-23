@@ -30,7 +30,7 @@ from uuid import UUID
 from helao.framework.models.errors import ErrorCodes
 from helao.framework.models.hlostatus import HloStatus
 from helao.framework.models.data import DataModel, DataPackageModel
-from helao.framework.models.file import FileInfo
+from helao.framework.models.file import FileInfo, HloHeaderModel
 from helao.framework.models.sample import (
     NoneSample,
     SampleInheritance,
@@ -321,6 +321,26 @@ class ActionSession:
             action = self.action
         return f"{action.action_output_dir}/{action.action_name}-{file_conn_key}.hlo"
 
+    def _default_hlo_header(self, action: RunAction) -> str:
+        """Build the stamped HLO header string for an auto-opened connection.
+
+        Ports legacy ``Base.log_data_set_output_file`` (base.py:1517-1540): when the
+        host auto-opens the default file connection with an empty header, stamp a
+        full :class:`HloHeaderModel` carrying ``action_name`` (abbr preferred),
+        ``epoch_ns`` from the injected clock, ``hlo_version`` (auto), and
+        ``column_headings`` from the action's ``json_data_keys`` if available.
+        Serialization to YAML is delegated to the Storage port so the domain stays
+        free of serialization libraries.
+        """
+        action_name = action.action_abbr or action.action_name
+        column_headings = list(getattr(action, "json_data_keys", None) or [])
+        hloheader = HloHeaderModel(
+            action_name=action_name,
+            column_headings=column_headings,
+            epoch_ns=self.clock.now_ns(),
+        )
+        return self.storage.serialize_hlo_header(hloheader.clean_dict())
+
     async def open_file(
         self,
         file_conn_key: UUID,
@@ -333,7 +353,17 @@ class ActionSession:
         storage port writes the header + ``%%`` separator and returns an opaque
         handle, which is tracked under ``file_conn_key`` so ``split`` /
         ``substitute`` / ``finish`` can close it later.
+
+        When the caller passes an empty/blank ``header`` (the host's
+        ``contain_action`` auto-open path), a full :class:`HloHeaderModel` is
+        stamped (closing the SP7 empty-header gap). An explicit non-empty header
+        is preserved verbatim.
         """
+        if action is None:
+            action = self.action
+        # blank/empty header -> stamp a full HloHeaderModel; explicit header kept.
+        if not header.strip():
+            header = self._default_hlo_header(action)
         # Close any handle already open for this key (e.g. a default connection
         # auto-opened by the host's contain_action) so reopening with an explicit
         # header doesn't leak the prior handle.
@@ -755,4 +785,36 @@ class ActionSession:
             if not action.manual_action:
                 await self._relocate_aux_files(action)
 
+        # promote each finished non-manual action's whole output dir to the synced
+        # location so HelaoSyncer ships it (ports base.py:2218 move_dir). Handles
+        # are already closed above; a relocation failure is logged and swallowed so
+        # finish never crashes on a transient FS error.
+        for action in self.action_list:
+            if not action.manual_action:
+                await self._relocate_run_dir(action)
+
         return self.action
+
+    #: synced-tree prefix the finished run dir is relocated under (legacy
+    #: RUNS_ACTIVE -> RUNS_SYNCED promotion; the framework's action_output_dir
+    #: carries no RUNS_* segment, so we prefix the synced root segment here).
+    _SYNCED_ROOT = "RUNS_SYNCED"
+
+    async def _relocate_run_dir(self, action: RunAction) -> None:
+        """Relocate ``action``'s output dir to the synced tree; swallow failures.
+
+        Maps the active output dir (``<action_output_dir>``) to
+        ``RUNS_SYNCED/<action_output_dir>`` (see :attr:`_SYNCED_ROOT`). Ports the
+        legacy ``move_dir`` RUNS_ACTIVE->RUNS_FINISHED/synced promotion; a failure
+        is logged and never propagated so ``finish`` completes.
+        """
+        out_dir = str(action.action_output_dir or "")
+        if not out_dir:
+            return
+        dst = f"{self._SYNCED_ROOT}/{out_dir}"
+        try:
+            await self.storage.relocate_dir(out_dir, dst)
+        except Exception:
+            LOGGER.error(
+                f"failed to relocate run dir {out_dir!r} -> {dst!r}", exc_info=True
+            )

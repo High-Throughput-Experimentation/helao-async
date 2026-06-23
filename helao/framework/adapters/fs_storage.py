@@ -94,6 +94,12 @@ class FsStorage(Storage):
         await f.write("%%\n")
         return _FsHloHandle(relpath, f)
 
+    def serialize_hlo_header(self, header: Mapping[str, Any]) -> str:
+        # legacy parity: yml_dumps(clean_dict); an empty header renders to "".
+        if not header:
+            return ""
+        return _yml_dumps(dict(header))
+
     async def append_hlo(self, handle: _FsHloHandle, row: str) -> None:
         if not row.endswith("\n"):
             row += "\n"
@@ -128,6 +134,18 @@ class FsStorage(Storage):
         if src != dst_path:
             await aioshutil.copy(src, dst_path)
         return dst
+
+    async def relocate_dir(self, src_relpath: str, dst_relpath: str) -> str:
+        src_path = self._abs(src_relpath)
+        dst_path = self._abs(dst_relpath)
+        if src_path == dst_path:
+            return dst_relpath
+        # nothing to move (e.g. save_data was off, no dir created) -> no-op.
+        if not os.path.isdir(src_path):
+            return dst_relpath
+        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+        await aioshutil.move(src_path, dst_path)
+        return dst_relpath
 
     # --- post-processor ---
 

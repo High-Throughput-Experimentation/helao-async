@@ -18,10 +18,11 @@ Wave 2-E import-swap. Four groups (mirroring the SP7 design §5):
 * **T4 runner import smoke** — the MicroOrch example runners resolve to
   ``helao.framework.*`` with no ``ImportError``.
 
-The driver background-poll loop and orchestrator-driven request body are SP8
-concerns, so T3 seeds the live buffer via ``base.put_lbuf`` and POSTs a full
-action body itself, isolating the SP7 action-execution path from SP8 driver
-lifecycle / live-orch wiring.
+As of SP8 WS-C the driver background-poll loop is started from the FastAPI
+``startup`` hook (loop live), so T3 drives the app through the ASGI lifespan and
+the ``WsSim`` poll loop self-populates the live buffer — no manual ``put_lbuf``
+seed. T3 still POSTs a full action body itself (the live orch supplies it in
+production).
 """
 import ast
 import asyncio
@@ -190,28 +191,29 @@ def _action_body(file_conn: str) -> dict:
 async def test_ws_simulator_runs_action_and_writes_hlo():
     from helao.deploy.test.servers.action.ws_simulator import makeApp
 
+    from helao.framework.tests.conftest import asgi_lifespan
+
     app = makeApp("SIM")
     save_root = Path(app.state.save_root)
-    await app.base.myinit()  # start the live-buffer drain loop
-
-    # SP8 owns the driver poll loop; seed the live buffer here so the executor
-    # has a snapshot to forward on each poll.
-    async def _seed():
-        for _ in range(40):
-            await app.base.put_lbuf({"sim_dict": {"series_0": 1.0, "series_1": 2.0}})
-            await asyncio.sleep(0.02)
-
-    seeder = asyncio.create_task(_seed())
-    await asyncio.sleep(0.05)  # let the drain populate the buffer first
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post(
-            "/SIM/acquire_data", json=_action_body(str(_uuid.uuid4()))
-        )
-        assert resp.status_code == 200, resp.text
-        await asyncio.sleep(0.5)  # let the bounded-duration executor finish
-    seeder.cancel()
+    # the lifespan fires the startup hook -> drivers built on the live loop and
+    # the WsSim poll loop self-populates the live buffer (SP8 WS-C). No seeding.
+    async with asgi_lifespan(app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
+            # let the 10 Hz poll loop populate sim_dict before acquiring
+            for _ in range(100):
+                if "sim_dict" in app.base.live_buffer:
+                    break
+                await asyncio.sleep(0.02)
+            assert "sim_dict" in app.base.live_buffer, "WsSim poll loop did not run"
+            resp = await client.post(
+                "/SIM/acquire_data", json=_action_body(str(_uuid.uuid4()))
+            )
+            assert resp.status_code == 200, resp.text
+            await asyncio.sleep(0.5)  # let the bounded-duration executor finish
 
     hlo_files = list(save_root.rglob("*.hlo"))
     act_files = list(save_root.rglob("*.act"))
@@ -220,13 +222,24 @@ async def test_ws_simulator_runs_action_and_writes_hlo():
 
     text = hlo_files[0].read_text(encoding="utf-8")
     # structural parity with the legacy HLO layout: a '%%' header/data separator
-    # followed by one JSON object per data row (header content / hloheader model
-    # stamping is SP8).
+    # followed by one JSON object per data row.
     assert "%%\n" in text
-    body = text.split("%%\n", 1)[1].strip().splitlines()
+    header_text, _, after = text.partition("%%\n")
+    body = after.strip().splitlines()
     assert body, "no data rows written after the %% separator"
     row = json.loads(body[0])
     assert "series_0" in row and "epoch_s" in row
+
+    # SP8 WS-F: the auto-opened (empty-header) connection now stamps a full
+    # HloHeaderModel -- the header before '%%' parses to a dict carrying the
+    # action_name and a numeric epoch_ns (no longer the SP7 empty header).
+    import ruamel.yaml
+
+    parsed = ruamel.yaml.YAML(typ="safe").load(header_text)
+    assert isinstance(parsed, dict), f"header did not parse to a dict: {header_text!r}"
+    assert parsed.get("action_name") == "acquire_data"
+    assert isinstance(parsed.get("epoch_ns"), int)
+    assert parsed.get("hlo_version")
 
 
 # ---------------------------------------------------------------------------

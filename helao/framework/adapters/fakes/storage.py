@@ -29,6 +29,8 @@ class FakeStorage(Storage):
         self.meta_docs: dict[str, dict[str, Any]] = {}
         #: list of (src, dst) relocations recorded in order.
         self.relocations: list[tuple[str, str]] = []
+        #: list of (src_relpath, dst_relpath) whole-dir relocations in order.
+        self.dir_relocations: list[tuple[str, str]] = []
         #: list of (name, relpath, context) post-processor calls.
         self.postproc_calls: list[tuple[str, str, dict[str, Any]]] = []
 
@@ -41,6 +43,19 @@ class FakeStorage(Storage):
             return copy.deepcopy(self._docs[relpath])
         except KeyError as exc:
             raise StorageKeyError(relpath) from exc
+
+    def serialize_hlo_header(self, header: Mapping[str, Any]) -> str:
+        # mirror FsStorage: yml_dumps(clean_dict); empty -> "" (no header block).
+        if not header:
+            return ""
+        import ruamel.yaml
+        from io import StringIO
+
+        yaml = ruamel.yaml.YAML(typ="rt")
+        yaml.indent(mapping=2, sequence=4, offset=2)
+        buf = StringIO()
+        yaml.dump(dict(header), buf)
+        return buf.getvalue()
 
     async def open_hlo(self, relpath: str, header: str) -> _FakeHloHandle:
         buf = ""
@@ -67,6 +82,10 @@ class FakeStorage(Storage):
     async def relocate(self, src: str, dst: str) -> str:
         self.relocations.append((src, dst))
         return dst
+
+    async def relocate_dir(self, src_relpath: str, dst_relpath: str) -> str:
+        self.dir_relocations.append((src_relpath, dst_relpath))
+        return dst_relpath
 
     async def run_postprocessor(
         self, name: str, relpath: str, context: Mapping[str, Any]

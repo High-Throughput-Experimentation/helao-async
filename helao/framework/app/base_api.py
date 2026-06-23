@@ -138,11 +138,16 @@ class FrameworkBase:
         self._live_task: Optional[asyncio.Task] = None
 
         # --- server identity + status model (port base.py:272-326, 479-799) --
-        # Minimal identity sufficient for actionservermodel + send_statuspackage
-        # (full MachineModel identity is WS-C). Field names match MachineModel.
+        # Fuller MachineModel identity (SP8 WS-C): hostname/port come from this
+        # server's config block; machine_name falls back server_cfg ->
+        # world_cfg so a group-wide machine name is honored when the per-server
+        # block omits it. server_params is exposed above.
+        machine_name = self.server_cfg.get("machine_name")
+        if machine_name is None:
+            machine_name = self.world_cfg.get("machine_name")
         self.server = MachineModel(
             server_name=server_key,
-            machine_name=self.server_cfg.get("machine_name"),
+            machine_name=machine_name,
             hostname=self.server_cfg.get("host"),
             port=self.server_cfg.get("port"),
         )
@@ -183,6 +188,24 @@ class FrameworkBase:
         """
         self._live_task = asyncio.create_task(self._live_buffer_task())
         self._status_task = asyncio.create_task(self._status_push_task())
+
+    async def shutdown(self) -> None:
+        """Cancel the background tasks started by :meth:`myinit`.
+
+        Cancels the live-buffer drain and status-push drain (the tasks this base
+        owns). Driver-owned tasks are the host's responsibility (the FastAPI
+        ``shutdown`` hook calls each driver's ``async_shutdown``/``shutdown``).
+        Idempotent and safe to call when the tasks were never started.
+        """
+        for task in (self._status_task, self._live_task):
+            if task is not None and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+        self._status_task = None
+        self._live_task = None
 
     # --- orchestrator status push (port base.py:272-326, 479-799) -----------
 
@@ -885,22 +908,19 @@ def _make_base_api_class():
             self.state.base = base
             self.state.save_root = save_root
 
-            # --- driver instantiation (dual-convention) --------------------
+            # --- driver instantiation (DEFERRED to startup) ----------------
+            # Drivers are NOT built here: several ``test``-deployment drivers
+            # start a poll task in ``__init__`` via
+            # ``asyncio.get_event_loop().create_task(...)`` (e.g. ``WsSim``),
+            # which is orphaned on a dead loop when built before uvicorn's loop
+            # exists (this caused the SP7 golden-master 'sim_dict' KeyError).
+            # Instantiation is moved to the FastAPI ``startup`` event (loop
+            # running) so the driver's own ``create_task`` binds to the live
+            # loop. ``app.driver``/``app.drivers`` stay ``None``/``()`` until
+            # then.
+            self._driver_classes = list(driver_classes or [])
             self.drivers = tuple()
             self.driver = None
-            if driver_classes:
-                Drivers = namedtuple(
-                    "Drivers", [d.__name__ for d in driver_classes]
-                )
-                driver_dict = {}
-                for driver_class in driver_classes:
-                    if self._is_helao_driver(driver_class):
-                        driver_inst = driver_class(config=self.base.server_params)
-                    else:
-                        driver_inst = driver_class(self.base)
-                    driver_dict[driver_class.__name__] = driver_inst
-                self.drivers = Drivers(**driver_dict)
-                self.driver = self.drivers[0] if self.drivers else None
 
             # --- dynamic endpoints -----------------------------------------
             if dyn_endpoints is not None:
@@ -909,11 +929,69 @@ def _make_base_api_class():
             # --- private status-client endpoints (port base.py attach/detach) ---
             self._register_status_endpoints(server_key, base)
 
-            # --- startup hook: start base tasks + register endpoint status ---
+            # --- startup hook: build drivers (loop live) + start base tasks --
             @self.on_event("startup")
             async def _framework_base_startup():
+                # build drivers first: their __init__ may schedule poll tasks
+                # onto the now-running loop.
+                self._instantiate_drivers()
                 await base.myinit()
                 await base.init_endpoint_status(self.routes)
+
+            # --- shutdown hook: stop driver + base background tasks ---------
+            @self.on_event("shutdown")
+            async def _framework_base_shutdown():
+                await self._shutdown_drivers()
+                await base.shutdown()
+
+        def _instantiate_drivers(self):
+            """Instantiate ``driver_classes`` against the base (dual-convention).
+
+            Called from the ``startup`` event so any poll task a driver schedules
+            in ``__init__`` (``asyncio.get_event_loop().create_task(...)``) binds
+            to the running loop. Populates ``self.drivers`` (a namedtuple keyed by
+            class name) and ``self.driver`` (the first entry). Idempotent.
+            """
+            if self.drivers or not self._driver_classes:
+                return
+            Drivers = namedtuple(
+                "Drivers", [d.__name__ for d in self._driver_classes]
+            )
+            driver_dict = {}
+            for driver_class in self._driver_classes:
+                if self._is_helao_driver(driver_class):
+                    driver_inst = driver_class(config=self.base.server_params)
+                else:
+                    driver_inst = driver_class(self.base)
+                driver_dict[driver_class.__name__] = driver_inst
+            self.drivers = Drivers(**driver_dict)
+            self.driver = self.drivers[0] if self.drivers else None
+
+        async def _shutdown_drivers(self):
+            """Shut down each driver, preferring ``async_shutdown`` over ``shutdown``.
+
+            For every constructed driver: ``await async_shutdown()`` if present,
+            else call ``shutdown()`` if present. Failures are logged, not raised,
+            so one driver's shutdown error does not block the rest.
+            """
+            for driver in self.drivers or ():
+                async_shutdown = getattr(driver, "async_shutdown", None)
+                if callable(async_shutdown):
+                    try:
+                        await async_shutdown()
+                    except Exception:
+                        LOGGER.exception(
+                            f"async_shutdown failed for {type(driver).__name__}"
+                        )
+                    continue
+                shutdown = getattr(driver, "shutdown", None)
+                if callable(shutdown):
+                    try:
+                        shutdown()
+                    except Exception:
+                        LOGGER.exception(
+                            f"shutdown failed for {type(driver).__name__}"
+                        )
 
         def _register_status_endpoints(self, server_key, base):
             """Register the orch-facing private status-client endpoints.

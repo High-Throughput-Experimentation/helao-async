@@ -32,6 +32,7 @@ from helao.framework.app.base_api import (
     wrap_action_endpoint,
     _build_action_from_kwargs,
 )
+from helao.framework.tests.conftest import asgi_lifespan
 
 
 # --- T-wrap ----------------------------------------------------------------
@@ -98,7 +99,8 @@ class FakeBareDriver:
         self.base = base
 
 
-def test_baseapi_builds_base_and_bare_driver(tmp_path):
+@pytest.mark.asyncio
+async def test_baseapi_builds_base_and_bare_driver(tmp_path):
     app = BaseAPI(
         server_key="SIM",
         driver_classes=[FakeBareDriver],
@@ -106,17 +108,22 @@ def test_baseapi_builds_base_and_bare_driver(tmp_path):
     )
     assert isinstance(app.base, FrameworkBase)
     assert app.base.server_key == "SIM"
-    # driver instantiated, exposed via drivers + driver
-    assert isinstance(app.driver, FakeBareDriver)
-    assert app.drivers[0] is app.driver
-    # bare helper got the base positionally
-    assert app.driver.base is app.base
+    # drivers are deferred to the startup hook (SP8 WS-C lifecycle); drive the
+    # app through the ASGI lifespan to fire startup before asserting.
+    async with asgi_lifespan(app):
+        # driver instantiated, exposed via drivers + driver
+        assert isinstance(app.driver, FakeBareDriver)
+        assert app.drivers[0] is app.driver
+        # bare helper got the base positionally
+        assert app.driver.base is app.base
 
 
-def test_baseapi_no_drivers(tmp_path):
+@pytest.mark.asyncio
+async def test_baseapi_no_drivers(tmp_path):
     app = BaseAPI(server_key="SIM", save_root=str(tmp_path))
-    assert app.drivers == tuple()
-    assert app.driver is None
+    async with asgi_lifespan(app):
+        assert app.drivers == tuple()
+        assert app.driver is None
 
 
 def test_baseapi_dyn_endpoints_invoked(tmp_path):

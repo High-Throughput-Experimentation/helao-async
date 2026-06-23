@@ -48,6 +48,17 @@ class Storage(Protocol):
         """
         ...
 
+    def serialize_hlo_header(self, header: Mapping[str, Any]) -> str:
+        """Serialize an HLO header ``dict`` to the YAML string written to disk.
+
+        Mirrors legacy ``Base.init_datafile`` (``yml_dumps(hloheader.clean_dict())``,
+        base.py:1298-1303): the domain builds a :class:`HloHeaderModel`, cleans it
+        to a dict, and asks the storage layer to render it so YAML formatting stays
+        an adapter concern (the domain stays free of serialization libraries).
+        An empty mapping renders to ``""`` (no header block).
+        """
+        ...
+
     async def append_hlo(self, handle: Any, row: str) -> None:
         """Append a single data ``row`` to an open HLO ``handle``.
 
@@ -70,6 +81,17 @@ class Storage(Protocol):
 
     async def relocate(self, src: str, dst: str) -> str:
         """Copy ``src`` to ``dst`` (relocating an aux file); return ``dst``."""
+        ...
+
+    async def relocate_dir(self, src_relpath: str, dst_relpath: str) -> str:
+        """Move a whole run directory tree from ``src_relpath`` to ``dst_relpath``.
+
+        Ports legacy ``move_dir`` (base.py:2218 / yml_tools.move_dir): a finished,
+        non-manual action's output directory is promoted from the active location
+        to the synced location so ``HelaoSyncer`` ships it. Both paths are relpaths
+        beneath the storage root; the destination's parent is created on demand and
+        the source subtree is moved (not copied). Returns ``dst_relpath``.
+        """
         ...
 
     async def run_postprocessor(
