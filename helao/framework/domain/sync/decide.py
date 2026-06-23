@@ -95,20 +95,29 @@ def decide_sync(
        (legacy 1044-1048: status already 'synced').
     3. ``node_status == "active"`` -> ``SOFT_BLOCK``
        (legacy 1054-1058: not 'finished' yet, return False).
-    4. any child not ``"synced"`` -> ``REQUEUE_CHILDREN``
-       (legacy 1066-1104). The children are re-enqueued at ``child_rank`` and
-       self at ``parent_rank``; legacy lines 1082-1083 define::
+    4. any child still ``"active"`` -> ``SOFT_BLOCK`` (legacy lines 1067-1071:
+       ``if self.active_children: return False``). This is a BARE soft-block --
+       NO re-queue, NO rank decrement. The hierarchical sync locks handle
+       concurrency, so an active child just means "not ready yet, try later".
+       This gate MUST precede and short-circuit the finished-children requeue
+       below; a mixed active+finished child set soft-blocks and re-queues
+       nothing, exactly as legacy returns at the active gate before ever
+       reaching the ``elif finished_children`` branch. (The earlier collapse of
+       active into the requeue path was a parity bug: it decremented rank every
+       pass, so an experiment with a long-running active child would exhaust the
+       ``rank_limit`` floor and be dropped -- legacy never has this bug.)
+    5. else if any child not ``"synced"`` (i.e. ``"finished"``) ->
+       ``REQUEUE_CHILDREN`` (legacy 1072-1104, the ``elif finished_children``
+       branch). The finished children are re-enqueued at ``child_rank`` and self
+       at ``parent_rank``; legacy lines 1082-1083 define::
 
            parent_rank = rank - 1
            child_rank  = parent_rank - 1   # == rank - 2
 
        i.e. children are re-queued at strictly *higher* priority (lower number)
-       than the parent so they sync first. Only the non-synced children are
-       re-queued (legacy iterates ``finished_children``; an ``active`` child
-       blocks too, but in this pure decider any non-synced child uniformly maps
-       here). Self is enqueued last, matching legacy order (children loop at
-       1092-1094, then self at 1102).
-    5. otherwise -> ``PROCEED`` (legacy 1106).
+       than the parent so they sync first. Self is enqueued last, matching
+       legacy order (children loop at 1092-1094, then self at 1102).
+    6. otherwise -> ``PROCEED`` (legacy 1106).
 
     Args:
         exists: Whether the yml file exists on disk.
@@ -137,7 +146,14 @@ def decide_sync(
     if node_status == "active":
         return SyncDecision(action=SyncAction.SOFT_BLOCK)
 
-    # 4. legacy 1066-1104 — re-queue unsynced children, then self.
+    # 4. legacy 1067-1071 — any active child: bare SOFT_BLOCK, NO requeue.
+    #    Must precede & short-circuit the finished-children requeue below.
+    if any(status == "active" for _, status in child_statuses):
+        return SyncDecision(action=SyncAction.SOFT_BLOCK)
+
+    # 5. legacy 1072-1104 — elif finished_children: re-queue finished children,
+    #    then self. (Only reached when no child is active, so every non-synced
+    #    child here is "finished".)
     unsynced = [relpath for relpath, status in child_statuses if status != "synced"]
     if unsynced:
         parent_rank = rank - 1  # legacy 1082
@@ -149,7 +165,7 @@ def decide_sync(
             action=SyncAction.REQUEUE_CHILDREN, requeue=tuple(items)
         )
 
-    # 5. legacy 1106
+    # 6. legacy 1106
     return SyncDecision(action=SyncAction.PROCEED)
 
 

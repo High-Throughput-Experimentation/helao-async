@@ -93,10 +93,10 @@ def test_decide_unsynced_children_requeue_ranks():
     )
 
 
-def test_decide_active_child_also_requeues():
-    # An "active" child is not "synced" -> still triggers REQUEUE_CHILDREN
-    # (the legacy active_children short-circuit returns False; in the pure
-    # decider a non-synced child uniformly maps to REQUEUE_CHILDREN per spec).
+def test_decide_active_child_soft_blocks_no_requeue():
+    # legacy lines 1067-1071: `if self.active_children: return False` -- a BARE
+    # soft-block. An active child must NOT trigger a rank-decrementing requeue
+    # (that would strand a long-running experiment at the rank floor).
     d = decide_sync(
         exists=True,
         node_status="finished",
@@ -104,11 +104,26 @@ def test_decide_active_child_also_requeues():
         already_synced=False,
         rank=10,
     )
-    assert d.action is SyncAction.REQUEUE_CHILDREN
-    assert d.requeue == (
-        RequeueItem(relpath="seq/exp/a-act.yml", rank=8),
-        RequeueItem(relpath="", rank=9),
+    assert d.action is SyncAction.SOFT_BLOCK
+    assert d.requeue == ()
+
+
+def test_decide_mixed_active_and_finished_children_soft_blocks():
+    # The active gate (legacy 1067-1071) precedes & short-circuits the
+    # finished-children requeue (legacy 1072-1104): a mix soft-blocks and
+    # re-queues NOTHING, exactly as legacy returns at the active gate.
+    d = decide_sync(
+        exists=True,
+        node_status="finished",
+        child_statuses=[
+            ("seq/exp/a-act.yml", "finished"),
+            ("seq/exp/b-act.yml", "active"),
+        ],
+        already_synced=False,
+        rank=10,
     )
+    assert d.action is SyncAction.SOFT_BLOCK
+    assert d.requeue == ()
 
 
 def test_decide_all_children_synced_proceeds():
