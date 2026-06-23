@@ -142,5 +142,5 @@ def zpickle(fpath, data) -> bool:
     """
     with pyzstd.ZstdFile(fpath, "wb") as f:
         cPickle.dump(data, f)
-    print(f"wrote to {os.path.abspath(f)}")
+    print(f"wrote to {os.path.abspath(fpath)}")
     return True
