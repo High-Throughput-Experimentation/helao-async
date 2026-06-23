@@ -14,9 +14,9 @@ from typing import List, Union
 from fastapi import Body
 import numpy as np
 
-from helao.core.error import ErrorCodes
-from helao.core.models.hlostatus import HloStatus
-from helao.core.models.sample import (
+from helao.framework.models.errors import ErrorCodes
+from helao.framework.models.hlostatus import HloStatus
+from helao.framework.models.sample import (
     AssemblySample,
     LiquidSample,
     GasSample,
@@ -24,12 +24,12 @@ from helao.core.models.sample import (
     NoneSample,
 )
 
-from helao.helpers import helao_logging as logging
+from helao.framework.support import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.base import Base, Executor
-from helao.core.servers.base_api import BaseAPI
-from helao.helpers.premodels import Action
+from helao.framework.app.base_api import Base, BaseAPI
+from helao.framework.domain.executor import Executor
+from helao.framework.models.action import ActionModel as Action
 
 
 class WsSim:
