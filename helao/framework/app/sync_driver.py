@@ -110,7 +110,7 @@ class SyncDriver:
 
         self.task_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
         self.task_set: set[str] = set()
-        self.running_tasks: dict[str, asyncio.Task] = {}
+        self.running_tasks: dict[str, "asyncio.Task | None"] = {}
 
         # Hierarchical sync locks keyed by each yml's path relative to RUNS_*
         # (stable as the yml moves between RUNS_FINISHED/SYNCED). seq_locks are
@@ -255,7 +255,7 @@ class SyncDriver:
         expanded type via ``paths.ABR_MAP`` that ``Progress.initial`` expects.
         """
         yml_path = Path(yml_path)
-        prg_path = Path(syncpaths.prg_path(yml_path))
+        prg_path = self._prg_for(yml_path)
         existing = self.sync_storage.read_prg(prg_path)
         if existing:
             return Progress.from_dict(
@@ -269,9 +269,21 @@ class SyncDriver:
         self.sync_storage.write_prg(prg_path, prog.to_dict())
         return prog
 
+    @staticmethod
+    def _prg_for(yml_path: Path) -> Path:
+        """``.prg`` sidecar path for ``yml_path``, ALWAYS under RUNS_SYNCED.
+
+        Legacy keeps the prg at ``self.yml.synced_path.with_suffix(".prg")``
+        (sync_driver.py line 557) regardless of where the yml currently lives, so
+        the progress doc is stable across the FINISHED->SYNCED move and a resumed
+        sync looks in the right tree. ``paths.prg_path`` is a pure same-dir
+        helper; we apply ``synced_path`` here at the call site to pin the tree.
+        """
+        return Path(syncpaths.prg_path(Path(syncpaths.synced_path(yml_path))))
+
     def _write_progress(self, yml_path: Path, prog: Progress) -> None:
-        """Persist ``prog`` to its ``.prg`` sidecar next to ``yml_path``."""
-        self.sync_storage.write_prg(Path(syncpaths.prg_path(yml_path)), prog.to_dict())
+        """Persist ``prog`` to its ``.prg`` sidecar under RUNS_SYNCED."""
+        self.sync_storage.write_prg(self._prg_for(yml_path), prog.to_dict())
 
     # --- the pipeline -------------------------------------------------------
 
@@ -359,14 +371,21 @@ class SyncDriver:
         meta = self.sync_storage.read_yml(yml_path)
         node_dir = yml_path.parent
 
-        # 1. actions: push pending files to S3 (legacy 1108-1206).
+        # 1. actions: push pending files to S3 (legacy 1108-1206). MUST rebind
+        #    prog: the per-file files_s3 map + trimmed files_pending are written
+        #    into a NEW Progress; dropping the return would re-persist a stale
+        #    prog with an empty files_s3 (legacy accumulates in one dict, 1160-1180).
         if abbr == "act":
-            await self._upload_action_files(yml_path, prog, meta, compress=compress)
+            prog = await self._upload_action_files(
+                yml_path, prog, meta, compress=compress
+            )
 
         # 2. experiments: finalize processes before pushing the experiment doc
-        #    (legacy 1207-1227).
+        #    (legacy 1207-1227). MUST rebind prog: the advanced experiment
+        #    Progress (process_s3/process_api/process_metas) is otherwise lost
+        #    and steps 4-6 would wipe the just-written process bookkeeping.
         if abbr == "exp":
-            ok = await self._finalize_processes(yml_path, prog, retries=retries)
+            prog, ok = await self._finalize_processes(yml_path, prog, retries=retries)
             if not ok:
                 return False
             metas = prog.to_dict().get("process_metas", {})
@@ -419,8 +438,11 @@ class SyncDriver:
             self._write_progress(Path(new_yml), prog)
 
             # action contributing processes: fold + push (legacy 1346-1349).
+            # Legacy resolves the parent against the POST-move (SYNCED) yml
+            # (legacy 1285): the action just moved out of RUNS_FINISHED, so its
+            # parent must be located in the tree consistent with the moved action.
             if abbr == "act" and meta.get("process_contrib", False):
-                await self.update_process(yml_path, meta)
+                await self.update_process(Path(new_yml), meta)
 
         return {k: v for k, v in prog.to_dict().items() if k != "process_metas"}
 
@@ -501,12 +523,17 @@ class SyncDriver:
 
     async def _finalize_processes(
         self, exp_yml: Path, prog: Progress, *, retries: int
-    ) -> bool:
+    ) -> tuple[Progress, bool]:
         """Drain unfinished process groups for an experiment (legacy 1208-1222).
 
         Repeatedly forces :meth:`sync_process` until no process group is
-        unfinished or ``retries`` is exhausted. Returns ``True`` when all
-        processes synced, ``False`` otherwise (caller aborts this pass).
+        unfinished or ``retries`` is exhausted.
+
+        Returns:
+            ``(advanced_progress, all_synced)``. The advanced ``Progress`` carries
+            the appended ``process_s3``/``process_api`` and any ``process_metas``
+            written by :meth:`sync_process`; the caller MUST rebind it (legacy
+            accumulates these in the one shared dict, 1215/1223/1566-1576).
         """
         s3_unf, api_unf = prog.list_unfinished_procs()
         retry_count = 0
@@ -518,8 +545,8 @@ class SyncDriver:
             retry_count += 1
         if s3_unf or api_unf:
             LOGGER.info(f"Processes in {exp_yml} did not sync after {retries} tries.")
-            return False
-        return True
+            return prog, False
+        return prog, True
 
     async def update_process(self, act_yml: Path, act_meta: dict) -> Progress:
         """Fold a finished action into its parent experiment's processes.
@@ -605,21 +632,30 @@ class SyncDriver:
     def _parent_yml(self, child_yml: Path, parent_abbr: str) -> Path:
         """Resolve the parent (exp/seq) yml path for a child yml on disk.
 
-        The parent yml lives one directory up; its name is found by listing the
-        parent dir's children meta files for the matching ``-{parent_abbr}.yml``
-        suffix.
+        The parent yml lives one directory up. ``update_process`` runs AFTER the
+        contributing action has moved to RUNS_SYNCED while the parent experiment
+        usually still lives under RUNS_FINISHED, so the parent dir is searched in
+        every status tree (FINISHED/SYNCED/ACTIVE) for the matching
+        ``-{parent_abbr}.yml`` -- whichever tree currently holds it wins.
         """
         child_yml = Path(child_yml)
-        parent_dir = child_yml.parent.parent
-        for cand in self.sync_storage.list_children(parent_dir.parent):
-            cand = Path(cand)
-            if cand.parent == parent_dir and cand.stem.endswith(f"-{parent_abbr}"):
-                return cand
-        # fall back to a direct glob of the parent dir
-        for cand in self.sync_storage.list_children(parent_dir):
-            cand = Path(cand)
-            if cand.stem.endswith(f"-{parent_abbr}"):
-                return cand
+        parent_dir = child_yml.parent.parent  # the experiment/sequence dir
+        # ``list_children`` globs ``<dir>/*/*.yml`` (one level DOWN), so to find
+        # the parent yml that lives *in* ``parent_dir`` we list children of its
+        # grandparent and keep the ``-{abbr}.yml`` whose own dir is ``parent_dir``.
+        grandparent = parent_dir.parent
+        for tree_dir in (
+            Path(syncpaths.finished_path(grandparent)),
+            Path(syncpaths.synced_path(grandparent)),
+            Path(syncpaths.active_path(grandparent)),
+        ):
+            want_parent = Path(syncpaths.rename_status(
+                parent_dir, syncpaths.status_of(tree_dir)
+            ))
+            for cand in self.sync_storage.list_children(tree_dir):
+                cand = Path(cand)
+                if cand.stem.endswith(f"-{parent_abbr}") and cand.parent == want_parent:
+                    return cand
         raise FileNotFoundError(f"no -{parent_abbr}.yml parent for {child_yml}")
 
     # --- bulk / maintenance -------------------------------------------------

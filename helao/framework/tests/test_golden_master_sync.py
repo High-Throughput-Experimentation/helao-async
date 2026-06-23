@@ -48,10 +48,12 @@ COVERS, end-to-end through real fs:
     ``s3``/``api`` legs marked done.
 OMITS (deliberate, out of scope for a NoopCloudSink fs golden master):
   - real S3 object bytes / real API registration payloads (NoopCloudSink stubs
-    both -- covered by ``test_app_sync_driver`` against the recording fake);
-  - process-folding for ``process_contrib`` actions (the fixture action sets
-    ``process_contrib: false``, so no process docs are produced; process logic is
-    covered by the domain ``process_fold`` unit tests).
+    both -- covered by ``test_app_sync_driver`` against the recording fake).
+PROCESS FOLDING is exercised: the fixture action carries ``process_contrib`` and
+the experiment a ``process_order_groups`` group, so the action sync runs
+``update_process`` -> ``sync_process`` and the experiment ``.prg`` accumulates
+``process_metas``/``process_s3`` (asserted below). This guards the
+Progress-threading bugs that a ``process_contrib: false`` fixture could not.
 """
 from __future__ import annotations
 
@@ -180,6 +182,11 @@ def test_full_chain_drains_finished_to_synced(tmp_path):
     leftover += list(fin.rglob("*-act.yml"))
     assert leftover == [], f"unsynced leftovers under RUNS_FINISHED: {leftover}"
     assert list(fin.rglob("*.hlo")) == []
+    # The .prg sidecar lives under RUNS_SYNCED (legacy line 557:
+    # yml.synced_path.with_suffix(".prg")), NEVER orphaned in RUNS_FINISHED.
+    assert list(fin.rglob("*.prg")) == [], (
+        f"orphan .prg left under RUNS_FINISHED: {list(fin.rglob('*.prg'))}"
+    )
 
 
 def test_sequence_dir_is_zipped_under_synced(tmp_path):
@@ -232,13 +239,14 @@ def test_prg_sidecars_have_legacy_schema_with_both_legs_done(tmp_path):
 
     # action-only fields present in the schema (legacy 574-579).
     assert "files_pending" in act_prg and "files_s3" in act_prg
-    # Nothing is left pending after a completed action PROCEED: the data files
-    # were uploaded (NoopCloudSink) and then relocated to RUNS_SYNCED (asserted
-    # in test_children_relocate_finished_to_synced). (files_s3 is not asserted by
-    # count here: the app reuses the same prg target for the upload + yml-doc legs
-    # and the final s3/api flip persists from the sync_yml-local Progress, so the
-    # per-file map round-trips through the relocate rather than this sidecar.)
+    # A completed action PROCEED leaves NOTHING pending and records every
+    # uploaded file in files_s3. The fixture action carries one .hlo + one misc
+    # file, so files_s3 has two entries. (This is the CRITICAL-1 parity contract:
+    # _upload_action_files returns a NEW Progress that sync_yml MUST rebind and
+    # persist -- legacy accumulates the per-file map in the one prg dict,
+    # 1160-1180/1287.)
     assert act_prg["files_pending"] == []
+    assert len(act_prg["files_s3"]) == 2, f"files_s3 not threaded into prg: {act_prg}"
 
     # experiment-only fields (legacy 580-591)
     for key in (
@@ -251,6 +259,19 @@ def test_prg_sidecars_have_legacy_schema_with_both_legs_done(tmp_path):
         "legacy_experiment",
     ):
         assert key in exp_prg, f"experiment prg missing legacy field {key}"
+
+    # CRITICAL-2 parity contract: the action's update_process -> sync_process
+    # folds the contributing action into the experiment process bookkeeping and
+    # pushes it. The advanced experiment Progress MUST round-trip to the exp prg
+    # under RUNS_SYNCED (the fixture exp has process_order_groups {0:[0]} and the
+    # action sets process_contrib + process_finish). A dropped _finalize_processes
+    # return would leave these empty.
+    assert exp_prg["legacy_experiment"] is False, "modern experiment expected"
+    assert 0 in exp_prg["process_actions_done"], (
+        f"action not recorded into process_actions_done: {exp_prg}"
+    )
+    assert exp_prg["process_metas"], f"process_metas not folded: {exp_prg}"
+    assert 0 in exp_prg["process_s3"], f"process not pushed to s3: {exp_prg}"
 
     # The sequence .prg ends up inside the zip (its dir is zipped after the seq
     # syncs), so drive a full sync on a fresh fixture and assert it is present in

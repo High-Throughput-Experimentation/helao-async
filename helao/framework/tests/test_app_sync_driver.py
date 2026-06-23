@@ -182,6 +182,18 @@ def _act_yml():
     return f"{_act_dir()}/240101.000002000000-act.yml"
 
 
+def _synced_prg(yml_path):
+    """The ``.prg`` sidecar path the driver uses: ALWAYS under RUNS_SYNCED.
+
+    Legacy keeps the prg at ``yml.synced_path.with_suffix(".prg")`` regardless of
+    where the yml currently lives, so the driver reads/writes prgs under
+    RUNS_SYNCED even while the yml is still in RUNS_FINISHED.
+    """
+    return str(
+        Path(yml_path.replace("RUNS_FINISHED", "RUNS_SYNCED")).with_suffix(".prg")
+    )
+
+
 def _driver(storage, cloud, **kw):
     return SyncDriver(storage, cloud, {"aws_bucket": "b"}, max_tasks=2, **kw)
 
@@ -239,6 +251,14 @@ def test_sync_yml_action_uploads_hlo_and_misc_files():
     assert any("data.hlo.json" in k for k, _ in cloud.upload_bytes_calls)
     assert any("aux.txt" in k for _, k in cloud.upload_file_calls)
 
+    # CRITICAL 1 regression guard: the per-file files_s3 map written by
+    # _upload_action_files MUST be threaded through into the persisted prg (the
+    # returned Progress is rebound in sync_yml). A dropped return would leave
+    # files_s3 empty / files_pending non-empty.
+    prg = storage.prgs[_synced_prg(_act_yml())]
+    assert prg["files_pending"] == []
+    assert len(prg["files_s3"]) == 2  # the hlo + the misc file both recorded
+
 
 def test_sync_yml_sequence_proceed_triggers_zip():
     storage, cloud = FakeSyncStorage(), FakeCloudSink()
@@ -295,7 +315,7 @@ def test_sync_yml_skip_when_not_exists():
 def test_sync_yml_skip_when_already_synced():
     storage, cloud = FakeSyncStorage(), FakeCloudSink()
     _seed_finished_act(storage)
-    prg_path = str(Path(_act_yml()).with_suffix(".prg"))
+    prg_path = _synced_prg(_act_yml())  # driver reads the prg under RUNS_SYNCED
     storage.prgs[prg_path] = {"yml": _act_yml(), "s3": True, "api": True,
                               "files_pending": [], "files_s3": {}}
     drv = _driver(storage, cloud)
@@ -378,14 +398,14 @@ def test_get_progress_creates_and_persists_when_missing():
     # action default schema fields present + persisted
     d = prog.to_dict()
     assert "files_pending" in d and "files_s3" in d
-    prg_path = str(Path(_act_yml()).with_suffix(".prg"))
+    prg_path = _synced_prg(_act_yml())  # persisted under RUNS_SYNCED
     assert prg_path in storage.prgs
 
 
 def test_get_progress_reads_existing():
     storage, cloud = FakeSyncStorage(), FakeCloudSink()
     _seed_finished_act(storage)
-    prg_path = str(Path(_act_yml()).with_suffix(".prg"))
+    prg_path = _synced_prg(_act_yml())  # driver reads the prg under RUNS_SYNCED
     storage.prgs[prg_path] = {"yml": _act_yml(), "s3": True, "api": False,
                               "files_pending": ["x"], "files_s3": {}}
     drv = _driver(storage, cloud)
