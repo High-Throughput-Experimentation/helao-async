@@ -82,3 +82,21 @@ class Storage(Protocol):
         save root). Pure ports define the contract only.
         """
         ...
+
+    async def relocate_run(
+        self, action_output_dir: str, sync_data: bool = True
+    ) -> None:
+        """Promote a finished action's output directory out of the active root.
+
+        Mirrors the legacy ``helao.helpers.yml_tools.move_dir`` for an *action*:
+        every file beneath ``action_output_dir`` (a relpath under the active
+        save root) is relocated from the active root to the finished root, after
+        which the active directory is removed so :class:`HelaoSyncer` picks the
+        run up. ``.hlo`` data files are diverted to the no-sync root instead of
+        the finished root when ``sync_data`` is ``False`` (legacy behaviour).
+
+        This is a no-op for adapters that share a single root or cannot resolve
+        an active/finished split. ``relocate_run`` is invoked once per finished,
+        non-manual action by :meth:`ActionSession.finish`.
+        """
+        ...

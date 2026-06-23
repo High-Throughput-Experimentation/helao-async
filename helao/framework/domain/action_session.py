@@ -779,4 +779,22 @@ class ActionSession:
             if not action.manual_action:
                 await self._relocate_aux_files(action)
 
+        # promote each finished, non-manual action's whole output directory out
+        # of the active root so HelaoSyncer picks it up. Ports the legacy
+        # ``move_dir(action, base=...)`` scheduled in ``Active._finish``
+        # (helao/core/servers/base.py ~L2218): one move per action directory,
+        # only for non-manual runs that actually produced on-disk output
+        # (``save_act``). The active/finished/no-sync root split and the
+        # ``.hlo`` -> no-sync diversion live in the storage adapter; the domain
+        # only supplies the relpath + the action's ``sync_data`` flag. Done last
+        # so it runs after meta is written, file handles are closed, and aux
+        # files are relocated -- i.e. once every file in the dir is final.
+        for action in self.action_list:
+            if action.manual_action or not action.save_act:
+                continue
+            await self.storage.relocate_run(
+                str(action.action_output_dir or ""),
+                getattr(action, "sync_data", True),
+            )
+
         return self.action
