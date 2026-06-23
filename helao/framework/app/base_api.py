@@ -813,7 +813,16 @@ def _make_base_api_class():
     """Build the ``BaseAPI`` class (FastAPI imported lazily here)."""
     import tempfile
 
-    from fastapi import FastAPI
+    from fastapi import FastAPI, WebSocket
+
+    # Publish WebSocket into this module's globals so FastAPI can resolve the
+    # ``websocket: WebSocket`` annotation on the ws-route handlers. This module
+    # uses ``from __future__ import annotations`` (annotations are strings), and
+    # FastAPI resolves them against each handler's ``__globals__`` (this module),
+    # so a function-local import of WebSocket would NOT be visible to it. We
+    # inject it here (lazy class-build time) rather than at module import to
+    # preserve the lazy-FastAPI design.
+    globals().setdefault("WebSocket", WebSocket)
 
     from helao.framework.adapters.fs_storage import FsStorage
     from helao.framework.adapters.ntp_clock import NtpClock
@@ -929,6 +938,10 @@ def _make_base_api_class():
             # --- private status-client endpoints (port base.py attach/detach) ---
             self._register_status_endpoints(server_key, base)
 
+            # --- WS-B: ws publishers + admin/private endpoints --------------
+            self._register_ws_routes(server_key, base)
+            self._register_admin_endpoints(server_key, base)
+
             # --- startup hook: build drivers (loop live) + start base tasks --
             @self.on_event("startup")
             async def _framework_base_startup():
@@ -937,6 +950,11 @@ def _make_base_api_class():
                 self._instantiate_drivers()
                 await base.myinit()
                 await base.init_endpoint_status(self.routes)
+                # WS-B: mirror every POST route as a HEAD route so the
+                # dispatcher's endpoints_available HEAD probes return 200. Done
+                # in startup (after all routes — incl. user dyn endpoints — are
+                # registered) and is idempotent.
+                self._add_head_mirrors()
 
             # --- shutdown hook: stop driver + base background tasks ---------
             @self.on_event("shutdown")
@@ -1015,6 +1033,218 @@ def _make_base_api_class():
             ):
                 base.detach_client(client_servkey, client_host, client_port)
                 return True
+
+        async def _ws_relay(self, websocket, channel: str) -> None:
+            """Accept ``websocket`` and forward matching eventsink items until disconnect.
+
+            Subscribes a fresh queue from the base's :class:`QueueEventSink`
+            (multisubscriber, so this does not steal the status-push drain's
+            events) and forwards the payload dict of every ``(channel, payload)``
+            tuple whose channel equals ``channel``.
+
+            WIRE FORMAT (SP8 WS-B): payloads are sent as **JSON** via
+            ``send_json``. This DIFFERS from legacy ``Base._ws_relay``, which
+            sends zstd-compressed pickle over a ``MultisubscriberQueue``. The
+            framework visualizers (the only zstd-pickle consumers) are out of
+            scope for SP8, so JSON parity with the Bokeh live-plot apps is
+            deferred. Disconnects are handled cleanly: the loop stops on
+            ``WebSocketDisconnect`` (or any send/recv error).
+            """
+            from starlette.websockets import WebSocketDisconnect
+
+            from helao.framework.ports.eventsink import STATUS_CHANNEL
+
+            await websocket.accept()
+            subscribe = getattr(self.base.eventsink, "subscribe", None)
+            if not callable(subscribe):
+                await websocket.close()
+                return
+            queue = subscribe()
+            try:
+                while True:
+                    item = await queue.get()
+                    if isinstance(item, tuple) and len(item) == 2:
+                        item_channel, payload = item
+                    else:
+                        # bare-payload sinks: forward only on the status channel
+                        item_channel, payload = STATUS_CHANNEL, item
+                    if item_channel != channel:
+                        continue
+                    await websocket.send_json(payload)
+            except WebSocketDisconnect:
+                return
+            except Exception:
+                # client gone / send failed: stop the relay quietly.
+                return
+
+        def _register_ws_routes(self, server_key, base):
+            """Register the ``/ws_status`` / ``/ws_data`` / ``/ws_live`` publishers.
+
+            Each route delegates to :meth:`_ws_relay` with its channel.
+            ``ws_status`` forwards STATUS_CHANNEL items; ``ws_data`` and
+            ``ws_live`` both forward DATA_CHANNEL items (legacy ``ws_live``
+            relays live-buffer snapshots; the framework forwards the same data
+            stream the live buffer is fed from — documented simplification, the
+            visualizer live-plot parity is deferred to a later wave).
+            """
+            from helao.framework.ports.eventsink import (
+                DATA_CHANNEL,
+                STATUS_CHANNEL,
+            )
+
+            @self.websocket(f"/{server_key}/ws_status")
+            async def ws_status(websocket: WebSocket):
+                await self._ws_relay(websocket, STATUS_CHANNEL)
+
+            @self.websocket(f"/{server_key}/ws_data")
+            async def ws_data(websocket: WebSocket):
+                await self._ws_relay(websocket, DATA_CHANNEL)
+
+            @self.websocket(f"/{server_key}/ws_live")
+            async def ws_live(websocket: WebSocket):
+                await self._ws_relay(websocket, DATA_CHANNEL)
+
+        def _register_admin_endpoints(self, server_key, base):
+            """Register the legacy-named admin/private POST endpoints (WS-B).
+
+            Mirrors ``helao.core.servers.base_api`` endpoint names/methods:
+            ``get_status`` / ``get_config`` / ``endpoints`` / ``get_lbuf`` /
+            ``list_executors`` / ``stop_executor`` / ``resend_active`` /
+            ``shutdown`` plus the ``estop`` / ``stop`` action endpoints.
+            """
+            from fastapi import Body
+
+            @self.post(f"/{server_key}/get_status", tags=["private"])
+            def get_status():
+                """Return the action-server model dump + driver status."""
+                status_dict = base.actionservermodel.as_dict()
+                driver_status = "not_implemented"
+                drv = self.driver
+                get_status_fn = getattr(drv, "get_status", None)
+                if drv is not None and callable(get_status_fn):
+                    try:
+                        resp = get_status_fn()
+                        driver_status = getattr(resp, "status", resp)
+                    except Exception:
+                        LOGGER.exception("driver get_status() failed")
+                status_dict["_driver_status"] = driver_status
+                return status_dict
+
+            @self.post(f"/{server_key}/get_config", tags=["private"])
+            def get_config():
+                """Return this server's config block (no world secrets)."""
+                return base.server_cfg
+
+            @self.post(f"/{server_key}/endpoints", tags=["private"])
+            def get_all_urls():
+                """Return the registered route descriptors (``fast_urls``)."""
+                return base.fast_urls
+
+            @self.post(f"/{server_key}/get_lbuf", tags=["private"])
+            def get_lbuf(live_key: str = Body(..., embed=True)):
+                """Return the ``(value, timestamp)`` for ``live_key`` or ``None``."""
+                try:
+                    return base.get_lbuf(live_key)
+                except KeyError:
+                    return None
+
+            @self.post(f"/{server_key}/list_executors", tags=["private"])
+            def list_executors():
+                """Return the ids of all registered executors."""
+                return list(base.executors.keys())
+
+            @self.post(f"/{server_key}/stop_executor", tags=["private"])
+            def stop_executor(executor_id: str = Body(..., embed=True)):
+                """Stop the named executor; report ``{stopped: bool}``."""
+                executor = base.executors.get(executor_id)
+                if executor is None:
+                    return {"stopped": False, "executor_id": executor_id}
+                stop_fn = getattr(executor, "stop_action_task", None)
+                if callable(stop_fn):
+                    stop_fn()
+                return {"stopped": True, "executor_id": executor_id}
+
+            @self.post(f"/{server_key}/resend_active", tags=["private"])
+            def resend_active(action_uuid: str = Body(..., embed=True)):
+                """Return the active action dict for ``action_uuid`` or ``None``."""
+                try:
+                    uuid = UUID(action_uuid)
+                except (ValueError, AttributeError, TypeError):
+                    return None
+                return base.get_active_info(uuid)
+
+            @self.post(f"/{server_key}/shutdown", tags=["private"])
+            async def post_shutdown():
+                """Trigger base + driver shutdown; report ``{ok: True}``."""
+                await self._shutdown_drivers()
+                await base.shutdown()
+                return {"ok": True}
+
+            @self.post(f"/{server_key}/estop", tags=["action"])
+            async def estop(switch: bool = Body(True, embed=True)):
+                """Latch the e-stop flag and stop every running executor."""
+                base.actionservermodel.estop = bool(switch)
+                for executor_id in list(base.executors):
+                    executor = base.executors.get(executor_id)
+                    stop_fn = getattr(executor, "stop_action_task", None)
+                    if callable(stop_fn):
+                        stop_fn()
+                return {"estop": base.actionservermodel.estop}
+
+            @self.post(f"/{server_key}/stop", tags=["action"])
+            async def stop():
+                """Generic stop: signal every running executor to stop."""
+                for executor_id in list(base.executors):
+                    executor = base.executors.get(executor_id)
+                    stop_fn = getattr(executor, "stop_action_task", None)
+                    if callable(stop_fn):
+                        stop_fn()
+                return {"ok": True}
+
+        def _add_head_mirrors(self):
+            """Add a lightweight HEAD route for every POST path (idempotent).
+
+            The dispatcher's ``endpoints_available`` probes routes with HEAD
+            requests and treats only a 2xx as "available"
+            (``support/dispatcher.endpoints_available``). FastAPI registers only
+            the declared POST handler per path, so a bare HEAD probe 405s.
+
+            Unlike the legacy ``_add_default_head_endpoints`` (which shallow-
+            copies the POST route and merely swaps its methods to HEAD), copying
+            the route keeps the POST endpoint's body dependant — an action
+            route's required ``action`` body then makes the HEAD probe 422
+            (a *client* error, not 2xx). Instead this registers a dedicated
+            no-arg HEAD handler per path that always returns 200, which is what
+            the dispatcher's reachability probe actually needs.
+            """
+            from fastapi.routing import APIRoute
+
+            existing_head = {
+                getattr(r, "path", None)
+                for r in self.routes
+                if isinstance(r, APIRoute) and "HEAD" in (r.methods or set())
+            }
+            post_paths = {
+                route.path
+                for route in self.routes
+                if isinstance(route, APIRoute)
+                and "POST" in (route.methods or set())
+            }
+            for path in post_paths:
+                if path in existing_head:
+                    continue
+                self.add_api_route(
+                    path,
+                    self._head_probe,
+                    methods=["HEAD"],
+                    include_in_schema=False,
+                )
+                existing_head.add(path)
+
+        @staticmethod
+        async def _head_probe():
+            """No-op HEAD handler: 200 reachability marker for the dispatcher."""
+            return None
 
         @staticmethod
         def _load_server_cfg(server_key):
