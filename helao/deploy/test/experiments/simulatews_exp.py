@@ -9,11 +9,11 @@ __all__ = ["SIM_websocket_data"]
 
 from socket import gethostname
 
-from helao.core.models.machine import MachineModel
-from helao.core.models.process_contrib import ProcessContrib
-
-from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helao.helpers.lib_decorators import experiment
+from helao.framework.models.machine import MachineModel
+from helao.framework.models.process_contrib import ProcessContrib
+from helao.framework.domain.run_models import RunExperiment as Experiment
+from helao.framework.domain.plan_makers import ActionPlanMaker
+from helao.framework.support.lib_decorators import experiment
 
 
 # list valid experiment functions
