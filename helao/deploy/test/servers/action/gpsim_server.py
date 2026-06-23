@@ -12,11 +12,11 @@ __all__ = ["makeApp"]
 from typing import Union
 from fastapi import Body
 
-from helao.core.servers.base_api import BaseAPI
-from helao.helpers.premodels import Action
+from helao.framework.app.server_api import BaseAPI
+from helao.framework.models.action import ActionModel as Action
 from ...drivers.data.gpsim_driver import GPSim, GPSimExec
 
-from helao.helpers import helao_logging as logging
+from helao.framework.support import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

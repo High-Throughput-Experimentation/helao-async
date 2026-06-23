@@ -12,10 +12,10 @@ from typing import Optional, List
 from fastapi import Body
 import pandas as pd
 
-from helao.helpers import helao_logging as logging
-from helao.core.servers.base import Base
-from helao.core.servers.base_api import BaseAPI
-from helao.helpers.premodels import Action
+from helao.framework.support import helao_logging as logging
+from helao.framework.app.base_api import FrameworkBase as Base
+from helao.framework.app.server_api import BaseAPI
+from helao.framework.models.action import ActionModel as Action
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
