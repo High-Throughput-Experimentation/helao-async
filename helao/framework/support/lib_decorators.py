@@ -10,8 +10,19 @@ __all__ = ["experiment", "sequence"]
 import functools
 import inspect
 
+from pydantic import BaseModel
+
 from helao.framework.domain.run_models import RunExperiment
 from helao.framework.domain.plan_makers import EXPERIMENT_CTX
+
+
+def _is_experiment_obj(obj) -> bool:
+    """Duck-typed check: any BaseModel with experiment_name is treated as an experiment context.
+
+    Accepts both legacy Experiment (helao.helpers.premodels) and RunExperiment
+    so the decorator works when called from an old-style orchestrator.
+    """
+    return isinstance(obj, BaseModel) and hasattr(obj, "experiment_name")
 
 
 def _declares_experiment_param(sig: inspect.Signature) -> bool:
@@ -42,9 +53,9 @@ def experiment(version: int = 1):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             exp = None
-            if args and isinstance(args[0], RunExperiment):
+            if args and _is_experiment_obj(args[0]):
                 exp, args = args[0], args[1:]
-            if isinstance(kwargs.get("experiment"), RunExperiment):
+            if _is_experiment_obj(kwargs.get("experiment")):
                 exp = kwargs.pop("experiment")
             if exp is None:
                 exp = EXPERIMENT_CTX.get(None)
