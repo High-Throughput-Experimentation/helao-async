@@ -75,3 +75,14 @@ def test_file_utils_importable():
 def test_file_in_use_returns_false_for_nonexistent(tmp_path):
     from helao.framework.support.file_utils import file_in_use
     assert file_in_use(tmp_path / "no_such_file.txt") is False
+
+
+def test_dispatcher_importable():
+    from helao.framework.support.dispatcher import (
+        async_action_dispatcher,
+        async_private_dispatcher,
+        private_dispatcher,
+        aclose_all_rpc_clients,
+        close_all_sync_rpc_clients,
+    )
+    assert callable(async_private_dispatcher)
