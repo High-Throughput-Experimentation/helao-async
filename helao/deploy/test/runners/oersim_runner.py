@@ -54,9 +54,9 @@ import os
 import asyncio
 from typing import Any, Dict, Optional
 
-from helao.core.runners.micro_orch import MicroOrch
-from helao.helpers.premodels import Action
-from helao.core.models.machine import MachineModel
+from helao.framework.runners.micro_orch import MicroOrch
+from helao.framework.models.action import ActionModel as Action
+from helao.framework.models.machine import MachineModel
 
 
 # --- wiring (matches demo0.yml CPSIM/GPSIM host:port) ----------------------
