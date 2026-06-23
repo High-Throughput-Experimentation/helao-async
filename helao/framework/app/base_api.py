@@ -67,6 +67,7 @@ class FrameworkBase:
         clock: Clock,
         transport: Optional[Transport] = None,
         postprocessors: Optional[List[str]] = None,
+        world_cfg: Optional[Dict] = None,
     ) -> None:
         """Wire the base to its server identity and injected adapters.
 
@@ -77,6 +78,7 @@ class FrameworkBase:
             clock: Clock adapter for timestamps.
             transport: Optional transport adapter (global-param export).
             postprocessors: Names of HLO post-processors to run at finish.
+            world_cfg: Full HELAO world config dict (from CONFIG singleton).
         """
         self.server_key = server_key
         self.storage = storage
@@ -86,6 +88,8 @@ class FrameworkBase:
         self.postprocessors = list(postprocessors or [])
         self.actives: Dict[UUID, ActionSession] = {}
         self.history: Dict[UUID, RunAction] = {}
+        self.world_cfg: Dict = world_cfg or {}
+        self.server_cfg: Dict = self.world_cfg.get("servers", {}).get(server_key, {})
 
     # --- request -> action ---------------------------------------------------
 
