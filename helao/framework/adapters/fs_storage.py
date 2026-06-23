@@ -16,11 +16,13 @@ ruamel.yaml). The YAML formatting matches ``helao.helpers.yml_tools.yml_dumps``
 """
 import json
 import os
+from glob import glob
 from io import StringIO
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Optional, Sequence
 from uuid import uuid1
 
 import aiofiles
+import aiofiles.os
 import aioshutil
 import ruamel.yaml
 
@@ -57,8 +59,40 @@ class FsStorage(Storage):
     created on demand.
     """
 
-    def __init__(self, save_root: str) -> None:
+    def __init__(
+        self,
+        save_root: str,
+        *,
+        finished_root: Optional[str] = None,
+        nosync_root: Optional[str] = None,
+    ) -> None:
+        """Root the adapter at ``save_root`` (the active run root).
+
+        ``save_root`` is the active root (in production it ends in a
+        ``RUNS_ACTIVE`` segment). ``finished_root`` / ``nosync_root`` are the
+        promotion targets used by :meth:`relocate_run`; when omitted they are
+        derived from ``save_root`` by the legacy ``RUNS_ACTIVE`` ->
+        ``RUNS_FINISHED`` / ``RUNS_NOSYNC`` string substitution (matching
+        ``helao.helpers.yml_tools.move_dir``). If ``save_root`` carries no
+        ``RUNS_ACTIVE`` segment and no explicit roots are given, the finished
+        root collapses to ``save_root`` and :meth:`relocate_run` becomes a
+        no-op (single-root adapters / tmp_path tests).
+        """
         self.save_root = save_root
+        if finished_root is None:
+            finished_root = (
+                save_root.replace("RUNS_ACTIVE", "RUNS_FINISHED")
+                if "RUNS_ACTIVE" in save_root
+                else save_root
+            )
+        if nosync_root is None:
+            nosync_root = (
+                save_root.replace("RUNS_ACTIVE", "RUNS_NOSYNC")
+                if "RUNS_ACTIVE" in save_root
+                else finished_root
+            )
+        self.finished_root = finished_root
+        self.nosync_root = nosync_root
 
     def _abs(self, relpath: str) -> str:
         return os.path.join(self.save_root, relpath)
@@ -137,3 +171,39 @@ class FsStorage(Storage):
         # SP4 has no registered processors; the contract returns the file list
         # unchanged. Real processor dispatch is wired in app/ composition.
         return list(context.get("files", []))
+
+    # --- whole-run-dir relocation at finish ---
+
+    async def relocate_run(
+        self, action_output_dir: str, sync_data: bool = True
+    ) -> None:
+        src_dir = os.path.normpath(os.path.join(self.save_root, action_output_dir))
+        # finished destination for this action dir
+        dst_dir = os.path.normpath(
+            os.path.join(self.finished_root, action_output_dir)
+        )
+        if src_dir == dst_dir:
+            # single-root adapter (no active/finished split) -> nothing to do.
+            return
+        if not os.path.isdir(src_dir):
+            return
+
+        # Mirror legacy move_dir(action): glob every file beneath the action
+        # directory, copy each into the finished root (or no-sync root for .hlo
+        # data when sync_data is False), then remove the active directory tree.
+        src_list = [
+            p
+            for p in glob(os.path.join(src_dir, "**", "*"), recursive=True)
+            if os.path.isfile(p)
+        ]
+        for src in src_list:
+            rel = os.path.relpath(src, src_dir)
+            if src.endswith(".hlo") and not sync_data:
+                dst = os.path.join(self.nosync_root, action_output_dir, rel)
+            else:
+                dst = os.path.join(dst_dir, rel)
+            await aiofiles.os.makedirs(os.path.dirname(dst), exist_ok=True)
+            await aioshutil.copy(src, dst)
+
+        # remove the now-promoted active directory tree
+        await aioshutil.rmtree(src_dir)

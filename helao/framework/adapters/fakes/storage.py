@@ -31,6 +31,8 @@ class FakeStorage(Storage):
         self.relocations: list[tuple[str, str]] = []
         #: list of (name, relpath, context) post-processor calls.
         self.postproc_calls: list[tuple[str, str, dict[str, Any]]] = []
+        #: list of (action_output_dir, sync_data) whole-run relocations.
+        self.run_relocations: list[tuple[str, bool]] = []
 
     def write_json(self, relpath: str, payload: Mapping[str, Any]) -> str:
         self._docs[relpath] = copy.deepcopy(dict(payload))
@@ -73,3 +75,8 @@ class FakeStorage(Storage):
     ) -> Sequence[Any]:
         self.postproc_calls.append((name, relpath, copy.deepcopy(dict(context))))
         return list(context.get("files", []))
+
+    async def relocate_run(
+        self, action_output_dir: str, sync_data: bool = True
+    ) -> None:
+        self.run_relocations.append((action_output_dir, sync_data))
