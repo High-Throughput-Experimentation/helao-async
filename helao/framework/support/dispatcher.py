@@ -192,6 +192,10 @@ async def async_action_dispatcher(
                             f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}"
                         )
                         success = False
+                        # A non-2xx HTTP response is terminal for this attempt;
+                        # count it so the retry loop can exit (otherwise the
+                        # loop spins forever since `success` never flips).
+                        retry_count += 1
                     else:
                         success = True
         except Exception:
@@ -299,6 +303,10 @@ async def async_private_dispatcher(
                             f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')"
                         )
                         success = False
+                        # A non-2xx HTTP response is terminal for this attempt;
+                        # count it so the retry loop can exit (otherwise the
+                        # loop spins forever since `success` never flips).
+                        retry_count += 1
                     else:
                         success = True
         except Exception:

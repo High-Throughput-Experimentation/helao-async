@@ -78,6 +78,7 @@ class ActionSession:
         now_factory: Optional[Callable[[], datetime]] = None,
         uuid_factory: Optional[Callable[[], UUID]] = None,
         postprocessors: Optional[List[str]] = None,
+        base=None,
     ) -> None:
         """Wire the session to its run-action and injected ports.
 
@@ -96,6 +97,12 @@ class ActionSession:
                 promotion. Injected for determinism; defaults to ``uuid.uuid4``.
             postprocessors: Names of registered HLO post-processors to run over
                 this action's output at finish (ports ``Base.hlo_postprocessors``).
+            base: Optional backref to the containing app-layer base (legacy
+                ``Active.base``). Duck-typed (no framework import) so the domain
+                stays pure; used by :meth:`start_executor` to register the
+                executor and by :meth:`put_lbuf` / :meth:`get_lbuf` to delegate
+                live-buffer access. Defaults to ``None`` so callers that don't
+                supply a base keep working.
         """
         self.action = run_action
         self.storage = storage
@@ -106,6 +113,9 @@ class ActionSession:
         self._now: Callable[[], datetime] = now_factory or datetime.now
         self._uuid: Callable[[], UUID] = uuid_factory or _uuid.uuid4
         self.postprocessors: List[str] = list(postprocessors or [])
+        self.base = base
+        # background task handle for the executor action loop (start_executor)
+        self.action_task = None
 
         # newest action is at position 0 (matches legacy Active.action_list)
         self.action_list: List[RunAction] = [self.action]
@@ -490,6 +500,25 @@ class ActionSession:
         await self.add_status(action=action)
 
     # --- executor loop -------------------------------------------------------
+
+    def start_executor(self, executor) -> dict:
+        """Register the executor and spawn its action loop as a background task; return the active action dict. Ports base.py:1202."""
+        self.executor = executor
+        if self.base is not None:
+            self.base.executors[executor.exec_id] = executor
+        self.action_task = asyncio.create_task(self.action_loop_task(executor))
+        LOGGER.info("Executor task started.")
+        return self.action.as_dict()
+
+    # --- live buffer ---------------------------------------------------------
+
+    async def put_lbuf(self, message: dict) -> None:
+        """Delegate live-buffer publish to the containing base. Ports Active.put_lbuf (base.py:2487)."""
+        await self.base.put_lbuf(message)
+
+    def get_lbuf(self, buf_key):
+        """Return the (value, timestamp) for buf_key from the base live buffer. Ports Active.get_lbuf (base.py:2493)."""
+        return self.base.get_lbuf(buf_key)
 
     async def action_loop_task(self, executor: Executor) -> RunAction:
         """Drive the executor lifecycle: pre -> exec | poll-loop -> manual_stop -> post.

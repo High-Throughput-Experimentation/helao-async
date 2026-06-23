@@ -517,7 +517,7 @@ async def test_endpoints_available_timeout_classified(monkeypatch):
 async def test_endpoints_available_cert_failure_classified(monkeypatch):
     """aiohttp.ClientSSLError is classified as 'cert failure'."""
     async def _fake_check(url: str) -> int:
-        raise aiohttp.ClientSSLError(None, None)
+        raise aiohttp.ClientSSLError(None, OSError(1, "ssl handshake failed"))
 
     monkeypatch.setattr(disp_mod, "check_endpoint", _fake_check)
     ok, unavail = await endpoints_available(["https://badcert/ep"])

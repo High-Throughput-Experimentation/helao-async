@@ -177,3 +177,14 @@ class Executor:
                 :meth:`_manual_stop`.
         """
         self._manual_stop = MethodType(manual_stop_func, self)
+
+    def stop_action_task(self) -> None:
+        """Signal the action loop to exit on its next iteration and request a manual stop.
+
+        Ports ``helao.core.servers.base.py:2461``. In legacy this method lived on
+        ``Active``; in the framework it lives on :class:`Executor` and reaches the
+        session through :attr:`active`, whose ``action_loop_task`` honours both flags.
+        """
+        LOGGER.info("Stop action request received. Stopping poll.")
+        self.active.manual_stop = True
+        self.active.action_loop_running = False

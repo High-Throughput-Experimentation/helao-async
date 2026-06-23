@@ -214,6 +214,117 @@ def test_action_loop_drives_oneoff_and_finishes():
     assert result is session.action
 
 
+def test_construct_base_defaults_none_and_action_task_none():
+    session, *_ = _make_session()
+    assert session.base is None
+    assert session.action_task is None
+
+
+# --- start_executor ------------------------------------------------------------
+
+
+class _FakeBase:
+    """Minimal duck-typed base: executors registry + live-buffer hooks."""
+
+    def __init__(self):
+        self.executors = {}
+        self.put_messages = []
+        self.lbuf_sentinel = (123, 456.0)
+
+    async def put_lbuf(self, message):
+        self.put_messages.append(message)
+
+    def get_lbuf(self, buf_key):
+        return self.lbuf_sentinel
+
+
+def _make_session_with_base(base, exec_data=None):
+    storage = FakeStorage()
+    eventsink = FakeEventSink()
+    clock = FakeClock()
+    transport = FakeTransport()
+    action = _run_action()
+
+    class _Wrap:
+        def __init__(self, act):
+            self.action = act
+
+    executor = Executor(active=_Wrap(action))
+    if exec_data is not None:
+
+        async def _exec(self):
+            return {"data": exec_data, "error": ErrorCodes.none}
+
+        executor.set_exec(_exec)
+
+    session = ActionSession(
+        action,
+        storage=storage,
+        eventsink=eventsink,
+        clock=clock,
+        executor=executor,
+        transport=transport,
+        base=base,
+    )
+    return session, executor
+
+
+def test_start_executor_registers_and_spawns_task():
+    async def _run():
+        base = _FakeBase()
+        session, executor = _make_session_with_base(base, exec_data={"v": 1})
+        await session.myinit()
+        result = session.start_executor(executor)
+        # returns the active action dict
+        assert result == session.action.as_dict()
+        # executor registered in base.executors keyed by exec_id
+        assert base.executors[executor.exec_id] is executor
+        # self.executor set + a task created
+        assert session.executor is executor
+        assert session.action_task is not None
+        # drain the background task so it doesn't leak (oneoff finishes promptly)
+        finished = await session.action_task
+        assert finished is session.action
+        assert HloStatus.finished in session.action.action_status
+
+    asyncio.run(_run())
+
+
+def test_start_executor_without_base_skips_registry():
+    async def _run():
+        session, storage, eventsink, clock, executor = _make_session(
+            exec_data={"v": 1}
+        )
+        await session.myinit()
+        result = session.start_executor(executor)
+        assert result == session.action.as_dict()
+        assert session.executor is executor
+        # base is None -> no registry write, no error
+        assert session.base is None
+        await session.action_task
+
+    asyncio.run(_run())
+
+
+# --- put_lbuf / get_lbuf delegation --------------------------------------------
+
+
+def test_put_lbuf_delegates_to_base():
+    async def _run():
+        base = _FakeBase()
+        session, _executor = _make_session_with_base(base)
+        await session.put_lbuf({"temp": 25})
+        assert base.put_messages == [{"temp": 25}]
+
+    asyncio.run(_run())
+
+
+def test_get_lbuf_delegates_to_base():
+    base = _FakeBase()
+    session, _executor = _make_session_with_base(base)
+    assert session.get_lbuf("temp") == base.lbuf_sentinel
+
+
 def test_poll_executor_runs_until_terminal_then_finishes():
     session, storage, eventsink, clock, executor = _make_session(
         executor_kwargs={"oneoff": False, "poll_rate": 0}

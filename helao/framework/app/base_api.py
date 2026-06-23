@@ -13,6 +13,10 @@ method names are preserved so deployment authors keep the same surface.
 """
 from __future__ import annotations
 
+import asyncio
+import os
+import time
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -24,7 +28,15 @@ from helao.framework.ports.eventsink import EventSink
 from helao.framework.ports.storage import Storage
 from helao.framework.ports.transport import Transport
 
-__all__ = ["ActionContext", "FrameworkBase"]
+__all__ = [
+    "ActionContext",
+    "FrameworkBase",
+    "Base",
+    "ACTION_CTX",
+    "BaseAPI",
+    "ActionAPIRoute",
+    "wrap_action_endpoint",
+]
 
 
 @dataclass
@@ -42,6 +54,14 @@ class ActionContext:
 
     action: RunAction
     endpoint_name: Optional[str] = None
+
+
+#: Per-request action context, set by the action-endpoint request wrapper
+#: (Task D) and recovered by the no-arg :meth:`FrameworkBase.setup_and_contain_action`.
+#: ``None`` outside an action request. Ports ``base_api.py:89``.
+ACTION_CTX: ContextVar[Optional[ActionContext]] = ContextVar(
+    "ACTION_CTX", default=None
+)
 
 
 class FrameworkBase:
@@ -67,6 +87,8 @@ class FrameworkBase:
         clock: Clock,
         transport: Optional[Transport] = None,
         postprocessors: Optional[List[str]] = None,
+        world_cfg: Optional[dict] = None,
+        server_cfg: Optional[dict] = None,
     ) -> None:
         """Wire the base to its server identity and injected adapters.
 
@@ -77,6 +99,10 @@ class FrameworkBase:
             clock: Clock adapter for timestamps.
             transport: Optional transport adapter (global-param export).
             postprocessors: Names of HLO post-processors to run at finish.
+            world_cfg: Whole-group config (a.k.a. ``helao_cfg``); falls back to
+                the global ``CONFIG`` when ``None`` and a config is loaded.
+            server_cfg: This server's config block; ``server_cfg["params"]`` is
+                exposed as :attr:`server_params`.
         """
         self.server_key = server_key
         self.storage = storage
@@ -86,6 +112,74 @@ class FrameworkBase:
         self.postprocessors = list(postprocessors or [])
         self.actives: Dict[UUID, ActionSession] = {}
         self.history: Dict[UUID, RunAction] = {}
+
+        # --- server config surface (port Base.__init__ config wiring) --------
+        if world_cfg is None:
+            world_cfg = self._load_global_cfg()
+        self.world_cfg: dict = world_cfg or {}
+        self.helao_cfg = self.world_cfg  # legacy alias
+        self.server_cfg: dict = server_cfg or {}
+        self.server_params: dict = self.server_cfg.get("params", {}) or {}
+        # TODO(SP8): full helao_dirs wiring (RUNS_*/STATES/LOGS roots).
+        self.helaodirs = None
+        self.helao_dirs = self.helaodirs  # legacy alias
+
+        # --- executor registry (exec_id -> Executor) ------------------------
+        self.executors: Dict[str, Any] = {}
+
+        # --- live buffer (port base.py:672-687) -----------------------------
+        self.live_buffer: dict = {}
+        self.live_q: asyncio.Queue = asyncio.Queue()
+        self._live_task: Optional[asyncio.Task] = None
+
+    @staticmethod
+    def _load_global_cfg() -> dict:
+        """Best-effort fetch of the module-level global ``CONFIG``.
+
+        Defensive: returns ``{}`` when no config is loaded or the import is
+        unavailable, so construction never depends on a launched group.
+        """
+        try:
+            from helao.framework.support.config_loader import CONFIG
+
+            return CONFIG or {}
+        except Exception:
+            return {}
+
+    # --- lifecycle -----------------------------------------------------------
+
+    async def myinit(self) -> None:
+        """Start the minimal background tasks. Ports ``Base.myinit`` (subset).
+
+        SP7 starts ONLY the live-buffer drain loop; status/orch push tasks are
+        SP8.
+        """
+        self._live_task = asyncio.create_task(self._live_buffer_task())
+
+    # --- live buffer (port base.py:672-687) ---------------------------------
+
+    @staticmethod
+    def _stamp_lbuf_dict(live_dict: dict) -> dict:
+        """Stamp each live value with the current wall-clock time."""
+        return {k: (v, time.time()) for k, v in live_dict.items()}
+
+    async def put_lbuf(self, live_dict: dict) -> None:
+        """Enqueue a stamped live-buffer update (awaitable)."""
+        await self.live_q.put(self._stamp_lbuf_dict(live_dict))
+
+    def put_lbuf_nowait(self, live_dict: dict) -> None:
+        """Enqueue a stamped live-buffer update without awaiting."""
+        self.live_q.put_nowait(self._stamp_lbuf_dict(live_dict))
+
+    def get_lbuf(self, live_key):
+        """Return the ``(value, timestamp)`` tuple for ``live_key``."""
+        return self.live_buffer[live_key]
+
+    async def _live_buffer_task(self) -> None:
+        """Background drain loop: merge queued updates into ``live_buffer``."""
+        while True:
+            msg = await self.live_q.get()
+            self.live_buffer.update(msg)
 
     # --- request -> action ---------------------------------------------------
 
@@ -112,7 +206,7 @@ class FrameworkBase:
 
     async def setup_and_contain_action(
         self,
-        ctx: ActionContext,
+        ctx: Optional[ActionContext] = None,
         *,
         header: str = "",
     ) -> ActionSession:
@@ -121,13 +215,29 @@ class FrameworkBase:
         Ports ``Base.setup_and_contain_action``: finalize the action, default its
         file-connection header, and hand it to :meth:`contain_action`.
 
+        Two call forms are supported:
+
+        * **ctx-arg** (SP4 demo/tests): pass an explicit :class:`ActionContext`.
+        * **no-arg** (request wrapper, Task D): omit ``ctx`` and recover it from
+          the module-level :data:`ACTION_CTX` set by the endpoint wrapper.
+
         Args:
-            ctx: The per-request action context.
+            ctx: The per-request action context, or ``None`` to recover from
+                :data:`ACTION_CTX`.
             header: Default HLO header for this action's file connections.
 
         Returns:
             The :class:`ActionSession` now tracking this action.
+
+        Raises:
+            RuntimeError: When ``ctx`` is ``None`` and ``ACTION_CTX`` is unset.
         """
+        if ctx is None:
+            ctx = ACTION_CTX.get()
+        if ctx is None:
+            raise RuntimeError(
+                "no ActionContext: ACTION_CTX unset and no ctx passed"
+            )
         action = self._get_action(ctx)
         self._default_header = header
         return await self.contain_action(action)
@@ -156,6 +266,7 @@ class FrameworkBase:
             transport=self.transport,
             now_factory=self._clock_now,
             postprocessors=self.postprocessors,
+            base=self,
         )
         self.actives[action.action_uuid] = session
         await session.myinit()
@@ -185,3 +296,416 @@ class _ActionWrap:
     """Minimal wrapper exposing ``.action`` for :class:`Executor` construction."""
 
     action: RunAction = field(default=None)
+
+
+#: Legacy export alias. Deploy code imports ``Base`` from the action-server
+#: surface; the framework's composition root is :class:`FrameworkBase` (a
+#: deliberate SP7 subset of legacy ``Base``).
+Base = FrameworkBase
+
+
+# ===========================================================================
+# Action-endpoint request wrapper (port helao.core.servers.base_api.py:94-361)
+# ---------------------------------------------------------------------------
+# Repointed to the framework ``RunAction`` + ``ActionContext``. The legacy code
+# stored ``ActionInvocation(action, endpoint_func)`` in ``ACTION_CTX``; here we
+# store ``ActionContext(action=run_action, endpoint_name=fn.__name__)`` so the
+# no-arg :meth:`FrameworkBase.setup_and_contain_action` can recover it.
+# ===========================================================================
+
+import asyncio  # noqa: E402  (grouped with the wrapper machinery)
+import functools  # noqa: E402
+import inspect  # noqa: E402
+from collections import namedtuple  # noqa: E402
+from typing import Callable  # noqa: E402
+
+from helao.framework.support import helao_logging as logging  # noqa: E402
+
+LOGGER = (
+    logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+)
+
+
+def _build_action_from_kwargs(
+    kwargs: dict, default_params: Optional[dict] = None
+) -> RunAction:
+    """Build a :class:`RunAction` from an endpoint's parsed keyword arguments.
+
+    Ports ``base_api.py:_build_action_from_kwargs``, repointed to
+    :class:`RunAction`. Picks the first ``RunAction``-typed kwarg as the base
+    action and folds every remaining kwarg into ``action.action_params`` unless
+    that key was already provided. Signature defaults not supplied by the caller
+    are folded in via ``default_params`` so the action record reflects the
+    values the endpoint actually ran with.
+    """
+    action: Optional[RunAction] = None
+    seen_action_param: Optional[str] = None
+    for name, val in kwargs.items():
+        if isinstance(val, RunAction):
+            if action is None:
+                action = val
+                seen_action_param = name
+            else:
+                LOGGER.error(
+                    f"critical error: found another RunAction under parameter "
+                    f"'{name}', skipping it"
+                )
+    if action is None:
+        LOGGER.error(
+            "critical error: no RunAction was found by setup_action, using blank "
+            "RunAction."
+        )
+        action = RunAction()
+    else:
+        LOGGER.info(f"found RunAction under parameter '{seen_action_param}'")
+
+    for name, val in kwargs.items():
+        if isinstance(val, RunAction):
+            continue
+        if name not in action.action_params:
+            action.action_params[name] = val
+
+    if default_params:
+        for name, val in default_params.items():
+            if name in kwargs:
+                continue
+            if name in action.action_params:
+                continue
+            action.action_params[name] = val
+
+    return action
+
+
+def _collect_default_params(sig: "inspect.Signature") -> dict:
+    """Return ``{name: default}`` for sig params with usable Python defaults.
+
+    Ports ``base_api.py:_collect_default_params``. Skips ``RunAction``-typed
+    parameters (handled separately) and FastAPI parameter markers
+    (``Body``/``Query``/``Path``/``Depends``/…), whose "default" is a sentinel.
+    """
+    try:
+        from fastapi.params import Param as _FastAPIParam, Depends as _FastAPIDepends
+
+        marker_types: tuple = (_FastAPIParam, _FastAPIDepends)
+    except ImportError:
+        marker_types = ()
+
+    defaults: dict = {}
+    for name, param in sig.parameters.items():
+        if param.default is inspect.Parameter.empty:
+            continue
+        if marker_types and isinstance(param.default, marker_types):
+            continue
+        ann = param.annotation
+        if isinstance(ann, type) and issubclass(ann, RunAction):
+            continue
+        defaults[name] = param.default
+    return defaults
+
+
+def _is_action_param(param: "inspect.Parameter") -> bool:
+    """Return True if ``param`` is annotated as a :class:`RunAction` (sub)class."""
+    ann = param.annotation
+    return isinstance(ann, type) and issubclass(ann, RunAction)
+
+
+def _build_action_endpoint_signature(fn: Callable, sig: "inspect.Signature"):
+    """Augment ``fn``'s signature with an injected ``action`` param when absent.
+
+    Ports the action-injection half of ``base_api.py``'s
+    ``_build_action_endpoint_signature`` (SP7 subset: no ``action_version``
+    decorator wiring — that's SP8). When the endpoint omits an explicit
+    ``RunAction``-typed param we synthesize one (``action: RunAction =
+    Body({}, embed=True)``) so FastAPI builds the request body schema and the
+    wrapper can recover the action from kwargs.
+
+    Returns:
+        Tuple ``(exposed_sig, accepts_var_keyword, accepted_names)``.
+    """
+    from fastapi import Body
+
+    params = list(sig.parameters.values())
+    accepts_var_keyword = any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in params
+    )
+    accepted_names = {
+        p.name
+        for p in params
+        if p.kind is not inspect.Parameter.VAR_KEYWORD
+        and p.kind is not inspect.Parameter.VAR_POSITIONAL
+    }
+    has_action = any(_is_action_param(p) for p in params)
+
+    if has_action:
+        return sig, accepts_var_keyword, accepted_names
+
+    injected = [
+        inspect.Parameter(
+            "action",
+            kind=inspect.Parameter.KEYWORD_ONLY,
+            default=Body({}, embed=True),
+            annotation=RunAction,
+        )
+    ]
+    # KEYWORD_ONLY injected params must precede any VAR_KEYWORD (**kwargs) param.
+    non_var = [p for p in params if p.kind is not inspect.Parameter.VAR_KEYWORD]
+    var_kw = [p for p in params if p.kind is inspect.Parameter.VAR_KEYWORD]
+    exposed_sig = sig.replace(parameters=non_var + injected + var_kw)
+    return exposed_sig, accepts_var_keyword, accepted_names
+
+
+def wrap_action_endpoint(fn: Callable) -> Callable:
+    """Wrap an action endpoint so each call populates :data:`ACTION_CTX`.
+
+    Ports ``base_api.py:wrap_action_endpoint`` (SP7 subset). Exposes ``fn``'s
+    signature (augmented with a synthesized ``action`` param when omitted) so
+    FastAPI parameter resolution and schema generation work, rebuilds the parsed
+    kwargs into a :class:`RunAction`, and sets/resets an :class:`ActionContext`
+    (``action=run_action, endpoint_name=fn.__name__``) in :data:`ACTION_CTX`
+    around the call. Only the parameters ``fn`` actually declares are forwarded.
+    """
+    sig = inspect.signature(fn)
+    exposed_sig, accepts_var_keyword, accepted_names = (
+        _build_action_endpoint_signature(fn, sig)
+    )
+    default_params = _collect_default_params(exposed_sig)
+    is_async = asyncio.iscoroutinefunction(fn)
+
+    def _forward_kwargs(kwargs: dict) -> dict:
+        """Keep only the kwargs ``fn`` declares (all of them if it has **kwargs)."""
+        if accepts_var_keyword:
+            return kwargs
+        return {k: v for k, v in kwargs.items() if k in accepted_names}
+
+    if is_async:
+
+        @functools.wraps(fn)
+        async def wrapper(**kwargs):
+            action = _build_action_from_kwargs(kwargs, default_params)
+            token = ACTION_CTX.set(
+                ActionContext(action=action, endpoint_name=fn.__name__)
+            )
+            try:
+                return await fn(**_forward_kwargs(kwargs))
+            finally:
+                ACTION_CTX.reset(token)
+
+    else:
+
+        @functools.wraps(fn)
+        def wrapper(**kwargs):
+            action = _build_action_from_kwargs(kwargs, default_params)
+            token = ACTION_CTX.set(
+                ActionContext(action=action, endpoint_name=fn.__name__)
+            )
+            try:
+                return fn(**_forward_kwargs(kwargs))
+            finally:
+                ACTION_CTX.reset(token)
+
+    wrapper.__signature__ = exposed_sig  # type: ignore[attr-defined]
+    return wrapper
+
+
+def _make_action_api_route():
+    """Build the ``ActionAPIRoute`` class (FastAPI imported lazily here)."""
+    from fastapi.routing import APIRoute
+
+    class ActionAPIRoute(APIRoute):
+        """``APIRoute`` subclass that auto-wraps endpoints tagged ``"action"``.
+
+        Installing this as the router's ``route_class`` means every
+        ``@app.post(..., tags=["action"])`` handler is passed through
+        :func:`wrap_action_endpoint` at registration time (so the endpoint body
+        recovers the :class:`RunAction` from :data:`ACTION_CTX`). Ports
+        ``base_api.py:ActionAPIRoute``.
+        """
+
+        def __init__(self, *args, **kwargs):
+            tags = kwargs.get("tags") or []
+            if "action" in tags:
+                endpoint = kwargs.get("endpoint")
+                if endpoint is not None:
+                    kwargs["endpoint"] = wrap_action_endpoint(endpoint)
+            super().__init__(*args, **kwargs)
+
+    return ActionAPIRoute
+
+
+#: The ``APIRoute`` subclass installed as the action-server router route_class.
+ActionAPIRoute = _make_action_api_route()
+
+
+#: OpenAPI tag metadata (port legacy ``server_api.TAGS``).
+TAGS = [
+    {
+        "name": "action",
+        "description": "action endpoints will register status and block",
+    },
+    {"name": "private", "description": "private endpoints don't create actions"},
+]
+
+
+def _make_base_api_class():
+    """Build the ``BaseAPI`` class (FastAPI imported lazily here)."""
+    import tempfile
+
+    from fastapi import FastAPI
+
+    from helao.framework.adapters.fs_storage import FsStorage
+    from helao.framework.adapters.ntp_clock import NtpClock
+    from helao.framework.adapters.queue_eventsink import QueueEventSink
+    from helao.framework.adapters.fakes.transport import FakeTransport
+
+    class BaseAPI(FastAPI):
+        """FastAPI action-server host (SP7 subset of legacy ``BaseAPI``).
+
+        Hosts real ``test``-deployment action endpoints in-process: endpoints
+        tagged ``["action"]`` are auto-wrapped by :class:`ActionAPIRoute` to
+        populate :data:`ACTION_CTX`, so an endpoint body can call the no-arg
+        ``app.base.setup_and_contain_action()`` and have its :class:`RunAction`
+        recovered. The :class:`FrameworkBase` is built eagerly in ``__init__``
+        (NOT a startup event) and injected with the default adapters exactly like
+        :func:`helao.framework.app.factory.makeActionApp`.
+
+        TODO(SP8): this subclasses ``fastapi.FastAPI`` directly rather than the
+        legacy ``HelaoFastAPI``. The legacy class wires ZMQ-RPC, ``MachineModel``
+        identity, and world-config plumbing; those — together with the
+        ``/ws_status``/``/ws_data``/``/ws_live`` publishers, the admin endpoints
+        (``/get_status``, ``/endpoints``, ``/stop_executor``, ``/shutdown``),
+        the ``app_entry`` collision middleware, the estop exception handler, and
+        the orch ``attach_client`` -> ``/update_status`` status push — are SP8.
+
+        Attributes:
+            base: The :class:`FrameworkBase` controller bound to this app.
+            drivers: Named-tuple of constructed driver instances.
+            driver: First entry of ``drivers`` (or ``None``).
+        """
+
+        def __init__(
+            self,
+            server_key,
+            server_title="",
+            description="",
+            version="0.1",
+            *,
+            driver_classes=None,
+            dyn_endpoints=None,
+            save_root=None,
+            transport=None,
+            sequence_lib=None,
+            experiment_lib=None,
+            postprocessors=None,
+        ):
+            """Build the action-server app and its :class:`FrameworkBase`.
+
+            Args:
+                server_key: Server identifier (route prefix; stamped on actions).
+                server_title: OpenAPI title.
+                description: OpenAPI description.
+                version: OpenAPI version string.
+                driver_classes: Iterable of driver classes to instantiate against
+                    the base (dual-convention: ``HelaoDriver`` subclasses get
+                    ``config=server_params``; bare helpers get the base
+                    positionally — see ``[[sp8-drivers-bare-helpers]]``).
+                dyn_endpoints: Optional callable invoked as ``dyn_endpoints(app=self)``
+                    after base construction to register extra routes.
+                save_root: Output root for ``FsStorage``; a temp dir when ``None``.
+                transport: Transport adapter; a :class:`FakeTransport` when ``None``.
+                sequence_lib: Reserved (orchestrator concern; accepted for parity).
+                experiment_lib: Reserved (orchestrator concern; accepted for parity).
+                postprocessors: HLO post-processor names passed to the base.
+            """
+            super().__init__(
+                title=server_title or f"{server_key} (framework SP7)",
+                description=description,
+                version=str(version),
+                openapi_tags=TAGS,
+            )
+            # auto-wrap tags=["action"] endpoints to populate ACTION_CTX
+            self.router.route_class = ActionAPIRoute
+
+            if save_root is None:
+                save_root = tempfile.mkdtemp(prefix="helao_framework_baseapi_")
+            os.makedirs(save_root, exist_ok=True)
+
+            world_cfg, server_cfg = self._load_server_cfg(server_key)
+
+            base = FrameworkBase(
+                server_key=server_key,
+                storage=FsStorage(save_root=save_root),
+                eventsink=QueueEventSink(),
+                clock=NtpClock(),
+                transport=transport if transport is not None else FakeTransport(),
+                postprocessors=postprocessors,
+                world_cfg=world_cfg,
+                server_cfg=server_cfg,
+            )
+            self.base = base
+            self.state.base = base
+            self.state.save_root = save_root
+
+            # --- driver instantiation (dual-convention) --------------------
+            self.drivers = tuple()
+            self.driver = None
+            if driver_classes:
+                Drivers = namedtuple(
+                    "Drivers", [d.__name__ for d in driver_classes]
+                )
+                driver_dict = {}
+                for driver_class in driver_classes:
+                    if self._is_helao_driver(driver_class):
+                        driver_inst = driver_class(config=self.base.server_params)
+                    else:
+                        driver_inst = driver_class(self.base)
+                    driver_dict[driver_class.__name__] = driver_inst
+                self.drivers = Drivers(**driver_dict)
+                self.driver = self.drivers[0] if self.drivers else None
+
+            # --- dynamic endpoints -----------------------------------------
+            if dyn_endpoints is not None:
+                dyn_endpoints(app=self)
+
+        @staticmethod
+        def _load_server_cfg(server_key):
+            """Best-effort ``(world_cfg, server_cfg)`` slice from the global ``CONFIG``.
+
+            Defensive: returns ``({}, {})`` on any failure so construction never
+            depends on a launched group. ``server_cfg["params"]`` populates
+            :attr:`FrameworkBase.server_params`.
+            """
+            try:
+                from helao.framework.support.config_loader import CONFIG
+
+                world = CONFIG or {}
+                servers = (world.get("servers") or {}) if hasattr(world, "get") else {}
+                server = servers.get(server_key, {}) or {}
+                return dict(world) if world else {}, dict(server) if server else {}
+            except Exception:
+                return {}, {}
+
+        @staticmethod
+        def _is_helao_driver(driver_class) -> bool:
+            """True if ``driver_class`` is a ``HelaoDriver`` ABC subclass.
+
+            Tries the framework ``HelaoDriver`` first, falling back to the legacy
+            one; a missing import degrades to the bare-helper path (``False``).
+            """
+            try:
+                from helao.framework.ports.driver import HelaoDriver
+            except Exception:
+                try:
+                    from helao.core.drivers.helao_driver import HelaoDriver
+                except Exception:
+                    return False
+            try:
+                return isinstance(driver_class, type) and issubclass(
+                    driver_class, HelaoDriver
+                )
+            except Exception:
+                return False
+
+    return BaseAPI
+
+
+BaseAPI = _make_base_api_class()

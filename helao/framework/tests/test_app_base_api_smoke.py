@@ -24,7 +24,8 @@ from helao.framework.adapters.fs_storage import FsStorage
 from helao.framework.adapters.queue_eventsink import QueueEventSink
 from helao.framework.adapters.ntp_clock import NtpClock
 from helao.framework.adapters.fakes.transport import FakeTransport
-from helao.framework.app.base_api import FrameworkBase, ActionContext
+from helao.framework.domain.action_session import ActionSession
+from helao.framework.app.base_api import FrameworkBase, ActionContext, ACTION_CTX
 from helao.framework.app.factory import makeApp
 
 FIXED_NOW = datetime(2026, 6, 22, 14, 5, 6)
@@ -97,6 +98,95 @@ def test_setup_and_contain_then_finish_writes_hlo(tmp_path):
 
     # an .act meta file was written
     assert list(tmp_path.rglob("*.act")), "no .act meta written"
+
+
+def _make_base(tmp_path, **kwargs) -> FrameworkBase:
+    return FrameworkBase(
+        server_key="srv",
+        storage=FsStorage(save_root=str(tmp_path)),
+        eventsink=QueueEventSink(),
+        clock=NtpClock(),
+        transport=FakeTransport(),
+        **kwargs,
+    )
+
+
+def test_executors_registry_initialized_empty(tmp_path):
+    base = _make_base(tmp_path)
+    assert base.executors == {}
+
+
+def test_server_config_exposes_params(tmp_path):
+    base = _make_base(tmp_path, server_cfg={"params": {"x": 1}})
+    assert base.server_params == {"x": 1}
+
+
+def test_server_params_default_empty(tmp_path):
+    base = _make_base(tmp_path)
+    assert base.server_params == {}
+    assert base.server_cfg == {}
+
+
+def test_stamp_lbuf_dict_shape_and_get_lbuf(tmp_path):
+    base = _make_base(tmp_path)
+    stamped = base._stamp_lbuf_dict({"k": 1})
+    assert set(stamped) == {"k"}
+    value, ts = stamped["k"]
+    assert value == 1
+    assert isinstance(ts, float)
+    # get_lbuf returns whatever lives in the buffer
+    base.live_buffer["k"] = (1, ts)
+    assert base.get_lbuf("k") == (1, ts)
+
+
+def test_live_buffer_drain_via_myinit(tmp_path):
+    base = _make_base(tmp_path)
+
+    async def _drive():
+        await base.myinit()
+        await base.put_lbuf({"k": 1})
+        # let the drain task run
+        for _ in range(100):
+            await asyncio.sleep(0)
+            if "k" in base.live_buffer:
+                break
+        value, ts = base.get_lbuf("k")
+        base._live_task.cancel()
+        return value, ts
+
+    value, ts = asyncio.run(_drive())
+    assert value == 1
+    assert isinstance(ts, float)
+
+
+def test_setup_and_contain_action_no_arg_uses_action_ctx(tmp_path):
+    base = _make_base(tmp_path)
+    action = _run_action()
+    token = ACTION_CTX.set(ActionContext(action=action))
+    try:
+
+        async def _drive():
+            return await base.setup_and_contain_action(header="epoch_ns: 1")
+
+        session = asyncio.run(_drive())
+        assert isinstance(session, ActionSession)
+        assert session.action.action_uuid == action.action_uuid
+    finally:
+        ACTION_CTX.reset(token)
+
+
+def test_setup_and_contain_action_no_ctx_raises(tmp_path):
+    base = _make_base(tmp_path)
+    assert ACTION_CTX.get() is None
+
+    async def _drive():
+        await base.setup_and_contain_action()
+
+    try:
+        asyncio.run(_drive())
+        raise AssertionError("expected RuntimeError")
+    except RuntimeError as exc:
+        assert "ACTION_CTX" in str(exc)
 
 
 def test_make_app_runs_dummy_executor_end_to_end(tmp_path):

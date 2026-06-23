@@ -123,3 +123,23 @@ def test_bound_method_receives_self():
     ex.set_pre_exec(pre)
     asyncio.run(ex._pre_exec())
     assert seen["self"] is ex
+
+
+class _StoppableActive(_FakeActive):
+    """Action wrapper exposing the loop-control flags ``stop_action_task`` flips."""
+
+    def __init__(self, action=None):
+        super().__init__(action)
+        self.manual_stop = False
+        self.action_loop_running = True
+
+
+def test_stop_action_task_flips_active_flags():
+    active = _StoppableActive()
+    ex = Executor(active=active)
+    assert active.manual_stop is False
+    assert active.action_loop_running is True
+
+    assert ex.stop_action_task() is None
+    assert active.manual_stop is True
+    assert active.action_loop_running is False
