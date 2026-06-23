@@ -4,6 +4,7 @@ import pytest
 from helao.framework.adapters.fakes.clock import FakeClock
 from helao.framework.adapters.fakes.eventsink import FakeEventSink
 from helao.framework.adapters.fakes.storage import FakeStorage
+from helao.framework.adapters.fakes.sync_storage import FakeSyncStorage
 from helao.framework.adapters.fakes.transport import FakeTransport
 
 
@@ -25,3 +26,8 @@ def fake_storage() -> FakeStorage:
 @pytest.fixture
 def fake_transport() -> FakeTransport:
     return FakeTransport()
+
+
+@pytest.fixture
+def fake_sync_storage() -> FakeSyncStorage:
+    return FakeSyncStorage()
