@@ -31,7 +31,7 @@ from helao.framework.support.yml_tools import yml_load
 _yaml = YAML()
 
 
-def read_hlo(path, keep_keys: list = [], omit_keys: list = []) -> Tuple[dict, dict]:
+def read_hlo(path, keep_keys: list | None = None, omit_keys: list | None = None) -> Tuple[dict, dict]:
     """Read a .hlo file; return (header_dict, data_dict).
 
     `path` may be a filesystem path string or raw bytes.
@@ -42,22 +42,24 @@ def read_hlo(path, keep_keys: list = [], omit_keys: list = []) -> Tuple[dict, di
         return read_hlo_stream(f, keep_keys=keep_keys, omit_keys=omit_keys)
 
 
-def read_hlo_stream(stream, keep_keys: list = [], omit_keys: list = []) -> Tuple[dict, dict]:
+def read_hlo_stream(stream, keep_keys: list | None = None, omit_keys: list | None = None) -> Tuple[dict, dict]:
     """Parse a (meta, data) pair from an open binary stream."""
     header_lines = []
     header_end = False
     data: dict = defaultdict(list)
+    _keep = keep_keys or []
+    _omit = omit_keys or []
 
     for line in stream:
         if header_end:
             line_dict = orjson.loads(line)
             for k in line_dict:
-                if keep_keys:
-                    if k in keep_keys:
+                if _keep:
+                    if k in _keep:
                         v = line_dict[k]
                         data[k] += v if isinstance(v, list) else [v]
                 else:
-                    if k not in omit_keys:
+                    if k not in _omit:
                         v = line_dict[k]
                         data[k] += v if isinstance(v, list) else [v]
         elif line.decode("utf-8").startswith("%%"):
@@ -72,7 +74,7 @@ def read_hlo_stream(stream, keep_keys: list = [], omit_keys: list = []) -> Tuple
     return meta, dict(data)
 
 
-def read_hlo_bytes(content, keep_keys: list = [], omit_keys: list = []) -> Tuple[dict, dict]:
+def read_hlo_bytes(content, keep_keys: list | None = None, omit_keys: list | None = None) -> Tuple[dict, dict]:
     """Parse a (meta, data) pair from raw .hlo bytes."""
     return read_hlo_stream(BytesIO(content), keep_keys=keep_keys, omit_keys=omit_keys)
 
@@ -98,7 +100,7 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
         for i, line in enumerate(f):
             if i < data_start_index:
                 continue
-            jd = json.loads(line.strip())
+            jd = orjson.loads(line)
             for k, val in jd.items():
                 if isinstance(val, list):
                     chunkd[k] += val
@@ -112,7 +114,7 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
 
 
 def hlo_to_parquet(
-    input_hlo_path, output_parquet_path, chunk_size: int = 100, HISPEC: bool = False
+    input_hlo_path, output_parquet_path, chunk_size: int = 100
 ) -> None:
     """Convert a .hlo file to Parquet, embedding the header in schema metadata."""
     writer: pq.ParquetWriter | None = None
