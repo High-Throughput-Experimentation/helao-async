@@ -163,6 +163,20 @@ class FrameworkBase:
         #: background drain handle for the status-push loop (started by myinit).
         self._status_task: Optional[asyncio.Task] = None
 
+        # --- action-collision queues (port base.py:193-194, WS-E) -----------
+        #: unified queue used when ``allow_concurrent_actions`` is False; a list
+        #: of ``(RunAction, extra_params)`` tuples (ports ``local_action_queue``).
+        from collections import deque as _deque
+
+        self.local_action_queue = _deque()
+        #: per-endpoint collision queues keyed by endpoint name; each a deque of
+        #: ``(RunAction, extra_params)`` tuples (ports ``endpoint_queues``).
+        self.endpoint_queues: Dict[str, Any] = {}
+        #: optional async hook ``(action, extra) -> None`` used by the queue
+        #: drain to re-dispatch a queued action. Defaults to the in-process
+        #: re-dispatch (:meth:`_redispatch_queued`); tests may override it.
+        self._redispatch_queued = self._default_redispatch_queued
+
     @staticmethod
     def _load_global_cfg() -> dict:
         """Best-effort fetch of the module-level global ``CONFIG``.
@@ -242,6 +256,21 @@ class FrameworkBase:
             f"monitoring on {self.server.server_name}."
         )
         self.fast_urls = self.get_endpoint_urls(routes)
+        # WS-E: give every registered endpoint a collision queue.
+        self.endpoint_queues_init()
+
+    def endpoint_queues_init(self) -> None:
+        """Create a per-endpoint collision queue for every registered endpoint.
+
+        Ports ``Base.endpoint_queues_init`` (base.py:249): one ``deque`` per
+        action endpoint so the ``app_entry`` middleware always has a queue to
+        append a colliding action onto. Idempotent — existing queues are kept so
+        a re-init (e.g. dyn endpoints) never drops a queued action.
+        """
+        from collections import deque as _deque
+
+        for name in self.actionservermodel.endpoints:
+            self.endpoint_queues.setdefault(name, _deque())
 
     def get_endpoint_urls(self, routes) -> List[dict]:
         """Return ``[{path, name}]`` for every route. Ports base.py:296 (simplified).
@@ -408,6 +437,132 @@ class FrameworkBase:
                 # cooperative yield (legacy slept 0.3s between clients)
                 await asyncio.sleep(0)
             self.actionservermodel.endpoints[name].clear_finished()
+
+            # WS-E: drain the collision queues now that this endpoint may be
+            # idle. Ports the legacy status-loop queue block (base.py:802-820)
+            # that WS-A deliberately omitted. "Active non-queued" actions are
+            # those NOT parked on this server (queued_on_actserv) unless they
+            # have since been (re)launched (queued_launch).
+            await self._drain_queues(name)
+
+    def _active_nonqueued(self) -> Dict[str, list]:
+        """Per-endpoint UUIDs of actions actively occupying the server.
+
+        Ports the ``active_nonqueued`` comprehension (base.py:802): a queued
+        action (``queued_on_actserv``) does not count as occupying the endpoint
+        until it is actually (re)launched (``queued_launch``).
+        """
+        result: Dict[str, list] = {}
+        for endpoint, endmod in self.actionservermodel.endpoints.items():
+            uuids = []
+            for auuid, act in endmod.active_dict.items():
+                params = getattr(act, "action_params", {}) or {}
+                if not params.get("queued_on_actserv", False) or params.get(
+                    "queued_launch", False
+                ):
+                    uuids.append(auuid)
+            result[endpoint] = uuids
+        return result
+
+    async def _drain_queues(self, endpoint_name: str) -> None:
+        """Dispatch the next queued action when the server/endpoint is idle.
+
+        Ports base.py:813-820: when concurrency is disabled, drain the unified
+        queue once nothing is actively running anywhere; otherwise drain this
+        endpoint's queue once nothing is actively running on it.
+        """
+        active_nonqueued = self._active_nonqueued()
+        active_nq = [x for y in active_nonqueued.values() for x in y]
+        if not self.server_params.get("allow_concurrent_actions", True):
+            if len(self.local_action_queue) > 0 and not active_nq:
+                await self.process_unified_queue()
+        else:
+            queue = self.endpoint_queues.get(endpoint_name)
+            if (
+                queue
+                and len(queue) > 0
+                and not active_nonqueued.get(endpoint_name, [])
+            ):
+                await self.process_endpoint_queue(endpoint_name)
+
+    async def process_unified_queue(self) -> None:
+        """Dispatch the next action from the unified queue. Ports base.py:726."""
+        await self._dispatch_queued_action(
+            self.local_action_queue, "local unified"
+        )
+
+    async def process_endpoint_queue(self, endpoint_name: str) -> None:
+        """Dispatch the next action from ``endpoint_name``'s queue. Ports base.py:730.
+
+        Accepts the endpoint NAME (the legacy signature took an ``ActionModel``
+        ``status_msg`` and read ``status_msg.action_name``; the framework drain
+        already has the name in hand, so it is passed directly).
+        """
+        queue = self.endpoint_queues.get(endpoint_name)
+        if queue is None:
+            return
+        await self._dispatch_queued_action(queue, f"endpoint '{endpoint_name}'")
+
+    async def _dispatch_queued_action(self, action_queue, queue_label: str) -> None:
+        """Pop one queued action, re-launch it ``no_wait``, requeue on failure.
+
+        Ports ``Base._dispatch_queued_action`` (base.py:705). The popped action
+        is stamped ``start_condition=no_wait`` + ``action_params.queued_launch``
+        (so the middleware passes it through on re-entry) and handed to the
+        configurable re-dispatch hook (:attr:`_redispatch_queued`). On any
+        failure the action is re-queued at the head so it is not dropped.
+        """
+        if action_queue is None or len(action_queue) == 0:
+            return
+        qact, qpars = None, {}
+        try:
+            qact, qpars = action_queue.popleft()
+            LOGGER.info(f"running queued {qact.action_name}")
+            from helao.framework.models.action_start_condition import (
+                ActionStartCondition,
+            )
+
+            qact.start_condition = ActionStartCondition.no_wait
+            qact.action_params["queued_launch"] = True
+            await self._redispatch_queued(qact, qpars)
+        except Exception:
+            LOGGER.error(f"Failed to process {queue_label} queue", exc_info=True)
+            if qact is not None:
+                LOGGER.info(f"re-queueing {qact.action_name}")
+                action_queue.appendleft((qact, qpars))
+
+    async def _default_redispatch_queued(self, action: RunAction, extra: dict) -> None:
+        """Re-launch a queued action over HTTP via the dispatcher (in-process path).
+
+        Ports the ``async_action_dispatcher`` call in
+        ``Base._dispatch_queued_action`` (base.py:719). Re-POSTs the action to
+        this server's own endpoint so it flows back through ``app_entry`` (now
+        passing through, since ``queued_launch`` is set). The dispatch uses the
+        configured host/port from this server's config.
+
+        NB: this requires a live HTTP server (the launched group). Under the
+        in-process golden-master tests there is no socket server, so tests
+        override :attr:`_redispatch_queued` with an in-process recorder; the
+        ordering/queuing behaviour is what is asserted there. The full
+        socket-backed re-dispatch is exercised under the live orchestrator
+        (WS-E live smoke), not in the unit gate.
+        """
+        host = self.server_cfg.get("host")
+        port = self.server_cfg.get("port")
+        if not host or not port:
+            LOGGER.error(
+                "cannot re-dispatch queued action: server host/port unknown "
+                f"on {self.server.server_name}; leaving it queued."
+            )
+            raise RuntimeError("no host/port for queued re-dispatch")
+        await async_private_dispatcher(
+            server_key=self.server.server_name,
+            host=host,
+            port=port,
+            private_action=action.action_name,
+            params_dict={},
+            json_dict={"action": action.as_dict()},
+        )
 
     # --- live buffer (port base.py:672-687) ---------------------------------
 
@@ -942,6 +1097,10 @@ def _make_base_api_class():
             self._register_ws_routes(server_key, base)
             self._register_admin_endpoints(server_key, base)
 
+            # --- WS-E: action-collision middleware + estop handler ----------
+            self._register_concurrency_middleware(server_key, base)
+            self._register_estop_handler(server_key, base)
+
             # --- startup hook: build drivers (loop live) + start base tasks --
             @self.on_event("startup")
             async def _framework_base_startup():
@@ -1200,6 +1359,227 @@ def _make_base_api_class():
                     if callable(stop_fn):
                         stop_fn()
                 return {"ok": True}
+
+        def _register_concurrency_middleware(self, server_key, base):
+            """Register the ``app_entry`` action-collision HTTP middleware (WS-E).
+
+            Ports ``helao.core.servers.base_api._make_app_entry_middleware``
+            (383-481). Behaviour per request:
+
+            * **HEAD** → return a bare 200 immediately (the dispatcher's
+              ``endpoints_available`` probe; matches the WS-B HEAD mirrors —
+              the middleware short-circuits before they are reached, which is
+              fine since both answer 200).
+            * **POST ``/{server_key}/...``** → inspect the target endpoint's
+              ``active_dict``. If the endpoint is idle, the action starts with
+              ``no_wait``, or it carries ``queued_launch`` (a re-dispatched
+              queued action) → pass through (``call_next``). Otherwise queue it:
+              the unified queue when concurrency is disabled and any endpoint is
+              busy, else the per-endpoint queue. A queued action is stamped
+              ``queued_on_actserv``, given a fresh uuid, has its status emitted
+              through the shared eventsink (so the status drain folds it in and
+              later re-dispatches it), and the queued action dict is returned.
+            * **everything else** → ``call_next``.
+
+            BODY REWIND: ``BaseHTTPMiddleware`` (what ``@app.middleware('http')``
+            installs) drives the downstream app with its OWN receive channel, so
+            a naive ``await request.body()`` here would drain the stream and the
+            endpoint's ``await request.json()`` would hang waiting for a body
+            that never arrives. We therefore re-inject the consumed bytes onto
+            the request's receive channel (a one-shot ``http.request`` message
+            carrying ``body_bytes``) BEFORE calling ``call_next``, so the
+            downstream read succeeds without blocking. This is the anti-hang
+            fix; ``test_passthrough_idle_endpoint_runs_and_returns`` proves a
+            real POST runs end-to-end under ``asyncio.wait_for``.
+            """
+            from collections import deque
+
+            from fastapi import Response
+            from fastapi.responses import JSONResponse
+
+            from helao.framework.models.action_start_condition import (
+                ActionStartCondition,
+            )
+
+            prefix = f"{server_key}/"
+
+            def _rewind_body(request, body_bytes):
+                """Re-inject ``body_bytes`` so a downstream read does not hang."""
+                sent = False
+
+                async def receive():
+                    nonlocal sent
+                    if not sent:
+                        sent = True
+                        return {
+                            "type": "http.request",
+                            "body": body_bytes,
+                            "more_body": False,
+                        }
+                    return {"type": "http.disconnect"}
+
+                request._receive = receive
+
+            @self.middleware("http")
+            async def app_entry(request, call_next):
+                if request.method == "HEAD":
+                    # endpoint-checker probe: 200 immediately, no call_next.
+                    return Response()
+
+                path = request.url.path.strip("/")
+                if not (path.startswith(prefix) and request.method == "POST"):
+                    return await call_next(request)
+
+                endpoint = path.split("/")[-1]
+                body_bytes = await request.body()
+                # rewind so the downstream endpoint can re-read the body.
+                _rewind_body(request, body_bytes)
+                try:
+                    import json as _json
+
+                    body_dict = _json.loads(body_bytes) if body_bytes else {}
+                except Exception:
+                    body_dict = {}
+                action_dict = body_dict.get("action", {}) or {}
+                params = action_dict.get("action_params", {}) or {}
+                start_cond = action_dict.get(
+                    "start_condition", ActionStartCondition.wait_for_all
+                )
+
+                endpoints = base.actionservermodel.endpoints
+                endmod = endpoints.get(endpoint)
+                idle = endmod is None or len(endmod.active_dict) == 0
+                if (
+                    idle
+                    or start_cond == ActionStartCondition.no_wait
+                    or params.get("queued_launch", False)
+                ):
+                    return await call_next(request)
+
+                allow_concurrent = base.server_params.get(
+                    "allow_concurrent_actions", True
+                )
+                if not allow_concurrent:
+                    active_endpoints = [
+                        ep
+                        for ep, em in endpoints.items()
+                        if em.active_dict
+                    ]
+                    if active_endpoints:
+                        action = await self._queue_action(
+                            base, server_key, endpoint, action_dict, request
+                        )
+                        base.local_action_queue.append((action, {}))
+                        return JSONResponse(action.as_dict())
+                    return await call_next(request)
+
+                # same-endpoint collision: queue on the endpoint's own queue.
+                action = await self._queue_action(
+                    base, server_key, endpoint, action_dict, request
+                )
+                base.endpoint_queues.setdefault(endpoint, deque()).append(
+                    (action, {})
+                )
+                return JSONResponse(action.as_dict())
+
+        @staticmethod
+        async def _queue_action(base, server_key, endpoint, action_dict, request):
+            """Build a queued :class:`RunAction`, emit its status, and return it.
+
+            Ports the queueing half of legacy ``app_entry`` (base_api.py:430-451):
+            stamp ``queued_on_actserv``, mint a fresh uuid, set
+            ``action_name``/``action_server``, and emit the status through the
+            shared eventsink (legacy did ``status_q.put(action.get_act())``; the
+            framework emits via ``eventsink.emit_status`` so the status-push
+            drain folds it into ``actionservermodel`` and later re-dispatches it).
+            """
+            import uuid as _uuid
+
+            action_dict = dict(action_dict)
+            action_dict["action_params"] = dict(action_dict.get("action_params", {}))
+            action_dict["action_params"]["queued_on_actserv"] = True
+            action = RunAction(**action_dict)
+            action.action_uuid = _uuid.uuid4()
+            action.action_name = endpoint
+            action.action_server = MachineModel(
+                server_name=server_key,
+                machine_name=base.server.machine_name,
+            )
+            await base.eventsink.emit_status(action.as_dict())
+            return action
+
+        def _register_estop_handler(self, server_key, base):
+            """Register the estop-all-on-unhandled-error HTTP exception handler.
+
+            Ports ``_make_http_exception_handler`` (base_api.py:486-512). When a
+            request to a ``/{server_key}/...`` path raises, every active session
+            is e-stopped and every registered executor is stopped, then the
+            default FastAPI handler turns the exception into its HTTP response.
+
+            Active-session e-stop is duck-typed: an :class:`ActionSession` has no
+            ``set_estop`` (the legacy ``Active`` did), so we prefer ``set_estop``
+            when present and otherwise append ``HloStatus.estopped`` to the
+            action's status — matching the legacy ``Active.set_estop`` effect.
+
+            Two handlers are registered. The legacy server only handled
+            ``StarletteHTTPException`` because its ``status_q`` drain re-raised
+            endpoint errors AS HTTP exceptions; the framework endpoint bodies can
+            raise a bare ``Exception`` (e.g. a driver fault), which FastAPI would
+            otherwise route straight to ``ServerErrorMiddleware`` as a 500 WITHOUT
+            firing the HTTP-exception handler. We therefore also register a
+            generic ``Exception`` handler that e-stops then RE-RAISES so the 500
+            response is still produced by the server-error middleware.
+            """
+            from starlette.exceptions import HTTPException as StarletteHTTPException
+            from fastapi.exception_handlers import http_exception_handler
+
+            prefix = f"{server_key}/"
+
+            def _estop_all():
+                LOGGER.error(f"e-stopping all active work on {server_key}")
+                for _, active in list(base.actives.items()):
+                    self._estop_active(active)
+                for executor_id in list(base.executors):
+                    executor = base.executors.get(executor_id)
+                    stop_fn = getattr(executor, "stop_action_task", None)
+                    if callable(stop_fn):
+                        try:
+                            stop_fn()
+                        except Exception:
+                            LOGGER.exception(
+                                f"stop_action_task failed for {executor_id}"
+                            )
+
+            @self.exception_handler(StarletteHTTPException)
+            async def _estop_http_exception_handler(request, exc):
+                if request.url.path.strip("/").startswith(prefix):
+                    LOGGER.error(f"Could not process request: {repr(exc)}")
+                    _estop_all()
+                return await http_exception_handler(request, exc)
+
+            @self.exception_handler(Exception)
+            async def _estop_unhandled_exception_handler(request, exc):
+                if request.url.path.strip("/").startswith(prefix):
+                    LOGGER.error(f"Unhandled error processing request: {repr(exc)}")
+                    _estop_all()
+                # re-raise so ServerErrorMiddleware produces the 500 response.
+                raise exc
+
+        @staticmethod
+        def _estop_active(active):
+            """E-stop one active session (``set_estop`` or status fallback)."""
+            from helao.framework.models.hlostatus import HloStatus
+
+            set_estop = getattr(active, "set_estop", None)
+            if callable(set_estop):
+                try:
+                    set_estop()
+                    return
+                except Exception:
+                    LOGGER.exception("set_estop failed on active session")
+            action = getattr(active, "action", None)
+            if action is not None and HloStatus.estopped not in action.action_status:
+                action.action_status.append(HloStatus.estopped)
 
         def _add_head_mirrors(self):
             """Add a lightweight HEAD route for every POST path (idempotent).
