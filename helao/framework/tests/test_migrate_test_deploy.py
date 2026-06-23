@@ -62,3 +62,16 @@ def test_sequence_decorator_sets_version():
     def my_seq():
         pass
     assert my_seq.sequence_version == 5
+
+
+def test_file_utils_importable():
+    from helao.framework.support.file_utils import (
+        file_in_use, rm_tree, rm_tree_async, zip_dir, unzpickle, zpickle
+    )
+    assert callable(file_in_use)
+    assert callable(unzpickle)
+
+
+def test_file_in_use_returns_false_for_nonexistent(tmp_path):
+    from helao.framework.support.file_utils import file_in_use
+    assert file_in_use(tmp_path / "no_such_file.txt") is False
