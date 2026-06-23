@@ -34,3 +34,11 @@ def test_real_domain_package_is_clean():
     domain_dir = Path("helao/framework/domain")
     violations = scan_dir(domain_dir, DOMAIN_FORBIDDEN)
     assert violations == {}, f"domain/ has forbidden imports: {violations}"
+
+
+def test_domain_sync_package_is_clean():
+    # SP6 gate: the pure data-sync deciders (paths/progress/decide/process_fold)
+    # must not reach into adapters, transports, FastAPI, boto3, etc.
+    sync_dir = Path("helao/framework/domain/sync")
+    violations = scan_dir(sync_dir, DOMAIN_FORBIDDEN)
+    assert violations == {}, f"domain/sync has forbidden imports: {violations}"

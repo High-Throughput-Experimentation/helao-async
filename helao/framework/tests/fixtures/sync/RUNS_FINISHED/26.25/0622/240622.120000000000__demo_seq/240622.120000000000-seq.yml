@@ -1,0 +1,14 @@
+yml: 240622.120000000000-seq.yml
+access: hte
+dummy: true
+simulation: false
+sequence_codehash: 0000000000000000000000000000000000000000000000000000000000000000
+sequence_label: demo
+sequence_name: demo_seq
+sequence_params:
+  count: 1
+sequence_status:
+  - finished
+sequence_timestamp: 2024-06-22 12:00:00.000000
+sequence_uuid: 11111111-1111-1111-1111-111111111111
+sequence_output_dir: 26.25/0622/240622.120000000000__demo_seq

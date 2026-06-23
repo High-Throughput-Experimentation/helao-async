@@ -34,7 +34,6 @@ from typing import Callable, Optional, Union
 from helao.framework.adapters.loaders import hlo_loader
 from helao.framework.domain.sync import paths as syncpaths
 from helao.framework.domain.sync.decide import (
-    MOD_PATCH,
     SyncAction,
     build_upload_file_list,
     decide_sync,
@@ -303,8 +302,8 @@ class SyncDriver:
 
         exists = self.sync_storage.exists(yml_path)
         if not exists:
-            # legacy 1027-1031: assume already moved to synced.
-            return decide_and_skip(self)
+            # legacy 1027-1031: missing yml -> assume already moved to synced (SKIP).
+            return True
 
         prog = self.get_progress(yml_path)
         already_synced = bool(prog.s3_done and prog.api_done)
@@ -694,11 +693,6 @@ class SyncDriver:
         if save_root is not None:
             return Path(str(save_root).replace("RUNS_ACTIVE", "RUNS_FINISHED"))
         return Path(self.config.get("root", ".")) / "RUNS_FINISHED"
-
-
-def decide_and_skip(_driver: "SyncDriver") -> bool:
-    """Return the legacy SKIP result for a missing yml (assume moved to synced)."""
-    return True
 
 
 def _json_bytes(payload: dict) -> bytes:
