@@ -25,6 +25,7 @@ from helao.framework.adapters.queue_eventsink import QueueEventSink
 from helao.framework.app.orch_api import OrchDriver, OrchPorts
 from helao.framework.domain.orchestration import OrchState
 from helao.framework.domain.run_models import RunAction, RunExperiment, RunSequence
+from helao.framework.models.action import ActionModel
 from helao.framework.ports.transport import Transport
 
 __all__ = ["MicroOrch", "run_sequence", "run_experiment", "run_action"]
@@ -97,8 +98,6 @@ class MicroOrch:
         Accepts either :class:`RunAction` or :class:`ActionModel` (the latter
         is coerced to ``RunAction`` for compat with deployment runner scripts).
         """
-        from helao.framework.domain.run_models import RunAction
-        from helao.framework.models.action import ActionModel
         if isinstance(action, ActionModel) and not isinstance(action, RunAction):
             action = RunAction(**action.model_dump())
         self.driver.state.action_dq.append(action)
