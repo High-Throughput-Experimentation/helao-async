@@ -23,10 +23,15 @@ from uuid import UUID
 
 from helao.framework.domain.action_session import ActionSession
 from helao.framework.domain.run_models import RunAction
+from helao.framework.models.action import ActionModel
+from helao.framework.models.errors import ErrorCodes
+from helao.framework.models.machine import MachineModel
+from helao.framework.models.server import ActionServerModel, EndpointModel
 from helao.framework.ports.clock import Clock
 from helao.framework.ports.eventsink import EventSink
 from helao.framework.ports.storage import Storage
 from helao.framework.ports.transport import Transport
+from helao.framework.support.dispatcher import async_private_dispatcher
 
 __all__ = [
     "ActionContext",
@@ -132,6 +137,27 @@ class FrameworkBase:
         self.live_q: asyncio.Queue = asyncio.Queue()
         self._live_task: Optional[asyncio.Task] = None
 
+        # --- server identity + status model (port base.py:272-326, 479-799) --
+        # Minimal identity sufficient for actionservermodel + send_statuspackage
+        # (full MachineModel identity is WS-C). Field names match MachineModel.
+        self.server = MachineModel(
+            server_name=server_key,
+            machine_name=self.server_cfg.get("machine_name"),
+            hostname=self.server_cfg.get("host"),
+            port=self.server_cfg.get("port"),
+        )
+        self.actionservermodel = ActionServerModel(action_server=self.server)
+        #: set of (client_servkey, client_host, client_port) status subscribers.
+        self.status_clients: set = set()
+        #: route descriptors (path/name) filled by init_endpoint_status.
+        self.fast_urls: List[dict] = []
+        #: orch coordinates for auto-attach (port base.py:765); None when unset.
+        self.orch_key = self.server_cfg.get("orch_key")
+        self.orch_host = self.server_cfg.get("orch_host")
+        self.orch_port = self.server_cfg.get("orch_port")
+        #: background drain handle for the status-push loop (started by myinit).
+        self._status_task: Optional[asyncio.Task] = None
+
     @staticmethod
     def _load_global_cfg() -> dict:
         """Best-effort fetch of the module-level global ``CONFIG``.
@@ -149,12 +175,216 @@ class FrameworkBase:
     # --- lifecycle -----------------------------------------------------------
 
     async def myinit(self) -> None:
-        """Start the minimal background tasks. Ports ``Base.myinit`` (subset).
+        """Start the background tasks. Ports ``Base.myinit`` (subset).
 
-        SP7 starts ONLY the live-buffer drain loop; status/orch push tasks are
-        SP8.
+        Starts the live-buffer drain loop (SP7) **and** the status-push drain
+        loop (SP8 WS-A): the latter consumes status emissions from the shared
+        eventsink and POSTs status packages to each registered orch client.
         """
         self._live_task = asyncio.create_task(self._live_buffer_task())
+        self._status_task = asyncio.create_task(self._status_push_task())
+
+    # --- orchestrator status push (port base.py:272-326, 479-799) -----------
+
+    async def init_endpoint_status(self, routes, dyn_endpoints=None) -> None:
+        """Register every action endpoint with the status model. Ports base.py:272.
+
+        ``FrameworkBase`` does not hold the FastAPI app, so the host
+        (:class:`BaseAPI`) passes its ``self.routes`` in. For each route whose
+        path starts with ``/{server_name}`` an :class:`EndpointModel` is
+        registered (keyed by route name) and sorted; ``fast_urls`` is populated
+        with route descriptors.
+
+        Args:
+            routes: Iterable of FastAPI routes (``app.routes``).
+            dyn_endpoints: Optional callable invoked as ``dyn_endpoints(app=...)``
+                before route scanning (accepted for parity; the host already
+                registers dyn endpoints in ``__init__``).
+        """
+        if callable(dyn_endpoints):
+            res = dyn_endpoints(app=self)
+            if asyncio.iscoroutine(res):
+                await res
+        prefix = f"/{self.server.server_name}"
+        for route in routes:
+            path = getattr(route, "path", "")
+            name = getattr(route, "name", None)
+            if path.startswith(prefix) and name:
+                self.actionservermodel.endpoints[name] = EndpointModel(
+                    endpoint_name=name
+                )
+                self.actionservermodel.endpoints[name].sort_status()
+        LOGGER.info(
+            f"Found {len(self.actionservermodel.endpoints)} endpoints for status "
+            f"monitoring on {self.server.server_name}."
+        )
+        self.fast_urls = self.get_endpoint_urls(routes)
+
+    def get_endpoint_urls(self, routes) -> List[dict]:
+        """Return ``[{path, name}]`` for every route. Ports base.py:296 (simplified).
+
+        The legacy version also introspects flat params via ``route.dependant``;
+        that introspection is fragile across FastAPI versions, so this port keeps
+        the minimal ``{path, name}`` descriptor (documented simplification, WS-A).
+        """
+        url_list = []
+        for route in routes:
+            url_list.append(
+                {
+                    "path": getattr(route, "path", ""),
+                    "name": getattr(route, "name", None),
+                }
+            )
+        return url_list
+
+    async def send_statuspackage(
+        self,
+        client_servkey: str,
+        client_host: str,
+        client_port: int,
+        action_name: Optional[str] = None,
+    ) -> tuple:
+        """POST the action-server model to a subscriber's ``update_status``. Ports base.py:479."""
+        json_dict = {
+            "actionservermodel": self.actionservermodel.get_fastapi_json(
+                action_name=action_name
+            )
+        }
+        return await async_private_dispatcher(
+            server_key=client_servkey,
+            host=client_host,
+            port=client_port,
+            private_action="update_status",
+            params_dict={
+                "regular_task": "true" if action_name is None else "false"
+            },
+            json_dict=json_dict,
+        )
+
+    async def send_nbstatuspackage(
+        self,
+        client_servkey: str,
+        client_host: str,
+        client_port: int,
+        actionmodel,
+    ) -> tuple:
+        """POST a single non-blocking action to ``update_nonblocking``. Ports base.py:512."""
+        json_dict = {"actionmodel": actionmodel.as_dict()}
+        params_dict = {
+            "server_host": self.server_cfg.get("host"),
+            "server_port": self.server_cfg.get("port"),
+        }
+        return await async_private_dispatcher(
+            server_key=client_servkey,
+            host=client_host,
+            port=client_port,
+            private_action="update_nonblocking",
+            params_dict=params_dict,
+            json_dict=json_dict,
+        )
+
+    async def attach_client(
+        self,
+        client_servkey: str,
+        client_host: str,
+        client_port: int,
+        retry_limit: int = 5,
+    ) -> bool:
+        """Register a status subscriber and push an initial full snapshot. Ports base.py:550."""
+        success = False
+        combo_key = (client_servkey, client_host, client_port)
+        self.status_clients.add(combo_key)
+        for _ in range(retry_limit):
+            response, error_code = await self.send_statuspackage(
+                client_servkey=client_servkey,
+                client_host=client_host,
+                client_port=client_port,
+                action_name=None,
+            )
+            if response is not None and error_code == ErrorCodes.none:
+                success = True
+                break
+            LOGGER.error(
+                f"Failed to add {combo_key} to {self.server.server_name} status "
+                f"subscriber list."
+            )
+        return success
+
+    def detach_client(
+        self, client_servkey: str, client_host: str, client_port: int
+    ) -> None:
+        """Remove a status subscriber. Idempotent. Ports base.py:609."""
+        combo_key = (client_servkey, client_host, client_port)
+        if combo_key in self.status_clients:
+            self.status_clients.remove(combo_key)
+
+    async def _status_push_task(self, retry_limit: int = 5) -> None:
+        """Drain status emissions and push to orch clients. Ports base.py:737 (WS-A subset).
+
+        Subscribes to the shared eventsink's status queue. Each emission is an
+        ``ActionModel``-shaped dict (from :meth:`ActionSession.add_status`);
+        it is rehydrated into an :class:`ActionModel`, folded into the
+        ``actionservermodel`` (active_dict + last_action_uuid + sort), pushed to
+        every registered client (auto-attaching the orch when none are present),
+        then the endpoint's finished bucket is cleared. The legacy unified/
+        endpoint queue processing block (base.py:802-820) is WS-E and omitted.
+        """
+        subscribe = getattr(self.eventsink, "subscribe", None)
+        if not callable(subscribe):
+            LOGGER.error(
+                "eventsink has no subscribe(); status push disabled "
+                f"on {self.server.server_name}."
+            )
+            return
+        queue = subscribe()
+        LOGGER.info(f"{self.server.server_name} status push task created.")
+        while True:
+            payload = await queue.get()
+            # QueueEventSink delivers (channel, payload); other sinks may deliver
+            # the bare payload. Normalize to the status payload dict.
+            if isinstance(payload, tuple) and len(payload) == 2:
+                channel, body = payload
+                from helao.framework.ports.eventsink import STATUS_CHANNEL
+
+                if channel != STATUS_CHANNEL:
+                    continue
+                payload = body
+            try:
+                status_msg = ActionModel(**payload)
+            except Exception:
+                LOGGER.exception("could not rehydrate status payload to ActionModel")
+                continue
+
+            name = status_msg.action_name
+            if name not in self.actionservermodel.endpoints:
+                self.actionservermodel.endpoints[name] = EndpointModel(
+                    endpoint_name=name
+                )
+            self.actionservermodel.endpoints[name].active_dict[
+                status_msg.action_uuid
+            ] = status_msg
+            self.actionservermodel.last_action_uuid = status_msg.action_uuid
+            self.actionservermodel.endpoints[name].sort_status()
+
+            if len(self.status_clients) == 0 and self.orch_key is not None:
+                await self.attach_client(
+                    self.orch_key, self.orch_host, self.orch_port
+                )
+
+            for combo_key in self.status_clients.copy():
+                client_servkey, client_host, client_port = combo_key
+                for _ in range(retry_limit):
+                    response, error_code = await self.send_statuspackage(
+                        action_name=name,
+                        client_servkey=client_servkey,
+                        client_host=client_host,
+                        client_port=client_port,
+                    )
+                    if response and error_code == ErrorCodes.none:
+                        break
+                # cooperative yield (legacy slept 0.3s between clients)
+                await asyncio.sleep(0)
+            self.actionservermodel.endpoints[name].clear_finished()
 
     # --- live buffer (port base.py:672-687) ---------------------------------
 
@@ -675,6 +905,38 @@ def _make_base_api_class():
             # --- dynamic endpoints -----------------------------------------
             if dyn_endpoints is not None:
                 dyn_endpoints(app=self)
+
+            # --- private status-client endpoints (port base.py attach/detach) ---
+            self._register_status_endpoints(server_key, base)
+
+            # --- startup hook: start base tasks + register endpoint status ---
+            @self.on_event("startup")
+            async def _framework_base_startup():
+                await base.myinit()
+                await base.init_endpoint_status(self.routes)
+
+        def _register_status_endpoints(self, server_key, base):
+            """Register the orch-facing private status-client endpoints.
+
+            ``POST /{server_key}/attach_client`` and ``/detach_client`` delegate
+            to the base so a live orchestrator can subscribe/unsubscribe to this
+            action server's status pushes.
+            """
+
+            @self.post(f"/{server_key}/attach_client", tags=["private"])
+            async def attach_client(
+                client_servkey: str, client_host: str, client_port: int
+            ):
+                return await base.attach_client(
+                    client_servkey, client_host, client_port
+                )
+
+            @self.post(f"/{server_key}/detach_client", tags=["private"])
+            async def detach_client(
+                client_servkey: str, client_host: str, client_port: int
+            ):
+                base.detach_client(client_servkey, client_host, client_port)
+                return True
 
         @staticmethod
         def _load_server_cfg(server_key):
