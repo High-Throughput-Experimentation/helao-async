@@ -46,7 +46,7 @@ class BaseAPI(FastAPI):
             storage=FsStorage(save_root=save_root or tempfile.mkdtemp()),
             eventsink=QueueEventSink(),
             clock=NtpClock(),
-            transport=FakeTransport(),
+            transport=FakeTransport(),  # TODO SP8: replace with real transport wiring
         )
         self.driver = None
         self.drivers: dict = {}

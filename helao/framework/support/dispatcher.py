@@ -175,9 +175,12 @@ async def async_action_dispatcher(
                     error_code = ErrorCodes.none
                     if resp.status != 200:
                         error_code = ErrorCodes.http
+                        retry_count += 1
+                        retry_wait = retry_count * timeout / 2
                         LOGGER.error(
                             f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}"
                         )
+                        await asyncio.sleep(retry_wait)
                         success = False
                     else:
                         success = True
@@ -282,9 +285,12 @@ async def async_private_dispatcher(
                     error_code = ErrorCodes.none
                     if resp.status != 200:
                         error_code = ErrorCodes.http
+                        retry_count += 1
+                        retry_wait = retry_count * timeout / 2
                         LOGGER.error(
                             f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')"
                         )
+                        await asyncio.sleep(retry_wait)
                         success = False
                     else:
                         success = True
