@@ -113,6 +113,9 @@ class FrameworkBase:
         self.history: Dict[UUID, RunAction] = {}
         self.world_cfg: Dict = world_cfg or {}
         self.server_cfg: Dict = self.world_cfg.get("servers", {}).get(server_key, {})
+        # per-server params block (ports Base.server_params); HelaoDriver
+        # subclasses are constructed with ``config=server_params`` (SP8 WS-C).
+        self.server_params: Dict = self.server_cfg.get("params", {})
         # running executors keyed by exec_id; maps to the ActionSession driving
         # it (ports Base.executors). Deployment cancel-endpoints iterate this.
         self.executors: Dict[str, ActionSession] = {}
