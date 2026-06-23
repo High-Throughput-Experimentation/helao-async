@@ -212,31 +212,20 @@ def test_simulatews_runner_importable():
 
 
 def test_gpsim_driver_importable():
-    """gpsim_driver.py resolves all helao.framework.* imports before hitting gpflow.
-
-    gpflow is not installed in the helao env, so the import will fail at the
-    ``import gpflow`` line.  importorskip verifies that every helao.framework.*
-    import above that line resolved cleanly (if they had failed, a different
-    ImportError / ModuleNotFoundError would surface before we even reach gpflow).
-    """
-    gpflow = pytest.importorskip("gpflow", reason="gpflow not installed — skipping GPSim test")
+    """gpsim_driver.py — skipped when gpflow is absent (transitive dep)."""
+    pytest.importorskip("gpflow", reason="gpflow not installed — skipping GPSim test")
     from helao.deploy.test.drivers.data.gpsim_driver import GPSim, GPSimExec, calc_eta
-    assert callable(calc_eta), "calc_eta must be a callable"
-    assert GPSim is not None
-    assert GPSimExec is not None
+    assert callable(calc_eta), "calc_eta must be callable"
+    assert callable(GPSim), "GPSim must be a callable class"
+    assert callable(GPSimExec), "GPSimExec must be a callable class"
 
 
 def test_cpsim_driver_importable():
-    """cpsim_driver.py resolves all helao.framework.* imports before hitting gpflow.
-
-    cpsim_driver imports calc_eta from gpsim_driver, which triggers the gpflow
-    import transitively.  importorskip confirms that gpflow is the only missing
-    piece — all helao.framework.* imports above it resolved correctly.
-    """
+    """cpsim_driver.py — skipped when gpflow is absent (transitive via gpsim_driver)."""
     pytest.importorskip("gpflow", reason="gpflow not installed — skipping CPSim test")
     from helao.deploy.test.drivers.pstat.cpsim_driver import CPSim, CPSimExec
-    assert CPSim is not None
-    assert CPSimExec is not None
+    assert callable(CPSim), "CPSim must be a callable class"
+    assert callable(CPSimExec), "CPSimExec must be a callable class"
 
 
 def test_wssim_import_and_makeapp_attempt(tmp_path):
