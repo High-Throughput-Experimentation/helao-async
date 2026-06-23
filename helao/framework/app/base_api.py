@@ -13,20 +13,29 @@ method names are preserved so deployment authors keep the same surface.
 """
 from __future__ import annotations
 
+import asyncio
 import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 from uuid import UUID
 
 from helao.framework.domain.action_session import ActionSession
 from helao.framework.domain.run_models import RunAction
+from helao.framework.models.action import ActionModel
+from helao.framework.models.errors import ErrorCodes
+from helao.framework.models.hlostatus import HloStatus
+from helao.framework.models.machine import MachineModel
+from helao.framework.models.server import ActionServerModel, EndpointModel
 from helao.framework.ports.clock import Clock
 from helao.framework.ports.eventsink import EventSink
 from helao.framework.ports.storage import Storage
 from helao.framework.ports.transport import Transport
 
 from helao.framework.support import helao_logging as logging
+
+#: A registered status-client coordinate: ``(server_key, host, port)``.
+ClientCoord = Tuple[str, str, int]
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -109,6 +118,24 @@ class FrameworkBase:
         self.executors: Dict[str, ActionSession] = {}
         # live data buffer: key -> (value, epoch_seconds). Ports Base.live_buffer.
         self.live_buffer: Dict[str, Any] = {}
+
+        # --- orch status-push surface (ports Base; SP8 WS-A) -----------------
+        # server identity used by the action-server status model + nb params.
+        self.server = MachineModel(
+            server_name=server_key,
+            machine_name=self.server_cfg.get("machine_name"),
+            hostname=self.server_cfg.get("host"),
+            port=self.server_cfg.get("port"),
+        )
+        # live per-endpoint/per-server status snapshot (ports Base.actionservermodel).
+        self.actionservermodel = ActionServerModel(action_server=self.server)
+        self.actionservermodel.init_endpoints()
+        # registered orchestrator status subscribers (ports Base.status_clients).
+        self.status_clients: Set[ClientCoord] = set()
+        # background task draining the eventsink status stream -> push to clients.
+        # Started lazily (first attach_client) or by the startup hook's start();
+        # never assume a running loop at __init__ (Python 3.12 raises).
+        self._status_drain_task: Optional[asyncio.Task] = None
 
     # --- live buffer (ports Base.put_lbuf / get_lbuf) ------------------------
 
@@ -234,6 +261,284 @@ class FrameworkBase:
         if action_uuid in self.actives:
             return self.actives[action_uuid].action.as_dict()
         return None
+
+    # --- orch status model (ports Base.init_endpoint_status; SP8 WS-A) -------
+
+    def init_endpoint_status(self, app: Any) -> None:
+        """Register every action route on ``app`` with the status model.
+
+        Ports ``Base.init_endpoint_status``: each route whose path begins
+        ``/<server_key>`` becomes an :class:`EndpointModel` in
+        ``actionservermodel.endpoints`` keyed by the route name. Sorting each
+        endpoint's status leaves it with an empty ``finished`` bucket so the
+        first emitted status sorts cleanly.
+
+        Args:
+            app: The FastAPI app whose ``routes`` are introspected.
+        """
+        prefix = f"/{self.server_key}"
+        for route in getattr(app, "routes", []):
+            path = getattr(route, "path", "")
+            name = getattr(route, "name", None)
+            if name and path.startswith(prefix):
+                self.actionservermodel.endpoints[name] = EndpointModel(
+                    endpoint_name=name
+                )
+                self.actionservermodel.endpoints[name].sort_status()
+        LOGGER.info(
+            f"Found {len(self.actionservermodel.endpoints)} endpoints for "
+            f"status monitoring on {self.server_key}."
+        )
+
+    # --- status clients (ports Base.attach_client / detach_client) -----------
+
+    async def attach_client(
+        self,
+        client_servkey: str,
+        client_host: str,
+        client_port: int,
+        retry_limit: int = 5,
+    ) -> bool:
+        """Register an orchestrator as a status subscriber; push an initial snapshot.
+
+        Ports ``Base.attach_client``. The background status-drain task is started
+        lazily here (we are now guaranteed a running loop) so the first attach
+        wires up the emit->push pipeline. The current full status snapshot
+        (``action_name=None``) is delivered to the new client.
+
+        Returns:
+            ``True`` if the initial snapshot was delivered, ``False`` otherwise.
+        """
+        self._ensure_status_drain()
+        combo_key: ClientCoord = (client_servkey, client_host, client_port)
+        if combo_key in self.status_clients:
+            LOGGER.info(f"Client {combo_key} already subscribed to {self.server_key}.")
+        self.status_clients.add(combo_key)
+
+        success = False
+        for _ in range(retry_limit):
+            response, error_code = await self.send_statuspackage(
+                client_servkey=client_servkey,
+                client_host=client_host,
+                client_port=client_port,
+                action_name=None,
+            )
+            if response is not None and error_code == ErrorCodes.none:
+                LOGGER.info(f"Added {combo_key} to {self.server_key} subscribers.")
+                success = True
+                break
+            LOGGER.error(f"Failed to add {combo_key} to {self.server_key} subscribers.")
+        return success
+
+    def detach_client(
+        self, client_servkey: str, client_host: str, client_port: int
+    ) -> bool:
+        """Remove an orchestrator from the status subscriber set. Ports ``Base.detach_client``."""
+        combo_key: ClientCoord = (client_servkey, client_host, client_port)
+        if combo_key in self.status_clients:
+            self.status_clients.remove(combo_key)
+            LOGGER.info(f"Client {combo_key} will no longer receive status updates.")
+            return True
+        LOGGER.info(f"Client {combo_key} is not subscribed.")
+        return False
+
+    # --- status push (ports Base.send_statuspackage / send_nbstatuspackage) --
+
+    async def send_statuspackage(
+        self,
+        client_servkey: str,
+        client_host: str,
+        client_port: int,
+        action_name: Optional[str] = None,
+    ) -> tuple:
+        """POST the current action-server model to one subscriber's ``update_status``.
+
+        Ports ``Base.send_statuspackage``: the payload is byte-compatible with
+        what the orchestrator's ``update_status`` parses
+        (``{"actionservermodel": ActionServerModel.get_fastapi_json(...)}``).
+        """
+        from helao.framework.support.dispatcher import async_private_dispatcher
+
+        json_dict = {
+            "actionservermodel": self.actionservermodel.get_fastapi_json(
+                action_name=action_name,
+            ),
+        }
+        response, error_code = await async_private_dispatcher(
+            server_key=client_servkey,
+            host=client_host,
+            port=client_port,
+            private_action="update_status",
+            params_dict={"regular_task": "true" if action_name is None else "false"},
+            json_dict=json_dict,
+        )
+        return response, error_code
+
+    async def send_nbstatuspackage(
+        self,
+        client_servkey: str,
+        client_host: str,
+        client_port: int,
+        actionmodel: ActionModel,
+    ) -> tuple:
+        """POST a single non-blocking action transition to ``update_nonblocking``.
+
+        Ports ``Base.send_nbstatuspackage``.
+        """
+        from helao.framework.support.dispatcher import async_private_dispatcher
+
+        json_dict = {"actionmodel": actionmodel.as_dict()}
+        params_dict = {
+            "server_host": self.server_cfg.get("host"),
+            "server_port": self.server_cfg.get("port"),
+        }
+        LOGGER.info(f"sending non-blocking status: {json_dict}")
+        response, error_code = await async_private_dispatcher(
+            server_key=client_servkey,
+            host=client_host,
+            port=client_port,
+            private_action="update_nonblocking",
+            params_dict=params_dict,
+            json_dict=json_dict,
+        )
+        LOGGER.info(f"update_nonblocking request got response: {response}")
+        return response, error_code
+
+    # --- status-drain background task (ports Base.log_status_task) -----------
+
+    def _ensure_status_drain(self) -> None:
+        """Start the eventsink->client drain task if not already running.
+
+        Started lazily so ``__init__`` never assumes a running loop (Python 3.12
+        raises ``RuntimeError`` if there is none). Idempotent.
+        """
+        if self._status_drain_task is not None and not self._status_drain_task.done():
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            LOGGER.debug("no running loop; status drain not started yet")
+            return
+        sub = getattr(self.eventsink, "subscribe", None)
+        if not callable(sub):
+            LOGGER.warning("eventsink has no subscribe(); status drain disabled")
+            return
+        self._status_q = self.eventsink.subscribe()
+        self._status_drain_task = loop.create_task(self._status_drain_loop())
+
+    async def start(self) -> None:
+        """Async startup hook: ensure the status-drain task is running.
+
+        Called by the server startup hook once the event loop exists. Safe to
+        call when no status clients are attached yet.
+        """
+        self._ensure_status_drain()
+
+    async def _status_drain_loop(self, retry_limit: int = 5) -> None:
+        """Drain status emissions and push each to every registered client.
+
+        Ports ``Base.log_status_task``: each ``(channel, payload)`` pulled off the
+        eventsink status subscription is parsed back into an :class:`ActionModel`,
+        folded into ``actionservermodel`` (active bucket + ``last_action_uuid``),
+        sorted, then ``send_statuspackage`` POSTs it to each subscriber's
+        ``update_status``; finished/errored entries are cleared afterwards so the
+        next snapshot starts clean (matching the legacy ``clear_finished``).
+        """
+        from helao.framework.ports.eventsink import (
+            STATUS_CHANNEL,
+            NONBLOCKING_STATUS_CHANNEL,
+        )
+
+        LOGGER.info(f"{self.server_key} status drain task created.")
+        try:
+            while True:
+                channel, payload = await self._status_q.get()
+                if channel not in (STATUS_CHANNEL, NONBLOCKING_STATUS_CHANNEL):
+                    continue
+                try:
+                    status_msg = ActionModel(**dict(payload))
+                except Exception:
+                    LOGGER.error("could not parse status payload", exc_info=True)
+                    continue
+                if channel == NONBLOCKING_STATUS_CHANNEL:
+                    await self._push_nonblocking_status(
+                        status_msg, retry_limit=retry_limit
+                    )
+                else:
+                    await self._fold_and_push_status(
+                        status_msg, retry_limit=retry_limit
+                    )
+        except asyncio.CancelledError:
+            LOGGER.info(f"{self.server_key} status drain task cancelled.")
+            raise
+
+    async def _fold_and_push_status(
+        self, status_msg: ActionModel, retry_limit: int = 5
+    ) -> None:
+        """Fold one action status into the model and push to every client."""
+        name = status_msg.action_name
+        if name not in self.actionservermodel.endpoints:
+            self.actionservermodel.endpoints[name] = EndpointModel(endpoint_name=name)
+        self.actionservermodel.endpoints[name].active_dict.update(
+            {status_msg.action_uuid: status_msg}
+        )
+        self.actionservermodel.last_action_uuid = status_msg.action_uuid
+        self.actionservermodel.endpoints[name].sort_status()
+
+        for combo_key in self.status_clients.copy():
+            client_servkey, client_host, client_port = combo_key
+            success = False
+            for _ in range(retry_limit):
+                response, error_code = await self.send_statuspackage(
+                    client_servkey=client_servkey,
+                    client_host=client_host,
+                    client_port=client_port,
+                    action_name=name,
+                )
+                if response and error_code == ErrorCodes.none:
+                    success = True
+                    break
+            if success:
+                LOGGER.info(f"Pushed status message to {client_servkey}.")
+            else:
+                LOGGER.error(
+                    f"Failed to push status to {client_servkey} after "
+                    f"{retry_limit} attempts."
+                )
+        # clear finished/errored after pushing so the next snapshot starts clean
+        self.actionservermodel.endpoints[name].clear_finished()
+
+    async def _push_nonblocking_status(
+        self, status_msg: ActionModel, retry_limit: int = 5
+    ) -> None:
+        """Push one non-blocking action transition to every client's ``update_nonblocking``.
+
+        Ports the legacy ``Active.send_nonblocking_status`` (single-action POST to
+        ``update_nonblocking``); non-blocking actions are never folded into the
+        ``actionservermodel`` snapshot.
+        """
+        for combo_key in self.status_clients.copy():
+            client_servkey, client_host, client_port = combo_key
+            success = False
+            for _ in range(retry_limit):
+                response, error_code = await self.send_nbstatuspackage(
+                    client_servkey=client_servkey,
+                    client_host=client_host,
+                    client_port=client_port,
+                    actionmodel=status_msg,
+                )
+                if (
+                    isinstance(response, dict)
+                    and response.get("success", False)
+                    and error_code == ErrorCodes.none
+                ):
+                    success = True
+                    break
+            if not success:
+                LOGGER.error(
+                    f"Failed to push nonblocking status to {client_servkey} "
+                    f"after {retry_limit} attempts."
+                )
 
     # --- clock bridge --------------------------------------------------------
 

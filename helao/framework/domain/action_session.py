@@ -37,7 +37,7 @@ from helao.framework.models.sample import (
     SampleStatus,
 )
 from helao.framework.ports.clock import Clock
-from helao.framework.ports.eventsink import EventSink
+from helao.framework.ports.eventsink import EventSink, NONBLOCKING_STATUS_CHANNEL
 from helao.framework.ports.storage import Storage
 from helao.framework.ports.transport import Message, Transport
 from helao.framework.domain.run_models import RunAction
@@ -172,15 +172,25 @@ class ActionSession:
     # --- status / data -------------------------------------------------------
 
     async def add_status(self, action: Optional[RunAction] = None) -> None:
-        """Broadcast ``action``'s current status (skipped for nonblocking actions)."""
+        """Broadcast ``action``'s current status through the event sink.
+
+        Blocking actions are published on the canonical status channel (the
+        hosting base forwards them to the orchestrator's ``update_status``).
+        Non-blocking actions are published on the dedicated non-blocking channel
+        instead (forwarded to ``update_nonblocking``), mirroring the legacy
+        split between ``status_q`` and ``send_nonblocking_status``. Either way
+        the emission goes through the :class:`EventSink` port, keeping the domain
+        free of any app/transport coupling.
+        """
         if action is None:
             action = self.action
-        if action.nonblocking:
-            return
         LOGGER.info(
             f"Adding {action.action_uuid} to {action.action_name} status list."
         )
-        await self.eventsink.emit_status(action.as_dict())
+        if action.nonblocking:
+            await self.eventsink.emit(NONBLOCKING_STATUS_CHANNEL, action.as_dict())
+        else:
+            await self.eventsink.emit_status(action.as_dict())
 
     def _build_data_package(
         self, datamodel: DataModel, action: Optional[RunAction] = None

@@ -270,11 +270,32 @@ class BaseAPI(FastAPI):
                     driver_status = getattr(resp, "status", "ok")
                 except Exception:
                     driver_status = "error"
-            return {"_driver_status": driver_status, "endpoints": {}}
+            return {
+                "_driver_status": driver_status,
+                "endpoints": self.base.actionservermodel.get_fastapi_json().get(
+                    "endpoints", {}
+                ),
+            }
 
         @self.post("/attach_client", tags=["private"])
         async def attach_client(
             client_servkey: str, client_host: str, client_port: int
         ):
-            # TODO SP8: implement real status-subscriber wiring
-            return True
+            return await self.base.attach_client(
+                client_servkey, client_host, client_port
+            )
+
+        @self.post("/detach_client", tags=["private"])
+        async def detach_client(
+            client_servkey: str, client_host: str, client_port: int
+        ):
+            return self.base.detach_client(client_servkey, client_host, client_port)
+
+        # build the endpoint status model + start the status-drain task once the
+        # loop exists and all action routes are registered (ports Base.myinit +
+        # init_endpoint_status). Registered as a startup hook so decorators on the
+        # deployment module have run by the time it fires.
+        @self.on_event("startup")
+        async def _sp8_status_startup():
+            self.base.init_endpoint_status(self)
+            await self.base.start()
