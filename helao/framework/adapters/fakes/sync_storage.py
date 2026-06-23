@@ -21,8 +21,7 @@ class FakeSyncStorage:
     # ── SyncStorage protocol ──────────────────────────────────────────────
 
     def list_ymls(self, root: Path) -> list[Path]:
-        root_str = str(root)
-        return sorted(p for p in self._ymls if str(p).startswith(root_str))
+        return sorted(p for p in self._ymls if p.is_relative_to(root))
 
     def list_files(self, dir_path: Path, pattern: str = "*") -> list[Path]:
         return []
