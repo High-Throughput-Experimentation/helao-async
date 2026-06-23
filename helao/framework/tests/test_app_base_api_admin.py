@@ -37,7 +37,7 @@ async def test_get_status_reflects_actionservermodel(tmp_path):
     app = _make_app(tmp_path)
     async with asgi_lifespan(app):
         async with await _client(app) as client:
-            resp = await client.post("/SIM/get_status")
+            resp = await client.post("/get_status")
     assert resp.status_code == 200, resp.text
     body = resp.json()
     # the action-server model dump names this server
@@ -55,7 +55,7 @@ async def test_get_config_returns_server_cfg(tmp_path):
     app.base.server_cfg["params"] = {"foo": 1}
     async with asgi_lifespan(app):
         async with await _client(app) as client:
-            resp = await client.post("/SIM/get_config")
+            resp = await client.post("/get_config")
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["params"]["foo"] == 1
@@ -74,7 +74,7 @@ async def test_endpoints_returns_fast_urls(tmp_path):
 
     async with asgi_lifespan(app):
         async with await _client(app) as client:
-            resp = await client.post("/SIM/endpoints")
+            resp = await client.post("/endpoints")
     assert resp.status_code == 200, resp.text
     paths = [u["path"] for u in resp.json()]
     assert "/SIM/do" in paths
@@ -95,7 +95,7 @@ async def test_get_lbuf_after_put_and_drain(tmp_path):
                 break
             await asyncio.sleep(0.01)
         async with await _client(app) as client:
-            resp = await client.post("/SIM/get_lbuf", json={"live_key": "chan"})
+            resp = await client.post("/get_lbuf", json={"live_key": "chan"})
     assert resp.status_code == 200, resp.text
     val = resp.json()
     # value is the (value, timestamp) tuple -> list over JSON
@@ -108,7 +108,7 @@ async def test_get_lbuf_missing_key_returns_null(tmp_path):
     async with asgi_lifespan(app):
         async with await _client(app) as client:
             resp = await client.post(
-                "/SIM/get_lbuf", json={"live_key": "nope"}
+                "/get_lbuf", json={"live_key": "nope"}
             )
     assert resp.status_code == 200, resp.text
     assert resp.json() is None
@@ -131,7 +131,7 @@ async def test_list_executors_returns_ids(tmp_path):
     app.base.executors["exec-1"] = _FakeExecutor()
     async with asgi_lifespan(app):
         async with await _client(app) as client:
-            resp = await client.post("/SIM/list_executors")
+            resp = await client.post("/list_executors")
     assert resp.status_code == 200, resp.text
     assert "exec-1" in resp.json()
 
@@ -144,7 +144,7 @@ async def test_stop_executor_calls_stop_and_reports_ok(tmp_path):
     async with asgi_lifespan(app):
         async with await _client(app) as client:
             resp = await client.post(
-                "/SIM/stop_executor", json={"executor_id": "exec-1"}
+                "/stop_executor", json={"executor_id": "exec-1"}
             )
     assert resp.status_code == 200, resp.text
     assert resp.json()["stopped"] is True
@@ -157,7 +157,7 @@ async def test_stop_executor_missing_reports_missing(tmp_path):
     async with asgi_lifespan(app):
         async with await _client(app) as client:
             resp = await client.post(
-                "/SIM/stop_executor", json={"executor_id": "nope"}
+                "/stop_executor", json={"executor_id": "nope"}
             )
     assert resp.status_code == 200, resp.text
     assert resp.json()["stopped"] is False
@@ -181,7 +181,7 @@ async def test_resend_active_returns_active_dict(tmp_path):
     async with asgi_lifespan(app):
         async with await _client(app) as client:
             resp = await client.post(
-                "/SIM/resend_active",
+                "/resend_active",
                 json={"action_uuid": str(action.action_uuid)},
             )
     assert resp.status_code == 200, resp.text
@@ -194,7 +194,7 @@ async def test_resend_active_missing_returns_null(tmp_path):
     async with asgi_lifespan(app):
         async with await _client(app) as client:
             resp = await client.post(
-                "/SIM/resend_active",
+                "/resend_active",
                 json={"action_uuid": str(_uuid.uuid4())},
             )
     assert resp.status_code == 200, resp.text
@@ -209,7 +209,7 @@ async def test_shutdown_returns_ok(tmp_path):
     app = _make_app(tmp_path)
     async with asgi_lifespan(app):
         async with await _client(app) as client:
-            resp = await client.post("/SIM/shutdown")
+            resp = await client.post("/shutdown")
     assert resp.status_code == 200, resp.text
     assert resp.json()["ok"] is True
 
@@ -266,5 +266,5 @@ async def test_head_on_admin_route_returns_200(tmp_path):
     app = _make_app(tmp_path)
     async with asgi_lifespan(app):
         async with await _client(app) as client:
-            resp = await client.head("/SIM/get_status")
+            resp = await client.head("/get_status")
     assert resp.status_code == 200, resp.text

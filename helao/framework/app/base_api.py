@@ -1192,7 +1192,7 @@ def _make_base_api_class():
             action server's status pushes.
             """
 
-            @self.post(f"/{server_key}/attach_client", tags=["private"])
+            @self.post("/attach_client", tags=["private"])
             async def attach_client(
                 client_servkey: str, client_host: str, client_port: int
             ):
@@ -1200,7 +1200,7 @@ def _make_base_api_class():
                     client_servkey, client_host, client_port
                 )
 
-            @self.post(f"/{server_key}/detach_client", tags=["private"])
+            @self.post("/detach_client", tags=["private"])
             async def detach_client(
                 client_servkey: str, client_host: str, client_port: int
             ):
@@ -1265,15 +1265,15 @@ def _make_base_api_class():
                 STATUS_CHANNEL,
             )
 
-            @self.websocket(f"/{server_key}/ws_status")
+            @self.websocket("/ws_status")
             async def ws_status(websocket: WebSocket):
                 await self._ws_relay(websocket, STATUS_CHANNEL)
 
-            @self.websocket(f"/{server_key}/ws_data")
+            @self.websocket("/ws_data")
             async def ws_data(websocket: WebSocket):
                 await self._ws_relay(websocket, DATA_CHANNEL)
 
-            @self.websocket(f"/{server_key}/ws_live")
+            @self.websocket("/ws_live")
             async def ws_live(websocket: WebSocket):
                 await self._ws_relay(websocket, DATA_CHANNEL)
 
@@ -1287,7 +1287,7 @@ def _make_base_api_class():
             """
             from fastapi import Body
 
-            @self.post(f"/{server_key}/get_status", tags=["private"])
+            @self.post("/get_status", tags=["private"])
             def get_status():
                 """Return the action-server model dump + driver status."""
                 status_dict = base.actionservermodel.as_dict()
@@ -1303,17 +1303,17 @@ def _make_base_api_class():
                 status_dict["_driver_status"] = driver_status
                 return status_dict
 
-            @self.post(f"/{server_key}/get_config", tags=["private"])
+            @self.post("/get_config", tags=["private"])
             def get_config():
                 """Return this server's config block (no world secrets)."""
                 return base.server_cfg
 
-            @self.post(f"/{server_key}/endpoints", tags=["private"])
+            @self.post("/endpoints", tags=["private"])
             def get_all_urls():
                 """Return the registered route descriptors (``fast_urls``)."""
                 return base.fast_urls
 
-            @self.post(f"/{server_key}/get_lbuf", tags=["private"])
+            @self.post("/get_lbuf", tags=["private"])
             def get_lbuf(live_key: str = Body(..., embed=True)):
                 """Return the ``(value, timestamp)`` for ``live_key`` or ``None``."""
                 try:
@@ -1321,12 +1321,12 @@ def _make_base_api_class():
                 except KeyError:
                     return None
 
-            @self.post(f"/{server_key}/list_executors", tags=["private"])
+            @self.post("/list_executors", tags=["private"])
             def list_executors():
                 """Return the ids of all registered executors."""
                 return list(base.executors.keys())
 
-            @self.post(f"/{server_key}/stop_executor", tags=["private"])
+            @self.post("/stop_executor", tags=["private"])
             def stop_executor(executor_id: str = Body(..., embed=True)):
                 """Stop the named executor; report ``{stopped: bool}``."""
                 executor = base.executors.get(executor_id)
@@ -1337,7 +1337,7 @@ def _make_base_api_class():
                     stop_fn()
                 return {"stopped": True, "executor_id": executor_id}
 
-            @self.post(f"/{server_key}/resend_active", tags=["private"])
+            @self.post("/resend_active", tags=["private"])
             def resend_active(action_uuid: str = Body(..., embed=True)):
                 """Return the active action dict for ``action_uuid`` or ``None``."""
                 try:
@@ -1346,7 +1346,7 @@ def _make_base_api_class():
                     return None
                 return base.get_active_info(uuid)
 
-            @self.post(f"/{server_key}/shutdown", tags=["private"])
+            @self.post("/shutdown", tags=["private"])
             async def post_shutdown():
                 """Trigger base + driver shutdown; report ``{ok: True}``."""
                 await self._shutdown_drivers()

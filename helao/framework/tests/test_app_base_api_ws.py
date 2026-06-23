@@ -24,7 +24,7 @@ def _make_app(tmp_path):
 def test_ws_status_forwards_status_emission(tmp_path):
     app = _make_app(tmp_path)
     with TestClient(app) as client:
-        with client.websocket_connect("/SIM/ws_status") as ws:
+        with client.websocket_connect("/ws_status") as ws:
             # emit a status from the app's own loop via the portal
             client.portal.call(
                 app.base.eventsink.emit, STATUS_CHANNEL, {"hello": "status"}
@@ -36,7 +36,7 @@ def test_ws_status_forwards_status_emission(tmp_path):
 def test_ws_status_ignores_non_status_channel(tmp_path):
     app = _make_app(tmp_path)
     with TestClient(app) as client:
-        with client.websocket_connect("/SIM/ws_status") as ws:
+        with client.websocket_connect("/ws_status") as ws:
             # a DATA emission must NOT come through the status socket; a STATUS
             # emission after it is what we should receive.
             client.portal.call(
@@ -52,7 +52,7 @@ def test_ws_status_ignores_non_status_channel(tmp_path):
 def test_ws_data_forwards_data_emission(tmp_path):
     app = _make_app(tmp_path)
     with TestClient(app) as client:
-        with client.websocket_connect("/SIM/ws_data") as ws:
+        with client.websocket_connect("/ws_data") as ws:
             client.portal.call(
                 app.base.eventsink.emit, DATA_CHANNEL, {"v": 1}
             )
@@ -63,7 +63,7 @@ def test_ws_data_forwards_data_emission(tmp_path):
 def test_ws_live_forwards_data_emission(tmp_path):
     app = _make_app(tmp_path)
     with TestClient(app) as client:
-        with client.websocket_connect("/SIM/ws_live") as ws:
+        with client.websocket_connect("/ws_live") as ws:
             client.portal.call(
                 app.base.eventsink.emit, DATA_CHANNEL, {"live": 9}
             )
