@@ -23,12 +23,16 @@ __all__ = ["BaseAPI", "ActionAPIRoute", "wrap_action_endpoint"]
 import asyncio
 import functools
 import inspect
+import json
 import tempfile
 from copy import copy
 from typing import Callable, Dict, List, Optional, Type
 
-from fastapi import Body, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from helao.framework.app.base_api import FrameworkBase, ActionContext, ACTION_CTX
 from helao.framework.adapters.fs_storage import FsStorage
@@ -37,7 +41,10 @@ from helao.framework.adapters.queue_eventsink import QueueEventSink
 from helao.framework.adapters.fakes.transport import FakeTransport
 from helao.framework.domain.run_models import RunAction
 from helao.framework.models.action import ActionModel
+from helao.framework.models.action_start_condition import ActionStartCondition
+from helao.framework.models.errors import ErrorCodes
 from helao.framework.models.hlostatus import HloStatus
+from helao.framework.models.machine import MachineModel
 from helao.framework.ports.driver import HelaoDriver
 from helao.framework.ports.eventsink import (
     DATA_CHANNEL,
@@ -170,6 +177,210 @@ async def _ws_live_relay(base: FrameworkBase, websocket: WebSocket) -> None:
         LOGGER.info("live_buffer websocket client disconnected")
     except Exception as exc:
         LOGGER.info(f"live_buffer websocket relay ended: {exc!r}")
+
+
+# --- concurrency middleware + estop exception handler (ports base_api WS-E) ---
+
+
+def _make_app_entry_middleware(server_key: str, base: FrameworkBase) -> Callable:
+    """Build the per-request ``app_entry`` middleware for the action server.
+
+    Ports ``helao.core.servers.base_api._make_app_entry_middleware`` adapted to
+    the framework ``FrameworkBase`` (which has no ``status_q`` /
+    ``local_action_queue`` / ``endpoint_queues``). Behavior:
+
+    * ``HEAD`` requests (endpoint-availability ``session.head()`` checks) return a
+      bare ``200`` ``Response`` without touching the action machinery.
+    * ``POST`` to ``/{server_key}/<endpoint>`` (a routed action) reads and parses
+      the body. If the target endpoint has **no** active action, or the action's
+      ``start_condition`` is ``no_wait``, or ``action_params["queued_launch"]`` is
+      set, the request passes straight through to ``call_next`` and runs.
+    * Otherwise (endpoint busy) the legacy queue-and-later-dispatch is **not**
+      reproducible here — the framework has no background loop to drain a pending
+      queue. To preserve the legacy HTTP contract (legacy also returned the action
+      dict immediately at the boundary and dispatched it later from its own loop)
+      we take the **queued-return** path: stamp a fresh ``action_uuid``, mark the
+      action queued, emit its status through the eventsink (so a registered orch
+      learns of it), and return the action dict **without executing**. Concurrent
+      execution is only suppressed when ``allow_concurrent_actions`` is false in
+      ``server_params`` (matching the legacy gate); when concurrency is allowed
+      the request passes through.
+
+    Args:
+        server_key: Server key used to recognize routed action endpoints.
+        base: The live :class:`FrameworkBase` for this server.
+
+    Returns:
+        The middleware coroutine to register via ``@app.middleware("http")``.
+    """
+
+    async def app_entry(request: Request, call_next):
+        """Queue colliding action POSTs (return-only) and pass others through."""
+        path = request.url.path.strip("/")
+        endpoint = path.split("/")[-1]
+        if request.method == "HEAD":  # endpoint checker, session.head()
+            LOGGER.debug("got HEAD request in middleware")
+            return Response()
+        if not (path.startswith(f"{server_key}/") and request.method == "POST"):
+            return await call_next(request)
+
+        LOGGER.debug("got action POST request in middleware")
+        # Reading the body here caches it on the Request (``_body``); Starlette's
+        # BaseHTTPMiddleware replays the cached body to the downstream endpoint,
+        # so the routed handler can still parse it. Verified by the body-reread
+        # tests in test_sp8_concurrency.py.
+        try:
+            body_bytes = await request.body()
+            body_dict = json.loads(body_bytes) if body_bytes else {}
+        except (ValueError, json.JSONDecodeError):
+            # not JSON / empty — let the endpoint deal with it (and 4xx if needed)
+            return await call_next(request)
+        if not isinstance(body_dict, dict):
+            return await call_next(request)
+
+        action_dict = body_dict.get("action", {}) or {}
+        start_cond = action_dict.get(
+            "start_condition", ActionStartCondition.wait_for_all
+        )
+        action_params = action_dict.get("action_params", {}) or {}
+
+        endpoint_model = base.actionservermodel.endpoints.get(endpoint)
+        endpoint_busy = bool(endpoint_model and endpoint_model.active_dict)
+
+        if (
+            not endpoint_busy
+            or start_cond == ActionStartCondition.no_wait
+            or action_params.get("queued_launch", False)
+        ):
+            LOGGER.debug("action endpoint is available")
+            return await call_next(request)
+
+        if base.server_params.get("allow_concurrent_actions", True):
+            # concurrency permitted: collision is allowed to run.
+            LOGGER.debug(
+                "action endpoint busy but concurrency allowed; passing through"
+            )
+            return await call_next(request)
+
+        # endpoint busy + concurrency disabled: queued-return (no execution).
+        LOGGER.info(
+            f"action endpoint '{endpoint}' busy and concurrency disabled; "
+            "returning action as queued without executing"
+        )
+        return _queued_return(server_key, base, endpoint, action_dict)
+
+    return app_entry
+
+
+def _queued_return(
+    server_key: str,
+    base: FrameworkBase,
+    endpoint: str,
+    action_dict: dict,
+) -> JSONResponse:
+    """Build a queued :class:`RunAction`, emit its status, and return its dict.
+
+    Adapts the legacy ``status_q.put`` + ``JSONResponse(action.as_dict())`` tail of
+    ``_make_app_entry_middleware``. The action is stamped with a fresh
+    ``action_uuid``, marked ``queued_on_actserv``, named after ``endpoint``, and
+    its status is emitted through the base eventsink (the status-drain loop folds
+    it into ``actionservermodel`` and pushes it to registered clients). The action
+    is **not** containerized or executed.
+    """
+    params = dict(action_dict.get("action_params", {}) or {})
+    params["queued_on_actserv"] = True
+    action_dict = dict(action_dict)
+    action_dict["action_params"] = params
+    try:
+        action = RunAction(**action_dict)
+    except Exception:
+        LOGGER.error("could not build queued action from request", exc_info=True)
+        action = RunAction()
+        action.action_params = params
+    if not action.action_name:
+        action.action_name = endpoint
+    try:
+        action.init_act(force=True)
+    except Exception:
+        LOGGER.error("could not stamp queued action; using bare uuid", exc_info=True)
+        import uuid as _uuid
+
+        action.action_uuid = _uuid.uuid4()
+    action.action_server = MachineModel(
+        server_name=server_key,
+        machine_name=base.server.machine_name,
+        hostname=base.server.hostname,
+        port=base.server.port,
+    )
+    action.action_status = [HloStatus.active]
+    payload = action.as_dict()
+    # emit through the eventsink so the status-drain loop sees the queued action;
+    # schedule on the running loop (middleware runs inside it).
+    try:
+        asyncio.create_task(base.eventsink.emit_status(payload))
+    except RuntimeError:
+        LOGGER.debug("no running loop to emit queued status")
+    return JSONResponse(payload)
+
+
+def _make_http_exception_handler(server_key: str, base: FrameworkBase) -> Callable:
+    """Build the estop-on-unhandled-error HTTP exception handler.
+
+    Ports ``helao.core.servers.base_api._make_http_exception_handler`` to the
+    framework objects. When a routed action endpoint
+    (``/{server_key}/<endpoint>``) raises, every in-flight
+    :class:`ActionSession` in ``base.actives`` is e-stopped (``estopped`` status +
+    ``estop`` error code) and every running executor in ``base.executors`` is
+    stopped (``stop_action_task``), then the default handler returns the error
+    response (500 for a generic exception).
+
+    Args:
+        server_key: Server key used to recognize routed action endpoints.
+        base: The live :class:`FrameworkBase` for this server.
+
+    Returns:
+        The exception handler coroutine to register with the FastAPI app.
+    """
+
+    async def custom_http_exception_handler(request: Request, exc: Exception):
+        """E-stop active work for routed action errors, then delegate."""
+        if request.url.path.strip("/").startswith(f"{server_key}/"):
+            LOGGER.error(f"Could not process request: {exc!r}")
+            for _, active in list(base.actives.items()):
+                _estop_session(active)
+            for executor_id in list(base.executors):
+                session = base.executors.get(executor_id)
+                if session is not None:
+                    session.stop_action_task()
+        if isinstance(exc, StarletteHTTPException):
+            return await http_exception_handler(request, exc)
+        # generic unhandled exception -> 500 with the error string.
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal Server Error", "error": repr(exc)},
+        )
+
+    return custom_http_exception_handler
+
+
+def _estop_session(session: "ActionSession") -> None:  # noqa: F821
+    """Mark ``session``'s action e-stopped and halt its poll loop.
+
+    The framework :class:`ActionSession` has no ``set_estop`` (legacy
+    ``Active.set_estop``); this performs the equivalent: appends
+    ``HloStatus.estopped`` to the action status, sets the ``estop`` error code,
+    and signals the poll loop to stop.
+    """
+    try:
+        action = session.action
+        if HloStatus.estopped not in action.action_status:
+            action.action_status.append(HloStatus.estopped)
+        action.error_code = ErrorCodes.estop
+        stop = getattr(session, "stop_action_task", None)
+        if callable(stop):
+            stop()
+    except Exception:
+        LOGGER.error("failed to e-stop active session", exc_info=True)
 
 
 # --- action-endpoint request wrapping (ports helao.core.servers.base_api) -----
@@ -404,6 +615,21 @@ class BaseAPI(FastAPI):
                 self.poller = None
                 self.drivers = {}
                 self._drivers_deferred = True
+
+        # --- concurrency middleware + estop exception handler (WS-E) ----------
+        # app_entry queues colliding action POSTs (queued-return) and no-ops HEAD;
+        # the exception handler e-stops actives/executors on an unhandled error in
+        # a routed action endpoint. Registered before any routes are added.
+        self.middleware("http")(
+            _make_app_entry_middleware(self.server_key, self.base)
+        )
+        self.add_exception_handler(
+            Exception, _make_http_exception_handler(self.server_key, self.base)
+        )
+        self.add_exception_handler(
+            StarletteHTTPException,
+            _make_http_exception_handler(self.server_key, self.base),
+        )
 
         @self.post("/get_status", tags=["private"])
         def get_status():
