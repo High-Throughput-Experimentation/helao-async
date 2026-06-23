@@ -12,6 +12,8 @@ class FakeSyncStorage:
         self.zipped: list[Path] = []
         self.uploaded_files: list[tuple[Path, str]] = []
         self.uploaded_bytes: list[tuple[bytes, str]] = []
+        self.removed_dirs: list[Path] = []
+        self.will_fail: bool = False
 
     # ── helpers for test setup ────────────────────────────────────────────
 
@@ -42,6 +44,8 @@ class FakeSyncStorage:
         self._prgs.pop(path, None)
 
     def move_tree(self, src: Path, dst: Path) -> Path:
+        if self.will_fail:
+            raise RuntimeError("Fake move_tree failure")
         for p in list(self._ymls):
             rel = None
             try:
@@ -59,6 +63,7 @@ class FakeSyncStorage:
         return path.with_suffix(".zip")
 
     def try_remove_empty(self, path: Path) -> bool:
+        self.removed_dirs.append(path)
         return True
 
     def upload_file(self, local_path: Path, s3_key: str) -> bool:

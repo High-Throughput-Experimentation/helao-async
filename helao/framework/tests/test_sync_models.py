@@ -130,3 +130,36 @@ def test_sync_job_priority_ordering():
 def test_constants_present():
     assert ABR_MAP["act"] == "action"
     assert PLURALS["sequence"] == "sequences"
+
+
+# ─── Edge cases ──────────────────────────────────────────────────────────────
+
+def test_helao_yml_status_unknown_when_no_runs_prefix():
+    """When path has no RUNS_* directory, status returns 'unknown'."""
+    p = Path("/some/other/path/seq1/20240101T120002_uuid-seq.yml")
+    assert HelaoYml(p).status == "unknown"
+
+
+def test_helao_yml_relative_path_returns_full_path_when_no_runs_prefix():
+    """When path has no RUNS_* directory, relative_path returns full path."""
+    p = Path("/some/other/path/seq1/20240101T120002_uuid-seq.yml")
+    rel = HelaoYml(p).relative_path
+    assert rel == str(p)
+
+
+def test_helao_yml_active_path_unchanged_when_no_runs_prefix():
+    """When path has no RUNS_* directory, active_path returns the same path."""
+    p = Path("/some/other/path/seq1/20240101T120002_uuid-seq.yml")
+    assert HelaoYml(p).active_path == p
+
+
+def test_helao_yml_finished_path_unchanged_when_no_runs_prefix():
+    """When path has no RUNS_* directory, finished_path returns the same path."""
+    p = Path("/some/other/path/seq1/20240101T120002_uuid-seq.yml")
+    assert HelaoYml(p).finished_path == p
+
+
+def test_helao_yml_synced_path_unchanged_when_no_runs_prefix():
+    """When path has no RUNS_* directory, synced_path returns the same path."""
+    p = Path("/some/other/path/seq1/20240101T120002_uuid-seq.yml")
+    assert HelaoYml(p).synced_path == p
