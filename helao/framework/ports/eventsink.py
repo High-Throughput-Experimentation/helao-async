@@ -4,6 +4,8 @@ from typing import Any, Mapping, Protocol, runtime_checkable
 #: Canonical channel names used by the action path.
 STATUS_CHANNEL = "status"
 DATA_CHANNEL = "data"
+#: Channel the orchestrator broadcasts its ``GlobalStatusModel`` snapshots on.
+GLOBAL_STATUS_CHANNEL = "global_status"
 
 
 @runtime_checkable

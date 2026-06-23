@@ -17,6 +17,7 @@ from typing import Any, List, Mapping, Tuple
 
 from helao.framework.ports.eventsink import (
     DATA_CHANNEL,
+    GLOBAL_STATUS_CHANNEL,
     STATUS_CHANNEL,
     EventSink,
 )
@@ -61,6 +62,15 @@ class QueueEventSink(EventSink):
     async def emit_data(self, payload: Mapping[str, Any]) -> None:
         """Publish ``payload`` on the canonical data channel."""
         await self.emit(DATA_CHANNEL, payload)
+
+    async def emit_global_status(self, payload: Mapping[str, Any]) -> None:
+        """Publish ``payload`` on the orchestrator global-status channel."""
+        await self.emit(GLOBAL_STATUS_CHANNEL, payload)
+
+    @property
+    def global_statuses(self) -> List[Mapping[str, Any]]:
+        """Payloads emitted on the global-status channel, in order."""
+        return [p for c, p in self.history if c == GLOBAL_STATUS_CHANNEL]
 
     @property
     def statuses(self) -> List[Mapping[str, Any]]:

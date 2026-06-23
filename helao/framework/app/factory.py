@@ -1,11 +1,15 @@
-"""``makeApp`` factory: assemble a minimal FastAPI action server.
+"""``makeApp`` factory: assemble a FastAPI action *or* orchestrator server.
 
 This is the framework port of the deployment ``makeApp(server_key)`` pattern.
-SP4 keeps it intentionally minimal (full orchestrator/driver assembly is SP5):
-it constructs a real FastAPI app whose single action endpoint builds a
-:class:`RunAction`, contains it through :class:`FrameworkBase`, drives a dummy
-:class:`Executor` end-to-end, and finishes it — proving the wiring writes an HLO
-file through the real ``FsStorage`` adapter.
+The ``group`` argument (or a config lookup) selects the server kind:
+
+* ``group="action"`` (default) — the SP4 minimal action app: a single action
+  endpoint that builds a :class:`RunAction`, contains it through
+  :class:`FrameworkBase`, drives a dummy :class:`Executor` end-to-end, and
+  finishes it through the real ``FsStorage`` adapter.
+* ``group="orchestrator"`` — the SP5 orchestrator app: assembles an
+  :class:`OrchDriver` (via :func:`orch_api.makeOrchApp`) wired to the injected
+  ports + experiment/sequence library maps, exposing the control endpoints.
 
 FastAPI is imported HERE (app layer) only.
 """
@@ -15,7 +19,7 @@ import os
 import tempfile
 import uuid as _uuid
 from datetime import datetime
-from typing import Optional
+from typing import Callable, Mapping, Optional
 
 from fastapi import Body, FastAPI
 
@@ -29,10 +33,85 @@ from helao.framework.adapters.queue_eventsink import QueueEventSink
 from helao.framework.adapters.fakes.transport import FakeTransport
 from helao.framework.app.base_api import ActionContext, FrameworkBase
 
-__all__ = ["makeApp"]
+__all__ = ["makeApp", "makeActionApp", "makeOrchestratorApp"]
 
 
-def makeApp(server_key: str, save_root: Optional[str] = None) -> FastAPI:
+def makeApp(
+    server_key: str,
+    save_root: Optional[str] = None,
+    *,
+    group: str = "action",
+    transport=None,
+    sequence_lib: Optional[Mapping[str, Callable]] = None,
+    experiment_lib: Optional[Mapping[str, Callable]] = None,
+    postprocessors=None,
+) -> FastAPI:
+    """Build the FastAPI app for ``server_key`` per ``group``.
+
+    Args:
+        server_key: Server identifier (route prefix; stamped on actions).
+        save_root: Output root for the ``FsStorage`` adapter; a fresh temp dir
+            is created when omitted.
+        group: ``"action"`` (default) or ``"orchestrator"`` — selects the app
+            kind. Unknown values fall back to the action app.
+        transport: Optional transport adapter; a :class:`FakeTransport` is used
+            when omitted (so tests/demos run with no network).
+        sequence_lib: Sequence name -> factory map (orchestrator only).
+        experiment_lib: Experiment name -> factory map (orchestrator only).
+        postprocessors: HLO post-processor names (passed to the ports).
+
+    Returns:
+        A configured :class:`fastapi.FastAPI` instance.
+    """
+    if group == "orchestrator":
+        return makeOrchestratorApp(
+            server_key,
+            save_root,
+            transport=transport,
+            sequence_lib=sequence_lib,
+            experiment_lib=experiment_lib,
+            postprocessors=postprocessors,
+        )
+    return makeActionApp(server_key, save_root)
+
+
+def makeOrchestratorApp(
+    server_key: str,
+    save_root: Optional[str] = None,
+    *,
+    transport=None,
+    sequence_lib: Optional[Mapping[str, Callable]] = None,
+    experiment_lib: Optional[Mapping[str, Callable]] = None,
+    postprocessors=None,
+) -> FastAPI:
+    """Assemble the orchestrator FastAPI app (an :class:`OrchDriver`).
+
+    Wires ``FsStorage`` + ``QueueEventSink`` + ``NtpClock`` + a transport (a
+    :class:`FakeTransport` when none is supplied) and the library maps into an
+    :class:`helao.framework.app.orch_api.OrchPorts` bundle, then delegates to
+    :func:`orch_api.makeOrchApp`.
+    """
+    from helao.framework.app.orch_api import OrchPorts, makeOrchApp
+
+    if save_root is None:
+        save_root = tempfile.mkdtemp(prefix="helao_framework_orch_")
+    os.makedirs(save_root, exist_ok=True)
+
+    ports = OrchPorts(
+        transport=transport if transport is not None else FakeTransport(),
+        storage=FsStorage(save_root=save_root),
+        eventsink=QueueEventSink(),
+        clock=NtpClock(),
+        sequence_lib=sequence_lib,
+        experiment_lib=experiment_lib,
+        postprocessors=postprocessors,
+    )
+    app = makeOrchApp(server_key, ports=ports)
+    app.state.save_root = save_root
+    return app
+
+
+def makeActionApp(server_key: str, save_root: Optional[str] = None) -> FastAPI:
     """Build a FastAPI app exposing one dummy-executor action endpoint.
 
     Args:
