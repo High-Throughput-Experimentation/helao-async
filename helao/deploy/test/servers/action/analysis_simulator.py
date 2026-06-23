@@ -11,9 +11,9 @@ __all__ = ["makeApp"]
 from fastapi import Body
 import pandas as pd
 
-from helao.core.servers.base import Base
-from helao.core.servers.base_api import BaseAPI
-from helao.helpers.premodels import Action
+from helao.framework.app.base_api import FrameworkBase as Base
+from helao.framework.app.server_api import BaseAPI
+from helao.framework.models.action import ActionModel as Action
 
 
 class AnalysisSim:
