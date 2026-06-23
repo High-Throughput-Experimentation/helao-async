@@ -270,6 +270,16 @@ class FrameworkBase:
         )
         self.actives[action.action_uuid] = session
         await session.myinit()
+        # Auto-open the default file connection so a poll/streaming executor's
+        # data lands in an .hlo without the endpoint calling open_file itself.
+        # Ports the legacy default file connection (`dflt_file_conn_key()` +
+        # FileConnParams) that `Base.setup_and_contain_action` registers; the
+        # framework opens it eagerly here since there is no background data
+        # logger to open it lazily on first write.
+        if action.save_data and action.file_conn_keys:
+            await session.open_file(
+                action.file_conn_keys[0], header=self._default_header
+            )
         self.history[action.action_uuid] = action.model_copy(deep=True)
         return session
 

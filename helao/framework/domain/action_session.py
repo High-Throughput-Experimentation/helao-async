@@ -334,6 +334,12 @@ class ActionSession:
         handle, which is tracked under ``file_conn_key`` so ``split`` /
         ``substitute`` / ``finish`` can close it later.
         """
+        # Close any handle already open for this key (e.g. a default connection
+        # auto-opened by the host's contain_action) so reopening with an explicit
+        # header doesn't leak the prior handle.
+        prior = self._open_handles.get(file_conn_key)
+        if prior is not None:
+            await self.storage.close_hlo(prior)
         handle = await self.storage.open_hlo(
             self._conn_relpath(file_conn_key, action), header
         )
