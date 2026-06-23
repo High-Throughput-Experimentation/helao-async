@@ -91,8 +91,16 @@ class MicroOrch:
         await self.driver.start()
         return self.driver.state
 
-    async def run_action(self, action: RunAction) -> OrchState:
-        """Stage a single ``action`` and drive it to completion in-process."""
+    async def run_action(self, action) -> OrchState:
+        """Stage a single ``action`` and drive it to completion in-process.
+
+        Accepts either :class:`RunAction` or :class:`ActionModel` (the latter
+        is coerced to ``RunAction`` for compat with deployment runner scripts).
+        """
+        from helao.framework.domain.run_models import RunAction
+        from helao.framework.models.action import ActionModel
+        if isinstance(action, ActionModel) and not isinstance(action, RunAction):
+            action = RunAction(**action.model_dump())
         self.driver.state.action_dq.append(action)
         await self.driver.start()
         return self.driver.state

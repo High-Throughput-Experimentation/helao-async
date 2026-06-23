@@ -86,3 +86,93 @@ def test_dispatcher_importable():
         close_all_sync_rpc_clients,
     )
     assert callable(async_private_dispatcher)
+
+
+def test_base_api_importable():
+    from helao.framework.app.server_api import BaseAPI
+    assert BaseAPI is not None
+
+
+def test_base_api_has_base_attribute(tmp_path):
+    from helao.framework.app.server_api import BaseAPI
+    from helao.framework.app.base_api import FrameworkBase
+    app = BaseAPI("SRV", save_root=str(tmp_path))
+    assert isinstance(app.base, FrameworkBase)
+
+
+def test_base_api_instantiates_driver(tmp_path):
+    from helao.framework.app.server_api import BaseAPI
+    from helao.framework.app.base_api import FrameworkBase
+
+    class FakeDriver:
+        def __init__(self, base: FrameworkBase):
+            self.base = base
+
+    app = BaseAPI("SRV", driver_classes=[FakeDriver], save_root=str(tmp_path))
+    assert isinstance(app.driver, FakeDriver)
+    assert app.driver.base is app.base
+
+
+def test_action_session_start_executor(tmp_path):
+    import asyncio
+    from helao.framework.app.base_api import FrameworkBase, ActionContext
+    from helao.framework.adapters.fs_storage import FsStorage
+    from helao.framework.adapters.ntp_clock import NtpClock
+    from helao.framework.adapters.queue_eventsink import QueueEventSink
+    from helao.framework.adapters.fakes.transport import FakeTransport
+    from helao.framework.domain.run_models import RunAction
+    from helao.framework.domain.executor import Executor
+    from helao.framework.models.hlostatus import HloStatus
+
+    base = FrameworkBase(
+        server_key="SRV",
+        storage=FsStorage(save_root=str(tmp_path)),
+        eventsink=QueueEventSink(),
+        clock=NtpClock(),
+        transport=FakeTransport(),
+    )
+
+    async def _drive():
+        action = RunAction(
+            action_name="test_act",
+            action_output_dir="26.25/0622/test",
+            save_act=True,
+        )
+        active = await base.setup_and_contain_action(ActionContext(action=action))
+
+        exec_done = []
+
+        class DoneExec(Executor):
+            async def _exec(self):
+                exec_done.append(True)
+                return {"data": {}, "error": None}
+
+        result_dict = active.start_executor(DoneExec(active=active))
+        assert isinstance(result_dict, dict)
+        assert "action_name" in result_dict
+        # give the background task time to run
+        await asyncio.sleep(0.2)
+        assert exec_done, "executor _exec was not called"
+
+    asyncio.run(_drive())
+
+
+def test_micro_orch_run_action_accepts_action_model():
+    import asyncio
+    from helao.framework.runners.micro_orch import MicroOrch
+    from helao.framework.models.action import ActionModel
+    from helao.framework.models.machine import MachineModel
+
+    action = ActionModel(
+        action_name="noop",
+        action_server=MachineModel(server_name="ORCH"),
+        action_params={},
+    )
+
+    async def _run():
+        micro = MicroOrch()
+        return await micro.run_action(action)
+
+    state = asyncio.run(_run())
+    # state is OrchState — just assert it doesn't raise
+    assert state is not None

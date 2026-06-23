@@ -564,6 +564,18 @@ class ActionSession:
 
         return await self.finish()
 
+    def start_executor(self, executor: "Executor") -> dict:
+        """Schedule the executor loop as a background task; return action dict.
+
+        Compat shim for deployment servers that call ``active.start_executor(executor)``
+        synchronously and return its result as the HTTP response while the action
+        runs in the background. Ports ``Base.start_executor`` from
+        ``helao.core.servers.base``.
+        """
+        self.executor = executor
+        asyncio.ensure_future(self.action_loop_task(executor))
+        return self.action.as_dict()
+
     async def _sleep(self, seconds: float) -> None:
         """Cooperative yield between poll iterations (no wall-clock dependency).
 
