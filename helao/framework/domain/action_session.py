@@ -241,6 +241,16 @@ class ActionSession:
         key = self.action.file_conn_keys[0] if self.action.file_conn_keys else None
         await self.enqueue_data({key: data} if key is not None else {})
 
+    async def enqueue_data_dflt(self, datadict: dict) -> None:
+        """Enqueue ``datadict`` against the action's default file-connection key.
+
+        Ports ``Active.enqueue_data_dflt``: deployment endpoints (e.g. the CP/GP
+        simulators) call this to emit a single data row without managing file
+        connections themselves. Keyed by the action's first file-conn key, or
+        emitted status-only when no connection is open.
+        """
+        await self._enqueue_phase_data(datadict)
+
     # --- aux file writes -----------------------------------------------------
 
     async def write_file(
